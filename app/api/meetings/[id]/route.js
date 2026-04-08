@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
-import { resolveMeetingEmployee } from '@/lib/meetingAI'
+import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import { sortMeetingTranscript } from '@/lib/meetingLanguage'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 // GET - Get single meeting
 export async function GET(request, { params }) {

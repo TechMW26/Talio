@@ -22,19 +22,11 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { apiMutate } from '@/hooks/useApiMutation'
 import MeetingNotetakerPanel from '@/app/dashboard/meetings/components/MeetingNotetakerPanel'
 import {
-  blobToAudioFloat32Array,
-  createMeetingSpeechRecognition,
   getMeetingTranscriptionMode,
   getMeetingTranscriptionUnavailableReason,
-  getMeetingTranscriber,
   getSupportedAudioMimeType,
-  isMeetingAudioUploadSupported,
-  isMeetingTranscriptionSupported,
-  normalizeWhisperTranscript,
-  resetMeetingTranscriber,
 } from '@/lib/meetingTranscriber'
 import {
-  detectMeetingLanguage,
   mergeTranscriptSegments,
   normalizeMeetingLanguage,
 } from '@/lib/meetingLanguage'
@@ -102,9 +94,6 @@ export default function MeetingRoomPage({ params }) {
   const [notetakerReady, setNotetakerReady] = useState(false)
   const [notetakerError, setNotetakerError] = useState(null)
   const [notetakerMode, setNotetakerMode] = useState('unsupported')
-  const [canUseCloudTranscription, setCanUseCloudTranscription] = useState(false)
-  const [canUseLocalTranscription, setCanUseLocalTranscription] = useState(false)
-  const [preferCloudTranscription, setPreferCloudTranscription] = useState(false)
   const [isTranscribingSegment, setIsTranscribingSegment] = useState(false)
   const [activeSpeakers, setActiveSpeakers] = useState([])
 
@@ -131,12 +120,7 @@ export default function MeetingRoomPage({ params }) {
   const meetingStartedRef = useRef(false)
   const isLeavingRef = useRef(false)
   const meetingSessionStartedAtRef = useRef(null)
-  const segmentRecorderRef = useRef(null)
-  const segmentChunksRef = useRef([])
-  const speechRecognitionRef = useRef(null)
-  const shouldRestartSpeechRecognitionRef = useRef(false)
-  const silenceTimeoutRef = useRef(null)
-  const isSpeakingRef = useRef(false)
+  const transcriptionRecorderRef = useRef(null)
   const lastTranscriptionPromiseRef = useRef(Promise.resolve())
   const speakerTimeoutsRef = useRef({})
 
@@ -164,13 +148,6 @@ export default function MeetingRoomPage({ params }) {
       delete speakerTimeoutsRef.current[speakerName]
       setActiveSpeakers(prev => prev.filter(name => name !== speakerName))
     }, 5000)
-  }, [])
-
-  const clearSilenceTimer = useCallback(() => {
-    if (silenceTimeoutRef.current) {
-      clearTimeout(silenceTimeoutRef.current)
-      silenceTimeoutRef.current = null
-    }
   }, [])
 
   const applyPersistedTranscriptSegments = useCallback((segments = []) => {
@@ -210,6 +187,31 @@ export default function MeetingRoomPage({ params }) {
     }
   }, [meeting?._id, refreshTranscript, applyPersistedTranscriptSegments])
 
+  const stopTranscriptionRecorder = useCallback(() => {
+    const recorderState = transcriptionRecorderRef.current
+
+    if (!recorderState) {
+      return Promise.resolve()
+    }
+
+    transcriptionRecorderRef.current = null
+
+    if (recorderState.mediaRecorder.state !== 'inactive') {
+      try {
+        recorderState.mediaRecorder.stop()
+      } catch {
+        recorderState.recordingTrack.stop()
+        recorderState.resolveStopPromise?.()
+      }
+
+      return recorderState.stopPromise
+    }
+
+    recorderState.recordingTrack.stop()
+    recorderState.resolveStopPromise?.()
+    return recorderState.stopPromise
+  }, [])
+
   const transcribeRecordedSegmentWithElevenLabs = useCallback(async ({ blob, startedAt, durationMs }) => {
     if (!meeting?._id || !blob) {
       return
@@ -234,34 +236,6 @@ export default function MeetingRoomPage({ params }) {
       await refreshTranscript()
     }
   }, [meeting?._id, transcriptLanguages, applyPersistedTranscriptSegments, refreshTranscript])
-
-  const getRecognitionLanguage = useCallback(() => {
-    if (typeof navigator === 'undefined') {
-      return 'en-IN'
-    }
-
-    return navigator.language || 'en-IN'
-  }, [])
-
-  const normalizeRecognitionLanguage = useCallback((language) => {
-    const primaryLanguage = String(language || '')
-      .split('-')[0]
-      .trim()
-      .toLowerCase()
-
-    return normalizeMeetingLanguage(primaryLanguage || 'en')
-  }, [])
-
-  useEffect(() => {
-    if (!isJoined) {
-      setPreferCloudTranscription(false)
-    }
-  }, [isJoined])
-
-  useEffect(() => {
-    setCanUseCloudTranscription(isMeetingAudioUploadSupported())
-    setCanUseLocalTranscription(isMeetingTranscriptionSupported())
-  }, [isJoined, hasLocalStream, preferCloudTranscription])
 
   useEffect(() => {
     if (!transcriptRes?.success) return
@@ -293,7 +267,7 @@ export default function MeetingRoomPage({ params }) {
   useEffect(() => {
     if (!isJoined) return undefined
 
-    const transcriptionMode = getMeetingTranscriptionMode({ preferCloud: preferCloudTranscription })
+    const transcriptionMode = getMeetingTranscriptionMode()
     setNotetakerMode(transcriptionMode)
 
     if (transcriptionMode === 'unsupported') {
@@ -303,178 +277,18 @@ export default function MeetingRoomPage({ params }) {
       return undefined
     }
 
-    if (transcriptionMode === 'speech-recognition' || transcriptionMode === 'elevenlabs') {
+    if (transcriptionMode === 'elevenlabs') {
       setNotetakerError(null)
       setNotetakerLoading(false)
       setNotetakerReady(true)
       return undefined
     }
 
-    let cancelled = false
-    setNotetakerError(null)
-    setNotetakerLoading(true)
-
-    getMeetingTranscriber()
-      .then(() => {
-        if (cancelled) return
-        setNotetakerReady(true)
-      })
-      .catch(error => {
-        console.error('Failed to load meeting transcriber:', error)
-        if (cancelled) return
-
-        if (isMeetingAudioUploadSupported()) {
-          resetMeetingTranscriber()
-          setPreferCloudTranscription(true)
-          setNotetakerReady(true)
-          setNotetakerError(null)
-          return
-        }
-
-        setNotetakerError('Mira could not load live transcription. Summary generation will still use saved meeting notes and transcript history.')
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setNotetakerLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [isJoined, preferCloudTranscription])
-
-  useEffect(() => {
-    if (!isJoined || isMuted || notetakerMode !== 'speech-recognition') {
-      shouldRestartSpeechRecognitionRef.current = false
-
-      if (speechRecognitionRef.current) {
-        const recognition = speechRecognitionRef.current
-        speechRecognitionRef.current = null
-        recognition.onresult = null
-        recognition.onerror = null
-        recognition.onend = null
-        try {
-          recognition.stop()
-        } catch {}
-      }
-
-      return undefined
-    }
-
-    let cancelled = false
-    let restartTimer = null
-    const recognition = createMeetingSpeechRecognition()
-
-    speechRecognitionRef.current = recognition
-    shouldRestartSpeechRecognitionRef.current = true
-    setNotetakerReady(true)
     setNotetakerLoading(false)
-    setNotetakerError(null)
-
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.maxAlternatives = 1
-    recognition.lang = getRecognitionLanguage()
-
-    recognition.onresult = (event) => {
-      const finalSegments = []
-
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const result = event.results[index]
-        if (!result?.isFinal) {
-          continue
-        }
-
-        const text = String(result[0]?.transcript || '').trim()
-        if (!text) {
-          continue
-        }
-
-        finalSegments.push({
-          segmentId: `${meeting?._id || 'meeting'}-${user?._id || 'user'}-${Date.now()}-${index}`,
-          text,
-          timestamp: new Date().toISOString(),
-          language: normalizeRecognitionLanguage(recognition.lang),
-          source: 'live-speech-recognition',
-          speakerName: userDisplayName,
-        })
-      }
-
-      if (finalSegments.length === 0) {
-        return
-      }
-
-      persistTranscriptSegments(finalSegments).catch(error => {
-        console.error('Failed to persist browser speech recognition segments:', error)
-        if (!cancelled) {
-          setNotetakerError('Mira could not save the latest live transcript segment.')
-        }
-      })
-    }
-
-    recognition.onerror = (event) => {
-      if (cancelled || event?.error === 'aborted' || event?.error === 'no-speech') {
-        return
-      }
-
-      console.error('Speech recognition error:', event)
-      setNotetakerError('Mira could not continue live transcription in this browser session.')
-    }
-
-    recognition.onend = () => {
-      if (!shouldRestartSpeechRecognitionRef.current || cancelled) {
-        return
-      }
-
-      restartTimer = window.setTimeout(() => {
-        try {
-          recognition.start()
-        } catch (error) {
-          console.error('Failed to restart speech recognition:', error)
-          setNotetakerError('Mira could not restart live transcription automatically.')
-        }
-      }, 300)
-    }
-
-    try {
-      recognition.start()
-    } catch (error) {
-      console.error('Failed to start speech recognition:', error)
-      setNotetakerReady(false)
-      setNotetakerError('Mira could not start live transcription in this browser.')
-    }
-
-    return () => {
-      cancelled = true
-      shouldRestartSpeechRecognitionRef.current = false
-
-      if (restartTimer) {
-        window.clearTimeout(restartTimer)
-      }
-
-      recognition.onresult = null
-      recognition.onerror = null
-      recognition.onend = null
-      try {
-        recognition.stop()
-      } catch {}
-
-      if (speechRecognitionRef.current === recognition) {
-        speechRecognitionRef.current = null
-      }
-    }
-  }, [
-    isJoined,
-    isMuted,
-    notetakerMode,
-    meeting?._id,
-    persistTranscriptSegments,
-    normalizeRecognitionLanguage,
-    getRecognitionLanguage,
-    user?._id,
-    userDisplayName,
-  ])
+    setNotetakerReady(false)
+    setNotetakerError(getMeetingTranscriptionUnavailableReason())
+    return undefined
+  }, [isJoined])
 
   const upsertParticipant = useCallback((participantLike) => {
     if (!participantLike?.id) return
@@ -609,48 +423,7 @@ export default function MeetingRoomPage({ params }) {
     const processingPromise = lastTranscriptionPromiseRef.current
       .catch(() => {})
       .then(async () => {
-        if (notetakerMode === 'elevenlabs') {
-          await transcribeRecordedSegmentWithElevenLabs({ blob, startedAt, durationMs })
-          return
-        }
-
-        try {
-          const audioArray = await blobToAudioFloat32Array(blob)
-          if (!audioArray?.length) {
-            return
-          }
-
-          const transcriber = await getMeetingTranscriber()
-          const result = await transcriber(audioArray, {
-            return_timestamps: true,
-            chunk_length_s: 18,
-            stride_length_s: 3,
-          })
-
-          const normalizedSegments = normalizeWhisperTranscript(result, {
-            fallbackStartedAt: startedAt,
-            segmentIdPrefix: `${meeting._id}-${user?._id || 'user'}-${startedAt}`,
-            fallbackLanguage: detectMeetingLanguage(result?.text || '', 'en'),
-          }).map(segment => ({
-            ...segment,
-            speakerName: userDisplayName,
-          }))
-
-          if (normalizedSegments.length === 0) {
-            return
-          }
-
-          await persistTranscriptSegments(normalizedSegments)
-        } catch (error) {
-          if (!canUseCloudTranscription) {
-            throw error
-          }
-
-          console.warn('Falling back to ElevenLabs meeting transcription:', error)
-          resetMeetingTranscriber()
-          setPreferCloudTranscription(true)
-          await transcribeRecordedSegmentWithElevenLabs({ blob, startedAt, durationMs })
-        }
+        await transcribeRecordedSegmentWithElevenLabs({ blob, startedAt, durationMs })
       })
       .catch(error => {
         console.error('Failed to transcribe meeting audio segment:', error)
@@ -662,15 +435,7 @@ export default function MeetingRoomPage({ params }) {
 
     lastTranscriptionPromiseRef.current = processingPromise
     return processingPromise
-  }, [
-    meeting?._id,
-    notetakerMode,
-    persistTranscriptSegments,
-    canUseCloudTranscription,
-    transcribeRecordedSegmentWithElevenLabs,
-    user?._id,
-    userDisplayName,
-  ])
+  }, [meeting?._id, transcribeRecordedSegmentWithElevenLabs])
 
   useEffect(() => {
     if (!isJoined || !hasLocalStream || !notetakerReady || isMuted || notetakerMode !== 'elevenlabs') {
@@ -708,6 +473,18 @@ export default function MeetingRoomPage({ params }) {
 
     let segmentStartedAt = Date.now()
     const segmentTimesliceMs = 10000
+    let resolveStopPromise = () => {}
+    const stopPromise = new Promise((resolve) => {
+      resolveStopPromise = resolve
+    })
+    const recorderState = {
+      mediaRecorder,
+      recordingTrack,
+      resolveStopPromise,
+      stopPromise,
+    }
+
+    transcriptionRecorderRef.current = recorderState
 
     mediaRecorder.ondataavailable = (event) => {
       const blob = event.data
@@ -722,17 +499,17 @@ export default function MeetingRoomPage({ params }) {
 
     mediaRecorder.onstop = () => {
       recordingTrack.stop()
+      resolveStopPromise()
+
+      if (transcriptionRecorderRef.current === recorderState) {
+        transcriptionRecorderRef.current = null
+      }
     }
 
     mediaRecorder.start(segmentTimesliceMs)
 
     return () => {
-      if (mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop()
-        return
-      }
-
-      recordingTrack.stop()
+      void stopTranscriptionRecorder().catch(() => {})
     }
   }, [
     isJoined,
@@ -740,104 +517,9 @@ export default function MeetingRoomPage({ params }) {
     notetakerReady,
     isMuted,
     notetakerMode,
+    stopTranscriptionRecorder,
     transcribeRecordedSegment,
   ])
-
-  const startSegmentCapture = useCallback(() => {
-    if (segmentRecorderRef.current || !meeting?._id || isMuted || !notetakerReady) {
-      return
-    }
-
-    const sourceTrack = localStreamRef.current
-      ?.getAudioTracks()
-      ?.find(track => track.readyState === 'live' && track.enabled)
-
-    if (!sourceTrack) {
-      return
-    }
-
-    const mimeType = getSupportedAudioMimeType()
-    if (mimeType === null) {
-      setNotetakerError('This browser does not support local audio capture for Mira live transcription.')
-      return
-    }
-
-    const recordingTrack = sourceTrack.clone()
-    const recordingStream = new MediaStream([recordingTrack])
-
-    let mediaRecorder
-    try {
-      mediaRecorder = mimeType
-        ? new MediaRecorder(recordingStream, { mimeType })
-        : new MediaRecorder(recordingStream)
-    } catch (error) {
-      console.error('Failed to start meeting segment recorder:', error)
-      recordingTrack.stop()
-      setNotetakerError('Could not start local audio capture for Mira live transcription.')
-      return
-    }
-
-    segmentChunksRef.current = []
-
-    let resolveStopPromise = null
-    const stopPromise = new Promise(resolve => {
-      resolveStopPromise = resolve
-    })
-
-    const startedAt = Date.now()
-    const recorderState = {
-      mediaRecorder,
-      recordingTrack,
-      startedAt,
-      mimeType: mimeType || 'audio/webm',
-      stopPromise,
-      resolveStopPromise,
-    }
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        segmentChunksRef.current.push(event.data)
-      }
-    }
-
-    mediaRecorder.onstop = () => {
-      const durationMs = Date.now() - startedAt
-      const blob = new Blob(segmentChunksRef.current, { type: recorderState.mimeType })
-      segmentChunksRef.current = []
-      recordingTrack.stop()
-      resolveStopPromise?.()
-
-      if (durationMs >= 1200 && blob.size > 2048) {
-        transcribeRecordedSegment({ blob, startedAt, durationMs })
-      }
-    }
-
-    segmentRecorderRef.current = recorderState
-    isSpeakingRef.current = true
-    markSpeakerActive(userDisplayName)
-    mediaRecorder.start(250)
-  }, [isMuted, meeting?._id, notetakerReady, transcribeRecordedSegment, userDisplayName, markSpeakerActive])
-
-  const stopSegmentCapture = useCallback(() => {
-    clearSilenceTimer()
-    isSpeakingRef.current = false
-
-    const recorderState = segmentRecorderRef.current
-    if (!recorderState) {
-      return Promise.resolve()
-    }
-
-    segmentRecorderRef.current = null
-
-    if (recorderState.mediaRecorder.state !== 'inactive') {
-      recorderState.mediaRecorder.stop()
-      return recorderState.stopPromise
-    }
-
-    recorderState.recordingTrack.stop()
-    recorderState.resolveStopPromise?.()
-    return recorderState.stopPromise
-  }, [clearSilenceTimer])
 
   // Initialize WebRTC and Socket connection
   const joinMeeting = useCallback(async () => {
@@ -971,7 +653,6 @@ export default function MeetingRoomPage({ params }) {
       return
     }
 
-    meetingStartedRef.current = true
     const actualStart = meeting.actualStart || new Date().toISOString()
 
     apiMutate(`/api/meetings/${meeting._id}`, {
@@ -982,6 +663,7 @@ export default function MeetingRoomPage({ params }) {
       },
     })
       .then(() => {
+        meetingStartedRef.current = true
         setMeeting(prev => prev ? {
           ...prev,
           status: 'in-progress',
@@ -989,121 +671,16 @@ export default function MeetingRoomPage({ params }) {
         } : prev)
       })
       .catch(error => {
+        meetingStartedRef.current = false
         console.error('Failed to mark meeting as started:', error)
       })
   }, [isJoined, meeting?._id, meeting?.actualStart, meeting?.isOrganizer])
 
   useEffect(() => {
-    if (!isJoined || !hasLocalStream || !notetakerReady || isMuted || notetakerMode !== 'whisper') {
-      return undefined
-    }
-
-    if (!isMeetingTranscriptionSupported()) {
-      setNotetakerReady(false)
-      setNotetakerError(getMeetingTranscriptionUnavailableReason())
-      return undefined
-    }
-
-    const audioTrack = localStreamRef.current
-      ?.getAudioTracks()
-      ?.find(track => track.readyState === 'live')
-
-    if (!audioTrack) {
-      return undefined
-    }
-
-    const AudioContextCtor = window.AudioContext || window.webkitAudioContext
-    if (!AudioContextCtor) {
-      setNotetakerError('Audio analysis is not available for Mira live transcription in this browser.')
-      return undefined
-    }
-
-    const sourceStream = new MediaStream([audioTrack])
-    const audioContext = new AudioContextCtor()
-
-    if (
-      typeof audioContext.createMediaStreamSource !== 'function'
-      || typeof audioContext.createAnalyser !== 'function'
-    ) {
-      setNotetakerReady(false)
-      setNotetakerError(getMeetingTranscriptionUnavailableReason())
-      if (typeof audioContext.close === 'function' && audioContext.state !== 'closed') {
-        audioContext.close().catch(() => {})
-      }
-      return undefined
-    }
-
-    const source = audioContext.createMediaStreamSource(sourceStream)
-    const analyser = audioContext.createAnalyser()
-    analyser.fftSize = 2048
-    analyser.smoothingTimeConstant = 0.85
-    source.connect(analyser)
-
-    const dataArray = new Uint8Array(analyser.fftSize)
-    let animationFrameId = null
-
-    audioContext.resume().catch(() => {})
-
-    const detectSpeech = () => {
-      analyser.getByteTimeDomainData(dataArray)
-
-      let sumSquares = 0
-      for (let index = 0; index < dataArray.length; index += 1) {
-        const normalized = (dataArray[index] - 128) / 128
-        sumSquares += normalized * normalized
-      }
-
-      const volume = Math.sqrt(sumSquares / dataArray.length)
-      const isVoiceDetected = volume > 0.045
-
-      if (isVoiceDetected) {
-        clearSilenceTimer()
-        markSpeakerActive(userDisplayName)
-
-        if (!segmentRecorderRef.current) {
-          startSegmentCapture()
-        }
-      } else if (segmentRecorderRef.current && !silenceTimeoutRef.current) {
-        silenceTimeoutRef.current = setTimeout(() => {
-          silenceTimeoutRef.current = null
-          stopSegmentCapture()
-        }, 1200)
-      }
-
-      animationFrameId = window.requestAnimationFrame(detectSpeech)
-    }
-
-    animationFrameId = window.requestAnimationFrame(detectSpeech)
-
-    return () => {
-      if (animationFrameId) {
-        window.cancelAnimationFrame(animationFrameId)
-      }
-      clearSilenceTimer()
-      source.disconnect()
-      analyser.disconnect()
-      if (audioContext.state !== 'closed') {
-        audioContext.close().catch(() => {})
-      }
-    }
-  }, [
-    isJoined,
-    hasLocalStream,
-    notetakerReady,
-    notetakerMode,
-    isMuted,
-    clearSilenceTimer,
-    markSpeakerActive,
-    startSegmentCapture,
-    stopSegmentCapture,
-    userDisplayName,
-  ])
-
-  useEffect(() => {
     if (!isJoined || isMuted) {
-      stopSegmentCapture().catch?.(() => {})
+      void stopTranscriptionRecorder().catch(() => {})
     }
-  }, [isJoined, isMuted, stopSegmentCapture])
+  }, [isJoined, isMuted, stopTranscriptionRecorder])
 
   // Create WebRTC peer connection
   const createPeerConnection = (peerId, peerName, shouldOffer = false) => {
@@ -1464,10 +1041,8 @@ export default function MeetingRoomPage({ params }) {
     if (isLeavingRef.current) return
     isLeavingRef.current = true
 
-    clearSilenceTimer()
-
     try {
-      await stopSegmentCapture()
+      await stopTranscriptionRecorder()
       await lastTranscriptionPromiseRef.current.catch(() => {})
 
       if (meeting?._id && meeting.isOrganizer) {
@@ -1549,7 +1124,7 @@ export default function MeetingRoomPage({ params }) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      clearSilenceTimer()
+      void stopTranscriptionRecorder().catch(() => {})
       Object.values(speakerTimeoutsRef.current).forEach(clearTimeout)
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop())
@@ -1557,16 +1132,13 @@ export default function MeetingRoomPage({ params }) {
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach(track => track.stop())
       }
-      if (segmentRecorderRef.current?.mediaRecorder?.state && segmentRecorderRef.current.mediaRecorder.state !== 'inactive') {
-        segmentRecorderRef.current.mediaRecorder.stop()
-      }
       Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
       remoteStreamsRef.current = {}
       if (socketRef.current) {
         socketRef.current.disconnect()
       }
     }
-  }, [clearSilenceTimer])
+  }, [stopTranscriptionRecorder])
 
   if (meetingLoading) {
     return (
@@ -2047,17 +1619,6 @@ export default function MeetingRoomPage({ params }) {
           transcript={liveTranscript}
           languages={transcriptLanguages}
           activeSpeakers={activeSpeakers}
-          canUseCloud={canUseCloudTranscription}
-          canUseLocal={canUseLocalTranscription}
-          onUseCloud={() => {
-            setNotetakerError(null)
-            setPreferCloudTranscription(true)
-          }}
-          onUseLocal={() => {
-            setNotetakerError(null)
-            resetMeetingTranscriber()
-            setPreferCloudTranscription(false)
-          }}
           onClose={() => setShowNotetaker(false)}
         />
       </div>

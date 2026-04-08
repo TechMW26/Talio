@@ -4,8 +4,8 @@ import {
   hasMeetingInsightSource,
   generateMeetingInsights,
   persistMeetingInsights,
-  resolveMeetingEmployee,
 } from '@/lib/meetingAI'
+import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import { normalizeMeetingLanguage, sortMeetingTranscript } from '@/lib/meetingLanguage'
 
 export const dynamic = 'force-dynamic'

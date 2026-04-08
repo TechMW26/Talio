@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { transcribeAudio } from '@/lib/elevenLabs'
-import { resolveMeetingEmployee } from '@/lib/meetingAI'
+import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import {
   detectMeetingLanguage,
   mergeTranscriptSegments,

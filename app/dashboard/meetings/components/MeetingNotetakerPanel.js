@@ -2,35 +2,20 @@
 
 import ModalPortal from '@/components/ModalPortal'
 import {
-  HiOutlineArrowPath,
   HiOutlineBolt,
   HiOutlineCloudArrowUp,
-  HiOutlineCpuChip,
   HiOutlineExclamationTriangle,
   HiOutlineLanguage,
-  HiOutlineMicrophone,
   HiOutlineSparkles,
   HiOutlineXMark,
 } from 'react-icons/hi2'
 
 const MODE_META = {
-  whisper: {
-    label: 'Local Whisper',
-    detail: 'On-device transcription with automatic ElevenLabs cloud fallback when the browser model fails.',
-    icon: HiOutlineCpuChip,
-    chipClass: 'bg-indigo-50 border-indigo-200 text-indigo-700',
-  },
   elevenlabs: {
     label: 'ElevenLabs Scribe',
-    detail: 'Cloud transcription from live microphone chunks. This is the most stable mode for desktop environments.',
+    detail: 'Cloud transcription from live microphone chunks for a single, consistent Mira transcription pipeline.',
     icon: HiOutlineCloudArrowUp,
     chipClass: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-  },
-  'speech-recognition': {
-    label: 'Browser Speech Recognition',
-    detail: 'Browser-provided speech recognition fallback when local and cloud chunk transcription are unavailable.',
-    icon: HiOutlineMicrophone,
-    chipClass: 'bg-amber-50 border-amber-200 text-amber-700',
   },
   unsupported: {
     label: 'Unavailable',
@@ -59,10 +44,6 @@ export default function MeetingNotetakerPanel({
   transcript = [],
   languages = [],
   activeSpeakers = [],
-  canUseCloud = false,
-  canUseLocal = false,
-  onUseCloud,
-  onUseLocal,
   onClose,
 }) {
   if (!isOpen) {
@@ -120,24 +101,6 @@ export default function MeetingNotetakerPanel({
                 <span className={`h-2.5 w-2.5 rounded-full ${isReady ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                 {statusText}
               </span>
-              {canUseCloud && mode !== 'elevenlabs' && (
-                <button
-                  onClick={onUseCloud}
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-                >
-                  <HiOutlineCloudArrowUp className="h-4 w-4" />
-                  Switch To ElevenLabs
-                </button>
-              )}
-              {canUseLocal && mode !== 'whisper' && (
-                <button
-                  onClick={onUseLocal}
-                  className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
-                >
-                  <HiOutlineArrowPath className="h-4 w-4" />
-                  Try Local Whisper
-                </button>
-              )}
             </div>
           </div>
 
