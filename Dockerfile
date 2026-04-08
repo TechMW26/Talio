@@ -1,43 +1,44 @@
 # syntax=docker/dockerfile:1
 
 # ── Stage 1: deps ── ALL dependencies (dev + prod needed for Next.js build) ──
-FROM node:20-alpine AS deps
+# Use Debian slim instead of Alpine because onnxruntime-node segfaults on musl.
+FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
-# Native build tools for sharp, bcrypt, canvas
-RUN apk add --no-cache libc6-compat python3 make g++
+# Native build tools for bcrypt/sharp/node-gyp packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        python3 \
+        make \
+        g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./
 
-# Install all deps (dev + prod). npm install (not ci) because lockfile was
-# generated on macOS and ci would skip Linux optional deps.
-# Then add Alpine-specific native binaries (sharp needs binding + libvips).
+# npm install (not ci) so Linux-native optional dependencies are resolved for the
+# current container platform even if the lockfile was generated on macOS.
 RUN --mount=type=cache,target=/root/.npm \
-    ARCH=$(node -p "process.arch") && \
-    npm install --prefer-offline && \
-    npm install --no-save \
-      "@img/sharp-linuxmusl-${ARCH}" \
-      "@img/sharp-libvips-linuxmusl-${ARCH}" \
-      "@rollup/rollup-linux-${ARCH}-musl"
+        npm install --prefer-offline
 
 # ── Stage 2: prod-deps ── Production-only dependencies (no devDeps) ──────────
 # Runs in PARALLEL with builder stage — saves ~247s vs npm prune after build.
-FROM node:20-alpine AS prod-deps
+FROM node:20-bookworm-slim AS prod-deps
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        python3 \
+        make \
+        g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./
 
 RUN --mount=type=cache,target=/root/.npm \
-    ARCH=$(node -p "process.arch") && \
-    npm install --prefer-offline --omit=dev && \
-    npm install --no-save \
-      "@img/sharp-linuxmusl-${ARCH}" \
-      "@img/sharp-libvips-linuxmusl-${ARCH}"
+    npm install --prefer-offline --omit=dev
 
 # ── Stage 3: builder ── Build Next.js production output ──────────────────────
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -67,17 +68,18 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 RUN npm run build
 
 # ── Stage 4: runner ── Minimal production image ─────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000
 
-# libc6-compat needed at runtime for sharp and other native modules
-RUN apk add --no-cache libc6-compat && \
-    addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 1001 nodejs \
+    && useradd --system --uid 1001 --gid nodejs nextjs
 
 # Production-only node_modules from parallel stage (no devDeps, no prune needed)
 COPY --from=prod-deps /app/node_modules ./node_modules
