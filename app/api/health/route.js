@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import mongoose from 'mongoose'
 
 // Health check endpoint for Docker and monitoring
+export async function HEAD() {
+  return new Response(null, { status: 200 })
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const detailed = searchParams.get('detailed') === 'true'
