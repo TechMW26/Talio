@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { transcribeAudio } from '@/lib/elevenLabs'
 import { resolveMeetingEmployee } from '@/lib/meetingAI'
 import {
   detectMeetingLanguage,
@@ -90,7 +91,10 @@ async function parseTranscriptPayload(request) {
     const source = formData.get('source')
     const segmentId = formData.get('segmentId')
     const timestamp = formData.get('timestamp')
+    const startedAt = formData.get('startedAt')
+    const durationMs = Number(formData.get('durationMs') || 0) || undefined
     const segmentsJson = formData.get('segments')
+    const audio = formData.get('audio')
 
     if (segmentsJson) {
       return {
@@ -110,8 +114,16 @@ async function parseTranscriptPayload(request) {
       }
     }
 
-    if (formData.get('audio')) {
-      throw new Error('Audio uploads are no longer transcribed server-side. Use the in-meeting OSS transcriber to submit transcript segments.')
+    if (audio && typeof audio.arrayBuffer === 'function') {
+      return {
+        audio,
+        language,
+        source,
+        segmentId,
+        timestamp,
+        startedAt: startedAt || timestamp,
+        durationMs,
+      }
     }
   }
 
@@ -143,7 +155,36 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'You do not have access to this meeting' }, { status: 403 })
     }
 
-    const payload = await parseTranscriptPayload(request)
+    const parsedPayload = await parseTranscriptPayload(request)
+    const usingAudioUpload = Boolean(parsedPayload?.audio)
+
+    let payload = parsedPayload
+
+    if (usingAudioUpload) {
+      const transcription = await transcribeAudio(parsedPayload.audio, {
+        languageCode: parsedPayload.language,
+        fileName: parsedPayload.audio?.name || `meeting-${id}-${Date.now()}.webm`,
+      })
+
+      if (!transcription.success) {
+        return NextResponse.json({ success: false, message: transcription.error }, { status: 502 })
+      }
+
+      if (!transcription.text) {
+        return NextResponse.json({ success: false, message: 'No speech was detected in the uploaded meeting audio segment' }, { status: 400 })
+      }
+
+      payload = {
+        text: transcription.text,
+        language: transcription.languageCode || parsedPayload.language || 'auto',
+        source: parsedPayload.source || 'live-elevenlabs',
+        segmentId: parsedPayload.segmentId,
+        timestamp: parsedPayload.startedAt || parsedPayload.timestamp,
+        startOffsetMs: 0,
+        endOffsetMs: parsedPayload.durationMs,
+      }
+    }
+
     const segments = buildTranscriptEntries({
       payload,
       employee,
@@ -163,6 +204,7 @@ export async function POST(request, { params }) {
       data: {
         transcriptCount: meeting.transcript.length,
         languages: meeting.transcriptLanguages || [],
+        provider: usingAudioUpload ? 'elevenlabs' : 'client',
         segments,
       },
     })

@@ -92,11 +92,15 @@ export default function MeetingDetailPage({ params }) {
   const summaryMutation = useApiMutation({
     method: 'POST',
     invalidateKeys: [id ? `/api/meetings/${id}` : null].filter(Boolean),
-    onSuccess: () => {
-      toast.success('AI meeting notes updated')
+    onSuccess: (data) => {
+      toast.success(
+        data?.data?.generated === false
+          ? (data?.message || 'Mira summary is already up to date')
+          : (data?.message || 'Mira summary updated')
+      )
       refreshMeeting()
     },
-    onError: (err) => toast.error(err.message || 'Failed to generate meeting summary'),
+    onError: (err) => toast.error(err.message || 'Failed to generate Mira summary'),
   })
 
   const toggleGuestAccess = async () => {
@@ -156,6 +160,34 @@ export default function MeetingDetailPage({ params }) {
     })
   }
 
+  const formatSummaryDateTime = (date) => {
+    if (!date) return null
+
+    return new Date(date).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const formatSummarySessionTag = (entry, index) => {
+    if (entry?.sessionTag) {
+      return entry.sessionTag
+    }
+
+    if (entry?.sessionStartedAt && entry?.sessionEndedAt) {
+      return `Session ${entry.sessionNumber || index + 1} • ${formatSummaryDateTime(entry.sessionStartedAt)} to ${formatSummaryDateTime(entry.sessionEndedAt)}`
+    }
+
+    if (entry?.generatedAt) {
+      return `Session ${entry.sessionNumber || index + 1} • Generated ${formatSummaryDateTime(entry.generatedAt)}`
+    }
+
+    return `Session ${entry?.sessionNumber || index + 1}`
+  }
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'scheduled': return 'bg-blue-100 text-blue-700'
@@ -213,6 +245,12 @@ export default function MeetingDetailPage({ params }) {
   const pendingInvitees = meeting.invitees?.filter(i => i.status === 'pending') || []
   const rejectedInvitees = meeting.invitees?.filter(i => i.status === 'rejected') || []
   const canGenerateInsights = (meeting.transcript?.length || 0) > 0 || !!meeting.notes || (meeting.mom?.length || 0) > 0
+  const summaryEntries = Array.isArray(meeting.aiSummary?.history) && meeting.aiSummary.history.length > 0
+    ? meeting.aiSummary.history
+    : meeting.aiSummary?.summary
+      ? [meeting.aiSummary]
+      : []
+  const latestSummary = summaryEntries.length > 0 ? summaryEntries[summaryEntries.length - 1] : null
   const participantNotes = [...(meeting.aiParticipantNotes || [])].sort((left, right) => {
     if (!currentUserName) return 0
     if (left.speakerName === currentUserName) return -1
@@ -341,6 +379,29 @@ export default function MeetingDetailPage({ params }) {
               <p className="text-gray-600 mb-6">
                 {meeting.description}
               </p>
+            )}
+
+            {latestSummary?.summary && (
+              <div className="mb-6 rounded-xl border border-purple-200 bg-purple-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-medium text-purple-700 flex items-center gap-2">
+                      <HiOutlineSparkles className="w-5 h-5" />
+                      Mira Summary
+                    </h3>
+                    <p className="text-xs text-purple-600 mt-1">
+                      {formatSummarySessionTag(latestSummary, summaryEntries.length - 1)}
+                    </p>
+                  </div>
+                  <span className="text-xs uppercase tracking-wide text-purple-600">
+                    {latestSummary.language || 'auto'}
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm text-purple-950 whitespace-pre-line">
+                  {latestSummary.summary}
+                </p>
+              </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -580,18 +641,18 @@ export default function MeetingDetailPage({ params }) {
             </div>
           )}
 
-          {/* AI Summary */}
+          {/* Mira Summary */}
           {(meeting.aiSummary?.summary || canGenerateInsights) && (
             <div className="p-6 border-b border-gray-200">
               <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 flex items-center gap-2">
                     <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
-                    AI Summary
+                    Mira Summary
                   </h3>
-                  {meeting.aiSummary?.generatedAt && (
+                  {latestSummary?.generatedAt && (
                     <p className="text-xs text-gray-400 mt-1">
-                      Generated {new Date(meeting.aiSummary.generatedAt).toLocaleString('en-IN')} • {meeting.aiSummary.language || 'auto'}
+                      {formatSummarySessionTag(latestSummary, summaryEntries.length - 1)} • {latestSummary.language || 'auto'}
                     </p>
                   )}
                 </div>
@@ -607,63 +668,76 @@ export default function MeetingDetailPage({ params }) {
                     {summaryMutation.isLoading
                       ? 'Generating...'
                       : meeting.aiSummary?.summary
-                        ? 'Refresh AI Notes'
-                        : 'Generate AI Notes'}
+                        ? 'Refresh Mira Summary'
+                        : 'Generate Mira Summary'}
                   </LoadingButton>
                 )}
               </div>
 
-              {meeting.aiSummary?.summary ? (
-                <div className="prose max-w-none">
-                  <p className="text-gray-600">{meeting.aiSummary.summary}</p>
+              {summaryEntries.length > 0 ? (
+                <div className="space-y-4">
+                  {summaryEntries.map((summaryEntry, index) => (
+                    <div key={`${summaryEntry.generatedAt || index}-${summaryEntry.sessionNumber || index}`} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-purple-600">
+                          {formatSummarySessionTag(summaryEntry, index)}
+                        </p>
+                        <span className="text-xs text-gray-400">
+                          {summaryEntry.generatedAt ? formatSummaryDateTime(summaryEntry.generatedAt) : 'Pending'}
+                        </span>
+                      </div>
 
-                  {meeting.aiSummary.keyPoints?.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-800 mb-2">Key Points</h4>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {meeting.aiSummary.keyPoints.map((point, i) => (
-                          <li key={i} className="text-sm text-gray-600">{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                      <p className="text-gray-600 whitespace-pre-line">{summaryEntry.summary}</p>
 
-                  {meeting.aiSummary.actionItems?.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-800 mb-2">Action Items</h4>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {meeting.aiSummary.actionItems.map((item, i) => (
-                          <li key={i} className="text-sm text-gray-600">{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                      {summaryEntry.keyPoints?.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-800 mb-2">Key Points</h4>
+                          <ul className="list-disc pl-5 space-y-1">
+                            {summaryEntry.keyPoints.map((point, i) => (
+                              <li key={i} className="text-sm text-gray-600">{point}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
 
-                  {meeting.aiSummary.decisions?.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-800 mb-2">Decisions</h4>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {meeting.aiSummary.decisions.map((item, i) => (
-                          <li key={i} className="text-sm text-gray-600">{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                      {summaryEntry.actionItems?.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-800 mb-2">Action Items</h4>
+                          <ul className="list-disc pl-5 space-y-1">
+                            {summaryEntry.actionItems.map((item, i) => (
+                              <li key={i} className="text-sm text-gray-600">{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
 
-                  {meeting.aiSummary.nextSteps?.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-800 mb-2">Next Steps</h4>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {meeting.aiSummary.nextSteps.map((item, i) => (
-                          <li key={i} className="text-sm text-gray-600">{item}</li>
-                        ))}
-                      </ul>
+                      {summaryEntry.decisions?.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-800 mb-2">Decisions</h4>
+                          <ul className="list-disc pl-5 space-y-1">
+                            {summaryEntry.decisions.map((item, i) => (
+                              <li key={i} className="text-sm text-gray-600">{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {summaryEntry.nextSteps?.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-800 mb-2">Next Steps</h4>
+                          <ul className="list-disc pl-5 space-y-1">
+                            {summaryEntry.nextSteps.map((item, i) => (
+                              <li key={i} className="text-sm text-gray-600">{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
-                  The meeting has transcript or notes available, but AI notes have not been generated yet.
+                  The meeting has transcript or notes available, but Mira has not generated a summary yet.
                 </div>
               )}
             </div>

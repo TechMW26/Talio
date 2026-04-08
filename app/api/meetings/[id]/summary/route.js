@@ -24,6 +24,70 @@ function canGenerateMeetingInsights(meeting, employee) {
   )
 }
 
+function toOptionalDate(value) {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function getLatestTranscriptTimestamp(transcript = []) {
+  let latestTimestamp = null
+
+  for (const segment of transcript) {
+    const parsed = toOptionalDate(segment?.timestamp)
+    if (!parsed) continue
+    if (!latestTimestamp || parsed > latestTimestamp) {
+      latestTimestamp = parsed
+    }
+  }
+
+  return latestTimestamp
+}
+
+function buildScopedMeetingForSummary(meeting, sessionStartedAt, sessionEndedAt) {
+  const sourceMeeting = meeting?.toObject ? meeting.toObject() : { ...meeting }
+  const transcript = sortMeetingTranscript(sourceMeeting.transcript || [])
+  const hasSessionWindow = Boolean(sessionStartedAt || sessionEndedAt)
+  const scopedTranscript = hasSessionWindow
+    ? transcript.filter(segment => {
+        const segmentTimestamp = toOptionalDate(segment?.timestamp)
+
+        if (sessionStartedAt && segmentTimestamp && segmentTimestamp < sessionStartedAt) {
+          return false
+        }
+
+        if (sessionEndedAt && segmentTimestamp && segmentTimestamp > sessionEndedAt) {
+          return false
+        }
+
+        return true
+      })
+    : transcript
+
+  const scopedTranscriptLanguages = [...new Set(
+    scopedTranscript
+      .map(segment => normalizeMeetingLanguage(segment?.language || 'auto'))
+      .filter(Boolean)
+      .filter(language => language !== 'auto')
+  )]
+
+  const hasPreviousSummary = Boolean(meeting?.aiSummary?.generatedAt || meeting?.aiSummary?.history?.length)
+
+  return {
+    meetingForSummary: {
+      ...sourceMeeting,
+      transcript: scopedTranscript,
+      transcriptLanguages: scopedTranscriptLanguages.length > 0
+        ? scopedTranscriptLanguages
+        : sourceMeeting.transcriptLanguages,
+      notes: hasSessionWindow && hasPreviousSummary ? '' : sourceMeeting.notes,
+      mom: hasSessionWindow && hasPreviousSummary ? [] : sourceMeeting.mom,
+    },
+    transcriptForSummary: scopedTranscript,
+    hasPreviousSummary,
+  }
+}
+
 export async function POST(request, { params }) {
   try {
     const { id } = await params
@@ -36,6 +100,9 @@ export async function POST(request, { params }) {
     const { Meeting } = models
     const body = await request.json().catch(() => ({}))
     const requestedLanguage = normalizeMeetingLanguage(body?.language || 'auto')
+    const allowNoContent = body?.allowNoContent === true
+    const sessionStartedAt = toOptionalDate(body?.sessionStartedAt)
+    const sessionEndedAt = toOptionalDate(body?.sessionEndedAt)
 
     const employee = await resolveMeetingEmployee(models, user)
     if (!employee) {
@@ -54,26 +121,55 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'You do not have access to generate meeting insights' }, { status: 403 })
     }
 
-    const transcript = sortMeetingTranscript(meeting.transcript || [])
-    if (!hasMeetingInsightSource(meeting)) {
+    const { meetingForSummary, transcriptForSummary, hasPreviousSummary } = buildScopedMeetingForSummary(
+      meeting,
+      sessionStartedAt,
+      sessionEndedAt,
+    )
+
+    if (!hasMeetingInsightSource(meetingForSummary)) {
+      const message = hasPreviousSummary
+        ? 'No new meeting transcript or notes are available yet for Mira summary generation'
+        : 'No meeting transcript or notes are available yet for Mira summary generation'
+
+      if (allowNoContent || hasPreviousSummary) {
+        return NextResponse.json({
+          success: true,
+          message,
+          data: {
+            generated: false,
+            aiSummary: meeting.aiSummary || null,
+            participantNotes: meeting.aiParticipantNotes || [],
+          },
+        })
+      }
+
       return NextResponse.json({
         success: false,
-        message: 'No meeting transcript or notes are available yet for AI summary generation',
+        message,
       }, { status: 400 })
     }
 
-    meeting.transcript = transcript
+    const latestSourceUpdatedAt = getLatestTranscriptTimestamp(transcriptForSummary)
+      || toOptionalDate(meeting.updatedAt)
+      || new Date()
 
-    const insights = await generateMeetingInsights(meeting, { language: requestedLanguage })
+    const insights = await generateMeetingInsights(meetingForSummary, { language: requestedLanguage })
 
     const persistedInsights = await persistMeetingInsights(Meeting, meeting, insights, {
-      sourceUpdatedAt: meeting.updatedAt,
+      sourceUpdatedAt: latestSourceUpdatedAt,
+      appendHistory: hasPreviousSummary || Boolean(sessionStartedAt || sessionEndedAt),
+      sessionStartedAt,
+      sessionEndedAt,
     })
 
     return NextResponse.json({
       success: true,
-      message: 'Meeting summary generated successfully',
+      message: hasPreviousSummary
+        ? 'Mira summary updated with the latest meeting session'
+        : 'Mira summary generated successfully',
       data: {
+        generated: true,
         aiSummary: persistedInsights.aiSummary,
         participantNotes: persistedInsights.aiParticipantNotes,
       },

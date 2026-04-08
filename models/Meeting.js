@@ -217,7 +217,28 @@ const MeetingSchema = new mongoose.Schema({
     language: {
       type: String,
       default: 'en'
-    }
+    },
+    sessionNumber: Number,
+    sessionStartedAt: Date,
+    sessionEndedAt: Date,
+    sessionTag: String,
+    history: [{
+      summary: String,
+      keyPoints: [String],
+      actionItems: [String],
+      decisions: [String],
+      nextSteps: [String],
+      generatedAt: Date,
+      sourceUpdatedAt: Date,
+      language: {
+        type: String,
+        default: 'en'
+      },
+      sessionNumber: Number,
+      sessionStartedAt: Date,
+      sessionEndedAt: Date,
+      sessionTag: String,
+    }]
   },
   aiParticipantNotes: [MeetingParticipantNoteSchema],
   // Audio data for offline meetings
