@@ -41,18 +41,28 @@ export async function GET(request, { params }) {
     if (company.isSetupComplete) {
       try {
         const tenantConnection = await getTenantConnection(company.databaseName);
-        const UserModel = tenantConnection.model('User', new (await import('mongoose')).Schema({}, { strict: false }));
-        const userCount = await UserModel.countDocuments({});
-        const activeUserCount = await UserModel.countDocuments({ isActive: true });
+        // Use raw collection to avoid model registration conflicts
+        const usersCollection = tenantConnection.db.collection('users');
+        const userCount = await usersCollection.countDocuments({});
+        const activeUserCount = await usersCollection.countDocuments({ isActive: true });
         userStats = { total: userCount, active: activeUserCount };
       } catch (error) {
         console.warn(`Could not get user stats for ${company.databaseName}:`, error.message);
       }
     }
 
-    // Get user mappings count
-    const UserTenantMapping = await getUserTenantMappingModel();
-    const mappedUsersCount = await UserTenantMapping.countDocuments({ tenantCompanyId: company._id });
+    // Fallback: get mapped users count from central DB
+    if (!userStats) {
+      try {
+        const UserTenantMapping = await getUserTenantMappingModel();
+        const mappedUsersCount = await UserTenantMapping.countDocuments({ tenantCompanyId: company._id });
+        if (mappedUsersCount > 0) {
+          userStats = { total: mappedUsersCount, active: mappedUsersCount };
+        }
+      } catch (error) {
+        console.warn(`Could not get mapped user count for ${company.name}:`, error.message);
+      }
+    }
 
     // Generate setup URL if not yet used
     let setupUrl = null;
@@ -68,7 +78,6 @@ export async function GET(request, { params }) {
         id: company._id.toString(),
         setupUrl,
         userStats,
-        mappedUsersCount,
       },
     });
 

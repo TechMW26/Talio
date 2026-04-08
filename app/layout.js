@@ -144,6 +144,9 @@ export default function RootLayout({ children }) {
             {children}
             <Toaster
               position="top-right"
+              containerStyle={{
+                zIndex: 999999,
+              }}
               toastOptions={{
                 style: {
                   fontSize: '14px',

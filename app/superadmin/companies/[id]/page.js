@@ -681,7 +681,7 @@ export default function CompanyDetailPage({ params }) {
             {/* User Stats */}
             <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">User Statistics</h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="bg-gray-50 rounded-xl p-4">
                   <p className="text-2xl font-bold text-gray-900">{company.userStats?.total || 0}</p>
                   <p className="text-sm text-gray-500">Total Users</p>
@@ -693,10 +693,6 @@ export default function CompanyDetailPage({ params }) {
                 <div className="bg-purple-50 rounded-xl p-4">
                   <p className="text-2xl font-bold text-purple-700">{company.subscription?.maxUsers || 0}</p>
                   <p className="text-sm text-gray-500">Max Users</p>
-                </div>
-                <div className="bg-cyan-50 rounded-xl p-4">
-                  <p className="text-2xl font-bold text-cyan-700">{company.mappedUsersCount || 0}</p>
-                  <p className="text-sm text-gray-500">Mapped Users</p>
                 </div>
               </div>
               {/* User limit warning */}
