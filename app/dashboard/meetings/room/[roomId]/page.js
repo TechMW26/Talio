@@ -30,6 +30,12 @@ import {
   mergeTranscriptSegments,
   normalizeMeetingLanguage,
 } from '@/lib/meetingLanguage'
+import {
+  addIceCandidateOrQueue,
+  clearQueuedIceCandidates,
+  createMeetingRtcConfiguration,
+  flushQueuedIceCandidates,
+} from '@/lib/meetingRtc'
 // Slash icons for muted/off states
 import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsPin, BsPinFill, BsEmojiSmile } from 'react-icons/bs'
@@ -117,6 +123,7 @@ export default function MeetingRoomPage({ params }) {
   const recordedChunksRef = useRef([])
   const socketRef = useRef(null)
   const peerConnectionsRef = useRef({})
+  const pendingIceCandidatesRef = useRef({})
   const remoteStreamsRef = useRef({})
   const cameraPreviewStartedRef = useRef(false)
   const meetingStartedRef = useRef(false)
@@ -423,7 +430,7 @@ export default function MeetingRoomPage({ params }) {
     setNotetakerError(null)
 
     const processingPromise = lastTranscriptionPromiseRef.current
-      .catch(() => {})
+      .catch(() => { })
       .then(async () => {
         await transcribeRecordedSegmentWithElevenLabs({ blob, startedAt, durationMs })
       })
@@ -475,7 +482,7 @@ export default function MeetingRoomPage({ params }) {
 
     let segmentStartedAt = Date.now()
     const segmentTimesliceMs = 10000
-    let resolveStopPromise = () => {}
+    let resolveStopPromise = () => { }
     const stopPromise = new Promise((resolve) => {
       resolveStopPromise = resolve
     })
@@ -511,7 +518,7 @@ export default function MeetingRoomPage({ params }) {
     mediaRecorder.start(segmentTimesliceMs)
 
     return () => {
-      void stopTranscriptionRecorder().catch(() => {})
+      void stopTranscriptionRecorder().catch(() => { })
     }
   }, [
     isJoined,
@@ -582,6 +589,7 @@ export default function MeetingRoomPage({ params }) {
         if (remoteStreamsRef.current[userData.id]) {
           delete remoteStreamsRef.current[userData.id]
         }
+        clearQueuedIceCandidates(pendingIceCandidatesRef, userData.id)
         // Clean up peer connection
         if (peerConnectionsRef.current[userData.id]) {
           peerConnectionsRef.current[userData.id].close()
@@ -612,6 +620,7 @@ export default function MeetingRoomPage({ params }) {
           upsertParticipant({ id: from, userName: 'Participant' })
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer))
+        await flushQueuedIceCandidates(peerConnectionsRef, pendingIceCandidatesRef, from)
         const answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
         console.log('Sending answer to', from)
@@ -623,17 +632,19 @@ export default function MeetingRoomPage({ params }) {
         const pc = peerConnectionsRef.current[from]
         if (pc) {
           await pc.setRemoteDescription(new RTCSessionDescription(answer))
+          await flushQueuedIceCandidates(peerConnectionsRef, pendingIceCandidatesRef, from)
         }
       })
 
       socketRef.current.on('ice-candidate', async ({ from, candidate }) => {
-        const pc = peerConnectionsRef.current[from]
-        if (pc && candidate) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate))
-          } catch (err) {
-            console.error('Error adding ICE candidate:', err)
-          }
+        if (!candidate) {
+          return
+        }
+
+        try {
+          await addIceCandidateOrQueue(peerConnectionsRef, pendingIceCandidatesRef, from, candidate)
+        } catch (err) {
+          console.error('Error adding ICE candidate:', err)
         }
       })
 
@@ -680,7 +691,7 @@ export default function MeetingRoomPage({ params }) {
 
   useEffect(() => {
     if (!isJoined || isMuted) {
-      void stopTranscriptionRecorder().catch(() => {})
+      void stopTranscriptionRecorder().catch(() => { })
     }
   }, [isJoined, isMuted, stopTranscriptionRecorder])
 
@@ -691,16 +702,7 @@ export default function MeetingRoomPage({ params }) {
       return peerConnectionsRef.current[peerId]
     }
 
-    const configuration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' }
-      ]
-    }
-
-    const pc = new RTCPeerConnection(configuration)
+    const pc = new RTCPeerConnection(createMeetingRtcConfiguration())
     peerConnectionsRef.current[peerId] = pc
 
     // Add local tracks
@@ -1047,7 +1049,7 @@ export default function MeetingRoomPage({ params }) {
 
     try {
       await stopTranscriptionRecorder()
-      await lastTranscriptionPromiseRef.current.catch(() => {})
+      await lastTranscriptionPromiseRef.current.catch(() => { })
 
       if (meeting?._id && meeting.isOrganizer) {
         const actualEnd = new Date().toISOString()
@@ -1123,6 +1125,8 @@ export default function MeetingRoomPage({ params }) {
 
       Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
       peerConnectionsRef.current = {}
+      pendingIceCandidatesRef.current = {}
+      remoteStreamsRef.current = {}
 
       if (socketRef.current) {
         socketRef.current.emit('leave-meeting', { roomId })
@@ -1136,7 +1140,7 @@ export default function MeetingRoomPage({ params }) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      void stopTranscriptionRecorder().catch(() => {})
+      void stopTranscriptionRecorder().catch(() => { })
       Object.values(speakerTimeoutsRef.current).forEach(clearTimeout)
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop())
@@ -1145,6 +1149,7 @@ export default function MeetingRoomPage({ params }) {
         screenStreamRef.current.getTracks().forEach(track => track.stop())
       }
       Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
+      pendingIceCandidatesRef.current = {}
       remoteStreamsRef.current = {}
       if (socketRef.current) {
         socketRef.current.disconnect()
@@ -1232,8 +1237,8 @@ export default function MeetingRoomPage({ params }) {
                 <button
                   onClick={togglePreviewMute}
                   className={`p-3 rounded-full transition-colors ${isMuted
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-gray-800/80 hover:bg-gray-700 text-white'
+                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                    : 'bg-gray-800/80 hover:bg-gray-700 text-white'
                     }`}
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
@@ -1242,8 +1247,8 @@ export default function MeetingRoomPage({ params }) {
                 <button
                   onClick={togglePreviewVideo}
                   className={`p-3 rounded-full transition-colors ${isVideoOff
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-gray-800/80 hover:bg-gray-700 text-white'
+                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                    : 'bg-gray-800/80 hover:bg-gray-700 text-white'
                     }`}
                   title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
                 >
@@ -1271,8 +1276,8 @@ export default function MeetingRoomPage({ params }) {
             onClick={joinMeeting}
             disabled={!previewReady && !previewError}
             className={`w-full py-3 font-medium rounded-xl transition-colors ${previewReady || previewError
-                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
           >
             {previewReady || previewError ? 'Join Meeting' : 'Preparing...'}

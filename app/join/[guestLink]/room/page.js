@@ -15,6 +15,12 @@ import {
   HiMiniVideoCamera
 } from 'react-icons/hi2'
 import Loader from '@/components/ui/Loader'
+import {
+  addIceCandidateOrQueue,
+  clearQueuedIceCandidates,
+  createMeetingRtcConfiguration,
+  flushQueuedIceCandidates,
+} from '@/lib/meetingRtc'
 // Slash icons for muted/off states
 import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsEmojiSmile } from 'react-icons/bs'
@@ -33,13 +39,13 @@ const REACTIONS = [
 export default function GuestMeetingRoom({ params }) {
   const router = useRouter()
   const { guestLink } = use(params)
-  
+
   // Guest info
   const [guestInfo, setGuestInfo] = useState(null)
   const [meeting, setMeeting] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isJoined, setIsJoined] = useState(false)
-  
+
   // Meeting controls
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(false)
@@ -53,12 +59,14 @@ export default function GuestMeetingRoom({ params }) {
   const [floatingReactions, setFloatingReactions] = useState([])
   const [previewReady, setPreviewReady] = useState(false)
   const [previewError, setPreviewError] = useState(null)
-  
+
   // Refs
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
   const socketRef = useRef(null)
   const peerConnectionsRef = useRef({})
+  const pendingIceCandidatesRef = useRef({})
+  const remoteStreamsRef = useRef({})
 
   // Load guest info and validate
   useEffect(() => {
@@ -71,7 +79,7 @@ export default function GuestMeetingRoom({ params }) {
 
     const info = JSON.parse(storedGuestInfo)
     setGuestInfo(info)
-    
+
     // Fetch meeting info
     fetchMeetingInfo()
   }, [guestLink])
@@ -104,13 +112,13 @@ export default function GuestMeetingRoom({ params }) {
         video: true,
         audio: true
       })
-      
+
       localStreamRef.current = stream
       setPreviewReady(true)
-      
+
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream
-        localVideoRef.current.play().catch(() => {})
+        localVideoRef.current.play().catch(() => { })
       }
     } catch (error) {
       console.error('Error starting camera preview:', error)
@@ -192,6 +200,10 @@ export default function GuestMeetingRoom({ params }) {
       socketRef.current.on('user-left', (userData) => {
         console.log('User left:', userData)
         setParticipants(prev => prev.filter(p => p.id !== userData.id))
+        clearQueuedIceCandidates(pendingIceCandidatesRef, userData.id)
+        if (remoteStreamsRef.current[userData.id]) {
+          delete remoteStreamsRef.current[userData.id]
+        }
         if (peerConnectionsRef.current[userData.id]) {
           peerConnectionsRef.current[userData.id].close()
           delete peerConnectionsRef.current[userData.id]
@@ -223,6 +235,7 @@ export default function GuestMeetingRoom({ params }) {
           })
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer))
+        await flushQueuedIceCandidates(peerConnectionsRef, pendingIceCandidatesRef, from)
         const answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
         socketRef.current.emit('answer', { to: from, answer })
@@ -232,17 +245,19 @@ export default function GuestMeetingRoom({ params }) {
         const pc = peerConnectionsRef.current[from]
         if (pc) {
           await pc.setRemoteDescription(new RTCSessionDescription(answer))
+          await flushQueuedIceCandidates(peerConnectionsRef, pendingIceCandidatesRef, from)
         }
       })
 
       socketRef.current.on('ice-candidate', async ({ from, candidate }) => {
-        const pc = peerConnectionsRef.current[from]
-        if (pc && candidate) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate))
-          } catch (err) {
-            console.error('Error adding ICE candidate:', err)
-          }
+        if (!candidate) {
+          return
+        }
+
+        try {
+          await addIceCandidateOrQueue(peerConnectionsRef, pendingIceCandidatesRef, from, candidate)
+        } catch (err) {
+          console.error('Error adding ICE candidate:', err)
         }
       })
 
@@ -260,12 +275,7 @@ export default function GuestMeetingRoom({ params }) {
       return peerConnectionsRef.current[peerId]
     }
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    })
+    const pc = new RTCPeerConnection(createMeetingRtcConfiguration())
 
     peerConnectionsRef.current[peerId] = pc
 
@@ -276,9 +286,38 @@ export default function GuestMeetingRoom({ params }) {
     }
 
     pc.ontrack = (event) => {
-      setParticipants(prev => prev.map(p => 
-        p.id === peerId ? { ...p, stream: event.streams[0] } : p
-      ))
+      const incomingTrack = event.track
+      const incomingStream = event.streams?.[0]
+
+      if (incomingStream) {
+        remoteStreamsRef.current[peerId] = incomingStream
+      } else {
+        if (!remoteStreamsRef.current[peerId]) {
+          remoteStreamsRef.current[peerId] = new MediaStream()
+        }
+
+        const syntheticStream = remoteStreamsRef.current[peerId]
+        const alreadyExists = syntheticStream.getTracks().some(track => track.id === incomingTrack.id)
+        if (!alreadyExists) {
+          syntheticStream.addTrack(incomingTrack)
+        }
+      }
+
+      const mediaStream = remoteStreamsRef.current[peerId]
+
+      setParticipants(prev => {
+        const nextParticipant = { id: peerId, userName: peerName || 'Participant', stream: mediaStream }
+        const existingParticipant = prev.find(participant => participant.id === peerId)
+
+        if (existingParticipant) {
+          return prev.map(participant => participant.id === peerId
+            ? { ...participant, ...nextParticipant }
+            : participant
+          )
+        }
+
+        return [...prev, nextParticipant]
+      })
     }
 
     pc.onicecandidate = (event) => {
@@ -295,7 +334,7 @@ export default function GuestMeetingRoom({ params }) {
 
   const createPeerConnectionAndOffer = async (peerId, peerName) => {
     const pc = createPeerConnection(peerId, peerName)
-    
+
     try {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
@@ -303,7 +342,7 @@ export default function GuestMeetingRoom({ params }) {
     } catch (err) {
       console.error('Error creating offer:', err)
     }
-    
+
     return pc
   }
 
@@ -373,6 +412,8 @@ export default function GuestMeetingRoom({ params }) {
       localStreamRef.current.getTracks().forEach(track => track.stop())
     }
     Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
+    pendingIceCandidatesRef.current = {}
+    remoteStreamsRef.current = {}
     if (socketRef.current) {
       socketRef.current.emit('leave-meeting', { roomId: meeting?.roomId })
       socketRef.current.disconnect()
@@ -388,6 +429,8 @@ export default function GuestMeetingRoom({ params }) {
         localStreamRef.current.getTracks().forEach(track => track.stop())
       }
       Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
+      pendingIceCandidatesRef.current = {}
+      remoteStreamsRef.current = {}
       if (socketRef.current) {
         socketRef.current.disconnect()
       }
@@ -419,7 +462,7 @@ export default function GuestMeetingRoom({ params }) {
           <p className="text-gray-500 mb-4">
             Joining as: <span className="font-medium text-indigo-600">{guestInfo?.guestName} (Guest)</span>
           </p>
-          
+
           {/* Camera Preview */}
           <div className="relative bg-gray-900 rounded-xl aspect-video mb-4 overflow-hidden">
             {previewReady && !isVideoOff ? (
@@ -450,23 +493,21 @@ export default function GuestMeetingRoom({ params }) {
                 <p className="text-gray-400 text-sm">Starting camera...</p>
               </div>
             )}
-            
+
             {/* Preview Controls */}
             {previewReady && (
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                 <button
                   onClick={togglePreviewMute}
-                  className={`p-3 rounded-full transition-colors ${
-                    isMuted ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
-                  }`}
+                  className={`p-3 rounded-full transition-colors ${isMuted ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
+                    }`}
                 >
                   {isMuted ? <HiOutlineMicrophoneSlash className="w-5 h-5" /> : <HiMiniMicrophone className="w-5 h-5" />}
                 </button>
                 <button
                   onClick={togglePreviewVideo}
-                  className={`p-3 rounded-full transition-colors ${
-                    isVideoOff ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
-                  }`}
+                  className={`p-3 rounded-full transition-colors ${isVideoOff ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
+                    }`}
                 >
                   {isVideoOff ? <HiOutlineVideoCameraSlash className="w-5 h-5" /> : <HiMiniVideoCamera className="w-5 h-5" />}
                 </button>
@@ -477,15 +518,14 @@ export default function GuestMeetingRoom({ params }) {
           <button
             onClick={joinMeeting}
             disabled={!previewReady && !previewError}
-            className={`w-full py-3 font-medium rounded-xl transition-colors ${
-              previewReady || previewError
+            className={`w-full py-3 font-medium rounded-xl transition-colors ${previewReady || previewError
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+              }`}
           >
             Join Meeting
           </button>
-          
+
           <button
             onClick={() => {
               if (localStreamRef.current) {
@@ -524,19 +564,18 @@ export default function GuestMeetingRoom({ params }) {
 
       {/* Video Grid */}
       <div className="flex-1 p-4 overflow-auto">
-        <div className={`grid gap-4 h-full ${
-          participants.length === 0 ? 'grid-cols-1' :
-          participants.length === 1 ? 'grid-cols-1 sm:grid-cols-2' :
-          participants.length <= 3 ? 'grid-cols-2' :
-          'grid-cols-2 sm:grid-cols-3'
-        }`}>
+        <div className={`grid gap-4 h-full ${participants.length === 0 ? 'grid-cols-1' :
+            participants.length === 1 ? 'grid-cols-1 sm:grid-cols-2' :
+              participants.length <= 3 ? 'grid-cols-2' :
+                'grid-cols-2 sm:grid-cols-3'
+          }`}>
           {/* Local Video */}
           <div className="relative bg-gray-800 rounded-xl overflow-hidden aspect-video">
             <video
               ref={(el) => {
                 if (el && localStreamRef.current) {
                   el.srcObject = localStreamRef.current
-                  el.play().catch(() => {})
+                  el.play().catch(() => { })
                 }
               }}
               autoPlay
@@ -562,17 +601,29 @@ export default function GuestMeetingRoom({ params }) {
           {participants.map(participant => (
             <div key={participant.id} className="relative bg-gray-800 rounded-xl overflow-hidden aspect-video">
               {participant.stream ? (
-                <video
-                  autoPlay
-                  playsInline
-                  ref={el => {
-                    if (el && participant.stream) {
-                      el.srcObject = participant.stream
-                      el.play().catch(() => {})
-                    }
-                  }}
-                  className="w-full h-full object-cover"
-                />
+                <>
+                  <video
+                    autoPlay
+                    playsInline
+                    ref={el => {
+                      if (el && participant.stream && el.srcObject !== participant.stream) {
+                        el.srcObject = participant.stream
+                        el.play().catch(() => { })
+                      }
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                  <audio
+                    autoPlay
+                    playsInline
+                    ref={el => {
+                      if (el && participant.stream && el.srcObject !== participant.stream) {
+                        el.srcObject = participant.stream
+                        el.play().catch(() => { })
+                      }
+                    }}
+                  />
+                </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
@@ -595,9 +646,8 @@ export default function GuestMeetingRoom({ params }) {
         <div className="flex items-center justify-center gap-3">
           <button
             onClick={toggleMute}
-            className={`p-4 rounded-full transition-colors ${
-              isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-700 hover:bg-gray-600'
-            }`}
+            className={`p-4 rounded-full transition-colors ${isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-700 hover:bg-gray-600'
+              }`}
           >
             {isMuted ? (
               <HiOutlineMicrophoneSlash className="w-6 h-6 text-white" />
@@ -608,9 +658,8 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={toggleVideo}
-            className={`p-4 rounded-full transition-colors ${
-              isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-700 hover:bg-gray-600'
-            }`}
+            className={`p-4 rounded-full transition-colors ${isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-700 hover:bg-gray-600'
+              }`}
           >
             {isVideoOff ? (
               <HiOutlineVideoCameraSlash className="w-6 h-6 text-white" />
@@ -621,9 +670,8 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={toggleHandRaise}
-            className={`p-4 rounded-full transition-colors ${
-              handRaised ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-gray-700 hover:bg-gray-600'
-            }`}
+            className={`p-4 rounded-full transition-colors ${handRaised ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-gray-700 hover:bg-gray-600'
+              }`}
           >
             <HiOutlineHandRaised className="w-6 h-6 text-white" />
           </button>
@@ -653,18 +701,16 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={() => setShowChat(!showChat)}
-            className={`p-4 rounded-full transition-colors ${
-              showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
-            }`}
+            className={`p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+              }`}
           >
             <HiOutlineChatBubbleLeftRight className="w-6 h-6 text-white" />
           </button>
 
           <button
             onClick={() => setShowParticipants(!showParticipants)}
-            className={`p-4 rounded-full transition-colors ${
-              showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
-            }`}
+            className={`p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+              }`}
           >
             <HiOutlineUserGroup className="w-6 h-6 text-white" />
           </button>
