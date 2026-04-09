@@ -50,6 +50,7 @@ const handle = app.getRequestHandler();
 
 // Global socket instance
 let io;
+let isShuttingDown = false;
 
 // In-memory presence tracking (employeeId -> { sockets: Set, lastSeenAt: Date|null })
 const presenceByEmployee = new Map();
@@ -475,6 +476,12 @@ app.prepare().then(() => {
 
   // Graceful shutdown handling for Docker
   const gracefulShutdown = async (signal) => {
+    if (isShuttingDown) {
+      console.log(`⚠️ Received ${signal} while graceful shutdown is already in progress`);
+      return;
+    }
+
+    isShuttingDown = true;
     console.log(`\n⚠️ Received ${signal}. Starting graceful shutdown...`);
 
     // Stop accepting new connections
@@ -525,6 +532,6 @@ app.prepare().then(() => {
   };
 
   // Handle Docker stop signals
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 });
