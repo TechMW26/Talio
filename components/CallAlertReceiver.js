@@ -5,6 +5,7 @@ import { FaPhoneAlt, FaVolumeUp, FaVolumeMute, FaCheck, FaUser, FaExclamationTri
 import { useSocket } from '@/contexts/SocketContext';
 import toast from '@/utils/toast';
 import Loader from '@/components/ui/Loader';
+import { getRoleDisplayLabel } from '@/hooks/useRoles';
 import ModalPortal from '@/components/ui/ModalPortal';
 
 // Alert sound URL - using existing notification sound
@@ -499,7 +500,7 @@ export default function CallAlertReceiver() {
                   {activeAlert.sender?.name || 'Unknown Sender'}
                 </p>
                 <p className="text-sm text-gray-500 capitalize">
-                  {activeAlert.sender?.role?.replace('_', ' ') || 'Team Member'}
+                  {getRoleDisplayLabel(activeAlert.sender?.role) || 'Team Member'}
                 </p>
               </div>
             </div>

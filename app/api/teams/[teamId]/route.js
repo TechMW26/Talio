@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels, hasRole } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
+import { requirePermission } from '@/lib/permissions'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 
 /**
@@ -40,16 +41,10 @@ export async function GET(request, context) {
 export async function PUT(request, context) {
     try {
         const { teamId } = await context.params
-        const auth = await getAuthAndModels(request, ['Team', 'Department', 'Employee', 'User'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
+        const result = await requirePermission('team_members', 'edit')(request, ['Team', 'Department', 'Employee', 'User'])
+        if (result.denied) return result.denied
+        const { user, models, tenant } = result
         const { Team, Department, User } = models
-
-        if (!hasRole(user, ['admin', 'hr', 'department_head', 'department_manager'])) {
-            return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
-        }
 
         const team = await Team.findById(teamId)
         if (!team) {
@@ -103,7 +98,7 @@ export async function PUT(request, context) {
             .populate('members', 'firstName lastName employeeCode email department')
 
         // Bust departments cache so list reflects updated team data
-        const bustPatternUpdate = buildCachePattern({ tenantId: auth.tenant?.databaseName, namespace: 'departments:list' })
+        const bustPatternUpdate = buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'departments:list' })
         await clearCachePattern(bustPatternUpdate).catch(() => { })
 
         return NextResponse.json({ success: true, data: populated, message: 'Team updated successfully' })
@@ -121,16 +116,10 @@ export async function PUT(request, context) {
 export async function DELETE(request, context) {
     try {
         const { teamId } = await context.params
-        const auth = await getAuthAndModels(request, ['Team', 'Department', 'User'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
+        const result = await requirePermission('team_members', 'delete')(request, ['Team', 'Department', 'User'])
+        if (result.denied) return result.denied
+        const { user, models, tenant } = result
         const { Team, Department, User } = models
-
-        if (!hasRole(user, ['admin', 'hr', 'department_head'])) {
-            return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
-        }
 
         const team = await Team.findById(teamId)
         if (!team) {
@@ -155,7 +144,7 @@ export async function DELETE(request, context) {
         )
 
         // Bust departments cache
-        const bustPattern = buildCachePattern({ tenantId: auth.tenant?.databaseName, namespace: 'departments:list' })
+        const bustPattern = buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'departments:list' })
         await clearCachePattern(bustPattern).catch(() => { })
 
         return NextResponse.json({ success: true, message: 'Team deleted successfully' })

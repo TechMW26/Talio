@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Select, SelectItem } from '@heroui/react';
 import Loader from '@/components/ui/Loader';
-import { 
+import { getRoleDisplayLabel } from '@/hooks/useRoles';
+import {
   HiOutlineXMark,
   HiOutlinePhone,
   HiOutlineMagnifyingGlass,
@@ -39,7 +40,7 @@ export default function CallAlertButton({ user }) {
   const [sending, setSending] = useState(false);
   const [canSendAlerts, setCanSendAlerts] = useState(false);
   const [permissionsChecked, setPermissionsChecked] = useState(false);
-  
+
   // Recipients data
   const [recipients, setRecipients] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -47,14 +48,14 @@ export default function CallAlertButton({ user }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [expandedDepts, setExpandedDepts] = useState({});
-  
+
   // Message data
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [customMessage, setCustomMessage] = useState('');
   const [priority, setPriority] = useState('high');
   const [generateVoice, setGenerateVoice] = useState(true);
-  
+
   // Check permissions on mount - handles both role-based and department head detection
   useEffect(() => {
     const checkPermissions = async () => {
@@ -80,7 +81,7 @@ export default function CallAlertButton({ user }) {
         setPermissionsChecked(true);
         return;
       }
-      
+
       // Check role directly from user object (Admin, God Admin, HR, or department_head role)
       // Note: Manager role does NOT get access unless they are a department head
       const allowedRoles = ['admin', 'department_head', 'hr'];
@@ -100,15 +101,15 @@ export default function CallAlertButton({ user }) {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
-        
+
         console.log('[CallAlertButton] API response:', data.success, data.data?.permissions);
-        
+
         if (data.success && data.data?.permissions) {
           // If API returns success, user has permission
           const hasAccess = data.data.permissions.isAdmin || data.data.permissions.isDepartmentHead;
           console.log('[CallAlertButton] API permission check:', hasAccess);
           setCanSendAlerts(hasAccess);
-          
+
           // Update localStorage with department head status if detected
           if (data.data.permissions.isDepartmentHead && currentUser) {
             try {
@@ -137,11 +138,11 @@ export default function CallAlertButton({ user }) {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
-      
+
       if (data.success) {
         setRecipients(data.data.recipients);
         setDepartments(data.data.departments);
-        
+
         // If user is a department head (not admin), default to their department
         const permissions = data.data.permissions;
         if (permissions?.isDepartmentHead && !permissions?.isAdmin && permissions?.headOfDepartments?.length > 0) {
@@ -166,7 +167,7 @@ export default function CallAlertButton({ user }) {
     try {
       const response = await fetch('/api/call-alert/templates');
       const data = await response.json();
-      
+
       if (data.success) {
         setTemplates(data.data.templates);
       }
@@ -269,7 +270,7 @@ export default function CallAlertButton({ user }) {
     try {
       setSending(true);
       const token = localStorage.getItem('token');
-      
+
       const response = await fetch('/api/call-alert', {
         method: 'POST',
         headers: {
@@ -335,7 +336,7 @@ export default function CallAlertButton({ user }) {
       <button
         onClick={() => setIsOpen(true)}
         className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-        style={{ 
+        style={{
           background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
         }}
         title="Send Call Alert"
@@ -346,16 +347,16 @@ export default function CallAlertButton({ user }) {
 
       {/* Modal via Portal */}
       <ModalPortal show={isOpen}>
-        <div 
+        <div
           className="modal-overlay"
           onClick={handleBackdropClick}
         >
           {/* Modal Content */}
           <div className="relative bg-white rounded-[30px] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-modal-enter" onClick={e => e.stopPropagation()}>
             {/* Header with gradient */}
-            <div 
+            <div
               className="px-6 py-5"
-              style={{ 
+              style={{
                 background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
               }}
             >
@@ -405,7 +406,7 @@ export default function CallAlertButton({ user }) {
                         className="input input-search"
                       />
                     </div>
-                    
+
                     {departments.length > 1 && (
                       <Select
                         selectedKeys={[selectedDepartment]}
@@ -466,21 +467,20 @@ export default function CallAlertButton({ user }) {
                               >
                                 <HiOutlineChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                               </button>
-                              
+
                               <button
                                 onClick={() => toggleSelectAllDepartment(deptId)}
-                                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                  allSelected 
-                                    ? 'border-blue-500 bg-blue-500' 
-                                    : someSelected 
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${allSelected
+                                    ? 'border-blue-500 bg-blue-500'
+                                    : someSelected
                                       ? 'border-blue-500 bg-blue-100'
                                       : 'border-gray-300'
-                                }`}
+                                  }`}
                               >
                                 {allSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
                                 {someSelected && !allSelected && <div className="w-2 h-0.5 bg-blue-500 rounded" />}
                               </button>
-                              
+
                               <div className="flex-1" onClick={() => toggleDepartmentExpand(deptId)}>
                                 <span className="font-medium text-black">{group.department.name}</span>
                                 <span className="ml-2 text-sm text-gray-500">({group.employees.length})</span>
@@ -496,16 +496,14 @@ export default function CallAlertButton({ user }) {
                                     <div
                                       key={recipient.userId}
                                       onClick={() => toggleRecipient(recipient)}
-                                      className={`flex items-center gap-3 px-4 py-3 pl-12 cursor-pointer transition-colors ${
-                                        isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
-                                      }`}
+                                      className={`flex items-center gap-3 px-4 py-3 pl-12 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                                        }`}
                                     >
-                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                        isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                                      }`}>
+                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                                        }`}>
                                         {isSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
                                       </div>
-                                      
+
                                       <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
                                         {recipient.profilePicture ? (
                                           <img src={recipient.profilePicture} alt="" className="w-full h-full object-cover" />
@@ -513,7 +511,7 @@ export default function CallAlertButton({ user }) {
                                           <HiOutlineUser className="w-5 h-5 text-gray-400" />
                                         )}
                                       </div>
-                                      
+
                                       <div className="flex-1 min-w-0">
                                         <p className="font-medium text-black truncate">
                                           {recipient.name}
@@ -579,11 +577,10 @@ export default function CallAlertButton({ user }) {
                         <button
                           key={template.id}
                           onClick={() => handleTemplateSelect(template)}
-                          className={`p-3 text-left border rounded-xl transition-all ${
-                            selectedTemplate?.id === template.id
+                          className={`p-3 text-left border rounded-xl transition-all ${selectedTemplate?.id === template.id
                               ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
                               : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           <p className="font-medium text-black truncate text-sm">{template.title}</p>
                           <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium ${priorityColors[template.priority]}`}>
@@ -632,11 +629,10 @@ export default function CallAlertButton({ user }) {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Voice Alert (AI)</label>
                       <button
                         onClick={() => setGenerateVoice(!generateVoice)}
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl transition-all font-medium ${
-                          generateVoice
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl transition-all font-medium ${generateVoice
                             ? 'border-green-500 bg-green-50 text-green-700'
                             : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         <HiOutlineSpeakerWave className="w-5 h-5" />
                         {generateVoice ? 'Voice Enabled' : 'Voice Disabled'}
@@ -653,7 +649,7 @@ export default function CallAlertButton({ user }) {
                       <p className="text-sm text-blue-600">
                         {customMessage
                           .replace('{senderName}', `${user?.firstName || 'You'} ${user?.lastName || ''}`.trim())
-                          .replace('{senderRole}', user?.role === 'admin' ? 'Administrator' : user?.role === 'department_head' ? 'Department Head' : 'Manager')
+                          .replace('{senderRole}', getRoleDisplayLabel(user?.role))
                           .replace('{receiverName}', selectedRecipients[0]?.name || 'Employee')
                           .replace('{receiverDepartment}', selectedRecipients[0]?.department || 'Department')
                           .replace('{time}', new Date().toLocaleTimeString())

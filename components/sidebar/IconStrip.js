@@ -12,7 +12,8 @@ import {
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
-import { getHiddenSidebarItems } from '@/lib/planFeatures'
+import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
+import { filterMenuByPermissions, getStoredPermissions } from '@/utils/permissionFilters'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
@@ -130,12 +131,18 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
   }, [user, isDepartmentHead, isTeamLeader])
 
   // Filter menu items based on company feature flags
-  const filteredMenuItems = useMemo(() => {
-    if (!companyFeatures || !menuItems.length) return menuItems
-    const hidden = getHiddenSidebarItems(companyFeatures)
-    if (hidden.size === 0) return menuItems
-    return menuItems.filter((item) => !hidden.has(item.name))
+  const featureFilteredMenuItems = useMemo(() => {
+    return filterMenuItemsByFeatures(menuItems, companyFeatures)
   }, [menuItems, companyFeatures])
+
+  // Filter menu items by resolved RBAC permissions
+  const filteredMenuItems = useMemo(() => {
+    if (!user || !featureFilteredMenuItems.length) return featureFilteredMenuItems
+    if (user.role === 'admin') return featureFilteredMenuItems
+    const perms = getStoredPermissions()
+    if (!perms) return featureFilteredMenuItems
+    return filterMenuByPermissions(featureFilteredMenuItems, perms, user.role)
+  }, [featureFilteredMenuItems, user])
 
   const handleLinkClick = (path) => {
     if (path && path !== pathname) {
@@ -190,7 +197,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
       fetch('/api/auth/logout', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
-      }).catch(() => {})
+      }).catch(() => { })
     }
     localStorage.removeItem('token')
     localStorage.removeItem('user')

@@ -13,13 +13,15 @@ import {
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
-import { getHiddenSidebarItems } from '@/lib/planFeatures'
+import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
+import { filterMenuByPermissions, getStoredPermissions } from '@/utils/permissionFilters'
 import toast from '@/utils/toast'
 import { handleSessionExpired } from '@/utils/userHelper'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
 import { useSocket } from '@/contexts/SocketContext'
+import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import UnreadBadge from './UnreadBadge'
 import { Button, Chip, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 
@@ -61,6 +63,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const { toggleWidget } = useChatWidget()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
   const { subscribe, isConnected } = useSocket()
+  const { features: companyFeatures } = useCompanyFeatures()
   const sidebarDebounceRef = useRef(null)
   const wasConnectedRef = useRef(null) // null = never connected yet
 
@@ -80,9 +83,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     notifications: 0
   })
 
-  // Company feature flags for gating menu items
-  const [companyFeatures, setCompanyFeatures] = useState(null)
-
   // Check if desktop/tablet (matches Tailwind lg: breakpoint at 1024px)
   useEffect(() => {
     const checkDesktop = () => {
@@ -101,7 +101,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
       checkDepartmentHead()
-      fetchCompanyFeatures()
     }
   }, [])
 
@@ -132,25 +131,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       }
     } catch (error) {
       console.error('Error checking department head:', error)
-    }
-  }
-
-  // Fetch company feature flags for sidebar gating
-  const fetchCompanyFeatures = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) return
-      const response = await fetch('/api/company/features', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.features) {
-          setCompanyFeatures(data.features)
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching company features:', error)
     }
   }
 
@@ -337,12 +317,18 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   }, [user, isDepartmentHead, isTeamLeader])
 
   // Filter menu items based on company feature flags
-  const filteredMenuItems = useMemo(() => {
-    if (!companyFeatures || !menuItems.length) return menuItems
-    const hidden = getHiddenSidebarItems(companyFeatures)
-    if (hidden.size === 0) return menuItems
-    return menuItems.filter((item) => !hidden.has(item.name))
+  const featureFilteredMenuItems = useMemo(() => {
+    return filterMenuItemsByFeatures(menuItems, companyFeatures)
   }, [menuItems, companyFeatures])
+
+  // Filter menu items by resolved RBAC permissions
+  const filteredMenuItems = useMemo(() => {
+    if (!user || !featureFilteredMenuItems.length) return featureFilteredMenuItems
+    if (user.role === 'admin') return featureFilteredMenuItems
+    const perms = getStoredPermissions()
+    if (!perms) return featureFilteredMenuItems
+    return filterMenuByPermissions(featureFilteredMenuItems, perms, user.role)
+  }, [featureFilteredMenuItems, user])
 
   const toggleSubmenu = (menuName) => {
     setExpandedMenus(prev => ({

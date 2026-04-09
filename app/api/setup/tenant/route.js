@@ -9,21 +9,8 @@ import { NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
 import { validateSetupCode, markSetupCodeUsed, registerUserTenantMapping } from '@/lib/tenantContext';
 import { getTenantConnection } from '@/lib/tenantDb';
+import { getTenantModels } from '@/lib/tenantModels';
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
-
-// User schema for tenant database
-const UserSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password: { type: String, required: true, minlength: 6, select: false },
-  role: { type: String, enum: ['admin', 'hr', 'manager', 'employee', 'department_head'], default: 'employee' },
-  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
-  company: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
-  avatar: String,
-  isActive: { type: Boolean, default: true },
-  forcePasswordChange: { type: Boolean, default: false },
-  lastLogin: Date,
-}, { timestamps: true });
 
 // Employee schema for tenant database
 const EmployeeSchema = new mongoose.Schema({
@@ -126,7 +113,7 @@ export async function POST(request) {
     const tenantConnection = await getTenantConnection(company.databaseName);
 
     // Get or create models on tenant connection
-    const User = tenantConnection.models.User || tenantConnection.model('User', UserSchema);
+    const { User } = await getTenantModels(company.databaseName, ['User']);
     const Employee = tenantConnection.models.Employee || tenantConnection.model('Employee', EmployeeSchema);
 
     // Check if email already exists in tenant database
@@ -137,10 +124,6 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create employee record
     const employee = new Employee({
@@ -158,7 +141,7 @@ export async function POST(request) {
     // Create admin user
     const user = new User({
       email: email.toLowerCase(),
-      password: hashedPassword,
+      password,
       role: 'admin',
       employeeId: employee._id,
       isActive: true,

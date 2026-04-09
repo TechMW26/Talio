@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import Fuse from 'fuse.js'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import { resolveUserPermissions } from '@/lib/permissions'
+import { checkPermission, getPageSlugForPath } from '@/lib/permissions.shared'
+import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
+import { filterMenuItemsByFeatures, isPathEnabledForFeatures } from '@/lib/planFeatures'
+import { filterMenuByPermissions } from '@/utils/permissionFilters'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,6 +90,126 @@ function buildSearchablePagesFromMenu(menuItems) {
   return pages
 }
 
+function buildMenuItemsForUser(user) {
+  if (!user) return []
+
+  const isDepartmentHead = user.isDepartmentHead === true
+  const isTeamLeader = Array.isArray(user.teamLeaderOf) && user.teamLeaderOf.length > 0
+  const effectiveRole = (isDepartmentHead && user.role !== 'admin') ? 'department_head' : user.role
+  let baseMenuItems = getMenuItemsForRole(effectiveRole)
+
+  if (isDepartmentHead) {
+    const teamSubmenu = [
+      { name: 'Team Members', path: '/dashboard/team/members' },
+      { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
+      { name: 'Team Goals', path: '/dashboard/performance/goals' },
+      { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+      { name: 'Geofencing', path: '/dashboard/team/geofencing' }
+    ]
+
+    if (isTeamLeader) {
+      teamSubmenu.splice(1, 0, { name: 'My Teams', path: '/dashboard/team/my-teams' })
+    }
+
+    const teamMenuItem = {
+      name: 'Team',
+      path: '/dashboard/team/members',
+      group: 'Main',
+      submenu: teamSubmenu
+    }
+
+    const attendanceMenuIndex = baseMenuItems.findIndex((item) => item.name === 'Attendance & Leaves')
+    if (attendanceMenuIndex !== -1) {
+      baseMenuItems = [...baseMenuItems]
+      const currentSubmenu = baseMenuItems[attendanceMenuIndex].submenu || []
+      const hasTeamAttendance = currentSubmenu.some((item) => item.path === '/dashboard/attendance/team')
+
+      if (!hasTeamAttendance) {
+        const myAttendanceIndex = currentSubmenu.findIndex((item) => item.path === '/dashboard/attendance')
+        const newSubmenu = [...currentSubmenu]
+        newSubmenu.splice(myAttendanceIndex + 1, 0, { name: 'Team Attendance', path: '/dashboard/attendance/team' })
+        baseMenuItems[attendanceMenuIndex] = {
+          ...baseMenuItems[attendanceMenuIndex],
+          submenu: newSubmenu
+        }
+      }
+    }
+
+    return [
+      baseMenuItems[0],
+      teamMenuItem,
+      ...baseMenuItems.slice(1)
+    ]
+  }
+
+  if (isTeamLeader) {
+    const teamSubmenu = [
+      { name: 'My Teams', path: '/dashboard/team/my-teams' },
+      { name: 'Team Members', path: '/dashboard/team/members' },
+      { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
+      { name: 'Team Goals', path: '/dashboard/performance/goals' },
+      { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+    ]
+    const teamMenuItem = {
+      name: 'Team',
+      path: '/dashboard/team/my-teams',
+      group: 'Main',
+      submenu: teamSubmenu
+    }
+
+    baseMenuItems = [...baseMenuItems]
+    const attendanceMenuIndex = baseMenuItems.findIndex((item) => item.name === 'Attendance & Leaves')
+    if (attendanceMenuIndex !== -1) {
+      const currentSubmenu = baseMenuItems[attendanceMenuIndex].submenu || []
+      const hasTeamAttendance = currentSubmenu.some((item) => item.path === '/dashboard/attendance/team')
+      if (!hasTeamAttendance) {
+        const myAttendanceIndex = currentSubmenu.findIndex((item) => item.path === '/dashboard/attendance')
+        const newSubmenu = [...currentSubmenu]
+        newSubmenu.splice(
+          myAttendanceIndex + 1,
+          0,
+          { name: 'Team Attendance', path: '/dashboard/attendance/team' },
+          { name: 'Attendance Regularisation', path: '/dashboard/team/regularisation' }
+        )
+        if (!newSubmenu.some((item) => item.path === '/dashboard/leave/approvals')) {
+          newSubmenu.push({ name: 'Leave Approvals', path: '/dashboard/leave/approvals' })
+        }
+        baseMenuItems[attendanceMenuIndex] = {
+          ...baseMenuItems[attendanceMenuIndex],
+          submenu: newSubmenu
+        }
+      }
+    }
+
+    const hasProductivity = baseMenuItems.some((item) => item.name === 'Productivity')
+    const result = [baseMenuItems[0], teamMenuItem, ...baseMenuItems.slice(1)]
+    if (!hasProductivity) {
+      result.splice(2, 0, { name: 'Productivity', path: '/dashboard/productivity', group: 'Work' })
+    }
+
+    return result
+  }
+
+  return baseMenuItems
+}
+
+function canAccessPath(path, companyFeatures, permissions, userRole) {
+  if (path && !isPathEnabledForFeatures(path, companyFeatures)) {
+    return false
+  }
+
+  if (!permissions || userRole === 'admin') {
+    return true
+  }
+
+  const slug = getPageSlugForPath(path)
+  if (!slug) {
+    return true
+  }
+
+  return checkPermission(permissions, slug, 'view')
+}
+
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
@@ -92,7 +217,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models } = auth
+    const { user: authUser, models, tenant } = auth
     const { User, Employee, Leave, Attendance, Department, Designation, Document, Asset, Announcement, Policy } = models
 
     const user = await User.findById(authUser._id || authUser.userId).populate('employeeId')
@@ -107,16 +232,41 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Search query too short' }, { status: 400 })
     }
 
+    let permissions = null
+    try {
+      permissions = await resolveUserPermissions(user, tenant?.databaseName)
+    } catch (permissionError) {
+      console.error('Search permission resolution error:', permissionError)
+    }
+
+    let companyFeatures = null
+    try {
+      const featurePayload = await getTenantCompanyFeaturePayload({
+        companySlug: tenant?.companySlug,
+        databaseName: tenant?.databaseName,
+      })
+      companyFeatures = featurePayload?.features || null
+    } catch (featureError) {
+      console.error('Search feature resolution error:', featureError)
+    }
+
     const searchRegex = new RegExp(query, 'i')
     const results = {
       pages: [],
       leaves: [],
+      attendance: [],
+      departments: [],
+      designations: [],
+      documents: [],
+      assets: [],
       announcements: [],
       policies: []
     }
 
-    // Build searchable pages from user's role-based menu items
-    const menuItems = getMenuItemsForRole(user.role)
+    // Build searchable pages from the same dynamic menu logic used by the sidebar.
+    let menuItems = buildMenuItemsForUser(user)
+    menuItems = filterMenuItemsByFeatures(menuItems, companyFeatures)
+    menuItems = filterMenuByPermissions(menuItems, permissions, user.role)
     const appPages = buildSearchablePagesFromMenu(menuItems)
 
     // Expand query with synonyms
@@ -164,194 +314,210 @@ export async function GET(request) {
     }))
 
     // Search Leaves (only user's leaves)
-    const leaves = await Leave.find({
-      employee: user.employeeId._id,
-      $or: [
-        { reason: searchRegex },
-        { status: searchRegex },
-        { applicationNumber: searchRegex }
-      ]
-    })
-      .select('reason status startDate endDate numberOfDays applicationNumber')
-      .populate('leaveType', 'name')
-      .limit(10)
+    if (canAccessPath('/dashboard/leave', companyFeatures, permissions, user.role)) {
+      const leaves = await Leave.find({
+        employee: user.employeeId._id,
+        $or: [
+          { reason: searchRegex },
+          { status: searchRegex },
+          { applicationNumber: searchRegex }
+        ]
+      })
+        .select('reason status startDate endDate numberOfDays applicationNumber')
+        .populate('leaveType', 'name')
+        .limit(10)
 
-    results.leaves = leaves.map(leave => ({
-      _id: leave._id,
-      type: 'leave',
-      title: leave.leaveType?.name || 'Leave',
-      subtitle: `${leave.numberOfDays} days`,
-      description: leave.reason,
-      meta: `${leave.status} • ${new Date(leave.startDate).toLocaleDateString()}`,
-      link: `/dashboard/leave`
-    }))
+      results.leaves = leaves.map(leave => ({
+        _id: leave._id,
+        type: 'leave',
+        title: leave.leaveType?.name || 'Leave',
+        subtitle: `${leave.numberOfDays} days`,
+        description: leave.reason,
+        meta: `${leave.status} • ${new Date(leave.startDate).toLocaleDateString()}`,
+        link: `/dashboard/leave`
+      }))
+    }
 
     // Search Attendance (only user's attendance)
-    const attendance = await Attendance.find({
-      employee: user.employeeId._id,
-      $or: [
-        { status: searchRegex },
-        { remarks: searchRegex }
-      ]
-    })
-      .select('date status checkIn checkOut workHours')
-      .sort({ date: -1 })
-      .limit(10)
+    if (canAccessPath('/dashboard/attendance', companyFeatures, permissions, user.role)) {
+      const attendance = await Attendance.find({
+        employee: user.employeeId._id,
+        $or: [
+          { status: searchRegex },
+          { remarks: searchRegex }
+        ]
+      })
+        .select('date status checkIn checkOut workHours')
+        .sort({ date: -1 })
+        .limit(10)
 
-    results.attendance = attendance.map(att => ({
-      _id: att._id,
-      type: 'attendance',
-      title: `Attendance - ${new Date(att.date).toLocaleDateString()}`,
-      subtitle: att.status,
-      description: `Work Hours: ${att.workHours || 0}`,
-      meta: att.checkIn ? new Date(att.checkIn).toLocaleTimeString() : 'N/A',
-      link: `/dashboard/attendance`
-    }))
+      results.attendance = attendance.map(att => ({
+        _id: att._id,
+        type: 'attendance',
+        title: `Attendance - ${new Date(att.date).toLocaleDateString()}`,
+        subtitle: att.status,
+        description: `Work Hours: ${att.workHours || 0}`,
+        meta: att.checkIn ? new Date(att.checkIn).toLocaleTimeString() : 'N/A',
+        link: `/dashboard/attendance`
+      }))
+    }
 
     // Search Departments (all departments)
-    const departments = await Department.find({
-      $or: [
-        { name: searchRegex },
-        { code: searchRegex },
-        { description: searchRegex }
-      ]
-    })
-      .select('name code description')
-      .limit(10)
+    if (canAccessPath('/dashboard/departments', companyFeatures, permissions, user.role)) {
+      const departments = await Department.find({
+        $or: [
+          { name: searchRegex },
+          { code: searchRegex },
+          { description: searchRegex }
+        ]
+      })
+        .select('name code description')
+        .limit(10)
 
-    results.departments = departments.map(dept => ({
-      _id: dept._id,
-      type: 'department',
-      title: dept.name,
-      subtitle: dept.code,
-      description: dept.description,
-      link: `/dashboard/organization/departments`
-    }))
+      results.departments = departments.map(dept => ({
+        _id: dept._id,
+        type: 'department',
+        title: dept.name,
+        subtitle: dept.code,
+        description: dept.description,
+        link: `/dashboard/departments`
+      }))
+    }
 
     // Search Designations (all designations)
-    const designations = await Designation.find({
-      title: searchRegex
-    })
-      .select('title level')
-      .populate('department', 'name')
-      .limit(10)
+    if (canAccessPath('/dashboard/designations', companyFeatures, permissions, user.role)) {
+      const designations = await Designation.find({
+        title: searchRegex
+      })
+        .select('title level')
+        .populate('department', 'name')
+        .limit(10)
 
-    results.designations = designations.map(des => ({
-      _id: des._id,
-      type: 'designation',
-      title: des.title,
-      subtitle: des.level || 'Designation',
-      description: des.department?.name,
-      link: `/dashboard/organization/designations`
-    }))
+      results.designations = designations.map(des => ({
+        _id: des._id,
+        type: 'designation',
+        title: des.title,
+        subtitle: des.level || 'Designation',
+        description: des.department?.name,
+        link: `/dashboard/designations`
+      }))
+    }
 
     // Search Documents (accessible to user)
-    const documents = await Document.find({
-      $and: [
-        {
-          $or: [
-            { accessLevel: 'public' },
-            { uploadedBy: user.employeeId._id },
-            { sharedWith: user.employeeId._id },
-            { department: user.employeeId.department }
-          ]
-        },
-        {
-          $or: [
-            { title: searchRegex },
-            { description: searchRegex },
-            { fileName: searchRegex },
-            { category: searchRegex }
-          ]
-        }
-      ]
-    })
-      .select('title description category fileName fileType')
-      .limit(10)
+    if (canAccessPath('/dashboard/documents', companyFeatures, permissions, user.role)) {
+      const documents = await Document.find({
+        $and: [
+          {
+            $or: [
+              { accessLevel: 'public' },
+              { uploadedBy: user.employeeId._id },
+              { sharedWith: user.employeeId._id },
+              { department: user.employeeId.department }
+            ]
+          },
+          {
+            $or: [
+              { title: searchRegex },
+              { description: searchRegex },
+              { fileName: searchRegex },
+              { category: searchRegex }
+            ]
+          }
+        ]
+      })
+        .select('title description category fileName fileType')
+        .limit(10)
 
-    results.documents = documents.map(doc => ({
-      _id: doc._id,
-      type: 'document',
-      title: doc.title,
-      subtitle: doc.category,
-      description: doc.description,
-      meta: doc.fileType,
-      link: `/dashboard/documents`
-    }))
+      results.documents = documents.map(doc => ({
+        _id: doc._id,
+        type: 'document',
+        title: doc.title,
+        subtitle: doc.category,
+        description: doc.description,
+        meta: doc.fileType,
+        link: `/dashboard/documents`
+      }))
+    }
 
     // Search Assets (assigned to user or available)
-    const assets = await Asset.find({
-      $and: [
-        {
-          $or: [
-            { assignedTo: user.employeeId._id },
-            { status: 'available' }
-          ]
-        },
-        {
-          $or: [
-            { name: searchRegex },
-            { assetCode: searchRegex },
-            { category: searchRegex },
-            { serialNumber: searchRegex }
-          ]
-        }
-      ]
-    })
-      .select('name assetCode category status serialNumber')
-      .limit(10)
+    if (canAccessPath('/dashboard/assets', companyFeatures, permissions, user.role)) {
+      const assets = await Asset.find({
+        $and: [
+          {
+            $or: [
+              { assignedTo: user.employeeId._id },
+              { status: 'available' }
+            ]
+          },
+          {
+            $or: [
+              { name: searchRegex },
+              { assetCode: searchRegex },
+              { category: searchRegex },
+              { serialNumber: searchRegex }
+            ]
+          }
+        ]
+      })
+        .select('name assetCode category status serialNumber')
+        .limit(10)
 
-    results.assets = assets.map(asset => ({
-      _id: asset._id,
-      type: 'asset',
-      title: asset.name,
-      subtitle: asset.assetCode,
-      description: asset.category,
-      meta: asset.status,
-      link: `/dashboard/assets`
-    }))
+      results.assets = assets.map(asset => ({
+        _id: asset._id,
+        type: 'asset',
+        title: asset.name,
+        subtitle: asset.assetCode,
+        description: asset.category,
+        meta: asset.status,
+        link: `/dashboard/assets`
+      }))
+    }
 
     // Search Announcements (all active announcements)
-    const announcements = await Announcement.find({
-      $or: [
-        { title: searchRegex },
-        { content: searchRegex }
-      ]
-    })
-      .select('title content priority publishedAt')
-      .sort({ publishedAt: -1 })
-      .limit(10)
+    if (canAccessPath('/dashboard/announcements', companyFeatures, permissions, user.role)) {
+      const announcements = await Announcement.find({
+        $or: [
+          { title: searchRegex },
+          { content: searchRegex }
+        ]
+      })
+        .select('title content priority publishedAt')
+        .sort({ publishedAt: -1 })
+        .limit(10)
 
-    results.announcements = announcements.map(ann => ({
-      _id: ann._id,
-      type: 'announcement',
-      title: ann.title,
-      subtitle: 'Announcement',
-      description: ann.content?.substring(0, 100),
-      meta: ann.priority,
-      link: `/dashboard/announcements`
-    }))
+      results.announcements = announcements.map(ann => ({
+        _id: ann._id,
+        type: 'announcement',
+        title: ann.title,
+        subtitle: 'Announcement',
+        description: ann.content?.substring(0, 100),
+        meta: ann.priority,
+        link: `/dashboard/announcements`
+      }))
+    }
 
     // Search Policies (all active policies)
-    const policies = await Policy.find({
-      $or: [
-        { title: searchRegex },
-        { description: searchRegex },
-        { category: searchRegex }
-      ]
-    })
-      .select('title description category version')
-      .limit(10)
+    if (canAccessPath('/dashboard/policies', companyFeatures, permissions, user.role)) {
+      const policies = await Policy.find({
+        $or: [
+          { title: searchRegex },
+          { description: searchRegex },
+          { category: searchRegex }
+        ]
+      })
+        .select('title description category version')
+        .limit(10)
 
-    results.policies = policies.map(policy => ({
-      _id: policy._id,
-      type: 'policy',
-      title: policy.title,
-      subtitle: `Policy v${policy.version}`,
-      description: policy.description,
-      meta: policy.category,
-      link: `/dashboard/policies`
-    }))
+      results.policies = policies.map(policy => ({
+        _id: policy._id,
+        type: 'policy',
+        title: policy.title,
+        subtitle: `Policy v${policy.version}`,
+        description: policy.description,
+        meta: policy.category,
+        link: `/dashboard/policies`
+      }))
+    }
 
     // Count total results
     const totalResults = Object.values(results).reduce((sum, arr) => sum + arr.length, 0)

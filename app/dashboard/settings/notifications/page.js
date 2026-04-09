@@ -7,6 +7,7 @@ import Loader from '@/components/ui/Loader'
 import ModalPortal from '@/components/ui/ModalPortal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
+import useRoles, { getRoleDisplayLabel } from '@/hooks/useRoles'
 import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
 import { Skeleton } from '@heroui/react'
 
@@ -112,6 +113,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
 
   const { data: deptData } = useAuthedSWR('/api/departments')
   const departments = deptData?.data || []
+  const { roles: availableRoles } = useRoles()
 
   const { data: empData } = useAuthedSWR('/api/employees?limit=1000')
   const employees = empData?.data || []
@@ -236,21 +238,21 @@ function SendNotificationTab({ userRole, userDepartment }) {
               Select Roles
             </label>
             <div className="space-y-2">
-              {['admin', 'hr', 'manager', 'employee', 'department_head'].map(role => (
-                <label key={role} className="flex items-center space-x-2">
+              {availableRoles.map(role => (
+                <label key={role.name} className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={formData.targetRoles.includes(role)}
+                    checked={formData.targetRoles.includes(role.name)}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setFormData({ ...formData, targetRoles: [...formData.targetRoles, role] })
+                        setFormData({ ...formData, targetRoles: [...formData.targetRoles, role.name] })
                       } else {
-                        setFormData({ ...formData, targetRoles: formData.targetRoles.filter(r => r !== role) })
+                        setFormData({ ...formData, targetRoles: formData.targetRoles.filter(r => r !== role.name) })
                       }
                     }}
                     className="rounded text-blue-600"
                   />
-                  <span className="text-sm capitalize">{role.replace('_', ' ')}</span>
+                  <span className="text-sm capitalize">{role.displayLabel}</span>
                 </label>
               ))}
             </div>
@@ -293,6 +295,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
 
   const { data: deptData } = useAuthedSWR('/api/departments')
   const departments = deptData?.data || []
+  const { roles: availableRoles } = useRoles()
 
   const { data: empData } = useAuthedSWR('/api/employees?limit=1000')
   const employees = empData?.data || []
@@ -368,7 +371,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
       case 'department':
         return notification.targetDepartment?.name || 'Department'
       case 'role':
-        return notification.targetRoles?.join(', ') || 'Roles'
+        return notification.targetRoles?.map(r => getRoleDisplayLabel(r, availableRoles)).join(', ') || 'Roles'
       case 'specific':
         return `${notification.targetUsers?.length || 0} users`
       default:
@@ -532,21 +535,21 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select Roles</label>
                   <div className="space-y-2">
-                    {['admin', 'hr', 'manager', 'employee', 'department_head'].map(role => (
-                      <label key={role} className="flex items-center gap-2">
+                    {availableRoles.map(role => (
+                      <label key={role.name} className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={formData.targetRoles.includes(role)}
+                          checked={formData.targetRoles.includes(role.name)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setFormData({ ...formData, targetRoles: [...formData.targetRoles, role] })
+                              setFormData({ ...formData, targetRoles: [...formData.targetRoles, role.name] })
                             } else {
-                              setFormData({ ...formData, targetRoles: formData.targetRoles.filter(r => r !== role) })
+                              setFormData({ ...formData, targetRoles: formData.targetRoles.filter(r => r !== role.name) })
                             }
                           }}
                           className="rounded text-blue-600"
                         />
-                        <span className="text-sm capitalize">{role.replace('_', ' ')}</span>
+                        <span className="text-sm capitalize">{role.displayLabel}</span>
                       </label>
                     ))}
                   </div>
@@ -602,6 +605,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
 
   const { data: deptData } = useAuthedSWR('/api/departments')
   const departments = deptData?.data || []
+  const { roles: availableRoles } = useRoles()
 
   const createMutation = useApiMutation({
     method: 'POST',
@@ -681,7 +685,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
       case 'department':
         return notification.targetDepartment?.name || 'Department'
       case 'role':
-        return notification.targetRoles?.join(', ') || 'Roles'
+        return notification.targetRoles?.map(r => getRoleDisplayLabel(r, availableRoles)).join(', ') || 'Roles'
       case 'specific':
         return `${notification.targetUsers?.length || 0} users`
       default:
@@ -958,21 +962,21 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select Roles</label>
                   <div className="space-y-2">
-                    {['admin', 'hr', 'manager', 'employee', 'department_head'].map(role => (
-                      <label key={role} className="flex items-center gap-2">
+                    {availableRoles.map(role => (
+                      <label key={role.name} className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={formData.targetRoles.includes(role)}
+                          checked={formData.targetRoles.includes(role.name)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setFormData({ ...formData, targetRoles: [...formData.targetRoles, role] })
+                              setFormData({ ...formData, targetRoles: [...formData.targetRoles, role.name] })
                             } else {
-                              setFormData({ ...formData, targetRoles: formData.targetRoles.filter(r => r !== role) })
+                              setFormData({ ...formData, targetRoles: formData.targetRoles.filter(r => r !== role.name) })
                             }
                           }}
                           className="rounded text-blue-600"
                         />
-                        <span className="text-sm capitalize">{role.replace('_', ' ')}</span>
+                        <span className="text-sm capitalize">{role.displayLabel}</span>
                       </label>
                     ))}
                   </div>
@@ -1007,6 +1011,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
 function NotificationHistoryTab({ userRole, userDepartment }) {
   const [filter, setFilter] = useState('all') // 'all', 'scheduled', 'recurring'
   const [selectedNotification, setSelectedNotification] = useState(null)
+  const { roles: availableRoles } = useRoles()
 
   // Fetch scheduled sent notifications (when filter is 'all' or 'scheduled')
   const { data: sentData, isLoading: loadingSent } = useAuthedSWR(
@@ -1084,7 +1089,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
       case 'department':
         return notification.targetDepartment?.name || 'Department'
       case 'role':
-        return notification.targetRoles?.join(', ') || 'Roles'
+        return notification.targetRoles?.map(r => getRoleDisplayLabel(r, availableRoles)).join(', ') || 'Roles'
       case 'specific':
         return `${notification.targetUsers?.length || 0} users`
       default:

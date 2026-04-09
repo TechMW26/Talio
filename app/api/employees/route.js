@@ -179,7 +179,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get auth and tenant-aware models
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'OnboardingEmail', 'CompanySettings']);
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'OnboardingEmail', 'CompanySettings', 'Role']);
     if (!auth.success) {
       return NextResponse.json(
         { success: false, message: auth.message || 'Unauthorized' },
@@ -187,7 +187,7 @@ export async function POST(request) {
       )
     }
 
-    const { models: { Employee: TenantEmployee, User: TenantUser, OnboardingEmail: TenantOnboardingEmail, CompanySettings: TenantCompanySettings } } = auth;
+    const { models: { Employee: TenantEmployee, User: TenantUser, OnboardingEmail: TenantOnboardingEmail, CompanySettings: TenantCompanySettings, Role: TenantRole } } = auth;
 
     // Check user limit for tenant if tenant info is available
     if (auth.tenant?.databaseName) {
@@ -277,6 +277,14 @@ export async function POST(request) {
       role: data.role || 'employee', // Default role is employee
       employeeId: employee._id,
       forcePasswordChange: true, // Force password change on first login
+    }
+
+    // Look up roleId from Role collection
+    if (TenantRole) {
+      const roleDoc = await TenantRole.findOne({ name: userData.role }).select('_id').lean()
+      if (roleDoc) {
+        userData.roleId = roleDoc._id
+      }
     }
 
     // Add company to user if provided (same company as employee)

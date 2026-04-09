@@ -9,6 +9,7 @@ import { Card, CardBody, Button, Select, SelectItem } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
+import useRoles from '@/hooks/useRoles'
 
 export default function AddEmployeePage() {
   const router = useRouter()
@@ -26,6 +27,8 @@ export default function AddEmployeePage() {
 
   const { data: compRes } = useAuthedSWR(accessDenied ? null : '/api/companies')
   const companies = compRes?.data || []
+
+  const { roles: availableRoles, loading: rolesLoading } = useRoles()
 
   // --- Submit mutation ---
   const submitMutation = useApiMutation({
@@ -279,8 +282,8 @@ export default function AddEmployeePage() {
             type="button"
             onClick={() => setActiveTab('single')}
             className={`px-6 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'single'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
               }`}
           >
             <FaUserPlus />
@@ -290,8 +293,8 @@ export default function AddEmployeePage() {
             type="button"
             onClick={() => setActiveTab('bulk')}
             className={`px-6 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'bulk'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
               }`}
           >
             <FaFileUpload />
@@ -699,10 +702,13 @@ export default function AddEmployeePage() {
                   </label>
                   <Select
                     name="role"
-                    selectedKeys={[formData.role]}
+                    selectedKeys={formData.role ? [formData.role] : []}
                     onChange={handleChange}
                     isRequired
+                    isLoading={rolesLoading}
                     aria-label="User Role"
+                    placeholder="Select Role"
+                    items={availableRoles}
                     className="text-default-900"
                     classNames={{
                       trigger: "bg-white border border-default-300 text-default-900 data-[hover=true]:border-default-400",
@@ -713,10 +719,9 @@ export default function AddEmployeePage() {
                       popoverContent: "bg-white text-default-900"
                     }}
                   >
-                    <SelectItem key="employee">Employee</SelectItem>
-                    <SelectItem key="manager">Manager</SelectItem>
-                    <SelectItem key="hr">HR</SelectItem>
-                    <SelectItem key="admin">Admin</SelectItem>
+                    {(role) => (
+                      <SelectItem key={role.name}>{role.displayLabel}</SelectItem>
+                    )}
                   </Select>
                   <p className="text-xs text-default-500 mt-1">
                     Determines access level in the system
@@ -843,12 +848,12 @@ export default function AddEmployeePage() {
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-default-600">Total of components:</span>
                         <span className={`font-semibold ${(parseFloat(formData.salary.basic || 0) +
-                            parseFloat(formData.salary.hra || 0) +
-                            parseFloat(formData.salary.conveyance || 0) +
-                            parseFloat(formData.salary.medical || 0) +
-                            parseFloat(formData.salary.special || 0)) === parseFloat(formData.salary.grossSalary || 0)
-                            ? 'text-success'
-                            : 'text-danger'
+                          parseFloat(formData.salary.hra || 0) +
+                          parseFloat(formData.salary.conveyance || 0) +
+                          parseFloat(formData.salary.medical || 0) +
+                          parseFloat(formData.salary.special || 0)) === parseFloat(formData.salary.grossSalary || 0)
+                          ? 'text-success'
+                          : 'text-danger'
                           }`}>
                           ₹{(
                             parseFloat(formData.salary.basic || 0) +

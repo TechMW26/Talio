@@ -25,6 +25,7 @@ import {
   HiOutlineListBullet,
   HiOutlineSignal,
   HiOutlineLightBulb,
+  HiOutlineShieldCheck,
 } from 'react-icons/hi2'
 
 // Define menu items for each role
@@ -161,6 +162,7 @@ export const roleBasedMenus = {
     },
     { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays', group: 'Company' },
     { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
+    { name: 'Role Management', icon: HiOutlineShieldCheck, path: '/dashboard/rbac/roles', group: 'Company' },
   ],
 
   // HR - Full HR management access (similar to admin for HR functions)

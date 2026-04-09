@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
+import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,6 +42,17 @@ export async function GET(request) {
     const isManagement = ['admin', 'department_head', 'hr', 'manager'].includes(userRole)
     const isHRLevel = ['admin', 'department_head', 'hr'].includes(userRole)
 
+    let companyFeatures = null
+    try {
+      const featurePayload = await getTenantCompanyFeaturePayload({
+        companySlug: tenant?.companySlug,
+        databaseName: tenant?.databaseName,
+      })
+      companyFeatures = featurePayload?.features || null
+    } catch (featureError) {
+      console.error('[Dashboard Unified API] Failed to resolve company features:', featureError)
+    }
+
     // Get user with employee data (lean for performance)
     const userWithEmployee = await User.findById(user._id || user.userId)
       .populate({
@@ -77,6 +89,7 @@ export async function GET(request) {
     const dashboardData = {
       success: true,
       timestamp: new Date().toISOString(),
+      companyFeatures,
       user: {
         _id: user._id || user.userId,
         role: userRole,
@@ -108,15 +121,19 @@ export async function GET(request) {
 
     // === HOLIDAYS (for all roles) ===
     // === COMPANY SETTINGS (for CheckInOutWidget work hours config) ===
-    fetchPromises.push(
-      CompanySettings.findOne().lean()
-        .then(settings => {
-          dashboardData.companySettings = settings || null
-        })
-        .catch(() => { dashboardData.companySettings = null })
-    )
+    if (!companyFeatures || companyFeatures.gpsAttendance !== false) {
+      fetchPromises.push(
+        CompanySettings.findOne().lean()
+          .then(settings => {
+            dashboardData.companySettings = settings || null
+          })
+          .catch(() => { dashboardData.companySettings = null })
+      )
+    } else {
+      dashboardData.companySettings = null
+    }
 
-    if (includeAll || includeWidgets.includes('holidays')) {
+    if ((!companyFeatures || companyFeatures.holidays !== false) && (includeAll || includeWidgets.includes('holidays'))) {
       fetchPromises.push(
         Holiday.find({
           date: { $gte: new Date() }
@@ -129,10 +146,12 @@ export async function GET(request) {
           })
           .catch(() => { dashboardData.holidays = [] })
       )
+    } else {
+      dashboardData.holidays = []
     }
 
     // === ANNOUNCEMENTS (for all roles) ===
-    if (includeAll || includeWidgets.includes('announcements')) {
+    if ((!companyFeatures || companyFeatures.announcements !== false) && (includeAll || includeWidgets.includes('announcements'))) {
       const now = new Date()
       fetchPromises.push(
         Announcement.find({
@@ -160,10 +179,12 @@ export async function GET(request) {
           })
           .catch(() => { dashboardData.announcements = [] })
       )
+    } else {
+      dashboardData.announcements = []
     }
 
     // === MY ASSETS (for employees) ===
-    if (employeeId && (includeAll || includeWidgets.includes('assets'))) {
+    if (employeeId && (!companyFeatures || companyFeatures.assets !== false) && (includeAll || includeWidgets.includes('assets'))) {
       fetchPromises.push(
         Asset.find({ assignedTo: employeeId })
           .select('name type serialNumber status')
@@ -173,10 +194,12 @@ export async function GET(request) {
           })
           .catch(() => { dashboardData.myAssets = [] })
       )
+    } else {
+      dashboardData.myAssets = []
     }
 
     // === MY EXPENSES (for employees) ===
-    if (employeeId && (includeAll || includeWidgets.includes('expenses'))) {
+    if (employeeId && (!companyFeatures || companyFeatures.expenses !== false) && (includeAll || includeWidgets.includes('expenses'))) {
       fetchPromises.push(
         Expense.find({ employee: employeeId })
           .sort({ createdAt: -1 })
@@ -188,10 +211,12 @@ export async function GET(request) {
           })
           .catch(() => { dashboardData.myExpenses = [] })
       )
+    } else {
+      dashboardData.myExpenses = []
     }
 
     // === MY HELPDESK TICKETS (for employees) ===
-    if (employeeId && (includeAll || includeWidgets.includes('helpdesk'))) {
+    if (employeeId && (!companyFeatures || companyFeatures.helpdesk !== false) && (includeAll || includeWidgets.includes('helpdesk'))) {
       fetchPromises.push(
         Ticket.find({
           $or: [{ createdBy: employeeId }, { assignedTo: employeeId }]
@@ -205,10 +230,12 @@ export async function GET(request) {
           })
           .catch(() => { dashboardData.myHelpdesk = [] })
       )
+    } else {
+      dashboardData.myHelpdesk = []
     }
 
     // === POLICIES (for employees) ===
-    if (includeAll || includeWidgets.includes('policies')) {
+    if ((!companyFeatures || companyFeatures.policies !== false) && (includeAll || includeWidgets.includes('policies'))) {
       fetchPromises.push(
         Policy.find({ isActive: true })
           .sort({ createdAt: -1 })
@@ -220,10 +247,12 @@ export async function GET(request) {
           })
           .catch(() => { dashboardData.policies = [] })
       )
+    } else {
+      dashboardData.policies = []
     }
 
     // === TODAY'S ATTENDANCE (for employee) ===
-    if (employeeId && (includeAll || includeWidgets.includes('attendance'))) {
+    if (employeeId && (!companyFeatures || companyFeatures.gpsAttendance !== false) && (includeAll || includeWidgets.includes('attendance'))) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const tomorrow = new Date(today)
@@ -240,10 +269,12 @@ export async function GET(request) {
           })
           .catch(() => { dashboardData.todayAttendance = null })
       )
+    } else {
+      dashboardData.todayAttendance = null
     }
 
     // === LEAVE BALANCE (for employee) ===
-    if (employeeId && (includeAll || includeWidgets.includes('leaveBalance'))) {
+    if (employeeId && (!companyFeatures || companyFeatures.leaveManagement !== false) && (includeAll || includeWidgets.includes('leaveBalance'))) {
       fetchPromises.push(
         LeaveBalance.find({ employee: employeeId })
           .populate('leaveType', 'name code color')
@@ -253,12 +284,14 @@ export async function GET(request) {
           })
           .catch(() => { dashboardData.leaveBalance = [] })
       )
+    } else {
+      dashboardData.leaveBalance = []
     }
 
     // === MANAGEMENT DATA ===
     if (isManagement) {
       // Pending leave requests
-      if (includeAll || includeWidgets.includes('leaveRequests')) {
+      if ((!companyFeatures || companyFeatures.leaveManagement !== false) && (includeAll || includeWidgets.includes('leaveRequests'))) {
         fetchPromises.push(
           Leave.find({ status: 'pending' })
             .populate('employee', 'firstName lastName profilePicture employeeCode')
@@ -271,13 +304,15 @@ export async function GET(request) {
             })
             .catch(() => { dashboardData.pendingLeaveRequests = [] })
         )
+      } else {
+        dashboardData.pendingLeaveRequests = []
       }
     }
 
     // === HR/ADMIN DATA ===
     if (isHRLevel) {
       // Department stats
-      if (includeAll || includeWidgets.includes('departments')) {
+      if ((!companyFeatures || companyFeatures.employees !== false) && (includeAll || includeWidgets.includes('departments'))) {
         fetchPromises.push(
           Department.find({ isActive: true })
             .select('name employeeCount')
@@ -287,10 +322,12 @@ export async function GET(request) {
             })
             .catch(() => { dashboardData.departments = [] })
         )
+      } else {
+        dashboardData.departments = []
       }
 
       // Today's attendance summary
-      if (includeAll || includeWidgets.includes('attendanceSummary')) {
+      if ((!companyFeatures || companyFeatures.gpsAttendance !== false) && (includeAll || includeWidgets.includes('attendanceSummary'))) {
         const today = new Date()
         today.setHours(0, 0, 0, 0)
         const tomorrow = new Date(today)
@@ -322,6 +359,13 @@ export async function GET(request) {
               }
             })
         )
+      } else {
+        dashboardData.attendanceSummary = {
+          totalEmployees: 0,
+          presentToday: 0,
+          absentToday: 0,
+          lateToday: 0,
+        }
       }
     }
 

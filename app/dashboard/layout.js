@@ -24,7 +24,10 @@ import { TicTacToeProvider } from '@/contexts/TicTacToeContext'
 import RouteProgressBar from '@/components/ui/RouteProgressBar'
 import { getSkeletonForRoute } from '@/components/ui/PageSkeletons'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
+import toast from '@/utils/toast'
 import { getCurrentUser, getEmployeeId, syncUserData, getToken } from '@/utils/userHelper'
+import { CompanyFeaturesProvider, useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
+import { isPathEnabledForFeatures } from '@/lib/planFeatures'
 import {
   getOptimisticAuth,
   validateAuthBackground,
@@ -92,6 +95,35 @@ function SidebarStateSync({ sidebarCollapsed }) {
   useEffect(() => {
     updateSidebarCollapsed(sidebarCollapsed)
   }, [sidebarCollapsed, updateSidebarCollapsed])
+
+  return null
+}
+
+function CompanyFeatureRouteGuard() {
+  const pathname = usePathname()
+  const router = useRouter()
+  const blockedPathRef = useRef(null)
+  const { features } = useCompanyFeatures()
+
+  useEffect(() => {
+    if (!pathname || pathname === '/dashboard' || !features) {
+      blockedPathRef.current = null
+      return
+    }
+
+    if (isPathEnabledForFeatures(pathname, features)) {
+      blockedPathRef.current = null
+      return
+    }
+
+    if (blockedPathRef.current === pathname) {
+      return
+    }
+
+    blockedPathRef.current = pathname
+    toast.error('This feature is disabled for your company')
+    router.replace('/dashboard')
+  }, [features, pathname, router])
 
   return null
 }
@@ -374,125 +406,131 @@ export default function DashboardLayout({ children }) {
   if (isMeetingRoomPage) {
     return (
       <SocketProvider>
-        <TicTacToeProvider>
-        <UnreadMessagesProvider>
-          <ChatWidgetProvider>
-            <InAppNotificationProvider>
-              <ActionableToastProvider>
-                {children}
-                <CallAlertReceiver />
-              </ActionableToastProvider>
-            </InAppNotificationProvider>
-          </ChatWidgetProvider>
-        </UnreadMessagesProvider>
-        </TicTacToeProvider>
+        <CompanyFeaturesProvider>
+          <CompanyFeatureRouteGuard />
+          <TicTacToeProvider>
+            <UnreadMessagesProvider>
+              <ChatWidgetProvider>
+                <InAppNotificationProvider>
+                  <ActionableToastProvider>
+                    {children}
+                    <CallAlertReceiver />
+                  </ActionableToastProvider>
+                </InAppNotificationProvider>
+              </ChatWidgetProvider>
+            </UnreadMessagesProvider>
+          </TicTacToeProvider>
+        </CompanyFeaturesProvider>
       </SocketProvider>
     )
   }
 
   return (
     <SocketProvider>
-      <TicTacToeProvider>
-      <UnreadMessagesProvider>
-        <ChatWidgetProvider>
-          <PageTransitionProvider>
-            <InAppNotificationProvider>
-              <ActionableToastProvider>
-                {/* Sync sidebar state to chat widget context */}
-                <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
+      <CompanyFeaturesProvider>
+        <CompanyFeatureRouteGuard />
+        <TicTacToeProvider>
+          <UnreadMessagesProvider>
+            <ChatWidgetProvider>
+              <PageTransitionProvider>
+                <InAppNotificationProvider>
+                  <ActionableToastProvider>
+                    {/* Sync sidebar state to chat widget context */}
+                    <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
 
-                {/* Route progress bar - slim top bar during navigation */}
-                <RouteProgressBar />
+                    {/* Route progress bar - slim top bar during navigation */}
+                    <RouteProgressBar />
 
-                {/* Main Layout Container - Flex Row */}
-                <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
+                    {/* Main Layout Container - Flex Row */}
+                    <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
 
-                  {/* Sidebar - Static on Desktop, Fixed on Mobile */}
-                  <Sidebar
-                    isOpen={sidebarOpen}
-                    setIsOpen={setSidebarOpen}
-                    isCollapsed={sidebarCollapsed}
-                    setIsCollapsed={setSidebarCollapsed}
-                  />
+                      {/* Sidebar - Static on Desktop, Fixed on Mobile */}
+                      <Sidebar
+                        isOpen={sidebarOpen}
+                        setIsOpen={setSidebarOpen}
+                        isCollapsed={sidebarCollapsed}
+                        setIsCollapsed={setSidebarCollapsed}
+                      />
 
-                  {/* Right Side Content - Flex Column */}
-                  <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-                    {/* Offline Indicator */}
-                    <OfflineIndicator />
+                      {/* Right Side Content - Flex Column */}
+                      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+                        {/* Offline Indicator */}
+                        <OfflineIndicator />
 
-                    {/* Header - Static at top of right column */}
-                    <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+                        {/* Header - Static at top of right column */}
+                        <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
-                    {/* Main Content Area - Scrollable */}
-                    <main ref={mainRef} className={`z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white dark:bg-zinc-800 md:bg-transparent' : ''}`}>
-                      {/* Navigation skeleton overlay */}
-                      <PageTransitionOverlay />
+                        {/* Main Content Area - Scrollable */}
+                        <main ref={mainRef} className={`z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
+                          {/* Navigation skeleton overlay */}
+                          <PageTransitionOverlay />
 
-                      <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
-                        <ErrorBoundaryWithRetry>
-                          <PageContentWrapper>
-                            {children}
-                          </PageContentWrapper>
-                        </ErrorBoundaryWithRetry>
+                          <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
+                            <ErrorBoundaryWithRetry>
+                              <PageContentWrapper>
+                                {children}
+                              </PageContentWrapper>
+                            </ErrorBoundaryWithRetry>
+                          </div>
+
+                          {/* Bottom padding for mobile nav */}
+                          <div className={`w-full flex-shrink-0 md:hidden ${shouldShowFade ? 'h-20' : 'h-16'}`}></div>
+                          {/* Bottom padding for desktop */}
+                          <div className="w-full flex-shrink-0 hidden md:block h-4"></div>
+                        </main>
+
+                        {/* Gradient above bottom nav - Mobile only */}
+                        {shouldShowFade && (
+                          <div
+                            className="md:hidden fixed left-0 right-0 h-[124px] pointer-events-none z-[39]"
+                            style={{
+                              bottom: '68px',
+                              background: `linear-gradient(179.13deg, transparent 0%, var(--color-bg-main) 71.18%)`,
+                              opacity: 1,
+                              transition: 'opacity 0.6s ease-in-out'
+                            }}
+                          />
+                        )}
+
+                        {/* Bottom Navigation for Mobile */}
+                        <BottomNav />
                       </div>
 
-                      {/* Bottom padding for mobile nav */}
-                      <div className={`w-full flex-shrink-0 md:hidden ${shouldShowFade ? 'h-20' : 'h-16'}`}></div>
-                      {/* Bottom padding for desktop */}
-                      <div className="w-full flex-shrink-0 hidden md:block h-4"></div>
-                    </main>
+                      {/* Out of Premises Popup */}
+                      <OutOfPremisesPopup />
 
-                    {/* Gradient above bottom nav - Mobile only */}
-                    {shouldShowFade && (
-                      <div
-                        className="md:hidden fixed left-0 right-0 h-[124px] pointer-events-none z-[39]"
-                        style={{
-                          bottom: '68px',
-                          background: `linear-gradient(179.13deg, transparent 0%, var(--color-bg-main) 71.18%)`,
-                          opacity: 1,
-                          transition: 'opacity 0.6s ease-in-out'
-                        }}
+                      {/* Floating Chat Widget for Desktop */}
+                      <ChatWidgetContainer />
+
+                      {/* Profile Completion Modal */}
+                      <ProfileCompletionModal
+                        isOpen={showProfileCompletionModal}
+                        onClose={handleProfileModalClose}
+                        profileStatus={profileCompletionStatus}
                       />
-                    )}
 
-                    {/* Bottom Navigation for Mobile */}
-                    <BottomNav />
-                  </div>
+                      {/* Call Alert Receiver - Global alert listener */}
+                      <CallAlertReceiver />
 
-                  {/* Out of Premises Popup */}
-                  <OutOfPremisesPopup />
+                      {/* Web Push Notification Prompt */}
+                      <WebPushPrompt />
 
-                  {/* Floating Chat Widget for Desktop */}
-                  <ChatWidgetContainer />
+                      {/* Desktop Notification Permission Prompt (Electron only) */}
+                      <DesktopNotificationPrompt />
 
-                  {/* Profile Completion Modal */}
-                  <ProfileCompletionModal
-                    isOpen={showProfileCompletionModal}
-                    onClose={handleProfileModalClose}
-                    profileStatus={profileCompletionStatus}
-                  />
+                      {/* MIRA AI Chat Sidebar */}
+                      <MiraChatSidebar />
 
-                  {/* Call Alert Receiver - Global alert listener */}
-                  <CallAlertReceiver />
-
-                  {/* Web Push Notification Prompt */}
-                  <WebPushPrompt />
-
-                  {/* Desktop Notification Permission Prompt (Electron only) */}
-                  <DesktopNotificationPrompt />
-
-                  {/* MIRA AI Chat Sidebar */}
-                  <MiraChatSidebar />
-
-                  {/* Birthday & Work Anniversary Celebrations */}
-                  <CelebrationPopup />
-                </div>
-              </ActionableToastProvider>
-            </InAppNotificationProvider>
-          </PageTransitionProvider>
-        </ChatWidgetProvider>
-      </UnreadMessagesProvider>
-      </TicTacToeProvider>
+                      {/* Birthday & Work Anniversary Celebrations */}
+                      <CelebrationPopup />
+                    </div>
+                  </ActionableToastProvider>
+                </InAppNotificationProvider>
+              </PageTransitionProvider>
+            </ChatWidgetProvider>
+          </UnreadMessagesProvider>
+        </TicTacToeProvider>
+      </CompanyFeaturesProvider>
     </SocketProvider>
   )
 }

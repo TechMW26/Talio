@@ -11,6 +11,7 @@ import {
   HiOutlineMagnifyingGlass
 } from 'react-icons/hi2'
 import Loader from '@/components/ui/Loader'
+import { getRoleDisplayLabel } from '@/hooks/useRoles'
 
 /**
  * ManualCapturePanel Component
@@ -63,7 +64,7 @@ export default function ManualCapturePanel() {
         setPermissions(data.permissions)
         setTargetUsers(data.targetableUsers || [])
         setFilteredUsers(data.targetableUsers || [])
-        
+
       } catch (error) {
         console.error('Error fetching permissions:', error)
         setError('Failed to load permissions')
@@ -135,7 +136,7 @@ export default function ManualCapturePanel() {
 
         const data = await res.json()
         const targetUser = targetUsers.find(u => u._id === userId)
-        
+
         results.push({
           userId,
           userName: targetUser?.name || targetUser?.email || userId,
@@ -143,7 +144,7 @@ export default function ManualCapturePanel() {
           message: data.success ? 'Capture request sent' : data.error,
           requestId: data.request?.requestId
         })
-        
+
       } catch (error) {
         const targetUser = targetUsers.find(u => u._id === userId)
         results.push({
@@ -186,8 +187,8 @@ export default function ManualCapturePanel() {
           <div>
             <h3 className="font-semibold text-gray-900">Manual Capture</h3>
             <p className="text-xs text-gray-500">
-              {permissions?.captureScope === 'all' 
-                ? 'Capture any user\'s screen' 
+              {permissions?.captureScope === 'all'
+                ? 'Capture any user\'s screen'
                 : 'Capture screens of your department members'}
             </p>
           </div>
@@ -264,7 +265,7 @@ export default function ManualCapturePanel() {
                       </p>
                       <p className="text-xs text-gray-500 truncate">
                         {targetUser.employeeCode && `${targetUser.employeeCode} • `}
-                        {targetUser.role}
+                        {getRoleDisplayLabel(targetUser.role)}
                       </p>
                     </div>
                   </label>
@@ -300,9 +301,8 @@ export default function ManualCapturePanel() {
                 {captureResults.map((result, index) => (
                   <div
                     key={index}
-                    className={`flex items-center gap-3 px-3 py-2 text-sm ${
-                      result.success ? 'bg-green-50' : 'bg-red-50'
-                    }`}
+                    className={`flex items-center gap-3 px-3 py-2 text-sm ${result.success ? 'bg-green-50' : 'bg-red-50'
+                      }`}
                   >
                     {result.success ? (
                       <HiOutlineCheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />

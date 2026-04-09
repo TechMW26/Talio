@@ -49,8 +49,7 @@ const AnnouncementSchema = new mongoose.Schema({
     required: true,
   },
   createdByRole: {
-    type: String,
-    enum: ['admin', 'hr', 'department_head', 'manager', 'employee', 'super_admin'],
+    type: String
   },
   isDepartmentAnnouncement: {
     type: Boolean,
@@ -153,7 +152,7 @@ const AnnouncementSchema = new mongoose.Schema({
 });
 
 // Methods
-AnnouncementSchema.methods.isVisibleTo = function(employee) {
+AnnouncementSchema.methods.isVisibleTo = function (employee) {
   if (this.status !== 'published') return false
   if (this.expiryDate && new Date() > this.expiryDate) return false
 
@@ -168,7 +167,7 @@ AnnouncementSchema.methods.isVisibleTo = function(employee) {
   return false
 }
 
-AnnouncementSchema.methods.addView = function(employeeId) {
+AnnouncementSchema.methods.addView = function (employeeId) {
   const existingView = this.views.find(view => view.employee.toString() === employeeId.toString())
   if (!existingView) {
     this.views.push({ employee: employeeId, viewedAt: new Date() })
@@ -176,13 +175,13 @@ AnnouncementSchema.methods.addView = function(employeeId) {
   }
 }
 
-AnnouncementSchema.methods.addReaction = function(employeeId, reaction) {
+AnnouncementSchema.methods.addReaction = function (employeeId, reaction) {
   this.reactions = this.reactions.filter(r => r.employee.toString() !== employeeId.toString())
   this.reactions.push({ employee: employeeId, reaction, reactedAt: new Date() })
   this.engagement.totalLikes = this.reactions.length
 }
 
-AnnouncementSchema.methods.addAcknowledgment = function(employeeId) {
+AnnouncementSchema.methods.addAcknowledgment = function (employeeId) {
   const existingAck = this.acknowledgments.find(ack => ack.employee.toString() === employeeId.toString())
   if (!existingAck) {
     this.acknowledgments.push({ employee: employeeId, acknowledgedAt: new Date() })

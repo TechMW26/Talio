@@ -209,12 +209,12 @@ export async function PUT(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation'])
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'Role'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
-    const { Employee, User, Department, Designation } = models
+    const { models, tenant } = auth
+    const { Employee, User, Department, Designation, Role } = models
 
     if (!Employee || !User) {
       return NextResponse.json(
@@ -232,6 +232,37 @@ export async function PUT(request, { params }) {
         { success: false, message: 'Employee not found' },
         { status: 404 }
       )
+    }
+
+    const requestedSystemRole = typeof data.systemRole === 'string' ? data.systemRole.trim() : ''
+
+    let linkedUser = null
+    let targetRole = null
+    if (requestedSystemRole) {
+      linkedUser = await User.findOne({ employeeId: employee._id })
+        .select('_id email role roleId permissionsCache cacheUpdatedAt employeeId')
+        .lean()
+
+      if (!linkedUser) {
+        return NextResponse.json(
+          { success: false, message: 'No linked user account found for this employee' },
+          { status: 400 }
+        )
+      }
+
+      const roleQuery = employee.company
+        ? { name: requestedSystemRole, company: employee.company }
+        : { name: requestedSystemRole }
+
+      targetRole = Role ? await Role.findOne(roleQuery).select('_id name displayLabel').lean() : null
+      if (!targetRole) {
+        return NextResponse.json(
+          { success: false, message: 'Selected system role was not found' },
+          { status: 400 }
+        )
+      }
+
+      data.systemRole = requestedSystemRole
     }
 
     // Optimized: Check both validations in parallel if needed
@@ -293,6 +324,9 @@ export async function PUT(request, { params }) {
     if (data.designationLevel) {
       data.designationLevel = parseInt(data.designationLevel) || 1
     }
+
+    // System role belongs to the linked User document, not the Employee document.
+    delete data.systemRole
 
     // Handle profile picture upload to ImageKit if base64 is provided
     if (data.profilePicture && data.profilePicture.startsWith('data:image/')) {
@@ -386,19 +420,63 @@ export async function PUT(request, { params }) {
       })
       .lean()
 
-    // Handle system role update if provided
-    if (data.systemRole && ['admin', 'hr', 'manager', 'employee', 'department_head'].includes(data.systemRole)) {
-      const user = await User.findOne({ employeeId: id })
-      if (user && user.role !== data.systemRole) {
-        await User.findByIdAndUpdate(user._id, { role: data.systemRole })
-        console.log(`[Employee Update] Updated user role from ${user.role} to ${data.systemRole} for employee ${id}`)
+    let updatedLinkedUser = linkedUser
+    if (requestedSystemRole && linkedUser && targetRole) {
+      const currentRoleId = linkedUser.roleId?.toString?.() || linkedUser.roleId?.toString() || ''
+      const targetRoleId = targetRole._id?.toString?.() || targetRole._id?.toString() || ''
+      const shouldUpdateRole =
+        linkedUser.role !== requestedSystemRole ||
+        currentRoleId !== targetRoleId ||
+        linkedUser.permissionsCache !== null ||
+        linkedUser.cacheUpdatedAt !== null
+
+      if (shouldUpdateRole) {
+        const updateResult = await User.collection.updateOne(
+          { _id: linkedUser._id },
+          {
+            $set: {
+              role: requestedSystemRole,
+              roleId: targetRole._id,
+              permissionsCache: null,
+              cacheUpdatedAt: null,
+            },
+          }
+        )
+
+        if (updateResult.matchedCount === 0) {
+          return NextResponse.json(
+            { success: false, message: 'Failed to locate linked user for role update' },
+            { status: 500 }
+          )
+        }
+
+        updatedLinkedUser = await User.findById(linkedUser._id)
+          .select('_id email role roleId employeeId permissionsCache cacheUpdatedAt')
+          .lean()
+
+        const persistedRoleId = updatedLinkedUser?.roleId?.toString?.() || updatedLinkedUser?.roleId?.toString() || ''
+        if (!updatedLinkedUser || updatedLinkedUser.role !== requestedSystemRole || persistedRoleId !== targetRoleId) {
+          return NextResponse.json(
+            { success: false, message: 'System role update did not persist correctly' },
+            { status: 500 }
+          )
+        }
+
+        console.log(`[Employee Update] Updated user role from ${linkedUser.role} to ${requestedSystemRole} (roleId: ${targetRole._id}) for employee ${id}`)
       }
     }
 
-    // Clear cache for this employee and list
+    // Clear cache for this employee and related user/auth state
     queryCache.delete(queryCache.generateKey('employee', id))
     queryCache.clearPattern('employees')
+    const employeeUserId = updatedLinkedUser?._id?.toString() || linkedUser?._id?.toString() || '*'
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'employee:detail' })).catch(() => { })
     await clearCachePattern(buildCachePattern({ tenantId: auth.tenant?.databaseName, namespace: 'employees:list' })).catch(() => { })
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: employeeUserId })).catch(() => { })
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: employeeUserId })).catch(() => { })
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: employeeUserId })).catch(() => { })
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' })).catch(() => { })
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' })).catch(() => { })
 
     // Log activity for profile update
     await logActivity({
@@ -421,7 +499,10 @@ export async function PUT(request, { params }) {
     return NextResponse.json({
       success: true,
       message: 'Employee updated successfully',
-      data: updatedEmployee,
+      data: {
+        ...updatedEmployee,
+        userId: updatedLinkedUser || linkedUser || null,
+      },
     })
   } catch (error) {
     console.error('Update employee error:', error)

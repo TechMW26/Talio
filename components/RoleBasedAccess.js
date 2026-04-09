@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaExclamationTriangle } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
+import { getPageSlugForPath, checkPermission } from '@/lib/permissions.shared'
+import { getRoleDisplayLabel } from '@/hooks/useRoles'
 
 // Define role permissions for different routes
 const rolePermissions = {
   // Admin has access to everything
   admin: ['*'],
-  
+
   // HR has access to HR-related functions
   hr: [
     '/dashboard',
@@ -35,7 +37,7 @@ const rolePermissions = {
     '/dashboard/announcements',
     '/dashboard/holidays',
   ],
-  
+
   // Manager has access to team management
   manager: [
     '/dashboard',
@@ -59,7 +61,7 @@ const rolePermissions = {
     '/dashboard/learning/certificates',
     '/dashboard/announcements',
   ],
-  
+
   // Team Leader has access to team monitoring + personal functions
   team_leader: [
     '/dashboard',
@@ -111,23 +113,31 @@ const rolePermissions = {
 }
 
 // Helper function to check if user has access to a route
-const hasAccess = (userRole, pathname) => {
+const hasAccess = (userRole, pathname, rbacPermissions) => {
   if (!userRole || !rolePermissions[userRole]) {
     return false
   }
-  
+
   const permissions = rolePermissions[userRole]
-  
+
   // Admin has access to everything
   if (permissions.includes('*')) {
     return true
   }
-  
+
+  // RBAC permissions check (if available, grants access alongside legacy)
+  if (rbacPermissions) {
+    const slug = getPageSlugForPath(pathname)
+    if (slug && checkPermission(rbacPermissions, slug, 'view')) {
+      return true
+    }
+  }
+
   // Check exact match first
   if (permissions.includes(pathname)) {
     return true
   }
-  
+
   // Check if any permission is a parent path of the current pathname
   return permissions.some(permission => {
     // Handle wildcard permissions like '/dashboard/employees/*'
@@ -135,7 +145,7 @@ const hasAccess = (userRole, pathname) => {
       const basePath = permission.slice(0, -2)
       return pathname.startsWith(basePath)
     }
-    
+
     // Handle parent path permissions
     return pathname.startsWith(permission + '/')
   })
@@ -155,7 +165,8 @@ export default function RoleBasedAccess({ children, requiredRoles = [], pathname
 
       // Check if user has access to current route
       const currentPath = pathname || window.location.pathname
-      const permission = hasAccess(parsedUser.role, currentPath)
+      const rbacPerms = parsedUser.permissions || parsedUser.permissionsCache || null
+      const permission = hasAccess(parsedUser.role, currentPath, rbacPerms)
       setHasPermission(permission)
 
       // If specific roles are required, check against them
@@ -189,7 +200,7 @@ export default function RoleBasedAccess({ children, requiredRoles = [], pathname
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-6">
-            You don&apos;t have permission to access this page. Your current role ({user?.role}) doesn&apos;t allow access to this resource.
+            You don&apos;t have permission to access this page. Your current role ({getRoleDisplayLabel(user?.role)}) doesn&apos;t allow access to this resource.
           </p>
           <div className="space-y-3">
             <button
@@ -205,18 +216,17 @@ export default function RoleBasedAccess({ children, requiredRoles = [], pathname
               Go to Dashboard
             </button>
           </div>
-          
+
           {/* Role Information */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">Your Access Level:</h3>
             <div className="flex items-center justify-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${
-                user?.role === 'admin' ? 'bg-red-500' :
+              <div className={`w-3 h-3 rounded-full ${user?.role === 'admin' ? 'bg-red-500' :
                 user?.role === 'hr' ? 'bg-green-500' :
-                user?.role === 'manager' ? 'bg-blue-500' : 'bg-gray-500'
-              }`}></div>
+                  user?.role === 'manager' ? 'bg-blue-500' : 'bg-gray-500'
+                }`}></div>
               <span className="text-sm font-medium text-gray-900 capitalize">
-                {user?.role} User
+                {getRoleDisplayLabel(user?.role)} User
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-2">

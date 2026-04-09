@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { sendPasswordChangedEmail } from '@/lib/mailer'
 import { syncUserToBackup } from '@/lib/backupDb'
-import bcrypt from 'bcryptjs'
+import { compareStoredPassword } from '@/lib/passwordAuth'
 import { getTenantBySlug } from '@/lib/tenantContext'
 import { getTenantModels } from '@/lib/tenantModels'
 
@@ -190,8 +190,8 @@ export async function POST(request, { params }) {
       )
     }
 
-    // Check if new password is same as old password
-    const isSamePassword = await bcrypt.compare(password, user.password)
+    // Check if new password is same as old password even when schema methods are unavailable.
+    const isSamePassword = await compareStoredPassword(password, user.password)
     if (isSamePassword) {
       return NextResponse.json(
         { success: false, error: 'New password must be different from your current password' },

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
+import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import UnreadBadge from './UnreadBadge'
 import { Button } from '@heroui/react'
 
@@ -13,6 +14,7 @@ export default function BottomNav() {
   const { currentTheme, themes, isDarkMode } = useTheme()
   const { unreadCount } = useUnreadMessages()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
+  const { isFeatureEnabled } = useCompanyFeatures()
 
   // Get theme colors with fallbacks
   const bottomNavColor = '#FFFFFF' // White bottom nav
@@ -42,27 +44,31 @@ export default function BottomNav() {
       name: 'Projects',
       icon: '/assets/Bottom Bar/Frame 69.svg',
       path: '/dashboard/projects/my-tasks',
+      featureKey: 'projects',
       active: effectivePath.startsWith('/dashboard/projects')
     },
     {
       name: 'Chat',
       icon: '/assets/Bottom Bar/proicons_chat.svg',
       path: '/dashboard/chat',
+      featureKey: 'teamChat',
       active: effectivePath.startsWith('/dashboard/chat')
     },
     {
       name: 'Leave',
       icon: '/assets/Bottom Bar/proicons_calendar.svg',
       path: '/dashboard/leave',
+      featureKey: 'leaveManagement',
       active: effectivePath.startsWith('/dashboard/leave')
     },
     {
       name: 'Ideas',
       icon: '/assets/Bottom Bar/proicons_lightbulb.svg',
       path: '/dashboard/sandbox',
+      featureKey: 'ideas',
       active: effectivePath.startsWith('/dashboard/sandbox')
     }
-  ]
+  ].filter((item) => !item.featureKey || isFeatureEnabled(item.featureKey))
 
   const handleNavPress = (path) => {
     if (path !== pathname) {
@@ -103,6 +109,7 @@ export default function BottomNav() {
               >
                 <img
                   src={item.icon}
+                  alt=""
                   width={28}
                   height={28}
                   style={{

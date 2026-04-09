@@ -15,7 +15,6 @@ const CallAlertSchema = new mongoose.Schema({
   },
   senderRole: {
     type: String,
-    enum: ['admin', 'hr', 'manager', 'employee', 'department_head'],
     required: true
   },
   senderName: {
@@ -154,29 +153,29 @@ CallAlertSchema.index({ status: 1, createdAt: -1 });
 CallAlertSchema.index({ createdAt: -1 });
 
 // Virtual for checking if all receivers acknowledged
-CallAlertSchema.virtual('allAcknowledged').get(function() {
+CallAlertSchema.virtual('allAcknowledged').get(function () {
   return this.receivers.every(r => r.acknowledged);
 });
 
 // Method to mark receiver as having received alert
-CallAlertSchema.methods.markReceiverDelivered = async function(userId, platform) {
+CallAlertSchema.methods.markReceiverDelivered = async function (userId, platform) {
   const receiver = this.receivers.find(r => r.user.toString() === userId.toString());
   if (receiver) {
     receiver.deliveryStatus.socketIO.delivered = true;
     receiver.deliveryStatus.socketIO.deliveredAt = new Date();
-    
+
     if (platform && receiver.deliveryStatus[platform]) {
       receiver.deliveryStatus[platform].received = true;
       receiver.deliveryStatus[platform].receivedAt = new Date();
     }
-    
+
     await this.save();
   }
   return this;
 };
 
 // Method to mark audio as played
-CallAlertSchema.methods.markAudioPlayed = async function(userId, platform) {
+CallAlertSchema.methods.markAudioPlayed = async function (userId, platform) {
   const receiver = this.receivers.find(r => r.user.toString() === userId.toString());
   if (receiver && receiver.deliveryStatus[platform]) {
     receiver.deliveryStatus[platform].audioPlayed = true;
@@ -187,33 +186,33 @@ CallAlertSchema.methods.markAudioPlayed = async function(userId, platform) {
 };
 
 // Method to acknowledge alert
-CallAlertSchema.methods.acknowledgeAlert = async function(userId) {
+CallAlertSchema.methods.acknowledgeAlert = async function (userId) {
   const receiver = this.receivers.find(r => r.user.toString() === userId.toString());
   if (receiver) {
     receiver.acknowledged = true;
     receiver.acknowledgedAt = new Date();
-    
+
     // Check if all acknowledged
     if (this.receivers.every(r => r.acknowledged)) {
       this.status = 'completed';
       this.completedAt = new Date();
     }
-    
+
     await this.save();
   }
   return this;
 };
 
 // Static method to get alerts for a user
-CallAlertSchema.statics.getAlertsForUser = async function(userId, options = {}) {
+CallAlertSchema.statics.getAlertsForUser = async function (userId, options = {}) {
   const { limit = 20, skip = 0, acknowledged } = options;
-  
+
   const query = { 'receivers.user': userId };
-  
+
   if (typeof acknowledged === 'boolean') {
     query['receivers.acknowledged'] = acknowledged;
   }
-  
+
   return this.find(query)
     .populate('sender', 'email role')
     .populate('senderEmployee', 'firstName lastName employeeCode')
@@ -223,21 +222,21 @@ CallAlertSchema.statics.getAlertsForUser = async function(userId, options = {}) 
 };
 
 // Static method to get alert logs for admin
-CallAlertSchema.statics.getAlertLogs = async function(options = {}) {
+CallAlertSchema.statics.getAlertLogs = async function (options = {}) {
   const { limit = 50, skip = 0, senderId, startDate, endDate } = options;
-  
+
   const query = {};
-  
+
   if (senderId) {
     query.sender = senderId;
   }
-  
+
   if (startDate || endDate) {
     query.createdAt = {};
     if (startDate) query.createdAt.$gte = new Date(startDate);
     if (endDate) query.createdAt.$lte = new Date(endDate);
   }
-  
+
   return this.find(query)
     .populate('sender', 'email role')
     .populate('senderEmployee', 'firstName lastName employeeCode')

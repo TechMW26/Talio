@@ -5,6 +5,7 @@ import { Skeleton } from '@heroui/react'
 import { FaUser, FaEye, FaEyeSlash, FaCopy } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { getRoleDisplayLabel } from '@/hooks/useRoles'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
@@ -147,11 +148,11 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                        user.role === 'hr' ? 'bg-blue-100 text-blue-800' :
-                          user.role === 'manager' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
+                      user.role === 'hr' ? 'bg-blue-100 text-blue-800' :
+                        user.role === 'manager' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
                       }`}>
-                      {user.role.toUpperCase()}
+                      {getRoleDisplayLabel(user.role)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

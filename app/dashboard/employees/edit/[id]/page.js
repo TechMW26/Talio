@@ -8,6 +8,7 @@ import { Card, CardBody, Button, Skeleton, Select, SelectItem } from '@heroui/re
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
+import useRoles from '@/hooks/useRoles'
 
 export default function EditEmployeePage() {
   const params = useParams()
@@ -23,6 +24,8 @@ export default function EditEmployeePage() {
   const { data: desigRes } = useAuthedSWR(accessDenied ? null : '/api/designations')
   const designations = desigRes?.data || []
 
+  const { roles: availableRoles, loading: rolesLoading } = useRoles()
+
   // --- SWR: Employee data ---
   const { data: empRes, isLoading: loading } = useAuthedSWR(
     accessDenied ? null : `/api/employees/${params.id}`
@@ -32,7 +35,31 @@ export default function EditEmployeePage() {
   const submitMutation = useApiMutation({
     method: 'PUT',
     invalidateKeys: [`/api/employees/${params.id}`],
-    onSuccess: () => {
+    onSuccess: (response) => {
+      try {
+        const storedUser = JSON.parse(localStorage.getItem('user') || 'null')
+        const storedEmployeeId =
+          storedUser?.employeeId?._id ||
+          storedUser?.employeeId?.id ||
+          storedUser?.employeeId ||
+          null
+
+        if (storedUser && storedEmployeeId && String(storedEmployeeId) === String(params.id)) {
+          localStorage.setItem(
+            'user',
+            JSON.stringify({
+              ...storedUser,
+              role: response?.data?.userId?.role || formData.systemRole,
+              roleId: response?.data?.userId?.roleId || storedUser.roleId || null,
+              permissionsCache: null,
+              cacheUpdatedAt: null,
+            })
+          )
+        }
+      } catch (error) {
+        console.warn('[Edit Employee] Failed to sync local user role after update:', error)
+      }
+
       toast.success('Employee updated successfully!')
       router.push('/dashboard/employees')
     },
@@ -578,16 +605,33 @@ export default function EditEmployeePage() {
                     <span className="text-xs text-default-400 ml-2">(Access level)</span>
                   </label>
                   <Select
-                    selectedKeys={[formData.systemRole]}
-                    onChange={(e) => setFormData({ ...formData, systemRole: e.target.value })}
+                    name="systemRole"
+                    selectedKeys={formData.systemRole ? [formData.systemRole] : []}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const selectedRole = Array.from(keys)[0]
+                      setFormData((prev) => ({
+                        ...prev,
+                        systemRole: selectedRole ? String(selectedRole) : '',
+                      }))
+                    }}
                     aria-label="System Role"
-                    classNames={{ trigger: "bg-white" }}
+                    placeholder="Select Role"
+                    isLoading={rolesLoading}
+                    items={availableRoles}
+                    className="text-default-900"
+                    classNames={{
+                      trigger: "bg-white border border-default-300 text-default-900 data-[hover=true]:border-default-400",
+                      value: "text-default-900",
+                      innerWrapper: "text-default-900",
+                      selectorIcon: "text-default-600",
+                      listbox: "text-default-900",
+                      popoverContent: "bg-white text-default-900"
+                    }}
                   >
-                    <SelectItem key="employee">Employee</SelectItem>
-                    <SelectItem key="manager">Manager</SelectItem>
-                    <SelectItem key="department_head">Department Head</SelectItem>
-                    <SelectItem key="hr">HR</SelectItem>
-                    <SelectItem key="admin">Admin</SelectItem>
+                    {(role) => (
+                      <SelectItem key={role.name}>{role.displayLabel}</SelectItem>
+                    )}
                   </Select>
                   <p className="text-xs text-default-500 mt-1">
                     Controls what features this user can access in the system

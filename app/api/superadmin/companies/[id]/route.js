@@ -10,6 +10,9 @@ import { verifySuperAdmin } from '@/lib/superadminAuth';
 import getTenantCompanyModel from '@/models/TenantCompany';
 import getUserTenantMappingModel from '@/models/UserTenantMapping';
 import { getTenantConnection, dropTenantDatabase } from '@/lib/tenantDb';
+import { mergeCompanyFeatures } from '@/lib/planFeatures';
+import { clearTenantCompanyFeaturesCache } from '@/lib/companyFeatures.server';
+import { buildCachePattern, clearCachePattern } from '@/lib/cache';
 
 /**
  * GET - Get company details
@@ -41,7 +44,6 @@ export async function GET(request, { params }) {
     if (company.isSetupComplete) {
       try {
         const tenantConnection = await getTenantConnection(company.databaseName);
-        // Use raw collection to avoid model registration conflicts
         const usersCollection = tenantConnection.db.collection('users');
         const userCount = await usersCollection.countDocuments({});
         const activeUserCount = await usersCollection.countDocuments({ isActive: true });
@@ -116,6 +118,11 @@ export async function PATCH(request, { params }) {
       );
     }
 
+    const featuresOrPlanChanged =
+      body.features !== undefined ||
+      body.subscription !== undefined ||
+      body.miraTokens !== undefined;
+
     // Update allowed fields
     const allowedFields = [
       'name', 'description', 'logo', 'primaryContact', 'address',
@@ -137,7 +144,7 @@ export async function PATCH(request, { params }) {
           // Merge nested objects to preserve existing data
           const existingData = company[field]?.toObject?.() || company[field] || {};
           company[field] = { ...existingData, ...body[field] };
-          
+
           // Handle subscription tenure calculation
           if (field === 'subscription' && body[field].tenureDays && body[field].startDate) {
             const startDate = new Date(body[field].startDate);
@@ -163,6 +170,40 @@ export async function PATCH(request, { params }) {
     }
 
     await company.save();
+
+    if (featuresOrPlanChanged) {
+      await Promise.all([
+        clearTenantCompanyFeaturesCache({
+          companySlug: company.slug,
+          databaseName: company.databaseName,
+        }),
+        clearCachePattern(buildCachePattern({
+          tenantId: company.databaseName,
+          namespace: 'sidebar:counts',
+        })),
+        clearCachePattern(buildCachePattern({
+          tenantId: company.databaseName,
+          namespace: 'dashboard:unified',
+        })),
+      ]).catch((error) => {
+        console.error('[SuperAdmin Company PATCH] Failed to clear feature-related caches:', error)
+      })
+
+      if (global.io && company.databaseName) {
+        global.io.to(`tenant:${company.databaseName}`).emit('company-features-updated', {
+          companyId: company._id.toString(),
+          companySlug: company.slug,
+          databaseName: company.databaseName,
+          plan: company.subscription?.plan || 'custom',
+          features: mergeCompanyFeatures(
+            company.features?.toObject?.() || company.features || {},
+            company.subscription?.plan || 'custom'
+          ),
+          miraTokens: company.miraTokens || { perUserAllocation: 0 },
+          updatedAt: company.updatedAt,
+        })
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -205,7 +246,7 @@ export async function DELETE(request, { params }) {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const isPermanent = searchParams.get('permanent') === 'true';
-    
+
     const TenantCompany = await getTenantCompanyModel();
     const company = await TenantCompany.findById(id);
 
@@ -221,7 +262,7 @@ export async function DELETE(request, { params }) {
     if (isPermanent) {
       // Hard delete - drop database and remove all records
       console.log(`🗑️ [SuperAdmin] Hard deleting company: ${company.name} (${company.slug})`);
-      
+
       // 1. Drop the tenant database
       if (company.databaseName) {
         const dropResult = await dropTenantDatabase(company.databaseName);

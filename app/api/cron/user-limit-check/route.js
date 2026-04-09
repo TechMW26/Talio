@@ -35,7 +35,7 @@ function createTransporter() {
 async function sendLimitNotification(transporter, company, currentCount, maxUsers, usagePercent) {
   const isAtLimit = currentCount >= maxUsers;
   const isNearLimit = usagePercent >= 80;
-  
+
   if (!isAtLimit && !isNearLimit) return null;
 
   const emailHtml = `
@@ -49,10 +49,10 @@ async function sendLimitNotification(transporter, company, currentCount, maxUser
         
         <div style="background: ${isAtLimit ? '#fee2e2' : '#fef3c7'}; border-left: 4px solid ${isAtLimit ? '#dc2626' : '#f59e0b'}; padding: 15px; margin: 20px 0;">
           <p style="margin: 0; color: ${isAtLimit ? '#dc2626' : '#92400e'};">
-            ${isAtLimit 
-              ? '🚫 You have reached your maximum user limit. New employee creation is blocked.' 
-              : `⚠️ You are using ${Math.round(usagePercent)}% of your user quota.`
-            }
+            ${isAtLimit
+      ? '🚫 You have reached your maximum user limit. New employee creation is blocked.'
+      : `⚠️ You are using ${Math.round(usagePercent)}% of your user quota.`
+    }
           </p>
         </div>
         
@@ -114,7 +114,7 @@ async function sendLimitNotification(transporter, company, currentCount, maxUser
   `;
 
   const emailTo = company.primaryContact?.email || company.adminEmail;
-  
+
   if (!emailTo) {
     return { success: false, reason: 'No email address' };
   }
@@ -175,26 +175,25 @@ export async function POST(request) {
       try {
         // Get current user count from tenant database
         const tenantConnection = await getTenantConnection(company.databaseName);
-        const UserModel = tenantConnection.model('User', new mongoose.Schema({}, { strict: false }), 'users');
-        const currentCount = await UserModel.countDocuments({ isActive: true });
+        const currentCount = await tenantConnection.db.collection('users').countDocuments({ isActive: true });
 
         const usagePercent = (currentCount / maxUsers) * 100;
 
         // Update company with current count
         await TenantCompany.updateOne(
           { _id: company._id },
-          { 
-            $set: { 
+          {
+            $set: {
               'subscription.currentUserCount': currentCount,
               'analytics.lastUserCountCheck': new Date(),
-            } 
+            }
           }
         );
 
         // Check if at limit
         if (currentCount >= maxUsers) {
           results.at_limit++;
-          
+
           // Check if we already notified today
           const lastNotified = company.analytics?.userLimitNotifiedAt;
           const today = new Date().toDateString();
@@ -206,18 +205,18 @@ export async function POST(request) {
               results.notifications_sent++;
               await TenantCompany.updateOne(
                 { _id: company._id },
-                { 
-                  $set: { 
+                {
+                  $set: {
                     'analytics.userLimitReachedAt': new Date(),
                     'analytics.userLimitNotifiedAt': new Date(),
-                  } 
+                  }
                 }
               );
             }
           }
         } else if (usagePercent >= 80) {
           results.near_limit++;
-          
+
           // Only notify once when crossing 80% threshold
           const wasNearLimit = company.analytics?.userLimitWarningAt;
           const lastCount = company.subscription?.currentUserCount || 0;

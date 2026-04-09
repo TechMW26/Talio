@@ -3,6 +3,8 @@ import { SignJWT } from 'jose'
 import { sendLoginAlertEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { warmDashboardCaches } from '@/lib/cacheWarming'
+import { resolveUserPermissions } from '@/lib/permissions'
+import { compareStoredPassword, needsPasswordHashUpgrade } from '@/lib/passwordAuth'
 import crypto from 'crypto'
 
 // Multi-tenant imports
@@ -115,20 +117,12 @@ export async function POST(request) {
       )
     }
 
-    // Check password using bcrypt comparison
-    let isPasswordMatch = false
+    // Compare robustly even if an ad hoc tenant model instance is returned.
+    const isPasswordMatch = await compareStoredPassword(password, user.password)
 
-    try {
-      isPasswordMatch = await user.comparePassword(password)
-    } catch (error) {
-      // Fallback for legacy users with plain text passwords (one-time migration)
-      // This is a security migration feature - upgrades plain text to hashed
-      if (user.password === password) {
-        isPasswordMatch = true
-        // Upgrade to hashed password
-        user.password = password // This will trigger the pre-save hook to hash it
-        await user.save({ validateBeforeSave: false })
-      }
+    if (isPasswordMatch && needsPasswordHashUpgrade(user.password)) {
+      user.password = password
+      await user.save({ validateBeforeSave: false })
     }
 
     if (!isPasswordMatch) {
@@ -360,6 +354,17 @@ export async function POST(request) {
       }
     }
 
+    // Resolve RBAC permissions for client-side hooks (fire-and-forget safe)
+    let rbacPermissions = null
+    try {
+      if (tenantInfo?.databaseName) {
+        rbacPermissions = await resolveUserPermissions(user, tenantInfo.databaseName)
+      }
+    } catch (permError) {
+      console.error('[Login] Failed to resolve RBAC permissions:', permError.message)
+      // Non-fatal: client will fall back to legacy role-based access
+    }
+
     const userData = {
       id: user._id.toString(),
       _id: user._id.toString(),
@@ -367,6 +372,9 @@ export async function POST(request) {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      // RBAC permissions — resolved at login for client-side hooks
+      permissions: rbacPermissions || null,
+      roleId: user.roleId ? user.roleId.toString() : null,
       // Multi-tenant info - for frontend to know which company user belongs to
       ...(tenantInfo && {
         tenant: {

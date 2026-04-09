@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
+import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,17 @@ export async function GET(request) {
       User, Employee, Department, ProjectMember, Leave, AttendanceCorrection,
       Expense, Helpdesk, Notification, Task, TaskAssignee
     } = models
+
+    let companyFeatures = null
+    try {
+      const featurePayload = await getTenantCompanyFeaturePayload({
+        companySlug: tenant?.companySlug,
+        databaseName: tenant?.databaseName,
+      })
+      companyFeatures = featurePayload?.features || null
+    } catch (featureError) {
+      console.error('Error resolving company features for sidebar counts:', featureError)
+    }
 
     // Check Redis cache first (30s TTL - badge counts are near-real-time)
     const cacheKey = buildCacheKey({
@@ -79,22 +91,26 @@ export async function GET(request) {
 
     // 1-3. Base counts in parallel
     const [projectCount, taskCount, notificationCount] = await Promise.all([
-      ProjectMember.countDocuments({
-        user: employeeId,
-        invitationStatus: 'invited'
-      }).catch((err) => {
-        console.error('Error counting project invitations:', err.message)
-        return 0
-      }),
-      TaskAssignee
-        ? TaskAssignee.countDocuments({
+      companyFeatures?.projects === false
+        ? Promise.resolve(0)
+        : ProjectMember.countDocuments({
           user: employeeId,
-          assignmentStatus: 'pending'
+          invitationStatus: 'invited'
         }).catch((err) => {
-          console.error('Error counting task assignments:', err.message)
+          console.error('Error counting project invitations:', err.message)
           return 0
-        })
-        : Promise.resolve(0),
+        }),
+      companyFeatures?.projects === false
+        ? Promise.resolve(0)
+        : TaskAssignee
+          ? TaskAssignee.countDocuments({
+            user: employeeId,
+            assignmentStatus: 'pending'
+          }).catch((err) => {
+            console.error('Error counting task assignments:', err.message)
+            return 0
+          })
+          : Promise.resolve(0),
       Notification.countDocuments({
         user: user._id || user.userId,
         read: false
@@ -182,19 +198,25 @@ export async function GET(request) {
       }
 
       const [leaveCount, attendanceCount, expenseCount, helpdeskCount] = await Promise.all([
-        Leave.countDocuments(leaveQuery).catch((err) => {
-          console.error('Error counting leave approvals:', err.message)
-          return 0
-        }),
-        AttendanceCorrection.countDocuments(correctionQuery).catch((err) => {
-          console.error('Error counting attendance corrections:', err.message)
-          return 0
-        }),
-        Expense.countDocuments(expenseQuery).catch((err) => {
-          console.error('Error counting expenses:', err.message)
-          return 0
-        }),
-        ['admin', 'hr'].includes(userRole)
+        companyFeatures?.leaveManagement === false
+          ? Promise.resolve(0)
+          : Leave.countDocuments(leaveQuery).catch((err) => {
+            console.error('Error counting leave approvals:', err.message)
+            return 0
+          }),
+        companyFeatures?.gpsAttendance === false
+          ? Promise.resolve(0)
+          : AttendanceCorrection.countDocuments(correctionQuery).catch((err) => {
+            console.error('Error counting attendance corrections:', err.message)
+            return 0
+          }),
+        companyFeatures?.expenses === false
+          ? Promise.resolve(0)
+          : Expense.countDocuments(expenseQuery).catch((err) => {
+            console.error('Error counting expenses:', err.message)
+            return 0
+          }),
+        ['admin', 'hr'].includes(userRole) && companyFeatures?.helpdesk !== false
           ? Helpdesk.countDocuments({ status: { $in: ['open', 'in-progress'] } }).catch((err) => {
             console.error('Error counting helpdesk tickets:', err.message)
             return 0

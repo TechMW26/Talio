@@ -123,6 +123,7 @@ app.prepare().then(() => {
     socket.on('authenticate', (payload) => {
       const resolvedUserId = typeof payload === 'object' ? payload?.userId || payload?.id : payload;
       const resolvedEmployeeId = typeof payload === 'object' ? payload?.employeeId : null;
+      const resolvedTenantDatabaseName = typeof payload === 'object' ? payload?.tenantDatabaseName : null;
 
       if (resolvedUserId) {
         socket.userId = resolvedUserId.toString();
@@ -135,6 +136,12 @@ app.prepare().then(() => {
         const userEntry = presenceByUserId.get(socket.userId) || { sockets: new Set(), lastSeenAt: null };
         userEntry.sockets.add(socket.id);
         presenceByUserId.set(socket.userId, userEntry);
+      }
+
+      if (resolvedTenantDatabaseName) {
+        socket.tenantDatabaseName = resolvedTenantDatabaseName.toString();
+        socket.join(`tenant:${socket.tenantDatabaseName}`);
+        console.log(`🏢 [Socket.IO] User ${socket.userId || socket.id} joined tenant:${socket.tenantDatabaseName}`);
       }
 
       if (resolvedEmployeeId) {

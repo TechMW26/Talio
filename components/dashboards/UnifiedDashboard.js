@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import { getRoleDisplayLabel } from '@/hooks/useRoles'
+import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import { CustomizableDashboard } from '@/components/dashboard'
 import CallAlertButton from '@/components/CallAlertButton'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
@@ -259,6 +261,29 @@ export default function UnifiedDashboard({ user: userProp }) {
     const employeeIdStr = getEmployeeId(user)
     const userRole = user?.role || 'employee'
     const permissions = useMemo(() => getPermissions(userRole), [userRole])
+    const { isFeatureEnabled } = useCompanyFeatures()
+    const featurePermissions = useMemo(() => ({
+        ...permissions,
+        checkInOut: permissions.checkInOut && isFeatureEnabled('gpsAttendance'),
+        quickGlance: permissions.quickGlance && isFeatureEnabled('gpsAttendance'),
+        attendanceSummary: permissions.attendanceSummary && isFeatureEnabled('gpsAttendance'),
+        teamAttendance: permissions.teamAttendance && isFeatureEnabled('gpsAttendance'),
+        leaveRequests: permissions.leaveRequests && isFeatureEnabled('leaveManagement'),
+        leaveBalance: permissions.leaveBalance && isFeatureEnabled('leaveManagement'),
+        projectTasks: permissions.projectTasks && isFeatureEnabled('projects'),
+        todayTasks: permissions.todayTasks && isFeatureEnabled('projects'),
+        departmentChart: permissions.departmentChart && isFeatureEnabled('employees'),
+        employeeDirectory: permissions.employeeDirectory && isFeatureEnabled('employees'),
+        goals: permissions.goals && isFeatureEnabled('performance'),
+        birthday: permissions.birthday && isFeatureEnabled('employees'),
+        announcements: permissions.announcements && isFeatureEnabled('announcements'),
+        holidays: permissions.holidays && isFeatureEnabled('holidays'),
+        myAssets: permissions.myAssets && isFeatureEnabled('assets'),
+        myExpenses: permissions.myExpenses && isFeatureEnabled('expenses'),
+        myHelpdesk: permissions.myHelpdesk && isFeatureEnabled('helpdesk'),
+        policies: permissions.policies && isFeatureEnabled('policies'),
+        recentActivities: permissions.recentActivities && isFeatureEnabled('gpsAttendance'),
+    }), [permissions, isFeatureEnabled])
 
     // Format countdown time - using useCallback for stable reference
     const formatCountdown = useCallback((seconds) => {
@@ -386,7 +411,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         } catch (error) {
             console.error('Error fetching unified widget data:', error)
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps - uses employeeDataRef to avoid re-fetch cycle
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Real-time update handlers - MUST come after fetch functions
     const handleRealtimeUpdate = useCallback((data) => {
@@ -474,7 +499,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         // Fetch data in parallel (non-blocking) - only 2 API calls from UnifiedDashboard
         fetchUnifiedWidgetData()  // Single aggregated call (replaces 6+ separate calls, includes company settings)
         fetchDashboardData()       // KPI stats only
-    }, [user, employeeIdStr]) // eslint-disable-line react-hooks/exhaustive-deps - callbacks are stable or use refs
+    }, [user, employeeIdStr]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Countdown timer effect
     useEffect(() => {
@@ -737,7 +762,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         // === COMMON WIDGETS (All Roles) ===
 
         // Check In/Out Widget - Primary widget for all users
-        if (permissions.checkInOut) {
+        if (featurePermissions.checkInOut) {
             components['check-in-out'] = (
                 <CheckInOutWidget
                     user={user}
@@ -751,7 +776,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
 
         // Quick Glance Widget
-        if (permissions.quickGlance) {
+        if (featurePermissions.quickGlance) {
             components['quick-glance'] = (
                 <QuickGlanceWidget
                     todayAttendance={todayAttendance}
@@ -771,7 +796,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             const statsArray = []
             if (dashboardStats) {
                 // HR/Admin stats format
-                if (dashboardStats.totalEmployees) {
+                if (dashboardStats.totalEmployees && isFeatureEnabled('employees')) {
                     statsArray.push({
                         title: 'Total Employees',
                         value: dashboardStats.totalEmployees?.value?.toString() || '0',
@@ -779,7 +804,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                         href: '/dashboard/employees'
                     })
                 }
-                if (dashboardStats.activeToday) {
+                if (dashboardStats.activeToday && isFeatureEnabled('gpsAttendance')) {
                     statsArray.push({
                         title: 'Active Today',
                         value: `${dashboardStats.activeToday?.value || 0}/${dashboardStats.activeToday?.total || 0}`,
@@ -787,7 +812,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                         href: '/dashboard/attendance'
                     })
                 }
-                if (dashboardStats.onLeaveToday) {
+                if (dashboardStats.onLeaveToday && isFeatureEnabled('leaveManagement')) {
                     // onLeaveToday can be an array or an object with value
                     const onLeaveCount = Array.isArray(dashboardStats.onLeaveToday)
                         ? dashboardStats.onLeaveToday.length
@@ -799,7 +824,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                         href: '/dashboard/leave'
                     })
                 }
-                if (dashboardStats.lateToday) {
+                if (dashboardStats.lateToday && isFeatureEnabled('gpsAttendance')) {
                     // lateToday can be an array or an object with value
                     const lateCount = Array.isArray(dashboardStats.lateToday)
                         ? dashboardStats.lateToday.length
@@ -811,7 +836,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                         href: '/dashboard/attendance'
                     })
                 }
-                if (dashboardStats.pendingApprovals) {
+                if (dashboardStats.pendingApprovals && isFeatureEnabled('leaveManagement')) {
                     statsArray.push({
                         title: 'Pending Approvals',
                         value: dashboardStats.pendingApprovals?.leaves?.toString() || '0',
@@ -819,7 +844,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                         href: '/dashboard/leave/approvals'
                     })
                 }
-                if (dashboardStats.openPositions) {
+                if (dashboardStats.openPositions && isFeatureEnabled('recruitment')) {
                     statsArray.push({
                         title: 'Open Positions',
                         value: dashboardStats.openPositions?.value?.toString() || '0',
@@ -828,7 +853,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                     })
                 }
                 // Manager stats format
-                if (dashboardStats.teamSize !== undefined) {
+                if (dashboardStats.teamSize !== undefined && isFeatureEnabled('employees')) {
                     statsArray.push({
                         title: 'Team Size',
                         value: dashboardStats.teamSize?.toString() || '0',
@@ -836,7 +861,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                         href: '/dashboard/employees'
                     })
                 }
-                if (dashboardStats.presentToday !== undefined) {
+                if (dashboardStats.presentToday !== undefined && isFeatureEnabled('gpsAttendance')) {
                     // presentToday can be an array or a number
                     const presentCount = Array.isArray(dashboardStats.presentToday)
                         ? dashboardStats.presentToday.length
@@ -848,7 +873,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                         href: '/dashboard/attendance'
                     })
                 }
-                if (dashboardStats.pendingTasks !== undefined) {
+                if (dashboardStats.pendingTasks !== undefined && isFeatureEnabled('projects')) {
                     statsArray.push({
                         title: 'Pending Tasks',
                         value: dashboardStats.pendingTasks?.toString() || '0',
@@ -856,7 +881,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                         href: '/dashboard/projects'
                     })
                 }
-                if (dashboardStats.completedTasks !== undefined) {
+                if (dashboardStats.completedTasks !== undefined && isFeatureEnabled('projects')) {
                     statsArray.push({
                         title: 'Completed Tasks',
                         value: dashboardStats.completedTasks?.toString() || '0',
@@ -866,15 +891,17 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
             }
 
-            components['kpi-stats'] = (
-                <KPIStatsWidget
-                    statsData={statsArray}
-                />
-            )
+            if (statsArray.length > 0) {
+                components['kpi-stats'] = (
+                    <KPIStatsWidget
+                        statsData={statsArray}
+                    />
+                )
+            }
         }
 
         // Leave Requests Widget (for approvers)
-        if (permissions.leaveRequests) {
+        if (featurePermissions.leaveRequests) {
             components['leave-requests'] = (
                 <LeaveRequestsWidget
                     leaveRequests={leaveRequests}
@@ -883,7 +910,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
 
         // Team Attendance Widget
-        if (permissions.teamAttendance) {
+        if (featurePermissions.teamAttendance) {
             components['team-attendance'] = <TeamAttendanceWidget />
         }
 
@@ -892,7 +919,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         // Department Chart Widget
         // OPTIMIZED: Use pre-aggregated departmentStats from hr-stats endpoint
         // instead of loading all 1000+ employees and filtering client-side
-        if (permissions.departmentChart) {
+        if (featurePermissions.departmentChart) {
             // Build department stats from hr-stats aggregated data + department names
             const deptStats = departments.map(dept => {
                 const statEntry = dashboardStats?.departmentStats?.find(
@@ -912,14 +939,14 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
 
         // Employee Directory Widget
-        if (permissions.employeeDirectory) {
+        if (featurePermissions.employeeDirectory) {
             components['employee-directory'] = <EmployeeDirectoryWidget />
         }
 
         // === EMPLOYEE-FOCUSED WIDGETS ===
 
         // Attendance Summary Widget
-        if (permissions.attendanceSummary) {
+        if (featurePermissions.attendanceSummary) {
             components['attendance-summary'] = (
                 <AttendanceSummaryWidget
                     employeeId={employeeIdStr}
@@ -928,7 +955,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
 
         // Leave Balance Widget (only create when unified data is loaded)
-        if (permissions.leaveBalance && unifiedWidgetData) {
+        if (featurePermissions.leaveBalance && unifiedWidgetData) {
             components['leave-balance'] = (
                 <LeaveBalanceWidget
                     employeeId={employeeIdStr}
@@ -938,17 +965,17 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
 
         // Goals Widget (Employee-focused)
-        if (permissions.goals) {
+        if (featurePermissions.goals) {
             components['goals'] = <GoalsWidget userId={user?.userId || user?._id} />
         }
 
         // Today's Tasks Widget
-        if (permissions.todayTasks) {
+        if (featurePermissions.todayTasks) {
             components['today-tasks'] = <TodayTasksWidget limit={5} />
         }
 
         // Project Tasks Widget
-        if (permissions.projectTasks) {
+        if (featurePermissions.projectTasks) {
             components['project-tasks'] = <ProjectTasksWidgetWrapper limit={5} />
         }
 
@@ -960,39 +987,39 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
 
         // Announcements Widget (only create when unified data is loaded to prevent self-fetch)
-        if (permissions.announcements && unifiedWidgetData) {
+        if (featurePermissions.announcements && unifiedWidgetData) {
             components['announcements'] = <AnnouncementsWidget initialData={unifiedWidgetData.announcements} />
         }
 
         // Holidays Widget
-        if (permissions.holidays && unifiedWidgetData) {
+        if (featurePermissions.holidays && unifiedWidgetData) {
             components['holidays'] = <HolidaysWidget initialData={unifiedWidgetData.holidays} />
         }
 
         // Birthday Widget
-        if (permissions.birthday) {
+        if (featurePermissions.birthday) {
             components['birthdays'] = <BirthdayWidget />
         }
 
         // === PERSONAL WIDGETS ===
 
         // My Assets Widget
-        if (permissions.myAssets && unifiedWidgetData) {
+        if (featurePermissions.myAssets && unifiedWidgetData) {
             components['my-assets'] = <MyAssetsWidget user={user} initialData={unifiedWidgetData.myAssets} />
         }
 
         // My Expenses Widget
-        if (permissions.myExpenses && unifiedWidgetData) {
+        if (featurePermissions.myExpenses && unifiedWidgetData) {
             components['my-expenses'] = <MyExpensesWidget user={user} initialData={unifiedWidgetData.myExpenses} />
         }
 
         // My Helpdesk Widget
-        if (permissions.myHelpdesk && unifiedWidgetData) {
+        if (featurePermissions.myHelpdesk && unifiedWidgetData) {
             components['my-helpdesk'] = <MyHelpdeskWidget user={user} initialData={unifiedWidgetData.myHelpdesk} />
         }
 
         // Policies Widget
-        if (permissions.policies && unifiedWidgetData) {
+        if (featurePermissions.policies && unifiedWidgetData) {
             components['policies'] = <PoliciesWidget initialData={unifiedWidgetData.policies} />
         }
 
@@ -1002,13 +1029,14 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
 
         // Recent Activities Widget
-        if (permissions.recentActivities) {
+        if (featurePermissions.recentActivities) {
             components['recent-activities'] = <RecentActivitiesWidget />
         }
 
         return components
     }, [
         permissions,
+        featurePermissions,
         user,
         userRole,
         employeeIdStr,
@@ -1026,19 +1054,13 @@ export default function UnifiedDashboard({ user: userProp }) {
         handleCheckIn,
         handleCheckOut,
         formatCountdown,
-        unifiedWidgetData
+        unifiedWidgetData,
+        isFeatureEnabled
     ])
 
     // Role display names
     const roleDisplayName = useMemo(() => {
-        const roleNames = {
-            admin: 'Administrator',
-            department_head: 'Department Head',
-            hr: 'HR Manager',
-            manager: 'Manager',
-            employee: 'Employee'
-        }
-        return roleNames[userRole] || 'User'
+        return getRoleDisplayLabel(userRole)
     }, [userRole])
 
     // Loading skeleton

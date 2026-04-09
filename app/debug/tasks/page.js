@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getRoleDisplayLabel } from '@/hooks/useRoles'
 
 export default function TaskDebugPage() {
   const [user, setUser] = useState(null)
@@ -25,7 +26,7 @@ export default function TaskDebugPage() {
 
     try {
       const token = localStorage.getItem('token')
-      
+
       const taskData = {
         title: 'Debug Test Task',
         description: 'This is a debug test task',
@@ -53,14 +54,14 @@ export default function TaskDebugPage() {
       })
 
       const responseData = await response.json()
-      
+
       setResult(prev => prev + `Response status: ${response.status}\n`)
       setResult(prev => prev + `Response data: ${JSON.stringify(responseData, null, 2)}\n\n`)
 
       if (responseData.success) {
         // Test fetching tasks
         setResult(prev => prev + 'Testing task fetch...\n')
-        
+
         const fetchResponse = await fetch('/api/tasks?view=personal&limit=10', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -144,10 +145,10 @@ export default function TaskDebugPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Task API Debug</h1>
-      
+
       {user ? (
         <div className="mb-4 p-4 bg-green-50 rounded">
-          <p>Logged in as: {user.firstName} {user.lastName} ({user.role})</p>
+          <p>Logged in as: {user.firstName} {user.lastName} ({getRoleDisplayLabel(user.role)})</p>
           <p>User ID: {user.userId}</p>
         </div>
       ) : (
@@ -164,7 +165,7 @@ export default function TaskDebugPage() {
         >
           {loading ? 'Testing...' : 'Test Task Creation'}
         </button>
-        
+
         <button
           onClick={testTaskFetch}
           disabled={loading}

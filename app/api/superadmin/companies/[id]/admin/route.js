@@ -10,29 +10,8 @@ import { verifySuperAdmin } from '@/lib/superadminAuth';
 import getTenantCompanyModel from '@/models/TenantCompany';
 import getUserTenantMappingModel from '@/models/UserTenantMapping';
 import { getTenantConnection } from '@/lib/tenantDb';
+import { getTenantModels } from '@/lib/tenantModels';
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
-
-// User schema for tenant database
-const UserSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password: { type: String, required: true, minlength: 6, select: false },
-  role: { type: String, enum: ['admin', 'hr', 'manager', 'employee', 'department_head'], default: 'employee' },
-  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
-  company: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
-  avatar: String,
-  isActive: { type: Boolean, default: true },
-  forcePasswordChange: { type: Boolean, default: true },
-  lastLogin: Date,
-  fcmTokens: [{
-    token: String,
-    device: { type: String, enum: ['android', 'web', 'ios'], default: 'android' },
-    platform: { type: String, enum: ['android', 'web', 'ios'], default: 'android' },
-    deviceInfo: { model: String, osVersion: String, appVersion: String },
-    createdAt: { type: Date, default: Date.now },
-    lastUsed: { type: Date, default: Date.now }
-  }],
-}, { timestamps: true });
 
 // Employee schema for tenant database
 const EmployeeSchema = new mongoose.Schema({
@@ -83,8 +62,7 @@ export async function GET(request, { params }) {
     }
 
     // Connect to tenant database
-    const tenantConnection = await getTenantConnection(company.databaseName);
-    const UserModel = tenantConnection.models.User || tenantConnection.model('User', UserSchema);
+    const { User: UserModel } = await getTenantModels(company.databaseName, ['User']);
 
     // Get all admin users
     const admins = await UserModel.find({ role: 'admin' })
@@ -152,7 +130,7 @@ export async function POST(request, { params }) {
 
     // Connect to tenant database
     const tenantConnection = await getTenantConnection(company.databaseName);
-    const UserModel = tenantConnection.models.User || tenantConnection.model('User', UserSchema);
+    const { User: UserModel } = await getTenantModels(company.databaseName, ['User']);
     const EmployeeModel = tenantConnection.models.Employee || tenantConnection.model('Employee', EmployeeSchema);
     const CompanyModel = tenantConnection.models.Company || tenantConnection.model('Company', CompanySchema);
 
@@ -195,14 +173,10 @@ export async function POST(request, { params }) {
       isActive: true,
     });
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     // Create User record
     const user = await UserModel.create({
       email: email.toLowerCase(),
-      password: hashedPassword,
+      password,
       role: 'admin',
       employeeId: employee._id,
       company: tenantCompany._id,
@@ -294,8 +268,7 @@ export async function PATCH(request, { params }) {
     }
 
     // Connect to tenant database
-    const tenantConnection = await getTenantConnection(company.databaseName);
-    const UserModel = tenantConnection.models.User || tenantConnection.model('User', UserSchema);
+    const { User: UserModel } = await getTenantModels(company.databaseName, ['User']);
 
     // Find the user
     const query = userId ? { _id: userId } : { email: email.toLowerCase() };
@@ -305,19 +278,19 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
     }
 
-    // Update fields
-    const updates = {};
+    const appliedUpdates = [];
 
     if (password) {
-      const salt = await bcrypt.genSalt(10);
-      updates.password = await bcrypt.hash(password, salt);
-      updates.forcePasswordChange = true; // Force password change after reset
+      user.password = password;
+      user.forcePasswordChange = true; // Force password change after reset
+      appliedUpdates.push('forcePasswordChange');
       console.log(`🔐 [SuperAdmin] Password reset for ${user.email} in ${company.name}`);
     }
 
     if (typeof isActive === 'boolean') {
-      updates.isActive = isActive;
-      
+      user.isActive = isActive;
+      appliedUpdates.push('isActive');
+
       // Update UserTenantMapping as well
       const UserTenantMapping = await getUserTenantMappingModel();
       await UserTenantMapping.updateOne(
@@ -327,19 +300,22 @@ export async function PATCH(request, { params }) {
     }
 
     if (typeof forcePasswordChange === 'boolean') {
-      updates.forcePasswordChange = forcePasswordChange;
+      user.forcePasswordChange = forcePasswordChange;
+      if (!appliedUpdates.includes('forcePasswordChange')) {
+        appliedUpdates.push('forcePasswordChange');
+      }
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (appliedUpdates.length === 0) {
       return NextResponse.json({ success: false, message: 'No updates provided' }, { status: 400 });
     }
 
-    await UserModel.updateOne({ _id: user._id }, { $set: updates });
+    await user.save({ validateBeforeSave: false });
 
     return NextResponse.json({
       success: true,
       message: 'Admin user updated successfully',
-      updates: Object.keys(updates).filter(k => k !== 'password'),
+      updates: appliedUpdates,
     });
 
   } catch (error) {

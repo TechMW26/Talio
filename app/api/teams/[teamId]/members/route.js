@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels, hasRole } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
+import { requirePermission } from '@/lib/permissions'
 
 /**
  * GET /api/teams/[teamId]/members
@@ -43,16 +44,10 @@ export async function GET(request, context) {
 export async function POST(request, context) {
     try {
         const { teamId } = await context.params
-        const auth = await getAuthAndModels(request, ['Team', 'User'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
+        const result = await requirePermission('team_members', 'assign')(request, ['Team', 'User'])
+        if (result.denied) return result.denied
+        const { user, models } = result
         const { Team, User } = models
-
-        if (!hasRole(user, ['admin', 'hr', 'department_head', 'department_manager', 'team_leader'])) {
-            return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
-        }
 
         const { employeeIds } = await request.json()
         if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
@@ -99,16 +94,10 @@ export async function POST(request, context) {
 export async function DELETE(request, context) {
     try {
         const { teamId } = await context.params
-        const auth = await getAuthAndModels(request, ['Team', 'User'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
+        const result = await requirePermission('team_members', 'assign')(request, ['Team', 'User'])
+        if (result.denied) return result.denied
+        const { user, models } = result
         const { Team, User } = models
-
-        if (!hasRole(user, ['admin', 'hr', 'department_head', 'department_manager', 'team_leader'])) {
-            return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
-        }
 
         const { employeeIds } = await request.json()
         if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {

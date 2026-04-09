@@ -1,26 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels, hasRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/permissions'
 
 /**
  * POST /api/departments/[id]/manager
  * Assign a Department Manager to a department.
- * Only admin, hr, or the department head can assign a manager.
+ * Requires departments.edit permission (admin, hr, department_head by default).
  * Body: { employeeId } or { employeeIds: [...] } for multiple managers
  */
 export async function POST(request, context) {
     try {
         const { id } = await context.params
-        const auth = await getAuthAndModels(request, ['Department', 'Employee', 'User'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
+        const result = await requirePermission('departments', 'edit')(request, ['Department', 'Employee', 'User'])
+        if (result.denied) return result.denied
+        const { user, models } = result
         const { Department, User, Employee } = models
-
-        // Only admin, hr, or department_head can assign managers
-        if (!hasRole(user, ['admin', 'hr', 'department_head'])) {
-            return NextResponse.json({ success: false, message: 'Only admin, HR, or department head can assign department managers' }, { status: 403 })
-        }
 
         const dept = await Department.findById(id)
         if (!dept) {
@@ -98,16 +91,10 @@ export async function POST(request, context) {
 export async function DELETE(request, context) {
     try {
         const { id } = await context.params
-        const auth = await getAuthAndModels(request, ['Department', 'User'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
+        const result = await requirePermission('departments', 'edit')(request, ['Department', 'User'])
+        if (result.denied) return result.denied
+        const { user, models } = result
         const { Department, User } = models
-
-        if (!hasRole(user, ['admin', 'hr', 'department_head'])) {
-            return NextResponse.json({ success: false, message: 'Only admin, HR, or department head can remove department managers' }, { status: 403 })
-        }
 
         const data = await request.json()
         const employeeIds = data.employeeIds || (data.employeeId ? [data.employeeId] : [])

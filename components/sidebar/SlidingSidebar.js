@@ -14,7 +14,8 @@ import {
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
-import { getHiddenSidebarItems } from '@/lib/planFeatures'
+import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
+import { filterMenuByPermissions, getStoredPermissions } from '@/utils/permissionFilters'
 import toast from '@/utils/toast'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
@@ -213,12 +214,18 @@ export default function SlidingSidebar({
   }, [user, isDepartmentHead, isTeamLeader])
 
   // Filter menu items based on company feature flags
-  const filteredMenuItems = useMemo(() => {
-    if (!companyFeatures || !menuItems.length) return menuItems
-    const hidden = getHiddenSidebarItems(companyFeatures)
-    if (hidden.size === 0) return menuItems
-    return menuItems.filter((item) => !hidden.has(item.name))
+  const featureFilteredMenuItems = useMemo(() => {
+    return filterMenuItemsByFeatures(menuItems, companyFeatures)
   }, [menuItems, companyFeatures])
+
+  // Filter menu items by resolved RBAC permissions
+  const filteredMenuItems = useMemo(() => {
+    if (!user || !featureFilteredMenuItems.length) return featureFilteredMenuItems
+    if (user.role === 'admin') return featureFilteredMenuItems
+    const perms = getStoredPermissions()
+    if (!perms) return featureFilteredMenuItems
+    return filterMenuByPermissions(featureFilteredMenuItems, perms, user.role)
+  }, [featureFilteredMenuItems, user])
 
   const toggleSubmenu = (menuName) => {
     setExpandedMenus(prev => ({
@@ -404,118 +411,118 @@ export default function SlidingSidebar({
                   backgroundColor: isTargeted ? 'color-mix(in srgb, var(--color-primary-100) 40%, transparent)' : 'transparent',
                   paddingBottom: isTargeted ? '4px' : '0',
                 }}>
-                {item.submenu ? (
-                  <div className="w-full">
+                  {item.submenu ? (
+                    <div className="w-full">
+                      <button
+                        type="button"
+                        onClick={() => toggleSubmenu(item.name)}
+                        className="w-full flex items-center text-left rounded-xl transition-all duration-200 group relative justify-between px-4 py-3"
+                        style={{
+                          backgroundColor: expandedMenus[item.name] ? 'var(--color-bg-hover)' : isTargeted ? 'var(--color-primary-50)' : 'transparent',
+                          color: 'var(--color-text-primary)'
+                        }}
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <div
+                            className="transition-colors p-2 rounded-lg"
+                            style={{
+                              backgroundColor: expandedMenus[item.name] ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
+                              color: expandedMenus[item.name] ? 'white' : 'var(--color-primary-700)'
+                            }}
+                          >
+                            <item.icon className="w-5 h-5" />
+                          </div>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {item.name === 'Attendance & Leaves' ? (
+                              <span className="text-sm font-medium leading-tight text-left">
+                                Attendance &<br />Leaves
+                              </span>
+                            ) : (
+                              <span className="text-sm font-medium truncate">{item.name}</span>
+                            )}
+                            <InlineBadge count={getBadgeCount(item.name)} />
+                          </div>
+                        </div>
+                        <div className={`transition-transform duration-200 flex-shrink-0 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
+                          <HiOutlineChevronRight className="w-4 h-4" />
+                        </div>
+                      </button>
+                      {expandedMenus[item.name] && (
+                        <div className="mt-2 space-y-1 ml-8 pl-3" style={{ borderLeft: '2px solid var(--color-primary-200)' }}>
+                          {item.submenu.map((subItem) => (
+                            <Link
+                              key={subItem.path}
+                              href={subItem.path}
+                              onClick={() => handleLinkClick(subItem.path)}
+                              className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
+                              style={{
+                                backgroundColor: effectivePath === subItem.path ? 'var(--color-primary-500)' : 'transparent',
+                                color: effectivePath === subItem.path ? 'white' : 'var(--color-text-secondary)'
+                              }}
+                            >
+                              <span>{subItem.name}</span>
+                              <InlineBadge count={getSubmenuBadgeCount(subItem.name)} />
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : item.name === 'Chat' ? (
                     <button
-                      type="button"
-                      onClick={() => toggleSubmenu(item.name)}
-                      className="w-full flex items-center text-left rounded-xl transition-all duration-200 group relative justify-between px-4 py-3"
+                      onClick={() => {
+                        toggleWidget('sidebar')
+                        handleLinkClick(null)
+                      }}
+                      className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
                       style={{
-                        backgroundColor: expandedMenus[item.name] ? 'var(--color-bg-hover)' : isTargeted ? 'var(--color-primary-50)' : 'transparent',
+                        backgroundColor: 'transparent',
                         color: 'var(--color-text-primary)'
+                      }}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <div
+                          className="transition-colors relative p-2 rounded-lg"
+                          style={{
+                            backgroundColor: 'var(--color-primary-100)',
+                            color: 'var(--color-primary-600)'
+                          }}
+                        >
+                          <item.icon className="w-5 h-5" />
+                          {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
+                        </div>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-sm font-medium truncate">{item.name}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ) : (
+                    <Link
+                      href={item.path}
+                      onClick={() => handleLinkClick(item.path)}
+                      className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
+                      style={{
+                        backgroundColor: isActive ? 'var(--color-primary-500)' : 'transparent',
+                        color: isActive ? 'white' : 'var(--color-text-primary)'
                       }}
                     >
                       <div className="flex items-center gap-3 flex-1">
                         <div
                           className="transition-colors p-2 rounded-lg"
                           style={{
-                            backgroundColor: expandedMenus[item.name] ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
-                            color: expandedMenus[item.name] ? 'white' : 'var(--color-primary-700)'
+                            backgroundColor: isActive ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
+                            color: isActive ? 'white' : 'var(--color-primary-700)'
                           }}
                         >
                           <item.icon className="w-5 h-5" />
                         </div>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          {item.name === 'Attendance & Leaves' ? (
-                            <span className="text-sm font-medium leading-tight text-left">
-                              Attendance &<br />Leaves
-                            </span>
-                          ) : (
-                            <span className="text-sm font-medium truncate">{item.name}</span>
-                          )}
-                          <InlineBadge count={getBadgeCount(item.name)} />
+                          <span className="text-sm font-medium truncate">{item.name}</span>
+                          {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
                         </div>
                       </div>
-                      <div className={`transition-transform duration-200 flex-shrink-0 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
-                        <HiOutlineChevronRight className="w-4 h-4" />
-                      </div>
-                    </button>
-                    {expandedMenus[item.name] && (
-                      <div className="mt-2 space-y-1 ml-8 pl-3" style={{ borderLeft: '2px solid var(--color-primary-200)' }}>
-                        {item.submenu.map((subItem) => (
-                          <Link
-                            key={subItem.path}
-                            href={subItem.path}
-                            onClick={() => handleLinkClick(subItem.path)}
-                            className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
-                            style={{
-                              backgroundColor: effectivePath === subItem.path ? 'var(--color-primary-500)' : 'transparent',
-                              color: effectivePath === subItem.path ? 'white' : 'var(--color-text-secondary)'
-                            }}
-                          >
-                            <span>{subItem.name}</span>
-                            <InlineBadge count={getSubmenuBadgeCount(subItem.name)} />
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : item.name === 'Chat' ? (
-                  <button
-                    onClick={() => {
-                      toggleWidget('sidebar')
-                      handleLinkClick(null)
-                    }}
-                    className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
-                    style={{
-                      backgroundColor: 'transparent',
-                      color: 'var(--color-text-primary)'
-                    }}
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <div
-                        className="transition-colors relative p-2 rounded-lg"
-                        style={{
-                          backgroundColor: 'var(--color-primary-100)',
-                          color: 'var(--color-primary-600)'
-                        }}
-                      >
-                        <item.icon className="w-5 h-5" />
-                        {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
-                      </div>
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-sm font-medium truncate">{item.name}</span>
-                      </div>
-                    </div>
-                  </button>
-                ) : (
-                  <Link
-                    href={item.path}
-                    onClick={() => handleLinkClick(item.path)}
-                    className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
-                    style={{
-                      backgroundColor: isActive ? 'var(--color-primary-500)' : 'transparent',
-                      color: isActive ? 'white' : 'var(--color-text-primary)'
-                    }}
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <div
-                        className="transition-colors p-2 rounded-lg"
-                        style={{
-                          backgroundColor: isActive ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
-                          color: isActive ? 'white' : 'var(--color-primary-700)'
-                        }}
-                      >
-                        <item.icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-sm font-medium truncate">{item.name}</span>
-                        {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
-                      </div>
-                    </div>
-                  </Link>
-                )}
-              </div>
+                    </Link>
+                  )}
+                </div>
               </div>
             )
           })}

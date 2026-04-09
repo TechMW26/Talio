@@ -8,6 +8,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { connectSuperadminDB } from '@/lib/superadminDb';
+import { compareStoredPassword } from '@/lib/passwordAuth';
 
 const SuperAdminSchema = new mongoose.Schema({
   email: {
@@ -62,7 +63,7 @@ SuperAdminSchema.pre('save', async function (next) {
 
 // Compare password method
 SuperAdminSchema.methods.comparePassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return await compareStoredPassword(enteredPassword, this.password);
 };
 
 // Static method to get the model with superadmin DB connection
@@ -80,19 +81,19 @@ let lastConnection = null;
  */
 export async function getSuperAdminModel() {
   const connection = await connectSuperadminDB();
-  
+
   // Check if we need to refresh the model (connection changed or stale)
   if (SuperAdminModel && lastConnection === connection && connection.readyState === 1) {
     return SuperAdminModel;
   }
-  
+
   // Check if model already exists on this connection
   if (connection.models.SuperAdmin) {
     SuperAdminModel = connection.models.SuperAdmin;
   } else {
     SuperAdminModel = connection.model('SuperAdmin', SuperAdminSchema);
   }
-  
+
   lastConnection = connection;
   return SuperAdminModel;
 }

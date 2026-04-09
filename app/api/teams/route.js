@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels, hasRole } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
+import { requirePermission } from '@/lib/permissions'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 
 /**
@@ -46,17 +47,10 @@ export async function GET(request) {
  */
 export async function POST(request) {
     try {
-        const auth = await getAuthAndModels(request, ['Team', 'Department', 'Employee', 'User'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
+        const result = await requirePermission('team_members', 'create')(request, ['Team', 'Department', 'Employee', 'User'])
+        if (result.denied) return result.denied
+        const { user, models, tenant } = result
         const { Team, Department, User } = models
-
-        // Role check - admin, hr, department_head, department_manager
-        if (!hasRole(user, ['admin', 'hr', 'department_head', 'department_manager'])) {
-            return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
-        }
 
         const data = await request.json()
         const { teamName, teamCode, description, department: deptId, teamLeaders = [], members = [] } = data
@@ -108,7 +102,7 @@ export async function POST(request) {
         await syncTeamToUsers(team, User)
 
         // Bust departments cache so the list shows updated teams
-        const bustPattern = buildCachePattern({ tenantId: auth.tenant?.databaseName, namespace: 'departments:list' })
+        const bustPattern = buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'departments:list' })
         await clearCachePattern(bustPattern).catch(() => { })
 
         const populated = await Team.findById(team._id)

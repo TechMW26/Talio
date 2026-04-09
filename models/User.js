@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { compareStoredPassword } from '@/lib/passwordAuth';
 
 const UserSchema = new mongoose.Schema({
   email: {
@@ -17,7 +18,6 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'hr', 'manager', 'employee', 'department_head'],
     default: 'employee',
   },
   employeeId: {
@@ -231,7 +231,7 @@ UserSchema.pre('findOneAndUpdate', function (next) {
 
 // Compare password method
 UserSchema.methods.comparePassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return await compareStoredPassword(enteredPassword, this.password);
 };
 
 // Indexes for performance optimization

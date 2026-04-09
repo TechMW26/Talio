@@ -9,8 +9,9 @@
 
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
-import getTenantCompanyModel from '@/models/TenantCompany';
-import { buildCacheKey, getCache, setCache } from '@/lib/cache';
+import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server';
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
   try {
@@ -33,43 +34,17 @@ export async function GET(request) {
       );
     }
 
-    // Check cache first
-    const cacheKey = buildCacheKey({
-      tenantId: tenant.databaseName,
-      role: 'any',
-      userId: 'shared',
-      namespace: 'company-features',
-      params: { slug: companySlug },
-    });
+    const response = await getTenantCompanyFeaturePayload({
+      companySlug,
+      databaseName: tenant.databaseName,
+    })
 
-    const cached = await getCache(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached);
-    }
-
-    // Fetch from superadmin database
-    const TenantCompany = await getTenantCompanyModel();
-    const company = await TenantCompany.findOne(
-      { slug: companySlug, isActive: true },
-      'features miraTokens subscription.plan subscription.status'
-    ).lean();
-
-    if (!company) {
+    if (!response) {
       return NextResponse.json(
         { success: false, message: 'Company not found' },
         { status: 404 }
       );
     }
-
-    const response = {
-      success: true,
-      features: company.features || {},
-      plan: company.subscription?.plan || 'custom',
-      miraTokens: company.miraTokens || { perUserAllocation: 0 },
-    };
-
-    // Cache for 5 minutes - features don't change often
-    await setCache(cacheKey, response, 300);
 
     return NextResponse.json(response);
   } catch (error) {

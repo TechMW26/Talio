@@ -37,7 +37,7 @@
   "build": {
     "appId": "in.talio.desktop",
     "productName": "Talio",
-    "copyright": "Copyright \u00a9 2026 MW FutureTech. All rights reserved.",
+    "copyright": "Copyright © 2026 MW FutureTech. All rights reserved.",
     "directories": {
       "output": "dist",
       "buildResources": "build"

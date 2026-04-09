@@ -69,8 +69,7 @@ const NotificationSchema = new mongoose.Schema({
     ref: 'Employee'
   },
   sentByRole: {
-    type: String,
-    enum: ['admin', 'hr', 'manager', 'employee', 'department_head', 'system']
+    type: String
   },
 
   // Timestamps

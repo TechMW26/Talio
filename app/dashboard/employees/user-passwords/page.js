@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardBody, Button, Skeleton, Input, Chip } from '@heroui/react'
+import { getRoleDisplayLabel } from '@/hooks/useRoles'
 import {
   HiOutlineKey,
   HiOutlineMagnifyingGlass,
@@ -353,7 +354,7 @@ export default function UserPasswordsPage() {
                       <td className="px-4 py-3">
                         <p className="text-sm text-default-800">{user.email}</p>
                         <Chip size="sm" variant="flat" color="secondary" className="mt-1">
-                          {user.role}
+                          {getRoleDisplayLabel(user.role)}
                         </Chip>
                       </td>
                       <td className="px-4 py-3">
@@ -365,8 +366,8 @@ export default function UserPasswordsPage() {
                         ) : user.hasPassword ? (
                           <div className="flex items-center gap-2">
                             <code className={`px-3 py-1.5 border rounded-lg text-sm font-mono font-semibold ${revealedPasswords[user._id]
-                                ? 'bg-warning-50 border-warning-200 text-warning-700'
-                                : 'bg-default-100 border-default-200 text-default-600'
+                              ? 'bg-warning-50 border-warning-200 text-warning-700'
+                              : 'bg-default-100 border-default-200 text-default-600'
                               }`}>
                               {getDisplayPassword(user)}
                             </code>

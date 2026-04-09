@@ -2,18 +2,19 @@
 
 import { Badge as HeroBadge, Chip as HeroChip, Avatar as HeroAvatar } from '@heroui/react'
 import { cn } from '@/utils/cn'
+import useRoles, { getRoleDisplayLabel } from '@/hooks/useRoles'
 
 /**
  * HRMS Status Badge
  * For indicating status of items (active, pending, etc.)
  */
-export function StatusBadge({ 
-  status, 
+export function StatusBadge({
+  status,
   variant = 'flat',
   size = 'sm',
   className,
   children,
-  ...props 
+  ...props
 }) {
   const statusStyles = {
     active: { color: 'success', label: 'Active' },
@@ -144,24 +145,27 @@ export function PriorityBadge({ priority, className }) {
  * For displaying user roles
  */
 export function RoleBadge({ role, className }) {
+  const { roles: availableRoles } = useRoles()
+
   const roleStyles = {
-    admin: { color: 'danger', label: 'Admin' },
-    hr: { color: 'secondary', label: 'HR' },
-    manager: { color: 'primary', label: 'Manager' },
-    department_head: { color: 'warning', label: 'Dept Head' },
-    employee: { color: 'default', label: 'Employee' },
+    admin: { color: 'danger' },
+    hr: { color: 'secondary' },
+    manager: { color: 'primary' },
+    department_head: { color: 'warning' },
+    employee: { color: 'default' },
   }
 
-  const config = roleStyles[role?.toLowerCase()] || { color: 'default', label: role }
+  const color = roleStyles[role?.toLowerCase()]?.color || 'default'
+  const label = getRoleDisplayLabel(role, availableRoles)
 
   return (
     <HeroChip
       variant="flat"
-      color={config.color}
+      color={color}
       size="sm"
       className={cn('capitalize', className)}
     >
-      {config.label}
+      {label}
     </HeroChip>
   )
 }

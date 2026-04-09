@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 import { getTenantModels } from '@/lib/tenantModels'
 import { syncUserToBackup } from '@/lib/backupDb'
+import { compareStoredPassword } from '@/lib/passwordAuth'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
@@ -93,16 +94,8 @@ export async function POST(request) {
       )
     }
 
-    // Verify current password
-    let isPasswordMatch = false
-    try {
-      isPasswordMatch = await user.comparePassword(currentPassword)
-    } catch (error) {
-      // Fallback for legacy users with plain text passwords
-      if (user.password === currentPassword) {
-        isPasswordMatch = true
-      }
-    }
+    // Verify current password even if the loaded model instance lacks schema methods.
+    const isPasswordMatch = await compareStoredPassword(currentPassword, user.password)
 
     if (!isPasswordMatch) {
       return NextResponse.json(
