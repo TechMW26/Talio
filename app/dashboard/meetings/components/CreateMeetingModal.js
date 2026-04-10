@@ -246,7 +246,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
   if (!isOpen) return null
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="3xl">
+    <Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="3xl" scrollBehavior="inside">
       <ModalContent>
         {(onModalClose) => (
           <>
@@ -539,118 +539,120 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
               </div>
 
               {/* Department groups */}
-              {loadingInvitees ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-12 bg-gray-200 rounded-lg"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredDeptGroups.map(group => {
-                    const deptId = group.department._id
-                    const isExpanded = expandedDepts[deptId]
-                    const deptEmployeeIds = group.employees.map(e => e._id)
-                    const selectedCount = deptEmployeeIds.filter(id => selectedInvitees.includes(id)).length
-                    const allSelected = selectedCount === group.employees.length
+              <div className="max-h-[50vh] overflow-y-auto pr-1 lg:max-h-[32rem]">
+                {loadingInvitees ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="animate-pulse">
+                        <div className="h-12 bg-gray-200 rounded-lg"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredDeptGroups.map(group => {
+                      const deptId = group.department._id
+                      const isExpanded = expandedDepts[deptId]
+                      const deptEmployeeIds = group.employees.map(e => e._id)
+                      const selectedCount = deptEmployeeIds.filter(id => selectedInvitees.includes(id)).length
+                      const allSelected = selectedCount === group.employees.length
 
-                    return (
-                      <div key={deptId} className="border border-gray-200 rounded-xl overflow-hidden">
-                        {/* Department Header */}
-                        <div
-                          className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer"
-                          onClick={() => toggleDepartmentExpand(deptId)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleSelectAllDepartment(deptId)
-                              }}
-                              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                allSelected
-                                  ? 'bg-indigo-600 border-indigo-600'
-                                  : selectedCount > 0
-                                  ? 'bg-indigo-200 border-indigo-400'
-                                  : 'border-gray-300'
-                              }`}
-                            >
-                              {allSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
-                              {selectedCount > 0 && !allSelected && <div className="w-2 h-2 bg-indigo-600 rounded-sm"></div>}
-                            </button>
-                            <div>
-                              <p className="font-medium text-gray-800">
-                                {group.department.name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {selectedCount}/{group.count} selected
-                              </p>
+                      return (
+                        <div key={deptId} className="border border-gray-200 rounded-xl overflow-hidden">
+                          {/* Department Header */}
+                          <div
+                            className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer"
+                            onClick={() => toggleDepartmentExpand(deptId)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleSelectAllDepartment(deptId)
+                                }}
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                  allSelected
+                                    ? 'bg-indigo-600 border-indigo-600'
+                                    : selectedCount > 0
+                                    ? 'bg-indigo-200 border-indigo-400'
+                                    : 'border-gray-300'
+                                }`}
+                              >
+                                {allSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
+                                {selectedCount > 0 && !allSelected && <div className="w-2 h-2 bg-indigo-600 rounded-sm"></div>}
+                              </button>
+                              <div>
+                                <p className="font-medium text-gray-800">
+                                  {group.department.name}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {selectedCount}/{group.count} selected
+                                </p>
+                              </div>
                             </div>
+                            {isExpanded ? (
+                              <HiOutlineChevronUp className="w-5 h-5 text-gray-400" />
+                            ) : (
+                              <HiOutlineChevronDown className="w-5 h-5 text-gray-400" />
+                            )}
                           </div>
-                          {isExpanded ? (
-                            <HiOutlineChevronUp className="w-5 h-5 text-gray-400" />
-                          ) : (
-                            <HiOutlineChevronDown className="w-5 h-5 text-gray-400" />
-                          )}
-                        </div>
 
-                        {/* Employees List */}
-                        {isExpanded && (
-                          <div className="divide-y divide-gray-100">
-                            {group.employees.map(emp => {
-                              const isSelected = selectedInvitees.includes(emp._id)
-                              return (
-                                <div
-                                  key={emp._id}
-                                  onClick={() => toggleEmployeeSelect(emp._id, deptId)}
-                                  className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
-                                    isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50'
-                                  }`}
-                                >
-                                  <button
-                                    type="button"
-                                    className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                      isSelected
-                                        ? 'bg-indigo-600 border-indigo-600'
-                                        : 'border-gray-300'
+                          {/* Employees List */}
+                          {isExpanded && (
+                            <div className="divide-y divide-gray-100">
+                              {group.employees.map(emp => {
+                                const isSelected = selectedInvitees.includes(emp._id)
+                                return (
+                                  <div
+                                    key={emp._id}
+                                    onClick={() => toggleEmployeeSelect(emp._id, deptId)}
+                                    className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
+                                      isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50'
                                     }`}
                                   >
-                                    {isSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
-                                  </button>
-                                  {emp.profilePicture ? (
-                                    <img
-                                      src={emp.profilePicture}
-                                      alt={emp.fullName}
-                                      className="w-8 h-8 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                                      <span className="text-xs font-medium text-indigo-600">
-                                        {emp.firstName?.[0]}{emp.lastName?.[0]}
-                                      </span>
+                                    <button
+                                      type="button"
+                                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                        isSelected
+                                          ? 'bg-indigo-600 border-indigo-600'
+                                          : 'border-gray-300'
+                                      }`}
+                                    >
+                                      {isSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
+                                    </button>
+                                    {emp.profilePicture ? (
+                                      <img
+                                        src={emp.profilePicture}
+                                        alt={emp.fullName}
+                                        className="w-8 h-8 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                        <span className="text-xs font-medium text-indigo-600">
+                                          {emp.firstName?.[0]}{emp.lastName?.[0]}
+                                        </span>
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-gray-800 truncate">
+                                        {emp.fullName}
+                                      </p>
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {emp.designation}
+                                      </p>
                                     </div>
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-800 truncate">
-                                      {emp.fullName}
-                                    </p>
-                                    <p className="text-xs text-gray-500 truncate">
-                                      {emp.designation}
-                                    </p>
                                   </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
