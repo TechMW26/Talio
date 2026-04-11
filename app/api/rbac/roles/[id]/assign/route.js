@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels, hasRole } from '@/lib/auth'
-import { invalidatePermissionsCache } from '@/lib/permissions'
 import { logRBACEvent, extractRequestMeta } from '@/lib/rbacAudit'
+import { refreshAffectedUsers } from '@/lib/rbacSessionRefresh'
 
 // PUT /api/rbac/roles/[id]/assign — assign role to users
 // Body: { userIds: string[] }
 export async function PUT(request, { params }) {
     try {
         const { id } = await params
-        const auth = await getAuthAndModels(request, ['Role', 'User'])
+        const auth = await getAuthAndModels(request, ['Role', 'User', 'ForceRefresh'])
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 })
         }
@@ -44,6 +44,18 @@ export async function PUT(request, { params }) {
             { _id: { $in: userIds }, isActive: true },
             { $set: { roleId: role._id, permissionsCache: null, cacheUpdatedAt: null } }
         )
+
+        await refreshAffectedUsers({
+            databaseName: tenant.databaseName,
+            userIds,
+            forceRefreshModel: models.ForceRefresh,
+            initiatedBy: {
+                userId: user._id?.toString?.() || user.userId,
+                email: user.email,
+                role: user.role,
+            },
+            message: `Your access role was updated to ${role.displayLabel}. Talio will refresh to apply the new permissions.`,
+        })
 
         // Audit log
         const meta = extractRequestMeta(request)

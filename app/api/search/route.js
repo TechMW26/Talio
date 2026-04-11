@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import Fuse from 'fuse.js'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import { getMenuTemplateRole } from '@/utils/rbacMenu'
 import { resolveUserPermissions } from '@/lib/permissions'
 import { checkPermission, getPageSlugForPath } from '@/lib/permissions.shared'
 import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
@@ -90,13 +91,13 @@ function buildSearchablePagesFromMenu(menuItems) {
   return pages
 }
 
-function buildMenuItemsForUser(user) {
+function buildMenuItemsForUser(user, permissions) {
   if (!user) return []
 
   const isDepartmentHead = user.isDepartmentHead === true
   const isTeamLeader = Array.isArray(user.teamLeaderOf) && user.teamLeaderOf.length > 0
-  const effectiveRole = (isDepartmentHead && user.role !== 'admin') ? 'department_head' : user.role
-  let baseMenuItems = getMenuItemsForRole(effectiveRole)
+  const menuTemplateRole = getMenuTemplateRole(user, { isDepartmentHead, permissions })
+  let baseMenuItems = getMenuItemsForRole(menuTemplateRole)
 
   if (isDepartmentHead) {
     const teamSubmenu = [
@@ -264,7 +265,7 @@ export async function GET(request) {
     }
 
     // Build searchable pages from the same dynamic menu logic used by the sidebar.
-    let menuItems = buildMenuItemsForUser(user)
+    let menuItems = buildMenuItemsForUser(user, permissions)
     menuItems = filterMenuItemsByFeatures(menuItems, companyFeatures)
     menuItems = filterMenuByPermissions(menuItems, permissions, user.role)
     const appPages = buildSearchablePagesFromMenu(menuItems)

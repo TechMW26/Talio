@@ -11,6 +11,17 @@ module.exports = {
                 '<rootDir>/tests/mobile/**/*.test.js',
             ],
             setupFilesAfterEnv: [],
+            moduleNameMapper: {
+                '^@/(.*)$': '<rootDir>/$1',
+            },
+            transform: {
+                '^.+\\.(js|jsx)$': ['@swc/jest', {
+                    jsc: {
+                        parser: { syntax: 'ecmascript', jsx: true },
+                        transform: { react: { runtime: 'automatic' } },
+                    },
+                }],
+            },
         },
         // ── jsdom tests (Web React context) ──
         {

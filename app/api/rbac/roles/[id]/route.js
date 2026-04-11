@@ -3,6 +3,7 @@ import { getAuthAndModels, hasRole } from '@/lib/auth'
 import { validatePermissionsShape, invalidatePermissionsCache } from '@/lib/permissions'
 import { SYSTEM_ROLE_DEFINITIONS } from '@/lib/systemRoles'
 import { logRBACEvent, extractRequestMeta } from '@/lib/rbacAudit'
+import { refreshAffectedUsers } from '@/lib/rbacSessionRefresh'
 
 // GET /api/rbac/roles/[id] — get a single role
 export async function GET(request, { params }) {
@@ -43,7 +44,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
     try {
         const { id } = await params
-        const auth = await getAuthAndModels(request, ['Role', 'User'])
+        const auth = await getAuthAndModels(request, ['Role', 'User', 'ForceRefresh'])
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 })
         }
@@ -103,6 +104,17 @@ export async function PUT(request, { params }) {
         ).lean()
         const userIds = affectedUsers.map((u) => u._id.toString())
         await invalidatePermissionsCache(tenant.databaseName, userIds)
+        await refreshAffectedUsers({
+            databaseName: tenant.databaseName,
+            userIds,
+            forceRefreshModel: models.ForceRefresh,
+            initiatedBy: {
+                userId: user._id?.toString?.() || user.userId,
+                email: user.email,
+                role: user.role,
+            },
+            message: `Permissions for ${role.displayLabel} were updated. Talio will refresh to apply the latest access.`,
+        })
 
         // Audit log
         const meta = extractRequestMeta(request)
@@ -138,7 +150,7 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
     try {
         const { id } = await params
-        const auth = await getAuthAndModels(request, ['Role', 'User'])
+        const auth = await getAuthAndModels(request, ['Role', 'User', 'ForceRefresh'])
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 })
         }
@@ -178,6 +190,18 @@ export async function DELETE(request, { params }) {
                 { roleId: role._id },
                 { $set: { roleId: null, permissionsCache: null, cacheUpdatedAt: null } }
             )
+
+            await refreshAffectedUsers({
+                databaseName: tenant.databaseName,
+                userIds,
+                forceRefreshModel: models.ForceRefresh,
+                initiatedBy: {
+                    userId: user._id?.toString?.() || user.userId,
+                    email: user.email,
+                    role: user.role,
+                },
+                message: `Your custom role ${role.displayLabel} was removed. Talio will refresh to apply the default access.`,
+            })
         }
 
         await models.Role.deleteOne({ _id: role._id })

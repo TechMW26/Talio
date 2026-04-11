@@ -205,6 +205,12 @@ export default function DashboardLayout({ children }) {
           return
         }
 
+        if (validationResult.userChanged) {
+          console.log('[Dashboard] Session user data changed, reloading to apply updated permissions...')
+          window.location.reload()
+          return
+        }
+
         // Check profile completion status (with caching)
         checkProfileCompletionStatus(token)
       } catch (error) {

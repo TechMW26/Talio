@@ -12,8 +12,9 @@ import {
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
 import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
-import { filterMenuByPermissions, getStoredPermissions } from '@/utils/permissionFilters'
+import { filterMenuByPermissions } from '@/utils/permissionFilters'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
@@ -60,10 +61,12 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
   const menuItems = useMemo(() => {
     if (!user) return []
 
-    // For admin users, keep admin role even if they're department heads (they should see both Employees and Team)
-    // For other users, switch to department_head role if they're a department head
-    const effectiveRole = (isDepartmentHead && user.role !== 'admin') ? 'department_head' : user.role
-    let baseMenuItems = getMenuItemsForRole(effectiveRole)
+    const rbacPermissions = getUserMenuPermissions(user)
+    const menuTemplateRole = getMenuTemplateRole(user, {
+      isDepartmentHead,
+      permissions: rbacPermissions,
+    })
+    let baseMenuItems = getMenuItemsForRole(menuTemplateRole)
 
     if (isDepartmentHead) {
       const teamSubmenu = [
@@ -139,9 +142,9 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
   const filteredMenuItems = useMemo(() => {
     if (!user || !featureFilteredMenuItems.length) return featureFilteredMenuItems
     if (user.role === 'admin') return featureFilteredMenuItems
-    const perms = getStoredPermissions()
-    if (!perms) return featureFilteredMenuItems
-    return filterMenuByPermissions(featureFilteredMenuItems, perms, user.role)
+    const rbacPermissions = getUserMenuPermissions(user)
+    if (!rbacPermissions) return featureFilteredMenuItems
+    return filterMenuByPermissions(featureFilteredMenuItems, rbacPermissions, user.role)
   }, [featureFilteredMenuItems, user])
 
   const handleLinkClick = (path) => {

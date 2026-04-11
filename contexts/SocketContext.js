@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { io } from 'socket.io-client'
 import toast from '@/utils/toast'
+import { clearAllSessionCaches, validateAuthBackground } from '@/utils/sessionCache'
 
 // Real-time event names (mirrored from lib/realtimeEvents.js for client-side)
 export const REALTIME_EVENTS = {
@@ -224,7 +225,17 @@ export function SocketProvider({ children }) {
         })
 
         // Delay the refresh to let user see the message
-        setTimeout(() => {
+        setTimeout(async () => {
+          try {
+            const token = localStorage.getItem('token')
+            if (token) {
+              clearAllSessionCaches()
+              await validateAuthBackground(token, null, { force: true })
+            }
+          } catch (error) {
+            console.error('❌ [Socket.IO Client] Failed to sync session before refresh:', error)
+          }
+
           // Hard refresh: clear cache and reload
           if (data?.hard) {
             const keysToRemove = []

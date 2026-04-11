@@ -155,39 +155,103 @@ export function getOptimisticAuth() {
   }
 }
 
+function syncStoredUserFromValidation(validatedUser) {
+  if (typeof window === 'undefined' || !validatedUser) {
+    return { changed: false, user: null }
+  }
+
+  const optimisticAuth = getOptimisticAuth()
+  if (!optimisticAuth?.user) {
+    return { changed: false, user: null }
+  }
+
+  const storedUser = optimisticAuth.user
+  const storedPermissions = storedUser.permissions || storedUser.permissionsCache || null
+  const nextPermissions = validatedUser.permissions || validatedUser.permissionsCache || null
+
+  const previousSnapshot = JSON.stringify({
+    role: storedUser.role || null,
+    roleId: storedUser.roleId || null,
+    permissions: storedPermissions,
+    isDepartmentHead: storedUser.isDepartmentHead === true,
+    headOfDepartments: storedUser.headOfDepartments || [],
+    forcePasswordChange: storedUser.forcePasswordChange === true,
+  })
+
+  const nextUser = {
+    ...storedUser,
+    ...validatedUser,
+    role: validatedUser.role ?? storedUser.role,
+    roleId: validatedUser.roleId ?? storedUser.roleId ?? null,
+    permissions: nextPermissions,
+    permissionsCache: nextPermissions,
+    isDepartmentHead: validatedUser.isDepartmentHead ?? storedUser.isDepartmentHead ?? false,
+    headOfDepartments: validatedUser.headOfDepartments ?? storedUser.headOfDepartments ?? [],
+    forcePasswordChange: validatedUser.forcePasswordChange ?? storedUser.forcePasswordChange ?? false,
+  }
+
+  const nextSnapshot = JSON.stringify({
+    role: nextUser.role || null,
+    roleId: nextUser.roleId || null,
+    permissions: nextPermissions,
+    isDepartmentHead: nextUser.isDepartmentHead === true,
+    headOfDepartments: nextUser.headOfDepartments || [],
+    forcePasswordChange: nextUser.forcePasswordChange === true,
+  })
+
+  const changed = previousSnapshot !== nextSnapshot
+  if (changed) {
+    localStorage.setItem('user', JSON.stringify(nextUser))
+  }
+
+  return { changed, user: nextUser }
+}
+
 /**
  * Validate auth in background and handle invalid sessions
  */
-export async function validateAuthBackground(token, onInvalid) {
+export async function validateAuthBackground(token, onInvalid, options = {}) {
+  const { force = false } = options
+
   // Check cache first
-  const cachedResult = getCachedAuthValidation()
+  const cachedResult = force ? null : getCachedAuthValidation()
   if (cachedResult) {
+    const syncedUser = syncStoredUserFromValidation(cachedResult.user)
     if (!cachedResult.valid) {
       onInvalid?.(cachedResult.message)
     }
-    return cachedResult
+    return { ...cachedResult, userChanged: syncedUser.changed }
   }
 
   try {
-    const response = await fetchWithRetry('/api/auth/validate', {
+    const queryParams = new URLSearchParams()
+    if (force) {
+      queryParams.set('ts', Date.now().toString())
+      queryParams.set('skipWarmCache', '1')
+    }
+    const validateUrl = queryParams.size > 0 ? `/api/auth/validate?${queryParams.toString()}` : '/api/auth/validate'
+
+    const response = await fetchWithRetry(validateUrl, {
       headers: { 'Authorization': `Bearer ${token}` },
+      cache: 'no-store',
     }, 1, 8000) // 1 retry, 8 second timeout
 
     const data = await response.json()
+    const syncedUser = syncStoredUserFromValidation(data.user)
 
     // Cache the result
     setCachedAuthValidation(data)
 
     if (!response.ok || !data.valid) {
       onInvalid?.(data.message || 'Session expired')
-      return { valid: false, message: data.message }
+      return { valid: false, message: data.message, userChanged: syncedUser.changed }
     }
 
-    return data
+    return { ...data, userChanged: syncedUser.changed }
   } catch (error) {
     // On network error, trust localStorage (offline-first)
     console.warn('[SessionCache] Auth validation failed, using cached data:', error.message)
-    return { valid: true, offline: true }
+    return { valid: true, offline: true, userChanged: false }
   }
 }
 
