@@ -301,11 +301,11 @@ log "Nginx config ready for $DOMAIN"
 # =============================================================================
 header "Phase 3: Building & Starting Docker Containers"
 
-# ── Stale container cleanup ──────────────────────────────────────────────────
-# Remove orphan containers and stop any old containers that may be holding
-# port 3000 or lingering from a previous failed deploy.
-info "Cleaning up stale containers..."
-docker compose down --remove-orphans 2>/dev/null || true
+# ── Full stack teardown before rebuild ───────────────────────────────────────
+# Always stop nginx and the app together before rebuilding so nginx cannot keep
+# a stale upstream container IP from a previous deployment.
+info "Bringing down existing stack to prevent stale nginx upstream state..."
+docker compose down --remove-orphans
 
 if $CLEAN || $FRESH; then
   info "Building Docker image (full rebuild, no cache)..."
@@ -334,7 +334,7 @@ while [[ $ELAPSED -lt $HEALTH_TIMEOUT ]]; do
   HEALTH=$(docker inspect talio-app --format='{{.State.Health.Status}}' 2>/dev/null || echo "missing")
 
   if [[ "$HEALTH" == "healthy" ]]; then
-    log "Application is healthy after ${ELAPSED}s!"
+    log "Deployment successful - app is healthy after ${ELAPSED}s!"
     break
   fi
 
@@ -484,11 +484,14 @@ fi
 echo -e "${GREEN}│${NC}  App Port:  ${BOLD}3000 (internal)${NC}"
 echo -e "${GREEN}│${NC}  Nginx:     ${BOLD}80/443 → 3000${NC}"
 echo -e "${GREEN}├─────────────────────────────────────────────────┤${NC}"
+echo -e "${GREEN}│${NC}  ${YELLOW}Avoid restarting only talio-app in production.${NC}"
+echo -e "${GREEN}│${NC}  ${YELLOW}Use a full stack redeploy so nginx refreshes its upstream.${NC}"
+echo -e "${GREEN}├─────────────────────────────────────────────────┤${NC}"
 echo -e "${GREEN}│${NC}  ${CYAN}Useful commands:${NC}"
 echo -e "${GREEN}│${NC}    docker compose logs -f talio-app    ${CYAN}# app logs${NC}"
 echo -e "${GREEN}│${NC}    docker compose logs -f nginx        ${CYAN}# nginx logs${NC}"
-echo -e "${GREEN}│${NC}    docker compose restart talio-app    ${CYAN}# restart app${NC}"
+echo -e "${GREEN}│${NC}    ./deploy-production.sh              ${CYAN}# safe redeploy${NC}"
 echo -e "${GREEN}│${NC}    docker compose down                 ${CYAN}# stop all${NC}"
-echo -e "${GREEN}│${NC}    docker compose up -d --build        ${CYAN}# rebuild & start${NC}"
+echo -e "${GREEN}│${NC}    docker compose down --remove-orphans && DOCKER_BUILDKIT=1 docker compose build talio-app && docker compose up -d${CYAN} # manual full redeploy${NC}"
 echo -e "${GREEN}└─────────────────────────────────────────────────┘${NC}"
 echo ""
