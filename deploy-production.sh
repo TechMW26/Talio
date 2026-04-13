@@ -308,6 +308,8 @@ info "Bringing down existing stack to prevent stale nginx upstream state..."
 docker compose down --remove-orphans
 
 if $CLEAN || $FRESH; then
+  info "Pruning BuildKit cache to remove stale npm/sharp artifacts..."
+  docker builder prune -af >/dev/null 2>&1 || true
   info "Building Docker image (full rebuild, no cache)..."
   DOCKER_BUILDKIT=1 docker compose build --no-cache talio-app
 else

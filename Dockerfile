@@ -17,8 +17,11 @@ COPY package.json package-lock.json* ./
 
 # npm install (not ci) so Linux-native optional dependencies are resolved for the
 # current container platform even if the lockfile was generated on macOS.
+# Clear sharp/prebuild caches first because corrupted cached libvips downloads can
+# cause integrity-check failures on long-lived VPS builders.
 RUN --mount=type=cache,target=/root/.npm \
-        npm install --prefer-offline
+    rm -rf /root/.npm/_libvips /root/.npm/_prebuilds && \
+    npm install --no-audit --no-fund
 
 # ── Stage 2: prod-deps ── Production-only dependencies (no devDeps) ──────────
 # Runs in PARALLEL with builder stage — saves ~247s vs npm prune after build.
@@ -35,7 +38,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package.json package-lock.json* ./
 
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --prefer-offline --omit=dev
+    rm -rf /root/.npm/_libvips /root/.npm/_prebuilds && \
+    npm install --no-audit --no-fund --omit=dev
 
 # ── Stage 3: builder ── Build Next.js production output ──────────────────────
 FROM node:20-bookworm-slim AS builder
