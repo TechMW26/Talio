@@ -7,10 +7,10 @@ WORKDIR /app
 
 # Native build tools for bcrypt/sharp/node-gyp packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        python3 \
-        make \
-        g++ \
+    ca-certificates \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./
@@ -29,10 +29,10 @@ FROM node:20-bookworm-slim AS prod-deps
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        python3 \
-        make \
-        g++ \
+    ca-certificates \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./
@@ -80,7 +80,7 @@ ENV NODE_ENV=production \
     PORT=3000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs nextjs
