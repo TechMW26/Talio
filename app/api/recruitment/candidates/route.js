@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { logActivity } from '@/lib/activityLogger'
+import { upsertCandidate } from '@/lib/recruitmentHelpers'
 import { emitRecruitmentUpdate, emitCandidateStageChanged } from '@/lib/realtimeEvents'
 
 const ALLOWED_ROLES = ['admin', 'hr', 'manager']
@@ -109,30 +110,34 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Job posting is not accepting applications' }, { status: 400 })
     }
 
-    // Check for duplicate application
-    const existingCandidate = await Candidate.findOne({
-      email: data.email.toLowerCase().trim(),
-      jobPosting: data.jobPosting,
+    data.createdBy = user.employeeId?._id || user.employeeId
+
+    const candidateResult = await upsertCandidate(auth.tenant, data, {
+      Candidate,
+      actorId: data.createdBy,
+      applicationNote: 'Application submitted',
     })
-    if (existingCandidate) {
+
+    if (candidateResult.existed) {
       return NextResponse.json(
         { success: false, message: 'This candidate has already applied for this position' },
         { status: 409 }
       )
     }
 
-    // Set defaults
-    data.stage = data.stage || 'applied'
-    data.createdBy = user.employeeId?._id || user.employeeId
-    data.stageHistory = [{
-      stage: data.stage,
-      movedAt: new Date(),
-      movedBy: data.createdBy,
-      notes: 'Application submitted',
-    }]
+    if (candidateResult.crossJobDuplicate) {
+      return NextResponse.json(
+        {
+          success: false,
+          crossJobDuplicate: true,
+          message: 'A candidate with this email already exists for another job posting',
+          existingCandidate: candidateResult.existingCandidate,
+        },
+        { status: 409 }
+      )
+    }
 
-    const candidate = await Candidate.create(data)
-    const populated = await Candidate.findById(candidate._id)
+    const populated = await Candidate.findById(candidateResult.candidate._id)
       .populate('jobPosting', 'jobTitle jobCode department status')
       .populate('referredBy', 'firstName lastName')
       .populate('createdBy', 'firstName lastName')
@@ -143,9 +148,9 @@ export async function POST(request) {
         type: 'recruitment_candidate_create',
         action: 'Added candidate',
         details: `Added candidate ${data.firstName} ${data.lastName} for ${job.jobTitle}`,
-        metadata: { candidateId: candidate._id, jobId: data.jobPosting },
+        metadata: { candidateId: candidateResult.candidate._id, jobId: data.jobPosting },
         relatedModel: 'Candidate',
-        relatedId: candidate._id,
+        relatedId: candidateResult.candidate._id,
       })
     } catch (e) {
       console.error('Activity log error (non-critical):', e)

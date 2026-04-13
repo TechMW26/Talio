@@ -11,6 +11,7 @@ import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import useApiMutation from '@/hooks/useApiMutation';
+import { getCandidateSourceLabel } from '@/lib/recruitmentConstants';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
@@ -66,7 +67,7 @@ export default function CandidateDetailPage() {
     if (!socket || !isConnected) return;
     const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_CANDIDATE_STAGE_CHANGED, () => refresh());
     return () => unsub?.();
-  }, [socket, isConnected]);
+  }, [socket, isConnected, refresh, subscribe]);
 
   const canManage = user && ['admin', 'hr', 'manager'].includes(user.role);
 
@@ -79,7 +80,7 @@ export default function CandidateDetailPage() {
 
   const handleStageChange = async () => {
     if (!newStage) return;
-    await stageMutation.execute(`/api/recruitment/candidates/${params.id}`, { stage: newStage, stageNotes });
+    await stageMutation.execute(`/api/recruitment/candidates/${params.id}`, { stage: newStage, stageChangeNotes: stageNotes });
   };
 
   const noteMutation = useApiMutation({
@@ -91,7 +92,7 @@ export default function CandidateDetailPage() {
 
   const handleAddNote = async () => {
     if (!noteText.trim()) return;
-    await noteMutation.execute(`/api/recruitment/candidates/${params.id}`, { addNote: noteText });
+    await noteMutation.execute(`/api/recruitment/candidates/${params.id}`, { newNote: noteText });
   };
 
   const ratingMutation = useApiMutation({
@@ -413,7 +414,7 @@ export default function CandidateDetailPage() {
                 {candidate.source && (
                   <div className="flex items-center gap-2.5">
                     <FaExternalLinkAlt className="w-3.5 h-3.5 text-default-400 flex-shrink-0" />
-                    <span className="text-default-600 capitalize">{candidate.source}</span>
+                    <span className="text-default-600">{getCandidateSourceLabel(candidate.source)}</span>
                   </div>
                 )}
               </CardBody>

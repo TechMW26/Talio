@@ -11,6 +11,7 @@ import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import useApiMutation from '@/hooks/useApiMutation';
+import { CANDIDATE_SOURCE_OPTIONS } from '@/lib/recruitmentConstants';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
@@ -44,7 +45,7 @@ export default function JobDetailPage() {
   const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure();
   const [candidateForm, setCandidateForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
-    source: 'direct', experience: '', currentCompany: '',
+    source: 'website', totalExperience: '', currentCompany: '',
     expectedSalary: '', skills: '',
   });
 
@@ -61,7 +62,7 @@ export default function JobDetailPage() {
     if (!socket || !isConnected) return;
     const unsub = subscribe ? subscribe(REALTIME_EVENTS.RECRUITMENT_UPDATE, () => refresh()) : undefined;
     return () => { if (unsub) unsub(); };
-  }, [socket, isConnected]);
+  }, [socket, isConnected, refresh, subscribe]);
 
   const canManage = user && ['admin', 'hr', 'manager'].includes(user.role);
 
@@ -93,7 +94,7 @@ export default function JobDetailPage() {
     onSuccess: () => {
       toast.success('Candidate added successfully');
       onAddClose();
-      setCandidateForm({ firstName: '', lastName: '', email: '', phone: '', source: 'direct', experience: '', currentCompany: '', expectedSalary: '', skills: '' });
+      setCandidateForm({ firstName: '', lastName: '', email: '', phone: '', source: 'website', totalExperience: '', currentCompany: '', expectedSalary: '', skills: '' });
     },
     onError: (msg) => toast.error(msg || 'Failed to add candidate'),
   });
@@ -106,7 +107,7 @@ export default function JobDetailPage() {
     const payload = {
       ...candidateForm,
       jobPosting: params.id,
-      experience: candidateForm.experience ? parseFloat(candidateForm.experience) : undefined,
+      totalExperience: candidateForm.totalExperience ? parseFloat(candidateForm.totalExperience) : undefined,
       expectedSalary: candidateForm.expectedSalary ? parseFloat(candidateForm.expectedSalary) : undefined,
       skills: candidateForm.skills ? candidateForm.skills.split(',').map((s) => s.trim()).filter(Boolean) : [],
     };
@@ -478,16 +479,11 @@ export default function JobDetailPage() {
                 <Input label="Email" type="email" isRequired size="sm" value={candidateForm.email} onValueChange={(v) => setCandidateForm((p) => ({ ...p, email: v }))} />
                 <Input label="Phone" size="sm" value={candidateForm.phone} onValueChange={(v) => setCandidateForm((p) => ({ ...p, phone: v }))} />
                 <Select label="Source" size="sm" selectedKeys={[candidateForm.source]} onSelectionChange={(keys) => setCandidateForm((p) => ({ ...p, source: Array.from(keys)[0] }))}>
-                  <SelectItem key="direct">Direct</SelectItem>
-                  <SelectItem key="referral">Referral</SelectItem>
-                  <SelectItem key="job-portal">Job Portal</SelectItem>
-                  <SelectItem key="linkedin">LinkedIn</SelectItem>
-                  <SelectItem key="career-page">Career Page</SelectItem>
-                  <SelectItem key="recruitment-agency">Agency</SelectItem>
-                  <SelectItem key="campus">Campus</SelectItem>
-                  <SelectItem key="other">Other</SelectItem>
+                  {CANDIDATE_SOURCE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value}>{option.label}</SelectItem>
+                  ))}
                 </Select>
-                <Input label="Experience (years)" type="number" size="sm" value={candidateForm.experience} onValueChange={(v) => setCandidateForm((p) => ({ ...p, experience: v }))} />
+                <Input label="Experience (years)" type="number" size="sm" value={candidateForm.totalExperience} onValueChange={(v) => setCandidateForm((p) => ({ ...p, totalExperience: v }))} />
                 <Input label="Current Company" size="sm" value={candidateForm.currentCompany} onValueChange={(v) => setCandidateForm((p) => ({ ...p, currentCompany: v }))} />
                 <Input label="Expected Salary" type="number" size="sm" value={candidateForm.expectedSalary} onValueChange={(v) => setCandidateForm((p) => ({ ...p, expectedSalary: v }))} />
                 <div className="sm:col-span-2">

@@ -9,6 +9,7 @@ import {
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
+import { CANDIDATE_SOURCE_OPTIONS, getCandidateSourceLabel } from '@/lib/recruitmentConstants';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
@@ -26,10 +27,6 @@ const STAGE_COLOR = {
   interview: 'primary', assessment: 'secondary', offer: 'success',
   hired: 'success', rejected: 'danger', withdrawn: 'default',
 };
-
-const SOURCES = [
-  'website', 'linkedin', 'referral', 'naukri', 'indeed', 'agency', 'other',
-];
 
 export default function CandidatesPage() {
   const router = useRouter();
@@ -63,7 +60,7 @@ export default function CandidatesPage() {
     if (!socket || !isConnected) return;
     const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_CANDIDATE_STAGE_CHANGED, () => refreshCandidates());
     return () => unsub?.();
-  }, [socket, isConnected]);
+  }, [socket, isConnected, refreshCandidates, subscribe]);
 
   const updateFilter = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: key === 'page' ? value : 1 }));
@@ -171,8 +168,8 @@ export default function CandidatesPage() {
                 selectedKeys={filters.source ? [filters.source] : []}
                 onSelectionChange={(keys) => updateFilter('source', Array.from(keys)[0] || '')}
               >
-                {SOURCES.map((s) => (
-                  <SelectItem key={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                {CANDIDATE_SOURCE_OPTIONS.map((source) => (
+                  <SelectItem key={source.value}>{source.label}</SelectItem>
                 ))}
               </Select>
               <Select size="sm" placeholder="All Jobs"
@@ -296,7 +293,7 @@ export default function CandidatesPage() {
                                   <p className="text-sm text-default-600 truncate max-w-[200px]">{candidate.jobPosting?.jobTitle || '-'}</p>
                                 </td>
                                 <td className="px-4 py-3.5">
-                                  <Chip size="sm" variant="flat" className="capitalize">{candidate.source || '-'}</Chip>
+                                  <Chip size="sm" variant="flat">{getCandidateSourceLabel(candidate.source)}</Chip>
                                 </td>
                                 <td className="px-4 py-3.5 text-center">
                                   <span className="text-sm text-default-600">
@@ -353,7 +350,7 @@ export default function CandidatesPage() {
                             <span className="text-warning"><FaStar className="inline w-3 h-3 mr-0.5" />{candidate.rating}/5</span>
                           )}
                           {candidate.source && (
-                            <span className="capitalize">{candidate.source}</span>
+                            <span>{getCandidateSourceLabel(candidate.source)}</span>
                           )}
                         </div>
                       </CardBody>

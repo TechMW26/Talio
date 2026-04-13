@@ -71,6 +71,8 @@ export async function middleware(request) {
     '/api/auth/forgot-password',
     '/api/auth/reset-password',
     '/api/auth/google/callback',
+    '/api/recruitment/linkedin/callback',
+    '/api/recruitment/webhooks/linkedin',
     '/api/assetlinks',
     '/api/meetings/guest/', // Guest meeting access (public)
     '/api/setup/check',

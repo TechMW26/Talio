@@ -74,28 +74,33 @@ export async function PUT(request, { params }) {
     const employeeId = user.employeeId?._id || user.employeeId
 
     // Handle stage change - push to stageHistory
+    const stageChangeNotes = data.stageChangeNotes || data.stageNotes
+    const newNote = data.newNote || data.addNote
+
     if (data.stage && data.stage !== existing.stage) {
       if (!existing.stageHistory) existing.stageHistory = []
       existing.stageHistory.push({
         stage: data.stage,
         movedAt: new Date(),
         movedBy: employeeId,
-        notes: data.stageChangeNotes || `Moved to ${data.stage}`,
+        notes: stageChangeNotes || `Moved to ${data.stage}`,
       })
       data.stageHistory = existing.stageHistory
       delete data.stageChangeNotes
+      delete data.stageNotes
     }
 
     // Handle adding a note
-    if (data.newNote) {
+    if (newNote) {
       if (!existing.notes) existing.notes = []
       existing.notes.push({
-        note: data.newNote,
+        note: newNote,
         addedBy: employeeId,
         addedAt: new Date(),
       })
       data.notes = existing.notes
       delete data.newNote
+      delete data.addNote
     }
 
     const candidate = await Candidate.findByIdAndUpdate(id, data, { new: true, runValidators: true })

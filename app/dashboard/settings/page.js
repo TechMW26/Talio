@@ -114,21 +114,21 @@ export default function SettingsPage() {
   const { data: deptHeadData } = useAuthedSWR('/api/team/check-head')
   const isDepartmentHead = deptHeadData?.success && deptHeadData?.isDepartmentHead
 
-  // Define tabs based on user role
-  const getTabs = () => {
+  const tabs = useMemo(() => {
     const baseTabs = []
 
     // Admin and HR get company settings
-    if (userRole === 'admin' || userRole === 'admin' || userRole === 'hr') {
+    if (userRole === 'admin' || userRole === 'hr') {
       baseTabs.push(
         { id: 'company', name: 'Company Settings', icon: FaBuilding },
+        { id: 'recruitment', name: 'Recruitment', icon: FaBriefcase },
         { id: 'geofencing', name: 'Geofencing', icon: FaMapMarkerAlt },
         { id: 'payroll', name: 'Payroll Settings', icon: FaMoneyBillWave },
       )
     }
 
     // Admin, HR, and Department Heads get notifications (check both role and isDepartmentHead flag)
-    if (userRole === 'admin' || userRole === 'admin' || userRole === 'hr' || userRole === 'department_head' || isDepartmentHead) {
+    if (userRole === 'admin' || userRole === 'hr' || userRole === 'department_head' || isDepartmentHead) {
       baseTabs.push(
         { id: 'notifications', name: 'Notifications', icon: FaBell }
       )
@@ -140,20 +140,61 @@ export default function SettingsPage() {
     )
 
     return baseTabs
-  }
-
-  const tabs = getTabs()
+  }, [userRole, isDepartmentHead])
 
   // Set default active tab based on role
   useEffect(() => {
-    if (userRole === 'admin' || userRole === 'admin' || userRole === 'hr') {
+    const requestedTab = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('tab')
+      : null
+
+    if (requestedTab && tabs.some((tab) => tab.id === requestedTab)) {
+      setActiveTab(requestedTab)
+    } else if (userRole === 'admin' || userRole === 'hr') {
       setActiveTab('company')
     } else if (userRole === 'department_head' || isDepartmentHead) {
       setActiveTab('notifications')
     } else {
       setActiveTab('personalization')
     }
-  }, [userRole, isDepartmentHead])
+  }, [userRole, isDepartmentHead, tabs])
+
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') {
+      return
+    }
+
+    const searchParams = new URLSearchParams(window.location.search)
+    const linkedinState = searchParams.get('linkedin')
+    if (!linkedinState) {
+      return
+    }
+
+    const linkedinAccount = searchParams.get('linkedinAccount')
+    const linkedinError = searchParams.get('linkedinError')
+    const errorMessageMap = {
+      missing_state: 'The LinkedIn callback did not include a valid state token.',
+      invalid_state: 'LinkedIn state validation failed. Try connecting again.',
+      missing_code: 'LinkedIn did not return an authorization code.',
+      unauthorized: 'Your session is no longer authorized for this tenant.',
+      callback_failed: 'LinkedIn connection could not be completed.',
+    }
+
+    setActiveTab('recruitment')
+
+    if (linkedinState === 'connected') {
+      toast.success(linkedinAccount ? `LinkedIn connected as ${linkedinAccount}` : 'LinkedIn connected successfully')
+    } else if (linkedinState === 'error') {
+      toast.error(errorMessageMap[linkedinError] || 'LinkedIn connection failed')
+    }
+
+    searchParams.delete('linkedin')
+    searchParams.delete('linkedinAccount')
+    searchParams.delete('linkedinError')
+    const nextQuery = searchParams.toString()
+    const nextUrl = nextQuery ? `${window.location.pathname}?${nextQuery}` : window.location.pathname
+    window.history.replaceState({}, '', nextUrl)
+  }, [mounted])
 
   // Show loading state while detecting device
   if (!mounted) {
@@ -211,10 +252,337 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
         {activeTab === 'company' && <CompanySettingsTab />}
+        {activeTab === 'recruitment' && <RecruitmentSettingsTab />}
         {activeTab === 'geofencing' && <GeofencingTab />}
         {activeTab === 'payroll' && <PayrollSettingsTab />}
         {activeTab === 'notifications' && <NotificationsTab />}
         {activeTab === 'personalization' && <PersonalizationTab />}
+      </div>
+    </div>
+  )
+}
+
+function formatRecruitmentSettingDate(value) {
+  if (!value) {
+    return 'Not available'
+  }
+
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(value))
+  } catch {
+    return 'Not available'
+  }
+}
+
+function RecruitmentSettingsTab() {
+  const [isConnecting, setIsConnecting] = useState(false)
+  const { isDarkMode } = useTheme()
+  const { data: statusResponse, error, isLoading, mutate } = useAuthedSWR('/api/recruitment/linkedin/status')
+  const status = statusResponse?.data || {}
+
+  const sectionClass = isDarkMode
+    ? 'border border-slate-800 bg-slate-950/80'
+    : 'border border-slate-200 bg-white'
+  const insetClass = isDarkMode
+    ? 'border border-slate-800 bg-slate-900/70'
+    : 'border border-slate-200 bg-slate-50'
+  const titleClass = isDarkMode ? 'text-slate-100' : 'text-gray-900'
+  const bodyClass = isDarkMode ? 'text-slate-400' : 'text-gray-600'
+  const mutedClass = isDarkMode ? 'text-slate-500' : 'text-gray-500'
+
+  const requiredEnvKeys = [
+    {
+      key: 'LINKEDIN_CLIENT_ID',
+      description: 'Public app identifier from your LinkedIn developer app.',
+      note: 'Copy it from the LinkedIn app Auth tab.',
+    },
+    {
+      key: 'LINKEDIN_CLIENT_SECRET',
+      description: 'Private secret paired with the LinkedIn client ID.',
+      note: 'Treat this like a password and keep it only on the server.',
+    },
+    {
+      key: 'APP_URL',
+      description: 'Base URL used to build the callback path when no explicit redirect URI is set.',
+      note: 'Set this to your app domain. For local development, use your localhost URL if needed.',
+    },
+    {
+      key: 'LINKEDIN_REDIRECT_URI',
+      description: 'Optional explicit callback URL for LinkedIn OAuth.',
+      note: 'If left blank, the app falls back to APP_URL + /api/recruitment/linkedin/callback.',
+    },
+    {
+      key: 'INTEGRATION_TOKEN_ENCRYPTION_KEY',
+      description: 'AES encryption key used to protect stored LinkedIn access and refresh tokens.',
+      note: 'Generate with openssl rand -hex 32.',
+    },
+  ]
+
+  const optionalEnvKeys = [
+    {
+      key: 'LINKEDIN_WEBHOOK_SECRET',
+      description: 'Used to verify signed webhook payloads from LinkedIn.',
+    },
+    {
+      key: 'LINKEDIN_WEBHOOK_VERIFY_TOKEN',
+      description: 'Optional verification token for webhook handshake routes.',
+    },
+    {
+      key: 'LINKEDIN_APPLICANTS_API_URL',
+      description: 'Optional backend sync endpoint template supporting {jobPostingId}, {jobId}, {since}, and {limit}.',
+    },
+  ]
+
+  const setupSteps = [
+    {
+      title: 'Open LinkedIn Developers',
+      body: 'Go to linkedin.com/developers/apps and create a new app or open the one your company will use.',
+    },
+    {
+      title: 'Associate the correct company page',
+      body: 'LinkedIn app creation typically requires a company page. Make sure you are using the company page that should own recruitment access.',
+    },
+    {
+      title: 'Enable the auth product',
+      body: 'In the Products section, enable the LinkedIn sign-in or OpenID product required for OAuth access.',
+    },
+    {
+      title: 'Copy Client ID and Client Secret',
+      body: 'Open the Auth tab of the LinkedIn app and copy the Client ID and Client Secret into the env keys listed on this page.',
+    },
+    {
+      title: 'Add your redirect URL exactly',
+      body: 'In LinkedIn Auth settings, add the callback URL shown below. The redirect URI must match exactly, including protocol and path.',
+    },
+  ]
+
+  const statusCards = [
+    {
+      label: 'Connection',
+      value: status.isConnected ? 'Connected' : 'Not connected',
+      detail: status.connectedAccountName || 'No LinkedIn account linked yet',
+      emphasis: status.isConnected ? 'text-emerald-500' : titleClass,
+    },
+    {
+      label: 'Token Health',
+      value: status.isConnected ? (status.isTokenExpired ? 'Expired' : 'Active') : 'Unavailable',
+      detail: `Expires ${formatRecruitmentSettingDate(status.tokenExpiresAt)}`,
+      emphasis: status.isConnected && status.isTokenExpired ? 'text-amber-500' : titleClass,
+    },
+    {
+      label: 'Connected At',
+      value: formatRecruitmentSettingDate(status.connectedAt),
+      detail: 'Tenant-wide LinkedIn OAuth status',
+      emphasis: titleClass,
+    },
+    {
+      label: 'Last Sync',
+      value: formatRecruitmentSettingDate(status.lastSyncAt),
+      detail: 'Updated when manual sync finishes successfully',
+      emphasis: titleClass,
+    },
+  ]
+
+  const disconnectMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/recruitment/linkedin/status'],
+    onSuccess: (response) => toast.success(response?.message || 'LinkedIn disconnected successfully'),
+    onError: (message) => toast.error(message || 'Failed to disconnect LinkedIn'),
+  })
+
+  const handleConnect = async () => {
+    try {
+      setIsConnecting(true)
+      const token = localStorage.getItem('token')
+      const returnTo = encodeURIComponent('/dashboard/settings?tab=recruitment')
+      const response = await fetch(`/api/recruitment/linkedin/auth-url?returnTo=${returnTo}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const data = await response.json()
+
+      if (!response.ok || data?.success === false || !data?.data?.url) {
+        throw new Error(data?.message || 'Failed to initialize LinkedIn connection')
+      }
+
+      window.location.href = data.data.url
+    } catch (connectError) {
+      console.error('LinkedIn connect error:', connectError)
+      toast.error(connectError.message || 'Failed to initialize LinkedIn connection')
+      setIsConnecting(false)
+    }
+  }
+
+  const handleDisconnect = async () => {
+    if (!window.confirm('Disconnect LinkedIn for this tenant? Applicant sync and webhook processing will stop until you reconnect.')) {
+      return
+    }
+
+    const response = await disconnectMutation.execute('/api/recruitment/linkedin/disconnect')
+    if (response?.success) {
+      mutate()
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="mb-6">
+        <h2 className={`text-xl font-bold flex items-center gap-2 ${titleClass}`}>
+          <FaBriefcase className="text-sky-600" />
+          Recruitment Integrations
+        </h2>
+        <p className={`mt-1 ${bodyClass}`}>Connect LinkedIn, monitor sync health, and keep setup instructions visible for the current env-based flow.</p>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {error.message || 'Failed to load LinkedIn status'}
+        </div>
+      )}
+
+      <div className={`overflow-hidden rounded-[28px] ${sectionClass}`}>
+        <div className={`border-b px-6 py-6 sm:px-8 ${isDarkMode ? 'border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_45%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))]' : 'border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_40%),linear-gradient(180deg,#ffffff,#f8fbff)]'}`}>
+          <div className="grid gap-6 xl:grid-cols-[1.4fr_0.95fr] xl:items-start">
+            <div className="space-y-4">
+              <div className="inline-flex items-center rounded-full bg-sky-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-500">
+                LinkedIn Direct
+              </div>
+              <div>
+                <h3 className={`text-2xl font-semibold ${titleClass}`}>Professional setup for your current env-based LinkedIn flow</h3>
+                <p className={`mt-2 max-w-2xl text-sm ${bodyClass}`}>
+                  The current implementation uses server environment variables. This panel shows the health of the connection, the exact keys you need, and the steps your team should follow to obtain them.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <div className={`rounded-xl px-3 py-2 text-sm ${insetClass} ${bodyClass}`}>
+                  Current mode: shared server env credentials
+                </div>
+                <div className={`rounded-xl px-3 py-2 text-sm ${insetClass} ${bodyClass}`}>
+                  Ready for OAuth callback, sync, import, and webhook routes
+                </div>
+              </div>
+            </div>
+
+            <div className={`rounded-2xl p-5 ${insetClass}`}>
+              <p className={`text-xs font-semibold uppercase tracking-wide ${mutedClass}`}>Action Panel</p>
+              <p className={`mt-2 text-sm ${bodyClass}`}>
+                Connect once the env keys are filled correctly. Disconnect only clears the stored LinkedIn tokens for this tenant.
+              </p>
+              <div className="mt-5 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={handleConnect}
+                  disabled={isConnecting}
+                  className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+                >
+                  {isConnecting ? 'Redirecting to LinkedIn...' : status.isConnected ? 'Reconnect LinkedIn' : 'Connect LinkedIn'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={!status.isConnected || disconnectMutation.isLoading}
+                  className={`inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${isDarkMode ? 'border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900 disabled:text-slate-500' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:text-gray-400'}`}
+                >
+                  {disconnectMutation.isLoading ? 'Disconnecting...' : 'Disconnect LinkedIn'}
+                </button>
+              </div>
+
+              <div className={`mt-5 rounded-xl p-4 text-sm ${isDarkMode ? 'border border-slate-800 bg-slate-950 text-slate-400' : 'border border-slate-200 bg-white text-gray-600'}`}>
+                Before connecting, make sure the env keys below are filled and the redirect URL has been added to your LinkedIn app.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`rounded-[28px] p-6 sm:p-8 ${sectionClass}`}>
+        {isLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((item) => (
+              <Skeleton key={item} className="h-24 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {statusCards.map((card) => (
+              <div key={card.label} className={`rounded-2xl p-4 ${insetClass}`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide ${mutedClass}`}>{card.label}</p>
+                <p className={`mt-2 text-lg font-semibold ${card.emphasis}`}>{card.value}</p>
+                <p className={`mt-1 text-sm ${bodyClass}`}>{card.detail}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_1.08fr]">
+        <div className={`rounded-[28px] p-6 sm:p-8 ${sectionClass}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className={`text-lg font-semibold ${titleClass}`}>Required .env Keys</h3>
+              <p className={`mt-1 text-sm ${bodyClass}`}>Copy these keys into your server env for the current LinkedIn setup.</p>
+            </div>
+            <div className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
+              Env Setup
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {requiredEnvKeys.map((item) => (
+              <div key={item.key} className={`rounded-2xl p-4 ${insetClass}`}>
+                <code className={`text-sm font-semibold ${isDarkMode ? 'text-sky-400' : 'text-sky-700'}`}>{item.key}</code>
+                <p className={`mt-2 text-sm ${bodyClass}`}>{item.description}</p>
+                <p className={`mt-1 text-xs ${mutedClass}`}>{item.note}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className={`mt-5 rounded-2xl p-4 ${insetClass}`}>
+            <p className={`text-sm font-semibold ${titleClass}`}>Optional keys</p>
+            <div className="mt-3 space-y-2">
+              {optionalEnvKeys.map((item) => (
+                <div key={item.key} className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <code className={`text-sm font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{item.key}</code>
+                  <p className={`text-sm sm:max-w-[70%] ${bodyClass}`}>{item.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className={`rounded-[28px] p-6 sm:p-8 ${sectionClass}`}>
+          <h3 className={`text-lg font-semibold ${titleClass}`}>How To Grab The Credentials</h3>
+          <p className={`mt-1 text-sm ${bodyClass}`}>Give these steps to the person who owns the company LinkedIn app or page access.</p>
+
+          <div className="mt-5 space-y-4">
+            {setupSteps.map((step, index) => (
+              <div key={step.title} className="flex gap-4">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-sm font-semibold text-sky-500">
+                  {index + 1}
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${titleClass}`}>{step.title}</p>
+                  <p className={`mt-1 text-sm ${bodyClass}`}>{step.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={`mt-6 rounded-2xl p-5 ${insetClass}`}>
+            <p className={`text-sm font-semibold ${titleClass}`}>Redirect URI to add in LinkedIn</p>
+            <code className={`mt-3 block rounded-xl px-4 py-3 text-sm ${isDarkMode ? 'bg-slate-950 text-sky-400' : 'bg-slate-900 text-sky-300'}`}>
+              https://your-domain.com/api/recruitment/linkedin/callback
+            </code>
+            <p className={`mt-3 text-sm ${bodyClass}`}>
+              If you are testing locally and your LinkedIn app allows it, use your local callback URL instead, for example http://localhost:3000/api/recruitment/linkedin/callback.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -1706,7 +2074,7 @@ function GeofencingTab() {
             <div className="text-center py-8 bg-gray-50 rounded-lg">
               <FaClock className="mx-auto text-gray-400 text-4xl mb-3" />
               <p className="text-gray-600">No break timings configured</p>
-              <p className="text-sm text-gray-500 mt-1">Click "Add Break" to configure break times</p>
+              <p className="text-sm text-gray-500 mt-1">Click &quot;Add Break&quot; to configure break times</p>
             </div>
           ) : (
             <div className="space-y-4">

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { sanitizeCompanySettingsForClient } from '@/lib/companySettingsUtils'
 import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
@@ -50,7 +51,7 @@ export async function GET(request) {
 
     console.log('GET company settings - notifications:', settings.notifications)
 
-    const responseData = { success: true, data: settings }
+    const responseData = { success: true, data: sanitizeCompanySettingsForClient(settings) }
     await setCache(cacheKey, responseData, 5 * 60).catch(() => { })
 
     return NextResponse.json(responseData)
@@ -161,6 +162,15 @@ export async function PUT(request) {
             deductions: body.payroll?.deductions || settings.payroll?.deductions || [],
           }
           console.log('Updated payroll settings:', settings.payroll)
+        } else if (key === 'integrations' && body.integrations) {
+          settings.integrations = {
+            ...(settings.integrations?.toObject?.() || settings.integrations || {}),
+            ...body.integrations,
+            linkedin: {
+              ...(settings.integrations?.linkedin?.toObject?.() || settings.integrations?.linkedin || {}),
+              ...(body.integrations?.linkedin || {}),
+            },
+          }
         } else {
           settings[key] = body[key]
         }
@@ -184,7 +194,7 @@ export async function PUT(request) {
     return NextResponse.json({
       success: true,
       message: 'Company settings updated successfully',
-      data: settings
+      data: sanitizeCompanySettingsForClient(settings)
     })
 
   } catch (error) {

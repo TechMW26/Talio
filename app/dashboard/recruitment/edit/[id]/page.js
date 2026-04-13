@@ -254,7 +254,7 @@ export default function EditJobPage() {
                 onSelectionChange={(keys) => updateField('status', Array.from(keys)[0])}>
                 <SelectItem key="draft">Draft</SelectItem>
                 <SelectItem key="open">Open</SelectItem>
-                <SelectItem key="paused">Paused</SelectItem>
+                <SelectItem key="on-hold">On Hold</SelectItem>
                 <SelectItem key="closed">Closed</SelectItem>
               </Select>
             </div>
