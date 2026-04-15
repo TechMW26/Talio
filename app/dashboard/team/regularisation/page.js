@@ -123,7 +123,7 @@ export default function TeamRegularisationPage() {
     })
   }
 
-  const formatRequestedTime = (dateString) => formatTime(dateString, { timeZone: 'UTC' })
+  const formatRequestedTime = (dateString) => formatTime(dateString)
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -367,8 +367,8 @@ export default function TeamRegularisationPage() {
               key={correction._id}
               shadow="sm"
               className={`border-l-4 overflow-visible ${correction.status === 'pending' ? 'border-l-warning-500' :
-                  correction.status === 'approved' ? 'border-l-success-500' :
-                    'border-l-danger-500'
+                correction.status === 'approved' ? 'border-l-success-500' :
+                  'border-l-danger-500'
                 }`}
             >
               <CardBody className="p-0">

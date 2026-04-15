@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
+import { getTimezone, parseDateTimeInTimezone } from '@/lib/timezone'
 import queryCache from '@/lib/queryCache'
 import mongoose from 'mongoose'
 import { emitEvent, EVENTS } from '@/lib/eventBus'
@@ -284,12 +285,12 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Attendance', 'AttendanceCorrection'])
+    const auth = await getAuthAndModels(request, ['User', 'Attendance', 'AttendanceCorrection', 'CompanySettings'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User, Attendance, AttendanceCorrection } = models
+    const { User, Attendance, AttendanceCorrection, CompanySettings } = models
 
     const data = await request.json()
     const {
@@ -317,14 +318,24 @@ export async function POST(request) {
       )
     }
 
-    if (requestedCheckIn && !isValidDateString(requestedCheckIn)) {
+    const settings = await CompanySettings.findOne().lean()
+    const companyTimezone = getTimezone(settings?.timezone)
+
+    const parsedRequestedCheckIn = requestedCheckIn
+      ? parseDateTimeInTimezone(requestedCheckIn, companyTimezone)
+      : null
+    const parsedRequestedCheckOut = requestedCheckOut
+      ? parseDateTimeInTimezone(requestedCheckOut, companyTimezone)
+      : null
+
+    if (requestedCheckIn && !parsedRequestedCheckIn) {
       return NextResponse.json(
         { success: false, message: 'Invalid requestedCheckIn format' },
         { status: 400 }
       )
     }
 
-    if (requestedCheckOut && !isValidDateString(requestedCheckOut)) {
+    if (requestedCheckOut && !parsedRequestedCheckOut) {
       return NextResponse.json(
         { success: false, message: 'Invalid requestedCheckOut format' },
         { status: 400 }
@@ -399,8 +410,8 @@ export async function POST(request) {
       currentStatus: attendance.status,
       currentWorkHours: attendance.workHours,
       correctionType,
-      requestedCheckIn: requestedCheckIn ? new Date(requestedCheckIn) : undefined,
-      requestedCheckOut: requestedCheckOut ? new Date(requestedCheckOut) : undefined,
+      requestedCheckIn: parsedRequestedCheckIn || undefined,
+      requestedCheckOut: parsedRequestedCheckOut || undefined,
       requestedStatus,
       reason,
       attachments: attachments || [],

@@ -1,0 +1,2279 @@
+{
+  "databaseName": "talio_company_mushroom_world_group",
+  "companyName": "talio_company_mushroom_world_group",
+  "timezone": "Asia/Kolkata",
+  "mode": "dry-run",
+  "fixCutoff": "2026-04-14T10:30:00.000Z",
+  "officeCheckIn": "09:00",
+  "officeCheckOut": "18:00",
+  "totalApprovedCorrectionsScanned": 63,
+  "likelyShiftedCount": 56,
+  "corrections": [
+    {
+      "correctionId": "6958eb2cf16dd4aa249d9656",
+      "employeeName": "Jaya Prashant Jain",
+      "attendanceId": "6958eb2cf16dd4aa249d9653",
+      "correctionType": "missing-entry",
+      "correctionDate": "2025-12-02T00:00:00.000Z",
+      "createdAt": "2026-01-03T10:10:52.303Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started",
+      "requestedCheckIn": {
+        "current": "2025-12-02T09:49:00.000Z",
+        "currentLocal": "02 Dec 2025, 03:19 pm",
+        "proposed": "2025-12-02T04:19:00.000Z",
+        "proposedLocal": "02 Dec 2025, 09:49 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2025-12-02T16:36:00.000Z",
+        "currentLocal": "02 Dec 2025, 10:06 pm",
+        "proposed": "2025-12-02T11:06:00.000Z",
+        "proposedLocal": "02 Dec 2025, 04:36 pm",
+        "improvementMinutes": 162
+      },
+      "attendanceCurrent": {
+        "checkIn": "2025-12-02T09:49:00.000Z",
+        "checkOut": "2025-12-02T16:36:00.000Z",
+        "status": "half-day",
+        "workHours": 6.78
+      }
+    },
+    {
+      "correctionId": "695b848f1a03693ecc2f20a8",
+      "employeeName": "Sahil Sahu",
+      "attendanceId": "695b848f1a03693ecc2f20a5",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-02T00:00:00.000Z",
+      "createdAt": "2026-01-05T09:29:51.665Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Didn't have access to talio app. ",
+      "requestedCheckIn": {
+        "current": "2026-01-02T10:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-02T04:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-02T18:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-02T12:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-02T10:00:00.000Z",
+        "checkOut": "2026-01-02T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "695b84ca1a03693ecc2f2346",
+      "employeeName": "Sahil Sahu",
+      "attendanceId": "695b84ca1a03693ecc2f2343",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-04T00:00:00.000Z",
+      "createdAt": "2026-01-05T09:30:50.667Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Didn't have access to talio. ",
+      "requestedCheckIn": {
+        "current": "2026-01-04T10:08:00.000Z",
+        "currentLocal": "04 Jan 2026, 03:38 pm",
+        "proposed": "2026-01-04T04:38:00.000Z",
+        "proposedLocal": "04 Jan 2026, 10:08 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": null,
+      "attendanceCurrent": {
+        "checkIn": "2026-01-04T10:08:00.000Z",
+        "checkOut": null,
+        "status": "absent",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "695b989a1a03693ecc2fc67f",
+      "employeeName": "Rithik Jain",
+      "attendanceId": "695b4ac826f3ff61eb68379e",
+      "correctionType": "both",
+      "correctionDate": "2026-01-05T05:23:20.901Z",
+      "createdAt": "2026-01-05T10:55:22.211Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "biometric not working",
+      "requestedCheckIn": {
+        "current": "2026-01-05T10:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-05T04:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-05T18:25:00.000Z",
+        "currentLocal": "05 Jan 2026, 11:55 pm",
+        "proposed": "2026-01-05T12:55:00.000Z",
+        "proposedLocal": "05 Jan 2026, 06:25 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-05T10:00:00.000Z",
+        "checkOut": "2026-01-05T18:25:00.000Z",
+        "status": "present",
+        "workHours": 8.42
+      }
+    },
+    {
+      "correctionId": "695b99441a03693ecc2fcd27",
+      "employeeName": "Rithik Jain",
+      "attendanceId": "695b99441a03693ecc2fcd24",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-01T00:00:00.000Z",
+      "createdAt": "2026-01-05T10:58:12.350Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "late working",
+      "requestedCheckIn": {
+        "current": "2026-01-01T10:00:00.000Z",
+        "currentLocal": "01 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-01T04:30:00.000Z",
+        "proposedLocal": "01 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-01T18:30:00.000Z",
+        "currentLocal": "02 Jan 2026, 12:00 am",
+        "proposed": "2026-01-01T13:00:00.000Z",
+        "proposedLocal": "01 Jan 2026, 06:30 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-01T10:00:00.000Z",
+        "checkOut": "2026-01-01T18:30:00.000Z",
+        "status": "present",
+        "workHours": 8.5
+      }
+    },
+    {
+      "correctionId": "695bb273afd157db4f5661d5",
+      "employeeName": "Khushboo Vishwakarma",
+      "attendanceId": "695b5e5c26f3ff61eb688a83",
+      "correctionType": "both",
+      "correctionDate": "2026-01-05T06:46:52.317Z",
+      "createdAt": "2026-01-05T12:45:39.168Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Late login because I have no access to change the password. ",
+      "requestedCheckIn": {
+        "current": "2026-01-05T12:16:00.000Z",
+        "currentLocal": "05 Jan 2026, 05:46 pm",
+        "proposed": "2026-01-05T06:46:00.000Z",
+        "proposedLocal": "05 Jan 2026, 12:16 pm",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-05T18:13:00.000Z",
+        "currentLocal": "05 Jan 2026, 11:43 pm",
+        "proposed": "2026-01-05T12:43:00.000Z",
+        "proposedLocal": "05 Jan 2026, 06:13 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-05T17:46:00.000Z",
+        "checkOut": "2026-01-05T23:43:00.000Z",
+        "status": "present",
+        "workHours": 5.95
+      }
+    },
+    {
+      "correctionId": "695d05874d42c79461e04ee4",
+      "employeeName": "Sachi Tiwari",
+      "attendanceId": "695c99041599fd8374935d07",
+      "correctionType": "both",
+      "correctionDate": "2026-01-06T05:09:24.338Z",
+      "createdAt": "2026-01-06T12:52:23.474Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Late app download and login",
+      "requestedCheckIn": {
+        "current": "2026-01-06T10:39:00.000Z",
+        "currentLocal": "06 Jan 2026, 04:09 pm",
+        "proposed": "2026-01-06T05:09:00.000Z",
+        "proposedLocal": "06 Jan 2026, 10:39 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-06T18:19:00.000Z",
+        "currentLocal": "06 Jan 2026, 11:49 pm",
+        "proposed": "2026-01-06T12:49:00.000Z",
+        "proposedLocal": "06 Jan 2026, 06:19 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-06T10:39:00.000Z",
+        "checkOut": "2026-01-06T18:19:00.000Z",
+        "status": "present",
+        "workHours": 7.67
+      }
+    },
+    {
+      "correctionId": "69620bc75248370fd9316ff0",
+      "employeeName": "Anukrati Chiroliya",
+      "attendanceId": "69620bc75248370fd9316fed",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-01T00:00:00.000Z",
+      "createdAt": "2026-01-10T08:20:23.401Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "app issues ",
+      "requestedCheckIn": {
+        "current": "2026-01-01T10:01:00.000Z",
+        "currentLocal": "01 Jan 2026, 03:31 pm",
+        "proposed": "2026-01-01T04:31:00.000Z",
+        "proposedLocal": "01 Jan 2026, 10:01 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-01T18:25:00.000Z",
+        "currentLocal": "01 Jan 2026, 11:55 pm",
+        "proposed": "2026-01-01T12:55:00.000Z",
+        "proposedLocal": "01 Jan 2026, 06:25 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-01T10:01:00.000Z",
+        "checkOut": "2026-01-01T18:25:00.000Z",
+        "status": "present",
+        "workHours": 8.4
+      }
+    },
+    {
+      "correctionId": "6962acf5e3aafddfdbd25696",
+      "employeeName": "Anuj Soni",
+      "attendanceId": "696221e25248370fd933b013",
+      "correctionType": "both",
+      "correctionDate": "2026-01-10T09:54:42.747Z",
+      "createdAt": "2026-01-10T19:48:05.488Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Check in corrected",
+      "requestedCheckIn": {
+        "current": "2026-01-10T10:00:00.000Z",
+        "currentLocal": "10 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-10T04:30:00.000Z",
+        "proposedLocal": "10 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-10T18:13:00.000Z",
+        "currentLocal": "10 Jan 2026, 11:43 pm",
+        "proposed": "2026-01-10T12:43:00.000Z",
+        "proposedLocal": "10 Jan 2026, 06:13 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-10T10:00:00.000Z",
+        "checkOut": "2026-01-10T18:13:00.000Z",
+        "status": "present",
+        "workHours": 8.22
+      }
+    },
+    {
+      "correctionId": "69647a3fe3aafddfdbd936ca",
+      "employeeName": "Jaya Prashant Jain",
+      "attendanceId": "695c9fb41599fd837493af39",
+      "correctionType": "both",
+      "correctionDate": "2026-01-06T05:37:56.037Z",
+      "createdAt": "2026-01-12T04:36:15.498Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Technical Error",
+      "requestedCheckIn": {
+        "current": "2026-01-06T09:50:00.000Z",
+        "currentLocal": "06 Jan 2026, 03:20 pm",
+        "proposed": "2026-01-06T04:20:00.000Z",
+        "proposedLocal": "06 Jan 2026, 09:50 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-06T06:15:00.000Z",
+        "currentLocal": "06 Jan 2026, 11:45 am",
+        "proposed": "2026-01-06T00:45:00.000Z",
+        "proposedLocal": "06 Jan 2026, 06:15 am",
+        "improvementMinutes": -330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-06T09:50:00.000Z",
+        "checkOut": "2026-01-06T06:15:00.000Z",
+        "status": "absent",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "69648d25e3aafddfdbdae705",
+      "employeeName": "Amreesh Saxena",
+      "attendanceId": "69648552e3aafddfdbda29f4",
+      "correctionType": "check-in",
+      "correctionDate": "2026-01-12T05:23:30.245Z",
+      "createdAt": "2026-01-12T05:56:53.616Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "ok",
+      "requestedCheckIn": {
+        "current": "2026-01-12T10:00:00.000Z",
+        "currentLocal": "12 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-12T04:30:00.000Z",
+        "proposedLocal": "12 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": null,
+      "attendanceCurrent": {
+        "checkIn": "2026-01-12T10:00:00.000Z",
+        "checkOut": "2026-01-12T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673f13e590b35ad711efa7",
+      "employeeName": "Subhra Nandi",
+      "attendanceId": "69673f13e590b35ad711efa4",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-02T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:00:35.710Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started that time ",
+      "requestedCheckIn": {
+        "current": "2026-01-02T10:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-02T04:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-02T18:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-02T12:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-02T10:00:00.000Z",
+        "checkOut": "2026-01-02T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673f22e590b35ad711f23c",
+      "employeeName": "Subhra Nandi",
+      "attendanceId": "69673f22e590b35ad711f237",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-03T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:00:50.438Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started that time ",
+      "requestedCheckIn": {
+        "current": "2026-01-03T10:00:00.000Z",
+        "currentLocal": "03 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-03T04:30:00.000Z",
+        "proposedLocal": "03 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-03T06:00:00.000Z",
+        "currentLocal": "03 Jan 2026, 11:30 am",
+        "proposed": "2026-01-03T00:30:00.000Z",
+        "proposedLocal": "03 Jan 2026, 06:00 am",
+        "improvementMinutes": -330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-03T10:00:00.000Z",
+        "checkOut": "2026-01-03T06:00:00.000Z",
+        "status": "absent",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "69673f34e590b35ad711f5e4",
+      "employeeName": "Subhra Nandi",
+      "attendanceId": "69673f34e590b35ad711f5e1",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-04T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:01:08.322Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started that time ",
+      "requestedCheckIn": {
+        "current": "2026-01-04T10:00:00.000Z",
+        "currentLocal": "04 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-04T04:30:00.000Z",
+        "proposedLocal": "04 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-04T18:00:00.000Z",
+        "currentLocal": "04 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-04T12:30:00.000Z",
+        "proposedLocal": "04 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-04T10:00:00.000Z",
+        "checkOut": "2026-01-04T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673f47e590b35ad711f871",
+      "employeeName": "Subhra Nandi",
+      "attendanceId": "69673f47e590b35ad711f86e",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-05T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:01:27.845Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started that time ",
+      "requestedCheckIn": {
+        "current": "2026-01-05T10:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-05T04:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-05T18:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-05T12:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-05T10:00:00.000Z",
+        "checkOut": "2026-01-05T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673f74e590b35ad7120390",
+      "employeeName": "Palak Lalwani",
+      "attendanceId": "696651608bebefc78acd5a75",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-01T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:02:12.886Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "started using this app from 9th January after receiving instructions",
+      "requestedCheckIn": {
+        "current": "2026-01-01T10:00:00.000Z",
+        "currentLocal": "01 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-01T04:30:00.000Z",
+        "proposedLocal": "01 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-01T18:00:00.000Z",
+        "currentLocal": "01 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-01T12:30:00.000Z",
+        "proposedLocal": "01 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-01T10:00:00.000Z",
+        "checkOut": "2026-01-01T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673f7ee590b35ad7120584",
+      "employeeName": "Subhra Nandi",
+      "attendanceId": "69673f7ee590b35ad712057e",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-06T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:02:22.434Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started that time ",
+      "requestedCheckIn": {
+        "current": "2026-01-06T10:00:00.000Z",
+        "currentLocal": "06 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-06T04:30:00.000Z",
+        "proposedLocal": "06 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-06T18:00:00.000Z",
+        "currentLocal": "06 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-06T12:30:00.000Z",
+        "proposedLocal": "06 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-06T10:00:00.000Z",
+        "checkOut": "2026-01-06T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673f90e590b35ad712075b",
+      "employeeName": "Subhra Nandi",
+      "attendanceId": "69673f90e590b35ad7120758",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-07T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:02:40.043Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started that time ",
+      "requestedCheckIn": {
+        "current": "2026-01-07T10:00:00.000Z",
+        "currentLocal": "07 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-07T04:30:00.000Z",
+        "proposedLocal": "07 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-07T18:00:00.000Z",
+        "currentLocal": "07 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-07T12:30:00.000Z",
+        "proposedLocal": "07 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-07T10:00:00.000Z",
+        "checkOut": "2026-01-07T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673f9be590b35ad7120936",
+      "employeeName": "Palak Lalwani",
+      "attendanceId": "69673f9be590b35ad7120933",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-02T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:02:51.155Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "started using this app from 9th January after receiving instructions",
+      "requestedCheckIn": {
+        "current": "2026-01-02T10:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-02T04:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-02T18:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-02T12:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-02T10:00:00.000Z",
+        "checkOut": "2026-01-02T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673face590b35ad7120c06",
+      "employeeName": "Subhra Nandi",
+      "attendanceId": "69673face590b35ad7120c03",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-08T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:03:08.157Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started that time ",
+      "requestedCheckIn": {
+        "current": "2026-01-08T10:00:00.000Z",
+        "currentLocal": "08 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-08T04:30:00.000Z",
+        "proposedLocal": "08 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-08T18:00:00.000Z",
+        "currentLocal": "08 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-08T12:30:00.000Z",
+        "proposedLocal": "08 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-08T10:00:00.000Z",
+        "checkOut": "2026-01-08T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673fc1e590b35ad7121037",
+      "employeeName": "Palak Lalwani",
+      "attendanceId": "69673fc1e590b35ad7121034",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-03T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:03:29.295Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "started using this app from 9th January after receiving instructions",
+      "requestedCheckIn": {
+        "current": "2026-01-03T10:00:00.000Z",
+        "currentLocal": "03 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-03T04:30:00.000Z",
+        "proposedLocal": "03 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-03T18:00:00.000Z",
+        "currentLocal": "03 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-03T12:30:00.000Z",
+        "proposedLocal": "03 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-03T10:00:00.000Z",
+        "checkOut": "2026-01-03T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673fd7e590b35ad71213e4",
+      "employeeName": "Palak Lalwani",
+      "attendanceId": "69673fd7e590b35ad71213e1",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-05T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:03:51.786Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "started using this app from 9th January after receiving instructions",
+      "requestedCheckIn": {
+        "current": "2026-01-05T10:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-05T04:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-05T18:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-05T12:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-05T10:00:00.000Z",
+        "checkOut": "2026-01-05T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673fe6e590b35ad712173c",
+      "employeeName": "Palak Lalwani",
+      "attendanceId": "69673fe6e590b35ad7121737",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-06T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:04:06.294Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "started using this app from 9th January after receiving instructions",
+      "requestedCheckIn": {
+        "current": "2026-01-06T10:00:00.000Z",
+        "currentLocal": "06 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-06T04:30:00.000Z",
+        "proposedLocal": "06 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-06T18:00:00.000Z",
+        "currentLocal": "06 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-06T12:30:00.000Z",
+        "proposedLocal": "06 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-06T10:00:00.000Z",
+        "checkOut": "2026-01-06T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69673ff5e590b35ad712187c",
+      "employeeName": "Palak Lalwani",
+      "attendanceId": "69673ff5e590b35ad7121879",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-07T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:04:21.881Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "started using this app from 9th January after receiving instructions",
+      "requestedCheckIn": {
+        "current": "2026-01-07T10:00:00.000Z",
+        "currentLocal": "07 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-07T04:30:00.000Z",
+        "proposedLocal": "07 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-07T18:00:00.000Z",
+        "currentLocal": "07 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-07T12:30:00.000Z",
+        "proposedLocal": "07 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-07T10:00:00.000Z",
+        "checkOut": "2026-01-07T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69674003e590b35ad7121aac",
+      "employeeName": "Palak Lalwani",
+      "attendanceId": "69674003e590b35ad7121aa9",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-08T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:04:35.682Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "started using this app from 9th January after receiving instructions",
+      "requestedCheckIn": {
+        "current": "2026-01-08T10:00:00.000Z",
+        "currentLocal": "08 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-08T04:30:00.000Z",
+        "proposedLocal": "08 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-08T18:00:00.000Z",
+        "currentLocal": "08 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-08T12:30:00.000Z",
+        "proposedLocal": "08 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-08T10:00:00.000Z",
+        "checkOut": "2026-01-08T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "696740f7e590b35ad7123d75",
+      "employeeName": "Debolina Roy",
+      "attendanceId": "696740f7e590b35ad7123d72",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-02T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:08:39.286Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started that time",
+      "requestedCheckIn": {
+        "current": "2026-01-02T10:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-02T04:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-02T18:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-02T12:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-02T10:00:00.000Z",
+        "checkOut": "2026-01-02T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69674119e590b35ad712428f",
+      "employeeName": "Debolina Roy",
+      "attendanceId": "69674119e590b35ad712428c",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-03T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:09:13.288Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio was not started that time",
+      "requestedCheckIn": {
+        "current": "2026-01-03T10:00:00.000Z",
+        "currentLocal": "03 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-03T04:30:00.000Z",
+        "proposedLocal": "03 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-03T18:00:00.000Z",
+        "currentLocal": "03 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-03T12:30:00.000Z",
+        "proposedLocal": "03 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-03T10:00:00.000Z",
+        "checkOut": "2026-01-03T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "6967412be590b35ad71246fe",
+      "employeeName": "Debolina Roy",
+      "attendanceId": "6967412be590b35ad71246f9",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-04T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:09:31.044Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio was not started that time",
+      "requestedCheckIn": {
+        "current": "2026-01-04T10:00:00.000Z",
+        "currentLocal": "04 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-04T04:30:00.000Z",
+        "proposedLocal": "04 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-04T18:00:00.000Z",
+        "currentLocal": "04 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-04T12:30:00.000Z",
+        "proposedLocal": "04 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-04T10:00:00.000Z",
+        "checkOut": "2026-01-04T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "6967415ce590b35ad7124d97",
+      "employeeName": "Debolina Roy",
+      "attendanceId": "6967415ce590b35ad7124d94",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-05T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:10:20.663Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio was not started that time",
+      "requestedCheckIn": {
+        "current": "2026-01-05T10:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-05T04:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-05T18:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-05T12:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-05T10:00:00.000Z",
+        "checkOut": "2026-01-05T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "6967416fe590b35ad71250b1",
+      "employeeName": "Debolina Roy",
+      "attendanceId": "6967416fe590b35ad71250ae",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-06T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:10:39.307Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio was not started that time",
+      "requestedCheckIn": {
+        "current": "2026-01-06T22:00:00.000Z",
+        "currentLocal": "07 Jan 2026, 03:30 am",
+        "proposed": "2026-01-06T16:30:00.000Z",
+        "proposedLocal": "06 Jan 2026, 10:00 pm",
+        "improvementMinutes": -330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-06T18:00:00.000Z",
+        "currentLocal": "06 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-06T12:30:00.000Z",
+        "proposedLocal": "06 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-06T22:00:00.000Z",
+        "checkOut": "2026-01-06T18:00:00.000Z",
+        "status": "absent",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "69674185e590b35ad7125622",
+      "employeeName": "Debolina Roy",
+      "attendanceId": "69674185e590b35ad712561d",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-07T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:11:01.730Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio was not started that time",
+      "requestedCheckIn": {
+        "current": "2026-01-07T10:00:00.000Z",
+        "currentLocal": "07 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-07T04:30:00.000Z",
+        "proposedLocal": "07 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-07T18:00:00.000Z",
+        "currentLocal": "07 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-07T12:30:00.000Z",
+        "proposedLocal": "07 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-07T10:00:00.000Z",
+        "checkOut": "2026-01-07T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69674196e590b35ad7125f3c",
+      "employeeName": "Debolina Roy",
+      "attendanceId": "69674196e590b35ad7125f39",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-08T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:11:18.717Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio was not started that time",
+      "requestedCheckIn": {
+        "current": "2026-01-08T10:00:00.000Z",
+        "currentLocal": "08 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-08T04:30:00.000Z",
+        "proposedLocal": "08 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-08T18:00:00.000Z",
+        "currentLocal": "08 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-08T12:30:00.000Z",
+        "proposedLocal": "08 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-08T10:00:00.000Z",
+        "checkOut": "2026-01-08T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69674757e590b35ad7136ff9",
+      "employeeName": "Suruchi Sen",
+      "attendanceId": "69674757e590b35ad7136ff6",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-12T00:00:00.000Z",
+      "createdAt": "2026-01-14T07:35:51.613Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "I have completed my 8 hours ",
+      "requestedCheckIn": {
+        "current": "2026-01-12T09:40:00.000Z",
+        "currentLocal": "12 Jan 2026, 03:10 pm",
+        "proposed": "2026-01-12T04:10:00.000Z",
+        "proposedLocal": "12 Jan 2026, 09:40 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-12T18:36:00.000Z",
+        "currentLocal": "13 Jan 2026, 12:06 am",
+        "proposed": "2026-01-12T13:06:00.000Z",
+        "proposedLocal": "12 Jan 2026, 06:36 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-12T09:40:00.000Z",
+        "checkOut": "2026-01-12T18:36:00.000Z",
+        "status": "present",
+        "workHours": 8.93
+      }
+    },
+    {
+      "correctionId": "69687fb9e590b35ad72053f8",
+      "employeeName": "Aman Tiwari",
+      "attendanceId": "69687fb9e590b35ad72053f5",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-05T00:00:00.000Z",
+      "createdAt": "2026-01-15T05:48:41.946Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "forget to clock in",
+      "requestedCheckIn": {
+        "current": "2026-01-05T10:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-05T04:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-05T20:18:00.000Z",
+        "currentLocal": "06 Jan 2026, 01:48 am",
+        "proposed": "2026-01-05T14:48:00.000Z",
+        "proposedLocal": "05 Jan 2026, 08:18 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-05T10:00:00.000Z",
+        "checkOut": "2026-01-05T20:18:00.000Z",
+        "status": "present",
+        "workHours": 10.3
+      }
+    },
+    {
+      "correctionId": "6968e4dbe590b35ad732b631",
+      "employeeName": "Sachi Tiwari",
+      "attendanceId": "696877d4e590b35ad71f4222",
+      "correctionType": "both",
+      "correctionDate": "2026-01-15T05:15:00.397Z",
+      "createdAt": "2026-01-15T13:00:11.090Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Due to heavy traffic, I logged into the office half an hour late today at 10:44 AM.",
+      "requestedCheckIn": {
+        "current": "2026-01-15T10:44:00.000Z",
+        "currentLocal": "15 Jan 2026, 04:14 pm",
+        "proposed": "2026-01-15T05:14:00.000Z",
+        "proposedLocal": "15 Jan 2026, 10:44 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-15T18:29:00.000Z",
+        "currentLocal": "15 Jan 2026, 11:59 pm",
+        "proposed": "2026-01-15T12:59:00.000Z",
+        "proposedLocal": "15 Jan 2026, 06:29 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-15T10:44:00.000Z",
+        "checkOut": "2026-01-15T18:29:00.000Z",
+        "status": "present",
+        "workHours": 7.75
+      }
+    },
+    {
+      "correctionId": "696a249f4047d058954cf4dd",
+      "employeeName": "Deepa Mishra",
+      "attendanceId": "69686ceae590b35ad71e9d08",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-15T04:28:26.550Z",
+      "createdAt": "2026-01-16T11:44:31.678Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "I won't be able to clock out due to talio app error kindly regularize my attendance. ",
+      "requestedCheckIn": {
+        "current": "2026-01-15T10:00:00.000Z",
+        "currentLocal": "15 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-15T04:30:00.000Z",
+        "proposedLocal": "15 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-15T18:00:00.000Z",
+        "currentLocal": "15 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-15T12:30:00.000Z",
+        "proposedLocal": "15 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-15T10:00:00.000Z",
+        "checkOut": "2026-01-15T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "696b10f6bec12e5a24548b08",
+      "employeeName": "Tripti Gupta",
+      "attendanceId": "696b10f6bec12e5a24548b05",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-02T00:00:00.000Z",
+      "createdAt": "2026-01-17T04:32:54.954Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "login from ",
+      "requestedCheckIn": {
+        "current": "2026-01-02T10:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-02T04:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-02T06:30:00.000Z",
+        "currentLocal": "02 Jan 2026, 12:00 pm",
+        "proposed": "2026-01-02T01:00:00.000Z",
+        "proposedLocal": "02 Jan 2026, 06:30 am",
+        "improvementMinutes": -330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-02T10:00:00.000Z",
+        "checkOut": "2026-01-02T06:30:00.000Z",
+        "status": "half-day",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "696db64ebec12e5a2459bcf3",
+      "employeeName": "Khushboo Vishwakarma",
+      "attendanceId": "695b5e5c26f3ff61eb688a83",
+      "correctionType": "both",
+      "correctionDate": "2026-01-05T06:46:52.317Z",
+      "createdAt": "2026-01-19T04:42:54.853Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "I forgot to punch out in the evening time.",
+      "requestedCheckIn": {
+        "current": "2026-01-05T17:46:00.000Z",
+        "currentLocal": "05 Jan 2026, 11:16 pm",
+        "proposed": "2026-01-05T12:16:00.000Z",
+        "proposedLocal": "05 Jan 2026, 05:46 pm",
+        "improvementMinutes": 58
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-05T23:43:00.000Z",
+        "currentLocal": "06 Jan 2026, 05:13 am",
+        "proposed": "2026-01-05T18:13:00.000Z",
+        "proposedLocal": "05 Jan 2026, 11:43 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-05T17:46:00.000Z",
+        "checkOut": "2026-01-05T23:43:00.000Z",
+        "status": "present",
+        "workHours": 5.95
+      }
+    },
+    {
+      "correctionId": "696f09681ca47d0fec37b8e4",
+      "employeeName": "6957b35ebf0b9ea49ca507cf",
+      "attendanceId": "696871fae590b35ad71ecd49",
+      "correctionType": "both",
+      "correctionDate": "2026-01-15T04:50:02.144Z",
+      "createdAt": "2026-01-20T04:49:44.585Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio automatic logout",
+      "requestedCheckIn": {
+        "current": "2026-01-15T10:55:00.000Z",
+        "currentLocal": "15 Jan 2026, 04:25 pm",
+        "proposed": "2026-01-15T05:25:00.000Z",
+        "proposedLocal": "15 Jan 2026, 10:55 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-15T07:10:00.000Z",
+        "currentLocal": "15 Jan 2026, 12:40 pm",
+        "proposed": "2026-01-15T01:40:00.000Z",
+        "proposedLocal": "15 Jan 2026, 07:10 am",
+        "improvementMinutes": -330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-15T10:55:00.000Z",
+        "checkOut": "2026-01-15T07:10:00.000Z",
+        "status": "half-day",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "696f5ff51ca47d0fec3c668e",
+      "employeeName": "Aviraj Sharma",
+      "attendanceId": "696f5ff51ca47d0fec3c668b",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-11T00:00:00.000Z",
+      "createdAt": "2026-01-20T10:59:01.874Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Technical Issue",
+      "requestedCheckIn": {
+        "current": "2026-01-11T09:56:00.000Z",
+        "currentLocal": "11 Jan 2026, 03:26 pm",
+        "proposed": "2026-01-11T04:26:00.000Z",
+        "proposedLocal": "11 Jan 2026, 09:56 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-11T19:35:00.000Z",
+        "currentLocal": "12 Jan 2026, 01:05 am",
+        "proposed": "2026-01-11T14:05:00.000Z",
+        "proposedLocal": "11 Jan 2026, 07:35 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-11T09:56:00.000Z",
+        "checkOut": "2026-01-11T19:35:00.000Z",
+        "status": "present",
+        "workHours": 9.65
+      }
+    },
+    {
+      "correctionId": "6971a12e652108bbf60370d5",
+      "employeeName": "Lovisha Goyal",
+      "attendanceId": "69719fed652108bbf6036f4c",
+      "correctionType": "both",
+      "correctionDate": "2026-01-22T03:56:29.715Z",
+      "createdAt": "2026-01-22T04:01:50.823Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Network issues",
+      "requestedCheckIn": {
+        "current": "2026-01-22T09:26:00.000Z",
+        "currentLocal": "22 Jan 2026, 02:56 pm",
+        "proposed": "2026-01-22T03:56:00.000Z",
+        "proposedLocal": "22 Jan 2026, 09:26 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-22T18:00:00.000Z",
+        "currentLocal": "22 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-22T12:30:00.000Z",
+        "proposedLocal": "22 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-22T09:26:00.000Z",
+        "checkOut": "2026-01-22T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8.57
+      }
+    },
+    {
+      "correctionId": "6971a163652108bbf603715d",
+      "employeeName": "Lovisha Goyal",
+      "attendanceId": "696651608bebefc78acd5a93",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-01T00:00:00.000Z",
+      "createdAt": "2026-01-22T04:02:43.395Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Earlier log in at zimyo",
+      "requestedCheckIn": {
+        "current": "2026-01-01T10:00:00.000Z",
+        "currentLocal": "01 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-01T04:30:00.000Z",
+        "proposedLocal": "01 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-01T18:00:00.000Z",
+        "currentLocal": "01 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-01T12:30:00.000Z",
+        "proposedLocal": "01 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-01T10:00:00.000Z",
+        "checkOut": "2026-01-01T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "6979f3fc164861fcfe5af2dd",
+      "employeeName": "Adil Khan",
+      "attendanceId": "697997c4164861fcfe518405",
+      "correctionType": "check-out",
+      "correctionDate": "2026-01-28T04:59:48.235Z",
+      "createdAt": "2026-01-28T11:33:16.041Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Check out earlier for the testing purpose ",
+      "requestedCheckIn": null,
+      "requestedCheckOut": {
+        "current": "2026-01-28T18:07:00.000Z",
+        "currentLocal": "28 Jan 2026, 11:37 pm",
+        "proposed": "2026-01-28T12:37:00.000Z",
+        "proposedLocal": "28 Jan 2026, 06:07 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-28T04:59:47.297Z",
+        "checkOut": "2026-01-28T18:07:00.000Z",
+        "status": "present",
+        "workHours": 13.12
+      }
+    },
+    {
+      "correctionId": "697b2e42511f871222d6519f",
+      "employeeName": "Adil Khan",
+      "attendanceId": "697ae7e0511f871222cb7dbf",
+      "correctionType": "check-out",
+      "correctionDate": "2026-01-29T04:53:52.795Z",
+      "createdAt": "2026-01-29T09:54:10.864Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "For the testing purpose checked out early",
+      "requestedCheckIn": null,
+      "requestedCheckOut": {
+        "current": "2026-01-29T18:23:00.000Z",
+        "currentLocal": "29 Jan 2026, 11:53 pm",
+        "proposed": "2026-01-29T12:53:00.000Z",
+        "proposedLocal": "29 Jan 2026, 06:23 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-29T04:53:00.000Z",
+        "checkOut": "2026-01-29T18:23:00.000Z",
+        "status": "present",
+        "workHours": 13.5
+      }
+    },
+    {
+      "correctionId": "6988d89b4c381a6b5d3d7576",
+      "employeeName": "Aviraj Sharma",
+      "attendanceId": "6982ca45e4f10628f3359918",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-02-04T04:25:41.168Z",
+      "createdAt": "2026-02-08T18:40:27.704Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Glitch",
+      "requestedCheckIn": {
+        "current": "2026-02-04T09:56:00.000Z",
+        "currentLocal": "04 Feb 2026, 03:26 pm",
+        "proposed": "2026-02-04T04:26:00.000Z",
+        "proposedLocal": "04 Feb 2026, 09:56 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-02-04T19:05:00.000Z",
+        "currentLocal": "05 Feb 2026, 12:35 am",
+        "proposed": "2026-02-04T13:35:00.000Z",
+        "proposedLocal": "04 Feb 2026, 07:05 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-02-04T09:56:00.000Z",
+        "checkOut": "2026-02-04T19:05:00.000Z",
+        "status": "present",
+        "workHours": 9.15
+      }
+    },
+    {
+      "correctionId": "698abba7c7ded17a95b88e7b",
+      "employeeName": "Jaya Prashant Jain",
+      "attendanceId": "698abba7c7ded17a95b88e78",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-02-06T00:00:00.000Z",
+      "createdAt": "2026-02-10T05:01:27.102Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Forget entry",
+      "requestedCheckIn": {
+        "current": "2026-02-06T10:01:00.000Z",
+        "currentLocal": "06 Feb 2026, 03:31 pm",
+        "proposed": "2026-02-06T04:31:00.000Z",
+        "proposedLocal": "06 Feb 2026, 10:01 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-02-06T18:20:00.000Z",
+        "currentLocal": "06 Feb 2026, 11:50 pm",
+        "proposed": "2026-02-06T12:50:00.000Z",
+        "proposedLocal": "06 Feb 2026, 06:20 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-02-06T10:01:00.000Z",
+        "checkOut": "2026-02-06T18:20:00.000Z",
+        "status": "present",
+        "workHours": 8.32
+      }
+    },
+    {
+      "correctionId": "69953d9004f16930d85a2331",
+      "employeeName": "Navneet Saxena",
+      "attendanceId": "69953d9004f16930d85a232e",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-02-13T00:00:00.000Z",
+      "createdAt": "2026-02-18T04:18:24.953Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "..",
+      "requestedCheckIn": {
+        "current": "2026-02-13T09:47:00.000Z",
+        "currentLocal": "13 Feb 2026, 03:17 pm",
+        "proposed": "2026-02-13T04:17:00.000Z",
+        "proposedLocal": "13 Feb 2026, 09:47 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-02-13T21:47:00.000Z",
+        "currentLocal": "14 Feb 2026, 03:17 am",
+        "proposed": "2026-02-13T16:17:00.000Z",
+        "proposedLocal": "13 Feb 2026, 09:47 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-02-13T09:47:00.000Z",
+        "checkOut": "2026-02-13T21:47:00.000Z",
+        "status": "present",
+        "workHours": 12
+      }
+    },
+    {
+      "correctionId": "6995578704f16930d85b207a",
+      "employeeName": "Anuj Soni",
+      "attendanceId": "6995571204f16930d85b1c09",
+      "correctionType": "check-in",
+      "correctionDate": "2026-02-18T06:07:14.415Z",
+      "createdAt": "2026-02-18T06:09:11.696Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Forget to check in on app",
+      "requestedCheckIn": {
+        "current": "2026-02-18T10:05:00.000Z",
+        "currentLocal": "18 Feb 2026, 03:35 pm",
+        "proposed": "2026-02-18T04:35:00.000Z",
+        "proposedLocal": "18 Feb 2026, 10:05 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": null,
+      "attendanceCurrent": {
+        "checkIn": "2026-02-18T10:05:00.000Z",
+        "checkOut": "2026-02-18T12:30:00.000Z",
+        "status": "half-day",
+        "workHours": 2.42
+      }
+    },
+    {
+      "correctionId": "699d2808c1007b47fead4bc2",
+      "employeeName": "Rohit sharma",
+      "attendanceId": "699c396fc1007b47feac1109",
+      "correctionType": "both",
+      "correctionDate": "2026-02-23T11:26:39.081Z",
+      "createdAt": "2026-02-24T04:24:40.953Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not working ",
+      "requestedCheckIn": {
+        "current": "2026-02-23T10:00:00.000Z",
+        "currentLocal": "23 Feb 2026, 03:30 pm",
+        "proposed": "2026-02-23T04:30:00.000Z",
+        "proposedLocal": "23 Feb 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-02-23T18:00:00.000Z",
+        "currentLocal": "23 Feb 2026, 11:30 pm",
+        "proposed": "2026-02-23T12:30:00.000Z",
+        "proposedLocal": "23 Feb 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-02-23T10:00:00.000Z",
+        "checkOut": "2026-02-23T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "69ae828452a037eafea1a8b3",
+      "employeeName": "Mahendra Mourya",
+      "attendanceId": "69ae828352a037eafea1a8ae",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-03-05T00:00:00.000Z",
+      "createdAt": "2026-03-09T08:19:16.102Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Tech Issue",
+      "requestedCheckIn": {
+        "current": "2026-03-05T10:00:00.000Z",
+        "currentLocal": "05 Mar 2026, 03:30 pm",
+        "proposed": "2026-03-05T04:30:00.000Z",
+        "proposedLocal": "05 Mar 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-03-05T18:30:00.000Z",
+        "currentLocal": "06 Mar 2026, 12:00 am",
+        "proposed": "2026-03-05T13:00:00.000Z",
+        "proposedLocal": "05 Mar 2026, 06:30 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-03-05T10:00:00.000Z",
+        "checkOut": "2026-03-05T18:30:00.000Z",
+        "status": "present",
+        "workHours": 8.5
+      }
+    },
+    {
+      "correctionId": "69ae82a9fbceac913dc45e49",
+      "employeeName": "Mahendra Mourya",
+      "attendanceId": "69ae82a9fbceac913dc45e43",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-03-07T00:00:00.000Z",
+      "createdAt": "2026-03-09T08:19:53.763Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Tech Issue",
+      "requestedCheckIn": {
+        "current": "2026-03-07T10:01:00.000Z",
+        "currentLocal": "07 Mar 2026, 03:31 pm",
+        "proposed": "2026-03-07T04:31:00.000Z",
+        "proposedLocal": "07 Mar 2026, 10:01 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-03-07T18:30:00.000Z",
+        "currentLocal": "08 Mar 2026, 12:00 am",
+        "proposed": "2026-03-07T13:00:00.000Z",
+        "proposedLocal": "07 Mar 2026, 06:30 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-03-07T10:01:00.000Z",
+        "checkOut": "2026-03-07T18:30:00.000Z",
+        "status": "present",
+        "workHours": 8.48
+      }
+    },
+    {
+      "correctionId": "69ae82c452a037eafea1ab33",
+      "employeeName": "Mahendra Mourya",
+      "attendanceId": "69ae7b5f3761d529cdd51b61",
+      "correctionType": "both",
+      "correctionDate": "2026-03-09T07:48:47.040Z",
+      "createdAt": "2026-03-09T08:20:20.235Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Tech Issue",
+      "requestedCheckIn": {
+        "current": "2026-03-09T10:00:00.000Z",
+        "currentLocal": "09 Mar 2026, 03:30 pm",
+        "proposed": "2026-03-09T04:30:00.000Z",
+        "proposedLocal": "09 Mar 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": null,
+      "attendanceCurrent": {
+        "checkIn": "2026-03-09T10:00:00.000Z",
+        "checkOut": null,
+        "status": "absent",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "69ba4900558ae3868d21180a",
+      "employeeName": "Aviraj Sharma",
+      "attendanceId": "69ba4900558ae3868d2117ff",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-03-02T00:00:00.000Z",
+      "createdAt": "2026-03-18T06:41:04.679Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Did not sign in\n",
+      "requestedCheckIn": {
+        "current": "2026-03-02T09:58:00.000Z",
+        "currentLocal": "02 Mar 2026, 03:28 pm",
+        "proposed": "2026-03-02T04:28:00.000Z",
+        "proposedLocal": "02 Mar 2026, 09:58 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-03-02T19:10:00.000Z",
+        "currentLocal": "03 Mar 2026, 12:40 am",
+        "proposed": "2026-03-02T13:40:00.000Z",
+        "proposedLocal": "02 Mar 2026, 07:10 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-03-02T09:58:00.000Z",
+        "checkOut": "2026-03-02T19:10:00.000Z",
+        "status": "present",
+        "workHours": 9.2
+      }
+    },
+    {
+      "correctionId": "69c4c78493d03fb36c858823",
+      "employeeName": "Anuj Soni",
+      "attendanceId": "69993c9ac1007b47fea3ab91",
+      "correctionType": "check-in",
+      "correctionDate": "2026-03-26T00:00:00.000Z",
+      "createdAt": "2026-03-26T05:43:32.274Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Due to Talio Holiday Error",
+      "requestedCheckIn": {
+        "current": "2026-03-26T10:10:00.000Z",
+        "currentLocal": "26 Mar 2026, 03:40 pm",
+        "proposed": "2026-03-26T04:40:00.000Z",
+        "proposedLocal": "26 Mar 2026, 10:10 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": null,
+      "attendanceCurrent": {
+        "checkIn": "2026-03-26T10:10:00.000Z",
+        "checkOut": null,
+        "status": "absent",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "69d49125f92bdda8df9776c3",
+      "employeeName": "Anuj Soni",
+      "attendanceId": "69d49125f92bdda8df9776c0",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-03-10T00:00:00.000Z",
+      "createdAt": "2026-04-07T05:07:49.724Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Missed Talio Entry",
+      "requestedCheckIn": {
+        "current": "2026-03-10T10:02:00.000Z",
+        "currentLocal": "10 Mar 2026, 03:32 pm",
+        "proposed": "2026-03-10T04:32:00.000Z",
+        "proposedLocal": "10 Mar 2026, 10:02 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-03-10T18:35:00.000Z",
+        "currentLocal": "11 Mar 2026, 12:05 am",
+        "proposed": "2026-03-10T13:05:00.000Z",
+        "proposedLocal": "10 Mar 2026, 06:35 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-03-10T10:02:00.000Z",
+        "checkOut": "2026-03-10T18:35:00.000Z",
+        "status": "present",
+        "workHours": 8.55
+      }
+    },
+    {
+      "correctionId": "69ddd391e8a3a1a1cc364048",
+      "employeeName": "Aviraj Sharma",
+      "attendanceId": "69ddd391e8a3a1a1cc364045",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-04-13T00:00:00.000Z",
+      "createdAt": "2026-04-14T05:41:37.309Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Forgot to punch in.",
+      "requestedCheckIn": {
+        "current": "2026-04-13T10:11:00.000Z",
+        "currentLocal": "13 Apr 2026, 03:41 pm",
+        "proposed": "2026-04-13T04:41:00.000Z",
+        "proposedLocal": "13 Apr 2026, 10:11 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-04-13T20:11:00.000Z",
+        "currentLocal": "14 Apr 2026, 01:41 am",
+        "proposed": "2026-04-13T14:41:00.000Z",
+        "proposedLocal": "13 Apr 2026, 08:11 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-04-13T10:11:00.000Z",
+        "checkOut": "2026-04-13T20:11:00.000Z",
+        "status": "present",
+        "workHours": 10
+      }
+    },
+    {
+      "correctionId": "697246a948e91568e8cef83d",
+      "employeeName": "Aviraj Sharma",
+      "attendanceId": "69609ec981b8ffc05dd33942",
+      "correctionType": "both",
+      "correctionDate": "2026-01-09T06:23:05.718Z",
+      "createdAt": "2026-01-22T15:47:53.928Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": false,
+      "maxImprovementMinutes": 16,
+      "reason": "Technical issue",
+      "requestedCheckIn": {
+        "current": "2026-01-09T06:23:00.000Z",
+        "currentLocal": "09 Jan 2026, 11:53 am",
+        "proposed": "2026-01-09T00:53:00.000Z",
+        "proposedLocal": "09 Jan 2026, 06:23 am",
+        "improvementMinutes": 16
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-09T13:42:00.000Z",
+        "currentLocal": "09 Jan 2026, 07:12 pm",
+        "proposed": "2026-01-09T08:12:00.000Z",
+        "proposedLocal": "09 Jan 2026, 01:42 pm",
+        "improvementMinutes": -186
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-09T06:23:00.000Z",
+        "checkOut": "2026-01-09T13:42:00.000Z",
+        "status": "present",
+        "workHours": 7.32
+      }
+    },
+    {
+      "correctionId": "6962259622a6ca93b12a0f0c",
+      "employeeName": "Adil Khan",
+      "attendanceId": "69608ac862488f31782b5560",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-09T04:57:44.827Z",
+      "createdAt": "2026-01-10T10:10:30.015Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": false,
+      "maxImprovementMinutes": -90,
+      "reason": "Testing is the reason",
+      "requestedCheckIn": {
+        "current": "2026-01-09T04:30:00.000Z",
+        "currentLocal": "09 Jan 2026, 10:00 am",
+        "proposed": "2026-01-08T23:00:00.000Z",
+        "proposedLocal": "09 Jan 2026, 04:30 am",
+        "improvementMinutes": -210
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-09T14:30:00.000Z",
+        "currentLocal": "09 Jan 2026, 08:00 pm",
+        "proposed": "2026-01-09T09:00:00.000Z",
+        "proposedLocal": "09 Jan 2026, 02:30 pm",
+        "improvementMinutes": -90
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-09T04:30:00.000Z",
+        "checkOut": "2026-01-09T14:30:00.000Z",
+        "status": "present",
+        "workHours": 10
+      }
+    },
+    {
+      "correctionId": "69de1538e14f7682ecc2cd8f",
+      "employeeName": "Aviraj Sharma",
+      "attendanceId": "69de1537e14f7682ecc2cd8c",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-04-12T18:30:00.000Z",
+      "createdAt": "2026-04-14T10:21:44.049Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": false,
+      "maxImprovementMinutes": -90,
+      "reason": "Live timezone retest for attendance regularisation after parser fix.",
+      "requestedCheckIn": {
+        "current": "2026-04-13T04:30:00.000Z",
+        "currentLocal": "13 Apr 2026, 10:00 am",
+        "proposed": "2026-04-12T23:00:00.000Z",
+        "proposedLocal": "13 Apr 2026, 04:30 am",
+        "improvementMinutes": -210
+      },
+      "requestedCheckOut": {
+        "current": "2026-04-13T14:30:00.000Z",
+        "currentLocal": "13 Apr 2026, 08:00 pm",
+        "proposed": "2026-04-13T09:00:00.000Z",
+        "proposedLocal": "13 Apr 2026, 02:30 pm",
+        "improvementMinutes": -90
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-04-13T04:30:00.000Z",
+        "checkOut": "2026-04-13T14:30:00.000Z",
+        "status": "present",
+        "workHours": 10
+      }
+    },
+    {
+      "correctionId": "6968d873c39031648e62d615",
+      "employeeName": "Lokesh Dhote",
+      "attendanceId": "6968d873c39031648e62d612",
+      "correctionType": "missing-entry",
+      "correctionDate": "2025-12-02T18:30:00.000Z",
+      "createdAt": "2026-01-15T12:07:15.872Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": false,
+      "maxImprovementMinutes": -210,
+      "reason": "late ",
+      "requestedCheckIn": {
+        "current": "2025-12-03T04:30:00.000Z",
+        "currentLocal": "03 Dec 2025, 10:00 am",
+        "proposed": "2025-12-02T23:00:00.000Z",
+        "proposedLocal": "03 Dec 2025, 04:30 am",
+        "improvementMinutes": -210
+      },
+      "requestedCheckOut": {
+        "current": "2025-12-03T12:30:00.000Z",
+        "currentLocal": "03 Dec 2025, 06:00 pm",
+        "proposed": "2025-12-03T07:00:00.000Z",
+        "proposedLocal": "03 Dec 2025, 12:30 pm",
+        "improvementMinutes": -330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2025-12-03T04:30:00.000Z",
+        "checkOut": "2025-12-03T12:30:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "6969d07dd46696a2baf93501",
+      "employeeName": "Lokesh Dhote",
+      "attendanceId": "695b59f4a9974c7e3fa105c4",
+      "correctionType": "missing-entry",
+      "correctionDate": "2025-12-31T18:30:00.000Z",
+      "createdAt": "2026-01-16T05:45:33.456Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": false,
+      "maxImprovementMinutes": -210,
+      "reason": "late (test)",
+      "requestedCheckIn": {
+        "current": "2026-01-01T04:30:00.000Z",
+        "currentLocal": "01 Jan 2026, 10:00 am",
+        "proposed": "2025-12-31T23:00:00.000Z",
+        "proposedLocal": "01 Jan 2026, 04:30 am",
+        "improvementMinutes": -210
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-01T12:30:00.000Z",
+        "currentLocal": "01 Jan 2026, 06:00 pm",
+        "proposed": "2026-01-01T07:00:00.000Z",
+        "proposedLocal": "01 Jan 2026, 12:30 pm",
+        "improvementMinutes": -330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-01T04:30:00.000Z",
+        "checkOut": "2026-01-01T12:30:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "695ca62471b85ab9180300fd",
+      "employeeName": "Aviraj Sharma",
+      "attendanceId": "695b59f3a9974c7e3fa1058b",
+      "correctionType": "missing-entry",
+      "correctionDate": "2025-12-31T18:30:00.000Z",
+      "createdAt": "2026-01-06T06:05:24.841Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": false,
+      "maxImprovementMinutes": -220,
+      "reason": "Technical issue",
+      "requestedCheckIn": {
+        "current": "2026-01-01T04:25:00.000Z",
+        "currentLocal": "01 Jan 2026, 09:55 am",
+        "proposed": "2025-12-31T22:55:00.000Z",
+        "proposedLocal": "01 Jan 2026, 04:25 am",
+        "improvementMinutes": -220
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-01T13:00:00.000Z",
+        "currentLocal": "01 Jan 2026, 06:30 pm",
+        "proposed": "2026-01-01T07:30:00.000Z",
+        "proposedLocal": "01 Jan 2026, 01:00 pm",
+        "improvementMinutes": -270
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-01T04:25:00.000Z",
+        "checkOut": "2026-01-01T13:00:00.000Z",
+        "status": "present",
+        "workHours": 8.58
+      }
+    },
+    {
+      "correctionId": "695ca6bd71b85ab9180302ab",
+      "employeeName": "Aviraj Sharma",
+      "attendanceId": "695ca6bd71b85ab9180302a8",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-01T18:30:00.000Z",
+      "createdAt": "2026-01-06T06:07:57.914Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": false,
+      "maxImprovementMinutes": -220,
+      "reason": "Technical issue",
+      "requestedCheckIn": {
+        "current": "2026-01-02T04:25:00.000Z",
+        "currentLocal": "02 Jan 2026, 09:55 am",
+        "proposed": "2026-01-01T22:55:00.000Z",
+        "proposedLocal": "02 Jan 2026, 04:25 am",
+        "improvementMinutes": -220
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-02T13:07:00.000Z",
+        "currentLocal": "02 Jan 2026, 06:37 pm",
+        "proposed": "2026-01-02T07:37:00.000Z",
+        "proposedLocal": "02 Jan 2026, 01:07 pm",
+        "improvementMinutes": -256
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-02T04:25:00.000Z",
+        "checkOut": "2026-01-02T13:07:00.000Z",
+        "status": "present",
+        "workHours": 8.7
+      }
+    }
+  ],
+  "sample": [
+    {
+      "correctionId": "6958eb2cf16dd4aa249d9656",
+      "employeeName": "Jaya Prashant Jain",
+      "attendanceId": "6958eb2cf16dd4aa249d9653",
+      "correctionType": "missing-entry",
+      "correctionDate": "2025-12-02T00:00:00.000Z",
+      "createdAt": "2026-01-03T10:10:52.303Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Talio not started",
+      "requestedCheckIn": {
+        "current": "2025-12-02T09:49:00.000Z",
+        "currentLocal": "02 Dec 2025, 03:19 pm",
+        "proposed": "2025-12-02T04:19:00.000Z",
+        "proposedLocal": "02 Dec 2025, 09:49 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2025-12-02T16:36:00.000Z",
+        "currentLocal": "02 Dec 2025, 10:06 pm",
+        "proposed": "2025-12-02T11:06:00.000Z",
+        "proposedLocal": "02 Dec 2025, 04:36 pm",
+        "improvementMinutes": 162
+      },
+      "attendanceCurrent": {
+        "checkIn": "2025-12-02T09:49:00.000Z",
+        "checkOut": "2025-12-02T16:36:00.000Z",
+        "status": "half-day",
+        "workHours": 6.78
+      }
+    },
+    {
+      "correctionId": "695b848f1a03693ecc2f20a8",
+      "employeeName": "Sahil Sahu",
+      "attendanceId": "695b848f1a03693ecc2f20a5",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-02T00:00:00.000Z",
+      "createdAt": "2026-01-05T09:29:51.665Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Didn't have access to talio app. ",
+      "requestedCheckIn": {
+        "current": "2026-01-02T10:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-02T04:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-02T18:00:00.000Z",
+        "currentLocal": "02 Jan 2026, 11:30 pm",
+        "proposed": "2026-01-02T12:30:00.000Z",
+        "proposedLocal": "02 Jan 2026, 06:00 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-02T10:00:00.000Z",
+        "checkOut": "2026-01-02T18:00:00.000Z",
+        "status": "present",
+        "workHours": 8
+      }
+    },
+    {
+      "correctionId": "695b84ca1a03693ecc2f2346",
+      "employeeName": "Sahil Sahu",
+      "attendanceId": "695b84ca1a03693ecc2f2343",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-04T00:00:00.000Z",
+      "createdAt": "2026-01-05T09:30:50.667Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "Didn't have access to talio. ",
+      "requestedCheckIn": {
+        "current": "2026-01-04T10:08:00.000Z",
+        "currentLocal": "04 Jan 2026, 03:38 pm",
+        "proposed": "2026-01-04T04:38:00.000Z",
+        "proposedLocal": "04 Jan 2026, 10:08 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": null,
+      "attendanceCurrent": {
+        "checkIn": "2026-01-04T10:08:00.000Z",
+        "checkOut": null,
+        "status": "absent",
+        "workHours": 0
+      }
+    },
+    {
+      "correctionId": "695b989a1a03693ecc2fc67f",
+      "employeeName": "Rithik Jain",
+      "attendanceId": "695b4ac826f3ff61eb68379e",
+      "correctionType": "both",
+      "correctionDate": "2026-01-05T05:23:20.901Z",
+      "createdAt": "2026-01-05T10:55:22.211Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "biometric not working",
+      "requestedCheckIn": {
+        "current": "2026-01-05T10:00:00.000Z",
+        "currentLocal": "05 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-05T04:30:00.000Z",
+        "proposedLocal": "05 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-05T18:25:00.000Z",
+        "currentLocal": "05 Jan 2026, 11:55 pm",
+        "proposed": "2026-01-05T12:55:00.000Z",
+        "proposedLocal": "05 Jan 2026, 06:25 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-05T10:00:00.000Z",
+        "checkOut": "2026-01-05T18:25:00.000Z",
+        "status": "present",
+        "workHours": 8.42
+      }
+    },
+    {
+      "correctionId": "695b99441a03693ecc2fcd27",
+      "employeeName": "Rithik Jain",
+      "attendanceId": "695b99441a03693ecc2fcd24",
+      "correctionType": "missing-entry",
+      "correctionDate": "2026-01-01T00:00:00.000Z",
+      "createdAt": "2026-01-05T10:58:12.350Z",
+      "timezone": "Asia/Kolkata",
+      "officeCheckIn": "09:00",
+      "officeCheckOut": "18:00",
+      "likelyShifted": true,
+      "maxImprovementMinutes": 330,
+      "reason": "late working",
+      "requestedCheckIn": {
+        "current": "2026-01-01T10:00:00.000Z",
+        "currentLocal": "01 Jan 2026, 03:30 pm",
+        "proposed": "2026-01-01T04:30:00.000Z",
+        "proposedLocal": "01 Jan 2026, 10:00 am",
+        "improvementMinutes": 330
+      },
+      "requestedCheckOut": {
+        "current": "2026-01-01T18:30:00.000Z",
+        "currentLocal": "02 Jan 2026, 12:00 am",
+        "proposed": "2026-01-01T13:00:00.000Z",
+        "proposedLocal": "01 Jan 2026, 06:30 pm",
+        "improvementMinutes": 330
+      },
+      "attendanceCurrent": {
+        "checkIn": "2026-01-01T10:00:00.000Z",
+        "checkOut": "2026-01-01T18:30:00.000Z",
+        "status": "present",
+        "workHours": 8.5
+      }
+    }
+  ]
+}
