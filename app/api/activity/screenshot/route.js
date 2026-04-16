@@ -206,7 +206,7 @@ export async function POST(request) {
 
     console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${gridfsResult ? ` (GridFS: ${gridfsResult._id})` : ''}`);
 
-    // Auto-trigger session analysis if session is complete (20 screenshots)
+    // Auto-trigger session analysis if session is complete (60 screenshots)
     // Run async — don't block the upload response
     checkAndTriggerSessionAnalysis({
       userId,

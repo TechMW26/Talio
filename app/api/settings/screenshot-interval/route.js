@@ -15,17 +15,17 @@ export async function POST(request) {
 
     // Only admin, admin, and department_head can set screenshot interval
     if (!['admin', 'department_head'].includes(user.role)) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Insufficient permissions' 
+      return NextResponse.json({
+        success: false,
+        error: 'Insufficient permissions'
       }, { status: 403 });
     }
 
     // Validate interval
     if (!interval || interval < 1 || interval > 1440) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid interval. Must be between 1 and 1440 minutes' 
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid interval. Must be between 1 and 1440 minutes'
       }, { status: 400 });
     }
 
@@ -45,9 +45,9 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Screenshot Interval Setting Error:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Failed to save screenshot interval setting' 
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to save screenshot interval setting'
     }, { status: 500 });
   }
 }
@@ -67,7 +67,7 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }
 
-    const interval = userRecord.settings?.screenshotInterval || 5; // Default 5 minutes
+    const interval = userRecord.settings?.screenshotInterval || 3; // Default 3 minutes
 
     return NextResponse.json({
       success: true,
@@ -77,9 +77,9 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('Get Screenshot Interval Error:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Failed to get screenshot interval setting' 
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to get screenshot interval setting'
     }, { status: 500 });
   }
 }

@@ -157,115 +157,115 @@ async function reassembleTenant(tenantConn, tenantName) {
 
     try {
 
-    // Get all existing sessions for this user+date (with screenshots)
-    const existingSessions = await ProductivitySession.find({
-      user: userId,
-      date: { $gte: dayStart, $lt: dayEnd },
-      screenshotsDeleted: { $ne: true },
-      'screenshots.0': { $exists: true }
-    }).sort({ sessionNumber: 1 });
+      // Get all existing sessions for this user+date (with screenshots)
+      const existingSessions = await ProductivitySession.find({
+        user: userId,
+        date: { $gte: dayStart, $lt: dayEnd },
+        screenshotsDeleted: { $ne: true },
+        'screenshots.0': { $exists: true }
+      }).sort({ sessionNumber: 1 });
 
-    if (existingSessions.length === 0) continue;
+      if (existingSessions.length === 0) continue;
 
-    // Collect ALL screenshots from all sessions, preserving full subdocument
-    const allScreenshots = [];
-    for (const session of existingSessions) {
-      for (const ss of session.screenshots) {
-        allScreenshots.push({
-          url: ss.url,
-          path: ss.path,
-          fileId: ss.fileId,
-          capturedAt: ss.capturedAt,
-          timestamp: ss.timestamp || ss.capturedAt,
-          filename: ss.filename,
-          captureType: ss.captureType,
-          isOfflineCapture: ss.isOfflineCapture,
-          capturedBy: ss.capturedBy,
-          capturedByRole: ss.capturedByRole,
-        });
-      }
-    }
-
-    // Re-group into 60-minute windows
-    const newGroups = groupInto60MinWindows(allScreenshots);
-
-    // Check if regrouping actually changes anything
-    if (newGroups.length === existingSessions.length) {
-      let same = true;
-      for (let i = 0; i < newGroups.length; i++) {
-        if (newGroups[i].length !== existingSessions[i].screenshotCount) {
-          same = false;
-          break;
+      // Collect ALL screenshots from all sessions, preserving full subdocument
+      const allScreenshots = [];
+      for (const session of existingSessions) {
+        for (const ss of session.screenshots) {
+          allScreenshots.push({
+            url: ss.url,
+            path: ss.path,
+            fileId: ss.fileId,
+            capturedAt: ss.capturedAt,
+            timestamp: ss.timestamp || ss.capturedAt,
+            filename: ss.filename,
+            captureType: ss.captureType,
+            isOfflineCapture: ss.isOfflineCapture,
+            capturedBy: ss.capturedBy,
+            capturedByRole: ss.capturedByRole,
+          });
         }
       }
-      if (same) {
-        totalSkipped += existingSessions.length;
-        continue; // No change needed
-      }
-    }
 
-    if (DRY_RUN) {
-      console.log(`  [${tenantName}] User ${userId} / ${dateStr}: ${existingSessions.length} sessions → ${newGroups.length} sessions (dry run)`);
-      for (let i = 0; i < newGroups.length; i++) {
-        const g = newGroups[i];
-        const firstTs = new Date(g[0].timestamp || g[0].capturedAt);
-        const lastTs = new Date(g[g.length - 1].timestamp || g[g.length - 1].capturedAt);
-        console.log(`    Session ${i + 1}: ${g.length} screenshots, ${firstTs.toISOString()} → ${lastTs.toISOString()}`);
-      }
-      continue;
-    }
+      // Re-group into 60-minute windows
+      const newGroups = groupInto60MinWindows(allScreenshots);
 
-    // Apply new grouping: update existing sessions, create new ones, delete extras
-    for (let i = 0; i < newGroups.length; i++) {
-      const group = newGroups[i];
-      const sessionNum = i + 1;
-      const startTime = new Date(group[0].timestamp || group[0].capturedAt);
-      const endTime = new Date(group[group.length - 1].timestamp || group[group.length - 1].capturedAt);
-      const estimatedDuration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
-
-      if (i < existingSessions.length) {
-        // Update existing session
-        const existing = existingSessions[i];
-        existing.sessionNumber = sessionNum;
-        existing.screenshots = group;
-        existing.screenshotCount = group.length;
-        existing.startTime = startTime;
-        existing.endTime = endTime;
-        existing.estimatedDuration = estimatedDuration || 1;
-        existing.isComplete = group.length >= 15; // 60 min / 3 min per capture ~= 20, use 15 as threshold
-        // Clear analysis if screenshot composition changed
-        if (existing.screenshotCount !== group.length && existing.analysis?.isAnalyzed) {
-          existing.analysis.isAnalyzed = false;
-          existing.analysis.analyzedAt = null;
+      // Check if regrouping actually changes anything
+      if (newGroups.length === existingSessions.length) {
+        let same = true;
+        for (let i = 0; i < newGroups.length; i++) {
+          if (newGroups[i].length !== existingSessions[i].screenshotCount) {
+            same = false;
+            break;
+          }
         }
-        await existing.save();
-        totalUpdated++;
-      } else {
-        // Create new session (we have more groups than existing sessions)
-        await ProductivitySession.create({
-          user: userId,
-          employee: existingSessions[0].employee,
-          date: dayStart,
-          sessionNumber: sessionNum,
-          screenshots: group,
-          screenshotCount: group.length,
-          startTime,
-          endTime,
-          estimatedDuration: estimatedDuration || 1,
-          isComplete: group.length >= 15,
-          status: 'ended',
-        });
-        totalCreated++;
+        if (same) {
+          totalSkipped += existingSessions.length;
+          continue; // No change needed
+        }
       }
-    }
 
-    // Delete excess sessions (old sessions beyond the new group count)
-    for (let i = newGroups.length; i < existingSessions.length; i++) {
-      const excess = existingSessions[i];
-      console.log(`    [${tenantName}] Deleting excess session #${excess.sessionNumber} (${excess._id})`);
-      await ProductivitySession.deleteOne({ _id: excess._id });
-      totalDeleted++;
-    }
+      if (DRY_RUN) {
+        console.log(`  [${tenantName}] User ${userId} / ${dateStr}: ${existingSessions.length} sessions → ${newGroups.length} sessions (dry run)`);
+        for (let i = 0; i < newGroups.length; i++) {
+          const g = newGroups[i];
+          const firstTs = new Date(g[0].timestamp || g[0].capturedAt);
+          const lastTs = new Date(g[g.length - 1].timestamp || g[g.length - 1].capturedAt);
+          console.log(`    Session ${i + 1}: ${g.length} screenshots, ${firstTs.toISOString()} → ${lastTs.toISOString()}`);
+        }
+        continue;
+      }
+
+      // Apply new grouping: update existing sessions, create new ones, delete extras
+      for (let i = 0; i < newGroups.length; i++) {
+        const group = newGroups[i];
+        const sessionNum = i + 1;
+        const startTime = new Date(group[0].timestamp || group[0].capturedAt);
+        const endTime = new Date(group[group.length - 1].timestamp || group[group.length - 1].capturedAt);
+        const estimatedDuration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+
+        if (i < existingSessions.length) {
+          // Update existing session
+          const existing = existingSessions[i];
+          existing.sessionNumber = sessionNum;
+          existing.screenshots = group;
+          existing.screenshotCount = group.length;
+          existing.startTime = startTime;
+          existing.endTime = endTime;
+          existing.estimatedDuration = estimatedDuration || 1;
+          existing.isComplete = group.length >= 45; // 180 min / 3 min per capture ~= 60, use 45 as threshold
+          // Clear analysis if screenshot composition changed
+          if (existing.screenshotCount !== group.length && existing.analysis?.isAnalyzed) {
+            existing.analysis.isAnalyzed = false;
+            existing.analysis.analyzedAt = null;
+          }
+          await existing.save();
+          totalUpdated++;
+        } else {
+          // Create new session (we have more groups than existing sessions)
+          await ProductivitySession.create({
+            user: userId,
+            employee: existingSessions[0].employee,
+            date: dayStart,
+            sessionNumber: sessionNum,
+            screenshots: group,
+            screenshotCount: group.length,
+            startTime,
+            endTime,
+            estimatedDuration: estimatedDuration || 1,
+            isComplete: group.length >= 15,
+            status: 'ended',
+          });
+          totalCreated++;
+        }
+      }
+
+      // Delete excess sessions (old sessions beyond the new group count)
+      for (let i = newGroups.length; i < existingSessions.length; i++) {
+        const excess = existingSessions[i];
+        console.log(`    [${tenantName}] Deleting excess session #${excess.sessionNumber} (${excess._id})`);
+        await ProductivitySession.deleteOne({ _id: excess._id });
+        totalDeleted++;
+      }
 
     } catch (comboErr) {
       console.error(`  [${tenantName}] Error processing user ${userId} / ${dateStr}: ${comboErr.message}`);

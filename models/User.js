@@ -153,7 +153,7 @@ const UserSchema = new mongoose.Schema({
   lastMiraGreeting: { type: Date }, // Track last greeting timestamp
   // General settings
   settings: {
-    screenshotInterval: { type: Number, default: 5 }, // minutes
+    screenshotInterval: { type: Number, default: 3 }, // minutes
     screenshotIntervalUpdatedAt: { type: Date }
   },
   // Department Head meta - synced from Department model when user is assigned as head

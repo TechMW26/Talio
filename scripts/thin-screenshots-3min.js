@@ -7,7 +7,7 @@
  *   2. The Screenshot collection in MongoDB
  *   3. GridFS storage (via bucket.delete)
  *
- * This ensures consistency: old sessions had ~20 screenshots per 60-min window
+ * This ensures consistency: sessions now have ~60 screenshots per 180-min window
  * (1 every 3 minutes). After the 60-min reassembly, some sessions ended up with
  * 50-70 screenshots because the original capture interval was shorter.
  *

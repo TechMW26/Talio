@@ -210,7 +210,7 @@ async function deduplicateTenant(tenantConn, tenantName) {
   }
 
   // 4. Force recompile all non-deleted sessions for today and recent dates
-  // This re-groups the remaining screenshots into sessions of 20
+  // This re-groups the remaining screenshots into sessions of 60
   console.log(`[${tenantName}] Recompiling recent sessions...`);
   let sessionsRecompiled = 0;
   try {

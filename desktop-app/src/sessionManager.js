@@ -9,8 +9,8 @@ const logger = require('./logger');
 
 const store = new Store({ name: 'sessions' });
 
-const SESSION_DURATION_MINUTES = 60;
-const CAPTURES_PER_SESSION = 20;
+const SESSION_DURATION_MINUTES = 180;
+const CAPTURES_PER_SESSION = 60;
 const HISTORY_DAYS = 7;
 
 function generateSessionId() {
@@ -40,7 +40,7 @@ class SessionManager {
   loadSessions() {
     try {
       const allSessions = store.get('sessions', []);
-      this.sessions = allSessions.filter(function(s) { return s.userId === this.userId; }.bind(this));
+      this.sessions = allSessions.filter(function (s) { return s.userId === this.userId; }.bind(this));
       this.cleanOldSessions();
     } catch (error) {
       logger.log('error', 'SessionManager', 'Load failed: ' + error.message);
@@ -53,7 +53,7 @@ class SessionManager {
     cutoffDate.setDate(cutoffDate.getDate() - HISTORY_DAYS);
     const cutoffStr = cutoffDate.toISOString().split('T')[0];
     const before = this.sessions.length;
-    this.sessions = this.sessions.filter(function(s) { return s.date >= cutoffStr; });
+    this.sessions = this.sessions.filter(function (s) { return s.date >= cutoffStr; });
     if (before !== this.sessions.length) {
       logger.log('info', 'SessionManager', 'Cleaned ' + (before - this.sessions.length) + ' old sessions');
       this.saveSessions();
@@ -64,20 +64,20 @@ class SessionManager {
     const today = new Date().toISOString().split('T')[0];
     const userId = this.userId;
     const activeSession = this.sessions
-      .filter(function(s) { return s.date === today && !s.isComplete; })
-      .sort(function(a, b) { return new Date(b.startTime) - new Date(a.startTime); })[0];
-    
+      .filter(function (s) { return s.date === today && !s.isComplete; })
+      .sort(function (a, b) { return new Date(b.startTime) - new Date(a.startTime); })[0];
+
     if (!activeSession) return false;
-    
+
     const elapsed = Date.now() - new Date(activeSession.startTime).getTime();
     const minutesElapsed = elapsed / (1000 * 60);
-    
+
     if (minutesElapsed < SESSION_DURATION_MINUTES && activeSession.captureCount < CAPTURES_PER_SESSION) {
       this.currentSession = activeSession;
       logger.log('info', 'SessionManager', 'Resumed session #' + activeSession.sessionNumber);
       return true;
     }
-    
+
     activeSession.isComplete = true;
     activeSession.endTime = new Date().toISOString();
     this.saveSessions();
@@ -88,13 +88,13 @@ class SessionManager {
     if (this.currentSession && !this.currentSession.isComplete) {
       this.endSession();
     }
-    
+
     const today = new Date().toISOString().split('T')[0];
     const userId = this.userId;
-    const todaySessions = this.sessions.filter(function(s) { 
-      return s.date === today && s.userId === userId; 
+    const todaySessions = this.sessions.filter(function (s) {
+      return s.date === today && s.userId === userId;
     });
-    
+
     this.currentSession = {
       sessionId: generateSessionId(),
       userId: this.userId,
@@ -107,7 +107,7 @@ class SessionManager {
       isComplete: false,
       totalWorkMinutes: 0
     };
-    
+
     this.sessions.push(this.currentSession);
     this.saveSessions();
     logger.log('info', 'SessionManager', 'Started session #' + this.currentSession.sessionNumber);
@@ -116,26 +116,26 @@ class SessionManager {
 
   recordCapture(captureData) {
     captureData = captureData || {};
-    
+
     if (!this.currentSession) {
       this.startNewSession();
     }
-    
+
     let sessionRotated = false;
-    
+
     if (this.currentSession.captureCount >= CAPTURES_PER_SESSION) {
       logger.log('info', 'SessionManager', 'Capture limit reached, rotating session');
       this.startNewSession();
       sessionRotated = true;
     }
-    
+
     const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
     if (elapsed >= SESSION_DURATION_MINUTES * 60 * 1000) {
       logger.log('info', 'SessionManager', 'Time limit reached, rotating session');
       this.startNewSession();
       sessionRotated = true;
     }
-    
+
     const capture = {
       captureId: captureData.captureId || generateSessionId(),
       timestamp: new Date().toISOString(),
@@ -145,20 +145,20 @@ class SessionManager {
       offline: captureData.offline || false,
       metadata: captureData.metadata || {}
     };
-    
+
     this.currentSession.captures.push(capture);
     this.currentSession.captureCount++;
     this.currentSession.endTime = new Date().toISOString();
-    
+
     const sessionElapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
     this.currentSession.totalWorkMinutes = Math.round(sessionElapsed / (1000 * 60));
-    
+
     if (this.currentSession.captureCount >= CAPTURES_PER_SESSION) {
       this.currentSession.isComplete = true;
     }
-    
+
     this.saveSessions();
-    
+
     return {
       sessionId: this.currentSession.sessionId,
       sessionNumber: this.currentSession.sessionNumber,
@@ -171,13 +171,13 @@ class SessionManager {
 
   endSession() {
     if (!this.currentSession) return;
-    
+
     this.currentSession.endTime = new Date().toISOString();
     this.currentSession.isComplete = true;
-    
+
     const sessionElapsed = new Date(this.currentSession.endTime) - new Date(this.currentSession.startTime);
     this.currentSession.totalWorkMinutes = Math.round(sessionElapsed / (1000 * 60));
-    
+
     this.saveSessions();
     logger.log('info', 'SessionManager', 'Ended session #' + this.currentSession.sessionNumber);
     this.currentSession = null;
@@ -203,11 +203,11 @@ class SessionManager {
         remainingMinutes: SESSION_DURATION_MINUTES
       };
     }
-    
+
     const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
     const workMinutes = Math.round(elapsed / (1000 * 60));
     const remainingMinutes = Math.max(0, SESSION_DURATION_MINUTES - workMinutes);
-    
+
     return {
       sessionId: this.currentSession.sessionId,
       sessionNumber: this.currentSession.sessionNumber,
@@ -225,7 +225,7 @@ class SessionManager {
     try {
       const allSessions = store.get('sessions', []);
       const userId = this.userId;
-      const otherUsers = allSessions.filter(function(s) { return s.userId !== userId; });
+      const otherUsers = allSessions.filter(function (s) { return s.userId !== userId; });
       const merged = otherUsers.concat(this.sessions);
       store.set('sessions', merged);
     } catch (error) {
@@ -236,10 +236,10 @@ class SessionManager {
   getTodayStats() {
     const today = new Date().toISOString().split('T')[0];
     const userId = this.userId;
-    const todaySessions = this.sessions.filter(function(s) { 
-      return s.date === today && s.userId === userId; 
+    const todaySessions = this.sessions.filter(function (s) {
+      return s.date === today && s.userId === userId;
     });
-    
+
     let totalWorkMinutes = 0;
     for (let i = 0; i < todaySessions.length; i++) {
       const s = todaySessions[i];
@@ -250,14 +250,14 @@ class SessionManager {
         totalWorkMinutes += Math.round(elapsed / (1000 * 60));
       }
     }
-    
+
     let totalCaptures = 0;
     let completedSessions = 0;
     for (let i = 0; i < todaySessions.length; i++) {
       totalCaptures += todaySessions[i].captureCount;
       if (todaySessions[i].isComplete) completedSessions++;
     }
-    
+
     return {
       date: today,
       totalSessions: todaySessions.length,
@@ -274,23 +274,23 @@ class SessionManager {
     const history = [];
     const today = new Date();
     const userId = this.userId;
-    
+
     for (let i = 0; i < days; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
-      
-      const daySessions = this.sessions.filter(function(s) { 
-        return s.date === dateStr && s.userId === userId; 
+
+      const daySessions = this.sessions.filter(function (s) {
+        return s.date === dateStr && s.userId === userId;
       });
-      
+
       let captureCount = 0;
       let workMinutes = 0;
       for (let j = 0; j < daySessions.length; j++) {
         captureCount += daySessions[j].captureCount;
         workMinutes += (daySessions[j].totalWorkMinutes || 0);
       }
-      
+
       history.push({
         date: dateStr,
         sessionCount: daySessions.length,
@@ -298,7 +298,7 @@ class SessionManager {
         workMinutes: workMinutes
       });
     }
-    
+
     return history;
   }
 
