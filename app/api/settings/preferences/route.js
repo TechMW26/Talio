@@ -1,17 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit'
+import { uploadImage, deleteImage } from '@/lib/gridfs'
 
 export const dynamic = 'force-dynamic'
-
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-  return !!(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-    process.env.IMAGEKIT_PRIVATE_KEY &&
-    process.env.IMAGEKIT_URL_ENDPOINT
-  )
-}
 
 
 // GET - Get system preferences
@@ -90,28 +81,27 @@ export async function PUT(request) {
     // Find existing preferences or create new one
     let preferences = await SystemPreferences.findOne()
 
-    // Handle companyLogo upload to ImageKit if it's base64
-    if (body.companyLogo && body.companyLogo.startsWith('data:image/') && isImageKitConfigured()) {
+    // Handle companyLogo upload to GridFS if it's base64
+    if (body.companyLogo && body.companyLogo.startsWith('data:image/')) {
       try {
-        // Delete old logo from ImageKit if exists
+        // Delete old logo from GridFS if exists
         if (preferences?.companyLogoFileId) {
-          await deleteFromImageKit(preferences.companyLogoFileId).catch(() => { });
+          await deleteImage(preferences.companyLogoFileId).catch(() => { });
         }
 
-        // Get settings folder path
-        const imagekitFolder = getImageKitFolder('settings');
+        const base64Data = body.companyLogo.replace(/^data:image\/\w+;base64,/, '')
+        const imageBuffer = Buffer.from(base64Data, 'base64')
 
-        const imagekitResult = await uploadImageToImageKit(body.companyLogo, {
-          fileName: `company_logo_${Date.now()}.webp`,
-          folder: imagekitFolder,
-          tags: ['company', 'logo', 'system'],
-        });
-        body.companyLogo = imagekitResult.url;
-        body.companyLogoFileId = imagekitResult.fileId;
-        console.log(`[SystemPreferences] Company logo uploaded to ImageKit: ${imagekitFolder}`);
+        const gridfsResult = await uploadImage(imageBuffer, {
+          category: 'settings',
+          contentType: 'image/webp',
+          originalName: `company_logo_${Date.now()}.webp`,
+        })
+        body.companyLogo = gridfsResult.url
+        body.companyLogoFileId = String(gridfsResult._id)
+        console.log(`[SystemPreferences] Company logo uploaded to GridFS`)
       } catch (imgError) {
-        console.error('[SystemPreferences] ImageKit logo upload failed:', imgError.message);
-        // Keep original base64 as fallback
+        console.error('[SystemPreferences] GridFS logo upload failed:', imgError.message)
       }
     }
 

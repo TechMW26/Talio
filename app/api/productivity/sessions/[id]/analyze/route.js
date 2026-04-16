@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { getTenantModels } from '@/lib/tenantModels';
-import { readFile } from 'fs/promises';
+import { readFile, unlink, rmdir } from 'fs/promises';
 import path from 'path';
 import { generateVisionContent, generateContent } from '@/lib/gemini';
-import { bulkDeleteFromImageKit } from '@/lib/imagekit';
+
+import { deleteScreenshots as deleteGridFSScreenshots } from '@/lib/gridfs';
 
 const MAX_IMAGES_PER_ANALYSIS = 10; // Limit images to avoid API limits
 
@@ -81,47 +82,55 @@ export async function POST(request, { params }) {
           // Get Screenshot model for cleanup
           const { Screenshot } = await getTenantModels(auth.tenant.databaseName, ['Screenshot']);
 
-          // Collect ImageKit file IDs from session screenshots
-          const imagekitFileIds = [];
-          const screenshotsForCleanup = session.screenshots || [];
+          // Query Screenshot DB for cleanup data (gridfsFileId, path)
+          const gridfsFileIds = [];
+          const filesystemPaths = [];
 
-          for (const screenshot of screenshotsForCleanup) {
-            if (screenshot.fileId) {
-              imagekitFileIds.push(screenshot.fileId);
-            }
-            if (screenshot.imagekitFileId) {
-              imagekitFileIds.push(screenshot.imagekitFileId);
-            }
-          }
-
-          // Also query Screenshot DB for imagekitFileIds
           try {
             const dbLookupQuery = { capturedAt: { $gte: session.startTime, $lte: session.endTime } };
             if (session.user) dbLookupQuery.user = session.user;
             else if (session.employee) dbLookupQuery.employee = session.employee;
 
             const dbScreenshotsLookup = await Screenshot.find(dbLookupQuery)
-              .select('imagekitFileId')
+              .select('gridfsFileId path')
               .lean();
 
             for (const ss of dbScreenshotsLookup) {
-              if (ss.imagekitFileId && !imagekitFileIds.includes(ss.imagekitFileId)) {
-                imagekitFileIds.push(ss.imagekitFileId);
+              if (ss.gridfsFileId) {
+                gridfsFileIds.push(ss.gridfsFileId);
+              }
+              if (ss.path && !ss.path.startsWith('http')) {
+                filesystemPaths.push(ss.path);
               }
             }
           } catch (lookupErr) {
             console.error(`[ProductivityAnalysis] DB lookup error:`, lookupErr.message);
           }
 
-          // Delete from ImageKit (bulk delete)
-          if (imagekitFileIds.length > 0) {
-            console.log(`[ProductivityAnalysis] Deleting ${imagekitFileIds.length} images from ImageKit...`);
+          // Delete GridFS files
+          if (gridfsFileIds.length > 0) {
             try {
-              await bulkDeleteFromImageKit(imagekitFileIds);
-              console.log(`[ProductivityAnalysis] Successfully deleted images from ImageKit`);
-            } catch (imagekitError) {
-              console.error(`[ProductivityAnalysis] ImageKit deletion failed:`, imagekitError.message);
+              const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds);
+              console.log(`[ProductivityAnalysis] GridFS cleanup: ${gridfsResult.successCount}/${gridfsFileIds.length} deleted`);
+            } catch (gridfsErr) {
+              console.error(`[ProductivityAnalysis] GridFS deletion failed:`, gridfsErr.message);
             }
+          }
+
+          // Delete local filesystem files
+          if (filesystemPaths.length > 0) {
+            let fsDeleteCount = 0;
+            for (const fsPath of filesystemPaths) {
+              try {
+                await unlink(path.join(process.cwd(), 'public', fsPath));
+                fsDeleteCount++;
+              } catch (err) {
+                if (err.code !== 'ENOENT') {
+                  console.warn(`[ProductivityAnalysis] Failed to delete file ${fsPath}:`, err.message);
+                }
+              }
+            }
+            console.log(`[ProductivityAnalysis] Filesystem cleanup: ${fsDeleteCount}/${filesystemPaths.length} deleted`);
           }
 
           // Delete raw captures from Screenshot collection
@@ -135,9 +144,9 @@ export async function POST(request, { params }) {
             deleteQuery.employee = session.employee;
           }
 
-          if (imagekitFileIds.length > 0) {
+          if (gridfsFileIds.length > 0) {
             deleteQuery.$or = [
-              { imagekitFileId: { $in: imagekitFileIds } },
+              { gridfsFileId: { $in: gridfsFileIds } },
               { capturedAt: { $gte: session.startTime, $lte: session.endTime } }
             ];
             delete deleteQuery.capturedAt;
@@ -274,7 +283,7 @@ export async function POST(request, { params }) {
     const selectedIndices = selectEvenlyDistributed(screenshots.length, MAX_IMAGES_PER_ANALYSIS);
     const selectedScreenshots = selectedIndices.map(i => screenshots[i]);
 
-    // Load images - handle both ImageKit URLs and local filesystem paths
+    // Load images - handle both URLs and local filesystem paths
     const images = [];
     const screenshotSummaries = [];
 
@@ -283,15 +292,15 @@ export async function POST(request, { params }) {
         let base64;
         let mimeType = 'image/jpeg'; // Default
         // Support both url and path fields
-        const screenshotUrl = screenshot.url || screenshot.path || screenshot.imagekitUrl;
+        const screenshotUrl = screenshot.url || screenshot.path;
 
         if (!screenshotUrl) {
           console.warn(`[ProductivityAnalysis] Screenshot missing url/path:`, screenshot);
           continue;
         }
 
-        // Check if it's a URL (ImageKit) or filesystem path
-        if (screenshotUrl.startsWith('http://') || screenshotUrl.startsWith('https://')) {
+        // Check if it's a URL or filesystem path
+        if (screenshotUrl.startsWith('http://') || screenshotUrl.startsWith('https://') || screenshotUrl.startsWith('/api/')) {
           // Fetch image from URL
           console.log(`[ProductivityAnalysis] Fetching image from URL: ${screenshotUrl}`);
           const response = await fetch(screenshotUrl);
@@ -800,56 +809,69 @@ CRITICAL REMINDERS:
       // Get Screenshot model for cleanup
       const { Screenshot } = await getTenantModels(auth.tenant.databaseName, ['Screenshot']);
 
-      // Collect ImageKit file IDs from session screenshots
-      const imagekitFileIds = [];
-      const screenshotIds = [];
+      // Query Screenshot DB records for full cleanup data
+      const gridfsFileIds = [];
+      const filesystemPaths = [];
 
-      for (const screenshot of screenshots) {
-        // Collect ImageKit file IDs from session subdocuments
-        if (screenshot.fileId) {
-          imagekitFileIds.push(screenshot.fileId);
-        }
-        if (screenshot.imagekitFileId) {
-          imagekitFileIds.push(screenshot.imagekitFileId);
-        }
-
-        // Collect screenshot document IDs if referenced
-        if (screenshot._id) {
-          screenshotIds.push(screenshot._id);
-        }
-      }
-
-      // FIX: Also query Screenshot DB records for imagekitFileId
-      // Session screenshots often don't have fileId populated, but the
-      // Screenshot collection always stores imagekitFileId from upload
       try {
         const dbQuery = { capturedAt: { $gte: session.startTime, $lte: session.endTime } };
         if (session.user) dbQuery.user = session.user;
         else if (session.employee) dbQuery.employee = session.employee;
 
         const dbScreenshots = await Screenshot.find(dbQuery)
-          .select('imagekitFileId')
+          .select('gridfsFileId path')
           .lean();
 
         for (const ss of dbScreenshots) {
-          if (ss.imagekitFileId && !imagekitFileIds.includes(ss.imagekitFileId)) {
-            imagekitFileIds.push(ss.imagekitFileId);
+          if (ss.gridfsFileId) {
+            gridfsFileIds.push(ss.gridfsFileId);
+          }
+          if (ss.path && !ss.path.startsWith('http')) {
+            filesystemPaths.push(ss.path);
           }
         }
-        console.log(`[ProductivityAnalysis] Found ${dbScreenshots.length} Screenshot DB records, total ImageKit fileIds: ${imagekitFileIds.length}`);
+        console.log(`[ProductivityAnalysis] Found ${dbScreenshots.length} Screenshot DB records — GridFS: ${gridfsFileIds.length}, Filesystem: ${filesystemPaths.length}`);
       } catch (dbLookupError) {
         console.error(`[ProductivityAnalysis] Screenshot DB lookup failed:`, dbLookupError.message);
       }
 
-      // Delete from ImageKit (bulk delete)
-      if (imagekitFileIds.length > 0) {
-        console.log(`[ProductivityAnalysis] Deleting ${imagekitFileIds.length} images from ImageKit...`);
+      // Delete GridFS files
+      if (gridfsFileIds.length > 0) {
+        console.log(`[ProductivityAnalysis] Deleting ${gridfsFileIds.length} GridFS files...`);
         try {
-          await bulkDeleteFromImageKit(imagekitFileIds);
-          console.log(`[ProductivityAnalysis] Successfully deleted images from ImageKit`);
-        } catch (imagekitError) {
-          console.error(`[ProductivityAnalysis] ImageKit deletion failed:`, imagekitError.message);
-          // Don't fail the whole operation if ImageKit deletion fails
+          const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds);
+          console.log(`[ProductivityAnalysis] GridFS cleanup: ${gridfsResult.successCount}/${gridfsFileIds.length} deleted`);
+        } catch (gridfsError) {
+          console.error(`[ProductivityAnalysis] GridFS deletion failed:`, gridfsError.message);
+        }
+      }
+
+      // Delete local filesystem files
+      if (filesystemPaths.length > 0) {
+        console.log(`[ProductivityAnalysis] Deleting ${filesystemPaths.length} local filesystem files...`);
+        let fsDeleteCount = 0;
+        const parentDirs = new Set();
+        for (const fsPath of filesystemPaths) {
+          try {
+            const fullPath = path.join(process.cwd(), 'public', fsPath);
+            await unlink(fullPath);
+            fsDeleteCount++;
+            parentDirs.add(path.dirname(fullPath));
+          } catch (err) {
+            if (err.code !== 'ENOENT') {
+              console.warn(`[ProductivityAnalysis] Failed to delete file ${fsPath}:`, err.message);
+            }
+          }
+        }
+        console.log(`[ProductivityAnalysis] Filesystem cleanup: ${fsDeleteCount}/${filesystemPaths.length} deleted`);
+
+        // Try to clean up empty parent directories
+        for (const dir of parentDirs) {
+          try {
+            await rmdir(dir);
+          } catch {
+            // Directory not empty or doesn't exist — that's fine
+          }
         }
       }
 
@@ -870,15 +892,11 @@ CRITICAL REMINDERS:
         deleteQuery.employee = session.employee;
       }
 
-      // If we have specific ImageKit file IDs, also delete by those (as a safety net)
+      // If we have specific GridFS file IDs, also delete by those (as a safety net)
       // But KEEP the time range constraint to avoid deleting from other sessions
-      if (imagekitFileIds.length > 0) {
-        // Only delete screenshots that EITHER:
-        // 1. Match the ImageKit file IDs from this session, OR
-        // 2. Fall within this session's time range (for the same user)
-        // This is more precise than deleting the whole day
+      if (gridfsFileIds.length > 0) {
         deleteQuery.$or = [
-          { imagekitFileId: { $in: imagekitFileIds } },
+          { gridfsFileId: { $in: gridfsFileIds } },
           {
             capturedAt: {
               $gte: session.startTime,

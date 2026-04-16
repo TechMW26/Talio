@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { uploadImageToImageKit, deleteFromImageKit, getProfilePictureUrl, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
+import { uploadImage, deleteImage } from '@/lib/gridfs'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import path from 'path'
 import fs from 'fs/promises'
@@ -10,17 +10,6 @@ export const dynamic = 'force-dynamic'
 
 // Maximum file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024
-
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-    const configured = !!(
-        process.env.IMAGEKIT_PUBLIC_KEY &&
-        process.env.IMAGEKIT_PRIVATE_KEY &&
-        process.env.IMAGEKIT_URL_ENDPOINT
-    )
-    console.log('[Profile Picture] ImageKit configured:', configured)
-    return configured
-}
 
 /**
  * POST /api/profile/picture
@@ -126,48 +115,31 @@ export async function POST(request) {
         const employeeCode = employee?.employeeCode || 'UNKNOWN'
         const filename = `profile_${employeeCode}_${timestamp}.webp`
 
-        // Get the appropriate ImageKit folder
-        const imagekitFolder = getImageKitFolder('profile', { employee })
-        const employeeFolderName = generateEmployeeFolderName(employee)
-
         let fileUrl = ''
         let fileId = null
-        let thumbnailUrl = null
 
-        // Try ImageKit upload if configured
-        if (isImageKitConfigured()) {
-            try {
-                console.log('[Profile Picture] Attempting ImageKit upload...')
-                console.log('[Profile Picture] Folder:', imagekitFolder)
-                console.log('[Profile Picture] Buffer size:', optimizedBuffer.length, 'bytes')
-
-                // Build safe tags (no undefined values)
-                const safeTags = ['profile', 'avatar', employeeCode].filter(Boolean)
-
-                // Use uploadImageToImageKit directly (no temp file) - works better in serverless/Docker
-                const imagekitResult = await uploadImageToImageKit(optimizedBuffer, {
-                    fileName: filename,
-                    folder: imagekitFolder,
-                    tags: safeTags,
-                    useUniqueFileName: true,
-                })
-
-                fileUrl = imagekitResult.url
-                fileId = imagekitResult.fileId
-                thumbnailUrl = imagekitResult.thumbnailUrl
-                console.log(`[Profile Picture] ✅ Uploaded to ImageKit: ${fileUrl}`)
-            } catch (imagekitError) {
-                console.error('[Profile Picture] ❌ ImageKit upload failed:')
-                console.error('[Profile Picture] Error name:', imagekitError.name)
-                console.error('[Profile Picture] Error message:', imagekitError.message)
-                // Fall through to local storage
-            }
-        } else {
-            console.log('[Profile Picture] ImageKit not configured, using local storage')
+        // Upload to GridFS
+        try {
+            console.log('[Profile Picture] Uploading to GridFS...')
+            const gridfsResult = await uploadImage(optimizedBuffer, {
+                category: 'profile',
+                contentType: 'image/webp',
+                originalName: filename,
+                userId: String(authUser._id || authUser.userId),
+                employeeId: employee?._id ? String(employee._id) : undefined,
+            })
+            fileUrl = gridfsResult.url
+            fileId = String(gridfsResult._id)
+            console.log(`[Profile Picture] ✅ Uploaded to GridFS: ${fileUrl}`)
+        } catch (gridfsError) {
+            console.error('[Profile Picture] ❌ GridFS upload failed:', gridfsError.message)
         }
 
-        // Fallback: Local file storage with employee folder structure
+        // Fallback: Local file storage
         if (!fileUrl) {
+            const firstName = (employee?.firstName || '').replace(/[^a-zA-Z0-9]/g, '')
+            const lastName = (employee?.lastName || '').replace(/[^a-zA-Z0-9]/g, '')
+            const employeeFolderName = `${firstName}${lastName}-${employeeCode}`
             const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'profiles', employeeFolderName)
             if (!existsSync(uploadDir)) {
                 await fs.mkdir(uploadDir, { recursive: true })
@@ -203,12 +175,12 @@ export async function POST(request) {
         // Delete old profile picture
         if (oldProfilePicture) {
             if (oldProfilePictureFileId) {
-                // Delete from ImageKit
+                // Delete from GridFS
                 try {
-                    await deleteFromImageKit(oldProfilePictureFileId)
-                    console.log(`[Profile Picture] Deleted old ImageKit file: ${oldProfilePictureFileId}`)
+                    await deleteImage(oldProfilePictureFileId)
+                    console.log(`[Profile Picture] Deleted old GridFS file: ${oldProfilePictureFileId}`)
                 } catch (err) {
-                    console.log('Old ImageKit file cleanup:', err.message)
+                    console.log('Old GridFS file cleanup:', err.message)
                 }
             } else if (oldProfilePicture.startsWith('/uploads/')) {
                 // Delete from local filesystem
@@ -227,8 +199,7 @@ export async function POST(request) {
             data: {
                 url: fileUrl,
                 fileId: fileId,
-                thumbnailUrl: thumbnailUrl,
-                storage: fileId ? 'imagekit' : 'local',
+                storage: fileId ? 'gridfs' : 'local',
             }
         })
 
@@ -273,10 +244,10 @@ export async function DELETE(request) {
         // Delete from storage
         if (profilePictureFileId) {
             try {
-                await deleteFromImageKit(profilePictureFileId)
-                console.log(`[Profile Picture] Deleted from ImageKit: ${profilePictureFileId}`)
+                await deleteImage(profilePictureFileId)
+                console.log(`[Profile Picture] Deleted from GridFS: ${profilePictureFileId}`)
             } catch (err) {
-                console.log('ImageKit delete error:', err.message)
+                console.log('GridFS delete error:', err.message)
             }
         } else if (profilePicture.startsWith('/uploads/')) {
             const filePath = path.join(process.cwd(), 'public', profilePicture)

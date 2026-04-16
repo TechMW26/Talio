@@ -2,21 +2,12 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import path from 'path'
 import fs from 'fs/promises'
-import { deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
+import { uploadImage, deleteImage } from '@/lib/gridfs'
 
 export const dynamic = 'force-dynamic'
 
 // Maximum file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024
-
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-  return !!(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-    process.env.IMAGEKIT_PRIVATE_KEY &&
-    process.env.IMAGEKIT_URL_ENDPOINT
-  )
-}
 
 /**
  * POST /api/profile/aadhaar-upload
@@ -100,52 +91,31 @@ export async function POST(request) {
     const employeeCode = employee?.employeeCode || 'UNKNOWN'
     const filename = `aadhaar_${side}_${employeeCode}_${timestamp}.${extension}`
 
-    // Get the appropriate ImageKit folder
-    const imagekitFolder = getImageKitFolder('aadhaar', { employee })
-    const employeeFolderName = generateEmployeeFolderName(employee)
-
     let fileUrl = ''
     let fileId = null
 
-    // Try ImageKit upload if configured
-    if (isImageKitConfigured()) {
-      try {
-        console.log('[Aadhaar Upload] ImageKit is configured, attempting upload...')
-        console.log('[Aadhaar Upload] Folder:', imagekitFolder)
-        console.log('[Aadhaar Upload] Filename:', filename)
-        console.log('[Aadhaar Upload] Buffer size:', imageBuffer.length, 'bytes')
-
-        // Build safe tags (no undefined values)
-        const safeTags = ['aadhaar', side, 'document', employeeCode].filter(Boolean)
-
-        // Use uploadImageToImageKit directly (no temp file) - works better in serverless/Docker
-        const { uploadImageToImageKit } = await import('@/lib/imagekit')
-        const imagekitResult = await uploadImageToImageKit(imageBuffer, {
-          fileName: filename,
-          folder: imagekitFolder,
-          tags: safeTags,
-          useUniqueFileName: true,
-        })
-
-        fileUrl = imagekitResult.url
-        fileId = imagekitResult.fileId
-        console.log(`[Aadhaar Upload] ✅ Uploaded to ImageKit: ${fileUrl}`)
-      } catch (imagekitError) {
-        console.error('[Aadhaar Upload] ❌ ImageKit upload failed:')
-        console.error('[Aadhaar Upload] Error name:', imagekitError.name)
-        console.error('[Aadhaar Upload] Error message:', imagekitError.message)
-        console.error('[Aadhaar Upload] Error stack:', imagekitError.stack)
-        // Fall through to local storage
-      }
-    } else {
-      console.log('[Aadhaar Upload] ImageKit not configured, using local storage')
-      console.log('[Aadhaar Upload] IMAGEKIT_PUBLIC_KEY:', process.env.IMAGEKIT_PUBLIC_KEY ? 'SET' : 'NOT SET')
-      console.log('[Aadhaar Upload] IMAGEKIT_PRIVATE_KEY:', process.env.IMAGEKIT_PRIVATE_KEY ? 'SET' : 'NOT SET')
-      console.log('[Aadhaar Upload] IMAGEKIT_URL_ENDPOINT:', process.env.IMAGEKIT_URL_ENDPOINT ? 'SET' : 'NOT SET')
+    // Upload to GridFS
+    try {
+      console.log('[Aadhaar Upload] Uploading to GridFS...')
+      const gridfsResult = await uploadImage(imageBuffer, {
+        category: 'aadhaar',
+        contentType: `image/${extension}`,
+        originalName: filename,
+        userId: String(authUser._id || authUser.userId),
+        employeeId: employee?._id ? String(employee._id) : undefined,
+      })
+      fileUrl = gridfsResult.url
+      fileId = String(gridfsResult._id)
+      console.log(`[Aadhaar Upload] ✅ Uploaded to GridFS: ${fileUrl}`)
+    } catch (gridfsError) {
+      console.error('[Aadhaar Upload] ❌ GridFS upload failed:', gridfsError.message)
     }
 
-    // Fallback: Local file storage with employee folder structure
+    // Fallback: Local file storage
     if (!fileUrl) {
+      const firstName = (employee?.firstName || '').replace(/[^a-zA-Z0-9]/g, '')
+      const lastName = (employee?.lastName || '').replace(/[^a-zA-Z0-9]/g, '')
+      const employeeFolderName = `${firstName}${lastName}-${employeeCode}`
       const uploadDir = path.join(process.cwd(), 'uploads', 'aadhaar', employeeFolderName)
       await fs.mkdir(uploadDir, { recursive: true })
 
@@ -182,13 +152,13 @@ export async function POST(request) {
     // Delete old file if exists
     const oldSideData = user.profileCompletion?.[side === 'front' ? 'aadhaarFront' : 'aadhaarBack']
     if (oldSideData?.url) {
-      // If old file was on ImageKit, delete from ImageKit
+      // If old file was on GridFS, delete from GridFS
       if (oldSideData.fileId) {
         try {
-          await deleteFromImageKit(oldSideData.fileId)
-          console.log(`[Aadhaar Upload] Deleted old ImageKit file: ${oldSideData.fileId}`)
+          await deleteImage(oldSideData.fileId)
+          console.log(`[Aadhaar Upload] Deleted old GridFS file: ${oldSideData.fileId}`)
         } catch (err) {
-          console.log('Old ImageKit file cleanup:', err.message)
+          console.log('Old GridFS file cleanup:', err.message)
         }
       } else if (oldSideData.url.startsWith('/uploads/')) {
         // Local file - delete from filesystem

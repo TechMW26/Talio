@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { getTenantModels } from '@/lib/tenantModels';
-import { bulkDeleteFromImageKit } from '@/lib/imagekit';
+import { deleteScreenshots as deleteGridFSScreenshots } from '@/lib/gridfs';
+import { unlink } from 'fs/promises';
+import path from 'path';
 
 /**
  * POST /api/productivity/sessions/cleanup
@@ -59,20 +61,13 @@ export async function POST(request) {
       try {
         console.log(`[SessionCleanup] Cleaning session ${session._id}...`);
 
-        // Collect ImageKit file IDs
-        const imagekitFileIds = [];
+        // Collect file IDs for cleanup
         const screenshots = session.screenshots || [];
 
-        for (const screenshot of screenshots) {
-          if (screenshot.fileId) {
-            imagekitFileIds.push(screenshot.fileId);
-          }
-          if (screenshot.imagekitFileId) {
-            imagekitFileIds.push(screenshot.imagekitFileId);
-          }
-        }
+        // Query Screenshot DB for full cleanup data (session screenshots often lack fileId)
+        const gridfsFileIds = [];
+        const filesystemPaths = [];
 
-        // Also query Screenshot DB for imagekitFileIds (session screenshots often lack fileId)
         try {
           const dbLookupQuery = {};
           if (session.user) dbLookupQuery.user = session.user;
@@ -82,27 +77,45 @@ export async function POST(request) {
           }
 
           const dbScreenshots = await Screenshot.find(dbLookupQuery)
-            .select('imagekitFileId')
+            .select('gridfsFileId path')
             .lean();
 
           for (const ss of dbScreenshots) {
-            if (ss.imagekitFileId && !imagekitFileIds.includes(ss.imagekitFileId)) {
-              imagekitFileIds.push(ss.imagekitFileId);
+            if (ss.gridfsFileId) {
+              gridfsFileIds.push(ss.gridfsFileId);
+            }
+            if (ss.path && !ss.path.startsWith('http')) {
+              filesystemPaths.push(ss.path);
             }
           }
         } catch (lookupErr) {
           console.error(`[SessionCleanup] DB lookup error for session ${session._id}:`, lookupErr.message);
         }
 
-        // Delete from ImageKit
-        if (imagekitFileIds.length > 0) {
+        // Delete GridFS files
+        if (gridfsFileIds.length > 0) {
           try {
-            await bulkDeleteFromImageKit(imagekitFileIds);
-            totalImagesDeleted += imagekitFileIds.length;
-            console.log(`[SessionCleanup] Deleted ${imagekitFileIds.length} images from ImageKit for session ${session._id}`);
-          } catch (imagekitError) {
-            console.error(`[SessionCleanup] ImageKit deletion failed for session ${session._id}:`, imagekitError.message);
+            const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds);
+            console.log(`[SessionCleanup] GridFS cleanup: ${gridfsResult.successCount}/${gridfsFileIds.length} for session ${session._id}`);
+          } catch (gridfsErr) {
+            console.error(`[SessionCleanup] GridFS deletion failed for session ${session._id}:`, gridfsErr.message);
           }
+        }
+
+        // Delete local filesystem files
+        if (filesystemPaths.length > 0) {
+          let fsCount = 0;
+          for (const fsPath of filesystemPaths) {
+            try {
+              await unlink(path.join(process.cwd(), 'public', fsPath));
+              fsCount++;
+            } catch (err) {
+              if (err.code !== 'ENOENT') {
+                console.warn(`[SessionCleanup] Failed to delete ${fsPath}:`, err.message);
+              }
+            }
+          }
+          if (fsCount > 0) console.log(`[SessionCleanup] Filesystem cleanup: ${fsCount}/${filesystemPaths.length} for session ${session._id}`);
         }
 
         // Delete raw captures from Screenshot collection
@@ -118,9 +131,9 @@ export async function POST(request) {
           deleteQuery.capturedAt = { $gte: session.startTime, $lte: session.endTime };
         }
 
-        if (imagekitFileIds.length > 0) {
+        if (gridfsFileIds.length > 0) {
           deleteQuery.$or = [
-            { imagekitFileId: { $in: imagekitFileIds } },
+            { gridfsFileId: { $in: gridfsFileIds } },
             ...(session.startTime && session.endTime ? [{ capturedAt: { $gte: session.startTime, $lte: session.endTime } }] : [])
           ];
           delete deleteQuery.capturedAt;

@@ -4,7 +4,7 @@ import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
-import { uploadImageToImageKit, uploadFileToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
+import { uploadImage } from '@/lib/gridfs'
 // Configure route for larger file uploads (10MB)
 export const config = {
   api: {
@@ -19,21 +19,6 @@ export const maxDuration = 60 // 60 seconds timeout for large uploads
 
 // Image MIME types that should be optimized
 const OPTIMIZABLE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
-
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-  const configured = !!(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-    process.env.IMAGEKIT_PRIVATE_KEY &&
-    process.env.IMAGEKIT_URL_ENDPOINT
-  )
-  console.log('[Upload] ImageKit configured:', configured, {
-    publicKey: process.env.IMAGEKIT_PUBLIC_KEY ? 'SET' : 'NOT SET',
-    privateKey: process.env.IMAGEKIT_PRIVATE_KEY ? 'SET' : 'NOT SET',
-    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT ? 'SET' : 'NOT SET'
-  })
-  return configured
-}
 
 export async function POST(request) {
   try {
@@ -96,63 +81,49 @@ export async function POST(request) {
       ? `${Date.now()}-${originalName}.webp`
       : `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
 
-    // Get the appropriate ImageKit folder based on upload type
-    const imagekitFolder = getImageKitFolder(folder, { employee })
+    // Get the upload category from folder parameter
+    const uploadCategory = folder || 'chat'
 
     console.log('[Upload] Processing:', {
       isImage,
-      imagekitConfigured: isImageKitConfigured(),
-      folder: imagekitFolder,
+      folder: uploadCategory,
       fileName: finalFilename
     })
 
-    // Try ImageKit upload if configured, fallback to local storage
-    if (isImageKitConfigured()) {
-      try {
-        console.log('[Upload] Attempting ImageKit upload...')
-        console.log('[Upload] Buffer size:', buffer.length, 'bytes')
+    // Upload to GridFS
+    try {
+      console.log('[Upload] Uploading to GridFS...')
+      const userId = user._id || user.userId
+      const contentType = isImage ? 'image/webp' : (file.type || 'application/octet-stream')
 
-        // Build safe tags (no undefined values)
-        const safeTags = ['upload', folder, employee?.employeeCode].filter(Boolean)
+      const gridfsResult = await uploadImage(buffer, {
+        category: uploadCategory,
+        contentType,
+        originalName: finalFilename,
+        userId: String(userId),
+        employeeId: employee?._id ? String(employee._id) : undefined,
+      })
 
-        const imagekitResult = isImage
-          ? await uploadImageToImageKit(buffer, {
-              fileName: finalFilename,
-              folder: imagekitFolder,
-              tags: safeTags,
-              useUniqueFileName: true,
-            })
-          : await uploadFileToImageKit(buffer, {
-              mimeType: file.type || 'application/octet-stream',
-              fileName: finalFilename,
-              folder: imagekitFolder,
-              tags: safeTags,
-              useUniqueFileName: true,
-            })
+      console.log('[Upload] GridFS SUCCESS:', gridfsResult.url)
 
-        console.log('[Upload] ImageKit SUCCESS:', imagekitResult.url)
-
-        return NextResponse.json({
-          success: true,
-          data: {
-            fileUrl: imagekitResult.url,
-            fileId: imagekitResult.fileId,
-            fileName: file.name,
-            fileType: isImage ? 'image/webp' : (file.type || 'application/octet-stream'),
-            fileSize: imagekitResult.size || buffer.length,
-            originalSize: file.size,
-            optimized: !!optimizationInfo,
-            thumbnailUrl: imagekitResult.thumbnailUrl,
-            width: imagekitResult.width,
-            height: imagekitResult.height,
-            storage: 'imagekit',
-            ...(optimizationInfo && { compressionRatio: optimizationInfo.compressionRatio })
-          }
-        })
-      } catch (imagekitError) {
-        console.error('[Upload] ImageKit upload failed, falling back to local:', imagekitError.message)
-        // Fall through to local storage
-      }
+      return NextResponse.json({
+        success: true,
+        data: {
+          fileUrl: gridfsResult.url,
+          fileId: String(gridfsResult._id),
+          fileName: file.name,
+          fileType: contentType,
+          fileSize: gridfsResult.length || buffer.length,
+          originalSize: file.size,
+          optimized: !!optimizationInfo,
+          width: optimizationInfo?.width,
+          height: optimizationInfo?.height,
+          storage: 'gridfs',
+          ...(optimizationInfo && { compressionRatio: optimizationInfo.compressionRatio })
+        }
+      })
+    } catch (gridfsError) {
+      console.error('[Upload] GridFS upload failed, falling back to local:', gridfsError.message)
     }
 
     // Fallback: Local file storage

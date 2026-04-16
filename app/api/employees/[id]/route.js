@@ -9,15 +9,6 @@ import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
 
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-  return !!(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-    process.env.IMAGEKIT_PRIVATE_KEY &&
-    process.env.IMAGEKIT_URL_ENDPOINT
-  )
-}
-
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id) &&
@@ -328,12 +319,12 @@ export async function PUT(request, { params }) {
     // System role belongs to the linked User document, not the Employee document.
     delete data.systemRole
 
-    // Handle profile picture upload to ImageKit if base64 is provided
+    // Handle profile picture upload to GridFS if base64 is provided
     if (data.profilePicture && data.profilePicture.startsWith('data:image/')) {
       console.log('[Employee Update] Processing profile picture upload...')
 
       try {
-        const { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } = await import('@/lib/imagekit')
+        const { uploadImage, deleteImage } = await import('@/lib/gridfs')
         const { optimizeImage, isValidImage } = await import('@/lib/imageOptimization')
 
         // Extract base64 data
@@ -354,42 +345,32 @@ export async function PUT(request, { params }) {
           const employeeCode = employee.employeeCode || 'UNKNOWN'
           const filename = `profile_${employeeCode}_${timestamp}.webp`
 
-          // Get the appropriate ImageKit folder
-          const imagekitFolder = getImageKitFolder('profile', { employee })
+          console.log('[Employee Update] Uploading to GridFS...')
 
-          if (isImageKitConfigured()) {
-            console.log('[Employee Update] Uploading to ImageKit...')
+          const gridfsResult = await uploadImage(optimizedBuffer, {
+            category: 'profile',
+            contentType: 'image/webp',
+            originalName: filename,
+            employeeId: String(id),
+          })
 
-            // Build safe tags (no undefined values)
-            const safeTags = ['profile', 'avatar', employeeCode].filter(Boolean)
-
-            const imagekitResult = await uploadImageToImageKit(optimizedBuffer, {
-              fileName: filename,
-              folder: imagekitFolder,
-              tags: safeTags,
-            })
-
-            // Delete old profile picture from ImageKit if exists
-            if (employee.profilePictureFileId) {
-              try {
-                await deleteFromImageKit(employee.profilePictureFileId)
-                console.log(`[Employee Update] Deleted old ImageKit file: ${employee.profilePictureFileId}`)
-              } catch (err) {
-                console.log('[Employee Update] Old file cleanup:', err.message)
-              }
+          // Delete old profile picture from GridFS if exists
+          if (employee.profilePictureFileId) {
+            try {
+              await deleteImage(employee.profilePictureFileId)
+              console.log(`[Employee Update] Deleted old GridFS file: ${employee.profilePictureFileId}`)
+            } catch (err) {
+              console.log('[Employee Update] Old file cleanup:', err.message)
             }
-
-            // Update data with ImageKit URL
-            data.profilePicture = imagekitResult.url
-            data.profilePictureFileId = imagekitResult.fileId
-            console.log(`[Employee Update] Profile picture uploaded to ImageKit: ${imagekitResult.url}`)
-          } else {
-            console.log('[Employee Update] ImageKit not configured, keeping base64')
           }
+
+          // Update data with GridFS URL
+          data.profilePicture = gridfsResult.url
+          data.profilePictureFileId = String(gridfsResult._id)
+          console.log(`[Employee Update] Profile picture uploaded to GridFS: ${gridfsResult.url}`)
         }
       } catch (uploadError) {
         console.error('[Employee Update] Profile picture upload failed:', uploadError.message)
-        // Keep the base64 if upload fails (fallback behavior)
       }
     }
 
@@ -600,11 +581,11 @@ export async function DELETE(request, { params }) {
       console.log(`[Employee Delete] Deleted user: ${user._id} (${user.email})`)
     }
 
-    // Delete profile picture from ImageKit if exists
-    if (employee.profilePictureFileId && isImageKitConfigured()) {
+    // Delete profile picture from GridFS if exists
+    if (employee.profilePictureFileId) {
       try {
-        const { deleteFromImageKit } = await import('@/lib/imagekit')
-        await deleteFromImageKit(employee.profilePictureFileId)
+        const { deleteImage } = await import('@/lib/gridfs')
+        await deleteImage(employee.profilePictureFileId)
         console.log(`[Employee Delete] Deleted profile picture: ${employee.profilePictureFileId}`)
       } catch (imgErr) {
         console.error('[Employee Delete] Failed to delete profile picture:', imgErr)

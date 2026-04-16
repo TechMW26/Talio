@@ -239,7 +239,7 @@ export async function GET(request) {
           user: { $in: allUserIds },
           dateString: dateParam
         })
-          .select('user imagekitUrl path capturedAt')
+          .select('user path capturedAt gridfsFileId')
           .sort({ capturedAt: -1 })
           .lean()
       : [];
@@ -259,7 +259,7 @@ export async function GET(request) {
       const bucket = screenshotsByUser.get(userId);
       bucket.count += 1;
       if (!bucket.latestPreview) {
-        bucket.latestPreview = shot.imagekitUrl || shot.path || null;
+        bucket.latestPreview = shot.path || (shot.gridfsFileId ? `/api/activity/screenshot?id=${shot._id}` : null);
       }
     });
     

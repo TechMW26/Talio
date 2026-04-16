@@ -7,7 +7,7 @@ import path from 'path'
 export const dynamic = 'force-dynamic'
 
 /**
- * Helper function to determine if a URL is remote (ImageKit/external) or local
+ * Helper function to determine if a URL is remote or local
  */
 function isRemoteUrl(url) {
   return url && (url.startsWith('http://') || url.startsWith('https://'))
@@ -18,7 +18,7 @@ function isRemoteUrl(url) {
  */
 async function fetchImageAsBase64(url) {
   if (isRemoteUrl(url)) {
-    // Fetch from remote URL (ImageKit, etc.)
+    // Fetch from remote URL
     const response = await fetch(url)
     if (!response.ok) {
       throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)

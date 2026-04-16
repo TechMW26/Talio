@@ -1,15 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit';
-
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-  return !!(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-    process.env.IMAGEKIT_PRIVATE_KEY &&
-    process.env.IMAGEKIT_URL_ENDPOINT
-  )
-}
+import { uploadImage, deleteImage } from '@/lib/gridfs';
 
 // GET /api/whiteboard/[id] - Get single whiteboard
 export async function GET(request, { params }) {
@@ -133,29 +124,28 @@ export async function PUT(request, { params }) {
     
     // Handle thumbnail upload
     if (thumbnail !== undefined) {
-      // Check if thumbnail is base64 and ImageKit is configured
-      if (thumbnail && thumbnail.startsWith('data:') && isImageKitConfigured()) {
+      // Upload to GridFS if thumbnail is base64
+      if (thumbnail && thumbnail.startsWith('data:')) {
         try {
-          const imagekitFolder = getImageKitFolder('whiteboards');
-          const imagekitResult = await uploadImageToImageKit(thumbnail, `whiteboard-${id}-thumbnail`, {
-            folder: imagekitFolder,
-            tags: ['whiteboard', 'thumbnail'],
-            customMetadata: {
-              whiteboardId: id,
-              userId: user._id || user.userId,
-            },
-          });
+          const base64Data = thumbnail.replace(/^data:image\/\w+;base64,/, '')
+          const imageBuffer = Buffer.from(base64Data, 'base64')
 
-          whiteboard.thumbnail = imagekitResult.url;
-          whiteboard.thumbnailFileId = imagekitResult.fileId;
-          console.log(`[Whiteboard] Thumbnail uploaded to ImageKit: ${imagekitFolder}`);
+          const gridfsResult = await uploadImage(imageBuffer, {
+            category: 'whiteboard',
+            contentType: 'image/webp',
+            originalName: `whiteboard-${id}-thumbnail.webp`,
+            userId: String(user._id || user.userId),
+          })
+
+          whiteboard.thumbnail = gridfsResult.url
+          whiteboard.thumbnailFileId = String(gridfsResult._id)
+          console.log(`[Whiteboard] Thumbnail uploaded to GridFS`)
         } catch (imgError) {
-          console.error('[Whiteboard] ImageKit thumbnail upload failed:', imgError.message);
-          // Fallback to storing base64 (not recommended but backwards compatible)
-          whiteboard.thumbnail = thumbnail;
+          console.error('[Whiteboard] GridFS thumbnail upload failed:', imgError.message)
+          whiteboard.thumbnail = thumbnail
         }
       } else {
-        whiteboard.thumbnail = thumbnail;
+        whiteboard.thumbnail = thumbnail
       }
     }
 
@@ -223,12 +213,12 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Only the owner can delete this whiteboard' }, { status: 403 });
     }
 
-    // Delete thumbnail from ImageKit if exists
-    if (whiteboard.thumbnailFileId && isImageKitConfigured()) {
+    // Delete thumbnail from GridFS if exists
+    if (whiteboard.thumbnailFileId) {
       try {
-        await deleteFromImageKit(whiteboard.thumbnailFileId);
+        await deleteImage(whiteboard.thumbnailFileId);
       } catch (imgError) {
-        console.error('[Whiteboard] Failed to delete thumbnail from ImageKit:', imgError.message);
+        console.error('[Whiteboard] Failed to delete thumbnail from GridFS:', imgError.message);
       }
     }
 

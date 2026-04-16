@@ -1,15 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { uploadImageToImageKit, getImageKitFolder } from '@/lib/imagekit'
-
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-  return !!(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-    process.env.IMAGEKIT_PRIVATE_KEY &&
-    process.env.IMAGEKIT_URL_ENDPOINT
-  )
-}
+import { uploadImage } from '@/lib/gridfs'
 
 // GET - List all companies
 export async function GET(request) {
@@ -89,30 +80,29 @@ export async function POST(request) {
       )
     }
 
-    // Handle logo upload to ImageKit if it's base64
+    // Handle logo upload to GridFS if it's base64
     let logoUrl = data.logo || '';
     let logoFileId = '';
 
-    // Get folder path with company code
     const companyCode = data.code.trim().toUpperCase();
-    const imagekitFolder = getImageKitFolder('company', { companyCode });
 
-    if (logoUrl && logoUrl.startsWith('data:image/') && isImageKitConfigured()) {
+    if (logoUrl && logoUrl.startsWith('data:image/')) {
       try {
-        const imagekitResult = await uploadImageToImageKit(logoUrl, {
-          fileName: `company_${companyCode}_logo_${Date.now()}.webp`,
-          folder: imagekitFolder,
-          tags: ['company', 'logo', companyCode],
-          customMetadata: {
-            companyCode: companyCode,
-          },
-        });
-        logoUrl = imagekitResult.url;
-        logoFileId = imagekitResult.fileId;
-        console.log(`[Company] Logo uploaded to ImageKit: ${imagekitFolder}`);
+        // Extract base64 data
+        const base64Data = logoUrl.replace(/^data:image\/\w+;base64,/, '')
+        const imageBuffer = Buffer.from(base64Data, 'base64')
+
+        const gridfsResult = await uploadImage(imageBuffer, {
+          category: 'company',
+          contentType: 'image/webp',
+          originalName: `company_${companyCode}_logo_${Date.now()}.webp`,
+          companyId: companyCode,
+        })
+        logoUrl = gridfsResult.url
+        logoFileId = String(gridfsResult._id)
+        console.log(`[Company] Logo uploaded to GridFS`)
       } catch (imgError) {
-        console.error('[Company] ImageKit logo upload failed:', imgError.message);
-        // Keep the base64 as fallback (not recommended)
+        console.error('[Company] GridFS logo upload failed:', imgError.message)
       }
     }
 

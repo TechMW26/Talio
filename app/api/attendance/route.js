@@ -10,7 +10,9 @@ import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/at
 import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
 import { emitAttendanceUpdate, emitDashboardRefresh, emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 import { getAuthAndModels } from '@/lib/auth'
+import { getTenantModels } from '@/lib/tenantModels'
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
+import { triggerAnalysisOnCheckout } from '@/lib/autoAnalysisTrigger'
 import mongoose from 'mongoose'
 import {
   getTimezone,
@@ -1286,6 +1288,29 @@ export async function POST(request) {
         }
       } catch (socketError) {
         console.error('Failed to emit attendance socket events:', socketError)
+      }
+
+      // Auto-trigger productivity analysis for any un-analyzed sessions on clock-out
+      // Run async — don't block the clock-out response
+      try {
+        const checkoutUserId = (user._id || user.userId)?.toString()
+        if (checkoutUserId && tenant?.databaseName) {
+          const productivityModels = await getTenantModels(tenant.databaseName, ['Screenshot', 'ProductivitySession'])
+          triggerAnalysisOnCheckout({
+            userId: checkoutUserId,
+            employeeId,
+            databaseName: tenant.databaseName,
+            models: productivityModels
+          }).then(result => {
+            if (result.triggered) {
+              console.log(`[Attendance] Auto-analysis on checkout: ${result.sessionsEnqueued} sessions enqueued for user ${checkoutUserId}`)
+            }
+          }).catch(err => {
+            console.error('[Attendance] Auto-analysis trigger failed (non-blocking):', err.message)
+          })
+        }
+      } catch (analysisError) {
+        console.error('[Attendance] Failed to trigger auto-analysis (non-blocking):', analysisError.message)
       }
 
       // Build response with optional warning

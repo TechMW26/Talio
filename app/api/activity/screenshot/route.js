@@ -3,20 +3,11 @@ import { getAuthAndModels } from '@/lib/auth'
 import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
-import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
+import { checkAndTriggerSessionAnalysis } from '@/lib/autoAnalysisTrigger';
 import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-  return !!(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-    process.env.IMAGEKIT_PRIVATE_KEY &&
-    process.env.IMAGEKIT_URL_ENDPOINT
-  )
-}
 
 /**
  * Ensure directory exists
@@ -39,12 +30,12 @@ async function ensureDirectory(dirPath) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Screenshot']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Screenshot', 'ProductivitySession']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth;
-    const { User, Employee, Screenshot } = models;
+    const { user, models, tenant } = auth;
+    const { User, Employee, Screenshot, ProductivitySession } = models;
 
     const userId = user._id || user.userId;
     const userRole = user.role;
@@ -144,59 +135,16 @@ export async function POST(request) {
       });
     }
 
-    // Get the appropriate ImageKit folder with employee subfolder
-    const imagekitFolder = getImageKitFolder('screenshot', { employee, dateString });
-    const employeeFolderName = generateEmployeeFolderName(employee);
+    // Generate employee folder name for filesystem fallback
+    const firstName = (employee?.firstName || '').replace(/[^a-zA-Z0-9]/g, '');
+    const lastName = (employee?.lastName || '').replace(/[^a-zA-Z0-9]/g, '');
+    const employeeFolderName = `${firstName}${lastName}-${employeeCode}`;
 
     let publicPath = '';
-    let imagekitFileId = null;
-    let imagekitUrl = null;
     let gridfsResult = null;
 
-    // === IMAGEKIT STORAGE (primary - CDN delivery) ===
-    if (isImageKitConfigured()) {
-      try {
-        console.log('[Screenshot] Attempting ImageKit upload...');
-        console.log('[Screenshot] Folder:', imagekitFolder);
-        console.log('[Screenshot] Buffer size:', buffer.length, 'bytes');
-
-        // Use uploadImageToImageKit directly (no temp file) - works better in serverless/Docker
-        const imagekitResult = await uploadImageToImageKit(buffer, {
-          fileName: filename,
-          folder: imagekitFolder,
-          tags: ['screenshot', 'productivity', dateString, employeeCode],
-          useUniqueFileName: true,
-        });
-
-        imagekitUrl = imagekitResult.url;
-        imagekitFileId = imagekitResult.fileId;
-        publicPath = imagekitUrl;
-        console.log(`[Screenshot] ✅ Uploaded to ImageKit: ${imagekitUrl}`);
-      } catch (imagekitError) {
-        console.error('[Screenshot] ❌ ImageKit upload failed:');
-        console.error('[Screenshot] Error name:', imagekitError.name);
-        console.error('[Screenshot] Error message:', imagekitError.message);
-        // Fall through to filesystem storage
-      }
-    } else {
-      console.log('[Screenshot] ImageKit not configured, using filesystem storage');
-    }
-
-    // === FALLBACK: FILESYSTEM STORAGE (for dashboard display) ===
-    if (!publicPath) {
-      const activityDir = path.join(process.cwd(), 'public', 'activity', employeeFolderName, dateString);
-      await ensureDirectory(activityDir);
-
-      const filePath = path.join(activityDir, filename);
-      await writeFile(filePath, buffer);
-
-      publicPath = `/activity/${employeeFolderName}/${dateString}/${filename}`;
-      console.log(`[Screenshot] Saved to filesystem: ${publicPath}`);
-    }
-
-    // === GRIDFS STORAGE (for long-term storage & AI analysis - fallback) ===
-    // Only use GridFS if ImageKit is not configured
-    if (!isImageKitConfigured()) {
+    // === GRIDFS STORAGE (primary - for long-term storage & AI analysis) ===
+    try {
       gridfsResult = await uploadScreenshot(buffer, {
         userId,
         employeeId: employeeId?.toString(),
@@ -208,6 +156,21 @@ export async function POST(request) {
         height: 1080,
         activity
       });
+      console.log(`[Screenshot] ✅ Uploaded to GridFS: ${gridfsResult._id}`);
+    } catch (gridfsError) {
+      console.error('[Screenshot] ❌ GridFS upload failed:', gridfsError.message);
+    }
+
+    // === FALLBACK: FILESYSTEM STORAGE (for dashboard display) ===
+    if (!gridfsResult) {
+      const activityDir = path.join(process.cwd(), 'public', 'activity', employeeFolderName, dateString);
+      await ensureDirectory(activityDir);
+
+      const filePath = path.join(activityDir, filename);
+      await writeFile(filePath, buffer);
+
+      publicPath = `/activity/${employeeFolderName}/${dateString}/${filename}`;
+      console.log(`[Screenshot] Saved to filesystem: ${publicPath}`);
     }
 
     // === DATABASE RECORD ===
@@ -215,12 +178,9 @@ export async function POST(request) {
       user: userId,
       employee: employeeId,
       gridfsFileId: gridfsResult?._id || null,
-      imagekitFileId: imagekitFileId,
-      imagekitUrl: imagekitUrl,
       capturedAt: safeCapturedAt,
       dateString,
-      // Add filesystem path for dashboard compatibility
-      path: publicPath,
+      path: publicPath || null,
       filename,
       metadata: {
         mimeType,
@@ -228,7 +188,7 @@ export async function POST(request) {
         height: 1080,
         fileSize: buffer.length,
         format,
-        storage: imagekitUrl ? 'imagekit' : (gridfsResult ? 'gridfs' : 'filesystem')
+        storage: gridfsResult ? 'gridfs' : 'filesystem'
       },
       captureType,
       activity: {
@@ -244,18 +204,32 @@ export async function POST(request) {
 
     await screenshot.save();
 
-    console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${imagekitUrl ? ` (ImageKit: ${imagekitFileId})` : (gridfsResult ? ` (GridFS: ${gridfsResult._id})` : '')}`);
+    console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${gridfsResult ? ` (GridFS: ${gridfsResult._id})` : ''}`);
+
+    // Auto-trigger session analysis if session is complete (20 screenshots)
+    // Run async — don't block the upload response
+    checkAndTriggerSessionAnalysis({
+      userId,
+      employeeId,
+      databaseName: tenant.databaseName,
+      capturedAt: safeCapturedAt,
+      models: { Screenshot, ProductivitySession }
+    }).then(result => {
+      if (result.triggered) {
+        console.log(`[Screenshot] Auto-analysis triggered for session ${result.sessionId}`);
+      }
+    }).catch(err => {
+      console.error('[Screenshot] Auto-analysis check failed (non-blocking):', err.message);
+    });
 
     return NextResponse.json({
       success: true,
       screenshotId: screenshot._id.toString(),
       gridfsId: gridfsResult?._id?.toString() || null,
-      imagekitFileId: imagekitFileId,
-      imagekitUrl: imagekitUrl,
       path: publicPath,
       timestamp: safeCapturedAt.toISOString(),
       fileSize: buffer.length,
-      storage: imagekitUrl ? 'imagekit' : (gridfsResult ? 'gridfs' : 'filesystem')
+      storage: gridfsResult ? 'gridfs' : 'filesystem'
     });
 
   } catch (error) {
@@ -269,7 +243,7 @@ export async function POST(request) {
 
 /**
  * GET /api/activity/screenshot?id=xxx
- * Retrieve a screenshot image by ID (from GridFS or ImageKit)
+ * Retrieve a screenshot image by ID (from GridFS or filesystem)
  */
 export async function GET(request) {
   try {
@@ -313,7 +287,7 @@ export async function GET(request) {
 
     // Access control - check if user can view this screenshot
     let hasAccess = false;
-    
+
     // Admin, HR, Manager can view all
     if (['admin', 'hr', 'manager'].includes(userRole)) {
       hasAccess = true;
@@ -326,17 +300,17 @@ export async function GET(request) {
     else {
       const viewer = await User.findById(userId).select('employeeId');
       const screenshotOwner = await User.findById(screenshot.user).select('employeeId');
-      
+
       if (viewer?.employeeId && screenshotOwner?.employeeId) {
         const viewerEmployee = await Employee.findById(viewer.employeeId).select('_id');
         const ownerEmployee = await Employee.findById(screenshotOwner.employeeId).select('department departments');
-        
+
         if (viewerEmployee && ownerEmployee) {
           // Get owner's departments
           const ownerDepartments = [];
           if (ownerEmployee.department) ownerDepartments.push(ownerEmployee.department);
           if (ownerEmployee.departments?.length) ownerDepartments.push(...ownerEmployee.departments);
-          
+
           // Check if viewer is head of any department
           const departments = await Department.find({
             _id: { $in: ownerDepartments },
@@ -345,12 +319,12 @@ export async function GET(request) {
               { heads: viewerEmployee._id }
             ]
           });
-          
+
           hasAccess = departments.length > 0;
         }
       }
     }
-    
+
     if (!hasAccess) {
       return NextResponse.json({
         success: false,
@@ -358,19 +332,14 @@ export async function GET(request) {
       }, { status: 403 });
     }
 
-    // If ImageKit URL exists, redirect to it
-    if (screenshot.imagekitUrl) {
-      return NextResponse.redirect(screenshot.imagekitUrl);
-    }
-
-    // Otherwise, get from GridFS
+    // Try GridFS first
     if (!screenshot.gridfsFileId) {
       return NextResponse.json({
         success: false,
         error: 'Screenshot image not available'
       }, { status: 404 });
     }
-    
+
     const imageBuffer = await getScreenshot(screenshot.gridfsFileId);
 
     // Return image

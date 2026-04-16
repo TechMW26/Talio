@@ -1,15 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit'
-
-// Check if ImageKit is configured
-const isImageKitConfigured = () => {
-  return !!(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-    process.env.IMAGEKIT_PRIVATE_KEY &&
-    process.env.IMAGEKIT_URL_ENDPOINT
-  )
-}
+import { uploadImage, deleteImage } from '@/lib/gridfs'
 
 // GET - Get single company
 export async function GET(request, { params }) {
@@ -108,37 +99,34 @@ export async function PUT(request, { params }) {
     if (data.description !== undefined) updateData.description = data.description.trim()
     if (data.isActive !== undefined) updateData.isActive = data.isActive
 
-    // Handle logo upload to ImageKit if it's base64
+    // Handle logo upload to GridFS if it's base64
     if (data.logo !== undefined) {
-      if (data.logo && data.logo.startsWith('data:image/') && isImageKitConfigured()) {
+      if (data.logo && data.logo.startsWith('data:image/')) {
         try {
-          // Delete old logo from ImageKit if exists
-          if (company.logoFileId) {
-            await deleteFromImageKit(company.logoFileId).catch(() => { });
+          // Delete old logo from GridFS if exists
+          if (existingCompany.logoFileId) {
+            await deleteImage(existingCompany.logoFileId).catch(() => { });
           }
 
-          // Get folder path with company code
-          const companyCode = data.code?.trim().toUpperCase() || company.code;
-          const imagekitFolder = getImageKitFolder('company', { companyCode });
+          const companyCode = data.code?.trim().toUpperCase() || existingCompany.code;
+          const base64Data = data.logo.replace(/^data:image\/\w+;base64,/, '')
+          const imageBuffer = Buffer.from(base64Data, 'base64')
 
-          const imagekitResult = await uploadImageToImageKit(data.logo, {
-            fileName: `company_${companyCode}_logo_${Date.now()}.webp`,
-            folder: imagekitFolder,
-            tags: ['company', 'logo', companyCode],
-            customMetadata: {
-              companyId: id,
-              companyCode: companyCode,
-            },
-          });
-          updateData.logo = imagekitResult.url;
-          updateData.logoFileId = imagekitResult.fileId;
-          console.log(`[Company] Logo uploaded to ImageKit: ${imagekitFolder}`);
+          const gridfsResult = await uploadImage(imageBuffer, {
+            category: 'company',
+            contentType: 'image/webp',
+            originalName: `company_${companyCode}_logo_${Date.now()}.webp`,
+            companyId: id,
+          })
+          updateData.logo = gridfsResult.url
+          updateData.logoFileId = String(gridfsResult._id)
+          console.log(`[Company] Logo uploaded to GridFS`)
         } catch (imgError) {
-          console.error('[Company] ImageKit logo upload failed:', imgError.message);
-          updateData.logo = data.logo; // Fallback to base64
+          console.error('[Company] GridFS logo upload failed:', imgError.message)
+          updateData.logo = data.logo
         }
       } else {
-        updateData.logo = data.logo;
+        updateData.logo = data.logo
       }
     }
 

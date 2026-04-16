@@ -5,7 +5,7 @@
  * apart. Removes the extras from:
  *   1. The session's screenshots[] subdocument array
  *   2. The Screenshot collection in MongoDB
- *   3. ImageKit storage (via bulk delete API)
+ *   3. GridFS storage (via bucket.delete)
  *
  * This ensures consistency: old sessions had ~20 screenshots per 60-min window
  * (1 every 3 minutes). After the 60-min reassembly, some sessions ended up with
@@ -16,7 +16,6 @@
  */
 
 const mongoose = require('mongoose');
-const ImageKit = require('imagekit');
 require('dotenv').config();
 
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -38,51 +37,20 @@ function getDatabaseUri(databaseName) {
   return `${baseUri}/${databaseName}${options}`;
 }
 
-// ── ImageKit setup ───────────────────────────────────────────────────────────
+// ── GridFS helpers ───────────────────────────────────────────────────────────
 
-let imagekit = null;
-function getImageKit() {
-  if (!imagekit) {
-    const publicKey = process.env.IMAGEKIT_PUBLIC_KEY;
-    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
-    const urlEndpoint = process.env.IMAGEKIT_URL_ENDPOINT;
-    if (!publicKey || !privateKey || !urlEndpoint) {
-      console.warn('[Thin] ImageKit not configured — will only clean DB');
-      return null;
-    }
-    imagekit = new ImageKit({ publicKey, privateKey, urlEndpoint });
-  }
-  return imagekit;
-}
-
-async function bulkDeleteFromImageKit(fileIds) {
-  const ik = getImageKit();
-  if (!ik || fileIds.length === 0) return { deleted: 0, failed: [] };
+async function deleteGridFSScreenshots(conn, fileIds) {
+  if (!fileIds || fileIds.length === 0) return { deleted: 0, failed: [] };
+  const db = conn.db;
+  const bucket = new mongoose.mongo.GridFSBucket(db, { bucketName: 'screenshots' });
   let deleted = 0;
   const failed = [];
-  const BATCH = 100;
-  for (let i = 0; i < fileIds.length; i += BATCH) {
-    const batch = fileIds.slice(i, i + BATCH);
+  for (const fid of fileIds) {
     try {
-      const result = await ik.bulkDeleteFiles(batch);
-      const successCount = result.successfullyDeletedFileIds?.length || 0;
-      deleted += successCount;
-      if (successCount < batch.length) {
-        const successSet = new Set(result.successfullyDeletedFileIds || []);
-        for (const fid of batch) {
-          if (!successSet.has(fid)) failed.push(fid);
-        }
-      }
+      await bucket.delete(new mongoose.Types.ObjectId(fid));
+      deleted++;
     } catch (err) {
-      console.error(`  [ImageKit] Batch delete failed, trying individually...`, err.message);
-      for (const fid of batch) {
-        try {
-          await ik.deleteFile(fid);
-          deleted++;
-        } catch (singleErr) {
-          failed.push(fid);
-        }
-      }
+      failed.push(fid);
     }
   }
   return { deleted, failed };
@@ -92,8 +60,7 @@ async function bulkDeleteFromImageKit(fileIds) {
 
 const ScreenshotSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
-  imagekitFileId: { type: String, index: true },
-  imagekitUrl: String,
+  gridfsFileId: mongoose.Schema.Types.ObjectId,
   path: String,
   filename: String,
   capturedAt: { type: Date, required: true },
@@ -177,15 +144,15 @@ async function thinTenant(tenantConn, tenantName) {
 
   let totalKept = 0;
   let totalRemoved = 0;
-  let totalImageKitDeleted = 0;
+  let totalGridFSDeleted = 0;
   let totalDbDeleted = 0;
   let sessionsModified = 0;
   let errors = 0;
 
-  // Collect all ImageKit file IDs to delete in bulk at the end
-  const allImageKitIdsToDelete = [];
-  // Collect all Screenshot collection fileIds/urls to match for DB deletion
-  const allScreenshotMatchCriteria = [];
+  // Collect all GridFS file IDs to delete in bulk at the end
+  const allGridFSIdsToDelete = [];
+  // Collect all Screenshot collection IDs for DB deletion
+  const allScreenshotIdsToDelete = [];
 
   for (let si = 0; si < sessions.length; si++) {
     const session = sessions[si];
@@ -214,14 +181,11 @@ async function thinTenant(tenantConn, tenantName) {
         continue;
       }
 
-      // Collect ImageKit fileIds from removed screenshots
+      // Collect GridFS fileIds from removed screenshots
       for (const ss of remove) {
         if (ss.fileId) {
-          allImageKitIdsToDelete.push(ss.fileId);
-        }
-        // Build criteria for Screenshot collection deletion
-        if (ss.fileId) {
-          allScreenshotMatchCriteria.push(ss.fileId);
+          allGridFSIdsToDelete.push(ss.fileId);
+          allScreenshotIdsToDelete.push(ss.fileId);
         }
       }
 
@@ -243,23 +207,23 @@ async function thinTenant(tenantConn, tenantName) {
     }
   }
 
-  // Batch delete from ImageKit and Screenshot collection
-  if (!DRY_RUN && allImageKitIdsToDelete.length > 0) {
-    console.log(`[${tenantName}] Deleting ${allImageKitIdsToDelete.length} screenshots from ImageKit...`);
-    const ikResult = await bulkDeleteFromImageKit(allImageKitIdsToDelete);
-    totalImageKitDeleted = ikResult.deleted;
-    console.log(`[${tenantName}] ImageKit: ${ikResult.deleted} deleted, ${ikResult.failed.length} failed`);
+  // Batch delete from GridFS and Screenshot collection
+  if (!DRY_RUN && allGridFSIdsToDelete.length > 0) {
+    console.log(`[${tenantName}] Deleting ${allGridFSIdsToDelete.length} screenshots from GridFS...`);
+    const gridfsResult = await deleteGridFSScreenshots(tenantConn, allGridFSIdsToDelete);
+    totalGridFSDeleted = gridfsResult.deleted;
+    console.log(`[${tenantName}] GridFS: ${gridfsResult.deleted} deleted, ${gridfsResult.failed.length} failed`);
   }
 
-  if (!DRY_RUN && allScreenshotMatchCriteria.length > 0) {
-    // Delete from Screenshot collection by imagekitFileId
-    console.log(`[${tenantName}] Deleting ${allScreenshotMatchCriteria.length} from Screenshot collection...`);
+  if (!DRY_RUN && allScreenshotIdsToDelete.length > 0) {
+    // Delete from Screenshot collection by gridfsFileId
+    console.log(`[${tenantName}] Deleting ${allScreenshotIdsToDelete.length} from Screenshot collection...`);
 
     // Batch in chunks of 1000 to avoid huge $in queries
     const CHUNK = 1000;
-    for (let i = 0; i < allScreenshotMatchCriteria.length; i += CHUNK) {
-      const chunk = allScreenshotMatchCriteria.slice(i, i + CHUNK);
-      const result = await Screenshot.deleteMany({ imagekitFileId: { $in: chunk } });
+    for (let i = 0; i < allScreenshotIdsToDelete.length; i += CHUNK) {
+      const chunk = allScreenshotIdsToDelete.slice(i, i + CHUNK);
+      const result = await Screenshot.deleteMany({ gridfsFileId: { $in: chunk } });
       totalDbDeleted += result.deletedCount;
     }
     console.log(`[${tenantName}] Screenshot collection: ${totalDbDeleted} deleted`);
@@ -271,7 +235,7 @@ async function thinTenant(tenantConn, tenantName) {
     sessionsModified,
     screenshotsKept: totalKept,
     screenshotsRemoved: totalRemoved,
-    imageKitDeleted: totalImageKitDeleted,
+    gridFSDeleted: totalGridFSDeleted,
     dbDeleted: totalDbDeleted,
     errors
   };
@@ -309,7 +273,7 @@ async function main() {
       console.log(`── Processing: ${tenant.name} (${tenant.databaseName}) ──`);
       const result = await thinTenant(tenantConn, tenant.name);
       results.push(result);
-      console.log(`[${tenant.name}] Done: ${result.sessionsModified}/${result.sessionsChecked} sessions modified, ${result.screenshotsRemoved} screenshots removed (${result.screenshotsKept} kept), ImageKit: ${result.imageKitDeleted}, DB: ${result.dbDeleted}, errors: ${result.errors}\n`);
+      console.log(`[${tenant.name}] Done: ${result.sessionsModified}/${result.sessionsChecked} sessions modified, ${result.screenshotsRemoved} screenshots removed (${result.screenshotsKept} kept), GridFS: ${result.gridFSDeleted}, DB: ${result.dbDeleted}, errors: ${result.errors}\n`);
     } catch (err) {
       console.error(`[${tenant.name}] ERROR: ${err.message}`);
       results.push({ tenant: tenant.name, error: err.message });
@@ -325,7 +289,7 @@ async function main() {
     if (r.error) {
       console.log(`  ${r.tenant}: ERROR - ${r.error}`);
     } else {
-      console.log(`  ${r.tenant}: ${r.sessionsModified} sessions modified, ${r.screenshotsRemoved} removed, ${r.screenshotsKept} kept, IK=${r.imageKitDeleted}, DB=${r.dbDeleted}`);
+      console.log(`  ${r.tenant}: ${r.sessionsModified} sessions modified, ${r.screenshotsRemoved} removed, ${r.screenshotsKept} kept, GFS=${r.gridFSDeleted}, DB=${r.dbDeleted}`);
     }
   }
 

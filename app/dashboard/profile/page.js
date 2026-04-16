@@ -359,7 +359,7 @@ export default function ProfilePage() {
 
       const result = await response.json()
       if (result.success) {
-        // Use the URL returned from the API (could be ImageKit URL or base64 fallback)
+        // Use the URL returned from the API
         const profilePictureUrl = result.data?.profilePicture || croppedImage
 
         setEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl }))

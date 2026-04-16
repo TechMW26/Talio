@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { getTenantModels } from '@/lib/tenantModels';
-import { deleteFromImageKit, bulkDeleteFromImageKit } from '@/lib/imagekit';
+import { deleteScreenshots as deleteGridFSScreenshots } from '@/lib/gridfs';
 import mongoose from 'mongoose';
 
 /**
  * POST /api/activity/screenshots/deduplicate
  * Remove duplicate screenshots that share the same minute-level timestamp for the same user.
- * Keeps the first screenshot per user per minute, deletes the rest from DB + ImageKit.
+ * Keeps the first screenshot per user per minute, deletes the rest from DB + GridFS.
  * Admin/HR only.
  * 
  * Query params:
@@ -82,7 +82,7 @@ export async function POST(request) {
           // Keep first screenshot (earliest), collect rest as duplicates
           keepId: { $first: '$_id' },
           allIds: { $push: '$_id' },
-          allImagekitFileIds: { $push: '$imagekitFileId' },
+          allImagekitFileIds: { $push: '$imagekitFileId' }, // legacy field, may be null
           allGridfsFileIds: { $push: '$gridfsFileId' },
           allPaths: { $push: '$path' }
         }
@@ -109,9 +109,7 @@ export async function POST(request) {
 
     // Calculate totals
     let totalDuplicates = 0;
-    let totalImagekitDeletes = 0;
     const idsToDelete = [];
-    const imagekitFileIdsToDelete = [];
 
     const groupSummaries = [];
 
@@ -121,18 +119,8 @@ export async function POST(request) {
       const dupeIds = group.allIds.filter(id => id.toString() !== keepId.toString());
       const dupeCount = dupeIds.length;
 
-      // Collect ImageKit file IDs for duplicates (skip the first/kept one)
-      const dupeImagekitIds = [];
-      for (let i = 0; i < group.allIds.length; i++) {
-        if (group.allIds[i].toString() !== keepId.toString() && group.allImagekitFileIds[i]) {
-          dupeImagekitIds.push(group.allImagekitFileIds[i]);
-        }
-      }
-
       idsToDelete.push(...dupeIds);
-      imagekitFileIdsToDelete.push(...dupeImagekitIds);
       totalDuplicates += dupeCount;
-      totalImagekitDeletes += dupeImagekitIds.length;
 
       groupSummaries.push({
         user: group._id.user,
@@ -143,7 +131,7 @@ export async function POST(request) {
       });
     }
 
-    console.log(`[Dedup] Found ${duplicateGroups.length} duplicate groups, ${totalDuplicates} screenshots to remove, ${totalImagekitDeletes} ImageKit files to delete`);
+    console.log(`[Dedup] Found ${duplicateGroups.length} duplicate groups, ${totalDuplicates} screenshots to remove`);
 
     if (dryRun) {
       return NextResponse.json({
@@ -152,47 +140,36 @@ export async function POST(request) {
         message: `Would remove ${totalDuplicates} duplicate screenshots across ${duplicateGroups.length} minute-groups`,
         duplicateGroups: duplicateGroups.length,
         screenshotsToDelete: totalDuplicates,
-        imagekitFilesToDelete: totalImagekitDeletes,
         groups: groupSummaries.slice(0, 50) // Limit preview to 50 groups
       });
     }
 
     // === EXECUTE DELETION ===
 
-    // 1. Delete from ImageKit (batch in chunks of 100 - ImageKit API limit)
-    let imagekitDeletedCount = 0;
-    const imagekitErrors = [];
+    // 1. Delete from GridFS (for screenshots stored in GridFS)
+    let gridfsDeletedCount = 0;
+    const gridfsErrors = [];
 
-    if (imagekitFileIdsToDelete.length > 0) {
-      const BATCH_SIZE = 100;
-      for (let i = 0; i < imagekitFileIdsToDelete.length; i += BATCH_SIZE) {
-        const batch = imagekitFileIdsToDelete.slice(i, i + BATCH_SIZE);
-        try {
-          const result = await bulkDeleteFromImageKit(batch);
-          const successCount = result.successfullyDeletedFileIds?.length || 0;
-          imagekitDeletedCount += successCount;
-          // Track files that weren't in the success list (partial failure)
-          if (successCount < batch.length) {
-            const successSet = new Set(result.successfullyDeletedFileIds || []);
-            for (const fileId of batch) {
-              if (!successSet.has(fileId)) {
-                imagekitErrors.push({ fileId, error: 'Not in successfullyDeletedFileIds' });
-              }
-            }
-          }
-          console.log(`[Dedup] Deleted ImageKit batch ${Math.floor(i / BATCH_SIZE) + 1}: ${successCount}/${batch.length} files`);
-        } catch (err) {
-          console.error(`[Dedup] ImageKit batch delete error:`, err.message);
-          // Fallback: try individual deletes for failed batch
-          for (const fileId of batch) {
-            try {
-              await deleteFromImageKit(fileId);
-              imagekitDeletedCount++;
-            } catch (singleErr) {
-              imagekitErrors.push({ fileId, error: singleErr.message });
-            }
-          }
+    // Collect GridFS file IDs from duplicate groups
+    const gridfsFileIdsToDelete = [];
+    for (const group of duplicateGroups) {
+      for (let i = 0; i < group.allIds.length; i++) {
+        if (group.allIds[i].toString() !== group.keepId.toString() && group.allGridfsFileIds[i]) {
+          gridfsFileIdsToDelete.push(group.allGridfsFileIds[i]);
         }
+      }
+    }
+
+    if (gridfsFileIdsToDelete.length > 0) {
+      try {
+        const result = await deleteGridFSScreenshots(gridfsFileIdsToDelete);
+        gridfsDeletedCount = result.successCount || 0;
+        if (result.errors?.length) {
+          gridfsErrors.push(...result.errors);
+        }
+        console.log(`[Dedup] Deleted ${gridfsDeletedCount}/${gridfsFileIdsToDelete.length} GridFS files`);
+      } catch (err) {
+        console.error('[Dedup] GridFS batch delete error:', err.message);
       }
     }
 
@@ -207,7 +184,7 @@ export async function POST(request) {
       console.log(`[Dedup] Deleted DB batch ${Math.floor(i / DB_BATCH_SIZE) + 1}: ${result.deletedCount} records`);
     }
 
-    console.log(`[Dedup] ✅ Deduplication complete: ${dbDeletedCount} DB records, ${imagekitDeletedCount} ImageKit files removed`);
+    console.log(`[Dedup] ✅ Deduplication complete: ${dbDeletedCount} DB records, ${gridfsDeletedCount} GridFS files removed`);
 
     // 3. Clean up ProductivitySession.screenshots arrays that reference deleted screenshots
     let sessionsUpdated = 0;
@@ -215,19 +192,27 @@ export async function POST(request) {
       const { ProductivitySession } = await getTenantModels(auth.tenant.databaseName, ['ProductivitySession']);
       
       // Collect all deleted ImageKit file IDs and paths for matching
-      const deletedFileIdSet = new Set(imagekitFileIdsToDelete.filter(Boolean));
+      // Collect GridFS file IDs from deleted duplicates for session cleanup
+      const deletedGridfsIds = new Set();
+      for (const group of duplicateGroups) {
+        for (let i = 0; i < group.allIds.length; i++) {
+          if (group.allIds[i].toString() !== group.keepId.toString() && group.allGridfsFileIds[i]) {
+            deletedGridfsIds.add(group.allGridfsFileIds[i]);
+          }
+        }
+      }
       
-      if (deletedFileIdSet.size > 0) {
-        // Find sessions that reference any of the deleted fileIds
+      if (deletedGridfsIds.size > 0) {
+        // Find sessions that reference any of the deleted gridfs fileIds
         const affectedSessions = await ProductivitySession.find({
-          'screenshots.fileId': { $in: [...deletedFileIdSet] },
+          'screenshots.gridfsFileId': { $in: [...deletedGridfsIds] },
           screenshotsDeleted: { $ne: true }
         });
 
         for (const session of affectedSessions) {
           const before = session.screenshots.length;
           session.screenshots = session.screenshots.filter(
-            s => !s.fileId || !deletedFileIdSet.has(s.fileId)
+            s => !s.gridfsFileId || !deletedGridfsIds.has(s.gridfsFileId)
           );
           session.screenshotCount = session.screenshots.length;
           await session.save();
@@ -244,9 +229,9 @@ export async function POST(request) {
       message: `Removed ${dbDeletedCount} duplicate screenshots`,
       duplicateGroups: duplicateGroups.length,
       dbRecordsDeleted: dbDeletedCount,
-      imagekitFilesDeleted: imagekitDeletedCount,
+      gridfsFilesDeleted: gridfsDeletedCount,
       sessionsUpdated,
-      imagekitErrors: imagekitErrors.length > 0 ? imagekitErrors : undefined,
+      gridfsErrors: gridfsErrors.length > 0 ? gridfsErrors : undefined,
       groups: groupSummaries.slice(0, 50)
     });
 

@@ -110,7 +110,7 @@ export default function DocumentsPage() {
     try {
       const token = localStorage.getItem('token')
 
-      // First, upload the file to ImageKit via the upload API
+      // Upload the file via the upload API
       const formData = new FormData()
       formData.append('file', selectedFile)
       formData.append('folder', 'documents')

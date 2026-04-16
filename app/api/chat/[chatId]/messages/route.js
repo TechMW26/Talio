@@ -220,7 +220,7 @@ export async function POST(request, context) {
     // Add file info if present
     if (fileUrl) {
       message.fileUrl = fileUrl
-      message.fileId = fileId // ImageKit file ID for deletion
+      message.fileId = fileId // GridFS file ID for deletion
       message.fileName = fileName
       message.fileType = fileType
       message.fileSize = fileSize

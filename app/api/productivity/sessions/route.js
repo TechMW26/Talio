@@ -42,13 +42,13 @@ async function syncScreenshotsToSessions(userId, date, models) {
     }).sort({ capturedAt: 1 }).lean();
 
     for (const ss of dbScreenshots) {
-      const displayPath = ss.imagekitUrl || ss.path || `/api/activity/screenshot?id=${ss._id}`;
+      const displayPath = ss.path || `/api/activity/screenshot?id=${ss._id}`;
       screenshots.push({
         path: displayPath,
         filename: ss.filename || `screenshot_${ss._id}.webp`,
         timestamp: ss.capturedAt,
         size: ss.metadata?.fileSize || 0,
-        imagekitFileId: ss.imagekitFileId || null
+        gridfsFileId: ss.gridfsFileId || null
       });
     }
   }
@@ -126,7 +126,7 @@ async function syncScreenshotsToSessions(userId, date, models) {
     const mappedScreenshots = sessionScreenshots.map(ss => ({
       path: ss.path, // path contains the URL or relative path (matches schema)
       url: ss.path,  // Also keep url for frontend compatibility
-      fileId: ss.imagekitFileId || null, // ImageKit fileId for cleanup
+      fileId: ss.gridfsFileId || null, // GridFS fileId for cleanup
       timestamp: ss.timestamp,
       capturedAt: ss.timestamp, // For frontend compatibility
       filename: ss.filename

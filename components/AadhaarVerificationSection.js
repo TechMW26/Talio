@@ -77,10 +77,10 @@ export default function AadhaarVerificationSection({
     loadExistingImages()
   }, [])
 
-  // Load image - either directly from external URL (ImageKit) or through secured API endpoint
+  // Load image - either directly from external URL or through secured API endpoint
   const loadSecuredImage = async (url, setPreview, token) => {
     try {
-      // If URL is an external URL (ImageKit, etc.), use it directly
+      // If URL is an external URL, use it directly
       if (url.startsWith('http://') || url.startsWith('https://')) {
         console.log('[Aadhaar] Loading image directly from external URL:', url)
         setPreview(url)

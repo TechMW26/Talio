@@ -176,8 +176,8 @@ export async function GET(request) {
     }).sort({ capturedAt: 1 }).lean();
     
     for (const ss of dbScreenshots) {
-      // Prefer ImageKit URL, then path, then construct from gridfs
-      const displayPath = ss.imagekitUrl || ss.path || (ss._id ? `/api/activity/screenshot?id=${ss._id}` : null);
+      // Prefer path, then construct from gridfs/screenshot ID
+      const displayPath = ss.path || (ss._id ? `/api/activity/screenshot?id=${ss._id}` : null);
       
       if (displayPath) {
         captures.push({
@@ -188,11 +188,9 @@ export async function GET(request) {
           date: dateParam,
           activity: ss.activity,
           screenshotId: ss._id.toString(),
-          storage: ss.metadata?.storage || (ss.imagekitUrl ? 'imagekit' : 'filesystem')
+          storage: ss.metadata?.storage || 'filesystem'
         });
         seenPaths.add(ss.path || displayPath);
-        // Also add imagekitUrl to seen paths to avoid duplicates
-        if (ss.imagekitUrl) seenPaths.add(ss.imagekitUrl);
       }
     }
     
