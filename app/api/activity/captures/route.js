@@ -14,7 +14,7 @@ const ADMIN_ROLES = ['admin', 'hr'];
  */
 async function getDepartmentsWhereUserIsHead(employeeId, Department) {
   if (!employeeId) return [];
-  
+
   const departments = await Department.find({
     $or: [
       { head: employeeId },
@@ -22,7 +22,7 @@ async function getDepartmentsWhereUserIsHead(employeeId, Department) {
     ],
     isActive: true
   }).select('_id name');
-  
+
   return departments;
 }
 
@@ -33,20 +33,20 @@ async function getDepartmentsWhereUserIsHead(employeeId, Department) {
  */
 async function getEmployeesInDepartments(departmentIds, Department, Employee) {
   if (!departmentIds || departmentIds.length === 0) return [];
-  
+
   // Get sub-departments recursively
   const allDeptIds = [...departmentIds];
   const subDepts = await Department.find({
     parentDepartment: { $in: departmentIds },
     isActive: true
   }).select('_id');
-  
+
   subDepts.forEach(d => {
     if (!allDeptIds.some(id => id.toString() === d._id.toString())) {
       allDeptIds.push(d._id);
     }
   });
-  
+
   // Get employees in these departments
   const employees = await Employee.find({
     $or: [
@@ -54,7 +54,7 @@ async function getEmployeesInDepartments(departmentIds, Department, Employee) {
       { departments: { $in: allDeptIds } }
     ]
   }).select('_id');
-  
+
   return employees.map(e => e._id);
 }
 
@@ -92,33 +92,33 @@ export async function GET(request) {
     if (targetUserId !== currentUserId && !mongoose.Types.ObjectId.isValid(targetUserId)) {
       return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
     }
-    
+
     // Permission check
     if (targetUserId !== currentUserId) {
       const isAdmin = ADMIN_ROLES.includes(currentUserRole);
-      
+
       if (!isAdmin) {
         // Check if current user is department head of target user's department
         const currentUser = await User.findById(currentUserId).populate('employeeId');
         const targetUser = await User.findById(targetUserId).populate('employeeId');
-        
+
         if (!currentUser?.employeeId || !targetUser?.employeeId) {
           return NextResponse.json(
             { error: 'Permission denied - Employee records not found' },
             { status: 403 }
           );
         }
-        
+
         // Get departments where current user is head
         const headOfDepartments = await getDepartmentsWhereUserIsHead(currentUser.employeeId._id, Department);
-        
+
         if (headOfDepartments.length === 0) {
           return NextResponse.json(
             { error: 'Permission denied - You can only view your own captures' },
             { status: 403 }
           );
         }
-        
+
         // Get target user's departments
         const targetDeptIds = [];
         if (targetUser.employeeId.department) {
@@ -127,11 +127,11 @@ export async function GET(request) {
         if (targetUser.employeeId.departments) {
           targetUser.employeeId.departments.forEach(d => targetDeptIds.push(d.toString()));
         }
-        
+
         // Check if any of target's departments are headed by current user
         const headDeptIds = headOfDepartments.map(d => d._id.toString());
         const hasAccess = targetDeptIds.some(id => headDeptIds.includes(id));
-        
+
         // Also check sub-departments
         if (!hasAccess) {
           const subDepts = await Department.find({
@@ -139,7 +139,7 @@ export async function GET(request) {
           }).select('_id');
           const subDeptIds = subDepts.map(d => d._id.toString());
           const hasSubAccess = targetDeptIds.some(id => subDeptIds.includes(id));
-          
+
           if (!hasSubAccess) {
             return NextResponse.json(
               { error: 'Permission denied - User is not in your department' },
@@ -168,17 +168,17 @@ export async function GET(request) {
     const activityDir = path.join(process.cwd(), 'public', 'activity', targetUserIdStr, dateParam);
     let captures = [];
     const seenPaths = new Set();
-    
+
     // First, get captures from Screenshot model (v3.0.0+ desktop app)
     const dbScreenshots = await Screenshot.find({
       user: targetUserId,
       dateString: dateParam
     }).sort({ capturedAt: 1 }).lean();
-    
+
     for (const ss of dbScreenshots) {
       // Prefer path, then construct from gridfs/screenshot ID
       const displayPath = ss.path || (ss._id ? `/api/activity/screenshot?id=${ss._id}` : null);
-      
+
       if (displayPath) {
         captures.push({
           path: displayPath,
@@ -193,22 +193,22 @@ export async function GET(request) {
         seenPaths.add(ss.path || displayPath);
       }
     }
-    
+
     // Then, also read from filesystem for backward compatibility
     try {
       const files = await readdir(activityDir);
       const imageFiles = files.filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
-      
+
       for (const file of imageFiles) {
         const publicPath = `/activity/${targetUserIdStr}/${dateParam}/${file}`;
-        
+
         // Skip if already in DB results
         if (seenPaths.has(publicPath)) continue;
-        
+
         const filePath = path.join(activityDir, file);
         const fileStat = await stat(filePath);
         const timestamp = parseTimestamp(file);
-        
+
         captures.push({
           path: publicPath,
           filename: file,
@@ -217,7 +217,7 @@ export async function GET(request) {
           date: dateParam
         });
       }
-      
+
       captures.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     } catch {
       // Directory doesn't exist, that's ok if we have DB results
@@ -228,7 +228,7 @@ export async function GET(request) {
     dateStart.setHours(0, 0, 0, 0);
     const dateEnd = new Date(dateParam);
     dateEnd.setHours(23, 59, 59, 999);
-    
+
     const sessions = await ProductivitySession.find({
       user: targetUserId,
       date: { $gte: dateStart, $lte: dateEnd }
@@ -266,8 +266,8 @@ export async function GET(request) {
         user: userInfo ? {
           _id: userInfo._id,
           email: userInfo.email,
-          name: userInfo.employeeId ? 
-            `${userInfo.employeeId.firstName} ${userInfo.employeeId.lastName}` : 
+          name: userInfo.employeeId ?
+            `${userInfo.employeeId.firstName} ${userInfo.employeeId.lastName}` :
             userInfo.email,
           employeeCode: userInfo.employeeId?.employeeCode,
           role: userInfo.role,

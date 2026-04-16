@@ -118,7 +118,7 @@ export async function GET(request, context) {
       messages: messagesWithReplies,
       _participants: chat.participants.map(p => p.toString()),
       cachedAt,
-    }, MESSAGES_CACHE_TTL).catch(() => {})
+    }, MESSAGES_CACHE_TTL).catch(() => { })
 
     // If incremental, filter to only new messages
     if (isIncremental) {
@@ -250,7 +250,7 @@ export async function POST(request, context) {
       userId: 'shared',
       namespace: `chat:messages:${chatId}`,
     })
-    deleteCache(cacheKey).catch(() => {})
+    deleteCache(cacheKey).catch(() => { })
 
     // Populate the new message
     const updatedChat = await Chat.findById(chatId)

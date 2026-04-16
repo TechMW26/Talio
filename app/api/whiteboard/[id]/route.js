@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
     // Get employee ID from user
     const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     let employeeId = userRecord?.employeeId
-    
+
     if (!employeeId) {
       const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
       employeeId = employee?._id
@@ -84,7 +84,7 @@ export async function PUT(request, { params }) {
     // Get employee ID from user
     const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     let employeeId = userRecord?.employeeId
-    
+
     if (!employeeId) {
       const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
       employeeId = employee?._id
@@ -121,7 +121,7 @@ export async function PUT(request, { params }) {
     if (data !== undefined) whiteboard.data = data;
     if (isPublic !== undefined) whiteboard.isPublic = isPublic;
     if (sharedWith !== undefined) whiteboard.sharedWith = sharedWith;
-    
+
     // Handle thumbnail upload
     if (thumbnail !== undefined) {
       // Upload to GridFS if thumbnail is base64
@@ -193,7 +193,7 @@ export async function DELETE(request, { params }) {
     // Get employee ID from user
     const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     let employeeId = userRecord?.employeeId
-    
+
     if (!employeeId) {
       const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
       employeeId = employee?._id

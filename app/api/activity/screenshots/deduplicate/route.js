@@ -190,7 +190,7 @@ export async function POST(request) {
     let sessionsUpdated = 0;
     try {
       const { ProductivitySession } = await getTenantModels(auth.tenant.databaseName, ['ProductivitySession']);
-      
+
       // Collect all deleted ImageKit file IDs and paths for matching
       // Collect GridFS file IDs from deleted duplicates for session cleanup
       const deletedGridfsIds = new Set();
@@ -201,7 +201,7 @@ export async function POST(request) {
           }
         }
       }
-      
+
       if (deletedGridfsIds.size > 0) {
         // Find sessions that reference any of the deleted gridfs fileIds
         const affectedSessions = await ProductivitySession.find({

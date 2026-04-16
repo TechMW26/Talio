@@ -470,8 +470,8 @@ export default function ProductivityPage() {
                     setEmployeeSessions([])
                   }}
                   className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${activeTab === 'my'
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
                   <HiOutlineUser className="w-5 h-5" />
@@ -486,8 +486,8 @@ export default function ProductivityPage() {
                   setEmployeeSessions([])
                 }}
                 className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${activeTab === 'team'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
               >
                 <HiOutlineUsers className="w-5 h-5" />
@@ -546,8 +546,8 @@ export default function ProductivityPage() {
           <button
             onClick={() => setViewMode('sessions')}
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${viewMode === 'sessions'
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             <HiOutlineSquares2X2 className="w-5 h-5" />
@@ -556,8 +556,8 @@ export default function ProductivityPage() {
           <button
             onClick={() => setViewMode('raw')}
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${viewMode === 'raw'
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             <HiOutlinePhoto className="w-5 h-5" />
@@ -567,8 +567,8 @@ export default function ProductivityPage() {
             <button
               onClick={() => setViewMode('manual')}
               className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${viewMode === 'manual'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
             >
               <HiOutlineCamera className="w-5 h-5" />
@@ -1037,7 +1037,7 @@ export default function ProductivityPage() {
                                 <div className="flex items-center gap-1">
                                   <HiOutlineTrophy className="w-5 h-5 text-amber-500" />
                                   <span className={`font-bold ${member.sessionsSummary.averageScore >= 70 ? 'text-green-600' :
-                                      member.sessionsSummary.averageScore >= 40 ? 'text-amber-600' : 'text-red-600'
+                                    member.sessionsSummary.averageScore >= 40 ? 'text-amber-600' : 'text-red-600'
                                     }`}>
                                     {member.sessionsSummary.averageScore}%
                                   </span>
@@ -1237,10 +1237,10 @@ export default function ProductivityPage() {
                       <div className="grid grid-cols-3 gap-3">
                         {/* Main Productivity Score */}
                         <div className={`p-3 rounded-xl text-center ${selectedSession.analysis.score >= 70 ? 'bg-green-50 border border-green-200' :
-                            selectedSession.analysis.score >= 40 ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'
+                          selectedSession.analysis.score >= 40 ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'
                           }`}>
                           <span className={`text-2xl font-bold ${selectedSession.analysis.score >= 70 ? 'text-green-600' :
-                              selectedSession.analysis.score >= 40 ? 'text-amber-600' : 'text-red-600'
+                            selectedSession.analysis.score >= 40 ? 'text-amber-600' : 'text-red-600'
                             }`}>
                             {selectedSession.analysis.score || '--'}
                           </span>
@@ -1250,10 +1250,10 @@ export default function ProductivityPage() {
                         {/* Focus Score */}
                         {selectedSession.analysis.focusScore != null && (
                           <div className={`p-3 rounded-xl text-center ${selectedSession.analysis.focusScore >= 70 ? 'bg-blue-50 border border-blue-200' :
-                              selectedSession.analysis.focusScore >= 40 ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'
+                            selectedSession.analysis.focusScore >= 40 ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'
                             }`}>
                             <span className={`text-2xl font-bold ${selectedSession.analysis.focusScore >= 70 ? 'text-blue-600' :
-                                selectedSession.analysis.focusScore >= 40 ? 'text-amber-600' : 'text-red-600'
+                              selectedSession.analysis.focusScore >= 40 ? 'text-amber-600' : 'text-red-600'
                               }`}>
                               {selectedSession.analysis.focusScore}
                             </span>
@@ -1264,10 +1264,10 @@ export default function ProductivityPage() {
                         {/* Task Completion */}
                         {selectedSession.analysis.taskCompletionIndicators != null && (
                           <div className={`p-3 rounded-xl text-center ${selectedSession.analysis.taskCompletionIndicators >= 70 ? 'bg-primary-50 border border-primary-200' :
-                              selectedSession.analysis.taskCompletionIndicators >= 40 ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'
+                            selectedSession.analysis.taskCompletionIndicators >= 40 ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'
                             }`}>
                             <span className={`text-2xl font-bold ${selectedSession.analysis.taskCompletionIndicators >= 70 ? 'text-primary-600' :
-                                selectedSession.analysis.taskCompletionIndicators >= 40 ? 'text-amber-600' : 'text-red-600'
+                              selectedSession.analysis.taskCompletionIndicators >= 40 ? 'text-amber-600' : 'text-red-600'
                               }`}>
                               {selectedSession.analysis.taskCompletionIndicators}
                             </span>
@@ -1297,8 +1297,8 @@ export default function ProductivityPage() {
                             </h4>
                             {selectedSession.analysis.taskRelativity.score !== null && (
                               <span className={`px-3 py-1 rounded-full text-sm font-semibold ${selectedSession.analysis.taskRelativity.score >= 70 ? 'bg-green-100 text-green-700' :
-                                  selectedSession.analysis.taskRelativity.score >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-red-100 text-red-700'
+                                selectedSession.analysis.taskRelativity.score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
                                 }`}>
                                 {selectedSession.analysis.taskRelativity.score}%
                               </span>
@@ -1509,8 +1509,8 @@ export default function ProductivityPage() {
                               <div className="flex-1 bg-gray-200 rounded-full h-2">
                                 <div
                                   className={`h-2 rounded-full ${selectedSession.analysis.overallAssessment.genuineWorkPercentage >= 70 ? 'bg-green-500' :
-                                      selectedSession.analysis.overallAssessment.genuineWorkPercentage >= 50 ? 'bg-yellow-500' :
-                                        'bg-red-500'
+                                    selectedSession.analysis.overallAssessment.genuineWorkPercentage >= 50 ? 'bg-yellow-500' :
+                                      'bg-red-500'
                                     }`}
                                   style={{ width: `${selectedSession.analysis.overallAssessment.genuineWorkPercentage}%` }}
                                 />
@@ -1572,9 +1572,9 @@ export default function ProductivityPage() {
                               <span
                                 key={idx}
                                 className={`px-3 py-1 rounded-full text-xs font-medium ${app.productivityImpact === 'positive' || app.category === 'work' || app.category === 'development' ? 'bg-green-100 text-green-700' :
-                                    app.productivityImpact === 'negative' || app.category === 'entertainment' ? 'bg-red-100 text-red-700' :
-                                      app.category === 'communication' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-gray-100 text-gray-700'
+                                  app.productivityImpact === 'negative' || app.category === 'entertainment' ? 'bg-red-100 text-red-700' :
+                                    app.category === 'communication' ? 'bg-blue-100 text-blue-700' :
+                                      'bg-gray-100 text-gray-700'
                                   }`}
                               >
                                 {app.name} {(app.duration || app.estimatedMinutes) ? `(${app.duration || app.estimatedMinutes}m)` : ''}
@@ -1593,8 +1593,8 @@ export default function ProductivityPage() {
                               <span
                                 key={idx}
                                 className={`px-3 py-1 rounded-full text-xs font-medium ${site.category === 'work' || site.category === 'research' ? 'bg-blue-100 text-blue-700' :
-                                    site.category === 'social' || site.category === 'entertainment' ? 'bg-red-100 text-red-700' :
-                                      'bg-gray-100 text-gray-700'
+                                  site.category === 'social' || site.category === 'entertainment' ? 'bg-red-100 text-red-700' :
+                                    'bg-gray-100 text-gray-700'
                                   }`}
                               >
                                 {site.domain} {site.estimatedMinutes ? `(${site.estimatedMinutes}m)` : ''}

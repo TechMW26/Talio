@@ -96,7 +96,7 @@ async function syncScreenshotsToSessions(userId, date, models) {
   const sessions = [];
   let currentGroup = [];
   let windowStart = null;
-  
+
   for (const ss of screenshots) {
     const t = new Date(ss.timestamp).getTime();
     if (windowStart === null) {

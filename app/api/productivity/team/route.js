@@ -19,29 +19,29 @@ export async function GET(request) {
 
     const currentUserId = (user._id || user.userId).toString();
     const currentUserRole = user.role;
-    
+
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
     const departmentFilter = searchParams.get('department'); // Department filter for admin/HR
     const teamFilter = searchParams.get('team'); // Team filter
     const date = new Date(dateParam);
     const dateEnd = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-    
+
     // Get current user with employee info
     const currentUser = await User.findById(currentUserId)
       .select('role employeeId isDepartmentHead headOfDepartments')
       .populate('employeeId');
-    
+
     const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
-    
+
     let teamMembers = [];
     let departmentName = null;
     let departments = [];
-    
+
     if (isAdminOrHR) {
       // Admin/HR can see all employees, optionally filtered by department
       let employeeQuery = { status: 'active' };
-      
+
       // Apply department filter if specified
       if (departmentFilter && departmentFilter !== 'all') {
         employeeQuery.department = departmentFilter;
@@ -50,24 +50,24 @@ export async function GET(request) {
       } else {
         departmentName = 'All Departments';
       }
-      
+
       const employees = await Employee.find(employeeQuery)
         .select('firstName lastName email profilePicture department designation userId')
         .populate('department', 'name')
         .populate('designation', 'title')
         .lean();
-      
+
       // Filter only employees with userId
       teamMembers = employees.filter(e => e.userId).map(e => ({
         ...e,
         user: e.userId // Map userId to user for consistency
       }));
-      
+
       console.log(`[Team API] Admin/HR viewing ${teamMembers.length} employees from ${departmentName}`);
     } else {
       // Check if user is department head - support multiple departments
       const currentEmployeeId = currentUser?.employeeId?._id;
-      
+
       if (!currentEmployeeId) {
         return NextResponse.json({
           success: true,
@@ -75,7 +75,7 @@ export async function GET(request) {
           message: 'No employee profile linked'
         });
       }
-      
+
       let departmentIds = [];
 
       // First check User.headOfDepartments (supports multiple departments)
@@ -83,7 +83,7 @@ export async function GET(request) {
         departmentIds = currentUser.headOfDepartments.map(d => d.toString());
         departments = await Department.find({ _id: { $in: departmentIds }, isActive: true }).lean();
       }
-      
+
       // Fallback: Check Department.head or Department.heads
       if (departmentIds.length === 0) {
         departments = await Department.find({
@@ -136,7 +136,7 @@ export async function GET(request) {
           }
         }
       }
-      
+
       if (departmentIds.length === 0 && teamMembers.length === 0) {
         return NextResponse.json({
           success: true,
@@ -145,7 +145,7 @@ export async function GET(request) {
           message: 'You are not a department head or team leader'
         });
       }
-      
+
       // Department head flow: filter by department
       if (departmentIds.length > 0) {
         // Apply department filter if specified and user is authorized for that department
@@ -161,13 +161,13 @@ export async function GET(request) {
             }, { status: 403 });
           }
         } else {
-          departmentName = departments.length > 1 
-            ? departments.map(d => d.name).join(', ') 
+          departmentName = departments.length > 1
+            ? departments.map(d => d.name).join(', ')
             : departments[0]?.name || 'Department';
         }
-        
+
         // Get all employees in filtered/all departments user heads
-        const employees = await Employee.find({ 
+        const employees = await Employee.find({
           status: 'active',
           $or: [
             { department: { $in: departmentIds } },
@@ -178,15 +178,15 @@ export async function GET(request) {
           .populate('department', 'name')
           .populate('designation', 'title')
           .lean();
-        
+
         console.log(`[Team API] Found ${employees.length} employees in department(s) ${departmentName}`);
-        
+
         // Filter only employees with userId and map for consistency
         teamMembers = employees.filter(e => e.userId).map(e => ({
           ...e,
           user: e.userId // Map userId to user for consistency
         }));
-        
+
         console.log(`[Team API] ${teamMembers.length} employees have userId linked`);
       }
       // Team leader flow: teamMembers already populated above
@@ -203,25 +203,25 @@ export async function GET(request) {
         teamMembers = teamMembers.filter(m => teamMemberIds.has(m._id.toString()));
       }
     }
-    
+
     // === OPTIMIZED: Batch fetch all sessions in ONE query instead of N queries ===
     // Collect all userIds and employeeIds upfront
     const allUserIds = [];
     const allEmployeeIds = [];
     const memberMap = new Map(); // Map to quickly look up members by userId/employeeId
-    
+
     teamMembers.forEach(member => {
       const userId = (member.user._id || member.user).toString();
       const employeeId = member._id.toString();
-      
+
       allUserIds.push(userId);
       allEmployeeIds.push(employeeId);
-      
+
       // Store member by both userId and employeeId for fast lookup
       memberMap.set(`user:${userId}`, member);
       memberMap.set(`emp:${employeeId}`, member);
     });
-    
+
     // Single batched query for ALL sessions
     const allSessions = await ProductivitySession.find({
       $or: [
@@ -230,18 +230,18 @@ export async function GET(request) {
       ],
       date: { $gte: date, $lt: dateEnd }
     }).select('user employee sessionNumber screenshotCount screenshots analysis startTime endTime').lean();
-    
+
     console.log(`[Team API] Fetched ${allSessions.length} sessions in single batched query`);
 
     // Fallback source: raw screenshots for users whose sessions are not yet synced
     const rawScreenshots = Screenshot
       ? await Screenshot.find({
-          user: { $in: allUserIds },
-          dateString: dateParam
-        })
-          .select('user path capturedAt gridfsFileId')
-          .sort({ capturedAt: -1 })
-          .lean()
+        user: { $in: allUserIds },
+        dateString: dateParam
+      })
+        .select('user path capturedAt gridfsFileId')
+        .sort({ capturedAt: -1 })
+        .lean()
       : [];
 
     const screenshotsByUser = new Map();
@@ -262,20 +262,20 @@ export async function GET(request) {
         bucket.latestPreview = shot.path || (shot.gridfsFileId ? `/api/activity/screenshot?id=${shot._id}` : null);
       }
     });
-    
+
     // Group sessions by member (using userId or employeeId)
     const sessionsByMember = new Map();
-    
+
     // Initialize empty arrays for all members
     teamMembers.forEach(member => {
       const memberId = member._id.toString();
       sessionsByMember.set(memberId, []);
     });
-    
+
     // Assign sessions to their respective members
     allSessions.forEach(session => {
       let memberId = null;
-      
+
       // Try to match by user first
       if (session.user) {
         const userIdStr = session.user.toString();
@@ -284,7 +284,7 @@ export async function GET(request) {
           memberId = member._id.toString();
         }
       }
-      
+
       // If not matched by user, try by employee
       if (!memberId && session.employee) {
         const empIdStr = session.employee.toString();
@@ -293,28 +293,28 @@ export async function GET(request) {
           memberId = member._id.toString();
         }
       }
-      
+
       // Add session to member's list
       if (memberId && sessionsByMember.has(memberId)) {
         sessionsByMember.get(memberId).push(session);
       }
     });
-    
+
     // Process each member with their pre-fetched sessions (no more N queries!)
     const teamWithSessions = teamMembers.map(member => {
       const userId = member.user._id || member.user;
       const memberId = member._id.toString();
-      
+
       // Get pre-fetched sessions for this member
       const sessions = sessionsByMember.get(memberId) || [];
       const fallbackShots = screenshotsByUser.get(userId.toString()) || { count: 0, latestPreview: null };
-      
+
       // Calculate average score
       const analyzedSessions = sessions.filter(s => s.analysis?.isAnalyzed && s.analysis?.score != null);
       const avgScore = analyzedSessions.length > 0
         ? Math.round(analyzedSessions.reduce((sum, s) => sum + s.analysis.score, 0) / analyzedSessions.length)
         : null;
-      
+
       // Get first screenshot URL from each session for preview
       const sessionsWithPreview = sessions.map(s => ({
         _id: s._id,
@@ -349,7 +349,7 @@ export async function GET(request) {
       const totalScreenshots = sessions.length > 0
         ? sessions.reduce((sum, s) => sum + (s.screenshotCount || 0), 0)
         : fallbackShots.count;
-      
+
       return {
         _id: member._id,
         firstName: member.firstName,
@@ -368,7 +368,7 @@ export async function GET(request) {
         }
       };
     });
-    
+
     // Sort by average score (highest first), then by total sessions
     teamWithSessions.sort((a, b) => {
       if (a.sessionsSummary.averageScore !== null && b.sessionsSummary.averageScore !== null) {
@@ -378,15 +378,15 @@ export async function GET(request) {
       if (b.sessionsSummary.averageScore !== null) return 1;
       return b.sessionsSummary.totalSessions - a.sessionsSummary.totalSessions;
     });
-    
+
     console.log(`[Team API] Returning ${teamWithSessions.length} team members for ${departmentName}`);
-    
+
     // Build departments list for filter (only for multi-department heads)
     let availableDepartments = [];
     if (!isAdminOrHR && departments && departments.length > 1) {
       availableDepartments = departments.map(d => ({ _id: d._id, name: d.name, code: d.code }));
     }
-    
+
     return NextResponse.json({
       success: true,
       data: teamWithSessions,
@@ -395,7 +395,7 @@ export async function GET(request) {
       departments: availableDepartments,
       totalMembers: teamWithSessions.length
     });
-    
+
   } catch (error) {
     console.error('Get team sessions error:', error);
     return NextResponse.json(

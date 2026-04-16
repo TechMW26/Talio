@@ -43,7 +43,7 @@ export default function AadhaarVerificationSection({
 
   const frontInputRef = useRef(null)
   const backInputRef = useRef(null)
-  
+
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading()
 

@@ -255,7 +255,7 @@ async function deduplicateTenant(tenantConn, tenantName) {
         const groups = [];
         let currentGroup = [];
         let windowStart = null;
-        
+
         for (const ss of remaining) {
           const t = new Date(ss.capturedAt).getTime();
           if (windowStart === null) {
