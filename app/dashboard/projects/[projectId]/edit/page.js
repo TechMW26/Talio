@@ -229,9 +229,9 @@ export default function EditProjectPage() {
   // Filter by member search query
   const filteredAvailableEmployees = memberSearch.trim()
     ? availableEmployees.filter(emp => {
-        const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
-        return fullName.includes(memberSearch.trim().toLowerCase())
-      })
+      const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
+      return fullName.includes(memberSearch.trim().toLowerCase())
+    })
     : availableEmployees
 
   // Group available employees by department
@@ -607,10 +607,10 @@ export default function EditProjectPage() {
                               }
                             }}
                             className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors ${allSelected
-                                ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
-                                : someSelected
-                                  ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                              : someSelected
+                                ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                           >
                             <FaCheckSquare className={`w-3 h-3 ${allSelected ? 'text-primary-600' : someSelected ? 'text-blue-500' : 'text-gray-400'}`} />
