@@ -23,6 +23,7 @@ export default function EditProjectPage() {
   const [searchHead, setSearchHead] = useState('')
   const [selectedNewMembers, setSelectedNewMembers] = useState([])
   const [expandedMemberDepts, setExpandedMemberDepts] = useState({})
+  const [memberSearch, setMemberSearch] = useState('')
   const [expandedHeadDepts, setExpandedHeadDepts] = useState({})
 
   // --- useMemo: user ---
@@ -225,9 +226,17 @@ export default function EditProjectPage() {
     emp._id !== form.projectHead
   )
 
+  // Filter by member search query
+  const filteredAvailableEmployees = memberSearch.trim()
+    ? availableEmployees.filter(emp => {
+        const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
+        return fullName.includes(memberSearch.trim().toLowerCase())
+      })
+    : availableEmployees
+
   // Group available employees by department
   const employeesByDept = {}
-  availableEmployees.forEach(emp => {
+  filteredAvailableEmployees.forEach(emp => {
     const deptName = emp.department?.name || 'No Department'
     if (!employeesByDept[deptName]) {
       employeesByDept[deptName] = []
@@ -544,11 +553,22 @@ export default function EditProjectPage() {
                   <h3 className="text-lg font-semibold">Add Team Members</h3>
                 </div>
                 <button
-                  onClick={() => { setShowAddMemberModal(false); setSelectedNewMembers([]) }}
+                  onClick={() => { setShowAddMemberModal(false); setSelectedNewMembers([]); setMemberSearch('') }}
                   className="p-2 hover:bg-gray-100 rounded-lg"
                 >
                   <FaTimes />
                 </button>
+              </div>
+
+              <div className="px-4 pt-3 pb-2 border-b border-gray-200 flex-shrink-0">
+                <input
+                  type="text"
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder="Search employees by name..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                  autoFocus
+                />
               </div>
 
               <div className="p-4 overflow-y-auto flex-1">
@@ -643,7 +663,7 @@ export default function EditProjectPage() {
 
               <div className="p-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
                 <Button
-                  onPress={() => { setShowAddMemberModal(false); setSelectedNewMembers([]) }}
+                  onPress={() => { setShowAddMemberModal(false); setSelectedNewMembers([]); setMemberSearch('') }}
                   variant="flat"
                 >
                   Cancel
