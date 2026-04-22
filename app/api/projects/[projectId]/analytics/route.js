@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { checkProjectAccess, getProjectTaskStats } from '@/lib/projectService'
 import { generateSmartContent } from '@/lib/promptEngine'
+import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // Allow up to 60 seconds for AI processing
@@ -44,7 +45,7 @@ export async function GET(request, { params }) {
     }
 
     // Get all members
-    const members = await ProjectMember.find({ 
+    const members = await ProjectMember.find({
       project: projectId,
       invitationStatus: 'accepted'
     }).populate('user', 'firstName lastName profilePicture email department')
@@ -136,7 +137,7 @@ export async function POST(request, { params }) {
     // Generate AI insights using Gemini with previous context
     try {
       const insights = await generateAIInsights(analyticsData, user._id, previousInsights)
-      
+
       // Store the new insights in project metadata for future reference
       await Project.findByIdAndUpdate(projectId, {
         $set: {
@@ -151,7 +152,7 @@ export async function POST(request, { params }) {
           'metadata.lastAIInsightsDate': new Date()
         }
       })
-      
+
       return NextResponse.json({
         success: true,
         insights,
@@ -166,8 +167,8 @@ export async function POST(request, { params }) {
     }
   } catch (error) {
     console.error('Generate AI insights error:', error)
-    return NextResponse.json({ 
-      success: false, 
+    return NextResponse.json({
+      success: false,
       message: error.message,
       insights: generateRuleBasedInsights(null)
     }, { status: 500 })
@@ -178,7 +179,7 @@ export async function POST(request, { params }) {
 function calculateMemberAnalytics(members, tasks, taskAssigneeMap) {
   const memberStats = members.map(member => {
     const memberId = member.user._id.toString()
-    
+
     let tasksAssigned = 0
     let tasksCompleted = 0
     let tasksInProgress = 0
@@ -189,28 +190,28 @@ function calculateMemberAnalytics(members, tasks, taskAssigneeMap) {
     let completedEstimatedHours = 0
 
     Object.entries(taskAssigneeMap).forEach(([taskId, assigneeList]) => {
-      const isAssigned = assigneeList.some(a => 
+      const isAssigned = assigneeList.some(a =>
         a.user._id.toString() === memberId && a.assignmentStatus === 'accepted'
       )
-      
+
       if (isAssigned) {
         const task = tasks.find(t => t._id.toString() === taskId)
         if (task) {
           tasksAssigned++
-          
+
           if (task.status === 'completed') {
             tasksCompleted++
             completedEstimatedHours += task.estimatedHours || 0
           } else if (task.status === 'in-progress') {
             tasksInProgress++
           }
-          
+
           if (task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed') {
             tasksOverdue++
           }
-          
+
           totalEstimatedHours += task.estimatedHours || 0
-          
+
           // Subtask stats
           if (task.subtasks && task.subtasks.length > 0) {
             subtasksTotal += task.subtasks.length
@@ -256,30 +257,30 @@ function calculateMemberAnalytics(members, tasks, taskAssigneeMap) {
 // Calculate productivity score
 function calculateProductivityScore(completed, assigned, overdue, subtasksCompleted, subtasksTotal) {
   if (assigned === 0) return 0
-  
+
   let score = 0
-  
+
   // Task completion rate (50% weight)
   score += (completed / assigned) * 50
-  
+
   // On-time delivery bonus (25% weight)
   const onTimeRate = assigned > 0 ? ((assigned - overdue) / assigned) : 1
   score += onTimeRate * 25
-  
+
   // Subtask completion rate (25% weight)
   if (subtasksTotal > 0) {
     score += (subtasksCompleted / subtasksTotal) * 25
   } else {
     score += 25 // Give full points if no subtasks
   }
-  
+
   return Math.round(score)
 }
 
 // Calculate task analytics
 function calculateTaskAnalytics(tasks) {
   const now = new Date()
-  
+
   const statusDistribution = {
     todo: 0,
     'in-progress': 0,
@@ -321,7 +322,7 @@ function calculateTaskAnalytics(tasks) {
     if (task.dueDate) {
       const dueDate = new Date(task.dueDate)
       const daysUntilDue = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24))
-      
+
       if (daysUntilDue < 0 && task.status !== 'completed') {
         overdueCount++
       } else if (daysUntilDue >= 0 && daysUntilDue <= 3 && task.status !== 'completed') {
@@ -357,8 +358,8 @@ function calculateTaskAnalytics(tasks) {
   })
 
   // Calculate average completion time
-  avgCompletionTime = completedWithTimeData > 0 
-    ? Math.round(avgCompletionTime / completedWithTimeData) 
+  avgCompletionTime = completedWithTimeData > 0
+    ? Math.round(avgCompletionTime / completedWithTimeData)
     : 0
 
   // Generate daily progress for last 30 days
@@ -395,7 +396,7 @@ function calculateTaskAnalytics(tasks) {
 function calculateSubtaskStats(tasks) {
   let totalSubtasks = 0
   let completedSubtasks = 0
-  
+
   tasks.forEach(task => {
     if (task.subtasks && task.subtasks.length > 0) {
       totalSubtasks += task.subtasks.length
@@ -425,9 +426,9 @@ function generateBurndownData(tasks) {
   // Generate data points for each day
   for (let d = new Date(minDate); d <= maxDate; d.setDate(d.getDate() + 1)) {
     const dateStr = d.toISOString().split('T')[0]
-    
+
     // Count tasks completed on this day
-    const completedOnDay = tasks.filter(t => 
+    const completedOnDay = tasks.filter(t =>
       t.completedAt && new Date(t.completedAt).toISOString().split('T')[0] === dateStr
     ).length
 
@@ -518,8 +519,8 @@ function calculateCompletionPrediction(project, tasks, taskAnalytics) {
   const velocity = completedTasks / elapsedDays
 
   // Estimate days needed for remaining tasks
-  let estimatedDaysRemaining = velocity > 0 
-    ? Math.ceil(remainingTasks / velocity) 
+  let estimatedDaysRemaining = velocity > 0
+    ? Math.ceil(remainingTasks / velocity)
     : remainingTasks * 3 // Default: 3 days per task if no velocity
 
   // Factor in estimated hours
@@ -527,7 +528,7 @@ function calculateCompletionPrediction(project, tasks, taskAnalytics) {
     const remainingHours = taskAnalytics.totalEstimatedHours - taskAnalytics.completedEstimatedHours
     const hoursPerDay = 6 // Assume 6 productive hours per day
     const etaBasedDays = Math.ceil(remainingHours / hoursPerDay)
-    
+
     // Blend velocity and ETA based estimates
     estimatedDaysRemaining = Math.ceil((estimatedDaysRemaining + etaBasedDays) / 2)
   }
@@ -577,7 +578,7 @@ function calculateCompletionPrediction(project, tasks, taskAnalytics) {
 function generateBasicSummary(project, tasks, memberAnalytics, taskAnalytics, completionPrediction) {
   const completedTasks = tasks.filter(t => t.status === 'completed').length
   const topPerformer = memberAnalytics[0]
-  
+
   return {
     overview: `Project has ${tasks.length} total tasks with ${completedTasks} completed (${project.completionPercentage || 0}% complete).`,
     teamSize: memberAnalytics.length,
@@ -668,15 +669,15 @@ async function generateAIInsights(analyticsData, userId, previousInsights = null
     const daysElapsed = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24))
     const isOverdue = daysUntilDeadline < 0
     const deadlineUrgency = isOverdue ? 'OVERDUE' : daysUntilDeadline <= 3 ? 'CRITICAL' : daysUntilDeadline <= 7 ? 'URGENT' : daysUntilDeadline <= 14 ? 'APPROACHING' : 'COMFORTABLE'
-    
+
     // Calculate expected completion % based on time elapsed
     const expectedCompletion = Math.min(100, Math.round((daysElapsed / totalProjectDays) * 100))
     const completionGap = expectedCompletion - (project.completionPercentage || 0)
-    
+
     // Calculate task density (tasks per team member)
     const tasksPerMember = memberAnalytics.length > 0 ? (taskAnalytics.total / memberAnalytics.length).toFixed(1) : 0
     const isUnderdeveloped = taskAnalytics.total < 5 || tasksPerMember < 2
-    
+
     // Calculate team utilization
     const membersWithTasks = memberAnalytics.filter(m => m.stats.tasksAssigned > 0).length
     const underutilizedMembers = memberAnalytics.length - membersWithTasks
@@ -742,9 +743,9 @@ TASK HEALTH:
 TEAM UTILIZATION (${memberAnalytics.length} members):
 - Members with tasks: ${membersWithTasks}
 - Underutilized (0 tasks): ${underutilizedMembers} ${underutilizedMembers > 0 ? '⚠️ WASTED CAPACITY' : '✓'}
-${memberAnalytics.slice(0, 8).map(m => 
-  `• ${m.member.firstName} ${m.member.lastName}: ${m.stats.tasksAssigned} assigned, ${m.stats.tasksCompleted} done, ${m.stats.tasksOverdue} overdue`
-).join('\n')}
+${memberAnalytics.slice(0, 8).map(m =>
+      `• ${m.member.firstName} ${m.member.lastName}: ${m.stats.tasksAssigned} assigned, ${m.stats.tasksCompleted} done, ${m.stats.tasksOverdue} overdue`
+    ).join('\n')}
 
 PROJECTION: ${completionPrediction.status} | Confidence: ${completionPrediction.confidence}%
 
@@ -795,11 +796,7 @@ Respond with ONLY valid JSON. healthScore and healthStatus MUST be consistent (c
 }`
 
     const text = await generateSmartContent(prompt, { userId, feature: 'project-analytics' });
-    
-    // Clean up markdown code blocks if present
-    const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim()
-    
-    return JSON.parse(jsonStr)
+    return parseAIJsonResponse(text, { expectedRoot: 'object' })
   } catch (error) {
     console.error('Error generating AI insights:', error)
     return generateRuleBasedInsights(analyticsData)

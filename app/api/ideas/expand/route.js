@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { generateContent } from '@/lib/gemini';
+import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 
 /**
  * POST /api/ideas/expand
@@ -57,12 +58,8 @@ Please respond in the following JSON format:
       const text = await generateContent(prompt, systemInstruction);
 
       if (text) {
-        // Extract JSON from response
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          expansion = JSON.parse(jsonMatch[0]);
-          console.log('[Ideas Expand] Successfully parsed AI response');
-        }
+        expansion = parseAIJsonResponse(text, { expectedRoot: 'object' });
+        console.log('[Ideas Expand] Successfully parsed AI response');
       }
     } catch (aiError) {
       console.log('[Ideas Expand] AI expansion failed:', aiError.message);

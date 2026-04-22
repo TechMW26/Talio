@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { generateContent } from '@/lib/gemini';
+import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 
 /**
  * GET /api/dashboard/ai-insights
@@ -119,12 +120,7 @@ Rules:
     let aiInsights = [];
     try {
       const aiResponse = await generateContent(dataContext, systemPrompt);
-      // Parse JSON from response, handling possible markdown wrapping
-      let cleaned = aiResponse.trim();
-      if (cleaned.startsWith('```')) {
-        cleaned = cleaned.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '');
-      }
-      aiInsights = JSON.parse(cleaned);
+      aiInsights = parseAIJsonResponse(aiResponse, { expectedRoot: 'array' });
     } catch {
       // Fallback insights if AI fails
       aiInsights = [

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
+import { enrichPersistedProductivityAnalysis } from '@/lib/productivityAnalysisResult';
 
 const SESSION_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
 
@@ -243,13 +244,21 @@ export async function GET(request) {
       }
     }).sort({ startTime: -1 }); // Sort by latest session first
 
+    const normalizedSessions = dbSessions.map((sessionDoc) => {
+      const session = sessionDoc.toObject ? sessionDoc.toObject() : sessionDoc;
+      if (session.analysis?.isAnalyzed) {
+        session.analysis = enrichPersistedProductivityAnalysis(session.analysis);
+      }
+      return session;
+    });
+
     return NextResponse.json({
       success: true,
-      data: dbSessions,
+      data: normalizedSessions,
       date: dateParam,
       userId: targetUserId,
-      totalSessions: dbSessions.length,
-      totalScreenshots: dbSessions.reduce((sum, s) => sum + s.screenshotCount, 0)
+      totalSessions: normalizedSessions.length,
+      totalScreenshots: normalizedSessions.reduce((sum, s) => sum + s.screenshotCount, 0)
     });
 
   } catch (error) {

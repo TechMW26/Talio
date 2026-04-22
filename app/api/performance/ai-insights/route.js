@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { generateSmartContent } from '@/lib/promptEngine'
+import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export async function POST(request) {
 
     // Allow access for admins, HR, managers, and check if user is a department head
     const allowedRoles = ['admin', 'hr', 'department_head', 'manager']
-    
+
     // Always allow if user has an allowed role
     if (!allowedRoles.includes(user.role)) {
       // For other roles, check if they are a department head
@@ -25,7 +26,7 @@ export async function POST(request) {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         const checkHeadData = await checkHeadRes.json()
-        
+
         if (!checkHeadData.success || !checkHeadData.isDepartmentHead) {
           return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
         }
@@ -74,9 +75,9 @@ Performance Data:
 - Engagement Score: ${reportData.engagementScore}/100
 
 Top 5 Departments:
-${reportData.departmentPerformance.slice(0, 5).map(dept => 
-  `${dept.department}: Score ${dept.avgScore}, Rating ${dept.avgRating}, Goals ${dept.goalCompletion}%`
-).join('\n')}
+${reportData.departmentPerformance.slice(0, 5).map(dept =>
+      `${dept.department}: Score ${dept.avgScore}, Rating ${dept.avgRating}, Goals ${dept.goalCompletion}%`
+    ).join('\n')}
 
 Return ONLY the JSON object, nothing else.`
 
@@ -87,12 +88,10 @@ Return ONLY the JSON object, nothing else.`
         skipRefinement: true, // Structured prompt
         skipGuardrails: true // We want JSON
       });
-      
+
       let insights;
       try {
-        // Clean up potential markdown code blocks
-        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        insights = JSON.parse(cleanText);
+        insights = parseAIJsonResponse(text, { expectedRoot: 'object' });
       } catch (e) {
         console.error('Failed to parse AI JSON:', e);
         insights = parseInsights(text, reportData);
@@ -132,7 +131,7 @@ function parseInsights(text, reportData) {
   sections.forEach(section => {
     const lowerSection = section.toLowerCase();
     const cleaned = section.replace(/\*\*(.*?)\*\*/g, '$1').replace(/^#+\s*/gm, '').trim();
-    
+
     if (lowerSection.includes('strength') || lowerSection.includes('positive')) {
       strengths = extractBullets(cleaned);
     } else if (lowerSection.includes('improvement') || lowerSection.includes('challenge') || lowerSection.includes('concern')) {
@@ -173,7 +172,7 @@ function generateRuleBasedInsights(reportData) {
 
 function generateStrengthsArray(data) {
   const strengths = [];
-  
+
   if (parseFloat(data.avgPerformanceScore) >= 75) {
     strengths.push(`Performance score of ${data.avgPerformanceScore}/100 exceeds benchmark`);
   }
@@ -199,7 +198,7 @@ function generateStrengthsArray(data) {
 
 function generateImprovementsArray(data) {
   const improvements = [];
-  
+
   if (parseFloat(data.innovationScore) < 70) {
     improvements.push(`Innovation score at ${data.innovationScore}/100 needs focus`);
   }
@@ -222,7 +221,7 @@ function generateImprovementsArray(data) {
 
 function generateRecommendationsArray(data) {
   const recommendations = [];
-  
+
   if (parseFloat(data.innovationScore) < 70) {
     recommendations.push('Launch quarterly innovation workshops');
   }
@@ -245,17 +244,17 @@ function generatePredictionsArray(data) {
   const predictions = [];
   const avgScore = parseFloat(data.avgPerformanceScore);
   const engagement = parseFloat(data.engagementScore);
-  
+
   if (avgScore >= 75 && engagement >= 70) {
     predictions.push('Expect 5-10% performance uplift next quarter');
   } else if (avgScore < 60) {
     predictions.push('Risk of further decline without intervention');
   }
-  
+
   if (parseFloat(data.goalCompletionRate) >= 80) {
     predictions.push('High goal achievement likely to continue');
   }
-  
+
   if (engagement < 60) {
     predictions.push('Attrition risk may increase in 3-6 months');
   }
@@ -265,7 +264,7 @@ function generatePredictionsArray(data) {
 
 function generateRiskAlertsArray(data) {
   const risks = [];
-  
+
   if (parseFloat(data.engagementScore) < 50) {
     risks.push('Critical: Low engagement may cause attrition spike');
   }
@@ -282,18 +281,18 @@ function generateRiskAlertsArray(data) {
 
 function generateQuickWinsArray(data) {
   const quickWins = [];
-  
+
   quickWins.push('Send recognition to top performers this week');
-  
+
   if (parseFloat(data.goalCompletionRate) < 90) {
     quickWins.push('Review incomplete goals and remove blockers');
   }
-  
+
   const topDept = data.departmentPerformance[0];
   if (topDept) {
     quickWins.push(`Share ${topDept.department} best practices with other teams`);
   }
-  
+
   quickWins.push('Schedule 1-on-1s with struggling employees');
 
   return quickWins.slice(0, 4);

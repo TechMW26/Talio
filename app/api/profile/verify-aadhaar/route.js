@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { generateVisionContent } from '@/lib/gemini'
+import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -154,13 +155,7 @@ Important:
         { mimeType: backMime, data: backImageData }
       ])
 
-      // Parse the JSON response
-      const jsonMatch = response.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        ocrResult = JSON.parse(jsonMatch[0])
-      } else {
-        throw new Error('Invalid OCR response format')
-      }
+      ocrResult = parseAIJsonResponse(response, { expectedRoot: 'object' })
     } catch (error) {
       console.error('[OCR] Gemini Vision error:', error)
 

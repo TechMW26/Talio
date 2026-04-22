@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { getTenantModels } from '@/lib/tenantModels';
-import { readFile, unlink, rmdir } from 'fs/promises';
+import { unlink, rmdir } from 'fs/promises';
 import path from 'path';
-import { generateVisionContent, generateContent } from '@/lib/gemini';
+import { generateVisionContent } from '@/lib/gemini';
+import { parseProductivityAnalysisResponse } from '@/lib/productivityAnalysisResult';
+import { loadScreenshotsForAnalysisBatch } from '@/lib/productivityScreenshotLoader';
 
 import { deleteScreenshots as deleteGridFSScreenshots } from '@/lib/gridfs';
 
@@ -20,13 +22,13 @@ export async function POST(request, { params }) {
     console.log(`[ProductivityAnalysis] Starting analysis for session: ${sessionId}`);
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Task', 'TaskAssignee', 'Project'])
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Task', 'TaskAssignee', 'Project', 'Screenshot'])
     if (!auth.success) {
       console.log(`[ProductivityAnalysis] Auth failed: ${auth.message}`);
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { ProductivitySession, User, Task, TaskAssignee, Project } = models
+    const { ProductivitySession, User, Task, TaskAssignee, Project, Screenshot } = models
 
     const currentUserId = user._id || user.userId;
     const currentUserRole = user.role;
@@ -284,67 +286,23 @@ export async function POST(request, { params }) {
     const selectedScreenshots = selectedIndices.map(i => screenshots[i]);
 
     // Load images - handle both URLs and local filesystem paths
-    const images = [];
-    const screenshotSummaries = [];
+    const { loaded: loadedScreenshots, errors: screenshotLoadErrors } = await loadScreenshotsForAnalysisBatch(
+      selectedScreenshots,
+      { ScreenshotModel: Screenshot }
+    );
 
-    for (const screenshot of selectedScreenshots) {
-      try {
-        let base64;
-        let mimeType = 'image/jpeg'; // Default
-        // Support both url and path fields
-        const screenshotUrl = screenshot.url || screenshot.path;
-
-        if (!screenshotUrl) {
-          console.warn(`[ProductivityAnalysis] Screenshot missing url/path:`, screenshot);
-          continue;
-        }
-
-        // Check if it's a URL or filesystem path
-        if (screenshotUrl.startsWith('http://') || screenshotUrl.startsWith('https://') || screenshotUrl.startsWith('/api/')) {
-          // Fetch image from URL
-          console.log(`[ProductivityAnalysis] Fetching image from URL: ${screenshotUrl}`);
-          const response = await fetch(screenshotUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.status}`);
-          }
-          const arrayBuffer = await response.arrayBuffer();
-          base64 = Buffer.from(arrayBuffer).toString('base64');
-
-          // Determine mime type from URL or content-type header
-          const contentType = response.headers.get('content-type');
-          if (contentType) {
-            mimeType = contentType.split(';')[0];
-          } else if (screenshotUrl.endsWith('.webp')) {
-            mimeType = 'image/webp';
-          } else if (screenshotUrl.endsWith('.png')) {
-            mimeType = 'image/png';
-          }
-        } else if (screenshotUrl) {
-          // Load from filesystem (legacy)
-          const imagePath = path.join(process.cwd(), 'public', screenshotUrl);
-          const imageBuffer = await readFile(imagePath);
-          base64 = imageBuffer.toString('base64');
-          mimeType = screenshotUrl.endsWith('.webp') ? 'image/webp' : 'image/png';
-        } else {
-          throw new Error('No valid screenshot URL or path');
-        }
-
-        images.push({
-          mimeType,
-          data: base64
-        });
-
-        screenshotSummaries.push({
-          screenshotPath: screenshotUrl,
-          timestamp: screenshot.capturedAt || screenshot.timestamp,
-          summary: '',
-          activity: '',
-          productivity: ''
-        });
-      } catch (error) {
-        console.error(`Failed to load image ${screenshot.url || screenshot.path}:`, error.message);
-      }
+    for (const { screenshot, error } of screenshotLoadErrors) {
+      console.error(`Failed to load image ${screenshot?.url || screenshot?.path}:`, error?.message || error);
     }
+
+    const images = loadedScreenshots.map(({ image }) => image);
+    const screenshotSummaries = loadedScreenshots.map(({ screenshot }) => ({
+      screenshotPath: screenshot.url || screenshot.path,
+      timestamp: screenshot.capturedAt || screenshot.timestamp,
+      summary: '',
+      activity: '',
+      productivity: ''
+    }));
 
     if (images.length === 0) {
       return NextResponse.json(
@@ -462,9 +420,16 @@ PATTERN ANALYSIS:
 
 RESPOND WITH ONLY THIS JSON (no markdown, no code blocks):
 
+OUTPUT RULES:
+- Do NOT omit any keys. Use [] or null when you are unsure.
+- Keep the summary detailed but concise: 2 short paragraphs, maximum 140 words total.
+- Keep achievements, suggestions, insights, concerns, and redFlags to the 3-4 most important items.
+- Keep applications, websites, and workCategories to the 5 most relevant items.
+- Include one screenshotAnalysis entry for each analyzed screenshot, but keep each summary to one concise sentence.
+
 {
   "sessionTitle": "<SHORT_2_TO_4_WORD_NAME_FOR_SESSION>",
-  "summary": "Detailed 2-3 paragraph analysis. Be SPECIFIC about what was observed. Note any concerns about productivity patterns. Mention specific apps/sites seen.",
+  "summary": "Detailed 2 short paragraph analysis. Be specific about what was observed and mention the most important apps/sites seen.",
   "score": <STRICTLY_CALCULATED_0_TO_100>,
   "focusScore": <0_TO_100_BASED_ON_CONTEXT_SWITCHING_AND_DISTRACTIONS>,
   "taskCompletionIndicators": <0_TO_100_EVIDENCE_OF_ACTUAL_WORK_COMPLETED>,
@@ -534,6 +499,7 @@ RESPOND WITH ONLY THIS JSON (no markdown, no code blocks):
     "taskAlignmentPercentage": <PERCENTAGE_OF_WORK_RELATED_TO_TASKS>,
     "strengths": ["What was done well"],
     "majorConcerns": ["Direct concerns if any"],
+    "areasForImprovement": ["Most important improvements needed"],
     "recommendation": "One sentence honest recommendation"
   }
 }
@@ -561,122 +527,31 @@ CRITICAL REMINDERS:
         throw new Error('Empty response from AI');
       }
 
-      // Parse JSON from response - handle markdown code blocks
-      let jsonText = responseText.trim();
-
-      // Remove markdown code block wrappers if present
-      const codeBlockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (codeBlockMatch) {
-        jsonText = codeBlockMatch[1].trim();
-        console.log(`[ProductivityAnalysis] Extracted JSON from markdown code block`);
-      }
-
-      // Try to parse the entire response as JSON first
       try {
-        analysisResult = JSON.parse(jsonText);
-        console.log(`[ProductivityAnalysis] Direct JSON parse succeeded`);
-      } catch (directParseError) {
-        console.log(`[ProductivityAnalysis] Direct parse failed, trying to fix truncated JSON...`);
-
-        // Find JSON object using regex
-        let jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-
-        if (jsonMatch) {
-          let jsonCandidate = jsonMatch[0];
-
-          // Try to fix truncated JSON by closing unclosed structures
-          try {
-            analysisResult = JSON.parse(jsonCandidate);
-            console.log(`[ProductivityAnalysis] Regex JSON parse succeeded`);
-          } catch (parseError) {
-            console.log(`[ProductivityAnalysis] JSON appears truncated, attempting repair...`);
-
-            // Count unclosed brackets/braces
-            let openBraces = (jsonCandidate.match(/\{/g) || []).length;
-            let closeBraces = (jsonCandidate.match(/\}/g) || []).length;
-            let openBrackets = (jsonCandidate.match(/\[/g) || []).length;
-            let closeBrackets = (jsonCandidate.match(/\]/g) || []).length;
-
-            // Try to extract key fields even from truncated JSON
-            const summaryMatch = jsonCandidate.match(/"summary"\s*:\s*"([^"]+(?:\\.[^"]*)*?)"/);
-            const scoreMatch = jsonCandidate.match(/"score"\s*:\s*(\d+)/);
-            const focusScoreMatch = jsonCandidate.match(/"focusScore"\s*:\s*(\d+)/);
-            const achievementsMatch = jsonCandidate.match(/"achievements"\s*:\s*\[(.*?)\]/s);
-            const suggestionsMatch = jsonCandidate.match(/"suggestions"\s*:\s*\[(.*?)\]/s);
-            const insightsMatch = jsonCandidate.match(/"insights"\s*:\s*\[(.*?)\]/s);
-
-            if (summaryMatch && scoreMatch) {
-              // Build a valid JSON from extracted fields
-              console.log(`[ProductivityAnalysis] Extracting key fields from truncated response`);
-
-              const parseArrayField = (match) => {
-                if (!match) return [];
-                try {
-                  const arrContent = match[1].trim();
-                  if (!arrContent) return [];
-                  // Try to parse the array content
-                  const parsed = JSON.parse(`[${arrContent}]`);
-                  return Array.isArray(parsed) ? parsed : [];
-                } catch {
-                  // Extract strings manually
-                  const strings = match[1].match(/"([^"]+)"/g);
-                  return strings ? strings.map(s => s.replace(/"/g, '')) : [];
-                }
-              };
-
-              analysisResult = {
-                summary: summaryMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n'),
-                score: parseInt(scoreMatch[1], 10),
-                focusScore: focusScoreMatch ? parseInt(focusScoreMatch[1], 10) : null,
-                achievements: parseArrayField(achievementsMatch),
-                suggestions: parseArrayField(suggestionsMatch),
-                insights: parseArrayField(insightsMatch),
-                _repaired: true
-              };
-              console.log(`[ProductivityAnalysis] Repaired JSON with score: ${analysisResult.score}`);
-            } else {
-              console.error(`[ProductivityAnalysis] Cannot repair JSON:`, parseError.message);
-              console.log(`[ProductivityAnalysis] Truncated at:`, jsonCandidate.substring(jsonCandidate.length - 200));
-              throw new Error('Invalid JSON in AI response: ' + parseError.message);
-            }
-          }
+        analysisResult = parseProductivityAnalysisResponse(responseText);
+        if (analysisResult._repaired) {
+          console.log('[ProductivityAnalysis] Repaired or normalized AI JSON response');
         } else {
-          console.error(`[ProductivityAnalysis] No JSON object found in response`);
-          console.log(`[ProductivityAnalysis] Full response:`, jsonText.substring(0, 1000));
-
-          // Check if this is a policy/refusal response from the AI
-          const lowerResponse = jsonText.toLowerCase();
-          const isRefusal = lowerResponse.includes('unable to') ||
-            lowerResponse.includes('cannot analyze') ||
-            lowerResponse.includes('cannot process') ||
-            lowerResponse.includes('cannot identify') ||
-            lowerResponse.includes("can't analyze") ||
-            lowerResponse.includes("i'm sorry") ||
-            lowerResponse.includes('policy');
-
-          if (isRefusal) {
-            console.log(`[ProductivityAnalysis] AI refused to analyze - likely content policy issue`);
-            throw new Error('AI_POLICY_REFUSAL: The AI service could not process these images. This may be due to content policies. Please try again or contact support.');
-          }
-
-          throw new Error('Invalid AI response format - no JSON found');
+          console.log('[ProductivityAnalysis] Direct JSON parse succeeded');
         }
-      }
+      } catch (parseError) {
+        const lowerResponse = responseText.toLowerCase();
+        const isRefusal = lowerResponse.includes('unable to') ||
+          lowerResponse.includes('cannot analyze') ||
+          lowerResponse.includes('cannot process') ||
+          lowerResponse.includes('cannot identify') ||
+          lowerResponse.includes("can't analyze") ||
+          lowerResponse.includes("i'm sorry") ||
+          lowerResponse.includes('policy');
 
-      // Validate required fields
-      if (typeof analysisResult.score !== 'number' || analysisResult.score < 0 || analysisResult.score > 100) {
-        console.warn(`[ProductivityAnalysis] Score is invalid:`, analysisResult.score);
-        // Try to estimate from summary keywords
-        const summary = (analysisResult.summary || '').toLowerCase();
-        if (summary.includes('highly productive') || summary.includes('excellent') || summary.includes('exceptional')) {
-          analysisResult.score = 85;
-        } else if (summary.includes('productive') || summary.includes('good') || summary.includes('focused')) {
-          analysisResult.score = 70;
-        } else if (summary.includes('moderate') || summary.includes('average')) {
-          analysisResult.score = 55;
-        } else {
-          analysisResult.score = 60; // Conservative default
+        if (isRefusal) {
+          console.log('[ProductivityAnalysis] AI refused to analyze - likely content policy issue');
+          throw new Error('AI_POLICY_REFUSAL: The AI service could not process these images. This may be due to content policies. Please try again or contact support.');
         }
+
+        console.error('[ProductivityAnalysis] Failed to parse AI response:', parseError.message);
+        console.log('[ProductivityAnalysis] Raw response preview:', responseText.substring(0, 1000));
+        throw new Error('Invalid JSON in AI response: ' + parseError.message);
       }
 
       console.log(`[ProductivityAnalysis] Analysis complete. Score: ${analysisResult.score}, Summary length: ${analysisResult.summary?.length || 0}`);
@@ -686,6 +561,9 @@ CRITICAL REMINDERS:
 
       // Check if this is a policy refusal
       const isPolicyRefusal = aiError.message?.includes('AI_POLICY_REFUSAL');
+      const isNetworkFailure = aiError.message?.includes('Custom AI service unreachable') ||
+        aiError.message?.includes('ECONNREFUSED') ||
+        aiError.message?.includes('fetch failed');
 
       // DON'T mark as analyzed if AI completely failed - let user retry
       // Return error response without saving
@@ -694,7 +572,9 @@ CRITICAL REMINDERS:
           success: false,
           error: isPolicyRefusal
             ? 'AI could not analyze these screenshots due to content policies. The screenshots may contain content that triggered safety filters. Please try again later.'
-            : 'AI analysis failed. Please try again later.',
+            : isNetworkFailure
+              ? 'Custom AI service is currently unreachable. Please try again later.'
+              : 'AI analysis failed. Please try again later.',
           details: aiError.message?.replace('AI_POLICY_REFUSAL: ', '') || 'Unknown error',
           retryable: true,
           isPolicyRefusal

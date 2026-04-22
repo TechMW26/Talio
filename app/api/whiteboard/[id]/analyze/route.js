@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
 import { generateContent, generateVisionContent } from '@/lib/gemini';
+import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 import { generateSmartContent } from '@/lib/promptEngine';
 
 export const maxDuration = 60;
@@ -338,7 +339,10 @@ Be genuinely helpful and insightful rather than just describing what you see. Sh
           userId: user._id || user.userId,
           feature: 'whiteboard-analyze',
           metadata: { whiteboardId: id },
-          skipRefinement: true // Prompt is already highly structured
+          skipRefinement: true,
+          skipContext: true,
+          skipSaveContext: true,
+          skipGuardrails: true
         });
       }
       summary = cleanAIResponse(summary);
@@ -399,7 +403,10 @@ ${hasScreenshot ? 'I can see your canvas now. ' : ''}Respond helpfully and natur
           userId: user._id || user.userId,
           feature: 'whiteboard-chat',
           systemInstruction: context,
-          metadata: { whiteboardId: id }
+          metadata: { whiteboardId: id },
+          skipContext: true,
+          skipSaveContext: true,
+          skipGuardrails: true
         });
       }
       response = cleanAIResponse(response);
@@ -660,46 +667,13 @@ Return ONLY this JSON structure (no markdown, no explanation):
         const aiResponse = await generateSmartContent(generatePrompt, {
           userId: user._id || user.userId,
           feature: 'whiteboard-generate',
-          skipRefinement: true // Prompt is already highly structured
+          skipRefinement: true,
+          skipContext: true,
+          skipSaveContext: true,
+          skipGuardrails: true
         });
 
-        // Extract JSON from response - more robust parsing
-        let jsonStr = aiResponse.trim();
-
-        // Remove markdown code blocks
-        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
-        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
-        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
-        jsonStr = jsonStr.trim();
-
-        // Try to find JSON object in the response
-        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonStr = jsonMatch[0];
-        }
-
-        let parsed;
-        try {
-          parsed = JSON.parse(jsonStr);
-        } catch (e) {
-          // Try to extract just the array if the response is malformed
-          const arrayMatch = jsonStr.match(/\[[\s\S]*?\]/);
-          if (arrayMatch) {
-            try {
-              parsed = { elements: JSON.parse(arrayMatch[0]), hasMore: false };
-            } catch (e2) {
-              // Last resort: try to fix common JSON issues
-              let fixedJson = jsonStr
-                .replace(/,\s*}/g, '}')  // Remove trailing commas in objects
-                .replace(/,\s*\]/g, ']') // Remove trailing commas in arrays
-                .replace(/'/g, '"')      // Replace single quotes with double
-                .replace(/(\w+):/g, '"$1":'); // Quote unquoted keys
-              parsed = JSON.parse(fixedJson);
-            }
-          } else {
-            throw new Error('Could not parse AI response as JSON');
-          }
-        }
+        const parsed = parseAIJsonResponse(aiResponse, { expectedRoot: 'any' });
 
         const generatedElements = Array.isArray(parsed) ? parsed : (parsed.elements || parsed);
         const hasMore = parsed.hasMore || false;
@@ -913,36 +887,13 @@ Return ONLY valid JSON:
         const aiResponse = await generateSmartContent(continuePrompt, {
           userId: user._id || user.userId,
           feature: 'whiteboard-continue',
-          skipRefinement: true
+          skipRefinement: true,
+          skipContext: true,
+          skipSaveContext: true,
+          skipGuardrails: true
         });
 
-        let jsonStr = aiResponse.trim();
-        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
-        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
-        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
-        jsonStr = jsonStr.trim();
-
-        // Try to find JSON object
-        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonStr = jsonMatch[0];
-        }
-
-        let parsed;
-        try {
-          parsed = JSON.parse(jsonStr);
-        } catch (e) {
-          const arrayMatch = jsonStr.match(/\[[\s\S]*?\]/);
-          if (arrayMatch) {
-            try {
-              parsed = { elements: JSON.parse(arrayMatch[0]), hasMore: false };
-            } catch (e2) {
-              throw new Error('Failed to parse continuation response');
-            }
-          } else {
-            throw new Error('No valid JSON found in continuation response');
-          }
-        }
+        const parsed = parseAIJsonResponse(aiResponse, { expectedRoot: 'any' });
 
         const generatedElements = Array.isArray(parsed) ? parsed : (parsed.elements || parsed);
         const hasMore = parsed.hasMore || false;
@@ -1086,16 +1037,13 @@ Return ONLY valid JSON array. No explanations.`;
         const aiResponse = await generateSmartContent(restructurePrompt, {
           userId: user._id || user.userId,
           feature: 'whiteboard-restructure',
-          skipRefinement: true
+          skipRefinement: true,
+          skipContext: true,
+          skipSaveContext: true,
+          skipGuardrails: true
         });
 
-        let jsonStr = aiResponse.trim();
-        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
-        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
-        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
-        jsonStr = jsonStr.trim();
-
-        const restructuredObjects = JSON.parse(jsonStr);
+        const restructuredObjects = parseAIJsonResponse(aiResponse, { expectedRoot: 'array' });
 
         if (!Array.isArray(restructuredObjects)) {
           throw new Error('Restructured content is not an array');
@@ -1161,7 +1109,7 @@ Return ONLY valid JSON array. No explanations.`;
       }
 
       const templateType = body.templateType || 'mindmap';
-      
+
       // Enhanced template-specific structure definitions - DYNAMIC with no hardcoded limits
       const templateStructures = {
         mindmap: {
@@ -1598,32 +1546,10 @@ Return ONLY this JSON structure (no markdown, no explanation):
       // ═══════════════════════════════════════════════════════════════
       const MAX_RETRIES = 3;
       const RETRY_DELAY = 1000; // ms
-      
+
       const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-      
-      const parseAIResponse = (response) => {
-        let jsonStr = response.trim();
-        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
-        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
-        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
-        jsonStr = jsonStr.trim();
 
-        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-        if (jsonMatch) jsonStr = jsonMatch[0];
-
-        try {
-          return JSON.parse(jsonStr);
-        } catch (e) {
-          // Try to fix common JSON issues
-          let fixedJson = jsonStr
-            .replace(/,\s*}/g, '}')
-            .replace(/,\s*\]/g, ']')
-            .replace(/[\r\n]+/g, ' ')
-            .replace(/\n/g, '\\n')
-            .replace(/\t/g, '\\t');
-          return JSON.parse(fixedJson);
-        }
-      };
+      const parseAIResponse = (response) => parseAIJsonResponse(response, { expectedRoot: 'object' });
 
       let preparedContent = null;
       let lastError = null;
@@ -1632,11 +1558,14 @@ Return ONLY this JSON structure (no markdown, no explanation):
       while (retryCount < MAX_RETRIES && !preparedContent) {
         try {
           console.log(`[MIRA] Content generation attempt ${retryCount + 1}/${MAX_RETRIES} for ${templateType}...`);
-          
+
           const aiResponse = await generateSmartContent(preparePrompt, {
             userId: user._id || user.userId,
             feature: 'whiteboard-prepare',
-            skipRefinement: true
+            skipRefinement: true,
+            skipContext: true,
+            skipSaveContext: true,
+            skipGuardrails: true
           });
 
           if (!aiResponse || aiResponse.trim().length === 0) {
@@ -1644,16 +1573,16 @@ Return ONLY this JSON structure (no markdown, no explanation):
           }
 
           preparedContent = parseAIResponse(aiResponse);
-          
+
           // Validate the parsed content
           if (!preparedContent.sections || !Array.isArray(preparedContent.sections)) {
             throw new Error('Invalid content structure - missing sections array');
           }
-          
+
           if (preparedContent.sections.length === 0) {
             throw new Error('Invalid content structure - empty sections');
           }
-          
+
           // ═══════════════════════════════════════════════════════════════
           // VALIDATE ITEM COUNTS - Reject if too few items per section
           // ═══════════════════════════════════════════════════════════════
@@ -1661,11 +1590,11 @@ Return ONLY this JSON structure (no markdown, no explanation):
           const sectionsWithTooFewItems = preparedContent.sections.filter(
             s => (s.items?.length || 0) < MIN_ITEMS_PER_SECTION
           );
-          
+
           if (sectionsWithTooFewItems.length > 0) {
             const itemCounts = preparedContent.sections.map(s => s.items?.length || 0);
             const avgItems = itemCounts.reduce((a, b) => a + b, 0) / itemCounts.length;
-            
+
             // If average is below 7, reject and retry
             if (avgItems < 7) {
               console.warn(`[MIRA] Insufficient item density: avg ${avgItems.toFixed(1)} items/section. Sections: ${itemCounts.join(', ')}`);
@@ -1675,15 +1604,15 @@ Return ONLY this JSON structure (no markdown, no explanation):
               console.warn(`[MIRA] Some sections have fewer than ${MIN_ITEMS_PER_SECTION} items: ${sectionsWithTooFewItems.map(s => `${s.title}: ${s.items?.length || 0}`).join(', ')}`);
             }
           }
-          
+
           const totalItems = preparedContent.sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
           console.log(`[MIRA] Successfully generated content with ${preparedContent.sections.length} sections, ${totalItems} total items (avg ${(totalItems / preparedContent.sections.length).toFixed(1)}/section)`);
-          
+
         } catch (error) {
           lastError = error;
           retryCount++;
           console.error(`[MIRA] Attempt ${retryCount} failed:`, error.message);
-          
+
           if (retryCount < MAX_RETRIES) {
             console.log(`[MIRA] Retrying in ${RETRY_DELAY}ms...`);
             await sleep(RETRY_DELAY * retryCount); // Exponential backoff
@@ -1733,7 +1662,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
 
         // Store in whiteboard for persistence across sessions (legacy field)
         whiteboard.aiAnalysis.agentPreparedContent = preparedContent;
-        
+
         // Also store in new agentContent structure for history
         if (!whiteboard.aiAnalysis.agentContent) {
           whiteboard.aiAnalysis.agentContent = {
@@ -1741,12 +1670,12 @@ Return ONLY this JSON structure (no markdown, no explanation):
             generations: []
           };
         }
-        
+
         // Check if this is an update to existing unpotted content or new content
         const existingUnplottedIdx = whiteboard.aiAnalysis.agentContent.generations.findIndex(
           g => !g.isPlotted && g.templateType === templateType
         );
-        
+
         const generationRecord = {
           id: prepareId,
           templateType,
@@ -1759,7 +1688,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
           createdAt: new Date(),
           updatedAt: new Date()
         };
-        
+
         if (existingUnplottedIdx >= 0) {
           // Update existing unplotted content
           whiteboard.aiAnalysis.agentContent.generations[existingUnplottedIdx] = generationRecord;
@@ -1768,7 +1697,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
           whiteboard.aiAnalysis.agentContent.generations.push(generationRecord);
         }
         whiteboard.aiAnalysis.agentContent.currentGenerationId = prepareId;
-        
+
         whiteboard.aiAnalysis.messages.push(
           { role: 'user', content: `Prepare ${templateType}: ${message}`, timestamp: new Date() },
           { role: 'assistant', content: `I've prepared structured content for your ${templateType}. Review and customize it, then click "Start Plotting" when ready.`, timestamp: new Date() }
@@ -1838,19 +1767,13 @@ Return ONLY this JSON structure:
         const aiResponse = await generateSmartContent(expandPrompt, {
           userId: user._id || user.userId,
           feature: 'whiteboard-expand-section',
-          skipRefinement: true
+          skipRefinement: true,
+          skipContext: true,
+          skipSaveContext: true,
+          skipGuardrails: true
         });
 
-        let jsonStr = aiResponse.trim();
-        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
-        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
-        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
-        jsonStr = jsonStr.trim();
-
-        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-        if (jsonMatch) jsonStr = jsonMatch[0];
-
-        const expandedSection = JSON.parse(jsonStr);
+        const expandedSection = parseAIJsonResponse(aiResponse, { expectedRoot: 'object' });
 
         return NextResponse.json({
           success: true,
@@ -1906,19 +1829,13 @@ Return ONLY this JSON structure:
         const aiResponse = await generateSmartContent(regeneratePrompt, {
           userId: user._id || user.userId,
           feature: 'whiteboard-regenerate-section',
-          skipRefinement: true
+          skipRefinement: true,
+          skipContext: true,
+          skipSaveContext: true,
+          skipGuardrails: true
         });
 
-        let jsonStr = aiResponse.trim();
-        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
-        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
-        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
-        jsonStr = jsonStr.trim();
-
-        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-        if (jsonMatch) jsonStr = jsonMatch[0];
-
-        const regeneratedSection = JSON.parse(jsonStr);
+        const regeneratedSection = parseAIJsonResponse(aiResponse, { expectedRoot: 'object' });
 
         return NextResponse.json({
           success: true,
@@ -1970,19 +1887,13 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         const aiResponse = await generateSmartContent(editPrompt, {
           userId: user._id || user.userId,
           feature: 'whiteboard-edit-content',
-          skipRefinement: true
+          skipRefinement: true,
+          skipContext: true,
+          skipSaveContext: true,
+          skipGuardrails: true
         });
 
-        let jsonStr = aiResponse.trim();
-        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
-        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
-        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
-        jsonStr = jsonStr.trim();
-
-        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-        if (jsonMatch) jsonStr = jsonMatch[0];
-
-        const updatedContent = JSON.parse(jsonStr);
+        const updatedContent = parseAIJsonResponse(aiResponse, { expectedRoot: 'object' });
 
         // Update stored content
         whiteboard.aiAnalysis.preparedContent = updatedContent;
@@ -2015,16 +1926,16 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
       // Validate targetPageIndex and ensure the page exists
       const pageIndex = Math.max(0, Math.min(targetPageIndex, whiteboard.pages.length - 1));
-      
+
       // ═══════════════════════════════════════════════════════════════
       // REMOVE PREVIOUS MIRA-GENERATED ELEMENTS (for update/re-plot)
       // ═══════════════════════════════════════════════════════════════
       const existingObjects = whiteboard.pages[pageIndex]?.objects || [];
-      
+
       // Check if this is an update (has previous generation ID or replaceExisting flag)
       const replaceExisting = body.replaceExisting !== false; // Default to true
       const previousGenerationId = body.previousGenerationId || preparedContent.id?.replace('prep-', 'gen-');
-      
+
       // Filter out previous MIRA-generated elements
       let filteredObjects = existingObjects;
       if (replaceExisting) {
@@ -2040,7 +1951,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           console.log(`[MIRA] Removed ${removedCount} previous MIRA-generated elements from page ${pageIndex} for clean re-plot`);
         }
       }
-      
+
       // Analyze layout from remaining (non-MIRA) objects
       const layout = analyzeLayout(filteredObjects);
 
@@ -2070,7 +1981,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       const generateId = () => `mira-${Date.now()}-${currentId++}-${Math.random().toString(36).substr(2, 4)}`;
 
       // ========== COLLISION DETECTION SYSTEM ==========
-      
+
       // Check if two rectangles overlap with padding
       const checkOverlap = (rect1, rect2, padding = 20) => {
         return !(
@@ -2094,7 +2005,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       // Find a valid position for an element, starting from preferred position
       const findValidPosition = (preferredX, preferredY, width, height, padding = 30) => {
         const rect = { x: preferredX, y: preferredY, width, height };
-        
+
         // If no collision at preferred position, use it
         if (!hasCollision(rect, padding)) {
           return { x: preferredX, y: preferredY };
@@ -2103,14 +2014,14 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         // Spiral outward to find valid position
         const spiralStep = 50;
         const maxAttempts = 100;
-        
+
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           const radius = spiralStep * Math.ceil(attempt / 8);
           const angle = (attempt % 8) * (Math.PI / 4);
-          
+
           const testX = preferredX + Math.cos(angle) * radius;
           const testY = preferredY + Math.sin(angle) * radius;
-          
+
           const testRect = { x: testX, y: testY, width, height };
           if (!hasCollision(testRect, padding)) {
             return { x: testX, y: testY };
@@ -2136,7 +2047,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           width: Number(element.width) || (element.type === 'text' ? 100 : element.type === 'sticky' ? 200 : 100),
           height: Number(element.height) || (element.type === 'text' ? 30 : element.type === 'sticky' ? 200 : 50),
         };
-        
+
         // Normalize points array for connectors
         if (normalizedElement.points && Array.isArray(normalizedElement.points)) {
           normalizedElement.points = normalizedElement.points.map(p => ({
@@ -2145,7 +2056,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             y: Number(p.y) || 0,
           }));
         }
-        
+
         if (isConnector) {
           connectorElements.push(normalizedElement);
         } else {
@@ -2164,7 +2075,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       };
 
       // ========== TEXT UTILITIES ==========
-      
+
       const wrapText = (text, maxWidth, fontSize = 14) => {
         if (!text) return '';
         const avgCharWidth = fontSize * 0.52;
@@ -2172,7 +2083,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         const words = String(text).split(' ');
         const lines = [];
         let currentLine = '';
-        
+
         words.forEach(word => {
           if ((currentLine + ' ' + word).trim().length <= charsPerLine) {
             currentLine = (currentLine + ' ' + word).trim();
@@ -2182,7 +2093,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           }
         });
         if (currentLine) lines.push(currentLine);
-        
+
         return lines.slice(0, 6).join('\n'); // Max 6 lines
       };
 
@@ -2192,7 +2103,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       };
 
       // ========== LAYOUT GENERATORS ==========
-      
+
       const layoutGenerators = {
         // ========== MINDMAP LAYOUT ==========
         mindmap: () => {
@@ -2215,10 +2126,10 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const textWidth = 180;
           // Perfect circle: use the larger dimension with extra padding
           const centralSize = Math.max(textWidth + 60, textHeight + 40, 180);
-          
-          const centralPos = findValidPosition(centerX - centralSize/2, centerY - centralSize/2, centralSize, centralSize);
-          const actualCenterX = centralPos.x + centralSize/2;
-          const actualCenterY = centralPos.y + centralSize/2;
+
+          const centralPos = findValidPosition(centerX - centralSize / 2, centerY - centralSize / 2, centralSize, centralSize);
+          const actualCenterX = centralPos.x + centralSize / 2;
+          const actualCenterY = centralPos.y + centralSize / 2;
 
           // Store central node ID for connectors
           const centralNodeId = generateId();
@@ -2242,7 +2153,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const inscribedSize = centralSize * 0.6;
           const textOffsetX = (centralSize - inscribedSize) / 2;
           const textOffsetY = (centralSize - inscribedSize) / 2;
-          
+
           placeElement({
             id: generateId(),
             type: 'text',
@@ -2264,8 +2175,8 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           if (preparedContent.description) {
             const descText = wrapText(preparedContent.description, 300, 12);
             const descHeight = calculateTextHeight(descText, 12);
-            const descPos = findValidPosition(actualCenterX - 160, actualCenterY + centralSize/2 + 20, 320, descHeight);
-            
+            const descPos = findValidPosition(actualCenterX - 160, actualCenterY + centralSize / 2 + 20, 320, descHeight);
+
             placeElement({
               id: generateId(),
               type: 'text',
@@ -2283,14 +2194,14 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
           // 2. PLACE SECTION NODES IN A GRID-LIKE RADIAL PATTERN
           const sectionPositions = [];
-          
+
           // Calculate section positions based on count
           const getOptimalSectionPositions = (count, centerX, centerY, radius) => {
             const positions = [];
-            
+
             if (count <= 4) {
               // Cardinal directions for 4 or fewer
-              const angles = [-Math.PI/2, 0, Math.PI/2, Math.PI]; // Top, Right, Bottom, Left
+              const angles = [-Math.PI / 2, 0, Math.PI / 2, Math.PI]; // Top, Right, Bottom, Left
               for (let i = 0; i < count; i++) {
                 positions.push({
                   angle: angles[i],
@@ -2301,7 +2212,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             } else if (count <= 6) {
               // Hexagonal pattern
               for (let i = 0; i < count; i++) {
-                const angle = (i * 2 * Math.PI / count) - Math.PI/2;
+                const angle = (i * 2 * Math.PI / count) - Math.PI / 2;
                 positions.push({
                   angle,
                   x: centerX + Math.cos(angle) * radius,
@@ -2314,9 +2225,9 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               const outerRadius = radius * 1.2;
               const innerCount = Math.ceil(count / 2);
               const outerCount = count - innerCount;
-              
+
               for (let i = 0; i < innerCount; i++) {
-                const angle = (i * 2 * Math.PI / innerCount) - Math.PI/2;
+                const angle = (i * 2 * Math.PI / innerCount) - Math.PI / 2;
                 positions.push({
                   angle,
                   x: centerX + Math.cos(angle) * innerRadius,
@@ -2325,7 +2236,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 });
               }
               for (let i = 0; i < outerCount; i++) {
-                const angle = (i * 2 * Math.PI / outerCount) - Math.PI/2 + Math.PI/outerCount;
+                const angle = (i * 2 * Math.PI / outerCount) - Math.PI / 2 + Math.PI / outerCount;
                 positions.push({
                   angle,
                   x: centerX + Math.cos(angle) * outerRadius,
@@ -2334,7 +2245,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 });
               }
             }
-            
+
             return positions;
           };
 
@@ -2344,7 +2255,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const color = SECTION_COLORS[sectionIdx % SECTION_COLORS.length];
             const sectionIds = [];
             const optPos = optimalPositions[sectionIdx];
-            
+
             // Section node dimensions - PERFECT CIRCLES with padding
             const sectionTitle = section.title || `Topic ${sectionIdx + 1}`;
             const wrappedSectionTitle = wrapText(sectionTitle, 90, 12);  // Smaller wrap width for padding
@@ -2352,19 +2263,19 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const textHeight = titleLines * 12 * 1.4 + 40;
             // Perfect circle: use fixed size with extra padding
             const sectionSize = Math.max(140, textHeight + 30, 140);
-            
+
             // Find valid position for section node
             const sectionPos = findValidPosition(
-              optPos.x - sectionSize/2,
-              optPos.y - sectionSize/2,
+              optPos.x - sectionSize / 2,
+              optPos.y - sectionSize / 2,
               sectionSize,
               sectionSize,
               40
             );
-            
-            const sectionCenterX = sectionPos.x + sectionSize/2;
-            const sectionCenterY = sectionPos.y + sectionSize/2;
-            
+
+            const sectionCenterX = sectionPos.x + sectionSize / 2;
+            const sectionCenterY = sectionPos.y + sectionSize / 2;
+
             sectionPositions.push({
               x: sectionCenterX,
               y: sectionCenterY,
@@ -2395,7 +2306,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const inscribedSize = sectionSize * 0.6;
             const textOffsetX = (sectionSize - inscribedSize) / 2;
             const textOffsetY = (sectionSize - inscribedSize) / 2;
-            
+
             placeElement({
               id: generateId(),
               type: 'text',
@@ -2416,39 +2327,39 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             // 3. PLACE ALL ITEMS FOR THIS SECTION - NO LIMIT
             const items = section.items || [];
             const itemCount = items.length; // No limit - use all items
-            
+
             if (itemCount > 0) {
               // Determine item placement direction based on section position
               const angleFromCenter = Math.atan2(sectionCenterY - actualCenterY, sectionCenterX - actualCenterX);
-              
+
               // Items fan out in direction away from center - expand spread for more items
               const spreadAngle = Math.min(Math.PI / 2, Math.PI / 6 + (itemCount * Math.PI / 40));
               const itemStartAngle = angleFromCenter - spreadAngle / 2;
               const itemEndAngle = angleFromCenter + spreadAngle / 2;
               const itemAngleStep = itemCount > 1 ? (itemEndAngle - itemStartAngle) / (itemCount - 1) : 0;
-              
+
               // Place items in expanding rings if there are many
               const itemsPerRing = 8;
               items.forEach((item, itemIdx) => {
                 const itemText = wrapText(item, 180, 13);
                 const stickyWidth = 200;
                 const stickyHeight = Math.max(90, calculateTextHeight(itemText, 13) + 30);
-                
+
                 // Calculate ring and position within ring
                 const ring = Math.floor(itemIdx / itemsPerRing);
                 const posInRing = itemIdx % itemsPerRing;
                 const ringItemCount = Math.min(itemsPerRing, itemCount - ring * itemsPerRing);
-                
+
                 // Calculate preferred position with expanding rings
                 const ringAngleStep = ringItemCount > 1 ? (itemEndAngle - itemStartAngle) / (ringItemCount - 1) : 0;
                 const itemAngle = ringItemCount === 1 ? angleFromCenter : itemStartAngle + ringAngleStep * posInRing;
                 const itemDistance = 200 + ring * 120 + (posInRing % 2) * 40; // Expand outward for each ring
-                const preferredX = sectionCenterX + Math.cos(itemAngle) * itemDistance - stickyWidth/2;
-                const preferredY = sectionCenterY + Math.sin(itemAngle) * itemDistance - stickyHeight/2;
-                
+                const preferredX = sectionCenterX + Math.cos(itemAngle) * itemDistance - stickyWidth / 2;
+                const preferredY = sectionCenterY + Math.sin(itemAngle) * itemDistance - stickyHeight / 2;
+
                 // Find valid position
                 const itemPos = findValidPosition(preferredX, preferredY, stickyWidth, stickyHeight, 25);
-                
+
                 const itemId = generateId();
                 sectionIds.push(itemId);
                 placeElement({
@@ -2468,9 +2379,9 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 });
 
                 // Queue connector from section to item (placed later) - using dynamic connector
-                const itemCenterX = itemPos.x + stickyWidth/2;
-                const itemCenterY = itemPos.y + stickyHeight/2;
-                
+                const itemCenterX = itemPos.x + stickyWidth / 2;
+                const itemCenterY = itemPos.y + stickyHeight / 2;
+
                 connectorElements.push({
                   id: generateId(),
                   type: 'connector',
@@ -2502,7 +2413,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 200,
                 summaryHeight
               );
-              
+
               placeElement({
                 id: generateId(),
                 type: 'text',
@@ -2548,15 +2459,15 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const conclusionText = wrapText(preparedContent.conclusion, 320, 14);
             const conclusionWidth = 360;
             const conclusionHeight = Math.max(100, calculateTextHeight(conclusionText, 14) + 50);
-            
+
             // Place below everything
             let maxY = actualCenterY;
             for (const placed of placedElements) {
               maxY = Math.max(maxY, placed.y + placed.height);
             }
-            
-            const conclusionPos = findValidPosition(actualCenterX - conclusionWidth/2, maxY + 60, conclusionWidth, conclusionHeight);
-            
+
+            const conclusionPos = findValidPosition(actualCenterX - conclusionWidth / 2, maxY + 60, conclusionWidth, conclusionHeight);
+
             placeElement({
               id: generateId(),
               type: 'sticky',
@@ -2584,7 +2495,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const stepHeight = 90;
           const gapY = 120;
           const branchOffsetX = 300;
-          
+
           let currentY = baseY;
           let mainFlowX = baseX + 400;
 
@@ -2592,7 +2503,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const titleText = preparedContent.title || 'Process Flow';
           const wrappedTitle = wrapText(titleText, 350, 22);
           const titlePos = findValidPosition(mainFlowX - 200, currentY, 400, 50);
-          
+
           placeElement({
             id: generateId(),
             type: 'text',
@@ -2611,14 +2522,14 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           // 2. PLACE START NODE
           const startWidth = 140;
           const startHeight = 60;
-          const startPos = findValidPosition(mainFlowX - startWidth/2, currentY, startWidth, startHeight);
-          const startCenterX = startPos.x + startWidth/2;
-          const startCenterY = startPos.y + startHeight/2;
-          
+          const startPos = findValidPosition(mainFlowX - startWidth / 2, currentY, startWidth, startHeight);
+          const startCenterX = startPos.x + startWidth / 2;
+          const startCenterY = startPos.y + startHeight / 2;
+
           // Store start node ID for connectors
           const startNodeId = generateId();
           const startGroupId = `start-${Date.now()}`;
-          
+
           placeElement({
             id: startNodeId,
             type: 'ellipse',
@@ -2649,7 +2560,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             groupId: startGroupId
           });
 
-          currentY = startPos.y + startHeight + gapY/2;
+          currentY = startPos.y + startHeight + gapY / 2;
           let prevElementId = startNodeId;
           let prevCenterX = startCenterX;
           let prevBottomY = startPos.y + startHeight;
@@ -2661,17 +2572,17 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const color = SECTION_COLORS[sectionIdx % SECTION_COLORS.length];
             const sectionIds = [];
             const isDecision = section.type === 'decisions' || section.title?.toLowerCase().includes('decision');
-            
+
             if (isDecision) {
               // DECISION DIAMOND
               const diamondSize = 140;
-              const diamondPos = findValidPosition(mainFlowX - diamondSize/2, currentY, diamondSize, diamondSize);
-              const diamondCenterX = diamondPos.x + diamondSize/2;
-              const diamondCenterY = diamondPos.y + diamondSize/2;
-              
+              const diamondPos = findValidPosition(mainFlowX - diamondSize / 2, currentY, diamondSize, diamondSize);
+              const diamondCenterX = diamondPos.x + diamondSize / 2;
+              const diamondCenterY = diamondPos.y + diamondSize / 2;
+
               const decisionId = generateId();
               sectionIds.push(decisionId);
-              
+
               placeElement({
                 id: decisionId,
                 type: 'diamond',
@@ -2690,7 +2601,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 id: generateId(),
                 type: 'text',
                 x: diamondPos.x + 20,
-                y: diamondPos.y + diamondSize/2 - 15,
+                y: diamondPos.y + diamondSize / 2 - 15,
                 text: decisionTitle,
                 fontSize: 12,
                 fontWeight: 'bold',
@@ -2723,14 +2634,14 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
               // Branch items (Yes/No paths)
               const items = section.items || ['Yes path', 'No path'];
-              
+
               // Yes branch (right)
               if (items[0]) {
                 const yesBranchText = wrapText(items[0], 140, 12);
                 const yesWidth = 160;
                 const yesHeight = Math.max(70, calculateTextHeight(yesBranchText, 12) + 20);
-                const yesPos = findValidPosition(diamondCenterX + branchOffsetX - yesWidth/2, diamondCenterY - yesHeight/2, yesWidth, yesHeight);
-                
+                const yesPos = findValidPosition(diamondCenterX + branchOffsetX - yesWidth / 2, diamondCenterY - yesHeight / 2, yesWidth, yesHeight);
+
                 const yesId = generateId();
                 sectionIds.push(yesId);
                 placeElement({
@@ -2754,10 +2665,10 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                   startElementId: decisionId,
                   endElementId: yesId,
                   startPoint: { x: diamondPos.x + diamondSize, y: diamondCenterY, edge: 'right' },
-                  endPoint: { x: yesPos.x, y: yesPos.y + yesHeight/2, edge: 'left' },
+                  endPoint: { x: yesPos.x, y: yesPos.y + yesHeight / 2, edge: 'left' },
                   points: [
                     { x: diamondPos.x + diamondSize, y: diamondCenterY },
-                    { x: yesPos.x, y: yesPos.y + yesHeight/2 }
+                    { x: yesPos.x, y: yesPos.y + yesHeight / 2 }
                   ],
                   strokeColor: '#10B981',
                   strokeWidth: 2,
@@ -2788,8 +2699,8 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 const noBranchText = wrapText(items[1], 140, 12);
                 const noWidth = 160;
                 const noHeight = Math.max(70, calculateTextHeight(noBranchText, 12) + 20);
-                const noPos = findValidPosition(diamondCenterX - branchOffsetX - noWidth/2, diamondCenterY - noHeight/2, noWidth, noHeight);
-                
+                const noPos = findValidPosition(diamondCenterX - branchOffsetX - noWidth / 2, diamondCenterY - noHeight / 2, noWidth, noHeight);
+
                 const noId = generateId();
                 sectionIds.push(noId);
                 placeElement({
@@ -2813,10 +2724,10 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                   startElementId: decisionId,
                   endElementId: noId,
                   startPoint: { x: diamondPos.x, y: diamondCenterY, edge: 'left' },
-                  endPoint: { x: noPos.x + noWidth, y: noPos.y + noHeight/2, edge: 'right' },
+                  endPoint: { x: noPos.x + noWidth, y: noPos.y + noHeight / 2, edge: 'right' },
                   points: [
                     { x: diamondPos.x, y: diamondCenterY },
-                    { x: noPos.x + noWidth, y: noPos.y + noHeight/2 }
+                    { x: noPos.x + noWidth, y: noPos.y + noHeight / 2 }
                   ],
                   strokeColor: '#EC4899',
                   strokeWidth: 2,
@@ -2846,21 +2757,21 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               prevCenterX = diamondCenterX;
               prevBottomY = diamondPos.y + diamondSize;
               currentY = prevBottomY + gapY;
-              
+
               stepPositions.push({ x: diamondCenterX, y: diamondCenterY, type: 'decision' });
             } else {
               // REGULAR PROCESS STEP
               const stepTitle = section.title || `Step ${sectionIdx + 1}`;
               const wrappedStepTitle = wrapText(stepTitle, stepWidth - 40, 14);
               const actualHeight = Math.max(stepHeight, calculateTextHeight(wrappedStepTitle, 14) + 30);
-              
-              const stepPos = findValidPosition(mainFlowX - stepWidth/2, currentY, stepWidth, actualHeight);
-              const stepCenterX = stepPos.x + stepWidth/2;
-              const stepCenterY = stepPos.y + actualHeight/2;
-              
+
+              const stepPos = findValidPosition(mainFlowX - stepWidth / 2, currentY, stepWidth, actualHeight);
+              const stepCenterX = stepPos.x + stepWidth / 2;
+              const stepCenterY = stepPos.y + actualHeight / 2;
+
               const stepId = generateId();
               sectionIds.push(stepId);
-              
+
               placeElement({
                 id: stepId,
                 type: 'rect',
@@ -2879,7 +2790,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 id: generateId(),
                 type: 'text',
                 x: stepPos.x + 15,
-                y: stepPos.y + actualHeight/2 - 10,
+                y: stepPos.y + actualHeight / 2 - 10,
                 text: wrappedStepTitle,
                 fontSize: 14,
                 fontWeight: 'bold',
@@ -2920,14 +2831,14 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                   const side = itemIdx % 2 === 0 ? 1 : -1;
                   const row = Math.floor(itemIdx / 2);
                   const offsetY = row * (itemHeight + 15);
-                  
+
                   const itemPos = findValidPosition(
-                    stepCenterX + side * (stepWidth/2 + 80) - itemWidth/2,
+                    stepCenterX + side * (stepWidth / 2 + 80) - itemWidth / 2,
                     stepPos.y + offsetY,
                     itemWidth,
                     itemHeight
                   );
-                  
+
                   const itemId = generateId();
                   sectionIds.push(itemId);
                   placeElement({
@@ -2950,11 +2861,11 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                     type: 'connector',
                     startElementId: stepId,
                     endElementId: itemId,
-                    startPoint: { x: stepCenterX + side * stepWidth/2, y: stepCenterY, edge: side > 0 ? 'right' : 'left' },
-                    endPoint: { x: itemPos.x + (side > 0 ? 0 : itemWidth), y: itemPos.y + itemHeight/2, edge: side > 0 ? 'left' : 'right' },
+                    startPoint: { x: stepCenterX + side * stepWidth / 2, y: stepCenterY, edge: side > 0 ? 'right' : 'left' },
+                    endPoint: { x: itemPos.x + (side > 0 ? 0 : itemWidth), y: itemPos.y + itemHeight / 2, edge: side > 0 ? 'left' : 'right' },
                     points: [
-                      { x: stepCenterX + side * stepWidth/2, y: stepCenterY },
-                      { x: itemPos.x + (side > 0 ? 0 : itemWidth), y: itemPos.y + itemHeight/2 }
+                      { x: stepCenterX + side * stepWidth / 2, y: stepCenterY },
+                      { x: itemPos.x + (side > 0 ? 0 : itemWidth), y: itemPos.y + itemHeight / 2 }
                     ],
                     strokeColor: color.stroke,
                     strokeWidth: 1,
@@ -2970,7 +2881,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               prevCenterX = stepCenterX;
               prevBottomY = stepPos.y + actualHeight;
               currentY = prevBottomY + gapY;
-              
+
               stepPositions.push({ x: stepCenterX, y: stepCenterY, type: 'step' });
             }
 
@@ -2980,12 +2891,12 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           // 4. PLACE END NODE
           const endWidth = 140;
           const endHeight = 60;
-          const endPos = findValidPosition(mainFlowX - endWidth/2, currentY, endWidth, endHeight);
-          
+          const endPos = findValidPosition(mainFlowX - endWidth / 2, currentY, endWidth, endHeight);
+
           // Store end node ID
           const endNodeId = generateId();
           const endGroupId = `end-${Date.now()}`;
-          
+
           placeElement({
             id: endNodeId,
             type: 'ellipse',
@@ -3023,10 +2934,10 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             startElementId: prevElementId,
             endElementId: endNodeId,
             startPoint: { x: prevCenterX, y: prevBottomY, edge: 'bottom' },
-            endPoint: { x: endPos.x + endWidth/2, y: endPos.y, edge: 'top' },
+            endPoint: { x: endPos.x + endWidth / 2, y: endPos.y, edge: 'top' },
             points: [
               { x: prevCenterX, y: prevBottomY },
-              { x: endPos.x + endWidth/2, y: endPos.y }
+              { x: endPos.x + endWidth / 2, y: endPos.y }
             ],
             strokeColor: '#71717a',
             strokeWidth: 2,
@@ -3041,8 +2952,8 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const conclusionText = wrapText(preparedContent.conclusion, 300, 13);
             const conclusionWidth = 340;
             const conclusionHeight = Math.max(80, calculateTextHeight(conclusionText, 13) + 40);
-            const conclusionPos = findValidPosition(mainFlowX - conclusionWidth/2, endPos.y + endHeight + 50, conclusionWidth, conclusionHeight);
-            
+            const conclusionPos = findValidPosition(mainFlowX - conclusionWidth / 2, endPos.y + endHeight + 50, conclusionWidth, conclusionHeight);
+
             placeElement({
               id: generateId(),
               type: 'sticky',
@@ -3074,7 +2985,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const titleText = preparedContent.title || 'Project Plan';
           const totalWidth = sections.length * columnWidth + (sections.length - 1) * columnGap;
           const titlePos = findValidPosition(baseX, baseY, totalWidth, 50);
-          
+
           placeElement({
             id: generateId(),
             type: 'text',
@@ -3101,7 +3012,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             // Column header
             const headerHeight = 50;
             const headerPos = findValidPosition(columnX, startY, columnWidth, headerHeight);
-            
+
             const headerId = generateId();
             sectionIds.push(headerId);
             placeElement({
@@ -3140,7 +3051,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               const cardText = wrapText(item, columnWidth - 30, 12);
               const actualCardHeight = Math.max(cardHeight, calculateTextHeight(cardText, 12) + 25);
               const cardPos = findValidPosition(columnX, currentCardY, columnWidth, actualCardHeight);
-              
+
               const cardId = generateId();
               sectionIds.push(cardId);
               placeElement({
@@ -3167,7 +3078,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               const summaryText = wrapText(section.summary, columnWidth - 20, 11);
               const summaryHeight = calculateTextHeight(summaryText, 11) + 10;
               const summaryPos = findValidPosition(columnX, currentCardY, columnWidth, summaryHeight);
-              
+
               placeElement({
                 id: generateId(),
                 type: 'text',
@@ -3197,7 +3108,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const conclusionText = wrapText(preparedContent.conclusion, totalWidth - 40, 14);
             const conclusionHeight = calculateTextHeight(conclusionText, 14) + 30;
             const conclusionPos = findValidPosition(baseX, maxY + 40, totalWidth, conclusionHeight);
-            
+
             placeElement({
               id: generateId(),
               type: 'sticky',
@@ -3228,14 +3139,14 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const wrappedTitle = wrapText(titleText, 200, 18);
           const centralWidth = 260;
           const centralHeight = Math.max(120, calculateTextHeight(wrappedTitle, 18) + 50);
-          
-          const centralPos = findValidPosition(centerX - centralWidth/2, centerY - centralHeight/2, centralWidth, centralHeight);
-          const actualCenterX = centralPos.x + centralWidth/2;
-          const actualCenterY = centralPos.y + centralHeight/2;
+
+          const centralPos = findValidPosition(centerX - centralWidth / 2, centerY - centralHeight / 2, centralWidth, centralHeight);
+          const actualCenterX = centralPos.x + centralWidth / 2;
+          const actualCenterY = centralPos.y + centralHeight / 2;
 
           // Store central theme ID for connectors
           const centralThemeId = generateId();
-          
+
           placeElement({
             id: centralThemeId,
             type: 'sticky',
@@ -3260,28 +3171,28 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           sections.forEach((section, sectionIdx) => {
             const color = SECTION_COLORS[sectionIdx % SECTION_COLORS.length];
             const sectionIds = [];
-            const angle = angleStep * sectionIdx - Math.PI/2;
-            
+            const angle = angleStep * sectionIdx - Math.PI / 2;
+
             // Section header position
             const sectionX = actualCenterX + Math.cos(angle) * clusterRadius;
             const sectionY = actualCenterY + Math.sin(angle) * clusterRadius;
-            
+
             const sectionTitle = section.title || `Category ${sectionIdx + 1}`;
             const wrappedSectionTitle = wrapText(sectionTitle, 160, 14);
             const sectionWidth = 180;
             const sectionHeight = Math.max(70, calculateTextHeight(wrappedSectionTitle, 14) + 25);
-            
-            const sectionPos = findValidPosition(sectionX - sectionWidth/2, sectionY - sectionHeight/2, sectionWidth, sectionHeight, 50);
-            const sectionCenterX = sectionPos.x + sectionWidth/2;
-            const sectionCenterY = sectionPos.y + sectionHeight/2;
+
+            const sectionPos = findValidPosition(sectionX - sectionWidth / 2, sectionY - sectionHeight / 2, sectionWidth, sectionHeight, 50);
+            const sectionCenterX = sectionPos.x + sectionWidth / 2;
+            const sectionCenterY = sectionPos.y + sectionHeight / 2;
 
             // Section shape (alternate shapes for variety)
             const shapes = ['ellipse', 'diamond', 'hexagon'];
             const shapeType = shapes[sectionIdx % shapes.length];
-            
+
             const sectionShapeId = generateId();
             sectionIds.push(sectionShapeId);
-            
+
             placeElement({
               id: sectionShapeId,
               type: shapeType,
@@ -3299,7 +3210,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               id: generateId(),
               type: 'text',
               x: sectionPos.x + 15,
-              y: sectionPos.y + sectionHeight/2 - 10,
+              y: sectionPos.y + sectionHeight / 2 - 10,
               text: wrappedSectionTitle,
               fontSize: 14,
               fontWeight: 'bold',
@@ -3333,33 +3244,33 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             // 3. PLACE ALL ITEMS SCATTERED AROUND SECTION - NO LIMIT
             const items = section.items || [];
             const itemCount = items.length;
-            
+
             // Expand radius and angle spread for more items
             const itemsPerRing = 6;
             const baseRadius = 160;
-            
+
             items.forEach((item, itemIdx) => {
               const itemText = wrapText(item, 150, 12);
               const itemWidth = 170;
               const itemHeight = Math.max(70, calculateTextHeight(itemText, 12) + 20);
-              
+
               // Calculate ring and position
               const ring = Math.floor(itemIdx / itemsPerRing);
               const posInRing = itemIdx % itemsPerRing;
               const ringItemCount = Math.min(itemsPerRing, itemCount - ring * itemsPerRing);
-              
+
               // Calculate angle and radius
               const ringAngleSpread = Math.PI * 0.7;
               const ringStartAngle = angle - ringAngleSpread / 2;
               const ringAngleStep = ringItemCount > 1 ? ringAngleSpread / (ringItemCount - 1) : 0;
               const itemAngle = ringItemCount === 1 ? angle : ringStartAngle + ringAngleStep * posInRing;
               const itemRadius = baseRadius + ring * 100;
-              
-              const preferredX = sectionCenterX + Math.cos(itemAngle) * itemRadius - itemWidth/2;
-              const preferredY = sectionCenterY + Math.sin(itemAngle) * itemRadius - itemHeight/2;
-              
+
+              const preferredX = sectionCenterX + Math.cos(itemAngle) * itemRadius - itemWidth / 2;
+              const preferredY = sectionCenterY + Math.sin(itemAngle) * itemRadius - itemHeight / 2;
+
               const itemPos = findValidPosition(preferredX, preferredY, itemWidth, itemHeight, 20);
-              
+
               const itemId = generateId();
               sectionIds.push(itemId);
               placeElement({
@@ -3384,10 +3295,10 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 startElementId: sectionShapeId,
                 endElementId: itemId,
                 startPoint: { x: sectionCenterX, y: sectionCenterY, edge: 'auto' },
-                endPoint: { x: itemPos.x + itemWidth/2, y: itemPos.y + itemHeight/2, edge: 'auto' },
+                endPoint: { x: itemPos.x + itemWidth / 2, y: itemPos.y + itemHeight / 2, edge: 'auto' },
                 points: [
                   { x: sectionCenterX, y: sectionCenterY },
-                  { x: itemPos.x + itemWidth/2, y: itemPos.y + itemHeight/2 }
+                  { x: itemPos.x + itemWidth / 2, y: itemPos.y + itemHeight / 2 }
                 ],
                 strokeColor: color.stroke,
                 strokeWidth: 1,
@@ -3411,8 +3322,8 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const conclusionText = wrapText(preparedContent.conclusion, 350, 14);
             const conclusionWidth = 400;
             const conclusionHeight = Math.max(90, calculateTextHeight(conclusionText, 14) + 40);
-            const conclusionPos = findValidPosition(actualCenterX - conclusionWidth/2, maxY + 60, conclusionWidth, conclusionHeight);
-            
+            const conclusionPos = findValidPosition(actualCenterX - conclusionWidth / 2, maxY + 60, conclusionWidth, conclusionHeight);
+
             placeElement({
               id: generateId(),
               type: 'sticky',
@@ -3445,7 +3356,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const SIBLING_GAP_X = 25;
           const ROW_GAP_Y = 40;
           const SECTION_GAP_Y = 70;
-          
+
           // Dynamic center based on content width
           const maxItemsPerRow = 6;
           const estimatedWidth = maxItemsPerRow * (NODE_WIDTH + SIBLING_GAP_X);
@@ -3501,7 +3412,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const textHeight = calculateTextHeight(wrappedText, 10);
             const nodeHeight = Math.max(NODE_MIN_HEIGHT, textHeight + (badge ? 40 : 25));
             const displayText = badge ? `${badge}\n${wrappedText}` : wrappedText;
-            
+
             placeElement({
               id: nodeId,
               type: 'sticky',
@@ -3534,7 +3445,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const createDiamond = (x, y, text, color) => {
             const nodeId = generateId();
             const size = DECISION_SIZE;
-            
+
             placeElement({
               id: nodeId,
               type: 'diamond',
@@ -3552,7 +3463,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             const labelText = text.length > 60 ? text.substring(0, 57) + '...' : text;
             const wrappedLabel = wrapText(labelText, labelWidth - 10, 9);
             const labelHeight = calculateTextHeight(wrappedLabel, 9) + 8;
-            
+
             placeElement({
               id: generateId(),
               type: 'sticky',
@@ -3588,7 +3499,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           const createCircle = (x, y, text, color, index = 0) => {
             const nodeId = generateId();
             const r = CIRCLE_RADIUS + 15; // Larger radius for text
-            
+
             placeElement({
               id: nodeId,
               type: 'ellipse',
@@ -3611,11 +3522,11 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             }
             if (innerText.length === 0) innerText = text.substring(0, 20);
             if (innerText.length < text.length) innerText += '...';
-            
+
             // Wrap text to fit inside circle
             const innerWrapped = wrapText(innerText, r * 2 - 20, 10);
             const innerHeight = calculateTextHeight(innerWrapped, 10);
-            
+
             placeElement({
               id: generateId(),
               type: 'text',
@@ -3637,7 +3548,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               const labelWidth = Math.max(r * 2 + 20, 180);
               const wrappedLabel = wrapText(text, labelWidth - 16, 9);
               const labelHeight = calculateTextHeight(wrappedLabel, 9) + 12;
-              
+
               placeElement({
                 id: generateId(),
                 type: 'sticky',
@@ -3673,7 +3584,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           // ═══════════════════════════════════════════════════════════════
           const createHexagon = (x, y, text, color, size = 140) => {
             const nodeId = generateId();
-            
+
             placeElement({
               id: nodeId,
               type: 'hexagon',
@@ -3709,7 +3620,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               const labelWidth = Math.max(size + 40, 200);
               const wrappedLabel = wrapText(text, labelWidth - 16, 10);
               const labelHeight = calculateTextHeight(wrappedLabel, 10) + 12;
-              
+
               placeElement({
                 id: generateId(),
                 type: 'sticky',
@@ -3745,7 +3656,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           // ═══════════════════════════════════════════════════════════════
           const connectNodes = (fromNode, toNode, color) => {
             if (!fromNode || !toNode) return;
-            
+
             connectorElements.push({
               id: generateId(),
               type: 'connector',
@@ -3841,8 +3752,8 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             for (let r = 0; r < rows; r++) {
               const rowItems = items.slice(r * maxPerRow, (r + 1) * maxPerRow);
               // Account for larger circle/diamond with labels below
-              const itemWidth = nodeType === 'diamond' ? DECISION_SIZE + 50 : 
-                               nodeType === 'circle' ? (CIRCLE_RADIUS + 10) * 2 + 40 : NODE_WIDTH;
+              const itemWidth = nodeType === 'diamond' ? DECISION_SIZE + 50 :
+                nodeType === 'circle' ? (CIRCLE_RADIUS + 10) * 2 + 40 : NODE_WIDTH;
               const gap = nodeType === 'diamond' || nodeType === 'circle' ? 60 : SIBLING_GAP_X;
               const rowWidth = rowItems.length * (itemWidth + gap) - gap;
               let itemX = centerX - rowWidth / 2;
@@ -3851,7 +3762,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               rowItems.forEach((item, idx) => {
                 const globalIdx = r * maxPerRow + idx;
                 const itemBadge = badge ? `${badge}${globalIdx + 1}` : '';
-                
+
                 let node;
                 if (nodeType === 'diamond') {
                   node = createDiamond(itemX, currentY, item, color);
@@ -3899,7 +3810,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               const text = wrapText(item, nodeWidth - 16, 9);
               const h = Math.max(55, calculateTextHeight(text, 9) + 30);
               maxHeight = Math.max(maxHeight, h);
-              
+
               placeElement({
                 id: nodeId,
                 type: 'sticky',
@@ -4093,7 +4004,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           // ═══════════════════════════════════════════════════════════════
           // 2. DYNAMICALLY PROCESS ALL SECTIONS
           // ═══════════════════════════════════════════════════════════════
-          
+
           // Section type configurations for visual representation
           const sectionTypeConfig = {
             root_decision: { nodeType: 'hexagon', isRoot: true },
@@ -4166,11 +4077,11 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
             // Standard section with header and items
             placeSectionHeader(getIcon(section.type) + ' ' + title, color);
-            
+
             const nodeType = config.nodeType || 'sticky';
             const maxPerRow = config.maxPerRow || 5;
             const badge = getBadge(section.type);
-            
+
             const result = placeAllItems(items, color, nodeType, badge, maxPerRow);
             previousSectionNodes = result.nodes;
             allNodes.set(section.type, result.nodes);
@@ -4227,7 +4138,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           if (preparedContent.conclusion) {
             const conclText = wrapText(preparedContent.conclusion, 700, 12);
             const conclH = Math.max(80, calculateTextHeight(conclText, 12) + 40);
-            
+
             placeElement({
               id: generateId(),
               type: 'sticky',
@@ -4256,7 +4167,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         generator();
       } catch (layoutError) {
         console.error('[MIRA] Layout generation failed:', layoutError);
-        
+
         // Attempt fallback to mindmap layout
         try {
           console.log('[MIRA] Attempting fallback to mindmap layout...');
@@ -4273,7 +4184,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
       // Combine content elements and connectors (connectors last)
       const generatedObjects = [...contentElements, ...connectorElements];
-      
+
       // Validate that we have objects
       if (generatedObjects.length === 0) {
         console.error('[MIRA] No objects generated');
@@ -4285,7 +4196,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
       // Generate a unique ID for this generation
       const generationId = `gen-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-      
+
       // Tag all elements with this generation ID for tracking
       generatedObjects.forEach(obj => {
         obj.generationId = generationId;
@@ -4295,7 +4206,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       const currentPage = whiteboard.pages[pageIndex] || { objects: [] };
       currentPage.objects = [...filteredObjects, ...generatedObjects];
       whiteboard.pages[pageIndex] = currentPage;
-      
+
       console.log(`[MIRA] Page ${pageIndex} updated: ${filteredObjects.length} existing + ${generatedObjects.length} new = ${currentPage.objects.length} total elements`);
 
       // Create generation record for history
@@ -4344,12 +4255,12 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       const CHUNK_SIZE = 50; // Save 50 objects at a time
       let saveSuccess = false;
       let saveError = null;
-      
+
       const allObjects = currentPage.objects;
       const totalObjects = allObjects.length;
-      
+
       console.log(`[MIRA] Preparing to save ${totalObjects} objects in chunks of ${CHUNK_SIZE}`);
-      
+
       for (let attempt = 0; attempt < MAX_SAVE_RETRIES && !saveSuccess; attempt++) {
         try {
           // Clear the page objects first
@@ -4359,26 +4270,26 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             { $set: { [`pages.${pageIndex}.objects`]: [] } },
             { maxTimeMS: 30000 }
           );
-          
+
           // Save objects in chunks using $push with $each
           for (let i = 0; i < totalObjects; i += CHUNK_SIZE) {
             const chunk = allObjects.slice(i, i + CHUNK_SIZE);
             const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
             const totalChunks = Math.ceil(totalObjects / CHUNK_SIZE);
-            
+
             console.log(`[MIRA] Attempt ${attempt + 1}: Saving chunk ${chunkNum}/${totalChunks} (${chunk.length} objects)...`);
-            
+
             await Whiteboard.updateOne(
               { _id: whiteboard._id },
-              { 
-                $push: { 
-                  [`pages.${pageIndex}.objects`]: { $each: chunk } 
+              {
+                $push: {
+                  [`pages.${pageIndex}.objects`]: { $each: chunk }
                 }
               },
               { maxTimeMS: 60000 }
             );
           }
-          
+
           // Save aiAnalysis separately (smaller payload)
           console.log(`[MIRA] Attempt ${attempt + 1}: Saving aiAnalysis...`);
           await Whiteboard.updateOne(
@@ -4391,7 +4302,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             },
             { maxTimeMS: 30000 }
           );
-          
+
           saveSuccess = true;
           console.log(`[MIRA] Whiteboard saved successfully (attempt ${attempt + 1}) - ${totalObjects} objects in ${Math.ceil(totalObjects / CHUNK_SIZE)} chunks`);
         } catch (err) {
@@ -4405,7 +4316,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           }
         }
       }
-      
+
       if (!saveSuccess) {
         console.error('[MIRA] All save attempts failed:', saveError?.message);
         return NextResponse.json({
