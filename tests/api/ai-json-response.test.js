@@ -78,4 +78,38 @@ describe('AI JSON response parser', () => {
         expect(parsed.sections[0].items).toEqual(['Open app', 'Enter credentials', 'Click sign in']);
         expect(parsed.sections[1].title).toBe('Decision');
     });
+
+    test('replaces bare ``**`` placeholders leaked into value positions with null', () => {
+        const { parseAIJsonResponse } = require('@/lib/aiJsonResponse');
+
+        const response = '{"title":**,"description":"Comprehensive plan","sections":[**,{"title":"Phase 1"}]}';
+
+        const parsed = parseAIJsonResponse(response, { expectedRoot: 'object' });
+
+        expect(parsed.title).toBeNull();
+        expect(parsed.description).toBe('Comprehensive plan');
+        expect(parsed.sections).toEqual([null, { title: 'Phase 1' }]);
+    });
+
+    test('unwraps markdown-bold values like **Plan Title** into JSON strings', () => {
+        const { parseAIJsonResponse } = require('@/lib/aiJsonResponse');
+
+        const response = '{"title":**Comprehensive Project Plan**,"sections":[**Phase One**,**Phase Two**]}';
+
+        const parsed = parseAIJsonResponse(response, { expectedRoot: 'object' });
+
+        expect(parsed.title).toBe('Comprehensive Project Plan');
+        expect(parsed.sections).toEqual(['Phase One', 'Phase Two']);
+    });
+
+    test('preserves ** characters that appear inside legitimate string values', () => {
+        const { parseAIJsonResponse } = require('@/lib/aiJsonResponse');
+
+        const response = '{"title":"Use **bold** in markdown","note":"keep ** as-is"}';
+
+        const parsed = parseAIJsonResponse(response, { expectedRoot: 'object' });
+
+        expect(parsed.title).toBe('Use **bold** in markdown');
+        expect(parsed.note).toBe('keep ** as-is');
+    });
 });
