@@ -49,13 +49,13 @@ Please respond in the following JSON format:
 
     const systemInstruction = 'You are a creative business consultant helping employees develop their ideas for workplace improvements. Always respond with valid JSON.';
 
-    // Use centralized AI with automatic fallback (Gemini → OpenAI → Perplexity)
+    // Use the centralized custom AI provider.
     let expansion = null;
-    
+
     try {
-      console.log('[Ideas Expand] Using centralized AI (Gemini → OpenAI → Perplexity fallback)...');
+      console.log('[Ideas Expand] Using centralized custom AI...');
       const text = await generateContent(prompt, systemInstruction);
-      
+
       if (text) {
         // Extract JSON from response
         const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -71,7 +71,7 @@ Please respond in the following JSON format:
     if (!expansion) {
       console.log('[Ideas Expand] All AI services unavailable')
       return NextResponse.json(
-        { success: false, message: 'AI service unavailable. Please ensure GEMINI_API_KEY, OPENAI_API_KEY, or PERPLEXITY_API_KEY is configured.' },
+        { success: false, message: 'AI service unavailable. Please ensure at least one AI provider is configured.' },
         { status: 503 }
       );
     }

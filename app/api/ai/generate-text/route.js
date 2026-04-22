@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
-import { generateContent } from '@/lib/gemini';
+import { generateContent, getAIAvailability } from '@/lib/gemini';
 
 /**
  * POST /api/ai/generate-text
@@ -13,7 +13,7 @@ export async function POST(request) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    if (!process.env.GEMINI_API_KEY && !process.env.NEXT_PUBLIC_GEMINI_API_KEY && !process.env.OPENAI_API_KEY && !process.env.PERPLEXITY_API_KEY) {
+    if (!getAIAvailability().anyAvailable) {
       return NextResponse.json({
         success: false,
         message: 'AI service is not configured'
@@ -41,9 +41,9 @@ export async function POST(request) {
             { status: 400 }
           );
         }
-        
+
         systemInstruction = `You are a professional project manager assistant. Write clear, professional project descriptions that are concise yet comprehensive. Focus on objectives, scope, and expected outcomes. Keep it to 2-3 paragraphs maximum.`;
-        
+
         prompt = `Write a professional project description for a project named "${context.projectName}".
 ${context.priority ? `Priority level: ${context.priority}` : ''}
 ${context.department ? `Department: ${context.department}` : ''}
@@ -65,9 +65,9 @@ Write only the description, no headers or labels.`;
             { status: 400 }
           );
         }
-        
+
         systemInstruction = `You are a professional task management assistant. Write clear, actionable task descriptions that help team members understand what needs to be done.`;
-        
+
         prompt = `Write a professional task description for a task named "${context.taskName}".
 ${context.projectName ? `Project: ${context.projectName}` : ''}
 ${context.priority ? `Priority: ${context.priority}` : ''}
@@ -87,9 +87,9 @@ Write only the description, no headers or labels.`;
             { status: 400 }
           );
         }
-        
+
         systemInstruction = `You are a professional corporate communications assistant. Write clear, engaging announcements suitable for an internal company platform.`;
-        
+
         prompt = `Write a professional announcement for: "${context.title}".
 ${context.type ? `Type: ${context.type}` : ''}
 ${context.targetAudience ? `Target audience: ${context.targetAudience}` : ''}
@@ -110,9 +110,9 @@ Write only the announcement content, no headers or labels.`;
             { status: 400 }
           );
         }
-        
+
         systemInstruction = `You are a professional meeting facilitator assistant. Create clear, structured meeting agendas.`;
-        
+
         prompt = `Create a meeting agenda for: "${context.meetingTitle}".
 ${context.duration ? `Duration: ${context.duration} minutes` : ''}
 ${context.participants ? `Participants: ${context.participants}` : ''}
@@ -132,9 +132,9 @@ Format as a simple numbered list with estimated time for each item.`;
             { status: 400 }
           );
         }
-        
+
         systemInstruction = `You are a professional email writing assistant. Write clear, professional emails suitable for workplace communication.`;
-        
+
         prompt = `Draft a professional email with subject: "${context.subject}".
 ${context.recipient ? `Recipient: ${context.recipient}` : ''}
 ${context.purpose ? `Purpose: ${context.purpose}` : ''}

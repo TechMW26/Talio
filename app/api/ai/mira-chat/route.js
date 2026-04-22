@@ -42,33 +42,9 @@ async function checkAndDeductToken(MiraTokenUsage, userId) {
   }
 }
 
-// Generate content with Google Search grounding via Gemini API
+// Route all MIRA generation through the shared custom AI provider.
 async function generateContentWithSearch(prompt, systemInstruction) {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
-  if (!apiKey) throw new Error('No Gemini API key')
-
-  const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']
-  for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt }] }],
-          tools: [{ google_search: {} }],
-          generationConfig: { temperature: 0.7 }
-        })
-      })
-      if (res.ok) {
-        const data = await res.json()
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-      }
-      if (res.status === 404 || res.status === 503) continue
-      if (res.status === 429) break
-    } catch { continue }
-  }
-  throw new Error('Search-grounded generation failed')
+  return generateContent(prompt, systemInstruction)
 }
 
 // Build role-aware system prompt with user context
@@ -615,40 +591,7 @@ export async function POST(request) {
       fullPrompt = `User: ${userMessage}`
     }
 
-    // Try Gemini with Google Search grounding first, fallback to standard generateContent
-    let aiResponse
-    try {
-      aiResponse = await generateContentWithSearch(fullPrompt, systemPrompt)
-    } catch {
-      // Fallback: direct Gemini call with JSON response mode
-      try {
-        const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
-        const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']
-        let success = false
-        for (const model of models) {
-          if (success) break
-          try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-            const res = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: `${systemPrompt}\n\n${fullPrompt}` }] }],
-                generationConfig: { temperature: 0.7, responseMimeType: 'application/json' }
-              })
-            })
-            if (res.ok) {
-              const data = await res.json()
-              aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-              success = true
-            }
-          } catch { continue }
-        }
-        if (!success) aiResponse = await generateContent(fullPrompt, systemPrompt)
-      } catch {
-        aiResponse = await generateContent(fullPrompt, systemPrompt)
-      }
-    }
+    const aiResponse = await generateContentWithSearch(fullPrompt, systemPrompt)
 
     // Parse JSON response - robust extraction
     let parsed
