@@ -2,6 +2,67 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { generateContent, getAIAvailability } from '@/lib/gemini';
 
+function mapAIErrorToResponse(error) {
+  const aggregatedErrors = Array.isArray(error?.allProviderErrors) ? error.allProviderErrors : [];
+  const errorClasses = new Set([
+    error?.errorClass,
+    ...aggregatedErrors.map((entry) => entry?.errorClass),
+  ].filter(Boolean));
+
+  if (error?.message === 'AI providers are temporarily unavailable' || errorClasses.has('unavailable')) {
+    return {
+      status: 503,
+      body: {
+        success: false,
+        message: 'AI providers are temporarily unavailable. Please try again in a moment.',
+        error: error.message,
+      },
+    };
+  }
+
+  if (errorClasses.has('rate_limit')) {
+    return {
+      status: 503,
+      body: {
+        success: false,
+        message: 'AI providers are currently rate-limited. Please try again shortly.',
+        error: error.message,
+      },
+    };
+  }
+
+  if (errorClasses.has('network') || errorClasses.has('server') || errorClasses.has('empty')) {
+    return {
+      status: 503,
+      body: {
+        success: false,
+        message: 'AI service is temporarily unavailable. Please try again in a moment.',
+        error: error.message,
+      },
+    };
+  }
+
+  if (errorClasses.has('auth')) {
+    return {
+      status: 503,
+      body: {
+        success: false,
+        message: 'AI service is temporarily unavailable due to provider authentication issues.',
+        error: error.message,
+      },
+    };
+  }
+
+  return {
+    status: 502,
+    body: {
+      success: false,
+      message: 'Failed to generate content',
+      error: error.message,
+    },
+  };
+}
+
 /**
  * POST /api/ai/generate-text
  * Generate text content using AI for various purposes
@@ -287,9 +348,7 @@ Write only the description, no headers or labels.`;
 
   } catch (error) {
     console.error('AI generate text error:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to generate content', error: error.message },
-      { status: 502 }
-    );
+    const mapped = mapAIErrorToResponse(error);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

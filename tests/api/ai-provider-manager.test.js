@@ -210,4 +210,25 @@ describe('AIProviderManager fallback routing (Custom AI → Gemini)', () => {
         expect(serialized).not.toContain('gem-1')
         expect(serialized).not.toContain('gem-2')
     })
+
+    test('still attempts the last configured provider when its circuit is open', async () => {
+        process.env.GEMINI_API_KEY = 'gem-1'
+
+        const { ProviderHealthMonitor } = require('@/lib/ai/providerHealthMonitor')
+        jest.spyOn(ProviderHealthMonitor.prototype, 'isAvailable').mockReturnValue(false)
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: jest.fn().mockResolvedValue({
+                candidates: [{ content: { parts: [{ text: 'gemini from forced attempt' }] } }],
+            }),
+        })
+
+        const { generateContent } = reqRouter()
+        const result = await generateContent('hello')
+
+        expect(result).toBe('gemini from forced attempt')
+        expect(global.fetch).toHaveBeenCalledTimes(1)
+        expect(global.fetch.mock.calls[0][0]).toContain('generativelanguage.googleapis.com')
+    })
 })
