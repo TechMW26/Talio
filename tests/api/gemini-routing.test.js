@@ -18,6 +18,16 @@ describe('custom AI routing in gemini library', () => {
         delete process.env.CUSTOM_AI_TOKEN
         delete process.env.CUSTOM_AI_BASE_URL
 
+        // Ensure Gemini fallback does not interfere with custom-AI-only
+        // assertions. The router is the new entry point and would otherwise
+        // try to recover from custom-AI failures by calling Gemini.
+        for (const key of Object.keys(process.env)) {
+            if (/^GEMINI_(API_)?KEY/i.test(key)) {
+                delete process.env[key]
+            }
+        }
+        delete process.env.GEMINI_API_KEY
+
         global.fetch = jest.fn()
     })
 
