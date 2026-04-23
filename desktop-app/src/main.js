@@ -110,6 +110,55 @@ const MIN_WHITESCREEN_RECOVERY_INTERVAL = 60000;
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
+const STORED_TOKEN_EXPIRY_SKEW_MS = 60 * 1000;
+
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') {
+    return null;
+  }
+
+  var parts = token.split('.');
+  if (parts.length < 2) {
+    return null;
+  }
+
+  try {
+    var base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    var padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+  } catch (error) {
+    logger.log('warn', 'Main', 'Failed to decode stored auth token: ' + error.message);
+    return null;
+  }
+}
+
+function isStoredTokenExpired(token) {
+  var payload = decodeJwtPayload(token);
+  if (!payload || !payload.exp) {
+    return true;
+  }
+
+  return Date.now() >= ((payload.exp * 1000) - STORED_TOKEN_EXPIRY_SKEW_MS);
+}
+
+function restoreSavedAuthentication() {
+  var savedToken = store.get('authToken');
+  var savedUser = store.get('userData');
+
+  if (!savedToken || !savedUser) {
+    return;
+  }
+
+  if (isStoredTokenExpired(savedToken)) {
+    logger.log('warn', 'Main', 'Stored auth token expired - clearing saved session');
+    handleLogout();
+    return;
+  }
+
+  setTimeout(function () {
+    handleAuthentication({ token: savedToken, user: savedUser });
+  }, 2000);
+}
 
 /**
  * Get desktop sources directly from main process desktopCapturer.
@@ -1093,14 +1142,8 @@ function scheduleWindowRecreation() {
       // Setup network monitoring for new window
       setupNetworkMonitoring();
 
-      // Re-authenticate if we had saved credentials
-      var savedToken = store.get('authToken');
-      var savedUser = store.get('userData');
-      if (savedToken && savedUser) {
-        setTimeout(function () {
-          handleAuthentication({ token: savedToken, user: savedUser });
-        }, 2000);
-      }
+      // Re-authenticate if we still have a valid saved session.
+      restoreSavedAuthentication();
 
       showNotification('\u26a0\ufe0f Talio Restarted', 'Talio window was closed and has been automatically reopened. This action has been logged.');
     }
@@ -3629,14 +3672,8 @@ app.whenReady().then(async function () {
     }, 3000);
   }
 
-  // Check for saved auth
-  var savedToken = store.get('authToken');
-  var savedUser = store.get('userData');
-  if (savedToken && savedUser) {
-    setTimeout(function () {
-      handleAuthentication({ token: savedToken, user: savedUser });
-    }, 2000);
-  }
+  // Restore saved auth only when the stored JWT has not expired.
+  restoreSavedAuthentication();
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
