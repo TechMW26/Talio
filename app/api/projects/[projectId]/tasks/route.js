@@ -7,6 +7,7 @@ import {
   createTimelineEvent
 } from '@/lib/projectService'
 import { notifyTaskAssigned, getProjectMemberUserIds } from '@/lib/projectNotifications'
+import { queueTaskCreatedEmailNotifications } from '@/lib/projectEmailNotifications'
 import { emitTaskUpdate } from '@/lib/realtimeEvents'
 import { createTaskAssignmentNotification } from '@/lib/actionableNotifications'
 import { canAssignTask } from '@/lib/hierarchyAuth'
@@ -109,7 +110,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification', 'Team'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification', 'Team', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -377,6 +378,18 @@ export async function POST(request, { params }) {
       )
     } catch (emitError) {
       console.error('Failed to emit task update:', emitError)
+    }
+
+    try {
+      await queueTaskCreatedEmailNotifications({
+        projectId,
+        taskId: task._id,
+        triggeredByEmployeeId: userRecord.employeeId,
+        triggeredByUserId: user._id || user.userId || null,
+        models,
+      })
+    } catch (emailError) {
+      console.error('Failed to queue task creation emails:', emailError)
     }
 
     return NextResponse.json({

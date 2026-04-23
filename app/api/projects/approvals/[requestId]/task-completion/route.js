@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
+import { queueTaskStatusChangedEmailNotifications } from '@/lib/projectEmailNotifications'
 
 // POST - Approve or reject task completion
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Task', 'ProjectApprovalRequest', 'User', 'Employee', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'ProjectApprovalRequest', 'User', 'Employee', 'ProjectTimelineEvent', 'ProjectMember', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -63,6 +64,7 @@ export async function POST(request, { params }) {
       // Update task status to completed
       const task = await Task.findById(approvalRequest.relatedTask._id)
       if (task) {
+        const oldStatus = task.status
         task.status = 'completed'
         task.completedAt = new Date()
         await task.save()
@@ -84,6 +86,21 @@ export async function POST(request, { params }) {
         // Recalculate project completion percentage
         const { calculateCompletionPercentage } = await import('@/lib/projectService')
         await calculateCompletionPercentage(project._id, models)
+
+        try {
+          await queueTaskStatusChangedEmailNotifications({
+            projectId: project._id,
+            taskId: task._id,
+            oldStatus,
+            newStatus: task.status,
+            changedByEmployeeId: userRecord.employeeId,
+            triggeredByUserId: user._id || user.userId || null,
+            eventTimestamp: task.updatedAt || new Date(),
+            models,
+          })
+        } catch (emailError) {
+          console.error('Failed to queue approved task completion emails:', emailError)
+        }
       }
 
       return NextResponse.json({
@@ -102,6 +119,7 @@ export async function POST(request, { params }) {
       // Update task status back to in-progress or review
       const task = await Task.findById(approvalRequest.relatedTask._id)
       if (task) {
+        const oldStatus = task.status
         task.status = 'in-progress'
         await task.save()
 
@@ -119,6 +137,21 @@ export async function POST(request, { params }) {
             reason: comment || 'No reason provided'
           }
         }, models)
+
+        try {
+          await queueTaskStatusChangedEmailNotifications({
+            projectId: project._id,
+            taskId: task._id,
+            oldStatus,
+            newStatus: task.status,
+            changedByEmployeeId: userRecord.employeeId,
+            triggeredByUserId: user._id || user.userId || null,
+            eventTimestamp: task.updatedAt || new Date(),
+            models,
+          })
+        } catch (emailError) {
+          console.error('Failed to queue rejected task completion emails:', emailError)
+        }
       }
 
       return NextResponse.json({

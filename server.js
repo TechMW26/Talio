@@ -472,6 +472,12 @@ app.prepare().then(() => {
       const { startMeetingFinalizerCron } = await import('./lib/meetingFinalizerCron.js');
       startMeetingFinalizerCron();
     } catch (e) { console.warn('⚠️ Meeting finalizer cron setup skipped:', e.message); }
+
+    // Start in-process email queue drain (onboarding + project notifications)
+    try {
+      const { startEmailQueueCron } = require('./lib/emailQueueCron');
+      startEmailQueueCron();
+    } catch (e) { console.warn('⚠️ Email queue cron setup skipped:', e.message); }
   });
 
   // Graceful shutdown handling for Docker
@@ -506,6 +512,11 @@ app.prepare().then(() => {
     try {
       const { stopMeetingFinalizerCron } = await import('./lib/meetingFinalizerCron.js');
       stopMeetingFinalizerCron();
+    } catch (e) { /* ignore if not loaded */ }
+
+    try {
+      const { stopEmailQueueCron } = require('./lib/emailQueueCron');
+      stopEmailQueueCron();
     } catch (e) { /* ignore if not loaded */ }
 
     // Close database connections

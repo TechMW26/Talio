@@ -2,13 +2,17 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent, calculateCompletionPercentage } from '@/lib/projectService'
 import { notifyTaskReviewRejected } from '@/lib/projectNotifications'
+import {
+  queueProjectStatusChangedEmailNotifications,
+  queueTaskStatusChangedEmailNotifications,
+} from '@/lib/projectEmailNotifications'
 import { sendEmail, emailTemplates } from '@/lib/mailer'
 
 // PUT - Approve or reject a request
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'ProjectApprovalRequest', 'User', 'Employee', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'ProjectApprovalRequest', 'User', 'Employee', 'ProjectTimelineEvent', 'ProjectMember', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -90,12 +94,13 @@ export async function PUT(request, { params }) {
           if (approvalRequest.relatedTask) {
             const taskTitle = approvalRequest.relatedTask.title
             const taskId = approvalRequest.relatedTask._id
+            const oldStatus = approvalRequest.relatedTask.status
             
             // Update task status to completed
-            await Task.findByIdAndUpdate(taskId, {
+            const updatedTask = await Task.findByIdAndUpdate(taskId, {
               status: 'completed',
               completedAt: new Date()
-            })
+            }, { new: true })
             
             // Recalculate completion percentage
             calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
@@ -109,6 +114,17 @@ export async function PUT(request, { params }) {
               description: `Task "${taskTitle}" completion approved`,
               metadata: { taskTitle, approvedBy: userDoc.employeeId }
             }, models).catch(console.error)
+
+            queueTaskStatusChangedEmailNotifications({
+              projectId: approvalRequest.project,
+              taskId,
+              oldStatus,
+              newStatus: updatedTask?.status || 'completed',
+              changedByEmployeeId: userDoc.employeeId,
+              triggeredByUserId: user._id || user.userId || null,
+              eventTimestamp: updatedTask?.updatedAt || new Date(),
+              models,
+            }).catch(console.error)
           }
           break
         
@@ -137,10 +153,12 @@ export async function PUT(request, { params }) {
           
         case 'project_completion':
           // Handle project completion approval
-          await Project.findByIdAndUpdate(approvalRequest.project, {
+          {
+          const oldStatus = project.status
+          const updatedProject = await Project.findByIdAndUpdate(approvalRequest.project, {
             status: 'approved',
             completedAt: new Date()
-          })
+          }, { new: true })
           
           createTimelineEvent({
             project: approvalRequest.project,
@@ -149,6 +167,17 @@ export async function PUT(request, { params }) {
             description: 'Project completion approved',
             metadata: { approvedBy: userDoc.employeeId }
           }, models).catch(console.error)
+
+          queueProjectStatusChangedEmailNotifications({
+            projectId: approvalRequest.project,
+            oldStatus,
+            newStatus: updatedProject?.status || 'approved',
+            changedByEmployeeId: userDoc.employeeId,
+            triggeredByUserId: user._id || user.userId || null,
+            eventTimestamp: updatedProject?.updatedAt || new Date(),
+            models,
+          }).catch(console.error)
+          }
           break
           
         case 'task_review':
@@ -156,12 +185,13 @@ export async function PUT(request, { params }) {
           if (approvalRequest.relatedTask) {
             const taskTitle = approvalRequest.relatedTask.title
             const taskId = approvalRequest.relatedTask._id
+            const oldStatus = approvalRequest.relatedTask.status
             
             // Update task status to completed
-            await Task.findByIdAndUpdate(taskId, {
+            const updatedTask = await Task.findByIdAndUpdate(taskId, {
               status: 'completed',
               completedAt: new Date()
-            })
+            }, { new: true })
             
             // Recalculate completion percentage
             calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
@@ -175,6 +205,17 @@ export async function PUT(request, { params }) {
               description: `Task "${taskTitle}" review approved and marked complete`,
               metadata: { taskTitle, approvedBy: userDoc.employeeId }
             }, models).catch(console.error)
+
+            queueTaskStatusChangedEmailNotifications({
+              projectId: approvalRequest.project,
+              taskId,
+              oldStatus,
+              newStatus: updatedTask?.status || 'completed',
+              changedByEmployeeId: userDoc.employeeId,
+              triggeredByUserId: user._id || user.userId || null,
+              eventTimestamp: updatedTask?.updatedAt || new Date(),
+              models,
+            }).catch(console.error)
           }
           break
           
@@ -188,6 +229,7 @@ export async function PUT(request, { params }) {
         const task = await Task.findById(approvalRequest.relatedTask._id)
         
         if (task) {
+          const oldStatus = task.status
           // Determine the new status
           let targetStatus = 'in-progress'
           
@@ -360,6 +402,18 @@ export async function PUT(request, { params }) {
               colorCode: 'red'
             }
           }, models).catch(console.error)
+
+          queueTaskStatusChangedEmailNotifications({
+            projectId: approvalRequest.project,
+            taskId: task._id,
+            oldStatus,
+            newStatus: task.status,
+            changedByEmployeeId: userDoc.employeeId,
+            triggeredByUserId: user._id || user.userId || null,
+            eventTimestamp: task.updatedAt || new Date(),
+            includeAssignees: false,
+            models,
+          }).catch(console.error)
         }
       }
     }

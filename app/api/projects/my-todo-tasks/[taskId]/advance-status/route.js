@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
 import { notifyTaskStatusChanged, getProjectMemberUserIds } from '@/lib/projectNotifications'
+import { queueTaskStatusChangedEmailNotifications } from '@/lib/projectEmailNotifications'
 import { emitTaskUpdate } from '@/lib/realtimeEvents'
 
 /**
@@ -10,7 +11,7 @@ import { emitTaskUpdate } from '@/lib/realtimeEvents'
  */
 export async function POST(request, { params }) {
   try {
-    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Employee', 'Project'])
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Employee', 'Project', 'ProjectMember', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -94,16 +95,30 @@ export async function POST(request, { params }) {
     try {
       const memberUserIds = await getProjectMemberUserIds(task.project._id, userRecord.employeeId, models)
       await notifyTaskStatusChanged(
-        task.project._id,
+        task.project,
         task,
-        oldStatus,
-        newStatus,
-        userRecord.employeeId,
+        updaterEmployee,
         memberUserIds,
-        models
+        oldStatus,
+        newStatus
       )
     } catch (e) {
       console.error('Failed to send notifications:', e)
+    }
+
+    try {
+      await queueTaskStatusChangedEmailNotifications({
+        projectId: task.project._id,
+        taskId,
+        oldStatus,
+        newStatus,
+        changedByEmployeeId: userRecord.employeeId,
+        triggeredByUserId: user._id || user.userId || null,
+        eventTimestamp: new Date(),
+        models,
+      })
+    } catch (emailError) {
+      console.error('Failed to queue quick-start task status emails:', emailError)
     }
 
     // Emit real-time update

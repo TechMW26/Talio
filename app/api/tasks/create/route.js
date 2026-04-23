@@ -6,6 +6,7 @@ import {
   createTimelineEvent
 } from '@/lib/projectService'
 import { notifyTaskAssigned } from '@/lib/projectNotifications'
+import { queueTaskCreatedEmailNotifications } from '@/lib/projectEmailNotifications'
 import { createTaskAssignmentNotification } from '@/lib/actionableNotifications'
 
 /**
@@ -18,7 +19,7 @@ export async function POST(request) {
   try {
     const auth = await getAuthAndModels(request, [
       'Project', 'ProjectMember', 'Task', 'TaskAssignee',
-      'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification'
+      'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification', 'ProjectEmailNotificationLog'
     ])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
@@ -235,6 +236,20 @@ export async function POST(request) {
 
     const taskAssignees = await TaskAssignee.find({ task: task._id })
       .populate('user', 'firstName lastName profilePicture employeeCode')
+
+    if (projectId) {
+      try {
+        await queueTaskCreatedEmailNotifications({
+          projectId,
+          taskId: task._id,
+          triggeredByEmployeeId: userRecord.employeeId,
+          triggeredByUserId: user._id || user.userId || null,
+          models,
+        })
+      } catch (emailError) {
+        console.error('Failed to queue project task creation emails:', emailError)
+      }
+    }
 
     return NextResponse.json({
       success: true,

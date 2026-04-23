@@ -6,6 +6,7 @@ import {
   createTimelineEvent,
   updateProjectStatus
 } from '@/lib/projectService'
+import { queueProjectStatusChangedEmailNotifications } from '@/lib/projectEmailNotifications'
 import { hasDepartmentAuthority } from '@/lib/hierarchyAuth'
 
 // GET - Get project details
@@ -125,7 +126,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Employee', 'Chat', 'ProjectTimelineEvent', 'ProjectMember'])
+    const auth = await getAuthAndModels(request, ['Project', 'Employee', 'Chat', 'ProjectTimelineEvent', 'ProjectMember', 'Task', 'User', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -250,12 +251,27 @@ export async function PUT(request, { params }) {
     }
 
     // Handle status change separately using service
+    let updatedStatusProject = null
     if (status && status !== project.status) {
       const employee = await Employee.findById(employeeId)
       try {
-        await updateProjectStatus(projectId, status, employee, { reason: 'Manual update' }, models)
+        updatedStatusProject = await updateProjectStatus(projectId, status, employee, { reason: 'Manual update' }, models)
       } catch (err) {
         return NextResponse.json({ success: false, message: err.message }, { status: 400 })
+      }
+
+      try {
+        await queueProjectStatusChangedEmailNotifications({
+          projectId,
+          oldStatus: project.status,
+          newStatus: updatedStatusProject.status,
+          changedByEmployeeId: employeeId,
+          triggeredByUserId: user._id || user.userId || null,
+          eventTimestamp: updatedStatusProject.updatedAt || new Date(),
+          models,
+        })
+      } catch (emailError) {
+        console.error('Failed to queue project status emails:', emailError)
       }
     }
 

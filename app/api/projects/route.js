@@ -9,6 +9,7 @@ import {
   notifyProjectInvitation,
   getProjectMemberUserIds
 } from '@/lib/projectNotifications'
+import { queueProjectCreatedEmailNotifications } from '@/lib/projectEmailNotifications'
 import { emitProjectUpdate } from '@/lib/realtimeEvents'
 import { getProjectVisibilityFilter } from '@/lib/hierarchyAuth'
 
@@ -187,7 +188,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent', 'Notification', 'Team'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent', 'Notification', 'Team', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -386,6 +387,17 @@ export async function POST(request) {
       )
     } catch (emitError) {
       console.error('Failed to emit project update:', emitError)
+    }
+
+    try {
+      await queueProjectCreatedEmailNotifications({
+        projectId: project._id,
+        triggeredByEmployeeId: creatorEmployee._id,
+        triggeredByUserId: authUser._id || authUser.userId || null,
+        models,
+      })
+    } catch (emailError) {
+      console.error('Failed to queue project creation emails:', emailError)
     }
 
     return NextResponse.json({

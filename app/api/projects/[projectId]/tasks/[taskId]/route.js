@@ -10,6 +10,7 @@ import {
   notifyTaskAssigned,
   getProjectMemberUserIds
 } from '@/lib/projectNotifications'
+import { queueTaskStatusChangedEmailNotifications } from '@/lib/projectEmailNotifications'
 import { emitTaskUpdate } from '@/lib/realtimeEvents'
 import { hasDepartmentAuthority } from '@/lib/hierarchyAuth'
 
@@ -78,7 +79,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ProjectApprovalRequest'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ProjectApprovalRequest', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -420,6 +421,23 @@ export async function PUT(request, { params }) {
       .populate('createdBy', 'firstName lastName profilePicture')
       .populate('assignedBy', 'firstName lastName')
 
+    if (status && status !== oldStatus) {
+      try {
+        await queueTaskStatusChangedEmailNotifications({
+          projectId,
+          taskId,
+          oldStatus,
+          newStatus: updatedTask.status,
+          changedByEmployeeId: userRecord.employeeId,
+          triggeredByUserId: user._id || user.userId || null,
+          eventTimestamp: updatedTask.updatedAt || new Date(),
+          models,
+        })
+      } catch (emailError) {
+        console.error('Failed to queue task status emails:', emailError)
+      }
+    }
+
     // Emit real-time task update to all project members
     try {
       const memberUserIds = await getProjectMemberUserIds(projectId, null, models)
@@ -439,7 +457,7 @@ export async function PUT(request, { params }) {
           action: 'update',
           statusChanged: status && status !== oldStatus,
           oldStatus,
-          newStatus: status
+          newStatus: updatedTask.status
         }
       )
     } catch (emitError) {

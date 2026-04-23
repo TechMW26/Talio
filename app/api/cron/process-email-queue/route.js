@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import OnboardingEmail from '@/models/OnboardingEmail'
 import { sendOnboardingEmail } from '@/lib/mailer'
-import { getTenantConnection } from '@/lib/tenantDb'
+import { getTenantModels } from '@/lib/tenantModels'
+import { processProjectEmailNotificationLog } from '@/lib/projectEmailNotifications'
 import getTenantCompanyModel from '@/models/TenantCompany'
 import { connectSuperadminDB } from '@/lib/superadminDb'
 
@@ -171,6 +172,12 @@ export async function GET(request) {
       failed: 0,
       errors: [],
       tenants: {},
+      projectNotifications: {
+        processed: 0,
+        sent: 0,
+        rescheduled: 0,
+        failed: 0,
+      },
     }
 
     // Get all active tenant companies
@@ -179,8 +186,9 @@ export async function GET(request) {
     
     for (const company of companies) {
       try {
-        const tenantDb = await getTenantConnection(company.databaseName)
-        const TenantOnboardingEmail = tenantDb.model('OnboardingEmail')
+        const tenantModels = await getTenantModels(company.databaseName, ['OnboardingEmail', 'ProjectEmailNotificationLog'])
+        const TenantOnboardingEmail = tenantModels.OnboardingEmail
+        const TenantProjectEmailNotificationLog = tenantModels.ProjectEmailNotificationLog
         
         // Find emails ready to process
         const queuedEmails = await TenantOnboardingEmail.find({
@@ -188,13 +196,22 @@ export async function GET(request) {
           scheduledFor: { $lte: now },
         }).limit(EMAIL_RATE_LIMIT.maxPerMinute).sort({ scheduledFor: 1 })
 
-        if (queuedEmails.length === 0) continue
+        const queuedProjectEmails = await TenantProjectEmailNotificationLog.find({
+          queued: true,
+          scheduledFor: { $lte: now },
+        }).limit(EMAIL_RATE_LIMIT.maxPerMinute).sort({ scheduledFor: 1 })
+
+        if (queuedEmails.length === 0 && queuedProjectEmails.length === 0) continue
 
         results.tenants[company.slug || company.databaseName] = {
           found: queuedEmails.length,
           sent: 0,
           rescheduled: 0,
           failed: 0,
+          projectEmailsFound: 0,
+          projectEmailsSent: 0,
+          projectEmailsRescheduled: 0,
+          projectEmailsFailed: 0,
         }
 
         for (const emailLog of queuedEmails) {
@@ -219,6 +236,37 @@ export async function GET(request) {
 
           // Delay between emails to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 3000))
+        }
+
+        if (queuedProjectEmails.length > 0) {
+          results.tenants[company.slug || company.databaseName].projectEmailsFound = queuedProjectEmails.length
+
+          for (const emailLog of queuedProjectEmails) {
+            results.processed++
+            results.projectNotifications.processed++
+
+            const processResult = await processProjectEmailNotificationLog(emailLog, tenantModels)
+
+            if (processResult.success) {
+              results.sent++
+              results.projectNotifications.sent++
+              results.tenants[company.slug || company.databaseName].projectEmailsSent++
+            } else if (processResult.rateLimited) {
+              results.rescheduled++
+              results.projectNotifications.rescheduled++
+              results.tenants[company.slug || company.databaseName].projectEmailsRescheduled++
+            } else {
+              results.failed++
+              results.projectNotifications.failed++
+              results.tenants[company.slug || company.databaseName].projectEmailsFailed++
+              results.errors.push({
+                emailId: processResult.emailLogId,
+                error: processResult.error,
+              })
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 3000))
+          }
         }
       } catch (tenantError) {
         console.error(`[email-queue] Error processing tenant ${company.slug || company.databaseName}:`, tenantError)

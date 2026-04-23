@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
 import { calculateCompletionPercentage, createTimelineEvent } from '@/lib/projectService'
+import { queueTaskStatusChangedEmailNotifications } from '@/lib/projectEmailNotifications'
 
 async function applySubtaskTaskState({
   task,
@@ -281,7 +282,7 @@ export async function POST(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Project', 'ProjectTimelineEvent', 'ProjectApprovalRequest'])
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Employee', 'Project', 'ProjectMember', 'ProjectTimelineEvent', 'ProjectApprovalRequest', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -684,6 +685,17 @@ export async function PUT(request, { params }) {
             approvalCreated
           }
         }, models).catch(console.error)
+
+        queueTaskStatusChangedEmailNotifications({
+          projectId,
+          taskId,
+          oldStatus: task.status,
+          newStatus: updatedTask.status,
+          changedByEmployeeId: userRecord.employeeId,
+          triggeredByUserId: user._id || user.userId || null,
+          eventTimestamp: updatedTask.updatedAt || new Date(),
+          models,
+        }).catch(console.error)
       }
     }
 

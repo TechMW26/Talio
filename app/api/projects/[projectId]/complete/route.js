@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
+import { queueProjectStatusChangedEmailNotifications } from '@/lib/projectEmailNotifications'
 
 // GET - Check if project can be marked complete (all tasks completed)
 export async function GET(request, { params }) {
@@ -51,7 +52,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Task', 'User', 'Employee', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'User', 'Employee', 'ProjectTimelineEvent', 'ProjectMember', 'ProjectEmailNotificationLog'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -120,6 +121,7 @@ export async function POST(request, { params }) {
     const employee = await Employee.findById(userRecord.employeeId)
 
     // Update project status to completed
+    const oldStatus = project.status
     project.status = 'completed'
     project.completionPercentage = 100
     await project.save()
@@ -138,6 +140,20 @@ export async function POST(request, { params }) {
         completedTasks
       }
     }, models)
+
+    try {
+      await queueProjectStatusChangedEmailNotifications({
+        projectId,
+        oldStatus,
+        newStatus: project.status,
+        changedByEmployeeId: userRecord.employeeId,
+        triggeredByUserId: user._id || user.userId || null,
+        eventTimestamp: project.updatedAt || new Date(),
+        models,
+      })
+    } catch (emailError) {
+      console.error('Failed to queue project completion emails:', emailError)
+    }
 
     return NextResponse.json({
       success: true,
