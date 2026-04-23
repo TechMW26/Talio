@@ -38,10 +38,10 @@ export async function POST(request, { params }) {
 
     // Check if user is a project head (support both old and new structure)
     const project = approvalRequest.project
-    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
+    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0
       ? project.projectHeads.map(h => h.toString())
-      : project.projectHead 
-        ? [project.projectHead.toString()] 
+      : project.projectHead
+        ? [project.projectHead.toString()]
         : []
 
     const isProjectHead = projectHeadIds.includes(userRecord.employeeId.toString())
@@ -76,7 +76,7 @@ export async function POST(request, { params }) {
           createdBy: userRecord.employeeId,
           relatedTask: task._id,
           description: `Task "${task.title}" approved as completed by ${employee.firstName} ${employee.lastName}`,
-          metadata: { 
+          metadata: {
             taskTitle: task.title,
             approvedBy: userRecord.employeeId,
             approverName: `${employee.firstName} ${employee.lastName}`
@@ -130,7 +130,7 @@ export async function POST(request, { params }) {
           createdBy: userRecord.employeeId,
           relatedTask: task._id,
           description: `Task "${task.title}" completion rejected by ${employee.firstName} ${employee.lastName}`,
-          metadata: { 
+          metadata: {
             taskTitle: task.title,
             rejectedBy: userRecord.employeeId,
             rejectorName: `${employee.firstName} ${employee.lastName}`,

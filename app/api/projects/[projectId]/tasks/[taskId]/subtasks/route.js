@@ -174,7 +174,7 @@ export async function POST(request, { params }) {
     })
     const isCreator = task.createdBy && task.createdBy.toString() === userRecord.employeeId.toString()
     const isAssigner = task.assignedBy && task.assignedBy.toString() === userRecord.employeeId.toString()
-    
+
     // Safely get project head IDs
     let projectHeadIds = []
     if (task.project && typeof task.project === 'object') {
@@ -188,9 +188,9 @@ export async function POST(request, { params }) {
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isAssignee && !isCreator && !isAssigner && !isProjectHead && !isAdmin) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to add subtasks' 
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have permission to add subtasks'
       }, { status: 403 })
     }
 
@@ -207,10 +207,10 @@ export async function POST(request, { params }) {
 
     // Use atomic $push operation for reliable array updates
     const currentSubtasks = [...(task.subtasks || []), newSubtask]
-    
+
     // Calculate progress
     const completedCount = currentSubtasks.filter(st => st.completed).length
-    const progressPercentage = currentSubtasks.length > 0 
+    const progressPercentage = currentSubtasks.length > 0
       ? Math.round((completedCount / currentSubtasks.length) * 100)
       : 0
 
@@ -230,7 +230,7 @@ export async function POST(request, { params }) {
       taskId,
       {
         $push: { subtasks: newSubtask },
-        $set: { 
+        $set: {
           progressPercentage,
           estimatedHours: taskEstimatedHours
         }
@@ -246,7 +246,7 @@ export async function POST(request, { params }) {
     const projectId = task.project?._id || task.project
     if (projectId) {
       calculateCompletionPercentage(projectId, models).catch(console.error)
-      
+
       // Create timeline event for subtask addition
       createTimelineEvent({
         project: projectId,
@@ -254,8 +254,8 @@ export async function POST(request, { params }) {
         createdBy: user.employeeId,
         relatedTask: taskId,
         description: `Subtask "${newSubtask.title}" added to task "${task.title}"`,
-        metadata: { 
-          taskTitle: task.title, 
+        metadata: {
+          taskTitle: task.title,
           subtaskTitle: newSubtask.title,
           estimatedDays: newSubtask.estimatedDays,
           estimatedHours: newSubtask.estimatedHours
@@ -315,7 +315,7 @@ export async function PUT(request, { params }) {
     })
     const isCreator = task.createdBy && task.createdBy.toString() === userRecord.employeeId.toString()
     const isAssigner = task.assignedBy && task.assignedBy.toString() === userRecord.employeeId.toString()
-    
+
     // Safely get project head IDs
     let projectHeadIds = []
     if (task.project && typeof task.project === 'object') {
@@ -329,9 +329,9 @@ export async function PUT(request, { params }) {
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isAssignee && !isCreator && !isAssigner && !isProjectHead && !isAdmin) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to update subtasks' 
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have permission to update subtasks'
       }, { status: 403 })
     }
 
@@ -340,11 +340,11 @@ export async function PUT(request, { params }) {
     if (task.status === 'review' && !isProjectHead && !isAdmin) {
       const completedCount = task.subtasks.filter(st => st.completed).length
       const currentProgress = Math.round((completedCount / task.subtasks.length) * 100)
-      
+
       if (currentProgress === 100 && completed === false) {
-        return NextResponse.json({ 
-          success: false, 
-          message: 'Task is under review. Subtasks cannot be modified until the project head reviews the task.' 
+        return NextResponse.json({
+          success: false,
+          message: 'Task is under review. Subtasks cannot be modified until the project head reviews the task.'
         }, { status: 403 })
       }
     }
@@ -353,7 +353,7 @@ export async function PUT(request, { params }) {
     if (!task.subtasks || task.subtasks.length === 0) {
       return NextResponse.json({ success: false, message: 'No subtasks found on this task' }, { status: 404 })
     }
-    
+
     const subtaskIndex = task.subtasks.findIndex(st => st._id.toString() === subtaskId.toString())
     if (subtaskIndex === -1) {
       return NextResponse.json({ success: false, message: 'Subtask not found' }, { status: 404 })
@@ -378,19 +378,19 @@ export async function PUT(request, { params }) {
     if (action === 'acceptCompletion') {
       // Another assignee is accepting a subtask completion
       if (!currentSubtask.pendingAcceptance) {
-        return NextResponse.json({ 
-          success: false, 
-          message: 'This subtask is not pending acceptance' 
+        return NextResponse.json({
+          success: false,
+          message: 'This subtask is not pending acceptance'
         }, { status: 400 })
       }
 
       const acceptedBy = currentSubtask.acceptedBy || []
       const alreadyAccepted = acceptedBy.some(id => id.toString() === userRecord.employeeId.toString())
-      
+
       if (alreadyAccepted) {
-        return NextResponse.json({ 
-          success: false, 
-          message: 'You have already accepted this completion' 
+        return NextResponse.json({
+          success: false,
+          message: 'You have already accepted this completion'
         }, { status: 400 })
       }
 
@@ -399,7 +399,7 @@ export async function PUT(request, { params }) {
       setOperations[`subtasks.${subtaskIndex}.acceptedBy`] = newAcceptedBy
 
       // Check if all assignees have accepted
-      const allAccepted = assigneeIds.every(id => 
+      const allAccepted = assigneeIds.every(id =>
         newAcceptedBy.some(accId => accId.toString() === id)
       )
 
@@ -456,9 +456,9 @@ export async function PUT(request, { params }) {
     if (action === 'rejectCompletion') {
       // Another assignee is rejecting a subtask completion
       if (!currentSubtask.pendingAcceptance) {
-        return NextResponse.json({ 
-          success: false, 
-          message: 'This subtask is not pending acceptance' 
+        return NextResponse.json({
+          success: false,
+          message: 'This subtask is not pending acceptance'
         }, { status: 400 })
       }
 
@@ -467,7 +467,7 @@ export async function PUT(request, { params }) {
       setOperations[`subtasks.${subtaskIndex}.pendingAcceptance`] = false
       setOperations[`subtasks.${subtaskIndex}.completedAt`] = null
       setOperations[`subtasks.${subtaskIndex}.acceptedBy`] = []
-      
+
       // Add rejection record
       const newRejection = {
         employee: userRecord.employeeId,
@@ -584,7 +584,7 @@ export async function PUT(request, { params }) {
     // Only fully completed subtasks count towards progress
     const completedCount = updatedSubtasks.filter(st => st.completed && !st.pendingAcceptance).length
     const pendingCount = updatedSubtasks.filter(st => st.pendingAcceptance).length
-    const progressPercentage = updatedSubtasks.length > 0 
+    const progressPercentage = updatedSubtasks.length > 0
       ? Math.round((completedCount / updatedSubtasks.length) * 100)
       : 0
     setOperations.progressPercentage = progressPercentage
@@ -625,12 +625,12 @@ export async function PUT(request, { params }) {
     const projectId = task.project?._id || task.project
     if (projectId) {
       calculateCompletionPercentage(projectId, models).catch(console.error)
-      
+
       // Create timeline event for subtask update
       const subtaskTitle = updatedSubtasks[subtaskIndex]?.title || 'Subtask'
       let timelineDescription = ''
       let timelineType = 'subtask_updated'
-      
+
       if (completed !== undefined) {
         timelineType = completed ? 'subtask_completed' : 'subtask_reopened'
         timelineDescription = `Subtask "${subtaskTitle}" ${completed ? 'completed' : 'reopened'} on task "${task.title}"`
@@ -639,7 +639,7 @@ export async function PUT(request, { params }) {
       } else if (title !== undefined) {
         timelineDescription = `Subtask renamed to "${title}" on task "${task.title}"`
       }
-      
+
       if (timelineDescription) {
         createTimelineEvent({
           project: projectId,
@@ -647,8 +647,8 @@ export async function PUT(request, { params }) {
           createdBy: userRecord.employeeId,
           relatedTask: taskId,
           description: timelineDescription,
-          metadata: { 
-            taskTitle: task.title, 
+          metadata: {
+            taskTitle: task.title,
             subtaskTitle,
             completed,
             progressPercentage,
@@ -657,7 +657,7 @@ export async function PUT(request, { params }) {
           }
         }, models).catch(console.error)
       }
-      
+
       // Additional timeline event for task status change
       if (statusChanged) {
         let statusDescription = ''
@@ -670,14 +670,14 @@ export async function PUT(request, { params }) {
         } else {
           statusDescription = newStatus.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
         }
-        
+
         createTimelineEvent({
           project: projectId,
           type: 'task_status_changed',
           createdBy: userRecord.employeeId,
           relatedTask: taskId,
           description: `Task "${task.title}" automatically moved to ${statusDescription} after subtask update`,
-          metadata: { 
+          metadata: {
             taskTitle: task.title,
             oldStatus: task.status,
             newStatus,
@@ -763,7 +763,7 @@ export async function DELETE(request, { params }) {
       user: userRecord.employeeId,
       assignmentStatus: 'accepted'
     })
-    
+
     // Safely get project head IDs
     let projectHeadIds = []
     if (task.project && typeof task.project === 'object') {
@@ -777,9 +777,9 @@ export async function DELETE(request, { params }) {
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isCreator && !isAssigner && !isAssignee && !isProjectHead && !isAdmin) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to delete subtasks' 
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have permission to delete subtasks'
       }, { status: 403 })
     }
 
@@ -787,7 +787,7 @@ export async function DELETE(request, { params }) {
     const deletedSubtask = (task.subtasks || []).find(st => st._id.toString() === subtaskId.toString())
     const remainingSubtasks = (task.subtasks || []).filter(st => st._id.toString() !== subtaskId.toString())
     const completedCount = remainingSubtasks.filter(st => st.completed).length
-    const progressPercentage = remainingSubtasks.length > 0 
+    const progressPercentage = remainingSubtasks.length > 0
       ? Math.round((completedCount / remainingSubtasks.length) * 100)
       : 0
 
@@ -809,7 +809,7 @@ export async function DELETE(request, { params }) {
     const projectId = task.project?._id || task.project
     if (projectId) {
       calculateCompletionPercentage(projectId, models).catch(console.error)
-      
+
       // Create timeline event for subtask deletion
       createTimelineEvent({
         project: projectId,
@@ -817,8 +817,8 @@ export async function DELETE(request, { params }) {
         createdBy: userRecord.employeeId,
         relatedTask: taskId,
         description: `Subtask "${deletedSubtask?.title || 'Unknown'}" deleted from task "${task.title}"`,
-        metadata: { 
-          taskTitle: task.title, 
+        metadata: {
+          taskTitle: task.title,
           subtaskTitle: deletedSubtask?.title,
           remainingSubtasks: remainingSubtasks.length
         }

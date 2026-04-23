@@ -23,7 +23,7 @@ function calculateNextRetryTime(retryCount) {
   const backoffMinutes = baseDelayMinutes * Math.pow(EMAIL_RATE_LIMIT.backoffMultiplier, retryCount)
   const maxDelayMinutes = 60 // Max 1 hour delay
   const delayMinutes = Math.min(backoffMinutes, maxDelayMinutes)
-  
+
   return new Date(Date.now() + delayMinutes * 60 * 1000)
 }
 
@@ -55,7 +55,7 @@ function isRateLimitError(errorMessage) {
 async function processQueuedEmail(emailLog) {
   emailLog.queued = false
   emailLog.scheduledFor = null
-  
+
   try {
     const result = await sendOnboardingEmail({
       to: emailLog.recipientEmail,
@@ -68,7 +68,7 @@ async function processQueuedEmail(emailLog) {
       department: emailLog.department,
       dateOfJoining: emailLog.dateOfJoining,
     })
-    
+
     if (result.success) {
       emailLog.status = 'sent'
       emailLog.sentAt = new Date()
@@ -80,7 +80,7 @@ async function processQueuedEmail(emailLog) {
       // Check if rate limited
       if (isRateLimitError(result.error)) {
         emailLog.autoRetryCount += 1
-        
+
         if (emailLog.autoRetryCount < EMAIL_RATE_LIMIT.maxAutoRetries) {
           // Schedule for retry
           emailLog.status = 'pending'
@@ -89,9 +89,9 @@ async function processQueuedEmail(emailLog) {
           emailLog.rateLimitedUntil = emailLog.scheduledFor
           emailLog.errorMessage = `Rate limited. Auto-retry ${emailLog.autoRetryCount}/${EMAIL_RATE_LIMIT.maxAutoRetries} scheduled for ${emailLog.scheduledFor.toISOString()}`
           await emailLog.save()
-          
-          return { 
-            success: false, 
+
+          return {
+            success: false,
             emailId: emailLog._id,
             rateLimited: true,
             scheduledFor: emailLog.scheduledFor,
@@ -116,7 +116,7 @@ async function processQueuedEmail(emailLog) {
     // Check if rate limited
     if (isRateLimitError(error.message)) {
       emailLog.autoRetryCount += 1
-      
+
       if (emailLog.autoRetryCount < EMAIL_RATE_LIMIT.maxAutoRetries) {
         emailLog.status = 'pending'
         emailLog.queued = true
@@ -124,16 +124,16 @@ async function processQueuedEmail(emailLog) {
         emailLog.rateLimitedUntil = emailLog.scheduledFor
         emailLog.errorMessage = `Rate limited. Auto-retry ${emailLog.autoRetryCount}/${EMAIL_RATE_LIMIT.maxAutoRetries} scheduled.`
         await emailLog.save()
-        
-        return { 
-          success: false, 
+
+        return {
+          success: false,
           emailId: emailLog._id,
           rateLimited: true,
           scheduledFor: emailLog.scheduledFor
         }
       }
     }
-    
+
     emailLog.status = 'failed'
     emailLog.errorMessage = error.message || 'Unknown error'
     await emailLog.save()
@@ -152,7 +152,7 @@ export async function GET(request) {
     // Verify cron secret to prevent unauthorized access
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
-    
+
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       // Allow localhost/internal calls without secret for dev
       const host = request.headers.get('host') || ''
@@ -163,7 +163,7 @@ export async function GET(request) {
 
     await connectDB()
     await connectSuperadminDB()
-    
+
     const now = new Date()
     const results = {
       processed: 0,
@@ -183,13 +183,13 @@ export async function GET(request) {
     // Get all active tenant companies
     const TenantCompany = await getTenantCompanyModel()
     const companies = await TenantCompany.find({ isActive: true }).lean()
-    
+
     for (const company of companies) {
       try {
         const tenantModels = await getTenantModels(company.databaseName, ['OnboardingEmail', 'ProjectEmailNotificationLog'])
         const TenantOnboardingEmail = tenantModels.OnboardingEmail
         const TenantProjectEmailNotificationLog = tenantModels.ProjectEmailNotificationLog
-        
+
         // Find emails ready to process
         const queuedEmails = await TenantOnboardingEmail.find({
           queued: true,
@@ -216,9 +216,9 @@ export async function GET(request) {
 
         for (const emailLog of queuedEmails) {
           results.processed++
-          
+
           const processResult = await processQueuedEmail(emailLog)
-          
+
           if (processResult.success) {
             results.sent++
             results.tenants[company.slug || company.databaseName].sent++
@@ -286,9 +286,9 @@ export async function GET(request) {
 
       for (const emailLog of globalQueuedEmails) {
         results.processed++
-        
+
         const processResult = await processQueuedEmail(emailLog)
-        
+
         if (processResult.success) {
           results.sent++
         } else if (processResult.rateLimited) {
@@ -328,7 +328,7 @@ export async function POST(request) {
     // Verify cron secret
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
-    
+
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       const host = request.headers.get('host') || ''
       if (!host.includes('localhost') && !host.includes('127.0.0.1')) {
@@ -338,13 +338,13 @@ export async function POST(request) {
 
     await connectDB()
     await connectSuperadminDB()
-    
+
     const { action, delayMinutes = 5 } = await request.json()
-    
+
     if (action === 'queue-all-failed') {
       // Queue all failed emails for retry
       const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000)
-      
+
       // Process all tenant databases
       const TenantCompany = await getTenantCompanyModel()
       const companies = await TenantCompany.find({ isActive: true }).lean()
@@ -354,9 +354,9 @@ export async function POST(request) {
         try {
           const tenantDb = await getTenantConnection(company.databaseName)
           const TenantOnboardingEmail = tenantDb.model('OnboardingEmail')
-          
+
           const result = await TenantOnboardingEmail.updateMany(
-            { 
+            {
               status: 'failed',
               queued: { $ne: true },
               autoRetryCount: { $lt: EMAIL_RATE_LIMIT.maxAutoRetries }
@@ -369,7 +369,7 @@ export async function POST(request) {
               }
             }
           )
-          
+
           totalQueued += result.modifiedCount
         } catch (err) {
           console.error(`[email-queue] Error queueing failed emails for ${company.slug || company.databaseName}:`, err)
@@ -378,7 +378,7 @@ export async function POST(request) {
 
       // Also process global database
       const globalResult = await OnboardingEmail.updateMany(
-        { 
+        {
           status: 'failed',
           queued: { $ne: true },
           autoRetryCount: { $lt: EMAIL_RATE_LIMIT.maxAutoRetries }
@@ -391,7 +391,7 @@ export async function POST(request) {
           }
         }
       )
-      
+
       totalQueued += globalResult.modifiedCount
 
       return NextResponse.json({

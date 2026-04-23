@@ -40,17 +40,17 @@ export async function POST(request, { params }) {
     })
 
     if (!userAssignment) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You are not assigned to this task' 
+      return NextResponse.json({
+        success: false,
+        message: 'You are not assigned to this task'
       }, { status: 403 })
     }
 
     // Check if task is in "todo" status
     if (task.status !== 'todo') {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Task is not in todo status' 
+      return NextResponse.json({
+        success: false,
+        message: 'Task is not in todo status'
       }, { status: 400 })
     }
 
@@ -58,15 +58,15 @@ export async function POST(request, { params }) {
     const newStatus = 'in-progress'
 
     // Update task status to in-progress
-    await Task.findByIdAndUpdate(taskId, { 
+    await Task.findByIdAndUpdate(taskId, {
       status: newStatus,
       startDate: task.startDate || new Date() // Set start date if not already set
     })
 
     // Get employee details for timeline
     const updaterEmployee = await Employee.findById(userRecord.employeeId)
-    const updaterName = updaterEmployee 
-      ? `${updaterEmployee.firstName} ${updaterEmployee.lastName}` 
+    const updaterName = updaterEmployee
+      ? `${updaterEmployee.firstName} ${updaterEmployee.lastName}`
       : 'Unknown'
 
     // Create timeline event
@@ -77,9 +77,9 @@ export async function POST(request, { params }) {
         createdBy: userRecord.employeeId,
         relatedTask: taskId,
         description: `Task "${task.title}" started by ${updaterName}`,
-        metadata: { 
-          taskTitle: task.title, 
-          oldStatus, 
+        metadata: {
+          taskTitle: task.title,
+          oldStatus,
           newStatus,
           changedBy: {
             employeeId: userRecord.employeeId,

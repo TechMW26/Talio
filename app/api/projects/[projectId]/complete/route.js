@@ -21,9 +21,9 @@ export async function GET(request, { params }) {
     }
 
     // Get all non-archived tasks
-    const tasks = await Task.find({ 
-      project: projectId, 
-      status: { $ne: 'archived' } 
+    const tasks = await Task.find({
+      project: projectId,
+      status: { $ne: 'archived' }
     }).select('status title')
 
     const totalTasks = tasks.length
@@ -72,35 +72,35 @@ export async function POST(request, { params }) {
     }
 
     // Check if user is a project head (support both old and new structure)
-    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
+    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0
       ? project.projectHeads.map(h => h.toString())
-      : project.projectHead 
-        ? [project.projectHead.toString()] 
+      : project.projectHead
+        ? [project.projectHead.toString()]
         : []
 
     const isProjectHead = projectHeadIds.includes(userRecord.employeeId.toString())
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isProjectHead && !isAdmin) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Only project heads can mark the project as complete' 
+      return NextResponse.json({
+        success: false,
+        message: 'Only project heads can mark the project as complete'
       }, { status: 403 })
     }
 
     // Check if ALL tasks are completed (not just percentage)
-    const tasks = await Task.find({ 
-      project: projectId, 
-      status: { $ne: 'archived' } 
+    const tasks = await Task.find({
+      project: projectId,
+      status: { $ne: 'archived' }
     }).select('status title')
 
     const totalTasks = tasks.length
     const completedTasks = tasks.filter(t => t.status === 'completed').length
-    
+
     if (totalTasks > 0 && completedTasks !== totalTasks) {
       const incompleteTasks = tasks.filter(t => t.status !== 'completed')
-      return NextResponse.json({ 
-        success: false, 
+      return NextResponse.json({
+        success: false,
         message: `All tasks must be completed. ${totalTasks - completedTasks} task(s) remaining.`,
         data: {
           totalTasks,
@@ -112,9 +112,9 @@ export async function POST(request, { params }) {
 
     // Check if already completed
     if (['completed', 'approved'].includes(project.status)) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Project is already marked as complete' 
+      return NextResponse.json({
+        success: false,
+        message: 'Project is already marked as complete'
       }, { status: 400 })
     }
 
@@ -132,7 +132,7 @@ export async function POST(request, { params }) {
       type: 'project_completed',
       createdBy: user.employeeId,
       description: `Project marked as completed by ${employee.firstName} ${employee.lastName}`,
-      metadata: { 
+      metadata: {
         completedBy: user.employeeId,
         completerName: `${employee.firstName} ${employee.lastName}`,
         completionPercentage: 100,

@@ -28,15 +28,15 @@ export async function PUT(request, { params }) {
 
     const approvalRequest = await ProjectApprovalRequest.findById(requestId)
       .populate('relatedTask')
-    
+
     if (!approvalRequest) {
       return NextResponse.json({ success: false, message: 'Request not found' }, { status: 404 })
     }
 
     if (approvalRequest.status !== 'pending') {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'This request has already been processed' 
+      return NextResponse.json({
+        success: false,
+        message: 'This request has already been processed'
       }, { status: 400 })
     }
 
@@ -47,34 +47,34 @@ export async function PUT(request, { params }) {
 
     // Only project head(s) or admin can approve
     const isAdmin = ['admin'].includes(userDoc.role)
-    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
+    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0
       ? project.projectHeads.map(h => h.toString())
-      : project.projectHead 
-        ? [project.projectHead.toString()] 
+      : project.projectHead
+        ? [project.projectHead.toString()]
         : []
     const isProjectHead = projectHeadIds.includes(userDoc.employeeId.toString())
 
     if (!isAdmin && !isProjectHead) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Only project heads can approve or reject requests' 
+      return NextResponse.json({
+        success: false,
+        message: 'Only project heads can approve or reject requests'
       }, { status: 403 })
     }
 
     const body = await request.json()
-    const { 
-      action, 
-      comment, 
-      unmarkSubtasks, 
+    const {
+      action,
+      comment,
+      unmarkSubtasks,
       subtasksToUnmark, // Array of subtask IDs to unmark
       subtaskComments,  // Object mapping subtask IDs to comments
       newStatus         // For tasks without subtasks - the new status to set
     } = body
 
     if (!action || !['approve', 'reject'].includes(action)) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Valid action (approve/reject) is required' 
+      return NextResponse.json({
+        success: false,
+        message: 'Valid action (approve/reject) is required'
       }, { status: 400 })
     }
 
@@ -95,13 +95,13 @@ export async function PUT(request, { params }) {
             const taskTitle = approvalRequest.relatedTask.title
             const taskId = approvalRequest.relatedTask._id
             const oldStatus = approvalRequest.relatedTask.status
-            
+
             // Update task status to completed
             const updatedTask = await Task.findByIdAndUpdate(taskId, {
               status: 'completed',
               completedAt: new Date()
             }, { new: true })
-            
+
             // Recalculate completion percentage
             calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
 
@@ -127,16 +127,16 @@ export async function PUT(request, { params }) {
             }).catch(console.error)
           }
           break
-        
+
         case 'task_deletion':
           if (approvalRequest.relatedTask) {
             const taskTitle = approvalRequest.relatedTask.title
             const taskId = approvalRequest.relatedTask._id
-            
+
             // Delete the task and its assignees
             await TaskAssignee.deleteMany({ task: taskId })
             await Task.findByIdAndDelete(taskId)
-            
+
             // Recalculate completion percentage
             calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
 
@@ -150,49 +150,49 @@ export async function PUT(request, { params }) {
             }, models).catch(console.error)
           }
           break
-          
+
         case 'project_completion':
           // Handle project completion approval
           {
-          const oldStatus = project.status
-          const updatedProject = await Project.findByIdAndUpdate(approvalRequest.project, {
-            status: 'approved',
-            completedAt: new Date()
-          }, { new: true })
-          
-          createTimelineEvent({
-            project: approvalRequest.project,
-            type: 'project_approved',
-            createdBy: userDoc.employeeId,
-            description: 'Project completion approved',
-            metadata: { approvedBy: userDoc.employeeId }
-          }, models).catch(console.error)
+            const oldStatus = project.status
+            const updatedProject = await Project.findByIdAndUpdate(approvalRequest.project, {
+              status: 'approved',
+              completedAt: new Date()
+            }, { new: true })
 
-          queueProjectStatusChangedEmailNotifications({
-            projectId: approvalRequest.project,
-            oldStatus,
-            newStatus: updatedProject?.status || 'approved',
-            changedByEmployeeId: userDoc.employeeId,
-            triggeredByUserId: user._id || user.userId || null,
-            eventTimestamp: updatedProject?.updatedAt || new Date(),
-            models,
-          }).catch(console.error)
+            createTimelineEvent({
+              project: approvalRequest.project,
+              type: 'project_approved',
+              createdBy: userDoc.employeeId,
+              description: 'Project completion approved',
+              metadata: { approvedBy: userDoc.employeeId }
+            }, models).catch(console.error)
+
+            queueProjectStatusChangedEmailNotifications({
+              projectId: approvalRequest.project,
+              oldStatus,
+              newStatus: updatedProject?.status || 'approved',
+              changedByEmployeeId: userDoc.employeeId,
+              triggeredByUserId: user._id || user.userId || null,
+              eventTimestamp: updatedProject?.updatedAt || new Date(),
+              models,
+            }).catch(console.error)
           }
           break
-          
+
         case 'task_review':
           // Task review approval - mark task as completed (same as task_completion)
           if (approvalRequest.relatedTask) {
             const taskTitle = approvalRequest.relatedTask.title
             const taskId = approvalRequest.relatedTask._id
             const oldStatus = approvalRequest.relatedTask.status
-            
+
             // Update task status to completed
             const updatedTask = await Task.findByIdAndUpdate(taskId, {
               status: 'completed',
               completedAt: new Date()
             }, { new: true })
-            
+
             // Recalculate completion percentage
             calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
 
@@ -218,7 +218,7 @@ export async function PUT(request, { params }) {
             }).catch(console.error)
           }
           break
-          
+
         case 'member_removal':
           // Handle member removal - to be implemented
           break
@@ -227,12 +227,12 @@ export async function PUT(request, { params }) {
       // Handle rejection
       if ((approvalRequest.type === 'task_completion' || approvalRequest.type === 'task_review') && approvalRequest.relatedTask) {
         const task = await Task.findById(approvalRequest.relatedTask._id)
-        
+
         if (task) {
           const oldStatus = task.status
           // Determine the new status
           let targetStatus = 'in-progress'
-          
+
           // For tasks without subtasks, allow project head to specify the status
           if ((!task.subtasks || task.subtasks.length === 0) && newStatus) {
             const validStatuses = ['todo', 'in-progress', 'on-hold']
@@ -240,18 +240,18 @@ export async function PUT(request, { params }) {
               targetStatus = newStatus
             }
           }
-          
+
           task.status = targetStatus
-          
+
           // Track rejection details
           task.lastRejectedAt = new Date()
           task.lastRejectedBy = userDoc.employeeId
           task.rejectionCount = (task.rejectionCount || 0) + 1
           task.lastRejectionReason = comment || ''
-          
+
           // Handle subtask unmarking and track unmarked names
           const unmarkedSubtaskNames = []
-          
+
           if (task.subtasks && task.subtasks.length > 0) {
             if (subtasksToUnmark && subtasksToUnmark.length > 0) {
               // Selective unmarking - only unmark specified subtasks
@@ -280,17 +280,17 @@ export async function PUT(request, { params }) {
                 st.completedBy = null
               })
             }
-            
+
             // Recalculate task progress percentage based on subtasks
             const completedCount = task.subtasks.filter(st => st.completed).length
-            task.progressPercentage = task.subtasks.length > 0 
+            task.progressPercentage = task.subtasks.length > 0
               ? Math.round((completedCount / task.subtasks.length) * 100)
               : 0
           } else {
             // No subtasks - set progress to 0
             task.progressPercentage = 0
           }
-          
+
           await task.save()
 
           // Emit socket event for real-time update with updated progress
@@ -305,36 +305,36 @@ export async function PUT(request, { params }) {
               rejectionCount: task.rejectionCount
             })
           }
-          
+
           // Recalculate project completion percentage
           calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
-          
+
           // Get task assignees for notifications
-          const taskAssignees = await TaskAssignee.find({ 
-            task: task._id, 
-            assignmentStatus: 'accepted' 
+          const taskAssignees = await TaskAssignee.find({
+            task: task._id,
+            assignmentStatus: 'accepted'
           }).populate('user', 'firstName lastName email')
-          
+
           const assigneeEmployeeIds = taskAssignees.map(ta => ta.user._id)
-          const assigneeUserIds = await User.find({ 
-            employeeId: { $in: assigneeEmployeeIds } 
+          const assigneeUserIds = await User.find({
+            employeeId: { $in: assigneeEmployeeIds }
           }).select('_id email')
-          
+
           // Get rejector employee details
           const rejectorEmployee = await Employee.findById(userDoc.employeeId).select('firstName lastName')
-          
+
           // Send push notifications to assignees
           if (assigneeUserIds.length > 0) {
             notifyTaskReviewRejected(
-              project, 
-              task, 
-              rejectorEmployee, 
+              project,
+              task,
+              rejectorEmployee,
               assigneeUserIds.map(u => u._id),
               comment,
               unmarkedSubtaskNames
             ).catch(console.error)
           }
-          
+
           // Send email notifications to assignees
           for (const assignee of taskAssignees) {
             if (assignee.user?.email) {
@@ -374,7 +374,7 @@ export async function PUT(request, { params }) {
                     </div>
                   </div>
                 `
-                
+
                 sendEmail({
                   to: assigneeUser.email,
                   subject: emailSubject,
@@ -383,7 +383,7 @@ export async function PUT(request, { params }) {
               }
             }
           }
-          
+
           // Create timeline event for rejection (with red color indicator)
           createTimelineEvent({
             project: approvalRequest.project,
@@ -391,9 +391,9 @@ export async function PUT(request, { params }) {
             createdBy: userDoc.employeeId,
             relatedTask: task._id,
             description: `Task "${task.title}" review rejected${comment ? `: ${comment}` : ''}`,
-            metadata: { 
-              requestType: approvalRequest.type, 
-              rejectionComment: comment, 
+            metadata: {
+              requestType: approvalRequest.type,
+              rejectionComment: comment,
               unmarkSubtasks,
               subtasksUnmarked: unmarkedSubtaskNames,
               subtaskComments,
@@ -454,21 +454,21 @@ export async function DELETE(request, { params }) {
     // Only requester, project head, or admin can cancel
     const isRequester = approvalRequest.requestedBy.toString() === userDoc.employeeId.toString()
     const isAdmin = ['admin'].includes(userDoc.role)
-    
+
     const project = await Project.findById(approvalRequest.project)
     const isProjectHead = project && project.projectHead.toString() === userDoc.employeeId.toString()
 
     if (!isRequester && !isAdmin && !isProjectHead) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You can only cancel your own requests' 
+      return NextResponse.json({
+        success: false,
+        message: 'You can only cancel your own requests'
       }, { status: 403 })
     }
 
     if (approvalRequest.status !== 'pending') {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Only pending requests can be cancelled' 
+      return NextResponse.json({
+        success: false,
+        message: 'Only pending requests can be cancelled'
       }, { status: 400 })
     }
 
