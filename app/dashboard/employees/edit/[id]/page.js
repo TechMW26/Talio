@@ -9,6 +9,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import useRoles from '@/hooks/useRoles'
+import { recalcSalary } from '@/utils/salaryRecalc'
 
 export default function EditEmployeePage() {
   const params = useParams()
@@ -846,7 +847,7 @@ export default function EditEmployeePage() {
                     <input
                       type="number"
                       value={formData.salary.ctc}
-                      onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, ctc: e.target.value } })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, salary: recalcSalary(prev.salary, 'ctc', e.target.value) }))}
                       placeholder="Annual CTC"
                       className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
@@ -862,7 +863,7 @@ export default function EditEmployeePage() {
                     <input
                       type="number"
                       value={formData.salary.grossSalary}
-                      onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, grossSalary: e.target.value } })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, salary: recalcSalary(prev.salary, 'grossSalary', e.target.value) }))}
                       placeholder="Monthly gross salary"
                       className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
@@ -878,7 +879,7 @@ export default function EditEmployeePage() {
                     <input
                       type="number"
                       value={formData.salary.basic}
-                      onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, basic: e.target.value } })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, salary: recalcSalary(prev.salary, 'basic', e.target.value) }))}
                       placeholder="Basic salary"
                       className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
@@ -894,7 +895,7 @@ export default function EditEmployeePage() {
                     <input
                       type="number"
                       value={formData.salary.hra}
-                      onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, hra: e.target.value } })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, salary: recalcSalary(prev.salary, 'hra', e.target.value) }))}
                       placeholder="House rent allowance"
                       className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
@@ -910,7 +911,7 @@ export default function EditEmployeePage() {
                     <input
                       type="number"
                       value={formData.salary.conveyance}
-                      onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, conveyance: e.target.value } })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, salary: recalcSalary(prev.salary, 'conveyance', e.target.value) }))}
                       placeholder="Conveyance allowance"
                       className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
@@ -926,7 +927,7 @@ export default function EditEmployeePage() {
                     <input
                       type="number"
                       value={formData.salary.medical}
-                      onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, medical: e.target.value } })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, salary: recalcSalary(prev.salary, 'medical', e.target.value) }))}
                       placeholder="Medical allowance"
                       className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
@@ -942,7 +943,7 @@ export default function EditEmployeePage() {
                     <input
                       type="number"
                       value={formData.salary.special}
-                      onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, special: e.target.value } })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, salary: recalcSalary(prev.salary, 'special', e.target.value) }))}
                       placeholder="Special allowance"
                       className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
