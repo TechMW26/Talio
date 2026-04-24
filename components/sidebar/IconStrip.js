@@ -9,7 +9,8 @@ import {
   HiOutlineUserCircle,
   HiOutlineInformationCircle,
 } from 'react-icons/hi2'
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { getMenuItemsForRole, NEW_MENU_PATHS } from '@/utils/roleBasedMenus'
 import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
@@ -30,6 +31,59 @@ function SidebarBadge({ count }) {
     <Chip size="sm" color="danger" variant="flat" className="absolute -top-3 -right-3 min-w-4 h-4 text-[9px] z-10 px-1">
       {count > 99 ? '99+' : count}
     </Chip>
+  )
+}
+
+// Floating "NEW" callout rendered into a portal so it sits above page chrome,
+// but tracks the anchor element's screen position so it scrolls with the icon.
+function NewMenuCallout({ anchorRef, label, onDismiss }) {
+  const [pos, setPos] = useState(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  useLayoutEffect(() => {
+    if (!anchorRef?.current) return
+    let raf = 0
+    const update = () => {
+      const el = anchorRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      setPos({ top: r.top + r.height / 2, left: r.right + 12 })
+    }
+    update()
+    const onScrollOrResize = () => {
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(update)
+    }
+    window.addEventListener('scroll', onScrollOrResize, true)
+    window.addEventListener('resize', onScrollOrResize)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onScrollOrResize) : null
+    if (ro && anchorRef.current) ro.observe(anchorRef.current)
+    const interval = setInterval(update, 500) // catch sidebar layout shifts
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true)
+      window.removeEventListener('resize', onScrollOrResize)
+      if (ro) ro.disconnect()
+      clearInterval(interval)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [anchorRef])
+
+  if (!mounted || !pos || typeof document === 'undefined') return null
+
+  return createPortal(
+    <div
+      onClick={onDismiss}
+      role="button"
+      aria-label={`New: ${label} (click to dismiss)`}
+      className="fixed px-2.5 py-1 rounded-lg bg-success-500 text-white text-[11px] font-semibold whitespace-nowrap shadow-lg shadow-success-500/40 animate-pulse cursor-pointer select-none"
+      style={{ top: pos.top, left: pos.left, transform: 'translateY(-50%)', zIndex: 9999, pointerEvents: 'auto' }}
+    >
+      <span className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 rotate-45 bg-success-500" />
+      New · {label}
+    </div>,
+    document.body
   )
 }
 
@@ -366,6 +420,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
             const newRingClass = isNewHighlighted
               ? 'ring-2 ring-success-400 ring-offset-1 ring-offset-transparent animate-pulse'
               : ''
+            const anchorRef = { current: null }
 
             let iconButton
 
@@ -396,17 +451,14 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
               // For items with submenu, clicking expands the sliding sidebar
               iconButton = (
                 <Tooltip
-                  content={isNewHighlighted ? `New · ${item.name}` : item.name}
+                  content={item.name}
                   placement="right"
                   delay={200}
                   closeDelay={0}
-                  color={isNewHighlighted ? 'success' : 'default'}
-                  isOpen={isNewHighlighted ? true : undefined}
-                  classNames={isNewHighlighted ? {
-                    content: 'bg-success-500 text-white font-semibold shadow-lg shadow-success-500/40',
-                  } : undefined}
+                  isDisabled={isNewHighlighted}
                 >
                   <button
+                    ref={(el) => { anchorRef.current = el }}
                     onClick={() => {
                       if (isNewHighlighted) dismissNewTooltip(item.path)
                       onExpandClick(item.name, index)
@@ -433,18 +485,15 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
               // Regular menu items - navigate directly
               iconButton = (
                 <Tooltip
-                  content={isNewHighlighted ? `New · ${item.name}` : item.name}
+                  content={item.name}
                   placement="right"
                   delay={200}
                   closeDelay={0}
-                  color={isNewHighlighted ? 'success' : 'default'}
-                  isOpen={isNewHighlighted ? true : undefined}
-                  classNames={isNewHighlighted ? {
-                    content: 'bg-success-500 text-white font-semibold shadow-lg shadow-success-500/40',
-                  } : undefined}
+                  isDisabled={isNewHighlighted}
                 >
                   <Link
                     href={item.path}
+                    ref={(el) => { anchorRef.current = el }}
                     onClick={() => {
                       if (isNewHighlighted) dismissNewTooltip(item.path)
                       handleLinkClick(item.path)
@@ -475,6 +524,13 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
                   <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
                 )}
                 {iconButton}
+                {isNewHighlighted && (
+                  <NewMenuCallout
+                    anchorRef={anchorRef}
+                    label={item.name}
+                    onDismiss={() => dismissNewTooltip(item.path)}
+                  />
+                )}
               </div>
             )
           })}

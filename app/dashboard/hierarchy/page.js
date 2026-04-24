@@ -9,8 +9,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 const NW = 214;
 const NH = 164;
 const H_GAP = 20;
-const ROW_GAP = 34;
-const BAND_GAP = 78;
+const ROW_GAP = 68;
+const BAND_GAP = 96;
 const AVATAR_H = 36;
 const PAD_X = 42;
 
