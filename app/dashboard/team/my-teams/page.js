@@ -33,15 +33,23 @@ export default function MyTeamsPage() {
   )
   const teamsData = teamsRes?.data
   const leadingTeams = teamsData?.leading || []
+  const directReports = teamsData?.assignedReports || []
+  const ASSIGNED_TEAM_ID = '__assigned_reports__'
+  const displayTeams = directReports.length > 0
+    ? [...leadingTeams, { _id: ASSIGNED_TEAM_ID, teamName: 'Assigned Reports', department: { name: 'Cross Department' }, members: directReports, isCrossDepartment: true, isVirtual: true }]
+    : leadingTeams
 
   // Fetch members for the selected team
   const { data: teamDetailRes, isLoading: teamDetailLoading } = useAuthedSWR(
-    selectedTeamId ? `/api/teams/${selectedTeamId}` : null
+    selectedTeamId && selectedTeamId !== ASSIGNED_TEAM_ID ? `/api/teams/${selectedTeamId}` : null
   )
   const selectedTeam = teamDetailRes?.data
 
   // Build the combined members + leaders list from the selected team
   const teamMembers = useMemo(() => {
+    if (selectedTeamId === ASSIGNED_TEAM_ID) {
+      return [...directReports].sort((a, b) => (a.firstName || '').localeCompare(b.firstName || ''))
+    }
     if (!selectedTeam) return []
     const memberMap = new Map()
 
@@ -61,7 +69,7 @@ export default function MyTeamsPage() {
     return [...memberMap.values()].sort((a, b) =>
       (a.firstName || '').localeCompare(b.firstName || '')
     )
-  }, [selectedTeam])
+  }, [selectedTeam, selectedTeamId, directReports])
 
   const filteredMembers = useMemo(() => {
     if (!searchTerm) return teamMembers
@@ -109,7 +117,7 @@ export default function MyTeamsPage() {
     )
   }
 
-  if (leadingTeams.length === 0) {
+  if (displayTeams.length === 0) {
     return (
       <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
         <div className="flex items-center mb-6">
@@ -127,7 +135,7 @@ export default function MyTeamsPage() {
 
   // If a team is selected, show the member list
   if (selectedTeamId) {
-    const currentTeam = leadingTeams.find(t => t._id === selectedTeamId)
+    const currentTeam = displayTeams.find(t => t._id === selectedTeamId)
 
     return (
       <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
@@ -180,7 +188,7 @@ export default function MyTeamsPage() {
         )}
 
         {/* Members */}
-        {teamDetailLoading ? (
+        {teamDetailLoading && selectedTeamId !== ASSIGNED_TEAM_ID ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="bg-white rounded-lg shadow-md p-6 space-y-3">
@@ -308,7 +316,7 @@ export default function MyTeamsPage() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600 font-medium">Teams You Lead</p>
-            <p className="text-3xl font-bold text-gray-900">{leadingTeams.length}</p>
+            <p className="text-3xl font-bold text-gray-900">{displayTeams.length}</p>
           </div>
           <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center">
             <FaUserFriends className="text-primary-500 text-2xl" />
@@ -318,7 +326,7 @@ export default function MyTeamsPage() {
 
       {/* Team Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {leadingTeams.map((team) => (
+        {displayTeams.map((team) => (
           <div
             key={team._id}
             onClick={() => handleTeamSelect(team._id)}

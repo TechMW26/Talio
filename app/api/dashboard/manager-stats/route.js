@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 export const dynamic = 'force-dynamic'
 
@@ -94,11 +95,10 @@ export async function GET(request) {
         status: 'active'
       }).select('firstName lastName employeeCode department reportingManager').lean()
     } else {
-      // Otherwise, get direct reportees
-      teamMembers = await Employee.find({
-        reportingManager: manager._id,
-        status: 'active'
-      }).select('firstName lastName employeeCode department reportingManager').lean()
+      // Otherwise, get direct reportees (assignedManager / TL / reportsTo / reportingManager)
+      teamMembers = await Employee.find(
+        buildDirectReportsFilter(manager._id, { status: 'active' })
+      ).select('firstName lastName employeeCode department reportingManager').lean()
     }
 
     teamMemberIds = teamMembers.map(member => member._id)

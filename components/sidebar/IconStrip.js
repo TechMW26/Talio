@@ -11,10 +11,11 @@ import {
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import { getMenuItemsForRole, NEW_MENU_PATHS } from '@/utils/roleBasedMenus'
 import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
 import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
 import { filterMenuByPermissions } from '@/utils/permissionFilters'
+import { getCurrentUser } from '@/utils/userHelper'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
@@ -54,7 +55,27 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
     }
+
+    const handleUserUpdate = (event) => {
+      setUser(event?.detail || getCurrentUser())
+    }
+
+    window.addEventListener('talio:user-updated', handleUserUpdate)
+
+    const handleStorage = (event) => {
+      if (event.key === 'user') {
+        setUser(getCurrentUser())
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+
     setIsDesktopApp(typeof window !== 'undefined' && (window.electronAPI !== undefined || window.isElectron === true))
+
+    return () => {
+      window.removeEventListener('talio:user-updated', handleUserUpdate)
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
   // Get menu items based on user role (memoized)
@@ -152,6 +173,76 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
       startNavigation(path)
     }
   }
+
+  // -------- "New menu item" session highlight --------
+  // Show a green pulsing tooltip on the sidebar for items recently introduced.
+  // Each path is highlighted until the user dismisses it (click) or 7 days pass,
+  // whichever comes first. Persisted in localStorage so it survives reloads.
+  const NEW_MENU_DISMISS_KEY = 'talio.newMenuDismissed.v2'
+  const NEW_MENU_FIRST_SEEN_KEY = 'talio.newMenuFirstSeen.v2'
+  const NEW_MENU_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+  const [openNewPaths, setOpenNewPaths] = useState(() => new Set())
+
+  const readJsonMap = useCallback((key) => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const raw = localStorage.getItem(key)
+      return raw ? JSON.parse(raw) : {}
+    } catch {
+      return {}
+    }
+  }, [])
+
+  const writeJsonMap = useCallback((key, obj) => {
+    if (typeof window === 'undefined') return
+    try { localStorage.setItem(key, JSON.stringify(obj)) } catch {}
+  }, [])
+
+  // Compute which new items to highlight on mount / role changes.
+  useEffect(() => {
+    if (!mounted) return
+    const now = Date.now()
+    const dismissed = readJsonMap(NEW_MENU_DISMISS_KEY) // { path: timestamp }
+    const firstSeen = readJsonMap(NEW_MENU_FIRST_SEEN_KEY) // { path: timestamp }
+    let firstSeenDirty = false
+    const pending = new Set()
+
+    filteredMenuItems.forEach(item => {
+      if (!item.isNew || !item.path) return
+      if (dismissed[item.path]) return
+      if (!firstSeen[item.path]) {
+        firstSeen[item.path] = now
+        firstSeenDirty = true
+      }
+      if (now - firstSeen[item.path] <= NEW_MENU_MAX_AGE_MS) {
+        pending.add(item.path)
+      }
+    })
+
+    if (firstSeenDirty) writeJsonMap(NEW_MENU_FIRST_SEEN_KEY, firstSeen)
+    if (pending.size === 0) return
+    setOpenNewPaths(pending)
+
+    // Auto-hide the pulsing tooltip after 8s per page-load (but keep NEW badge
+    // visible in the expanded sidebar until dismissed or 7 days elapse).
+    const timer = setTimeout(() => {
+      setOpenNewPaths(new Set())
+    }, 8000)
+    return () => clearTimeout(timer)
+  }, [mounted, filteredMenuItems, readJsonMap, writeJsonMap])
+
+  const dismissNewTooltip = useCallback((path) => {
+    if (!path) return
+    setOpenNewPaths(prev => {
+      if (!prev.has(path)) return prev
+      const next = new Set(prev)
+      next.delete(path)
+      return next
+    })
+    const dismissed = readJsonMap(NEW_MENU_DISMISS_KEY)
+    dismissed[path] = Date.now()
+    writeJsonMap(NEW_MENU_DISMISS_KEY, dismissed)
+  }, [readJsonMap, writeJsonMap])
 
   // Helper to check if a menu item is active (optimistic highlight during navigation)
   const effectivePath = (isNavigating && targetPath) ? targetPath : pathname
@@ -254,7 +345,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
             >
               <Avatar
                 size="sm"
-                src={user?.profilePicture}
+                src={user?.profilePicture || (typeof user?.employeeId === 'object' ? user?.employeeId?.profilePicture : null) || undefined}
                 name={getUserInitials()}
                 className="w-8 h-8 text-xs"
                 style={{
@@ -271,6 +362,10 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
             const isActive = isMenuItemActive(item)
             const badgeCount = getBadgeCount(item.name)
             const showGroupDivider = item.group && index > 0 && filteredMenuItems[index - 1]?.group !== item.group
+            const isNewHighlighted = item.isNew && openNewPaths.has(item.path)
+            const newRingClass = isNewHighlighted
+              ? 'ring-2 ring-success-400 ring-offset-1 ring-offset-transparent animate-pulse'
+              : ''
 
             let iconButton
 
@@ -301,14 +396,22 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
               // For items with submenu, clicking expands the sliding sidebar
               iconButton = (
                 <Tooltip
-                  content={item.name}
+                  content={isNewHighlighted ? `New · ${item.name}` : item.name}
                   placement="right"
                   delay={200}
                   closeDelay={0}
+                  color={isNewHighlighted ? 'success' : 'default'}
+                  isOpen={isNewHighlighted ? true : undefined}
+                  classNames={isNewHighlighted ? {
+                    content: 'bg-success-500 text-white font-semibold shadow-lg shadow-success-500/40',
+                  } : undefined}
                 >
                   <button
-                    onClick={() => onExpandClick(item.name, index)}
-                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10`}
+                    onClick={() => {
+                      if (isNewHighlighted) dismissNewTooltip(item.path)
+                      onExpandClick(item.name, index)
+                    }}
+                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10 ${newRingClass}`}
                     style={{
                       backgroundColor: isActive ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
                     }}
@@ -319,6 +422,9 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
                         style={{ color: isActive ? 'white' : 'var(--color-primary-600)' }}
                       />
                       <SidebarBadge count={badgeCount} />
+                      {isNewHighlighted && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-success-500 ring-2 ring-white dark:ring-black animate-pulse" />
+                      )}
                     </div>
                   </button>
                 </Tooltip>
@@ -327,15 +433,23 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
               // Regular menu items - navigate directly
               iconButton = (
                 <Tooltip
-                  content={item.name}
+                  content={isNewHighlighted ? `New · ${item.name}` : item.name}
                   placement="right"
                   delay={200}
                   closeDelay={0}
+                  color={isNewHighlighted ? 'success' : 'default'}
+                  isOpen={isNewHighlighted ? true : undefined}
+                  classNames={isNewHighlighted ? {
+                    content: 'bg-success-500 text-white font-semibold shadow-lg shadow-success-500/40',
+                  } : undefined}
                 >
                   <Link
                     href={item.path}
-                    onClick={() => handleLinkClick(item.path)}
-                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10`}
+                    onClick={() => {
+                      if (isNewHighlighted) dismissNewTooltip(item.path)
+                      handleLinkClick(item.path)
+                    }}
+                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10 ${newRingClass}`}
                     style={{
                       backgroundColor: isActive ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
                     }}
@@ -346,6 +460,9 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
                         style={{ color: isActive ? 'white' : 'var(--color-primary-600)' }}
                       />
                       <SidebarBadge count={badgeCount} />
+                      {isNewHighlighted && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-success-500 ring-2 ring-white dark:ring-black animate-pulse" />
+                      )}
                     </div>
                   </Link>
                 </Tooltip>

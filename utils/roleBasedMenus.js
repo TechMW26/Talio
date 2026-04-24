@@ -26,7 +26,9 @@ import {
   HiOutlineSignal,
   HiOutlineLightBulb,
   HiOutlineShieldCheck,
+  HiOutlineShare,
 } from 'react-icons/hi2'
+import { TbHierarchy3 } from 'react-icons/tb'
 
 // Define menu items for each role
 // Each item has an optional `group` field used by the sidebar to render section headings
@@ -493,6 +495,45 @@ export const roleBasedMenus = {
 }
 
 // Helper function to get menu items based on user role
+// Paths recently introduced — we annotate their menu items with `isNew: true` so the
+// sidebar can highlight them (green pulse + tooltip) once per session.
+export const NEW_MENU_PATHS = new Set([
+  '/dashboard/hierarchy',
+  '/dashboard/sandbox',
+  '/dashboard/rbac/roles',
+  '/dashboard/productivity',
+  '/dashboard/employees/user-passwords',
+  '/dashboard/recruitment/analytics',
+])
+
+const annotateIsNew = (items) => items.map(item => {
+  const matchesTop = item.path && NEW_MENU_PATHS.has(item.path)
+  const newSubPaths = (item.submenu || [])
+    .filter(s => s.path && NEW_MENU_PATHS.has(s.path))
+    .map(s => s.path)
+  if (!matchesTop && newSubPaths.length === 0) return item
+  return {
+    ...item,
+    isNew: matchesTop || newSubPaths.length > 0,
+    newSubPaths,
+    submenu: item.submenu ? item.submenu.map(s =>
+      s.path && NEW_MENU_PATHS.has(s.path) ? { ...s, isNew: true } : s
+    ) : item.submenu,
+  }
+})
+
 export const getMenuItemsForRole = (role) => {
-  return roleBasedMenus[role] || roleBasedMenus.employee
+  const base = roleBasedMenus[role] || roleBasedMenus.employee
+  const hasHierarchy = base.some((item) => item.path === '/dashboard/hierarchy')
+  if (hasHierarchy) return annotateIsNew(base)
+
+  const hierarchyItem = {
+    name: 'Organogram',
+    icon: TbHierarchy3,
+    path: '/dashboard/hierarchy',
+    group: base[0]?.group || 'Main',
+  }
+
+  // Place hierarchy at the very top (right under the fixed Profile link in sidebar)
+  return annotateIsNew([hierarchyItem, ...base])
 }

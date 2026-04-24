@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaSave, FaArrowLeft, FaChevronDown, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
@@ -23,6 +23,9 @@ export default function EditEmployeePage() {
 
   const { data: desigRes } = useAuthedSWR(accessDenied ? null : '/api/designations')
   const designations = desigRes?.data || []
+
+  const { data: assignRes } = useAuthedSWR(accessDenied ? null : '/api/employees?status=active&limit=500&sortBy=firstName&sortOrder=asc')
+  const assignmentEmployees = assignRes?.data || []
 
   const { roles: availableRoles, loading: rolesLoading } = useRoles()
 
@@ -66,17 +69,40 @@ export default function EditEmployeePage() {
     onError: (msg) => toast.error(msg || 'Failed to update employee'),
   })
 
-  // Static levels list
+  const presetDesignationTitles = [
+    'Director', 'CEO', 'CTO', 'CMO', 'CFO', 'COO', 'CHRO', 'CIO', 'CISO',
+    'Assistant Director', 'Senior Manager', 'Manager', 'Assistant Manager', 'Team Lead', 'Senior Executive', 'Executive'
+  ]
+
+  // Static levels list (1-9, top = Director).
   const levels = [
     { level: 1, levelName: 'Entry Level' },
-    { level: 2, levelName: 'Junior' },
-    { level: 3, levelName: 'Mid Level' },
-    { level: 4, levelName: 'Senior' },
-    { level: 5, levelName: 'Lead' },
+    { level: 2, levelName: 'Mid Level' },
+    { level: 3, levelName: 'Senior' },
+    { level: 4, levelName: 'Team Lead' },
+    { level: 5, levelName: 'Assistant Manager' },
     { level: 6, levelName: 'Manager' },
-    { level: 7, levelName: 'Director' },
-    { level: 8, levelName: 'Executive' },
+    { level: 7, levelName: 'C-Suite' },
+    { level: 8, levelName: 'Assistant Director' },
+    { level: 9, levelName: 'Director' },
   ]
+
+  const allDesignationOptions = useMemo(() => {
+    const existingTitles = new Set((designations || []).map((d) => (d.title || '').trim().toLowerCase()))
+    const presets = presetDesignationTitles
+      .filter((t) => !existingTitles.has(t.toLowerCase()))
+      .map((title) => ({ _id: `preset:${title}`, title, _preset: true }))
+    return [...(designations || []), ...presets]
+  }, [designations])
+
+  const managerCandidates = useMemo(
+    () => (assignmentEmployees || []).filter((e) => String(e._id) !== String(params.id)).filter((e) => Number(e.designationLevel || e.designation?.level || 0) >= 5),
+    [assignmentEmployees, params.id]
+  )
+  const teamLeadCandidates = useMemo(
+    () => (assignmentEmployees || []).filter((e) => String(e._id) !== String(params.id)).filter((e) => Number(e.designationLevel || e.designation?.level || 0) >= 4),
+    [assignmentEmployees, params.id]
+  )
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -90,6 +116,10 @@ export default function EditEmployeePage() {
     designation: '',
     designationLevel: '',
     designationLevelName: '',
+    designationTitle: '',
+    assignedManager: '',
+    assignedTeamLead: '',
+    reportsTo: '',
     dateOfJoining: '',
     employmentType: '',
     workLocation: '',
@@ -125,6 +155,21 @@ export default function EditEmployeePage() {
       provider: '',
     },
   })
+
+  // "Reports To" choices follow the strict hierarchy (see add page for details).
+  const reportsToCandidates = useMemo(() => {
+    const lvl = Number(formData.designationLevel || 0)
+    let allowed
+    if (lvl === 8) allowed = new Set([9])
+    else if (lvl === 7) allowed = new Set([8, 9])
+    else allowed = new Set([7, 8, 9])
+    return (assignmentEmployees || [])
+      .filter((e) => String(e._id) !== String(params.id))
+      .filter((e) => {
+        const lv = Number(e.designationLevel || e.designation?.level || 0)
+        return allowed.has(lv)
+      })
+  }, [assignmentEmployees, params.id, formData.designationLevel])
 
   useEffect(() => {
     // Check access control
@@ -167,6 +212,10 @@ export default function EditEmployeePage() {
       designation: emp.designation?._id?.toString() || emp.designation?.toString() || '',
       designationLevel: emp.designationLevel || emp.designation?.level || 1,
       designationLevelName: emp.designationLevelName || emp.designation?.levelName || '',
+      designationTitle: '',
+      assignedManager: emp.assignedManager?._id?.toString() || emp.assignedManager?.toString() || '',
+      assignedTeamLead: emp.assignedTeamLead?._id?.toString() || emp.assignedTeamLead?.toString() || '',
+      reportsTo: emp.reportsTo?._id?.toString() || emp.reportsTo?.toString() || '',
       dateOfJoining: emp.dateOfJoining ? new Date(emp.dateOfJoining).toISOString().split('T')[0] : '',
       employmentType: emp.employmentType || '',
       workLocation: emp.workLocation || '',
@@ -215,9 +264,44 @@ export default function EditEmployeePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const inferLevelFromTitle = (title = '') => {
+    const t = title.toLowerCase().trim()
+    if (!t) return 2
+    if (/(intern|trainee|apprentice|\bjunior\b|\bjr\b)/.test(t)) return 1
+    if (/(asst\.?|assistant)\s*director/.test(t)) return 8
+    if (/\bdirector\b/.test(t)) return 9
+    if (/(ceo|cto|cmo|cfo|coo|chro|cio|ciso|chief)/.test(t)) return 7
+    if (/(senior\s*manager|sr\.?\s*manager|head|principal)/.test(t)) return 6
+    if (/(asst\.?|assistant)\s*manager/.test(t)) return 5
+    if (/(manager|architect)/.test(t)) return 6
+    if (/(team\s*lead|tech\s*lead|\blead\b|supervisor)/.test(t)) return 4
+    if (/(senior|sr\.?)/.test(t)) return 3
+    return 2
+  }
+
+  const selectedLevel = Number(formData.designationLevel || 0)
+  const allowManagerAssignment = selectedLevel > 0 && selectedLevel <= 6
+  const allowTeamLeadAssignment = selectedLevel > 0 && selectedLevel <= 3
+  const requireReportsTo = selectedLevel > 0 && selectedLevel <= 8
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    await submitMutation.execute(`/api/employees/${params.id}`, formData)
+    const payload = { ...formData }
+
+    if (String(payload.designation || '').startsWith('preset:')) {
+      const title = String(payload.designation).replace('preset:', '')
+      const inferred = inferLevelFromTitle(title)
+      payload.designationTitle = title
+      payload.designation = ''
+      payload.designationLevel = payload.designationLevel || inferred
+      payload.designationLevelName = payload.designationLevelName || (levels.find((l) => l.level === Number(payload.designationLevel))?.levelName || '')
+    }
+
+    if (!allowManagerAssignment) payload.assignedManager = ''
+    if (!allowTeamLeadAssignment) payload.assignedTeamLead = ''
+    if (!requireReportsTo) payload.reportsTo = ''
+
+    await submitMutation.execute(`/api/employees/${params.id}`, payload)
   }
 
   // Access denied screen for non-admin/non-hr users
@@ -362,8 +446,12 @@ export default function EditEmployeePage() {
                     Gender
                   </label>
                   <Select
-                    selectedKeys={formData.gender ? [formData.gender] : []}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    selectedKeys={formData.gender ? new Set([String(formData.gender)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, gender: String(value) }))
+                    }}
                     aria-label="Gender"
                     placeholder="Select Gender"
                     classNames={{ trigger: "bg-white" }}
@@ -499,15 +587,26 @@ export default function EditEmployeePage() {
                   </label>
                   <Select
                     isRequired
-                    selectedKeys={formData.designation ? [formData.designation] : []}
-                    onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                    selectedKeys={formData.designation ? new Set([String(formData.designation)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      const selectedId = Array.from(keys)[0] || ''
+                      const selected = allDesignationOptions.find((d) => String(d._id) === String(selectedId))
+                      const level = Number(selected?.level || selected?.designationLevel || 0)
+                      setFormData((prev) => ({
+                        ...prev,
+                        designation: String(selectedId),
+                        designationTitle: selected?._preset ? selected.title : '',
+                        designationLevel: level || prev.designationLevel,
+                        designationLevelName: selected?.levelName || prev.designationLevelName,
+                      }))
+                    }}
                     aria-label="Designation"
                     placeholder="Select Designation"
                     classNames={{ trigger: "bg-white" }}
                   >
-                    {designations.map((desig) => (
-                      <SelectItem key={desig._id}>
-                        {desig.title}
+                    {allDesignationOptions.map((desig) => (
+                      <SelectItem key={String(desig._id)} textValue={desig._preset ? `${desig.title} (new)` : desig.title}>
+                        {desig.title}{desig._preset ? ' (new)' : ''}
                       </SelectItem>
                     ))}
                   </Select>
@@ -518,21 +617,23 @@ export default function EditEmployeePage() {
                     Level
                   </label>
                   <Select
-                    selectedKeys={formData.designationLevel ? [String(formData.designationLevel)] : []}
-                    onChange={(e) => {
-                      const selectedLevel = levels.find(l => l.level === parseInt(e.target.value))
-                      setFormData({
-                        ...formData,
-                        designationLevel: e.target.value,
+                    selectedKeys={formData.designationLevel ? new Set([String(formData.designationLevel)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      const selectedLevel = levels.find(l => l.level === parseInt(value))
+                      setFormData((prev) => ({
+                        ...prev,
+                        designationLevel: value,
                         designationLevelName: selectedLevel?.levelName || '',
-                      })
+                      }))
                     }}
                     aria-label="Level"
                     placeholder="Select Level"
                     classNames={{ trigger: "bg-white" }}
                   >
                     {levels.map((level) => (
-                      <SelectItem key={String(level.level)}>
+                      <SelectItem key={String(level.level)} textValue={level.levelName}>
                         {level.levelName}
                       </SelectItem>
                     ))}
@@ -557,8 +658,12 @@ export default function EditEmployeePage() {
                     Employment Type
                   </label>
                   <Select
-                    selectedKeys={formData.employmentType ? [formData.employmentType] : []}
-                    onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
+                    selectedKeys={formData.employmentType ? new Set([String(formData.employmentType)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, employmentType: String(value) }))
+                    }}
                     aria-label="Employment Type"
                     placeholder="Select Type"
                     classNames={{ trigger: "bg-white" }}
@@ -588,8 +693,12 @@ export default function EditEmployeePage() {
                   </label>
                   <Select
                     isRequired
-                    selectedKeys={[formData.status]}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    selectedKeys={formData.status ? new Set([String(formData.status)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, status: String(value) }))
+                    }}
                     aria-label="Status"
                     classNames={{ trigger: "bg-white" }}
                   >
@@ -606,7 +715,7 @@ export default function EditEmployeePage() {
                   </label>
                   <Select
                     name="systemRole"
-                    selectedKeys={formData.systemRole ? [formData.systemRole] : []}
+                    selectedKeys={formData.systemRole ? new Set([String(formData.systemRole)]) : new Set()}
                     onSelectionChange={(keys) => {
                       if (keys === 'all') return
                       const selectedRole = Array.from(keys)[0]
@@ -630,11 +739,93 @@ export default function EditEmployeePage() {
                     }}
                   >
                     {(role) => (
-                      <SelectItem key={role.name}>{role.displayLabel}</SelectItem>
+                      <SelectItem key={String(role.name)} textValue={role.displayLabel || role.name}>{role.displayLabel}</SelectItem>
                     )}
                   </Select>
                   <p className="text-xs text-default-500 mt-1">
                     Controls what features this user can access in the system
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-2">
+                    Assigned Manager
+                  </label>
+                  <Select
+                    name="assignedManager"
+                    selectedKeys={formData.assignedManager ? new Set([String(formData.assignedManager)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, assignedManager: String(value) }))
+                    }}
+                    isDisabled={!allowManagerAssignment}
+                    aria-label="Assigned Manager"
+                    placeholder={allowManagerAssignment ? 'Select Manager' : 'Not required for selected role level'}
+                    classNames={{ trigger: "bg-white" }}
+                  >
+                    {managerCandidates.map((emp) => (
+                      <SelectItem key={String(emp._id)} textValue={`${`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} (${emp.employeeCode || 'EMP'})`}>{`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} ({emp.employeeCode || 'EMP'})</SelectItem>
+                    ))}
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-2">
+                    Assigned Team Lead
+                  </label>
+                  <Select
+                    name="assignedTeamLead"
+                    selectedKeys={formData.assignedTeamLead ? new Set([String(formData.assignedTeamLead)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, assignedTeamLead: String(value) }))
+                    }}
+                    isDisabled={!allowTeamLeadAssignment}
+                    aria-label="Assigned Team Lead"
+                    placeholder={allowTeamLeadAssignment ? 'Select Team Lead' : 'Not required for selected role level'}
+                    classNames={{ trigger: "bg-white" }}
+                  >
+                    {teamLeadCandidates.map((emp) => (
+                      <SelectItem key={String(emp._id)} textValue={`${`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} (${emp.employeeCode || 'EMP'})`}>{`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} ({emp.employeeCode || 'EMP'})</SelectItem>
+                    ))}
+                  </Select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-default-700 mb-2">
+                    Reports To {requireReportsTo && <span className="text-danger">*</span>}
+                  </label>
+                  <Select
+                    name="reportsTo"
+                    selectedKeys={formData.reportsTo ? new Set([String(formData.reportsTo)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, reportsTo: String(value) }))
+                    }}
+                    isDisabled={!requireReportsTo}
+                    isRequired={requireReportsTo}
+                    aria-label="Reports To"
+                    placeholder={requireReportsTo ? (selectedLevel === 8 ? 'Select Director' : selectedLevel === 7 ? 'Select Assistant Director or Director' : 'Select Director, Assistant Director, or C-Suite') : 'Directors do not report to anyone'}
+                    classNames={{ trigger: "bg-white" }}
+                  >
+                    {reportsToCandidates.map((emp) => {
+                      const lvl = Number(emp.designationLevel || emp.designation?.level || 0)
+                      const lvlLabel = lvl === 9 ? 'Director' : lvl === 8 ? 'Asst. Director' : 'C-Suite'
+                      const label = `${`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} \u2014 ${lvlLabel} (${emp.employeeCode || 'EMP'})`
+                      return (
+                        <SelectItem key={String(emp._id)} textValue={label}>{label}</SelectItem>
+                      )
+                    })}
+                  </Select>
+                  <p className="text-xs text-default-500 mt-1">
+                    {selectedLevel === 8
+                      ? 'Assistant Directors report only to a Director.'
+                      : selectedLevel === 7
+                        ? 'C-Suite reports only to an Assistant Director or Director.'
+                        : 'Required for everyone except Directors. Choose from Director, Assistant Director, or C-Suite.'}
                   </p>
                 </div>
               </div>

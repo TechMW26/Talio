@@ -53,16 +53,30 @@ export async function GET(request, context) {
         // Count unique departments the user leads teams across
         const uniqueDepts = new Set(teamsLeading.map(t => t.department?._id?.toString()).filter(Boolean))
 
+        const assignedReports = await Employee.find({
+            status: 'active',
+            $or: [
+                { assignedManager: employeeId },
+                { assignedTeamLead: employeeId },
+            ],
+        })
+            .select('firstName lastName employeeCode email phone profilePicture designation designationLevel designationLevelName department assignedManager assignedTeamLead')
+            .populate('designation', 'title level levelName')
+            .populate('department', 'name code')
+            .lean()
+
         return NextResponse.json({
             success: true,
             data: {
                 employee: { _id: employee._id, firstName: employee.firstName, lastName: employee.lastName, employeeCode: employee.employeeCode, department: employee.department },
                 leading,
                 memberOf: teamsMemberOf,
+                assignedReports,
                 summary: {
                     teamsLeading: teamsLeading.length,
                     teamsMemberOf: teamsMemberOf.length,
                     departmentsLeadingAcross: uniqueDepts.size,
+                    directReports: assignedReports.length,
                 }
             }
         })

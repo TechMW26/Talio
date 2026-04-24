@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaSave, FaTimes, FaChevronDown, FaCheck, FaTimes as FaX, FaUserPlus, FaFileUpload, FaExclamationTriangle } from 'react-icons/fa'
@@ -28,6 +28,9 @@ export default function AddEmployeePage() {
   const { data: compRes } = useAuthedSWR(accessDenied ? null : '/api/companies')
   const companies = compRes?.data || []
 
+  const { data: assignRes } = useAuthedSWR(accessDenied ? null : '/api/employees?status=active&limit=500&sortBy=firstName&sortOrder=asc')
+  const assignmentEmployees = assignRes?.data || []
+
   const { roles: availableRoles, loading: rolesLoading } = useRoles()
 
   // --- Submit mutation ---
@@ -46,17 +49,69 @@ export default function AddEmployeePage() {
     onError: (msg) => toast.error(msg || 'Failed to create employee'),
   })
 
-  // Static levels list
+  const presetDesignationTitles = [
+    'Director',
+    'CEO',
+    'CTO',
+    'CMO',
+    'CFO',
+    'COO',
+    'CHRO',
+    'CIO',
+    'CISO',
+    'Assistant Director',
+    'Senior Manager',
+    'Manager',
+    'Assistant Manager',
+    'Team Lead',
+    'Senior Executive',
+    'Executive',
+  ]
+
+  // Static levels list (1-9, top = Director).
   const levels = [
     { level: 1, levelName: 'Entry Level' },
-    { level: 2, levelName: 'Junior' },
-    { level: 3, levelName: 'Mid Level' },
-    { level: 4, levelName: 'Senior' },
-    { level: 5, levelName: 'Lead' },
+    { level: 2, levelName: 'Mid Level' },
+    { level: 3, levelName: 'Senior' },
+    { level: 4, levelName: 'Team Lead' },
+    { level: 5, levelName: 'Assistant Manager' },
     { level: 6, levelName: 'Manager' },
-    { level: 7, levelName: 'Director' },
-    { level: 8, levelName: 'Executive' },
+    { level: 7, levelName: 'C-Suite' },
+    { level: 8, levelName: 'Assistant Director' },
+    { level: 9, levelName: 'Director' },
   ]
+
+  const allDesignationOptions = useMemo(() => {
+    const existingTitles = new Set((designations || []).map((d) => (d.title || '').trim().toLowerCase()))
+    const presets = presetDesignationTitles
+      .filter((t) => !existingTitles.has(t.toLowerCase()))
+      .map((title) => ({ _id: `preset:${title}`, title, _preset: true }))
+    return [...(designations || []), ...presets]
+  }, [designations])
+
+  const managerCandidates = useMemo(
+    () => (assignmentEmployees || []).filter((e) => Number(e.designationLevel || e.designation?.level || 0) >= 5),
+    [assignmentEmployees]
+  )
+  const teamLeadCandidates = useMemo(
+    () => (assignmentEmployees || []).filter((e) => Number(e.designationLevel || e.designation?.level || 0) >= 4),
+    [assignmentEmployees]
+  )
+  // "Reports To" choices follow the strict hierarchy:
+  //   Asst. Director (L8) -> only Director (L9)
+  //   C-Suite (L7)        -> Asst. Director (L8) or Director (L9)
+  //   L1-L6               -> C-Suite, Asst. Director, or Director
+  const reportsToCandidates = useMemo(() => {
+    const lvl = Number(formData.designationLevel || 0)
+    let allowed
+    if (lvl === 8) allowed = new Set([9])
+    else if (lvl === 7) allowed = new Set([8, 9])
+    else allowed = new Set([7, 8, 9])
+    return (assignmentEmployees || []).filter((e) => {
+      const lv = Number(e.designationLevel || e.designation?.level || 0)
+      return allowed.has(lv)
+    })
+  }, [assignmentEmployees, formData.designationLevel])
 
   const [formData, setFormData] = useState({
     employeeCode: '',
@@ -72,11 +127,15 @@ export default function AddEmployeePage() {
     designation: '',
     designationLevel: '',
     designationLevelName: '',
+    designationTitle: '',
     company: '',
     employmentType: 'full-time',
     status: 'active',
     password: '',
     role: 'employee',
+    assignedManager: '',
+    assignedTeamLead: '',
+    reportsTo: '',
     // Salary fields (optional)
     salary: {
       basic: '',
@@ -238,9 +297,48 @@ export default function AddEmployeePage() {
     })
   }
 
+  const inferLevelFromTitle = (title = '') => {
+    const t = title.toLowerCase().trim()
+    if (!t) return 2
+    if (/(intern|trainee|apprentice|\bjunior\b|\bjr\b)/.test(t)) return 1
+    if (/(asst\.?|assistant)\s*director/.test(t)) return 8
+    if (/\bdirector\b/.test(t)) return 9
+    if (/(ceo|cto|cmo|cfo|coo|chro|cio|ciso|chief)/.test(t)) return 7
+    if (/(senior\s*manager|sr\.?\s*manager|head|principal)/.test(t)) return 6
+    if (/(asst\.?|assistant)\s*manager/.test(t)) return 5
+    if (/(manager|architect)/.test(t)) return 6
+    if (/(team\s*lead|tech\s*lead|\blead\b|supervisor)/.test(t)) return 4
+    if (/(senior|sr\.?)/.test(t)) return 3
+    return 2
+  }
+
+  const selectedLevel = Number(formData.designationLevel || 0)
+  // Anyone Manager (L6) and below can have an assigned manager. C-Suite and above cannot.
+  const allowManagerAssignment = selectedLevel > 0 && selectedLevel <= 6
+  // Only IC roles (Senior and below) can have an assigned team lead.
+  const allowTeamLeadAssignment = selectedLevel > 0 && selectedLevel <= 3
+  // Everyone except Director (L9) needs to report to a higher exec.
+  const requireReportsTo = selectedLevel > 0 && selectedLevel <= 8
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    await submitMutation.execute('/api/employees', formData)
+    const payload = { ...formData }
+
+    // Custom/preset designation selected from UI (e.g. CTO/CMO/CEO) is created server-side.
+    if (String(payload.designation || '').startsWith('preset:')) {
+      const title = String(payload.designation).replace('preset:', '')
+      const inferred = inferLevelFromTitle(title)
+      payload.designationTitle = title
+      payload.designation = ''
+      payload.designationLevel = payload.designationLevel || inferred
+      payload.designationLevelName = payload.designationLevelName || (levels.find((l) => l.level === Number(payload.designationLevel))?.levelName || '')
+    }
+
+    if (!allowManagerAssignment) payload.assignedManager = ''
+    if (!allowTeamLeadAssignment) payload.assignedTeamLead = ''
+    if (!requireReportsTo) payload.reportsTo = ''
+
+    await submitMutation.execute('/api/employees', payload)
   }
 
   // Access denied screen for non-admin/non-hr users
@@ -408,8 +506,12 @@ export default function AddEmployeePage() {
                   </label>
                   <Select
                     name="gender"
-                    selectedKeys={formData.gender ? [formData.gender] : []}
-                    onChange={handleChange}
+                    selectedKeys={formData.gender ? new Set([String(formData.gender)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, gender: String(value) }))
+                    }}
                     aria-label="Gender"
                     placeholder="Select Gender"
                     classNames={{
@@ -537,8 +639,19 @@ export default function AddEmployeePage() {
                     </label>
                     <Select
                       name="designation"
-                      selectedKeys={formData.designation ? [formData.designation] : []}
-                      onChange={handleChange}
+                      selectedKeys={formData.designation ? new Set([String(formData.designation)]) : new Set()}
+                      onSelectionChange={(keys) => {
+                        const selectedId = Array.from(keys)[0] || ''
+                        const selected = allDesignationOptions.find((d) => String(d._id) === String(selectedId))
+                        const level = Number(selected?.level || selected?.designationLevel || 0)
+                        setFormData((prev) => ({
+                          ...prev,
+                          designation: String(selectedId),
+                          designationTitle: selected?._preset ? selected.title : '',
+                          designationLevel: level || prev.designationLevel,
+                          designationLevelName: selected?.levelName || prev.designationLevelName,
+                        }))
+                      }}
                       aria-label="Designation"
                       placeholder="Select Designation"
                       classNames={{
@@ -548,9 +661,9 @@ export default function AddEmployeePage() {
                         listbox: "text-default-700"
                       }}
                     >
-                      {designations.map((desig) => (
-                        <SelectItem key={desig._id}>
-                          {desig.title}
+                      {allDesignationOptions.map((desig) => (
+                        <SelectItem key={String(desig._id)} textValue={desig._preset ? `${desig.title} (new)` : desig.title}>
+                          {desig.title}{desig._preset ? ' (new)' : ''}
                         </SelectItem>
                       ))}
                     </Select>
@@ -563,14 +676,16 @@ export default function AddEmployeePage() {
                     </label>
                     <Select
                       name="designationLevel"
-                      selectedKeys={formData.designationLevel ? [String(formData.designationLevel)] : []}
-                      onChange={(e) => {
-                        const selectedLevel = levels.find(l => l.level === parseInt(e.target.value))
-                        setFormData({
-                          ...formData,
-                          designationLevel: e.target.value,
+                      selectedKeys={formData.designationLevel ? new Set([String(formData.designationLevel)]) : new Set()}
+                      onSelectionChange={(keys) => {
+                        if (keys === 'all') return
+                        const value = Array.from(keys)[0] || ''
+                        const selectedLevel = levels.find(l => l.level === parseInt(value))
+                        setFormData((prev) => ({
+                          ...prev,
+                          designationLevel: value,
                           designationLevelName: selectedLevel?.levelName || '',
-                        })
+                        }))
                       }}
                       aria-label="Level"
                       placeholder="Select Level"
@@ -582,7 +697,7 @@ export default function AddEmployeePage() {
                       }}
                     >
                       {levels.map((level) => (
-                        <SelectItem key={String(level.level)}>
+                        <SelectItem key={String(level.level)} textValue={level.levelName}>
                           {level.levelName}
                         </SelectItem>
                       ))}
@@ -595,6 +710,106 @@ export default function AddEmployeePage() {
                   </div>
                 </div>
 
+                {/* Hierarchy Assignment */}
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">
+                      Assigned Manager
+                    </label>
+                    <Select
+                      name="assignedManager"
+                      selectedKeys={formData.assignedManager ? new Set([String(formData.assignedManager)]) : new Set()}
+                      onSelectionChange={(keys) => {
+                        if (keys === 'all') return
+                        const value = Array.from(keys)[0] || ''
+                        setFormData((prev) => ({ ...prev, assignedManager: String(value) }))
+                      }}
+                      isDisabled={!allowManagerAssignment}
+                      aria-label="Assigned Manager"
+                      placeholder={allowManagerAssignment ? 'Select Manager' : 'Not required for selected role level'}
+                      classNames={{
+                        trigger: "bg-white border border-default-300 text-default-700 data-[hover=true]:border-default-400",
+                        value: "text-default-700",
+                        selectorIcon: "text-default-500",
+                        listbox: "text-default-700"
+                      }}
+                    >
+                      {managerCandidates.map((emp) => (
+                        <SelectItem key={String(emp._id)} textValue={`${`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} (${emp.employeeCode || 'EMP'})`}>{`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} ({emp.employeeCode || 'EMP'})</SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">
+                      Assigned Team Lead
+                    </label>
+                    <Select
+                      name="assignedTeamLead"
+                      selectedKeys={formData.assignedTeamLead ? new Set([String(formData.assignedTeamLead)]) : new Set()}
+                      onSelectionChange={(keys) => {
+                        if (keys === 'all') return
+                        const value = Array.from(keys)[0] || ''
+                        setFormData((prev) => ({ ...prev, assignedTeamLead: String(value) }))
+                      }}
+                      isDisabled={!allowTeamLeadAssignment}
+                      aria-label="Assigned Team Lead"
+                      placeholder={allowTeamLeadAssignment ? 'Select Team Lead' : 'Not required for selected role level'}
+                      classNames={{
+                        trigger: "bg-white border border-default-300 text-default-700 data-[hover=true]:border-default-400",
+                        value: "text-default-700",
+                        selectorIcon: "text-default-500",
+                        listbox: "text-default-700"
+                      }}
+                    >
+                      {teamLeadCandidates.map((emp) => (
+                        <SelectItem key={String(emp._id)} textValue={`${`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} (${emp.employeeCode || 'EMP'})`}>{`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} ({emp.employeeCode || 'EMP'})</SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-default-700 mb-2">
+                      Reports To {requireReportsTo && <span className="text-danger">*</span>}
+                    </label>
+                    <Select
+                      name="reportsTo"
+                      selectedKeys={formData.reportsTo ? new Set([String(formData.reportsTo)]) : new Set()}
+                      onSelectionChange={(keys) => {
+                        if (keys === 'all') return
+                        const value = Array.from(keys)[0] || ''
+                        setFormData((prev) => ({ ...prev, reportsTo: String(value) }))
+                      }}
+                      isDisabled={!requireReportsTo}
+                      isRequired={requireReportsTo}
+                      aria-label="Reports To"
+                      placeholder={requireReportsTo ? (selectedLevel === 8 ? 'Select Director' : selectedLevel === 7 ? 'Select Assistant Director or Director' : 'Select Director, Assistant Director, or C-Suite') : 'Directors do not report to anyone'}
+                      classNames={{
+                        trigger: "bg-white border border-default-300 text-default-700 data-[hover=true]:border-default-400",
+                        value: "text-default-700",
+                        selectorIcon: "text-default-500",
+                        listbox: "text-default-700"
+                      }}
+                    >
+                      {reportsToCandidates.map((emp) => {
+                        const lvl = Number(emp.designationLevel || emp.designation?.level || 0)
+                        const lvlLabel = lvl === 9 ? 'Director' : lvl === 8 ? 'Asst. Director' : 'C-Suite'
+                        const label = `${`${emp.firstName || ''} ${emp.lastName || ''}`.trim()} \u2014 ${lvlLabel} (${emp.employeeCode || 'EMP'})`
+                        return (
+                          <SelectItem key={String(emp._id)} textValue={label}>{label}</SelectItem>
+                        )
+                      })}
+                    </Select>
+                    <p className="text-xs text-default-500 mt-1">
+                      {selectedLevel === 8
+                        ? 'Assistant Directors report only to a Director.'
+                        : selectedLevel === 7
+                          ? 'C-Suite reports only to an Assistant Director or Director.'
+                          : 'Required for everyone except Directors. Choose from Director, Assistant Director, or C-Suite.'}
+                    </p>
+                  </div>
+                </div>
+
                 {/* Company */}
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-2">
@@ -602,8 +817,12 @@ export default function AddEmployeePage() {
                   </label>
                   <Select
                     name="company"
-                    selectedKeys={formData.company ? [formData.company] : []}
-                    onChange={handleChange}
+                    selectedKeys={formData.company ? new Set([String(formData.company)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, company: String(value) }))
+                    }}
                     aria-label="Company"
                     placeholder="Select Company"
                     className="text-default-900"
@@ -617,7 +836,7 @@ export default function AddEmployeePage() {
                     }}
                   >
                     {companies.map((company) => (
-                      <SelectItem key={company._id}>
+                      <SelectItem key={String(company._id)} textValue={`${company.name} (${company.code})`}>
                         {company.name} ({company.code})
                       </SelectItem>
                     ))}
@@ -631,8 +850,12 @@ export default function AddEmployeePage() {
                   </label>
                   <Select
                     name="employmentType"
-                    selectedKeys={[formData.employmentType]}
-                    onChange={handleChange}
+                    selectedKeys={formData.employmentType ? new Set([String(formData.employmentType)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, employmentType: String(value) }))
+                    }}
                     aria-label="Employment Type"
                     className="text-default-900"
                     classNames={{
@@ -658,8 +881,12 @@ export default function AddEmployeePage() {
                   </label>
                   <Select
                     name="status"
-                    selectedKeys={[formData.status]}
-                    onChange={handleChange}
+                    selectedKeys={formData.status ? new Set([String(formData.status)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, status: String(value) }))
+                    }}
                     aria-label="Status"
                     className="text-default-900"
                     classNames={{
@@ -702,8 +929,15 @@ export default function AddEmployeePage() {
                   </label>
                   <Select
                     name="role"
-                    selectedKeys={formData.role ? [formData.role] : []}
-                    onChange={handleChange}
+                    selectedKeys={formData.role ? new Set([String(formData.role)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const selectedRole = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({
+                        ...prev,
+                        role: selectedRole ? String(selectedRole) : '',
+                      }))
+                    }}
                     isRequired
                     isLoading={rolesLoading}
                     aria-label="User Role"
@@ -720,7 +954,7 @@ export default function AddEmployeePage() {
                     }}
                   >
                     {(role) => (
-                      <SelectItem key={role.name}>{role.displayLabel}</SelectItem>
+                      <SelectItem key={String(role.name)} textValue={role.displayLabel || role.name}>{role.displayLabel}</SelectItem>
                     )}
                   </Select>
                   <p className="text-xs text-default-500 mt-1">

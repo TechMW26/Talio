@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { emitExpenseUpdate } from '@/lib/realtimeEvents'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 // GET - List expenses
 export async function GET(request) {
@@ -94,8 +95,8 @@ export async function GET(request) {
       }
       // Managers see their direct reports' expenses
       else if (userRole === 'manager' && userEmployeeId) {
-        const directReports = await Employee.find({ 
-          reportingManager: userEmployeeId,
+        const directReports = await Employee.find({
+          ...buildDirectReportsFilter(userEmployeeId),
           _id: { $ne: userEmployeeId }
         }).select('_id').lean()
         const reportIds = directReports.map(e => e._id)

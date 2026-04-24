@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 // GET - Fetch performance goals
 export async function GET(request) {
@@ -72,16 +73,15 @@ export async function GET(request) {
         }
       }
     } else if (user.role === 'manager' || user.role === 'department_head') {
-      // Managers can see goals for their team members
+      // Managers can see goals for direct reports (any reporting field) + their department.
       const manager = await Employee.findOne({ userId }).select('_id department')
-      if (manager && manager.department) {
-        const teamMembers = await Employee.find({ 
-          $or: [
-            { department: manager.department },
-            { reportingManager: manager._id }
-          ]
-        }).select('_id')
-        query.employee = { $in: teamMembers.map(e => e._id) }
+      if (manager) {
+        const orClauses = [...(buildDirectReportsFilter(manager._id)?.$or || [])]
+        if (manager.department) orClauses.push({ department: manager.department })
+        if (orClauses.length > 0) {
+          const teamMembers = await Employee.find({ $or: orClauses }).select('_id')
+          query.employee = { $in: teamMembers.map(e => e._id) }
+        }
       }
     }
 

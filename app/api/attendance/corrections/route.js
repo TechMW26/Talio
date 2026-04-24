@@ -5,6 +5,7 @@ import { getTimezone, parseDateTimeInTimezone } from '@/lib/timezone'
 import queryCache from '@/lib/queryCache'
 import mongoose from 'mongoose'
 import { emitEvent, EVENTS } from '@/lib/eventBus'
+import { isDirectReport } from '@/lib/teamScope'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,8 +87,8 @@ async function canApproveCorrections(userId, targetEmployeeId, models) {
       }
     }
 
-    // Check if user is reporting manager of target
-    if (targetEmployee.reportingManager?.toString() === user.employeeId._id.toString()) {
+    // Check if user is reporting manager / assignedManager / assignedTeamLead / reportsTo of target
+    if (isDirectReport(targetEmployee, user.employeeId._id)) {
       return { canApprove: true, role: 'manager' }
     }
 

@@ -9,8 +9,8 @@ const logger = require('./logger');
 
 const store = new Store({ name: 'sessions' });
 
-const SESSION_DURATION_MINUTES = 180;
-const CAPTURES_PER_SESSION = 60;
+const SESSION_DURATION_MINUTES = 60;  // 60-minute sessions
+const CAPTURES_PER_SESSION = 20;      // 20 captures at 3-min intervals = 60 mins
 const HISTORY_DAYS = 7;
 
 function generateSessionId() {

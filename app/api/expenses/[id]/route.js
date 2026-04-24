@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { emitExpenseUpdate } from '@/lib/realtimeEvents'
+import { isDirectReport } from '@/lib/teamScope'
 
 // PUT - Update/Approve expense
 export async function PUT(request, { params }) {
@@ -82,9 +83,9 @@ export async function PUT(request, { params }) {
             )
           }
         } else if (userRole === 'manager') {
-          // Managers can approve for their direct reports
-          const isDirectReport = expenseEmployee?.reportingManager?.toString() === userEmployeeId?.toString()
-          if (!isDirectReport) {
+          // Managers can approve for their direct reports (any of the relationship fields)
+          const isReport = isDirectReport(expenseEmployee, userEmployeeId)
+          if (!isReport) {
             return NextResponse.json(
               { success: false, message: 'You can only approve expenses for your direct reports' },
               { status: 403 }

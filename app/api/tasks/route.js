@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -12,12 +13,12 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models, tenant } = auth
-    const { Project, ProjectMember } = models
+    const { Project, ProjectMember, Employee } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employee')
@@ -44,6 +45,22 @@ export async function GET(request) {
 
     const empId = employeeId || user.employeeId?._id?.toString() || user.employeeId?.toString()
 
+    // Assignment-based subordinate visibility for manager/team lead style users.
+    let subordinateProjectIds = []
+    if (empId) {
+      const subordinateFilter = buildDirectReportsFilter(empId, { status: 'active' })
+      const subordinateIds = subordinateFilter
+        ? await Employee.find(subordinateFilter).distinct('_id')
+        : []
+
+      if (subordinateIds.length > 0) {
+        subordinateProjectIds = await ProjectMember.find({
+          user: { $in: subordinateIds },
+          invitationStatus: 'accepted'
+        }).distinct('project')
+      }
+    }
+
     // Get projects where user is a member or owner
     const memberProjectIds = await ProjectMember.find({
       employee: empId,
@@ -53,6 +70,7 @@ export async function GET(request) {
     const query = {
       $or: [
         { _id: { $in: memberProjectIds } },
+        { _id: { $in: subordinateProjectIds } },
         { createdBy: user._id || user.userId }
       ],
       status: { $ne: 'deleted' }

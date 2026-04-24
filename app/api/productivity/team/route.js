@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import { buildDirectReportsFilter } from '@/lib/teamScope';
 
 const SCREENSHOTS_PER_SESSION_ESTIMATE = 60; // ~60 screenshots per 180-min session at 3-min intervals
 
@@ -29,7 +30,7 @@ export async function GET(request) {
 
     // Get current user with employee info
     const currentUser = await User.findById(currentUserId)
-      .select('role employeeId isDepartmentHead headOfDepartments')
+      .select('role employeeId isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf teamLeaderOf')
       .populate('employeeId');
 
     const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
@@ -137,12 +138,33 @@ export async function GET(request) {
         }
       }
 
+      // Assignment-based visibility: explicit manager / team lead / reportsTo / reportingManager mapping (cross-department).
+      const assignmentFilter = buildDirectReportsFilter(currentEmployeeId, { status: 'active' });
+      const assignmentMembers = assignmentFilter
+        ? await Employee.find(assignmentFilter)
+          .select('firstName lastName email profilePicture department designation userId assignedManager assignedTeamLead reportsTo reportingManager')
+          .populate('department', 'name')
+          .populate('designation', 'title')
+          .lean()
+        : [];
+
+      if (assignmentMembers.length > 0) {
+        const assignmentNormalized = assignmentMembers.filter(e => e.userId).map(e => ({ ...e, user: e.userId }));
+        const seen = new Set(teamMembers.map((m) => m._id.toString()));
+        for (const m of assignmentNormalized) {
+          if (!seen.has(m._id.toString())) {
+            seen.add(m._id.toString());
+            teamMembers.push(m);
+          }
+        }
+      }
+
       if (departmentIds.length === 0 && teamMembers.length === 0) {
         return NextResponse.json({
           success: true,
           data: [],
           departments: [],
-          message: 'You are not a department head or team leader'
+          message: 'You are not a department head, team leader, or mapped manager'
         });
       }
 

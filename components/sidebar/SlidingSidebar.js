@@ -17,6 +17,7 @@ import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
 import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
 import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
 import { filterMenuByPermissions } from '@/utils/permissionFilters'
+import { getCurrentUser } from '@/utils/userHelper'
 import toast from '@/utils/toast'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
@@ -137,7 +138,27 @@ export default function SlidingSidebar({
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
     }
+
+    const handleUserUpdate = (event) => {
+      setUser(event?.detail || getCurrentUser())
+    }
+
+    window.addEventListener('talio:user-updated', handleUserUpdate)
+
+    const handleStorage = (event) => {
+      if (event.key === 'user') {
+        setUser(getCurrentUser())
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+
     setIsDesktopApp(typeof window !== 'undefined' && (window.electronAPI !== undefined || window.isElectron === true))
+
+    return () => {
+      window.removeEventListener('talio:user-updated', handleUserUpdate)
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
   // Get menu items based on user role (memoized)
@@ -377,7 +398,7 @@ export default function SlidingSidebar({
             <div className="flex items-center gap-3 flex-1">
               <Avatar
                 size="sm"
-                src={user?.profilePicture}
+                src={user?.profilePicture || (typeof user?.employeeId === 'object' ? user?.employeeId?.profilePicture : null) || undefined}
                 name={(() => {
                   const fn = user?.firstName || '', ln = user?.lastName || ''
                   return (fn || ln) ? `${fn[0] || ''}${ln[0] || ''}`.toUpperCase() : (user?.email?.[0]?.toUpperCase() || 'U')
@@ -443,6 +464,11 @@ export default function SlidingSidebar({
                             ) : (
                               <span className="text-sm font-medium truncate">{item.name}</span>
                             )}
+                            {item.isNew && (
+                              <Chip size="sm" color="success" variant="flat" className="h-4 text-[9px] px-1.5 font-semibold">
+                                NEW
+                              </Chip>
+                            )}
                             <InlineBadge count={getBadgeCount(item.name)} />
                           </div>
                         </div>
@@ -463,7 +489,14 @@ export default function SlidingSidebar({
                                 color: effectivePath === subItem.path ? 'white' : 'var(--color-text-secondary)'
                               }}
                             >
-                              <span>{subItem.name}</span>
+                              <span className="flex items-center gap-2">
+                                {subItem.name}
+                                {subItem.isNew && (
+                                  <Chip size="sm" color="success" variant="flat" className="h-4 text-[9px] px-1.5 font-semibold">
+                                    NEW
+                                  </Chip>
+                                )}
+                              </span>
                               <InlineBadge count={getSubmenuBadgeCount(subItem.name)} />
                             </Link>
                           ))}
@@ -520,6 +553,11 @@ export default function SlidingSidebar({
                         </div>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <span className="text-sm font-medium truncate">{item.name}</span>
+                          {item.isNew && (
+                            <Chip size="sm" color="success" variant="flat" className="h-4 text-[9px] px-1.5 font-semibold">
+                              NEW
+                            </Chip>
+                          )}
                           {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
                         </div>
                       </div>

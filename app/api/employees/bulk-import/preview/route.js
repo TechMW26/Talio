@@ -1,94 +1,29 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { generateContent } from '@/lib/gemini'
+import { LEVEL_NAMES, inferLevelFromTitle } from '@/lib/designationLevels'
 
 /**
- * Level names mapping - matches the Add Employee form
- */
-const LEVEL_NAMES = {
-  1: 'Entry Level',
-  2: 'Junior',
-  3: 'Mid Level',
-  4: 'Senior',
-  5: 'Lead',
-  6: 'Manager',
-  7: 'Director',
-  8: 'Executive'
-}
-
-/**
- * Reverse mapping from level name to number
+ * Reverse mapping from level name / synonym to canonical level number (1-9).
  */
 const LEVEL_NAME_TO_NUMBER = {
-  'entry level': 1, 'entry': 1, 'intern': 1, 'internship': 1, 'trainee': 1,
-  'junior': 2, 'jr': 2, 'fresher': 2, 'graduate': 2,
-  'mid level': 3, 'mid': 3, 'intermediate': 3, 'associate': 3,
-  'senior': 4, 'sr': 4, 'experienced': 4,
-  'lead': 5, 'team lead': 5, 'tech lead': 5, 'principal': 5,
-  'manager': 6, 'mgr': 6, 'supervisor': 6,
-  'director': 7, 'head': 7, 'vp': 7,
-  'executive': 8, 'chief': 8, 'ceo': 8, 'cto': 8, 'cfo': 8, 'coo': 8
+  'entry level': 1, 'entry': 1, 'intern': 1, 'internship': 1, 'trainee': 1, 'fresher': 1, 'graduate': 1, 'apprentice': 1, 'junior': 1, 'jr': 1,
+  'mid level': 2, 'mid': 2, 'intermediate': 2, 'associate': 2,
+  'senior': 3, 'sr': 3, 'experienced': 3,
+  'team lead': 4, 'tech lead': 4, 'lead': 4, 'principal': 4, 'supervisor': 4,
+  'assistant manager': 5, 'asst manager': 5, 'asst. manager': 5, 'deputy manager': 5,
+  'manager': 6, 'mgr': 6, 'senior manager': 6, 'head': 6, 'architect': 6,
+  'c-suite': 7, 'csuite': 7, 'executive': 7, 'chief': 7, 'ceo': 7, 'cto': 7, 'cfo': 7, 'coo': 7, 'cmo': 7, 'chro': 7, 'cio': 7, 'ciso': 7, 'cpo': 7, 'president': 7, 'founder': 7,
+  'assistant director': 8, 'asst director': 8, 'asst. director': 8,
+  'director': 9, 'vp': 9, 'vice president': 9,
 }
 
 /**
- * Smart level detection based on designation/job title
- * Levels: 1=Entry Level, 2=Junior, 3=Mid Level, 4=Senior, 5=Lead, 6=Manager, 7=Director, 8=Executive
+ * Smart level detection based on designation/job title (uses shared inferLevelFromTitle).
  */
 function detectLevelFromDesignation(title) {
-  if (!title) return { level: 1, levelName: 'Entry Level' }
-
-  const normalizedTitle = title.toLowerCase().trim()
-
-  // Level 8: Executive/C-Suite
-  if (/\b(ceo|cto|cfo|coo|cmo|cio|cpo|chief|president|founder|co-founder|owner|chairman|chairwoman|chairperson)\b/i.test(normalizedTitle)) {
-    return { level: 8, levelName: 'Executive' }
-  }
-
-  // Level 7: Director
-  if (/\b(director|vp|vice\s*president|head\s+of|global\s+head|regional\s+head|country\s+head|avp|associate\s+vice\s+president)\b/i.test(normalizedTitle)) {
-    return { level: 7, levelName: 'Director' }
-  }
-
-  // Level 6: Manager
-  if (/\b(manager|mgr|gm|general\s+manager|agm|assistant\s+manager|deputy\s+manager|project\s+manager|product\s+manager|program\s+manager|account\s+manager|team\s+manager|operations\s+manager|branch\s+manager|area\s+manager|zonal\s+manager|regional\s+manager|supervisor|superintendent|controller|coordinator)\b/i.test(normalizedTitle)) {
-    return { level: 6, levelName: 'Manager' }
-  }
-
-  // Level 5: Lead/Principal
-  if (/\b(lead|principal|team\s+lead|tech\s+lead|technical\s+lead|group\s+lead|squad\s+lead|architect|staff\s+engineer|staff\s+developer|specialist|expert|consultant|advisor|strategist)\b/i.test(normalizedTitle)) {
-    return { level: 5, levelName: 'Lead' }
-  }
-
-  // Level 4: Senior
-  if (/\b(senior|sr\.?|snr|experienced|advanced|level\s*[3-4]|grade\s*[3-4]|band\s*[3-4])\b/i.test(normalizedTitle)) {
-    return { level: 4, levelName: 'Senior' }
-  }
-
-  // Level 3: Mid-Level
-  if (/\b(mid|mid-level|mid\s+level|intermediate|level\s*2|grade\s*2|band\s*2|associate(?!\s+(vice|director|manager)))\b/i.test(normalizedTitle)) {
-    return { level: 3, levelName: 'Mid Level' }
-  }
-
-  // Level 2: Junior
-  if (/\b(junior|jr\.?|jnr|fresher|graduate|trainee(?!\s+manager)|apprentice|probation|entry(?!\s+level)|beginner)\b/i.test(normalizedTitle)) {
-    return { level: 2, levelName: 'Junior' }
-  }
-
-  // Level 1: Entry Level - explicit terms
-  if (/\b(entry\s*level|intern|internship|trainee|fresher|newcomer|starter)\b/i.test(normalizedTitle)) {
-    return { level: 1, levelName: 'Entry Level' }
-  }
-
-  // Default heuristics based on common title patterns
-  if (/\b(analyst|engineer|developer|designer|executive|officer|representative|administrator|accountant|auditor|scientist|researcher)\b/i.test(normalizedTitle)) {
-    if (/\b(chief|head|principal|lead|senior|sr)\b/i.test(normalizedTitle)) {
-      return { level: 4, levelName: 'Senior' }
-    }
-    return { level: 3, levelName: 'Mid Level' }
-  }
-
-  // Default to Entry Level
-  return { level: 1, levelName: 'Entry Level' }
+  const level = inferLevelFromTitle(title)
+  return { level, levelName: LEVEL_NAMES[level] || 'Mid Level' }
 }
 
 /**
@@ -96,22 +31,21 @@ function detectLevelFromDesignation(title) {
  */
 function parseLevelFromValue(value) {
   if (!value) return null
-  
-  // If it's a number, use it directly
-  if (typeof value === 'number' && value >= 1 && value <= 8) {
+
+  // If it's a number, use it directly when it falls in the 1-9 canonical range
+  if (typeof value === 'number' && value >= 1 && value <= 9) {
     return { level: value, levelName: LEVEL_NAMES[value] }
   }
-  
+
   // If it's a string, try to match level name
   const normalized = String(value).toLowerCase().trim()
-  
-  // Check exact/partial match in level names
+
   for (const [key, levelNum] of Object.entries(LEVEL_NAME_TO_NUMBER)) {
     if (normalized === key || normalized.includes(key)) {
       return { level: levelNum, levelName: LEVEL_NAMES[levelNum] }
     }
   }
-  
+
   return null
 }
 
@@ -163,7 +97,7 @@ const TEMPLATE_FIELDS = [
   { key: 'dateOfJoining', label: 'Date of Joining', description: 'Hire date, start date' },
   { key: 'department', label: 'Department', description: 'Department name' },
   { key: 'designation', label: 'Designation', description: 'Job title, position' },
-  { key: 'level', label: 'Level', description: 'Employee level (Entry Level, Junior, Mid Level, Senior, Lead, Manager, Director, Executive)' },
+  { key: 'level', label: 'Level', description: 'Employee level (Entry, Mid, Senior, Team Lead, Assistant Manager, Manager, C-Suite, Assistant Director, Director)' },
   { key: 'company', label: 'Company', description: 'Company name' },
   { key: 'employmentType', label: 'Employment Type', description: 'Full-time, part-time, contract' },
   { key: 'grossSalary', label: 'Gross Salary', description: 'Monthly salary, CTC, compensation' },

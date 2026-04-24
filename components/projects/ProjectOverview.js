@@ -13,7 +13,8 @@ import {
   FaChartPie, FaChartBar, FaTrophy, FaFlag, FaRedo,
   FaTimesCircle, FaQuestionCircle, FaInfoCircle, FaBolt,
   FaUserClock, FaBalanceScale, FaShieldAlt, FaFire, FaBullseye,
-  FaUserCheck, FaUserTimes, FaExclamationCircle, FaArrowRight
+  FaUserCheck, FaUserTimes, FaExclamationCircle, FaArrowRight,
+  FaHourglassHalf
 } from 'react-icons/fa'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAILoading } from '@/contexts/AILoadingContext'
@@ -41,7 +42,8 @@ const statusColors = {
   'at-risk': 'bg-amber-500 text-white',
   'delayed': 'bg-red-500 text-white',
   'completed': 'bg-emerald-500 text-white',
-  'yet-to-start': 'bg-red-500 text-white'
+  'yet-to-start': 'bg-red-500 text-white',
+  'waiting-for-review': 'bg-yellow-400 text-yellow-900'
 }
 
 const statusIcons = {
@@ -50,7 +52,8 @@ const statusIcons = {
   'at-risk': FaExclamationTriangle,
   'delayed': FaTimesCircle,
   'completed': FaTrophy,
-  'yet-to-start': FaClock
+  'yet-to-start': FaClock,
+  'waiting-for-review': FaHourglassHalf
 }
 
 export default function ProjectOverview({ projectId }) {
@@ -261,10 +264,10 @@ export default function ProjectOverview({ projectId }) {
                     AI-powered prediction based on current velocity
                   </p>
                 </div>
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold ${statusColors[completionPrediction?.status]}`}>
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold ${statusColors[completionPrediction?.status] || 'bg-gray-200 text-gray-700'}`}>
                   <StatusIcon className="w-4 h-4" />
                   <span className="capitalize">
-                    {completionPrediction?.status?.replace('-', ' ')}
+                    {completionPrediction?.status === 'waiting-for-review' ? 'Waiting for Review' : completionPrediction?.status?.replace(/-/g, ' ')}
                   </span>
                 </div>
               </div>

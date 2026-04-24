@@ -17,7 +17,7 @@ import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
 import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
 import { filterMenuByPermissions } from '@/utils/permissionFilters'
 import toast from '@/utils/toast'
-import { handleSessionExpired } from '@/utils/userHelper'
+import { handleSessionExpired, getCurrentUser } from '@/utils/userHelper'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
@@ -102,6 +102,16 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
       checkDepartmentHead()
+    }
+
+    const handleUserUpdate = (event) => {
+      setUser(event?.detail || getCurrentUser())
+    }
+
+    window.addEventListener('talio:user-updated', handleUserUpdate)
+
+    return () => {
+      window.removeEventListener('talio:user-updated', handleUserUpdate)
     }
   }, [])
 

@@ -1329,7 +1329,8 @@ export default function ProjectDetailPage() {
   const canManage = isProjectHead || isCreator || (user && ['admin'].includes(user.role))
   const isAcceptedMember = project.currentUserInvitationStatus === 'accepted' || isProjectHead || isCreator || (user && ['admin'].includes(user.role))
   const isPendingInvitation = project.currentUserInvitationStatus === 'invited'
-  const isOverdue = new Date(project.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(project.status)
+  const isWaitingForReview = (project.completionPercentage >= 100) && new Date(project.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(project.status)
+  const isOverdue = new Date(project.endDate) < new Date() && !isWaitingForReview && !['completed', 'approved', 'archived'].includes(project.status)
 
   // Task grouping by status
   const tasksByStatus = {
@@ -1362,9 +1363,10 @@ export default function ProjectDetailPage() {
                   <FaComments className="w-5 h-5" />
                 </button>
               )}
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${isOverdue ? statusColors.overdue : statusColors[project.status]
-                }`}>
-                {isOverdue ? 'Overdue' : statusLabels[project.status]}
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                isWaitingForReview ? 'bg-yellow-100 text-yellow-800' : isOverdue ? statusColors.overdue : statusColors[project.status]
+              }`}>
+                {isWaitingForReview ? 'Waiting for Review' : isOverdue ? 'Overdue' : statusLabels[project.status]}
               </span>
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${priorityColors[project.priority]}`}>
                 {project.priority}

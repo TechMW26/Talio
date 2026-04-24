@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 // POST - Send daily goal reminders
 export async function POST(request) {
@@ -99,10 +100,9 @@ export async function POST(request) {
           case 'manager':
             // Manager notification for team goals
             if (employee.reportingManager) {
-              const teamMembers = await Employee.find({ 
-                reportingManager: employee._id,
-                status: 'active'
-              })
+              const teamMembers = await Employee.find(
+                buildDirectReportsFilter(employee._id, { status: 'active' })
+              )
               
               if (teamMembers.length > 0) {
                 const teamGoalsData = await DailyGoal.find({

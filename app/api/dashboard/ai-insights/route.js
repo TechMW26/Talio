@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { generateContent } from '@/lib/gemini';
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
+import { formatDesignation, formatDepartments } from '@/lib/formatters';
 
 /**
  * GET /api/dashboard/ai-insights
@@ -11,17 +12,35 @@ import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Attendance', 'Leave', 'LeaveBalance', 'LeaveType', 'Task', 'DailyGoal']);
+    const auth = await getAuthAndModels(request, ['Attendance', 'Leave', 'LeaveBalance', 'LeaveType', 'Task', 'DailyGoal', 'Employee']);
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
     }
 
     const { user, models } = auth;
-    const { Attendance, Leave, LeaveBalance, LeaveType, Task, DailyGoal } = models;
+    const { Attendance, Leave, LeaveBalance, LeaveType, Task, DailyGoal, Employee } = models;
 
     const employeeId = user.employeeId?._id || user.employeeId;
     const userId = user._id || user.userId;
     const now = new Date();
+
+    const employeeProfile = employeeId
+      ? await Employee.findById(employeeId)
+        .populate('designation', 'title level levelName')
+        .populate('department', 'name')
+        .populate('departments', 'name')
+        .select('designation designationLevelName department departments manualKRIs aiGeneratedKRIs')
+        .lean()
+      : null;
+
+    const roleDesignation = employeeProfile ? formatDesignation(employeeProfile.designation, employeeProfile) : 'Not available';
+    const roleDepartment = employeeProfile ? formatDepartments(employeeProfile) : 'Not available';
+    const roleKri = employeeProfile
+      ? [
+        ...(employeeProfile.manualKRIs || []),
+        ...((employeeProfile.aiGeneratedKRIs || []).map((item) => item?.title).filter(Boolean))
+      ].slice(0, 8)
+      : [];
 
     // --- Gather data in parallel ---
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -105,6 +124,9 @@ Employee Data Summary:
 - Pending tasks: ${pendingTasks.length} (${overdueTasks.length} overdue, ${highPriorityTasks.length} high priority)
 - Today's goals: ${completedGoals}/${totalGoals} completed
 - Current time: ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+- Designation: ${roleDesignation}
+- Department(s): ${roleDepartment}
+- KRIs: ${roleKri.length > 0 ? roleKri.join('; ') : 'Not configured'}
 `;
 
     const systemPrompt = `You are MIRA, the AI assistant for Talio HR platform. Generate exactly 3 short, actionable insights for this employee based on their data. Each insight must be practical and motivating.
@@ -114,6 +136,7 @@ Rules:
 - Be specific with numbers from the data
 - Focus on actionable advice, not just observations
 - Use a warm, professional tone
+- Evaluate advice in context of designation/KRIs. Do not penalize role-appropriate research/exploration work.
 - Return ONLY a valid JSON array of objects with fields: "title" (3-5 words), "insight" (the advice), "type" (one of: attendance, productivity, wellness, tasks, leave), "priority" (high/medium/low)
 - No markdown, no code fences, just the JSON array`;
 

@@ -80,7 +80,7 @@ export default function ProjectsPage() {
     total: projects.length,
     active: projects.filter(p => ['planned', 'ongoing', 'pending'].includes(p.status)).length,
     completed: projects.filter(p => ['completed', 'approved'].includes(p.status)).length,
-    overdue: projects.filter(p => p.status === 'overdue' || (new Date(p.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(p.status))).length,
+    overdue: projects.filter(p => p.status === 'overdue' || (new Date(p.endDate) < new Date() && (p.completionPercentage || 0) < 100 && !['completed', 'approved', 'archived'].includes(p.status))).length,
   }), [projects])
 
   // --- Invitation mutation ---
@@ -302,13 +302,15 @@ export default function ProjectsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
             const daysRemaining = getDaysRemaining(project.endDate)
-            const isOverdue = daysRemaining < 0 && !['completed', 'approved', 'archived'].includes(project.status)
+            const isWaitingForReview = (project.completionPercentage >= 100) && daysRemaining < 0 && !['completed', 'approved', 'archived'].includes(project.status)
+            const isOverdue = daysRemaining < 0 && !isWaitingForReview && !['completed', 'approved', 'archived'].includes(project.status)
             const isPendingInvitation = project.userInvitationStatus === 'invited'
 
             // Get status-based border color
             const getStatusBorderColor = () => {
               // Pending invitation takes priority
               if (isPendingInvitation) return 'border-warning bg-warning-50/30'
+              if (isWaitingForReview) return 'border-warning-400 bg-warning-50/30'
               if (isOverdue) return 'border-danger-300 bg-danger-50/30'
 
               switch (project.status) {
@@ -352,8 +354,8 @@ export default function ProjectsPage() {
 
                   {/* Status and Dates */}
                   <div className="flex items-center justify-between mb-4">
-                    <Chip color={isOverdue ? 'danger' : statusColors[project.status]} variant="flat" size="sm">
-                      {isOverdue ? 'Overdue' : statusLabels[project.status]}
+                    <Chip color={isWaitingForReview ? 'warning' : isOverdue ? 'danger' : statusColors[project.status]} variant="flat" size="sm">
+                      {isWaitingForReview ? 'Waiting for Review' : isOverdue ? 'Overdue' : statusLabels[project.status]}
                     </Chip>
                     <div className="flex items-center text-sm text-default-500">
                       <FaCalendarAlt className="mr-1" />
@@ -445,13 +447,15 @@ export default function ProjectsPage() {
 
                 {/* Days Remaining Footer */}
                 {!['completed', 'approved', 'archived'].includes(project.status) && project.userInvitationStatus !== 'invited' && (
-                  <div className={`px-5 py-3 ${isOverdue ? 'bg-danger-50' : 'bg-default-50'}`}>
-                    <p className={`text-sm ${isOverdue ? 'text-danger' : 'text-default-600'}`}>
-                      {isOverdue
-                        ? `${Math.abs(daysRemaining)} days overdue`
-                        : daysRemaining === 0
-                          ? 'Due today'
-                          : `${daysRemaining} days remaining`
+                  <div className={`px-5 py-3 ${isWaitingForReview ? 'bg-warning-50' : isOverdue ? 'bg-danger-50' : 'bg-default-50'}`}>
+                    <p className={`text-sm ${isWaitingForReview ? 'text-warning-700 font-medium' : isOverdue ? 'text-danger' : 'text-default-600'}`}>
+                      {isWaitingForReview
+                        ? 'All tasks complete — awaiting review'
+                        : isOverdue
+                          ? `${Math.abs(daysRemaining)} days overdue`
+                          : daysRemaining === 0
+                            ? 'Due today'
+                            : `${daysRemaining} days remaining`
                       }
                     </p>
                   </div>

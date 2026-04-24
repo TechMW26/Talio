@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { sendLeaveApprovedNotification, sendLeaveRejectedNotification } from '@/lib/notificationService'
 import { emitLeaveUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 import { emitEvent, EVENTS } from '@/lib/eventBus'
+import { isDirectReport } from '@/lib/teamScope'
 
 // PUT - Update leave status (Approve/Reject)
 export async function PUT(request, { params }) {
@@ -83,9 +84,9 @@ export async function PUT(request, { params }) {
           )
         }
       } else if (userRole === 'manager') {
-        // Managers can approve for their direct reports
-        const isDirectReport = leaveEmployee?.reportingManager?.toString() === userEmployeeId?.toString()
-        if (!isDirectReport) {
+        // Managers can approve for their direct reports (any of the relationship fields)
+        const isReport = isDirectReport(leaveEmployee, userEmployeeId)
+        if (!isReport) {
           return NextResponse.json(
             { success: false, message: 'You can only approve leaves for your direct reports' },
             { status: 403 }

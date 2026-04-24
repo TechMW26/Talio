@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 export const dynamic = 'force-dynamic'
 
@@ -120,13 +121,14 @@ export async function GET(request) {
             .lean()
         }
       } else {
-        // Fallback for managers: get direct reports and same department
+        // Fallback for managers: any direct report (assignedManager / TL / reportsTo / reportingManager) +
+        // anyone else in the same department.
+        const directReportsClause = buildDirectReportsFilter(requestingEmployee._id)
+        const orClauses = [{ department: requestingEmployee.department }]
+        if (directReportsClause) orClauses.unshift(...directReportsClause.$or)
         employees = await Employee.find({
           status: 'active',
-          $or: [
-            { reportingManager: requestingEmployee._id },
-            { department: requestingEmployee.department }
-          ]
+          $or: orClauses,
         })
           .select('firstName lastName profilePicture department')
           .lean()

@@ -6,6 +6,7 @@ import path from 'path';
 import { generateVisionContent } from '@/lib/gemini';
 import { parseProductivityAnalysisResponse } from '@/lib/productivityAnalysisResult';
 import { loadScreenshotsForAnalysisBatch } from '@/lib/productivityScreenshotLoader';
+import { formatDesignation, formatDepartments } from '@/lib/formatters';
 
 import { deleteScreenshots as deleteGridFSScreenshots } from '@/lib/gridfs';
 
@@ -201,29 +202,46 @@ export async function POST(request, { params }) {
     let employeeRole = 'Employee';
     let employeeDesignation = '';
     let employeeDepartment = '';
+    let employeeManualKRIs = [];
+    let employeeAiKRIs = [];
     let employeeId = null;
 
     if (sessionUserId) {
       const userRecord = await User.findById(sessionUserId).populate({
         path: 'employeeId',
-        populate: { path: 'department', select: 'name' }
+        populate: [
+          { path: 'designation', select: 'title level levelName' },
+          { path: 'department', select: 'name' },
+          { path: 'departments', select: 'name' }
+        ]
       });
       if (userRecord?.employeeId) {
         employeeName = `${userRecord.employeeId.firstName} ${userRecord.employeeId.lastName}`;
-        employeeDesignation = userRecord.employeeId.designation || userRecord.employeeId.jobTitle || '';
-        employeeDepartment = userRecord.employeeId.department?.name || '';
+        employeeDesignation = formatDesignation(userRecord.employeeId.designation, userRecord.employeeId) || userRecord.employeeId.jobTitle || '';
+        employeeDepartment = formatDepartments(userRecord.employeeId) || '';
+        employeeManualKRIs = Array.isArray(userRecord.employeeId.manualKRIs) ? userRecord.employeeId.manualKRIs.filter(Boolean) : [];
+        employeeAiKRIs = Array.isArray(userRecord.employeeId.aiGeneratedKRIs)
+          ? userRecord.employeeId.aiGeneratedKRIs.map((item) => item?.title).filter(Boolean)
+          : [];
         employeeId = userRecord.employeeId._id;
       }
       if (userRecord?.role) {
         employeeRole = userRecord.role;
       }
     } else if (sessionEmployeeId) {
-      const { Employee, Department } = await getTenantModels(auth.tenant.databaseName, ['Employee', 'Department']);
-      const employee = await Employee.findById(sessionEmployeeId).populate('department', 'name');
+      const { Employee } = await getTenantModels(auth.tenant.databaseName, ['Employee']);
+      const employee = await Employee.findById(sessionEmployeeId)
+        .populate('designation', 'title level levelName')
+        .populate('department', 'name')
+        .populate('departments', 'name');
       if (employee) {
         employeeName = `${employee.firstName} ${employee.lastName}`;
-        employeeDesignation = employee.designation || employee.jobTitle || '';
-        employeeDepartment = employee.department?.name || '';
+        employeeDesignation = formatDesignation(employee.designation, employee) || employee.jobTitle || '';
+        employeeDepartment = formatDepartments(employee) || '';
+        employeeManualKRIs = Array.isArray(employee.manualKRIs) ? employee.manualKRIs.filter(Boolean) : [];
+        employeeAiKRIs = Array.isArray(employee.aiGeneratedKRIs)
+          ? employee.aiGeneratedKRIs.map((item) => item?.title).filter(Boolean)
+          : [];
         employeeId = employee._id;
       }
     }
@@ -334,6 +352,10 @@ export async function POST(request, { params }) {
     }
 
     const roleContextStr = primaryRoleContext || fallbackContext || 'Not specified - evaluate based on observed activities';
+    const roleResponsibilities = [...employeeManualKRIs, ...employeeAiKRIs].slice(0, 10);
+    const kriContextStr = roleResponsibilities.length > 0
+      ? roleResponsibilities.map((item, index) => `${index + 1}. ${item}`).join('\n')
+      : 'No explicit KRIs configured. Infer from designation and assigned tasks.';
 
     // Build analysis prompt with comprehensive KPIs
     // IMPORTANT: Emphasize this is workplace productivity analysis, not facial recognition
@@ -354,11 +376,15 @@ EMPLOYEE PROFILE:
 - Name: ${employeeName}
 - ${roleContextStr}
 
+ROLE RESPONSIBILITIES (KRI CONTEXT - HIGH PRIORITY):
+${kriContextStr}
+
 IMPORTANT: The employee's DESIGNATION/JOB TITLE is the PRIMARY indicator of expected work type.
 - A "Software Developer" should be coding, not doing HR work
 - A "Graphic Designer" should be designing, not doing accounting
 - Use the designation to judge if activities are role-appropriate
 - Department name alone is NOT enough to determine expected work (e.g., "Engineering" dept could have developers, QA, DevOps, managers)
+- If activity appears non-core for the role but matches listed responsibilities, treat it as role-aligned (example: a video editor researching YouTube references).
 
 ASSIGNED TASKS (Current workload - use this to determine if work is task-related):
 ${taskContextStr}

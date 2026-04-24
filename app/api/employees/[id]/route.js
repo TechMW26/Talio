@@ -6,6 +6,16 @@ import { logActivity } from '@/lib/activityLogger'
 import { deleteUserFromBackup } from '@/lib/backupDb'
 import { emitEmployeeUpdate, emitDashboardRefresh, emitAssetUpdate } from '@/lib/realtimeEvents'
 import mongoose from 'mongoose'
+import {
+  inferLevelFromTitle,
+  levelNameFromNumber,
+  canHaveAssignedManager,
+  canHaveAssignedTeamLead,
+  requiresReportsTo,
+  REPORTS_TO_CANDIDATE_LEVELS,
+  allowedReportsToLevels,
+  DIRECTOR_LEVEL,
+} from '@/lib/designationLevels'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +23,86 @@ export const dynamic = 'force-dynamic'
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id) &&
     (new mongoose.Types.ObjectId(id)).toString() === id
+}
+
+function makeDesignationCode(title) {
+  return (title || '')
+    .toString()
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'DESIG'
+}
+
+async function resolveDesignationRef(Designation, payload) {
+  if (!Designation) return payload.designation
+  const isObjectId = (v) => mongoose.Types.ObjectId.isValid(v)
+  if (payload.designation && isObjectId(String(payload.designation))) {
+    const existing = await Designation.findById(payload.designation).select('_id level levelName').lean()
+    if (existing) {
+      payload.designationLevel = Number(payload.designationLevel || existing.level || inferLevelFromTitle(payload.designationLevelName || ''))
+      payload.designationLevelName = payload.designationLevelName || existing.levelName || levelNameFromNumber(payload.designationLevel)
+      return payload.designation
+    }
+  }
+
+  const title = (payload.designationTitle || payload.designationLevelName || '').toString().trim()
+  if (!title) return payload.designation
+
+  let designation = await Designation.findOne({ title: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }).lean()
+  if (!designation) {
+    const level = Number(payload.designationLevel) || inferLevelFromTitle(title)
+    const levelName = payload.designationLevelName || levelNameFromNumber(level)
+    const baseCode = makeDesignationCode(title)
+    let code = baseCode
+    let suffix = 2
+    while (await Designation.exists({ code })) {
+      code = `${baseCode}-${suffix++}`
+    }
+    designation = await Designation.create({
+      title,
+      code,
+      level,
+      levelName,
+      isActive: true,
+    })
+    designation = designation.toObject()
+  }
+
+  payload.designation = designation._id
+  payload.designationLevel = Number(payload.designationLevel || designation.level || inferLevelFromTitle(title))
+  payload.designationLevelName = payload.designationLevelName || designation.levelName || levelNameFromNumber(payload.designationLevel)
+  return designation._id
+}
+
+function validateHierarchyAssignmentPayload(payload, level, selfEmployeeId) {
+  const assignedManager = payload.assignedManager ? String(payload.assignedManager) : ''
+  const assignedTeamLead = payload.assignedTeamLead ? String(payload.assignedTeamLead) : ''
+  const reportsTo = payload.reportsTo ? String(payload.reportsTo) : ''
+  const lvl = Number(level) || 0
+
+  if (selfEmployeeId) {
+    if (assignedManager && assignedManager === String(selfEmployeeId)) return 'Employee cannot be assigned as their own manager'
+    if (assignedTeamLead && assignedTeamLead === String(selfEmployeeId)) return 'Employee cannot be assigned as their own team lead'
+    if (reportsTo && reportsTo === String(selfEmployeeId)) return 'Employee cannot report to themselves'
+  }
+
+  if (!canHaveAssignedManager(lvl) && assignedManager) {
+    return 'Director role cannot have an assigned manager'
+  }
+  if (!canHaveAssignedTeamLead(lvl) && assignedTeamLead) {
+    return 'Only IC roles (Senior and below) can have an assigned team lead'
+  }
+
+  if (lvl === DIRECTOR_LEVEL && reportsTo) {
+    return 'Director role does not report to anyone'
+  }
+
+  if (assignedManager && assignedTeamLead && assignedManager === assignedTeamLead) {
+    return 'Assigned manager and assigned team lead must be different users'
+  }
+
+  return null
 }
 
 // GET - Get single employee
@@ -93,6 +183,16 @@ export async function GET(request, { params }) {
         options: { strictPopulate: false, lean: true }
       })
       .populate({
+        path: 'assignedManager',
+        select: 'firstName lastName email employeeCode designation designationLevel designationLevelName',
+        options: { strictPopulate: false, lean: true }
+      })
+      .populate({
+        path: 'assignedTeamLead',
+        select: 'firstName lastName email employeeCode designation designationLevel designationLevelName',
+        options: { strictPopulate: false, lean: true }
+      })
+      .populate({
         path: 'company',
         select: 'name timezone',
         options: { strictPopulate: false, lean: true }
@@ -122,6 +222,16 @@ export async function GET(request, { params }) {
           .populate({
             path: 'reportingManager',
             select: 'firstName lastName email',
+            options: { strictPopulate: false, lean: true }
+          })
+          .populate({
+            path: 'assignedManager',
+            select: 'firstName lastName email employeeCode designation designationLevel designationLevelName',
+            options: { strictPopulate: false, lean: true }
+          })
+          .populate({
+            path: 'assignedTeamLead',
+            select: 'firstName lastName email employeeCode designation designationLevel designationLevelName',
             options: { strictPopulate: false, lean: true }
           })
           .lean()
@@ -241,11 +351,21 @@ export async function PUT(request, { params }) {
         )
       }
 
-      const roleQuery = employee.company
-        ? { name: requestedSystemRole, company: employee.company }
-        : { name: requestedSystemRole }
+      targetRole = null
+      if (Role) {
+        if (employee.company) {
+          targetRole = await Role.findOne({ name: requestedSystemRole, company: employee.company })
+            .select('_id name displayLabel')
+            .lean()
+        }
 
-      targetRole = Role ? await Role.findOne(roleQuery).select('_id name displayLabel').lean() : null
+        if (!targetRole) {
+          targetRole = await Role.findOne({ name: requestedSystemRole })
+            .select('_id name displayLabel')
+            .lean()
+        }
+      }
+
       if (!targetRole) {
         return NextResponse.json(
           { success: false, message: 'Selected system role was not found' },
@@ -288,12 +408,14 @@ export async function PUT(request, { params }) {
     console.log('Received department (legacy):', data.department)
 
     // Sanitize ObjectId fields - convert empty strings to null/undefined
-    const objectIdFields = ['company', 'department', 'designation', 'reportingManager'];
+    const objectIdFields = ['company', 'department', 'designation', 'reportingManager', 'assignedManager', 'assignedTeamLead'];
     objectIdFields.forEach(field => {
       if (data[field] === '') {
         data[field] = undefined; // Remove from object so Mongoose doesn't try to cast it
       }
     });
+
+    await resolveDesignationRef(Designation, data)
 
     if (data.departments && Array.isArray(data.departments) && data.departments.length > 0) {
       // Filter out empty strings
@@ -314,6 +436,49 @@ export async function PUT(request, { params }) {
     // Handle designation level
     if (data.designationLevel) {
       data.designationLevel = parseInt(data.designationLevel) || 1
+    }
+
+    const effectiveLevel = Number(data.designationLevel || employee.designationLevel || 0) || inferLevelFromTitle(data.designationLevelName || employee.designationLevelName || '')
+    const assignmentValidationError = validateHierarchyAssignmentPayload(data, effectiveLevel, employee._id)
+    if (assignmentValidationError) {
+      return NextResponse.json(
+        { success: false, message: assignmentValidationError },
+        { status: 400 }
+      )
+    }
+
+    // Validate the reportsTo target's level against the strict hierarchy:
+    //  L8 -> only L9 ; L7 -> L8 or L9 ; L1-L6 -> L7/L8/L9.
+    if (data.reportsTo) {
+      const target = await Employee.findById(data.reportsTo)
+        .select('_id designationLevel designationLevelName')
+        .lean()
+      if (!target) {
+        return NextResponse.json({ success: false, message: 'Selected "Reports To" employee not found' }, { status: 400 })
+      }
+      const targetLvl = Number(target.designationLevel) || inferLevelFromTitle(target.designationLevelName || '')
+      const allowed = allowedReportsToLevels(effectiveLevel)
+      if (!allowed.has(targetLvl)) {
+        const allowedNames = Array.from(allowed).sort((a, b) => b - a).map((l) => ({ 9: 'Director', 8: 'Assistant Director', 7: 'C-Suite' }[l] || `L${l}`)).join(', ')
+        return NextResponse.json({ success: false, message: `"Reports To" must be one of: ${allowedNames}` }, { status: 400 })
+      }
+    } else if (requiresReportsTo(effectiveLevel) && data.reportsTo === '') {
+      // Explicit clear: only allowed if there is no candidate at all in the org.
+      const allowed = allowedReportsToLevels(effectiveLevel)
+      const anyCandidate = await Employee.exists({ designationLevel: { $in: Array.from(allowed) } })
+      if (anyCandidate) {
+        const allowedNames = Array.from(allowed).sort((a, b) => b - a).map((l) => ({ 9: 'Director', 8: 'Assistant Director', 7: 'C-Suite' }[l] || `L${l}`)).join(', ')
+        return NextResponse.json(
+          { success: false, message: `"Reports To" is required (pick one of: ${allowedNames})` },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (!data.reportingManager) {
+      if (data.assignedTeamLead) data.reportingManager = data.assignedTeamLead
+      else if (data.assignedManager) data.reportingManager = data.assignedManager
+      else if (data.reportsTo) data.reportingManager = data.reportsTo
     }
 
     // System role belongs to the linked User document, not the Employee document.
@@ -399,6 +564,16 @@ export async function PUT(request, { params }) {
         select: 'firstName lastName',
         options: { strictPopulate: false }
       })
+      .populate({
+        path: 'assignedManager',
+        select: 'firstName lastName employeeCode',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'assignedTeamLead',
+        select: 'firstName lastName employeeCode',
+        options: { strictPopulate: false }
+      })
       .lean()
 
     let updatedLinkedUser = linkedUser
@@ -476,6 +651,24 @@ export async function PUT(request, { params }) {
       employeeId: id,
     })
     emitDashboardRefresh({ reason: 'employee-updated' })
+
+    // Auto-regenerate AI KRIs when role changes (promotion / department change).
+    try {
+      const designationChanged = data.designation && String(data.designation) !== String(employee.designation || '')
+      const departmentChanged = data.department && String(data.department) !== String(employee.department || '')
+      const levelChanged = data.designationLevel && Number(data.designationLevel) !== Number(employee.designationLevel || 0)
+      if (designationChanged || departmentChanged || levelChanged) {
+        const { generateAndStoreKRIsKPIs } = await import('@/lib/kriGenerator')
+        generateAndStoreKRIsKPIs({
+          Employee,
+          employeeId: id,
+          userId: auth.user?._id || auth.user?.userId,
+          generateKPIs: false,
+        }).catch((err) => console.error('[Employee Update] Auto KRI regeneration failed:', err.message))
+      }
+    } catch (e) {
+      console.warn('[Employee Update] Could not schedule KRI regeneration:', e.message)
+    }
 
     return NextResponse.json({
       success: true,

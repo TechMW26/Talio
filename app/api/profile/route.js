@@ -31,7 +31,7 @@ export async function GET(request) {
     const userRecord = await User.findById(user._id || user.userId)
       .populate({
         path: 'employeeId',
-        select: 'firstName lastName employeeCode email phone profilePicture designation designationLevel designationLevelName department departments reportingManager status dateOfJoining dateOfBirth gender address emergencyContact bloodGroup company',
+        select: 'firstName lastName employeeCode email phone profilePicture bio designation designationLevel designationLevelName department departments reportingManager status dateOfJoining dateOfBirth gender address emergencyContact bloodGroup company aiGeneratedKRIs aiGeneratedKRIsMeta manualKRIs manualKPIs',
         populate: [
           { path: 'designation', select: 'title level levelName' },
           { path: 'department', select: 'name code' },

@@ -277,9 +277,25 @@ export function syncUserData(employeeData) {
     }
     
     localStorage.setItem('user', JSON.stringify(syncedUser))
+
+    // Notify mounted components to refresh user state immediately.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('talio:user-updated', { detail: syncedUser }))
+    }
+
     return syncedUser
   } catch (error) {
     console.error('Error syncing user data:', error)
     return null
   }
+}
+
+/**
+ * Broadcast current user update to all mounted listeners.
+ * Useful after profile edits so UI refreshes without page reload.
+ * @param {Object} userData
+ */
+export function broadcastUserUpdate(userData) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('talio:user-updated', { detail: userData || getCurrentUser() }))
 }

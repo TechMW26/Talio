@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,12 +53,11 @@ export async function GET(request) {
         query._id = employeeId
       }
     } else if (user.role === 'manager') {
-      // Managers can see reviews for their team members
-      const teamMembers = await Employee.find({ 
-        reportingManager: employeeId,
-        status: 'active'
-      }).select('_id')
-      
+      // Managers can see reviews for any direct report (assignedManager / TL / reportsTo / reportingManager).
+      const teamMembers = await Employee.find(
+        buildDirectReportsFilter(employeeId, { status: 'active' })
+      ).select('_id')
+
       const teamMemberIds = teamMembers.map(member => member._id)
       query._id = { $in: [...teamMemberIds, employeeId] }
     }

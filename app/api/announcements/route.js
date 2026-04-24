@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendAnnouncementNotification } from '@/lib/notificationService'
 import { emitDashboardRefresh, REALTIME_EVENTS } from '@/lib/realtimeEvents'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 // GET - List announcements
 export async function GET(request) {
@@ -266,11 +267,10 @@ export async function POST(request) {
 
       // Check if this is a manager announcement (sent to direct reports only)
       if (creatorRole === 'manager' && creatorEmployeeId) {
-        // Send to manager's direct reports only
-        const directReports = await Employee.find({
-          reportingManager: creatorEmployeeId,
-          status: 'active'
-        }).select('userId')
+        // Send to manager's direct reports only (assignedManager / TL / reportsTo / reportingManager)
+        const directReports = await Employee.find(
+          buildDirectReportsFilter(creatorEmployeeId, { status: 'active' })
+        ).select('userId')
 
         const userIds = directReports.map(emp => emp.userId).filter(Boolean)
         targetUsers = await User.find({

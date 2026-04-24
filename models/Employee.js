@@ -14,6 +14,11 @@ const EmployeeSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  bio: {
+    type: String,
+    trim: true,
+    maxlength: 1000,
+  },
   email: {
     type: String,
     required: true,
@@ -82,6 +87,24 @@ const EmployeeSchema = new mongoose.Schema({
     set: v => v === '' ? null : v,
   },
   reportingManager: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    set: v => v === '' ? null : v,
+  },
+  // Explicit hierarchy links used for cross-department visibility and assignment flows
+  assignedManager: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    set: v => v === '' ? null : v,
+  },
+  assignedTeamLead: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    set: v => v === '' ? null : v,
+  },
+  // Executive reporting chain. Required for everyone except Director (level 9).
+  // Allowed targets: C-Suite (L7), Assistant Director (L8), Director (L9).
+  reportsTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee',
     set: v => v === '' ? null : v,
@@ -213,6 +236,48 @@ const EmployeeSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  aiGeneratedKRIs: [{
+    title: {
+      type: String,
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    importance: {
+      type: String,
+      enum: ['high', 'medium', 'low'],
+      default: 'medium',
+    },
+  }],
+  aiGeneratedKRIsMeta: {
+    generatedAt: Date,
+    generatedFromDesignation: String,
+    generatedFromDepartment: String,
+  },
+  manualKRIs: [{
+    type: String,
+    trim: true,
+  }],
+  manualKPIs: [{
+    name: {
+      type: String,
+      trim: true,
+    },
+    target: {
+      type: String,
+      trim: true,
+    },
+    unit: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
+    },
+  }],
   // Productivity monitoring settings
   screenshotInterval: {
     type: Number,
@@ -236,6 +301,9 @@ EmployeeSchema.index({ department: 1, status: 1 }); // Common filter combination
 EmployeeSchema.index({ departments: 1 }); // Multiple departments queries
 EmployeeSchema.index({ status: 1, createdAt: -1 }); // List queries with sorting
 EmployeeSchema.index({ reportingManager: 1 }); // Manager queries
+EmployeeSchema.index({ assignedManager: 1 }); // Explicit manager assignment queries
+EmployeeSchema.index({ assignedTeamLead: 1 }); // Explicit team lead assignment queries
+EmployeeSchema.index({ reportsTo: 1 }); // Executive reporting chain queries
 EmployeeSchema.index({ firstName: 'text', lastName: 'text', email: 'text' }); // Text search
 EmployeeSchema.index({ designation: 1 }); // Designation queries
 

@@ -21,6 +21,8 @@ import {
   FaSun,
   FaAdjust,
   FaExclamationTriangle,
+  FaSync,
+  FaBrain,
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Skeleton } from '@heroui/react'
@@ -32,6 +34,7 @@ import ActiveSessionsSection from '@/components/ActiveSessionsSection'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
+import { broadcastUserUpdate, syncUserData } from '@/utils/userHelper'
 
 // Dynamically import Lanyard with no SSR and error boundary
 const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) => {
@@ -68,6 +71,8 @@ export default function ProfilePage() {
 
   // Profile completion state
   const [isCompleteProfileMode, setIsCompleteProfileMode] = useState(false)
+  const [activeProfileTab, setActiveProfileTab] = useState('profile')
+  const [refreshingKri, setRefreshingKri] = useState(false)
 
   // --- SWR: Profile data ---
   const { data: profileRes, isLoading: profileLoading, mutate: refreshProfile } = useAuthedSWR('/api/profile')
@@ -76,12 +81,24 @@ export default function ProfilePage() {
   const { data: completionRes, mutate: refreshCompletion } = useAuthedSWR('/api/profile/completion-status')
   const profileCompletionStatus = useMemo(() => completionRes?.data || null, [completionRes])
 
+  // --- SWR: AI-generated role responsibilities ---
+  const { data: kriRes, isLoading: kriLoading, mutate: refreshKri } = useAuthedSWR('/api/profile/kri')
+  const kriData = useMemo(() => kriRes?.data || null, [kriRes])
+
   // Initialize user/employee from SWR data
   useEffect(() => {
     if (profileRes?.success && profileRes.data) {
       setUser(profileRes.data.user)
       setEmployee(profileRes.data.employee)
       setEditedEmployee(profileRes.data.employee)
+      // Keep localStorage user in sync (esp. profilePicture) so sidebar/avatars across the app stay current
+      try {
+        if (profileRes.data.employee) {
+          syncUserData(profileRes.data.employee)
+        }
+      } catch (e) {
+        console.warn('syncUserData failed', e)
+      }
     } else if (profileRes && !profileRes.success) {
       // Fallback to localStorage
       const userData = localStorage.getItem('user')
@@ -96,6 +113,7 @@ export default function ProfilePage() {
             dateOfBirth: parsedUser.employeeId.dateOfBirth || parsedUser.dateOfBirth,
             gender: parsedUser.employeeId.gender || parsedUser.gender,
             address: parsedUser.employeeId.address || parsedUser.address,
+            bio: parsedUser.employeeId.bio || parsedUser.bio,
             emergencyContact: parsedUser.employeeId.emergencyContact || parsedUser.emergencyContact,
             designation: parsedUser.employeeId.designation || parsedUser.designation,
             department: parsedUser.employeeId.department || parsedUser.department,
@@ -112,6 +130,7 @@ export default function ProfilePage() {
             dateOfBirth: parsedUser.dateOfBirth,
             gender: parsedUser.gender,
             address: parsedUser.address,
+            bio: parsedUser.bio,
             designation: parsedUser.designation,
             designationLevel: parsedUser.designationLevel,
             designationLevelName: parsedUser.designationLevelName,
@@ -360,20 +379,27 @@ export default function ProfilePage() {
       const result = await response.json()
       if (result.success) {
         // Use the URL returned from the API
-        const profilePictureUrl = result.data?.profilePicture || croppedImage
+        const rawUrl = result.data?.profilePicture || croppedImage
+        const profilePictureUrl = typeof rawUrl === 'string' && rawUrl.startsWith('http')
+          ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}v=${Date.now()}`
+          : rawUrl
 
         setEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl }))
         setEditedEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl }))
         toast.success('Profile picture updated successfully!')
 
-        // Update localStorage user data if it has employeeId
+        // Update localStorage user data and broadcast app-wide update instantly.
         const userData = localStorage.getItem('user')
         if (userData) {
           const parsedUser = JSON.parse(userData)
+          parsedUser.profilePicture = profilePictureUrl
           if (parsedUser.employeeId) {
-            parsedUser.employeeId.profilePicture = profilePictureUrl
-            localStorage.setItem('user', JSON.stringify(parsedUser))
+            if (typeof parsedUser.employeeId === 'object') {
+              parsedUser.employeeId.profilePicture = profilePictureUrl
+            }
           }
+          localStorage.setItem('user', JSON.stringify(parsedUser))
+          broadcastUserUpdate(parsedUser)
         }
 
         closeImageEditor()
@@ -398,6 +424,7 @@ export default function ProfilePage() {
       const updateData = {
         phone: editedEmployee.phone,
         address: editedEmployee.address,
+        bio: editedEmployee.bio,
         emergencyContact: editedEmployee.emergencyContact,
         bloodGroup: editedEmployee.bloodGroup,
         dateOfBirth: editedEmployee.dateOfBirth,
@@ -446,6 +473,31 @@ export default function ProfilePage() {
 
   const handleStartPhotoUpload = () => {
     setShowPhotoGuidance(true)
+  }
+
+  const handleRefreshKri = async () => {
+    try {
+      setRefreshingKri(true)
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/profile/kri?refresh=true', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const json = await res.json()
+      if (!json.success) {
+        toast.error(json.message || 'Failed to refresh role responsibilities')
+        return
+      }
+      toast.success('Role responsibilities refreshed')
+      refreshKri()
+      refreshProfile()
+    } catch (error) {
+      console.error('Refresh KRI error:', error)
+      toast.error('Failed to refresh role responsibilities')
+    } finally {
+      setRefreshingKri(false)
+    }
   }
 
   const handleConfirmPhotoUpload = () => {
@@ -847,6 +899,31 @@ export default function ProfilePage() {
   return (
     <div className="page-container pb-24 md:pb-6 px-2 sm:px-4 lg:px-8">
       <div className="max-w-[1400px] mx-auto w-full">
+        <div className="mb-4 flex justify-end">
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-900/70 p-2 w-fit">
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('profile')}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeProfileTab === 'profile'
+                ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                }`}
+            >
+              Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('kri')}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeProfileTab === 'kri'
+                ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                }`}
+            >
+              Key Responsibilities
+            </button>
+          </div>
+        </div>
+
         {/* Status and Edit buttons - Desktop only (hidden on mobile) */}
         <div className="mb-4 hidden lg:flex items-center justify-end gap-3">
           <StatusEditButtons />
@@ -890,6 +967,8 @@ export default function ProfilePage() {
 
           {/* Right Column: All Sections */}
           <div className="lg:col-span-2 space-y-5 sm:space-y-6 order-2 mt-6 lg:mt-0">
+            {activeProfileTab === 'profile' ? (
+              <>
             {/* Complete Your Profile Section - Always at top */}
             {renderCompleteProfileSection()}
 
@@ -1178,6 +1257,32 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
+                {/* Bio */}
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200/70 dark:border-sky-800/50 shadow-xs sm:col-span-2">
+                  <div className="w-11 h-11 rounded-full bg-sky-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-sky-500/40">
+                    <FaUser className="text-white text-base" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-medium text-sky-700 tracking-wide uppercase mb-1.5">
+                      Bio
+                    </p>
+                    {isEditing ? (
+                      <textarea
+                        value={editedEmployee.bio || ''}
+                        onChange={(e) => handleFieldChange('bio', e.target.value.slice(0, 1000))}
+                        className="w-full px-3 py-2 border border-sky-300 rounded-lg text-sm font-medium text-slate-900 bg-white focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all resize-none"
+                        placeholder="Tell a little bit about yourself, your expertise, and how you contribute."
+                        rows="3"
+                        maxLength={1000}
+                      />
+                    ) : (
+                      <p className="font-medium text-slate-900 text-sm sm:text-base whitespace-pre-line">
+                        {employee.bio || 'Add your bio from Edit Profile so teammates can know you better.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Blood Group */}
                 <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/50 shadow-xs">
                   <div className="w-11 h-11 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-amber-500/40">
@@ -1400,6 +1505,39 @@ export default function ProfilePage() {
             <div className="lg:hidden mt-8 mb-4">
               <StatusEditButtons />
             </div>
+              </>
+            ) : (
+              <section className="bg-white dark:bg-[#18181b] rounded-3xl border border-slate-100 dark:border-transparent shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-5 sm:p-6">
+                <div className="mb-5">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">
+                    Key Responsibilities
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Your core responsibilities aligned to your designation and department.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {kriLoading ? (
+                    <div className="text-sm text-slate-500">Loading responsibilities...</div>
+                  ) : (kriData?.responsibilities || []).length === 0 ? (
+                    <div className="rounded-2xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 px-4 py-3 text-sm text-slate-600 dark:text-zinc-300">
+                      Your responsibilities will appear here shortly.
+                    </div>
+                  ) : (
+                    (kriData?.responsibilities || []).map((item, index) => (
+                      <div key={`${item.title}-${index}`} className="rounded-2xl border border-slate-200 dark:border-zinc-700 p-4 bg-slate-50/70 dark:bg-zinc-900/60">
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">{item.title}</h4>
+                          <span className="text-[10px] uppercase tracking-wide text-slate-500">{item.importance || 'medium'}</span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-zinc-300">{item.description}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       </div>

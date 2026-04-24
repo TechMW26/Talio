@@ -43,7 +43,8 @@ export async function PUT(request, { params }) {
 
     // Normalize level input
     if ('level' in data) {
-      const levelMap = { entry: 1, junior: 2, mid: 3, senior: 4, lead: 5, manager: 6, director: 7, executive: 8 }
+      // Convention: L7=Director (top), L6=C-Suite, L5=Manager, L4=TL
+      const levelMap = { entry: 1, junior: 1, mid: 2, senior: 3, lead: 4, 'team lead': 4, manager: 5, head: 5, 'sr manager': 5, 'senior manager': 5, executive: 6, 'c-suite': 6, csuite: 6, chief: 6, director: 7 }
       if (typeof data.level === 'string') {
         const lower = data.level.toLowerCase()
         data.level = levelMap[lower] || parseInt(data.level, 10) || 1

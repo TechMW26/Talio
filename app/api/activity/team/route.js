@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import mongoose from 'mongoose';
+import { buildDirectReportsFilter } from '@/lib/teamScope';
 
 // Roles that can view all team members
 const ADMIN_ROLES = ['admin', 'hr'];
@@ -128,6 +129,54 @@ export async function GET(request) {
     }).select('_id name code');
     
     if (headOfDepartments.length === 0) {
+      // Not a department head - check if they manage anyone via assignedManager / TL / reportsTo
+      const managerFilter = buildDirectReportsFilter(currentUser.employeeId._id)
+      if (managerFilter) {
+        const reports = await Employee.find(managerFilter)
+          .populate('department', 'name code')
+          .select('firstName lastName employeeCode department departments')
+          .limit(100)
+        if (reports.length > 0) {
+          const reportUsers = await User.find({
+            employeeId: { $in: reports.map(e => e._id) }
+          }).select('_id employeeId role')
+          const reportUserMap = {}
+          reportUsers.forEach(u => {
+            if (u.employeeId) reportUserMap[u.employeeId.toString()] = {
+              _id: u._id.toString(), role: u.role
+            }
+          })
+          // Include self too
+          const team = [
+            {
+              employeeId: currentUser.employeeId._id,
+              userId: currentUserId,
+              name: `${currentUser.employeeId.firstName || ''} ${currentUser.employeeId.lastName || ''}`.trim() || currentUser.email,
+              employeeCode: currentUser.employeeId.employeeCode,
+              department: currentUser.employeeId.department,
+              role: currentUserRole,
+              canCapture: true
+            },
+            ...reports.map(e => ({
+              employeeId: e._id,
+              userId: reportUserMap[e._id.toString()]?._id,
+              name: `${e.firstName} ${e.lastName}`,
+              employeeCode: e.employeeCode,
+              department: e.department,
+              role: reportUserMap[e._id.toString()]?.role,
+              canCapture: !['admin'].includes(reportUserMap[e._id.toString()]?.role)
+            })).filter(e => e.userId)
+          ]
+          return NextResponse.json({
+            success: true,
+            isAdmin: false,
+            isDepartmentHead: false,
+            isManager: true,
+            departments: [],
+            team
+          })
+        }
+      }
       // Not a department head - can only see self
       return NextResponse.json({
         success: true,

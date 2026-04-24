@@ -503,11 +503,11 @@ function calculateCompletionPrediction(project, tasks, taskAnalytics) {
     }
   }
 
-  // All tasks completed
+  // All tasks completed — awaiting review/approval or new task scope
   if (remainingTasks === 0) {
     return {
-      status: 'completed',
-      message: 'Project is complete!',
+      status: 'waiting-for-review',
+      message: 'All tasks are done! Project is awaiting review, approval, or new task scope before closing.',
       projectedDate: null,
       daysVariance: 0,
       confidence: 100
@@ -691,37 +691,48 @@ Previous Health Score: ${previousInsights.healthScore || 'N/A'}
 Previous Status: ${previousInsights.healthStatus || 'N/A'}`
     }
 
-    const prompt = `You are a strict project health auditor. Your job is to give ACCURATE, REALISTIC health scores. Do NOT be optimistic - be brutally honest.
+    const prompt = `You are a project health evaluator. Your job is to give ACCURATE, EVIDENCE-BASED scores from the metrics below.
 
 TODAY: ${today.toLocaleDateString()}
 ${previousContextSection}
 
-===== MANDATORY HEALTH SCORE RULES (YOU MUST FOLLOW THESE EXACTLY) =====
+  ===== SCORING PRINCIPLES (MUST FOLLOW) =====
 
-AUTOMATIC CRITICAL STATUS (healthScore 0-39, healthStatus="critical"):
-- Project is OVERDUE (past deadline)
-- Completion gap > 30% behind schedule (expected ${expectedCompletion}%, actual ${project.completionPercentage}%)
-- More than 50% of tasks are overdue
-- Project has < 5 total tasks (severely underdeveloped = CRITICAL)
-- More than half the team has 0 tasks assigned (${underutilizedMembers} of ${memberAnalytics.length} underutilized)
+  1) Evidence over tone. Every conclusion must be supported by provided metrics.
+  2) Avoid contradictions:
+  - If completion is >= 95% and overdue tasks = 0 and blocked tasks = 0, healthScore MUST be >= 70.
+  - If completion is 100% and all tasks are completed, do not classify as critical.
+  3) Task count alone is NOT a reason for critical status.
+  - A low task count can reduce confidence or produce warning, but cannot by itself force critical.
+  4) If project is overdue but completed, classify as warning or good based on execution quality, not critical by default.
+  5) Keep the score calibrated to current state, not hypothetical ideal process.
 
-AUTOMATIC WARNING STATUS (healthScore 40-69, healthStatus="warning"):
+  CRITICAL SIGNALS (usually healthScore 0-39):
+  - Completion gap > 30% behind schedule (expected ${expectedCompletion}%, actual ${project.completionPercentage}%)
+  - More than 50% of tasks are overdue
+  - Multiple blocked tasks + low progress
+  - High underutilization with low completion
+
+  WARNING SIGNALS (usually healthScore 40-69):
 - Completion gap 10-30% behind schedule
 - Any overdue tasks exist (${taskAnalytics.overdueCount} overdue)
 - Any blocked tasks exist (${taskAnalytics.statusDistribution.blocked} blocked)
-- Tasks per member < 3 (currently ${tasksPerMember})
+  - Tasks per member < 3 (currently ${tasksPerMember}) may indicate planning weakness
 - Deadline within 14 days with < 70% completion
 
-GOOD STATUS (healthScore 70-100, healthStatus="good"):
+  GOOD SIGNALS (usually healthScore 70-100):
 - Only if NONE of the above conditions apply
 - On track or ahead of schedule
 - No overdue tasks
 - Well-distributed workload
+ - Projection status is "waiting-for-review" (ALL tasks completed, project pending approval/review/new scope)
 
-===== CURRENT PROJECT ANALYSIS =====
-
-PROJECT: ${project.name}
-Status: ${project.status} | Priority: ${project.priority}
+SPECIAL CASE — WAITING FOR REVIEW (projection status = "waiting-for-review"):
+- This means 100% of existing tasks are done. The project is NOT failing.
+- The project is simply awaiting formal sign-off, stakeholder approval, or new task scope.
+- healthScore MUST be >= 75 in this state unless there are other critical problems (e.g., many blocked/overdue tasks before completion).
+- Do NOT penalise for "low task count" or "wasted capacity" when status is waiting-for-review.
+- oneLineVerdict should reflect completion and pending approval, not criticise task scope or team utilization.
 Start: ${startDate.toLocaleDateString()} | Deadline: ${deadline.toLocaleDateString()}
 Days Remaining: ${isOverdue ? `${Math.abs(daysUntilDeadline)} days OVERDUE!` : daysUntilDeadline + ' days'}
 Deadline Urgency: ${deadlineUrgency}
@@ -751,7 +762,7 @@ PROJECTION: ${completionPrediction.status} | Confidence: ${completionPrediction.
 
 ===== YOUR ASSESSMENT =====
 
-Based on the MANDATORY RULES above, determine:
+Based on the SCORING PRINCIPLES above, determine:
 1. Is this CRITICAL? (score 0-39) - Check all critical conditions
 2. Is this WARNING? (score 40-69) - Check all warning conditions  
 3. Only if NO issues, rate as GOOD (score 70-100)
@@ -795,10 +806,90 @@ Respond with ONLY valid JSON. healthScore and healthStatus MUST be consistent (c
   "projectionInsight": "One line about timeline - will it finish on time?"
 }`
 
-    const text = await generateSmartContent(prompt, { userId, feature: 'project-analytics' });
-    return parseAIJsonResponse(text, { expectedRoot: 'object' })
+    const text = await generateSmartContent(prompt, {
+      userId,
+      feature: 'project-analytics',
+      skipRefinement: true,
+      skipGuardrails: true,
+      skipContext: true
+    });
+    const parsed = parseAIJsonResponse(text, { expectedRoot: 'object' })
+    return normalizeProjectInsights(parsed, analyticsData)
   } catch (error) {
     console.error('Error generating AI insights:', error)
     return generateRuleBasedInsights(analyticsData)
   }
+}
+
+function normalizeProjectInsights(insights, analyticsData) {
+  const safeInsights = insights && typeof insights === 'object' ? { ...insights } : {}
+  const project = analyticsData?.project || {}
+  const taskAnalytics = analyticsData?.taskAnalytics || {}
+
+  const completion = Number(project.completionPercentage || 0)
+  const overdue = Number(taskAnalytics.overdueCount || 0)
+  const blocked = Number(taskAnalytics?.statusDistribution?.blocked || 0)
+  const total = Number(taskAnalytics.total || 0)
+  const completed = Number(taskAnalytics?.statusDistribution?.completed || 0)
+  const allCompleted = total > 0 && completed >= total
+  const isWaitingForReview = analyticsData?.completionPrediction?.status === 'waiting-for-review'
+  const isHighExecution = completion >= 95 && overdue === 0 && blocked === 0
+
+  let score = Number(safeInsights.healthScore)
+  if (!Number.isFinite(score)) score = 60
+  score = Math.max(0, Math.min(100, Math.round(score)))
+
+  // Deterministic consistency guards to avoid contradictory scoring.
+  if (allCompleted || isWaitingForReview || isHighExecution) {
+    score = Math.max(score, 75)
+  }
+
+  let status = String(safeInsights.healthStatus || '').toLowerCase()
+  if (!['critical', 'warning', 'good'].includes(status)) {
+    status = score < 40 ? 'critical' : score < 70 ? 'warning' : 'good'
+  }
+
+  if (status === 'critical' && score >= 40) score = 39
+  if (status === 'warning' && (score < 40 || score >= 70)) score = Math.min(69, Math.max(40, score))
+  if (status === 'good' && score < 70) score = 70
+
+  status = score < 40 ? 'critical' : score < 70 ? 'warning' : 'good'
+
+  if (!safeInsights.oneLineVerdict || typeof safeInsights.oneLineVerdict !== 'string') {
+    if (isWaitingForReview) {
+      safeInsights.oneLineVerdict = 'All tasks are complete — project is awaiting review, stakeholder approval, or new scope before closure.'
+    } else if (status === 'good') {
+      safeInsights.oneLineVerdict = 'Project execution is strong with minimal delivery risk based on current metrics.'
+    } else if (status === 'warning') {
+      safeInsights.oneLineVerdict = 'Project needs targeted corrections to reduce schedule and execution risk.'
+    } else {
+      safeInsights.oneLineVerdict = 'Project is at critical risk and requires immediate intervention on delivery blockers.'
+    }
+  }
+
+  safeInsights.healthScore = score
+  safeInsights.healthStatus = status
+
+  if (!Array.isArray(safeInsights.keyMetrics)) safeInsights.keyMetrics = []
+  if (!Array.isArray(safeInsights.immediateActions)) safeInsights.immediateActions = []
+  if (!Array.isArray(safeInsights.employeeInsights)) safeInsights.employeeInsights = []
+  if (!Array.isArray(safeInsights.blockers)) safeInsights.blockers = []
+  if (!Array.isArray(safeInsights.riskRadar)) safeInsights.riskRadar = []
+  if (!Array.isArray(safeInsights.quickWins)) safeInsights.quickWins = []
+  if (!Array.isArray(safeInsights.bottlenecks)) safeInsights.bottlenecks = []
+  if (!safeInsights.weeklyFocus || typeof safeInsights.weeklyFocus !== 'object') {
+    safeInsights.weeklyFocus = {
+      priority1: 'Resolve highest-impact delivery blocker',
+      priority2: 'Stabilize workload allocation across members',
+      priority3: 'Update task statuses and ETAs for forecast accuracy'
+    }
+  }
+  if (!safeInsights.workloadDistribution || typeof safeInsights.workloadDistribution !== 'object') {
+    safeInsights.workloadDistribution = { overloaded: [], balanced: [], underutilized: [] }
+  }
+  if (!safeInsights.projectionInsight || typeof safeInsights.projectionInsight !== 'string') {
+    safeInsights.projectionInsight = 'Projection is based on current completion, overdue tasks, and blockers.'
+  }
+
+  return safeInsights
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 export const dynamic = 'force-dynamic'
 
@@ -316,11 +317,10 @@ export async function GET(request) {
         }
       })
     } else if (userRole === 'manager') {
-      // User is manager - get direct reports
-      teamMembers = await Employee.find({
-        reportingManager: userRecord.employeeId,
-        status: 'active'
-      })
+      // User is manager - get direct reports (all relationship fields)
+      teamMembers = await Employee.find(
+        buildDirectReportsFilter(userRecord.employeeId, { status: 'active' })
+      )
         .populate('designation', 'title level levelName')
         .populate('department', 'name')
         .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department profilePicture skills')

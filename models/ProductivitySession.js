@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 /**
  * ProductivitySession Model
- * Stores groups of 60 screenshots (3-min intervals, 180-min sessions) with AI analysis
+ * Stores groups of 20 screenshots (3-min intervals, 60-min sessions) with AI analysis
  */
 const ProductivitySessionSchema = new mongoose.Schema({
   // User who owns this session
@@ -220,7 +220,7 @@ const ProductivitySessionSchema = new mongoose.Schema({
 
   isComplete: {
     type: Boolean,
-    default: false // true when session has 60 screenshots (3-min intervals, 180-min session)
+    default: false // true when session has 20 screenshots (3-min intervals, 60-min session)
   },
 
   // Cleanup tracking - screenshots deleted after AI analysis
@@ -272,8 +272,8 @@ ProductivitySessionSchema.pre('save', function (next) {
       this.estimatedDuration = 1; // Single screenshot = 1 minute
     }
 
-    // Mark as complete if 60 or more screenshots
-    this.isComplete = this.screenshots.length >= 60;
+    // Mark as complete if 20 or more screenshots (3-min interval × 20 = 60-min session)
+    this.isComplete = this.screenshots.length >= 20;
   }
   next();
 });

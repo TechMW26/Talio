@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 // GET - Get daily goals
 export async function GET(request) {
@@ -30,11 +31,10 @@ export async function GET(request) {
     } else if (employeeId) {
       query.employee = employeeId
     } else if (user.role === 'manager') {
-      // Get team members for manager
-      const teamMembers = await Employee.find({
-        reportingManager: currentEmployeeId,
-        status: 'active'
-      }).select('_id')
+      // Get all direct reports for manager (assignedManager / TL / reportsTo / reportingManager).
+      const teamMembers = await Employee.find(
+        buildDirectReportsFilter(currentEmployeeId, { status: 'active' })
+      ).select('_id')
       query.employee = { $in: teamMembers.map(m => m._id) }
     }
 

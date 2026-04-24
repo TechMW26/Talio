@@ -4,7 +4,9 @@ import { readdir, stat } from 'fs/promises';
 import path from 'path';
 import { enrichPersistedProductivityAnalysis } from '@/lib/productivityAnalysisResult';
 
-const SESSION_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
+const SESSION_WINDOW_MS = 60 * 60 * 1000;  // 60-minute session windows
+const MAX_SCREENSHOTS_PER_SESSION = 20;     // 3-min interval × 20 = 60 min max
+const DEDUP_TOLERANCE_MS = 90 * 1000;       // 90-second tolerance for near-duplicate captures
 
 /**
  * Parse screenshot filename to get timestamp
@@ -21,6 +23,23 @@ function parseScreenshotTimestamp(filename) {
   } catch {
     return new Date();
   }
+}
+
+/**
+ * Deduplicate screenshots: if two captures are within DEDUP_TOLERANCE_MS of each other,
+ * keep only the first one. This removes re-uploads/retries that bypassed the 15s upload dedup.
+ */
+function deduplicateByInterval(screenshots) {
+  if (screenshots.length === 0) return screenshots;
+  const deduped = [screenshots[0]];
+  for (let i = 1; i < screenshots.length; i++) {
+    const prev = new Date(deduped[deduped.length - 1].timestamp).getTime();
+    const curr = new Date(screenshots[i].timestamp).getTime();
+    if (curr - prev >= DEDUP_TOLERANCE_MS) {
+      deduped.push(screenshots[i]);
+    }
+  }
+  return deduped;
 }
 
 /**
@@ -43,7 +62,7 @@ async function syncScreenshotsToSessions(userId, date, models) {
     }).sort({ capturedAt: 1 }).lean();
 
     for (const ss of dbScreenshots) {
-      const displayPath = ss.path || `/api/activity/screenshot?id=${ss._id}`;
+      const displayPath = ss.imagekitUrl || ss.path || `/api/activity/screenshot?id=${ss._id}`;
       screenshots.push({
         path: displayPath,
         filename: ss.filename || `screenshot_${ss._id}.webp`,
@@ -87,7 +106,9 @@ async function syncScreenshotsToSessions(userId, date, models) {
     return [];
   }
 
-  console.log(`Found ${screenshots.length} screenshots for user ${userId} on ${dateFolder}`);
+  // Deduplicate near-identical captures before grouping
+  const deduped = deduplicateByInterval(screenshots);
+  console.log(`Found ${screenshots.length} screenshots for user ${userId} on ${dateFolder} (${deduped.length} after dedup)`);
 
   // Get user and employee info
   const user = await User.findById(userId).select('employeeId');
@@ -98,7 +119,7 @@ async function syncScreenshotsToSessions(userId, date, models) {
   let currentGroup = [];
   let windowStart = null;
 
-  for (const ss of screenshots) {
+  for (const ss of deduped) {
     const t = new Date(ss.timestamp).getTime();
     if (windowStart === null) {
       const d = new Date(t);
@@ -120,16 +141,27 @@ async function syncScreenshotsToSessions(userId, date, models) {
 
   const result = [];
   for (let i = 0; i < sessions.length; i++) {
-    const sessionScreenshots = sessions[i];
+    // Hard cap: never store more than MAX_SCREENSHOTS_PER_SESSION per session.
+    // If a window still has excess after dedup (e.g. historical bad data), keep the
+    // most evenly spaced MAX_SCREENSHOTS_PER_SESSION to preserve temporal coverage.
+    let sessionScreenshots = sessions[i];
+    if (sessionScreenshots.length > MAX_SCREENSHOTS_PER_SESSION) {
+      const step = sessionScreenshots.length / MAX_SCREENSHOTS_PER_SESSION;
+      sessionScreenshots = Array.from({ length: MAX_SCREENSHOTS_PER_SESSION }, (_, k) =>
+        sessionScreenshots[Math.min(Math.round(k * step), sessionScreenshots.length - 1)]
+      );
+      console.warn(`Session ${i + 1} capped from ${sessions[i].length} to ${MAX_SCREENSHOTS_PER_SESSION} screenshots for user ${userId}`);
+    }
+
     const sessionNumber = i + 1;
 
     // Map screenshot data to match ProductivitySession schema
     const mappedScreenshots = sessionScreenshots.map(ss => ({
-      path: ss.path, // path contains the URL or relative path (matches schema)
-      url: ss.path,  // Also keep url for frontend compatibility
-      fileId: ss.gridfsFileId || null, // GridFS fileId for cleanup
+      path: ss.path,
+      url: ss.path,
+      fileId: ss.gridfsFileId || null,
       timestamp: ss.timestamp,
-      capturedAt: ss.timestamp, // For frontend compatibility
+      capturedAt: ss.timestamp,
       filename: ss.filename
     }));
 
@@ -158,7 +190,7 @@ async function syncScreenshotsToSessions(userId, date, models) {
       await session.save();
       console.log(`Created session ${sessionNumber} with ${mappedScreenshots.length} screenshots`);
     } else if (session.screenshotCount !== mappedScreenshots.length) {
-      // Update session with new screenshots
+      // Update session with corrected screenshots
       session.screenshots = mappedScreenshots;
       session.screenshotCount = mappedScreenshots.length;
       session.startTime = sessionScreenshots[0].timestamp;

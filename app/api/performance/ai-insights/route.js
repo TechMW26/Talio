@@ -43,9 +43,23 @@ export async function POST(request) {
     }
 
     // Prepare comprehensive performance summary
-    const performanceSummary = `You are a performance analytics expert. Analyze this data and provide actionable insights.
+    const designationContext = Array.isArray(reportData.designationPerformance) && reportData.designationPerformance.length > 0
+      ? `\nDesignation-level snapshots:\n${reportData.designationPerformance.slice(0, 8).map((row) =>
+        `- ${row.designation}: score ${row.avgScore || row.score || 'n/a'}, goals ${row.goalCompletion || row.goalCompletionRate || 'n/a'}%`
+      ).join('\n')}`
+      : '\nDesignation-level snapshots: not provided';
+
+    const performanceSummary = `You are a performance analytics expert. Analyze this data and provide actionable, evidence-based insights.
 
 IMPORTANT: Return ONLY a valid JSON object with NO markdown formatting, NO code blocks, NO extra text.
+
+  ACCURACY RULES:
+  - Use only the metrics provided below; do not invent missing data.
+  - Keep statements numerically consistent with the inputs.
+  - If a metric is strong, avoid contradictory negative claims for that same metric.
+  - Prefer specific, measurable actions tied to weak metrics.
+  - If overall data is mixed, reflect balanced insights rather than extreme conclusions.
+  - Compare performance with role/designation expectations where possible; avoid judging all roles by one benchmark.
 
 The JSON must have this EXACT structure with arrays of short, actionable bullet points:
 {
@@ -77,7 +91,8 @@ Performance Data:
 Top 5 Departments:
 ${reportData.departmentPerformance.slice(0, 5).map(dept =>
       `${dept.department}: Score ${dept.avgScore}, Rating ${dept.avgRating}, Goals ${dept.goalCompletion}%`
-    ).join('\n')}
+  ).join('\n')}
+${designationContext}
 
 Return ONLY the JSON object, nothing else.`
 

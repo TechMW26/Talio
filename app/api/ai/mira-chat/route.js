@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { generateContent } from '@/lib/gemini'
+import { generateCustomAIPublicContent } from '@/lib/ai/providers/customProvider'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 // Get current month key in "YYYY-MM" format
 function getCurrentMonth() {
@@ -44,7 +45,7 @@ async function checkAndDeductToken(MiraTokenUsage, userId) {
 
 // Route all MIRA generation through the shared custom AI provider.
 async function generateContentWithSearch(prompt, systemInstruction) {
-  return generateContent(prompt, systemInstruction)
+  return generateCustomAIPublicContent(prompt, systemInstruction)
 }
 
 // Build role-aware system prompt with user context
@@ -251,7 +252,9 @@ async function fetchContextData(models, user, role, query) {
     // Employee queries (admin/manager only)
     if (/employee|staff|team member|headcount|people|roster/i.test(queryLower)) {
       if ((isAdmin || isManager) && models.Employee) {
-        const empFilter = isAdmin ? { status: 'active' } : { reportingManager: user.employeeId, status: 'active' }
+        const empFilter = isAdmin
+          ? { status: 'active' }
+          : buildDirectReportsFilter(user.employeeId, { status: 'active' })
         const employees = await models.Employee.find(empFilter)
           .populate('department designation')
           .lean().limit(50)
@@ -534,6 +537,124 @@ function generateDataCards(ctx) {
   return cards
 }
 
+function isPendingTasksQuery(message = '') {
+  const q = String(message || '').toLowerCase()
+  return /(^|\s)\/tasks(\s|$)/i.test(q) || /\b(show|list|view|get)?\s*(my\s*)?(pending\s*)?tasks?\b/i.test(q)
+}
+
+function mapTaskToProgressStatus(task, now = new Date()) {
+  const due = task?.dueDate ? new Date(task.dueDate) : null
+  const isOverdue = due && !Number.isNaN(due.getTime()) && due < now
+  if (isOverdue) return 'overdue'
+
+  const priority = String(task?.priority || '').toLowerCase()
+  if (['critical', 'high', 'urgent'].includes(priority)) return 'at-risk'
+  return 'on-track'
+}
+
+function buildPendingTasksResponse(ctx) {
+  const now = new Date()
+  const allTasks = Array.isArray(ctx?.myTasks) ? ctx.myTasks : []
+  const pendingStatuses = new Set(['todo', 'to-do', 'pending', 'in-progress', 'review', 'blocked'])
+
+  const pendingTasks = allTasks.filter(t => {
+    const status = String(t?.status || '').toLowerCase()
+    return pendingStatuses.has(status)
+  })
+
+  const overdueCount = pendingTasks.filter(t => {
+    if (!t?.dueDate) return false
+    const d = new Date(t.dueDate)
+    return !Number.isNaN(d.getTime()) && d < now
+  }).length
+
+  const atRiskCount = pendingTasks.filter(t => {
+    const priority = String(t?.priority || '').toLowerCase()
+    return ['critical', 'high', 'urgent'].includes(priority)
+  }).length
+
+  const progressItems = pendingTasks.slice(0, 8).map(t => ({
+    label: t.title,
+    value: Number.isFinite(t?.progress) ? t.progress : 0,
+    max: 100,
+    status: mapTaskToProgressStatus(t, now)
+  }))
+
+  const listItems = pendingTasks.slice(0, 8).map(t => ({
+    title: t.title,
+    subtitle: [t.priority, t.project, t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : null].filter(Boolean).join(' · '),
+    status: t.status === 'review' ? 'active' : t.status === 'blocked' ? 'overdue' : 'pending',
+    link: '/dashboard/projects/my-tasks'
+  }))
+
+  const message = pendingTasks.length === 0
+    ? 'You have no pending tasks right now.'
+    : `You have ${pendingTasks.length} pending task${pendingTasks.length === 1 ? '' : 's'} (${overdueCount} overdue, ${atRiskCount} high priority).`
+
+  const cards = []
+  if (progressItems.length > 0) {
+    cards.push({
+      type: 'progress',
+      title: 'Your Pending Tasks',
+      data: { items: progressItems }
+    })
+  }
+  if (listItems.length > 0) {
+    cards.push({
+      type: 'list',
+      title: 'Task Breakdown',
+      data: { items: listItems }
+    })
+  }
+  cards.push({
+    type: 'action',
+    title: 'Quick Actions',
+    data: {
+      text: 'Open your task board to update status or unblock dependencies.',
+      actions: [
+        { label: 'Open My Tasks', link: '/dashboard/projects/my-tasks', variant: 'primary' }
+      ]
+    }
+  })
+
+  return {
+    message,
+    cards,
+    suggestedQuestions: []
+  }
+}
+
+function normalizeParsedResponse(parsed) {
+  if (!parsed || typeof parsed !== 'object') {
+    return { message: 'I encountered an issue. Please try again.', cards: [], suggestedQuestions: [] }
+  }
+
+  // Some providers return the full JSON payload stringified inside `message`.
+  if (typeof parsed.message === 'string') {
+    const raw = parsed.message.trim()
+    if (raw.startsWith('{') && raw.endsWith('}')) {
+      try {
+        const nested = JSON.parse(raw)
+        if (nested && typeof nested === 'object' && typeof nested.message === 'string') {
+          return {
+            message: nested.message,
+            cards: Array.isArray(nested.cards) ? nested.cards : (Array.isArray(parsed.cards) ? parsed.cards : []),
+            suggestedQuestions: Array.isArray(nested.suggestedQuestions) ? nested.suggestedQuestions : (Array.isArray(parsed.suggestedQuestions) ? parsed.suggestedQuestions : [])
+          }
+        }
+      } catch {
+        // Keep original parsed payload.
+      }
+    }
+  }
+
+  return {
+    message: typeof parsed.message === 'string' ? parsed.message : 'I encountered an issue. Please try again.',
+    cards: Array.isArray(parsed.cards) ? parsed.cards : [],
+    suggestedQuestions: Array.isArray(parsed.suggestedQuestions) ? parsed.suggestedQuestions : []
+  }
+}
+
 export async function POST(request) {
   try {
     const { success, user, models, message: authMsg } = await getAuthAndModels(request, [
@@ -575,6 +696,16 @@ export async function POST(request) {
 
     // Fetch relevant context data based on the query
     const contextData = await fetchContextData(models, user, role, userMessage)
+
+    // Fast path: task-list requests are deterministic and should not invoke AI.
+    if (isPendingTasksQuery(userMessage)) {
+      const directResponse = buildPendingTasksResponse(contextData)
+      return NextResponse.json({
+        success: true,
+        response: directResponse,
+        tokens: tokenResult
+      })
+    }
 
     // Build conversation for AI
     const systemPrompt = buildSystemPrompt(user, role, employeeData, contextData)
@@ -624,6 +755,8 @@ export async function POST(request) {
         }
       }
     }
+
+    parsed = normalizeParsedResponse(parsed)
 
     // Auto-generate reliable data cards from context data (don't depend on AI formatting)
     const dataCards = generateDataCards(contextData)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
 export const dynamic = 'force-dynamic'
 
 // Helper: Count working days between two dates, respecting company working days and holidays
@@ -92,11 +93,10 @@ export async function GET(request) {
         employeeQuery._id = currentEmployeeId
       }
     } else if (user.role === 'manager') {
-      const teamMembers = await Employee.find({ 
-        reportingManager: currentEmployeeId,
-        status: 'active'
-      }).select('_id')
-      
+      const teamMembers = await Employee.find(
+        buildDirectReportsFilter(currentEmployeeId, { status: 'active' })
+      ).select('_id')
+
       const teamMemberIds = teamMembers.map(member => member._id)
       employeeQuery._id = { $in: [...teamMemberIds, currentEmployeeId] }
     }

@@ -35,7 +35,7 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 // Helper function to get screenshot URL (handles different field names)
 const getScreenshotUrl = (screenshot) => {
   if (!screenshot) return null
-  return screenshot.url || screenshot.path || null
+  return screenshot.imagekitUrl || screenshot.url || screenshot.path || null
 }
 
 export default function ProductivityPage() {
