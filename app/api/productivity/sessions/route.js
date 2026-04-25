@@ -9,6 +9,20 @@ import {
   SCREENSHOTS_PER_SESSION,
 } from '@/lib/productivitySessionRules';
 
+function normalizeSessionScreenshotsForResponse(screenshots = []) {
+  return screenshots.map((screenshot) => {
+    if (!screenshot || screenshot.deletedAt) {
+      return screenshot;
+    }
+
+    if (screenshot.url?.startsWith('/api/images/') || screenshot.path?.startsWith('/api/images/')) {
+      return buildSessionScreenshotDoc(screenshot);
+    }
+
+    return screenshot;
+  });
+}
+
 const SESSION_WINDOW_MS = 60 * 60 * 1000;  // 60-minute session windows
 const MAX_SCREENSHOTS_PER_SESSION = 20;     // 3-min interval × 20 = 60 min max
 const DEDUP_TOLERANCE_MS = 90 * 1000;       // 90-second tolerance for near-duplicate captures
@@ -299,6 +313,9 @@ export async function GET(request) {
 
     const normalizedSessions = dbSessions.map((sessionDoc) => {
       const session = sessionDoc.toObject ? sessionDoc.toObject() : sessionDoc;
+      if (Array.isArray(session.screenshots)) {
+        session.screenshots = normalizeSessionScreenshotsForResponse(session.screenshots);
+      }
       if (session.analysis?.isAnalyzed) {
         session.analysis = enrichPersistedProductivityAnalysis(session.analysis);
       }

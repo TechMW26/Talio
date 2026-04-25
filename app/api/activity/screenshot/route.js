@@ -327,24 +327,34 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const screenshotId = searchParams.get('id');
+    const fileId = searchParams.get('fileId');
 
-    if (!screenshotId) {
+    if (!screenshotId && !fileId) {
       return NextResponse.json({
         success: false,
-        error: 'Screenshot ID required'
+        error: 'Screenshot ID or file ID required'
       }, { status: 400 });
     }
 
-    // Validate screenshotId format
-    if (!mongoose.Types.ObjectId.isValid(screenshotId)) {
+    if (screenshotId && !mongoose.Types.ObjectId.isValid(screenshotId)) {
       return NextResponse.json({
         success: false,
         error: 'Invalid screenshot ID format'
       }, { status: 400 });
     }
 
+    if (fileId && !mongoose.Types.ObjectId.isValid(fileId)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid file ID format'
+      }, { status: 400 });
+    }
+
     // Get screenshot metadata
-    const screenshot = await Screenshot.findById(screenshotId);
+    const screenshot = screenshotId
+      ? await Screenshot.findById(screenshotId)
+      : await Screenshot.findOne({ gridfsFileId: new mongoose.Types.ObjectId(fileId) });
+
     if (!screenshot) {
       return NextResponse.json({
         success: false,
