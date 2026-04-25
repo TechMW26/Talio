@@ -68,7 +68,7 @@ async function syncScreenshotsToSessions(userId, date, models) {
       dateString: dateFolder
     }).sort({ capturedAt: 1 }).lean();
 
-        for (const ss of dbScreenshots) {
+    for (const ss of dbScreenshots) {
       screenshots.push({
         ...ss,
         path: ss.path || `/api/activity/screenshot?id=${ss._id}`,

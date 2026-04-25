@@ -90,7 +90,7 @@ export async function POST(request) {
         // Delete GridFS files
         if (gridfsFileIds.length > 0) {
           try {
-            const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds);
+            const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds, { databaseName: auth.tenant.databaseName });
             console.log(`[SessionCleanup] GridFS cleanup: ${gridfsResult.successCount}/${gridfsFileIds.length} for session ${session._id}`);
           } catch (gridfsErr) {
             console.error(`[SessionCleanup] GridFS deletion failed for session ${session._id}:`, gridfsErr.message);

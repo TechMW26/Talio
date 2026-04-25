@@ -3,7 +3,9 @@ import connectDB from '@/lib/mongodb';
 import { connectSuperadminDB } from '@/lib/superadminDb';
 import getTenantCompanyModel from '@/models/TenantCompany';
 import { getTenantModels } from '@/lib/tenantModels';
+import { cleanupOrphanedScreenshots, deleteOldScreenshots } from '@/lib/gridfs';
 import { cleanupExpiredScreenshotsForTenant } from '@/lib/productivityScreenshotRetention';
+import { getScreenshotRetentionCutoff } from '@/lib/productivitySessionRules';
 
 function isAuthorizedCronRequest(request) {
     const authHeader = request.headers.get('authorization');
@@ -36,14 +38,23 @@ async function runCleanup(request) {
             gridfsDeleted: 0,
             filesystemDeleted: 0,
             sessionsUpdated: 0,
+            legacySharedBucketDeleted: 0,
+            legacySharedBucketOrphanChunksDeleted: 0,
+            legacySharedBucketOrphanFilesDeleted: 0,
             tenants: {},
             errors: [],
         };
 
+        const cutoff = getScreenshotRetentionCutoff();
+
         for (const company of companies) {
             try {
                 const tenantModels = await getTenantModels(company.databaseName, ['Screenshot', 'ProductivitySession']);
-                const tenantResult = await cleanupExpiredScreenshotsForTenant({ models: tenantModels });
+                const tenantResult = await cleanupExpiredScreenshotsForTenant({
+                    databaseName: company.databaseName,
+                    models: tenantModels,
+                    cutoff,
+                });
 
                 results.tenantsProcessed += 1;
                 results.screenshotsDeleted += tenantResult.screenshotDocsDeleted;
@@ -58,6 +69,24 @@ async function runCleanup(request) {
                     error: error.message,
                 });
             }
+        }
+
+        try {
+            const legacyResult = await deleteOldScreenshots(cutoff);
+            results.legacySharedBucketDeleted = legacyResult?.deletedCount || 0;
+            results.gridfsDeleted += results.legacySharedBucketDeleted;
+        } catch (error) {
+            console.error('[ScreenshotRetentionCron] Legacy shared bucket cleanup failed:', error.message);
+            results.errors.push({ tenant: 'legacy-shared-bucket', error: error.message });
+        }
+
+        try {
+            const legacyOrphanResult = await cleanupOrphanedScreenshots();
+            results.legacySharedBucketOrphanChunksDeleted = legacyOrphanResult?.orphanChunksDeleted || 0;
+            results.legacySharedBucketOrphanFilesDeleted = legacyOrphanResult?.orphanFilesDeleted || 0;
+        } catch (error) {
+            console.error('[ScreenshotRetentionCron] Legacy orphan cleanup failed:', error.message);
+            results.errors.push({ tenant: 'legacy-shared-bucket-orphans', error: error.message });
         }
 
         return NextResponse.json(results);

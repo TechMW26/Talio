@@ -162,7 +162,7 @@ export async function POST(request) {
 
     if (gridfsFileIdsToDelete.length > 0) {
       try {
-        const result = await deleteGridFSScreenshots(gridfsFileIdsToDelete);
+        const result = await deleteGridFSScreenshots(gridfsFileIdsToDelete, { databaseName: auth.tenant.databaseName });
         gridfsDeletedCount = result.successCount || 0;
         if (result.errors?.length) {
           gridfsErrors.push(...result.errors);

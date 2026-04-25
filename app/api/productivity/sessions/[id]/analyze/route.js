@@ -110,7 +110,7 @@ export async function POST(request, { params }) {
           // Delete GridFS files
           if (gridfsFileIds.length > 0) {
             try {
-              const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds);
+              const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds, { databaseName: auth.tenant.databaseName });
               console.log(`[ProductivityAnalysis] GridFS cleanup: ${gridfsResult.successCount}/${gridfsFileIds.length} deleted`);
             } catch (gridfsErr) {
               console.error(`[ProductivityAnalysis] GridFS deletion failed:`, gridfsErr.message);
@@ -280,7 +280,7 @@ export async function POST(request, { params }) {
     // Load images - handle both URLs and local filesystem paths
     const { loaded: loadedScreenshots, errors: screenshotLoadErrors } = await loadScreenshotsForAnalysisBatch(
       selectedScreenshots,
-      { ScreenshotModel: Screenshot }
+      { ScreenshotModel: Screenshot, databaseName: auth.tenant.databaseName }
     );
 
     for (const { screenshot, error } of screenshotLoadErrors) {
@@ -716,7 +716,7 @@ CRITICAL REMINDERS:
       if (gridfsFileIds.length > 0) {
         console.log(`[ProductivityAnalysis] Deleting ${gridfsFileIds.length} GridFS files...`);
         try {
-          const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds);
+          const gridfsResult = await deleteGridFSScreenshots(gridfsFileIds, { databaseName: auth.tenant.databaseName });
           console.log(`[ProductivityAnalysis] GridFS cleanup: ${gridfsResult.successCount}/${gridfsFileIds.length} deleted`);
         } catch (gridfsError) {
           console.error(`[ProductivityAnalysis] GridFS deletion failed:`, gridfsError.message);

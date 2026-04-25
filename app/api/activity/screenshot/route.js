@@ -210,6 +210,7 @@ export async function POST(request) {
     // === GRIDFS STORAGE (primary - for long-term storage & AI analysis) ===
     try {
       gridfsResult = await uploadScreenshot(buffer, {
+        databaseName: tenant.databaseName,
         userId,
         employeeId: employeeId?.toString(),
         capturedAt: safeCapturedAt,
@@ -406,7 +407,9 @@ export async function GET(request) {
       }, { status: 404 });
     }
 
-    const imageBuffer = await getScreenshot(screenshot.gridfsFileId);
+    const imageBuffer = await getScreenshot(screenshot.gridfsFileId, {
+      databaseName: auth.tenant.databaseName,
+    });
 
     // Return image
     return new NextResponse(imageBuffer, {
