@@ -5,6 +5,14 @@ import path from 'path';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import { checkAndTriggerSessionAnalysis } from '@/lib/autoAnalysisTrigger';
 import mongoose from 'mongoose';
+import {
+  getNextAllowedCaptureTime,
+  isEarlySessionCapture,
+  isSessionCaptureType,
+  SCREENSHOT_CAPTURE_INTERVAL_MINUTES,
+  SCREENSHOTS_PER_SESSION,
+  SESSION_CAPTURE_TYPES,
+} from '@/lib/productivitySessionRules';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -103,6 +111,7 @@ export async function POST(request) {
     const timestamp = safeCapturedAt.getTime();
     const employeeCode = employee?.employeeCode || 'UNKNOWN';
     const filename = `screenshot_${employeeCode}_${timestamp}.webp`;
+    const isSessionCapture = isSessionCaptureType(captureType)
 
     // Only deduplicate true retry uploads around the same capture timestamp.
     const duplicateWindowMs = 15 * 1000
@@ -133,6 +142,61 @@ export async function POST(request) {
         existingScreenshotId: existingDuplicate._id.toString(),
         timestamp: safeCapturedAt.toISOString()
       });
+    }
+
+    if (isSessionCapture && sessionId) {
+      const sessionCaptureCount = await Screenshot.countDocuments({
+        user: userId,
+        sessionId,
+        $or: [
+          { captureType: { $in: SESSION_CAPTURE_TYPES } },
+          { captureType: { $exists: false } },
+        ],
+      })
+
+      if (sessionCaptureCount >= SCREENSHOTS_PER_SESSION) {
+        console.log(
+          `[Screenshot] ⏭️ Session overflow dropped for user ${userId} - session ${sessionId} already has ${sessionCaptureCount} accepted captures`
+        )
+        return NextResponse.json({
+          success: true,
+          dropped: true,
+          reason: 'session_full',
+          message: `Session already has ${SCREENSHOTS_PER_SESSION} accepted screenshots`,
+          sessionId,
+          timestamp: safeCapturedAt.toISOString(),
+        })
+      }
+    }
+
+    if (isSessionCapture) {
+      const previousAcceptedCapture = await Screenshot.findOne({
+        user: userId,
+        capturedAt: { $lt: safeCapturedAt },
+        $or: [
+          { captureType: { $in: SESSION_CAPTURE_TYPES } },
+          { captureType: { $exists: false } },
+        ],
+      })
+        .sort({ capturedAt: -1 })
+        .select('_id capturedAt sessionId captureType')
+        .lean()
+
+      if (previousAcceptedCapture && isEarlySessionCapture(previousAcceptedCapture.capturedAt, safeCapturedAt)) {
+        const nextAllowedAt = getNextAllowedCaptureTime(previousAcceptedCapture.capturedAt)
+        console.log(
+          `[Screenshot] ⏭️ Early session capture dropped for user ${userId} - previous accepted capture at ${previousAcceptedCapture.capturedAt.toISOString()}`
+        )
+        return NextResponse.json({
+          success: true,
+          dropped: true,
+          reason: 'before_interval',
+          message: `Screenshot captured before ${SCREENSHOT_CAPTURE_INTERVAL_MINUTES}-minute interval`,
+          previousCaptureAt: previousAcceptedCapture.capturedAt.toISOString(),
+          nextAllowedAt: nextAllowedAt?.toISOString() || null,
+          timestamp: safeCapturedAt.toISOString(),
+        })
+      }
     }
 
     // Generate employee folder name for filesystem fallback
@@ -206,13 +270,15 @@ export async function POST(request) {
 
     console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${gridfsResult ? ` (GridFS: ${gridfsResult._id})` : ''}`);
 
-    // Auto-trigger session analysis if session is complete (60 screenshots)
+    // Auto-trigger session analysis when a full 20-screenshot session completes.
     // Run async — don't block the upload response
     checkAndTriggerSessionAnalysis({
       userId,
       employeeId,
       databaseName: tenant.databaseName,
       capturedAt: safeCapturedAt,
+      sessionId,
+      captureType,
       models: { Screenshot, ProductivitySession }
     }).then(result => {
       if (result.triggered) {

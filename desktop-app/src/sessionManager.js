@@ -1,6 +1,6 @@
 /**
  * Session Manager v5.0.0
- * Manages 60-minute activity sessions with 20 captures each (3-min intervals)
+ * Manages 60-minute activity sessions with 20 captures each (3-minute intervals)
  */
 
 const Store = require('electron-store');
@@ -9,8 +9,8 @@ const logger = require('./logger');
 
 const store = new Store({ name: 'sessions' });
 
-const SESSION_DURATION_MINUTES = 60;  // 60-minute sessions
-const CAPTURES_PER_SESSION = 20;      // 20 captures at 3-min intervals = 60 mins
+const SESSION_DURATION_MINUTES = 60;
+const CAPTURES_PER_SESSION = 20;
 const HISTORY_DAYS = 7;
 
 function generateSessionId() {

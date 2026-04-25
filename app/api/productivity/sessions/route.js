@@ -3,6 +3,11 @@ import { getAuthAndModels } from '@/lib/auth';
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
 import { enrichPersistedProductivityAnalysis } from '@/lib/productivityAnalysisResult';
+import {
+  buildSessionGroupsFromScreenshots,
+  buildSessionScreenshotDoc,
+  SCREENSHOTS_PER_SESSION,
+} from '@/lib/productivitySessionRules';
 
 const SESSION_WINDOW_MS = 60 * 60 * 1000;  // 60-minute session windows
 const MAX_SCREENSHOTS_PER_SESSION = 20;     // 3-min interval × 20 = 60 min max
@@ -51,6 +56,8 @@ function deduplicateByInterval(screenshots) {
 async function syncScreenshotsToSessions(userId, date, models) {
   const { User, ProductivitySession, Screenshot } = models;
   const dateFolder = date.toISOString().split('T')[0];
+  const dayStart = new Date(dateFolder);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
   let screenshots = [];
 
@@ -61,14 +68,13 @@ async function syncScreenshotsToSessions(userId, date, models) {
       dateString: dateFolder
     }).sort({ capturedAt: 1 }).lean();
 
-    for (const ss of dbScreenshots) {
-      const displayPath = ss.imagekitUrl || ss.path || `/api/activity/screenshot?id=${ss._id}`;
+        for (const ss of dbScreenshots) {
       screenshots.push({
-        path: displayPath,
+        ...ss,
+        path: ss.path || `/api/activity/screenshot?id=${ss._id}`,
         filename: ss.filename || `screenshot_${ss._id}.webp`,
         timestamp: ss.capturedAt,
-        size: ss.metadata?.fileSize || 0,
-        gridfsFileId: ss.gridfsFileId || null
+        size: ss.metadata?.fileSize || 0
       });
     }
   }
@@ -90,7 +96,9 @@ async function syncScreenshotsToSessions(userId, date, models) {
           path: `/activity/${userId}/${dateFolder}/${file}`,
           filename: file,
           timestamp: parseScreenshotTimestamp(file),
-          size: fileStat.size
+          size: fileStat.size,
+          captureType: 'automatic',
+          sessionId: null,
         });
       }
 
@@ -114,91 +122,104 @@ async function syncScreenshotsToSessions(userId, date, models) {
   const user = await User.findById(userId).select('employeeId');
   const employeeId = user?.employeeId;
 
-  // Group into sessions by 60-minute hourly windows
-  const sessions = [];
-  let currentGroup = [];
-  let windowStart = null;
+  const sessionGroups = buildSessionGroupsFromScreenshots(
+    screenshots.sort((a, b) => new Date(a.timestamp || a.capturedAt) - new Date(b.timestamp || b.capturedAt))
+  );
 
-  for (const ss of deduped) {
-    const t = new Date(ss.timestamp).getTime();
-    if (windowStart === null) {
-      const d = new Date(t);
-      windowStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0).getTime();
+  const existingSessions = await ProductivitySession.find({
+    user: userId,
+    date: { $gte: dayStart, $lt: dayEnd },
+  }).sort({ startTime: 1 });
+
+  const existingSessionsBySourceSessionId = new Map();
+  const staleSessionIds = [];
+  const activeSourceSessionIds = new Set(
+    sessionGroups.filter(group => group.sourceSessionId).map(group => group.sourceSessionId)
+  );
+
+  for (const session of existingSessions) {
+    if (session.analysis?.isAnalyzed) {
+      continue;
     }
-    if (t >= windowStart + SESSION_WINDOW_MS) {
-      if (currentGroup.length > 0) {
-        sessions.push(currentGroup);
+
+    if (session.sourceSessionId) {
+      if (activeSourceSessionIds.has(session.sourceSessionId)) {
+        existingSessionsBySourceSessionId.set(session.sourceSessionId, session);
+      } else {
+        staleSessionIds.push(session._id);
       }
-      const d = new Date(t);
-      windowStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0).getTime();
-      currentGroup = [];
+      continue;
     }
-    currentGroup.push(ss);
+
+    staleSessionIds.push(session._id);
   }
-  if (currentGroup.length > 0) {
-    sessions.push(currentGroup);
+
+  if (staleSessionIds.length > 0) {
+    await ProductivitySession.deleteMany({ _id: { $in: staleSessionIds } });
+  }
+
+  if (sessionGroups.length === 0) {
+    await ProductivitySession.deleteMany({
+      user: userId,
+      date: { $gte: dayStart, $lt: dayEnd },
+      'analysis.isAnalyzed': { $ne: true },
+    });
+    return [];
   }
 
   const result = [];
-  for (let i = 0; i < sessions.length; i++) {
-    // Hard cap: never store more than MAX_SCREENSHOTS_PER_SESSION per session.
-    // If a window still has excess after dedup (e.g. historical bad data), keep the
-    // most evenly spaced MAX_SCREENSHOTS_PER_SESSION to preserve temporal coverage.
-    let sessionScreenshots = sessions[i];
-    if (sessionScreenshots.length > MAX_SCREENSHOTS_PER_SESSION) {
-      const step = sessionScreenshots.length / MAX_SCREENSHOTS_PER_SESSION;
-      sessionScreenshots = Array.from({ length: MAX_SCREENSHOTS_PER_SESSION }, (_, k) =>
-        sessionScreenshots[Math.min(Math.round(k * step), sessionScreenshots.length - 1)]
-      );
-      console.warn(`Session ${i + 1} capped from ${sessions[i].length} to ${MAX_SCREENSHOTS_PER_SESSION} screenshots for user ${userId}`);
-    }
-
-    const sessionNumber = i + 1;
-
-    // Map screenshot data to match ProductivitySession schema
-    const mappedScreenshots = sessionScreenshots.map(ss => ({
-      path: ss.path,
-      url: ss.path,
-      fileId: ss.gridfsFileId || null,
-      timestamp: ss.timestamp,
-      capturedAt: ss.timestamp,
-      filename: ss.filename
-    }));
-
-    // Check if session already exists
-    let session = await ProductivitySession.findOne({
-      user: userId,
-      date: {
-        $gte: new Date(dateFolder),
-        $lt: new Date(new Date(dateFolder).getTime() + 24 * 60 * 60 * 1000)
-      },
-      sessionNumber
-    });
+  for (const group of sessionGroups) {
+    const mappedScreenshots = group.screenshots.map(buildSessionScreenshotDoc);
+    let session = group.sourceSessionId
+      ? existingSessionsBySourceSessionId.get(group.sourceSessionId) || null
+      : null;
 
     if (!session) {
-      // Create new session
       session = new ProductivitySession({
         user: userId,
         employee: employeeId,
-        date: new Date(dateFolder),
-        sessionNumber,
-        screenshots: mappedScreenshots,
-        screenshotCount: mappedScreenshots.length,
-        startTime: sessionScreenshots[0].timestamp,
-        endTime: sessionScreenshots[sessionScreenshots.length - 1].timestamp
+        date: dayStart,
+        sourceSessionId: group.sourceSessionId || null,
       });
-      await session.save();
-      console.log(`Created session ${sessionNumber} with ${mappedScreenshots.length} screenshots`);
-    } else if (session.screenshotCount !== mappedScreenshots.length) {
-      // Update session with corrected screenshots
-      session.screenshots = mappedScreenshots;
-      session.screenshotCount = mappedScreenshots.length;
-      session.startTime = sessionScreenshots[0].timestamp;
-      session.endTime = sessionScreenshots[sessionScreenshots.length - 1].timestamp;
-      await session.save();
     }
 
+    session.employee = employeeId;
+    session.date = dayStart;
+    session.sourceSessionId = group.sourceSessionId || null;
+    session.screenshots = mappedScreenshots;
+    session.screenshotCount = mappedScreenshots.length;
+    session.startTime = group.startTime;
+    session.endTime = group.endTime;
+    session.isComplete = mappedScreenshots.length >= SCREENSHOTS_PER_SESSION;
+    session.estimatedDuration = Math.max(
+      1,
+      Math.round((new Date(group.endTime) - new Date(group.startTime)) / 60000)
+    );
+
+    await session.save();
     result.push(session);
+  }
+
+  const allSessionsForDay = await ProductivitySession.find({
+    user: userId,
+    date: { $gte: dayStart, $lt: dayEnd },
+  }).sort({ startTime: 1 });
+
+  const renumberOps = [];
+  for (let i = 0; i < allSessionsForDay.length; i++) {
+    const expectedSessionNumber = i + 1;
+    if (allSessionsForDay[i].sessionNumber !== expectedSessionNumber) {
+      renumberOps.push({
+        updateOne: {
+          filter: { _id: allSessionsForDay[i]._id },
+          update: { $set: { sessionNumber: expectedSessionNumber } },
+        },
+      });
+    }
+  }
+
+  if (renumberOps.length > 0) {
+    await ProductivitySession.bulkWrite(renumberOps);
   }
 
   return result;

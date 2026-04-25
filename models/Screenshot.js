@@ -6,7 +6,8 @@ import mongoose from 'mongoose';
  * ImageKit: Primary CDN storage for optimized delivery
  * GridFS: Fallback for long-term storage and AI analysis
  * Filesystem: Legacy/fallback for dashboard display compatibility
- * Screenshots are auto-deleted after 7 days, but analytics are preserved
+ * Raw screenshots are actively cleaned after 48 hours; the TTL index below is a
+ * slower fallback so analytics metadata is still preserved even if cron cleanup is delayed.
  */
 const ScreenshotSchema = new mongoose.Schema({
   // User who owns this screenshot
@@ -63,6 +64,13 @@ const ScreenshotSchema = new mongoose.Schema({
     index: true
   },
 
+  captureType: {
+    type: String,
+    enum: ['automatic', 'session_start', 'manual'],
+    default: 'automatic',
+    index: true
+  },
+
   // Image metadata
   metadata: {
     mimeType: {
@@ -116,8 +124,9 @@ const ScreenshotSchema = new mongoose.Schema({
 ScreenshotSchema.index({ user: 1, capturedAt: -1 });
 ScreenshotSchema.index({ user: 1, dateString: 1 });
 ScreenshotSchema.index({ employee: 1, dateString: 1 });
-// TTL index - auto-delete after 7 days (backup to manual cleanup)
-// Note: This only deletes the metadata document, GridFS files are cleaned separately
+ScreenshotSchema.index({ user: 1, sessionId: 1, capturedAt: 1 });
+// TTL index is only a fallback. The active retention policy deletes raw screenshots
+// after 48 hours via cleanup jobs, while this index eventually clears metadata.
 ScreenshotSchema.index({ capturedAt: 1 }, { expireAfterSeconds: 604800 }); // 7 days
 
 // Virtual for formatted time

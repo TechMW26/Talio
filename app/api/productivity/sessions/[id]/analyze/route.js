@@ -6,7 +6,7 @@ import path from 'path';
 import { generateVisionContent } from '@/lib/gemini';
 import { parseProductivityAnalysisResponse } from '@/lib/productivityAnalysisResult';
 import { loadScreenshotsForAnalysisBatch } from '@/lib/productivityScreenshotLoader';
-import { formatDesignation, formatDepartments } from '@/lib/formatters';
+import { buildDeletedScreenshotPlaceholders, buildSessionScreenshotLookupQuery } from '@/lib/productivitySessionRules';
 
 import { deleteScreenshots as deleteGridFSScreenshots } from '@/lib/gridfs';
 
@@ -84,17 +84,14 @@ export async function POST(request, { params }) {
         try {
           // Get Screenshot model for cleanup
           const { Screenshot } = await getTenantModels(auth.tenant.databaseName, ['Screenshot']);
+          const screenshotQuery = buildSessionScreenshotLookupQuery(session);
 
           // Query Screenshot DB for cleanup data (gridfsFileId, path)
           const gridfsFileIds = [];
           const filesystemPaths = [];
 
           try {
-            const dbLookupQuery = { capturedAt: { $gte: session.startTime, $lte: session.endTime } };
-            if (session.user) dbLookupQuery.user = session.user;
-            else if (session.employee) dbLookupQuery.employee = session.employee;
-
-            const dbScreenshotsLookup = await Screenshot.find(dbLookupQuery)
+            const dbScreenshotsLookup = await Screenshot.find(screenshotQuery)
               .select('gridfsFileId path')
               .lean();
 
@@ -137,35 +134,12 @@ export async function POST(request, { params }) {
           }
 
           // Delete raw captures from Screenshot collection
-          const deleteQuery = {
-            capturedAt: { $gte: session.startTime, $lte: session.endTime }
-          };
-
-          if (session.user) {
-            deleteQuery.user = session.user;
-          } else if (session.employee) {
-            deleteQuery.employee = session.employee;
-          }
-
-          if (gridfsFileIds.length > 0) {
-            deleteQuery.$or = [
-              { gridfsFileId: { $in: gridfsFileIds } },
-              { capturedAt: { $gte: session.startTime, $lte: session.endTime } }
-            ];
-            delete deleteQuery.capturedAt;
-          }
-
-          const deleteResult = await Screenshot.deleteMany(deleteQuery);
+          const deleteResult = await Screenshot.deleteMany(screenshotQuery);
           console.log(`[ProductivityAnalysis] Deleted ${deleteResult.deletedCount} raw captures from Screenshot collection`);
 
           // Store original count and mark as deleted
           const originalScreenshotCount = session.screenshots?.length || 0;
-          session.screenshots = session.screenshots.map((s, index) => ({
-            deletedAt: new Date(),
-            originalUrl: s.url || s.path,
-            capturedAt: s.capturedAt || s.timestamp,
-            index: index
-          }));
+          session.screenshots = buildDeletedScreenshotPlaceholders(session.screenshots);
           session.screenshotCount = originalScreenshotCount;
           session.screenshotsDeleted = true;
           session.screenshotsDeletedAt = new Date();
@@ -714,17 +688,14 @@ CRITICAL REMINDERS:
     try {
       // Get Screenshot model for cleanup
       const { Screenshot } = await getTenantModels(auth.tenant.databaseName, ['Screenshot']);
+      const screenshotQuery = buildSessionScreenshotLookupQuery(session);
 
       // Query Screenshot DB records for full cleanup data
       const gridfsFileIds = [];
       const filesystemPaths = [];
 
       try {
-        const dbQuery = { capturedAt: { $gte: session.startTime, $lte: session.endTime } };
-        if (session.user) dbQuery.user = session.user;
-        else if (session.employee) dbQuery.employee = session.employee;
-
-        const dbScreenshots = await Screenshot.find(dbQuery)
+        const dbScreenshots = await Screenshot.find(screenshotQuery)
           .select('gridfsFileId path')
           .lean();
 
@@ -781,39 +752,7 @@ CRITICAL REMINDERS:
         }
       }
 
-      // Delete raw captures from Screenshot collection
-      // CRITICAL: Only delete screenshots for THIS SPECIFIC SESSION, not the whole day!
-      // Use the session's exact time range to avoid deleting screenshots from other sessions
-      const deleteQuery = {
-        capturedAt: {
-          $gte: session.startTime,
-          $lte: session.endTime
-        }
-      };
-
-      // Add user/employee filter - REQUIRED to avoid deleting other users' data
-      if (session.user) {
-        deleteQuery.user = session.user;
-      } else if (session.employee) {
-        deleteQuery.employee = session.employee;
-      }
-
-      // If we have specific GridFS file IDs, also delete by those (as a safety net)
-      // But KEEP the time range constraint to avoid deleting from other sessions
-      if (gridfsFileIds.length > 0) {
-        deleteQuery.$or = [
-          { gridfsFileId: { $in: gridfsFileIds } },
-          {
-            capturedAt: {
-              $gte: session.startTime,
-              $lte: session.endTime
-            }
-          }
-        ];
-        delete deleteQuery.capturedAt; // Remove top-level since we're using $or
-      }
-
-      const deleteResult = await Screenshot.deleteMany(deleteQuery);
+      const deleteResult = await Screenshot.deleteMany(screenshotQuery);
       console.log(`[ProductivityAnalysis] Deleted ${deleteResult.deletedCount} raw captures from Screenshot collection`);
 
       // Store the original screenshot count before clearing
@@ -821,13 +760,7 @@ CRITICAL REMINDERS:
 
       // Clear the screenshots array in the session (keep only metadata)
       // Store a summary instead of full screenshot data
-      session.screenshots = session.screenshots.map((s, index) => ({
-        // Keep minimal reference data
-        deletedAt: new Date(),
-        originalUrl: s.url || s.path,
-        capturedAt: s.capturedAt || s.timestamp,
-        index: index
-      }));
+      session.screenshots = buildDeletedScreenshotPlaceholders(session.screenshots);
       session.screenshotCount = originalScreenshotCount; // Preserve original count
       session.screenshotsDeleted = true;
       session.screenshotsDeletedAt = new Date();

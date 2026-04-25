@@ -478,6 +478,12 @@ app.prepare().then(() => {
       const { startEmailQueueCron } = require('./lib/emailQueueCron');
       startEmailQueueCron();
     } catch (e) { console.warn('⚠️ Email queue cron setup skipped:', e.message); }
+
+    // Enforce 48-hour screenshot retention for productivity captures.
+    try {
+      const { startProductivityScreenshotRetentionCron } = require('./lib/productivityScreenshotRetentionCron');
+      startProductivityScreenshotRetentionCron();
+    } catch (e) { console.warn('⚠️ Screenshot retention cron setup skipped:', e.message); }
   });
 
   // Graceful shutdown handling for Docker
@@ -517,6 +523,11 @@ app.prepare().then(() => {
     try {
       const { stopEmailQueueCron } = require('./lib/emailQueueCron');
       stopEmailQueueCron();
+    } catch (e) { /* ignore if not loaded */ }
+
+    try {
+      const { stopProductivityScreenshotRetentionCron } = require('./lib/productivityScreenshotRetentionCron');
+      stopProductivityScreenshotRetentionCron();
     } catch (e) { /* ignore if not loaded */ }
 
     // Close database connections

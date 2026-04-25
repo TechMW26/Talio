@@ -59,16 +59,16 @@ class ScreenshotService {
     this.onPermissionError = config.onPermissionError || null;
     this.permissionErrorShown = false;
     this.consecutiveFailures = 0;
-    
+
     // Initialize offline queue with upload function
     var self = this;
-    offlineQueue.initialize(function(data) {
+    offlineQueue.initialize(function (data) {
       return self.uploadScreenshot(data.buffer, data);
     });
-    
+
     // Initialize session manager
     sessionManager.initialize(this.userId);
-    
+
     logger.log('info', 'ScreenshotService', 'Initialized for user ' + this.userId + ' (role: ' + this.userRole + ')');
   }
 
@@ -148,24 +148,24 @@ class ScreenshotService {
       logger.log('debug', 'ScreenshotService', 'start() debounced — already capturing (started ' + Math.round((now - this.lastStartTime) / 1000) + 's ago)');
       return true;
     }
-    
+
     if (this.isCapturing) {
       logger.log('warn', 'ScreenshotService', 'Already capturing — stopping old session and restarting');
       this.stop();
     }
-    
+
     this.isCapturing = true;
     this.lastStartTime = now;
-    
+
     // Take first screenshot immediately
     this.captureScreen('session_start');
-    
+
     // Start interval
     var self = this;
-    this.captureTimer = setInterval(function() {
+    this.captureTimer = setInterval(function () {
       self.captureScreen('automatic');
     }, CAPTURE_INTERVAL_MS);
-    
+
     logger.log('info', 'ScreenshotService', 'Started capturing every ' + (CAPTURE_INTERVAL_MS / 1000) + ' seconds');
     return true;
   }
@@ -175,10 +175,10 @@ class ScreenshotService {
       clearInterval(this.captureTimer);
       this.captureTimer = null;
     }
-    
+
     this.isCapturing = false;
     sessionManager.endSession();
-    
+
     logger.log('info', 'ScreenshotService', 'Stopped capturing. Total: ' + this.captureCount);
   }
 
@@ -192,7 +192,7 @@ class ScreenshotService {
     if (!this.isCapturing && captureType === 'automatic') {
       return null;
     }
-    
+
     // Double check admin restriction
     if (this.userRole === 'admin') {
       logger.log('warn', 'ScreenshotService', 'Blocked capture attempt for admin');
@@ -212,10 +212,10 @@ class ScreenshotService {
       this.showPermissionError('Screen Recording permission is required. Please grant permission in System Preferences → Privacy & Security → Screen Recording.');
       return { success: false, error: 'Screen recording permission not granted' };
     }
-    
+
     try {
       logger.log('debug', 'ScreenshotService', 'Capturing screen (' + captureType + ')');
-      
+
       if (!this.getDesktopSources) {
         throw new Error('Desktop sources function not available - window may not be loaded');
       }
@@ -225,7 +225,7 @@ class ScreenshotService {
         types: ['screen'],
         thumbnailSize: this.getOptimalSize()
       });
-      
+
       if (!sources || sources.length === 0) {
         this.consecutiveFailures++;
         logger.log('error', 'ScreenshotService', 'No screen sources available (failure #' + this.consecutiveFailures + ')');
@@ -234,13 +234,13 @@ class ScreenshotService {
           : 'Screen capture is not working. Please check your security software or try running Talio as Administrator.');
         throw new Error('No screen sources available');
       }
-      
+
       // Get primary display
       const primaryDisplay = screen.getPrimaryDisplay();
-      var primarySource = sources.find(function(s) { 
-        return s.display_id === String(primaryDisplay.id); 
+      var primarySource = sources.find(function (s) {
+        return s.display_id === String(primaryDisplay.id);
       }) || sources[0];
-      
+
       // Check if thumbnail is empty (permission denied often results in blank thumbnail)
       if (primarySource.isEmpty) {
         this.consecutiveFailures++;
@@ -250,43 +250,48 @@ class ScreenshotService {
           : 'Screenshots are blank. Please check your security software or try running Talio as Administrator.');
         throw new Error('Screenshot is empty - Screen Recording permission not granted');
       }
-      
+
       // Convert base64 JPEG data back to a Buffer
       const buffer = Buffer.from(primarySource.thumbnailJPEG, 'base64');
-      
+
       // Additional check for buffer size (very small = likely failed capture)
       if (buffer.length < 1000) {
         this.consecutiveFailures++;
         logger.log('error', 'ScreenshotService', 'Screenshot buffer too small (' + buffer.length + ' bytes, failure #' + this.consecutiveFailures + ')');
         throw new Error('Screenshot capture failed - buffer too small');
       }
-      
+
       logger.log('debug', 'ScreenshotService', 'Screenshot captured successfully (' + buffer.length + ' bytes)');
-      
+
       // Reset failure counter on success
       this.consecutiveFailures = 0;
       this.captureCount++;
       this.lastCaptureTime = new Date().toISOString();
-      
-      // Record in session
-      const sessionData = sessionManager.recordCapture({
-        captureType: captureType,
-        offline: !this.isOnline
-      });
-      
+
+      const countsTowardSession = captureType !== 'manual';
+
+      // Manual/admin-requested captures should never advance the timed
+      // 20-shot productivity session. They are stored separately.
+      const sessionData = countsTowardSession
+        ? sessionManager.recordCapture({
+          captureType: captureType,
+          offline: !this.isOnline
+        })
+        : null;
+
       // Upload or queue
       if (this.isOnline) {
         const result = await this.uploadScreenshot(buffer, {
           captureType: captureType,
-          sessionId: sessionData.sessionId
+          sessionId: sessionData?.sessionId
         });
-        
+
         // Update session with upload result
-        if (result.success) {
+        if (result.success && sessionData?.capture) {
           sessionData.capture.imageUrl = result.imageUrl;
           sessionData.capture.imagekitFileId = result.imagekitFileId;
         }
-        
+
         return result;
       } else {
         // Queue for later upload
@@ -295,7 +300,7 @@ class ScreenshotService {
           userId: this.userId,
           employeeId: this.employeeId,
           captureType: captureType,
-          sessionId: sessionData.sessionId,
+          sessionId: sessionData?.sessionId,
           timestamp: this.lastCaptureTime
         });
       }
@@ -308,7 +313,7 @@ class ScreenshotService {
   getOptimalSize() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const scaleFactor = primaryDisplay.scaleFactor || 1;
-    
+
     // Capture at reasonable resolution (cap at 1920x1080 for bandwidth)
     return {
       width: Math.min(1920, primaryDisplay.workAreaSize.width * scaleFactor),
@@ -318,7 +323,7 @@ class ScreenshotService {
 
   async uploadScreenshot(buffer, metadata) {
     metadata = metadata || {};
-    
+
     try {
       const formData = new FormData();
       formData.append('screenshot', buffer, {
@@ -327,11 +332,11 @@ class ScreenshotService {
       });
       formData.append('captureType', metadata.captureType || 'automatic');
       formData.append('timestamp', metadata.timestamp || new Date().toISOString());
-      
+
       if (metadata.sessionId) {
         formData.append('sessionId', metadata.sessionId);
       }
-      
+
       const response = await fetch(API_BASE_URL + '/api/activity/screenshot', {
         method: 'POST',
         headers: {
@@ -339,16 +344,16 @@ class ScreenshotService {
         },
         body: formData
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error('Upload failed: ' + response.status + ' - ' + errorText);
       }
-      
+
       const result = await response.json();
-      
+
       logger.log('info', 'ScreenshotService', 'Uploaded successfully: ' + (result.imagekitUrl || result.imageUrl || 'OK'));
-      
+
       return {
         success: true,
         imageUrl: result.imagekitUrl || result.imageUrl,
@@ -357,7 +362,7 @@ class ScreenshotService {
       };
     } catch (error) {
       logger.log('error', 'ScreenshotService', 'Upload failed: ' + error.message);
-      
+
       // If network error and we have a buffer, queue it
       if (!metadata.isRetry && buffer) {
         return offlineQueue.add({
@@ -369,7 +374,7 @@ class ScreenshotService {
           timestamp: metadata.timestamp || new Date().toISOString()
         });
       }
-      
+
       return { success: false, error: error.message };
     }
   }
@@ -381,7 +386,7 @@ class ScreenshotService {
       logger.log('warn', 'ScreenshotService', 'Manual capture blocked for admin');
       return { success: false, error: 'Admin users cannot capture screenshots' };
     }
-    
+
     return await this.captureScreen('manual');
   }
 

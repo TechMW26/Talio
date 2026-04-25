@@ -4,6 +4,7 @@ import { getTenantModels } from '@/lib/tenantModels';
 import { deleteScreenshots as deleteGridFSScreenshots } from '@/lib/gridfs';
 import { unlink } from 'fs/promises';
 import path from 'path';
+import { buildDeletedScreenshotPlaceholders, buildSessionScreenshotLookupQuery } from '@/lib/productivitySessionRules';
 
 /**
  * POST /api/productivity/sessions/cleanup
@@ -67,16 +68,10 @@ export async function POST(request) {
         // Query Screenshot DB for full cleanup data (session screenshots often lack fileId)
         const gridfsFileIds = [];
         const filesystemPaths = [];
+        const screenshotQuery = buildSessionScreenshotLookupQuery(session);
 
         try {
-          const dbLookupQuery = {};
-          if (session.user) dbLookupQuery.user = session.user;
-          else if (session.employee) dbLookupQuery.employee = session.employee;
-          if (session.startTime && session.endTime) {
-            dbLookupQuery.capturedAt = { $gte: session.startTime, $lte: session.endTime };
-          }
-
-          const dbScreenshots = await Screenshot.find(dbLookupQuery)
+          const dbScreenshots = await Screenshot.find(screenshotQuery)
             .select('gridfsFileId path')
             .lean();
 
@@ -119,40 +114,13 @@ export async function POST(request) {
         }
 
         // Delete raw captures from Screenshot collection
-        const deleteQuery = {};
-
-        if (session.user) {
-          deleteQuery.user = session.user;
-        } else if (session.employee) {
-          deleteQuery.employee = session.employee;
-        }
-
-        if (session.startTime && session.endTime) {
-          deleteQuery.capturedAt = { $gte: session.startTime, $lte: session.endTime };
-        }
-
-        if (gridfsFileIds.length > 0) {
-          deleteQuery.$or = [
-            { gridfsFileId: { $in: gridfsFileIds } },
-            ...(session.startTime && session.endTime ? [{ capturedAt: { $gte: session.startTime, $lte: session.endTime } }] : [])
-          ];
-          delete deleteQuery.capturedAt;
-        }
-
-        if (Object.keys(deleteQuery).length > 0) {
-          const deleteResult = await Screenshot.deleteMany(deleteQuery);
-          totalRawCapturesDeleted += deleteResult.deletedCount;
-          console.log(`[SessionCleanup] Deleted ${deleteResult.deletedCount} raw captures for session ${session._id}`);
-        }
+        const deleteResult = await Screenshot.deleteMany(screenshotQuery);
+        totalRawCapturesDeleted += deleteResult.deletedCount;
+        console.log(`[SessionCleanup] Deleted ${deleteResult.deletedCount} raw captures for session ${session._id}`);
 
         // Update session
         const originalScreenshotCount = session.screenshots?.length || 0;
-        session.screenshots = session.screenshots.map((s, index) => ({
-          deletedAt: new Date(),
-          originalUrl: s.url || s.path,
-          capturedAt: s.capturedAt || s.timestamp,
-          index: index
-        }));
+        session.screenshots = buildDeletedScreenshotPlaceholders(session.screenshots);
         session.screenshotCount = originalScreenshotCount;
         session.screenshotsDeleted = true;
         session.screenshotsDeletedAt = new Date();

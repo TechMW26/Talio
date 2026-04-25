@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { buildDirectReportsFilter } from '@/lib/teamScope';
 
-const SCREENSHOTS_PER_SESSION_ESTIMATE = 60; // ~60 screenshots per 180-min session at 3-min intervals
+const SCREENSHOTS_PER_SESSION_ESTIMATE = 20; // 20 screenshots per 60-min session at 3-min intervals
 
 /**
  * GET /api/productivity/team

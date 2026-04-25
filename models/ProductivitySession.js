@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 /**
  * ProductivitySession Model
- * Stores groups of 20 screenshots (3-min intervals, 60-min sessions) with AI analysis
+ * Stores groups of 20 screenshots (3-min intervals, 60-min sessions) with AI analysis.
  */
 const ProductivitySessionSchema = new mongoose.Schema({
   // User who owns this session
@@ -32,6 +32,12 @@ const ProductivitySessionSchema = new mongoose.Schema({
     type: Number,
     required: true,
     default: 1
+  },
+
+  sourceSessionId: {
+    type: String,
+    index: true,
+    default: null
   },
 
   // Screenshots in this session (URLs/paths)
@@ -237,6 +243,7 @@ const ProductivitySessionSchema = new mongoose.Schema({
 ProductivitySessionSchema.index({ user: 1, date: -1 });
 ProductivitySessionSchema.index({ employee: 1, date: -1 });
 ProductivitySessionSchema.index({ date: -1, sessionNumber: 1 });
+ProductivitySessionSchema.index({ user: 1, sourceSessionId: 1 });
 
 // Virtual for formatted date
 ProductivitySessionSchema.virtual('formattedDate').get(function () {
