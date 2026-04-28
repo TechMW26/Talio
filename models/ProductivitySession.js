@@ -53,7 +53,7 @@ const ProductivitySessionSchema = new mongoose.Schema({
     filename: String,
     captureType: {
       type: String,
-      enum: ['automatic', 'manual'],
+      enum: ['automatic', 'session_start', 'manual'],
       default: 'automatic'
     },
     isOfflineCapture: {
