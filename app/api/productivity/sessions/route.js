@@ -302,14 +302,51 @@ export async function GET(request) {
     // Sync screenshots from filesystem and get sessions
     const sessions = await syncScreenshotsToSessions(targetUserId, date, models);
 
-    // Fetch from database to get full session data with analysis
-    const dbSessions = await ProductivitySession.find({
-      user: targetUserId,
-      date: {
-        $gte: date,
-        $lt: new Date(date.getTime() + 24 * 60 * 60 * 1000)
+    // Resolve target employee id so we can match sessions whose `user` field is missing
+    // but `employee` is set (older session writers, sessionAggregator, etc.).
+    const targetUserDoc = await User.findById(targetUserId).select('employeeId').lean();
+    const targetEmployeeId = targetUserDoc?.employeeId || null;
+
+    // Build a date window that tolerates timezone variations between writers.
+    // Some writers persist `date` at local midnight (IST), while the request param
+    // resolves to UTC midnight. Widening the window by ±1 day and additionally
+    // matching by `startTime` ensures we surface every session that physically
+    // belongs to the requested day.
+    const dayStartUtc = date;
+    const dayEndUtc = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+    const broadStart = new Date(date.getTime() - 24 * 60 * 60 * 1000);
+    const broadEnd = new Date(date.getTime() + 48 * 60 * 60 * 1000);
+
+    const userOrEmployee = targetEmployeeId
+      ? { $or: [{ user: targetUserId }, { employee: targetEmployeeId }] }
+      : { user: targetUserId };
+
+    // Fetch from database to get full session data with analysis.
+    // Match by EITHER `user` OR `employee` (mirrors /api/productivity/team) and
+    // filter on either `date` or `startTime` falling within the requested day.
+    const candidateSessions = await ProductivitySession.find({
+      ...userOrEmployee,
+      $or: [
+        { date: { $gte: broadStart, $lt: broadEnd } },
+        { startTime: { $gte: broadStart, $lt: broadEnd } }
+      ]
+    }).sort({ startTime: -1 });
+
+    const dbSessions = candidateSessions.filter((s) => {
+      const start = s.startTime ? new Date(s.startTime) : null;
+      if (start && start >= dayStartUtc && start < dayEndUtc) return true;
+      const d = s.date ? new Date(s.date) : null;
+      if (d && d >= dayStartUtc && d < dayEndUtc) return true;
+      // Fall back to local-midnight comparison for sessions written with setHours(0,0,0,0)
+      if (start) {
+        const localMidnight = new Date(start);
+        localMidnight.setHours(0, 0, 0, 0);
+        const reqLocalMidnight = new Date(date);
+        reqLocalMidnight.setHours(0, 0, 0, 0);
+        if (localMidnight.getTime() === reqLocalMidnight.getTime()) return true;
       }
-    }).sort({ startTime: -1 }); // Sort by latest session first
+      return false;
+    });
 
     const normalizedSessions = dbSessions.map((sessionDoc) => {
       const session = sessionDoc.toObject ? sessionDoc.toObject() : sessionDoc;

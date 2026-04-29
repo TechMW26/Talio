@@ -462,17 +462,6 @@ export async function PUT(request, { params }) {
         const allowedNames = Array.from(allowed).sort((a, b) => b - a).map((l) => ({ 9: 'Director', 8: 'Assistant Director', 7: 'C-Suite' }[l] || `L${l}`)).join(', ')
         return NextResponse.json({ success: false, message: `"Reports To" must be one of: ${allowedNames}` }, { status: 400 })
       }
-    } else if (requiresReportsTo(effectiveLevel) && data.reportsTo === '') {
-      // Explicit clear: only allowed if there is no candidate at all in the org.
-      const allowed = allowedReportsToLevels(effectiveLevel)
-      const anyCandidate = await Employee.exists({ designationLevel: { $in: Array.from(allowed) } })
-      if (anyCandidate) {
-        const allowedNames = Array.from(allowed).sort((a, b) => b - a).map((l) => ({ 9: 'Director', 8: 'Assistant Director', 7: 'C-Suite' }[l] || `L${l}`)).join(', ')
-        return NextResponse.json(
-          { success: false, message: `"Reports To" is required (pick one of: ${allowedNames})` },
-          { status: 400 }
-        )
-      }
     }
 
     if (!data.reportingManager) {

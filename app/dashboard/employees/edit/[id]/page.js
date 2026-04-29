@@ -283,7 +283,7 @@ export default function EditEmployeePage() {
   const selectedLevel = Number(formData.designationLevel || 0)
   const allowManagerAssignment = selectedLevel > 0 && selectedLevel <= 6
   const allowTeamLeadAssignment = selectedLevel > 0 && selectedLevel <= 3
-  const requireReportsTo = selectedLevel > 0 && selectedLevel <= 8
+  const canAssignReportsTo = selectedLevel > 0 && selectedLevel <= 8
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -300,7 +300,7 @@ export default function EditEmployeePage() {
 
     if (!allowManagerAssignment) payload.assignedManager = ''
     if (!allowTeamLeadAssignment) payload.assignedTeamLead = ''
-    if (!requireReportsTo) payload.reportsTo = ''
+    if (!canAssignReportsTo) payload.reportsTo = ''
 
     await submitMutation.execute(`/api/employees/${params.id}`, payload)
   }
@@ -796,7 +796,7 @@ export default function EditEmployeePage() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-default-700 mb-2">
-                    Reports To {requireReportsTo && <span className="text-danger">*</span>}
+                    Reports To
                   </label>
                   <Select
                     name="reportsTo"
@@ -806,10 +806,9 @@ export default function EditEmployeePage() {
                       const value = Array.from(keys)[0] || ''
                       setFormData((prev) => ({ ...prev, reportsTo: String(value) }))
                     }}
-                    isDisabled={!requireReportsTo}
-                    isRequired={requireReportsTo}
+                    isDisabled={!canAssignReportsTo}
                     aria-label="Reports To"
-                    placeholder={requireReportsTo ? (selectedLevel === 8 ? 'Select Director' : selectedLevel === 7 ? 'Select Assistant Director or Director' : 'Select Director, Assistant Director, or C-Suite') : 'Directors do not report to anyone'}
+                    placeholder={canAssignReportsTo ? (selectedLevel === 8 ? 'Select Director' : selectedLevel === 7 ? 'Select Assistant Director or Director' : 'Select Director, Assistant Director, or C-Suite') : 'Directors do not report to anyone'}
                     classNames={{ trigger: "bg-white" }}
                   >
                     {reportsToCandidates.map((emp) => {
