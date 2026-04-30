@@ -8,7 +8,6 @@ const { screen } = require('electron');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const logger = require('./logger');
-const sessionManager = require('./sessionManager');
 const offlineQueue = require('./offlineQueue');
 
 // Configuration
@@ -65,9 +64,6 @@ class ScreenshotService {
     offlineQueue.initialize(function (data) {
       return self.uploadScreenshot(data.buffer, data);
     });
-
-    // Initialize session manager
-    sessionManager.initialize(this.userId);
 
     logger.log('info', 'ScreenshotService', 'Initialized for user ' + this.userId + ' (role: ' + this.userRole + ')');
   }
@@ -177,7 +173,6 @@ class ScreenshotService {
     }
 
     this.isCapturing = false;
-    sessionManager.endSession();
 
     logger.log('info', 'ScreenshotService', 'Stopped capturing. Total: ' + this.captureCount);
   }
@@ -268,39 +263,17 @@ class ScreenshotService {
       this.captureCount++;
       this.lastCaptureTime = new Date().toISOString();
 
-      const countsTowardSession = captureType !== 'manual';
-
-      // Manual/admin-requested captures should never advance the timed
-      // 20-shot productivity session. They are stored separately.
-      const sessionData = countsTowardSession
-        ? sessionManager.recordCapture({
-          captureType: captureType,
-          offline: !this.isOnline
-        })
-        : null;
-
-      // Upload or queue
+      // Upload or queue (no session grouping — server bins by date)
       if (this.isOnline) {
-        const result = await this.uploadScreenshot(buffer, {
-          captureType: captureType,
-          sessionId: sessionData?.sessionId
+        return await this.uploadScreenshot(buffer, {
+          captureType: captureType
         });
-
-        // Update session with upload result
-        if (result.success && sessionData?.capture) {
-          sessionData.capture.imageUrl = result.imageUrl;
-          sessionData.capture.imagekitFileId = result.imagekitFileId;
-        }
-
-        return result;
       } else {
-        // Queue for later upload
         return offlineQueue.add({
           buffer: buffer,
           userId: this.userId,
           employeeId: this.employeeId,
           captureType: captureType,
-          sessionId: sessionData?.sessionId,
           timestamp: this.lastCaptureTime
         });
       }
@@ -332,10 +305,6 @@ class ScreenshotService {
       });
       formData.append('captureType', metadata.captureType || 'automatic');
       formData.append('timestamp', metadata.timestamp || new Date().toISOString());
-
-      if (metadata.sessionId) {
-        formData.append('sessionId', metadata.sessionId);
-      }
 
       const response = await fetch(API_BASE_URL + '/api/activity/screenshot', {
         method: 'POST',
@@ -370,7 +339,6 @@ class ScreenshotService {
           userId: this.userId,
           employeeId: this.employeeId,
           captureType: metadata.captureType || 'automatic',
-          sessionId: metadata.sessionId,
           timestamp: metadata.timestamp || new Date().toISOString()
         });
       }
@@ -397,7 +365,6 @@ class ScreenshotService {
       captureCount: this.captureCount,
       lastCaptureTime: this.lastCaptureTime,
       isOnline: this.isOnline,
-      session: sessionManager.getSessionInfo(),
       queue: offlineQueue.getStatus(),
       userRole: this.userRole,
       captureAllowed: this.shouldCapture()
@@ -406,8 +373,8 @@ class ScreenshotService {
 
   getStats() {
     return {
-      today: sessionManager.getTodayStats(),
-      history: sessionManager.getHistory(7),
+      captureCount: this.captureCount,
+      lastCaptureTime: this.lastCaptureTime,
       queue: offlineQueue.getStatus()
     };
   }
@@ -416,7 +383,6 @@ class ScreenshotService {
     this.stop();
     this.captureCount = 0;
     this.lastCaptureTime = null;
-    sessionManager.reset();
     offlineQueue.reset();
     logger.log('info', 'ScreenshotService', 'Reset complete');
   }

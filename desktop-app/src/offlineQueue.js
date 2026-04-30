@@ -108,7 +108,6 @@ class OfflineQueue {
           userId: screenshotData.userId,
           employeeId: screenshotData.employeeId,
           captureType: screenshotData.captureType || 'automatic',
-          sessionId: screenshotData.sessionId,
           originalTimestamp: screenshotData.timestamp || new Date().toISOString()
         }
       };
@@ -173,7 +172,6 @@ class OfflineQueue {
           userId: item.metadata.userId,
           employeeId: item.metadata.employeeId,
           captureType: item.metadata.captureType,
-          sessionId: item.metadata.sessionId,
           timestamp: item.metadata.originalTimestamp,
           isRetry: true
         });

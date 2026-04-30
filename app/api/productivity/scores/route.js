@@ -13,13 +13,13 @@ import { getAuthAndModels } from '@/lib/auth';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'Employee', 'User', 'Department']);
+    const auth = await getAuthAndModels(request, ['ScreenshotAnalysis', 'Employee', 'User', 'Department']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
     const { user, models } = auth;
-    const { ProductivitySession, Employee, Department, User } = models;
+    const { ScreenshotAnalysis, Employee, Department, User } = models;
     const { searchParams } = new URL(request.url);
 
     // Parse date range (default to current year)
@@ -122,25 +122,30 @@ export async function GET(request) {
     console.log('[Productivity Scores] Query params:', { startDate, endDate, departmentFilter, employeeIdFilter });
     console.log('[Productivity Scores] Found employees:', employeeIds.length, employeeIds.slice(0, 3).map(id => id.toString()));
 
-    // Get all analyzed sessions in the date range for these employees
-    const sessions = await ProductivitySession.find({
+    // Get all daily analyses (ScreenshotAnalysis) in the date range for these employees.
+    // Each doc represents one user/day with the merged AI analysis on aiAnalysis.
+    const analyses = await ScreenshotAnalysis.find({
       employee: { $in: employeeIds },
       date: {
         $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $lte: new Date(`${endDate}T23:59:59.999Z`),
       },
-      'analysis.isAnalyzed': true,
-      'analysis.score': { $exists: true, $ne: null }
-    }).select('employee date analysis.score analysis.focusScore analysis.timeDistribution analysis.focusMetrics').lean();
+    })
+      .select('employee date aiAnalysis')
+      .lean();
 
-    console.log('[Productivity Scores] Found sessions:', sessions.length, sessions.slice(0, 3).map(s => ({ emp: s.employee?.toString(), score: s.analysis?.score, date: s.date })));
+    console.log('[Productivity Scores] Found analyses:', analyses.length);
 
-    // Aggregate scores by employee
+    // Aggregate scores by employee — each ScreenshotAnalysis doc counts as 1 "session"
     const employeeScores = {};
-    
-    sessions.forEach(session => {
-      const empId = session.employee.toString();
-      
+
+    analyses.forEach((doc) => {
+      const empId = doc.employee?.toString();
+      if (!empId) return;
+      const ai = doc.aiAnalysis || {};
+      const score = Number.isFinite(Number(ai.score)) ? Number(ai.score) : null;
+      const focusScore = Number.isFinite(Number(ai.focusScore)) ? Number(ai.focusScore) : null;
+
       if (!employeeScores[empId]) {
         employeeScores[empId] = {
           employeeId: empId,
@@ -150,46 +155,35 @@ export async function GET(request) {
           totalFocusScore: 0,
           scores: [],
           focusScores: [],
-          timeDistribution: {
-            deepWork: 0,
-            collaboration: 0,
-            administrative: 0,
-            breaks: 0,
-            unfocused: 0
-          },
-          focusMetrics: {
-            totalContextSwitches: 0,
-            totalDistractions: 0
-          }
+          timeDistribution: { deepWork: 0, collaboration: 0, administrative: 0, breaks: 0, unfocused: 0 },
+          focusMetrics: { totalContextSwitches: 0, totalDistractions: 0 },
         };
       }
-      
+
       const empScore = employeeScores[empId];
-      empScore.totalSessions++;
-      
-      if (session.analysis?.score != null) {
-        empScore.analyzedSessions++;
-        empScore.totalScore += session.analysis.score;
-        empScore.scores.push(session.analysis.score);
-        
-        if (session.analysis.focusScore != null) {
-          empScore.totalFocusScore += session.analysis.focusScore;
-          empScore.focusScores.push(session.analysis.focusScore);
+      empScore.totalSessions += 1;
+
+      if (score != null) {
+        empScore.analyzedSessions += 1;
+        empScore.totalScore += score;
+        empScore.scores.push(score);
+
+        if (focusScore != null) {
+          empScore.totalFocusScore += focusScore;
+          empScore.focusScores.push(focusScore);
         }
-        
-        // Aggregate time distribution
-        if (session.analysis.timeDistribution) {
-          empScore.timeDistribution.deepWork += session.analysis.timeDistribution.deepWork || 0;
-          empScore.timeDistribution.collaboration += session.analysis.timeDistribution.collaboration || 0;
-          empScore.timeDistribution.administrative += session.analysis.timeDistribution.administrative || 0;
-          empScore.timeDistribution.breaks += session.analysis.timeDistribution.breaks || 0;
-          empScore.timeDistribution.unfocused += session.analysis.timeDistribution.unfocused || 0;
+
+        if (ai.timeDistribution) {
+          empScore.timeDistribution.deepWork += Number(ai.timeDistribution.deepWork) || 0;
+          empScore.timeDistribution.collaboration += Number(ai.timeDistribution.collaboration) || 0;
+          empScore.timeDistribution.administrative += Number(ai.timeDistribution.administrative) || 0;
+          empScore.timeDistribution.breaks += Number(ai.timeDistribution.breaks) || 0;
+          empScore.timeDistribution.unfocused += Number(ai.timeDistribution.unfocused) || 0;
         }
-        
-        // Aggregate focus metrics
-        if (session.analysis.focusMetrics) {
-          empScore.focusMetrics.totalContextSwitches += session.analysis.focusMetrics.contextSwitches || 0;
-          empScore.focusMetrics.totalDistractions += session.analysis.focusMetrics.distractionCount || 0;
+
+        if (ai.focusMetrics) {
+          empScore.focusMetrics.totalContextSwitches += Number(ai.focusMetrics.contextSwitches) || 0;
+          empScore.focusMetrics.totalDistractions += Number(ai.focusMetrics.distractionCount) || 0;
         }
       }
     });

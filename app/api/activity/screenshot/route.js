@@ -3,16 +3,8 @@ import { getAuthAndModels } from '@/lib/auth'
 import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
-import { checkAndTriggerSessionAnalysis } from '@/lib/autoAnalysisTrigger';
 import mongoose from 'mongoose';
-import {
-  getNextAllowedCaptureTime,
-  isEarlySessionCapture,
-  isSessionCaptureType,
-  SCREENSHOT_CAPTURE_INTERVAL_MINUTES,
-  SCREENSHOTS_PER_SESSION,
-  SESSION_CAPTURE_TYPES,
-} from '@/lib/productivitySessionRules';
+import { isWithinOfficeHours } from '@/lib/officeHours';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -38,12 +30,12 @@ async function ensureDirectory(dirPath) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Screenshot', 'ProductivitySession']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Screenshot', 'Company']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models, tenant } = auth;
-    const { User, Employee, Screenshot, ProductivitySession } = models;
+    const { User, Employee, Screenshot, Company } = models;
 
     const userId = user._id || user.userId;
     const userRole = user.role;
@@ -111,7 +103,29 @@ export async function POST(request) {
     const timestamp = safeCapturedAt.getTime();
     const employeeCode = employee?.employeeCode || 'UNKNOWN';
     const filename = `screenshot_${employeeCode}_${timestamp}.webp`;
-    const isSessionCapture = isSessionCaptureType(captureType)
+
+    // Office-hours gate: drop captures taken outside the company's working window.
+    // Manual admin captures (`captureType=manual`) bypass this gate.
+    if (captureType !== 'manual') {
+      try {
+        const company = Company ? await Company.findOne({}).select('workingHours timezone').lean() : null;
+        const officeCheck = isWithinOfficeHours(safeCapturedAt, company);
+        if (!officeCheck.allowed) {
+          console.log(
+            `[Screenshot] ⏭️ Outside office hours (${officeCheck.reason}) for user ${userId} at ${safeCapturedAt.toISOString()}`
+          );
+          return NextResponse.json({
+            success: true,
+            dropped: true,
+            reason: officeCheck.reason,
+            message: 'Capture outside configured office hours',
+            timestamp: safeCapturedAt.toISOString(),
+          });
+        }
+      } catch (officeErr) {
+        console.warn('[Screenshot] Office-hours check failed (allowing):', officeErr.message);
+      }
+    }
 
     // Only deduplicate true retry uploads around the same capture timestamp.
     const duplicateWindowMs = 15 * 1000
@@ -123,12 +137,8 @@ export async function POST(request) {
       captureType,
     }
 
-    if (sessionId) {
-      duplicateQuery.sessionId = sessionId
-    }
-
     const existingDuplicate = await Screenshot.findOne(duplicateQuery)
-      .select('_id capturedAt sessionId')
+      .select('_id capturedAt')
       .lean();
 
     if (existingDuplicate) {
@@ -142,61 +152,6 @@ export async function POST(request) {
         existingScreenshotId: existingDuplicate._id.toString(),
         timestamp: safeCapturedAt.toISOString()
       });
-    }
-
-    if (isSessionCapture && sessionId) {
-      const sessionCaptureCount = await Screenshot.countDocuments({
-        user: userId,
-        sessionId,
-        $or: [
-          { captureType: { $in: SESSION_CAPTURE_TYPES } },
-          { captureType: { $exists: false } },
-        ],
-      })
-
-      if (sessionCaptureCount >= SCREENSHOTS_PER_SESSION) {
-        console.log(
-          `[Screenshot] ⏭️ Session overflow dropped for user ${userId} - session ${sessionId} already has ${sessionCaptureCount} accepted captures`
-        )
-        return NextResponse.json({
-          success: true,
-          dropped: true,
-          reason: 'session_full',
-          message: `Session already has ${SCREENSHOTS_PER_SESSION} accepted screenshots`,
-          sessionId,
-          timestamp: safeCapturedAt.toISOString(),
-        })
-      }
-    }
-
-    if (isSessionCapture) {
-      const previousAcceptedCapture = await Screenshot.findOne({
-        user: userId,
-        capturedAt: { $lt: safeCapturedAt },
-        $or: [
-          { captureType: { $in: SESSION_CAPTURE_TYPES } },
-          { captureType: { $exists: false } },
-        ],
-      })
-        .sort({ capturedAt: -1 })
-        .select('_id capturedAt sessionId captureType')
-        .lean()
-
-      if (previousAcceptedCapture && isEarlySessionCapture(previousAcceptedCapture.capturedAt, safeCapturedAt)) {
-        const nextAllowedAt = getNextAllowedCaptureTime(previousAcceptedCapture.capturedAt)
-        console.log(
-          `[Screenshot] ⏭️ Early session capture dropped for user ${userId} - previous accepted capture at ${previousAcceptedCapture.capturedAt.toISOString()}`
-        )
-        return NextResponse.json({
-          success: true,
-          dropped: true,
-          reason: 'before_interval',
-          message: `Screenshot captured before ${SCREENSHOT_CAPTURE_INTERVAL_MINUTES}-minute interval`,
-          previousCaptureAt: previousAcceptedCapture.capturedAt.toISOString(),
-          nextAllowedAt: nextAllowedAt?.toISOString() || null,
-          timestamp: safeCapturedAt.toISOString(),
-        })
-      }
     }
 
     // Generate employee folder name for filesystem fallback
@@ -270,24 +225,6 @@ export async function POST(request) {
     await screenshot.save();
 
     console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${gridfsResult ? ` (GridFS: ${gridfsResult._id})` : ''}`);
-
-    // Auto-trigger session analysis when a full 20-screenshot session completes.
-    // Run async — don't block the upload response
-    checkAndTriggerSessionAnalysis({
-      userId,
-      employeeId,
-      databaseName: tenant.databaseName,
-      capturedAt: safeCapturedAt,
-      sessionId,
-      captureType,
-      models: { Screenshot, ProductivitySession }
-    }).then(result => {
-      if (result.triggered) {
-        console.log(`[Screenshot] Auto-analysis triggered for session ${result.sessionId}`);
-      }
-    }).catch(err => {
-      console.error('[Screenshot] Auto-analysis check failed (non-blocking):', err.message);
-    });
 
     return NextResponse.json({
       success: true,

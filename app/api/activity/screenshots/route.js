@@ -1,59 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose';
-
-/**
- * Check if a user is a department head who can view another user's screenshots
- * @param {Object} models - Tenant models (User, Employee, Department)
- */
-async function canViewUserScreenshots(viewerId, targetUserId, viewerRole, models) {
-  const { User, Employee, Department } = models;
-  
-  // Admins and HR can view all
-  if (['admin', 'hr'].includes(viewerRole)) {
-    return true;
-  }
-
-  // Same user
-  if (viewerId?.toString() === targetUserId?.toString()) {
-    return true;
-  }
-
-  // Check if viewer is department head of target's department
-  const viewer = await User.findById(viewerId).select('employeeId');
-  const target = await User.findById(targetUserId).select('employeeId');
-
-  if (!viewer?.employeeId || !target?.employeeId) {
-    return false;
-  }
-
-  const viewerEmployee = await Employee.findById(viewer.employeeId).select('_id');
-  const targetEmployee = await Employee.findById(target.employeeId).select('department departments');
-
-  if (!viewerEmployee || !targetEmployee) {
-    return false;
-  }
-
-  // Get all departments the target belongs to
-  const targetDepartments = [];
-  if (targetEmployee.department) {
-    targetDepartments.push(targetEmployee.department);
-  }
-  if (targetEmployee.departments?.length) {
-    targetDepartments.push(...targetEmployee.departments);
-  }
-
-  // Check if viewer is head of any of those departments
-  const departments = await Department.find({
-    _id: { $in: targetDepartments },
-    $or: [
-      { head: viewerEmployee._id },
-      { heads: viewerEmployee._id }
-    ]
-  });
-
-  return departments.length > 0;
-}
+import { canViewUserScreenshots } from '@/lib/productivityPermissions';
 
 /**
  * GET /api/activity/screenshots
@@ -179,6 +127,8 @@ export async function GET(request) {
           fileSize: s.metadata?.fileSize
         },
         sessionId: s.sessionId,
+        analyzed: !!s.analyzed,
+        analyzedAt: s.analyzedAt || null,
         // URL to fetch the actual image
         imageUrl: `/api/activity/screenshot?id=${s._id}`
       })),

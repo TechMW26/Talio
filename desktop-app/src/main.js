@@ -1478,8 +1478,8 @@ function setupIPCHandlers() {
   });
 
   ipcMain.handle('get-session-info', function () {
-    var sessionManager = require('./sessionManager');
-    return sessionManager.getSessionInfo();
+    // Sessions removed in v6.x — kept as no-op for backward compatibility with renderer.
+    return null;
   });
 
   // Network status - handle online/offline transitions

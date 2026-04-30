@@ -1,32 +1,29 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { buildDirectReportsFilter } from '@/lib/teamScope';
-
-const SCREENSHOTS_PER_SESSION_ESTIMATE = 20; // 20 screenshots per 60-min session at 3-min intervals
+import mongoose from 'mongoose';
 
 /**
  * GET /api/productivity/team
- * Get team members with their session summaries for department heads and admins
+ * Returns team members with their per-day screenshot/analysis summary.
+ * Pure raw-screenshot model — no ProductivitySession dependency.
  */
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department', 'Screenshot', 'Team']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Screenshot', 'ScreenshotAnalysis', 'Team']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { ProductivitySession, User, Employee, Department, Screenshot, Team } = models;
+    const { User, Employee, Department, Screenshot, ScreenshotAnalysis, Team } = models;
 
     const currentUserId = (user._id || user.userId).toString();
     const currentUserRole = user.role;
 
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
-    const departmentFilter = searchParams.get('department'); // Department filter for admin/HR
-    const teamFilter = searchParams.get('team'); // Team filter
-    const date = new Date(dateParam);
-    const dateEnd = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+    const departmentFilter = searchParams.get('department');
+    const teamFilter = searchParams.get('team');
 
     // Get current user with employee info
     const currentUser = await User.findById(currentUserId)
@@ -226,151 +223,54 @@ export async function GET(request) {
       }
     }
 
-    // === OPTIMIZED: Batch fetch all sessions in ONE query instead of N queries ===
-    // Collect all userIds and employeeIds upfront
-    const allUserIds = [];
-    const allEmployeeIds = [];
-    const memberMap = new Map(); // Map to quickly look up members by userId/employeeId
+    // === Aggregate per-user screenshot counts and analysis for the date ===
+    const allUserIds = teamMembers
+      .map((m) => (m.user._id || m.user)?.toString())
+      .filter(Boolean);
 
-    teamMembers.forEach(member => {
-      const userId = (member.user._id || member.user).toString();
-      const employeeId = member._id.toString();
-
-      allUserIds.push(userId);
-      allEmployeeIds.push(employeeId);
-
-      // Store member by both userId and employeeId for fast lookup
-      memberMap.set(`user:${userId}`, member);
-      memberMap.set(`emp:${employeeId}`, member);
-    });
-
-    // Single batched query for ALL sessions
-    const allSessions = await ProductivitySession.find({
-      $or: [
-        { user: { $in: allUserIds } },
-        { employee: { $in: allEmployeeIds } }
-      ],
-      date: { $gte: date, $lt: dateEnd }
-    }).select('user employee sessionNumber screenshotCount screenshots analysis startTime endTime').lean();
-
-    console.log(`[Team API] Fetched ${allSessions.length} sessions in single batched query`);
-
-    // Fallback source: raw screenshots for users whose sessions are not yet synced
-    const rawScreenshots = Screenshot
-      ? await Screenshot.find({
-        user: { $in: allUserIds },
-        dateString: dateParam
-      })
-        .select('user path capturedAt gridfsFileId')
-        .sort({ capturedAt: -1 })
-        .lean()
+    // Per-user counts (total + analyzed) using $facet via aggregation pipeline
+    const screenshotCounts = allUserIds.length > 0
+      ? await Screenshot.aggregate([
+          { $match: { user: { $in: allUserIds.map((id) => {
+            try { return new mongoose.Types.ObjectId(id); } catch { return id; }
+          }) }, dateString: dateParam } },
+          {
+            $group: {
+              _id: '$user',
+              total: { $sum: 1 },
+              analyzed: { $sum: { $cond: [{ $eq: ['$analyzed', true] }, 1, 0] } },
+              latestAt: { $max: '$capturedAt' },
+            },
+          },
+        ])
       : [];
 
-    const screenshotsByUser = new Map();
-    rawScreenshots.forEach((shot) => {
-      const userId = shot?.user?.toString();
-      if (!userId) return;
+    const countsByUser = new Map();
+    for (const row of screenshotCounts) {
+      countsByUser.set(row._id.toString(), {
+        total: row.total || 0,
+        analyzed: row.analyzed || 0,
+        pending: Math.max(0, (row.total || 0) - (row.analyzed || 0)),
+        latestAt: row.latestAt || null,
+      });
+    }
 
-      if (!screenshotsByUser.has(userId)) {
-        screenshotsByUser.set(userId, {
-          count: 0,
-          latestPreview: null
-        });
-      }
+    // Per-user analysis (one doc per user/day)
+    const analyses = allUserIds.length > 0
+      ? await ScreenshotAnalysis.find({ user: { $in: allUserIds }, dateString: dateParam })
+          .select('user aiAnalysis lastAnalyzedAt summary')
+          .lean()
+      : [];
+    const analysisByUser = new Map();
+    for (const doc of analyses) {
+      analysisByUser.set(doc.user.toString(), doc);
+    }
 
-      const bucket = screenshotsByUser.get(userId);
-      bucket.count += 1;
-      if (!bucket.latestPreview) {
-        bucket.latestPreview = shot.path || (shot.gridfsFileId ? `/api/activity/screenshot?id=${shot._id}` : null);
-      }
-    });
-
-    // Group sessions by member (using userId or employeeId)
-    const sessionsByMember = new Map();
-
-    // Initialize empty arrays for all members
-    teamMembers.forEach(member => {
-      const memberId = member._id.toString();
-      sessionsByMember.set(memberId, []);
-    });
-
-    // Assign sessions to their respective members
-    allSessions.forEach(session => {
-      let memberId = null;
-
-      // Try to match by user first
-      if (session.user) {
-        const userIdStr = session.user.toString();
-        const member = memberMap.get(`user:${userIdStr}`);
-        if (member) {
-          memberId = member._id.toString();
-        }
-      }
-
-      // If not matched by user, try by employee
-      if (!memberId && session.employee) {
-        const empIdStr = session.employee.toString();
-        const member = memberMap.get(`emp:${empIdStr}`);
-        if (member) {
-          memberId = member._id.toString();
-        }
-      }
-
-      // Add session to member's list
-      if (memberId && sessionsByMember.has(memberId)) {
-        sessionsByMember.get(memberId).push(session);
-      }
-    });
-
-    // Process each member with their pre-fetched sessions (no more N queries!)
-    const teamWithSessions = teamMembers.map(member => {
-      const userId = member.user._id || member.user;
-      const memberId = member._id.toString();
-
-      // Get pre-fetched sessions for this member
-      const sessions = sessionsByMember.get(memberId) || [];
-      const fallbackShots = screenshotsByUser.get(userId.toString()) || { count: 0, latestPreview: null };
-
-      // Calculate average score
-      const analyzedSessions = sessions.filter(s => s.analysis?.isAnalyzed && s.analysis?.score != null);
-      const avgScore = analyzedSessions.length > 0
-        ? Math.round(analyzedSessions.reduce((sum, s) => sum + s.analysis.score, 0) / analyzedSessions.length)
-        : null;
-
-      // Get first screenshot URL from each session for preview
-      const sessionsWithPreview = sessions.map(s => ({
-        _id: s._id,
-        sessionNumber: s.sessionNumber,
-        screenshotCount: s.screenshotCount,
-        isAnalyzed: s.analysis?.isAnalyzed || false,
-        score: s.analysis?.score || null,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        // Include first screenshot for preview
-        previewUrl: s.screenshots?.[0]?.url || s.screenshots?.[0]?.path || null,
-        // Include all screenshots for modal view
-        screenshots: s.screenshots || []
-      }));
-
-      const fallbackSessions = fallbackShots.count > 0 ? [{
-        _id: `fallback-${memberId}`,
-        sessionNumber: 1,
-        screenshotCount: fallbackShots.count,
-        isAnalyzed: false,
-        score: null,
-        startTime: null,
-        endTime: null,
-        previewUrl: fallbackShots.latestPreview,
-        screenshots: fallbackShots.latestPreview ? [{ url: fallbackShots.latestPreview, path: fallbackShots.latestPreview }] : []
-      }] : [];
-
-      const totalSessions = sessions.length > 0
-        ? sessions.length
-        : Math.ceil(fallbackShots.count / SCREENSHOTS_PER_SESSION_ESTIMATE);
-
-      const totalScreenshots = sessions.length > 0
-        ? sessions.reduce((sum, s) => sum + (s.screenshotCount || 0), 0)
-        : fallbackShots.count;
+    const teamWithStats = teamMembers.map((member) => {
+      const userId = (member.user._id || member.user).toString();
+      const counts = countsByUser.get(userId) || { total: 0, analyzed: 0, pending: 0, latestAt: null };
+      const analysisDoc = analysisByUser.get(userId);
+      const aiAnalysis = analysisDoc?.aiAnalysis || null;
 
       return {
         _id: member._id,
@@ -380,42 +280,42 @@ export async function GET(request) {
         profilePicture: member.profilePicture,
         department: member.department?.name || 'N/A',
         designation: member.designation?.title || 'N/A',
-        userId: userId.toString(),
-        sessionsSummary: {
-          totalSessions,
-          totalScreenshots,
-          analyzedSessions: analyzedSessions.length,
-          averageScore: avgScore,
-          sessions: sessionsWithPreview.length > 0 ? sessionsWithPreview : fallbackSessions
-        }
+        userId,
+        dailyStats: {
+          totalCaptures: counts.total,
+          analyzedCaptures: counts.analyzed,
+          pendingCaptures: counts.pending,
+          score: aiAnalysis?.score ?? null,
+          focusScore: aiAnalysis?.focusScore ?? null,
+          lastAnalyzedAt: analysisDoc?.lastAnalyzedAt || null,
+          summary: aiAnalysis?.summary || analysisDoc?.summary || null,
+          latestCaptureAt: counts.latestAt,
+        },
       };
     });
 
-    // Sort by average score (highest first), then by total sessions
-    teamWithSessions.sort((a, b) => {
-      if (a.sessionsSummary.averageScore !== null && b.sessionsSummary.averageScore !== null) {
-        return b.sessionsSummary.averageScore - a.sessionsSummary.averageScore;
-      }
-      if (a.sessionsSummary.averageScore !== null) return -1;
-      if (b.sessionsSummary.averageScore !== null) return 1;
-      return b.sessionsSummary.totalSessions - a.sessionsSummary.totalSessions;
+    // Sort: highest score first, then most captures
+    teamWithStats.sort((a, b) => {
+      const sa = a.dailyStats.score;
+      const sb = b.dailyStats.score;
+      if (sa != null && sb != null) return sb - sa;
+      if (sa != null) return -1;
+      if (sb != null) return 1;
+      return b.dailyStats.totalCaptures - a.dailyStats.totalCaptures;
     });
 
-    console.log(`[Team API] Returning ${teamWithSessions.length} team members for ${departmentName}`);
-
-    // Build departments list for filter (only for multi-department heads)
     let availableDepartments = [];
     if (!isAdminOrHR && departments && departments.length > 1) {
-      availableDepartments = departments.map(d => ({ _id: d._id, name: d.name, code: d.code }));
+      availableDepartments = departments.map((d) => ({ _id: d._id, name: d.name, code: d.code }));
     }
 
     return NextResponse.json({
       success: true,
-      data: teamWithSessions,
+      data: teamWithStats,
       date: dateParam,
       department: departmentName,
       departments: availableDepartments,
-      totalMembers: teamWithSessions.length
+      totalMembers: teamWithStats.length,
     });
 
   } catch (error) {
