@@ -28,6 +28,7 @@ import {
 } from 'react-icons/hi2'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import AnalyzedComposite from '@/components/productivity/AnalyzedComposite'
 
 /* ------------------------------------------------------------------ */
 /* Small presentational helpers (matched to meetings page styling)    */
@@ -111,21 +112,110 @@ function ScreenshotGrid({ screenshots, emptyHint, onPick }) {
   )
 }
 
-function ListBlock({ title, items, icon: Icon, iconColor = 'text-indigo-500' }) {
-  if (!items || items.length === 0) return null
+function ScoreTile({ label, value, accent = 'green' }) {
+  if (value == null || value === '') return null
+  const palette = {
+    green: 'bg-green-50 text-green-700 border-green-100',
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    purple: 'bg-purple-50 text-purple-700 border-purple-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  }[accent] || 'bg-gray-50 text-gray-700 border-gray-100'
+  return (
+    <div className={`rounded-lg border p-4 text-center ${palette}`}>
+      <div className="text-3xl font-bold">{value}</div>
+      <div className="mt-1 text-xs font-medium uppercase tracking-wide opacity-80">{label}</div>
+    </div>
+  )
+}
+
+function MetricTile({ label, value, accent = 'indigo' }) {
+  if (value == null || value === '') return null
+  const palette = {
+    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+    green: 'bg-green-50 text-green-700 border-green-100',
+  }[accent] || 'bg-gray-50 text-gray-700 border-gray-100'
+  return (
+    <div className={`rounded-lg border p-4 text-center ${palette}`}>
+      <div className="text-xl font-bold leading-tight">{value}</div>
+      <div className="mt-1 text-xs font-medium uppercase tracking-wide opacity-80">{label}</div>
+    </div>
+  )
+}
+
+function PercentBar({ label, value, color = 'bg-blue-500' }) {
+  const pct = Math.min(100, Math.max(0, Number(value) || 0))
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
+      <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
+        <span className="font-medium text-gray-700">{label}</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function BulletList({ title, items, icon: Icon, iconColor = 'text-indigo-500', tone = 'gray', bullet = 'check' }) {
+  if (!items || items.length === 0) return null
+  const toneClass = {
+    gray: 'text-gray-700',
+    green: 'text-green-700',
+    red: 'text-red-700',
+    amber: 'text-amber-700',
+    blue: 'text-blue-700',
+    purple: 'text-purple-700',
+  }[tone] || 'text-gray-700'
+  return (
+    <div>
+      <div className={`mb-2 flex items-center gap-2 text-sm font-semibold ${toneClass}`}>
         {Icon ? <Icon className={`w-4 h-4 ${iconColor}`} /> : null}
         <span>{title}</span>
       </div>
       <ul className="space-y-1.5">
         {items.map((item, i) => (
-          <li key={i} className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700 border border-gray-100">
-            {item}
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+            <span className={`mt-0.5 inline-block ${bullet === 'dot' ? 'h-1.5 w-1.5 rounded-full bg-current opacity-60' : ''}`}>
+              {bullet === 'check' ? '✓' : bullet === 'warn' ? '!' : ''}
+            </span>
+            <span className="flex-1">{typeof item === 'string' ? item : (item?.text || JSON.stringify(item))}</span>
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+function Chips({ items, color = 'indigo' }) {
+  if (!items || items.length === 0) return null
+  const palette = {
+    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    green: 'bg-green-50 text-green-700 border-green-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+  }[color] || 'bg-gray-50 text-gray-700 border-gray-100'
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((it, i) => (
+        <span key={i} className={`rounded-full border px-3 py-1 text-xs font-medium ${palette}`}>
+          {it}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function SectionTitle({ icon: Icon, children, iconColor = 'text-indigo-500' }) {
+  return (
+    <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
+      {Icon ? <Icon className={`w-4 h-4 ${iconColor}`} /> : null}
+      <span>{children}</span>
     </div>
   )
 }
@@ -138,33 +228,80 @@ function TimeDistribution({ td }) {
     ['Administrative', td.administrative, 'bg-purple-500'],
     ['Unfocused', td.unfocused, 'bg-amber-500'],
     ['Idle', td.idle, 'bg-red-500'],
-  ].filter(([, v]) => Number.isFinite(Number(v)))
+  ].filter(([, v]) => Number.isFinite(Number(v)) && Number(v) > 0)
   if (entries.length === 0) return null
   return (
     <div>
-      <div className="mb-2 text-sm font-semibold text-gray-700">Time Distribution</div>
+      <SectionTitle icon={HiOutlineChartBar} iconColor="text-blue-500">Time Distribution</SectionTitle>
       <div className="space-y-2">
         {entries.map(([label, value, bar]) => (
-          <div key={label}>
-            <div className="mb-1 flex justify-between text-xs text-gray-600">
-              <span>{label}</span>
-              <span>{value}%</span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-              <div className={`h-full ${bar}`} style={{ width: `${Math.min(100, Math.max(0, Number(value) || 0))}%` }} />
-            </div>
-          </div>
+          <PercentBar key={label} label={label} value={value} color={bar} />
         ))}
       </div>
     </div>
   )
 }
 
+function WorkBreakdown({ categories }) {
+  if (!Array.isArray(categories) || categories.length === 0) return null
+  const palette = ['bg-indigo-500', 'bg-blue-500', 'bg-purple-500', 'bg-amber-500', 'bg-red-500', 'bg-green-500']
+  const filtered = categories
+    .filter((c) => Number.isFinite(Number(c?.percentage)) && Number(c.percentage) > 0)
+    .slice(0, 6)
+  if (filtered.length === 0) return null
+  return (
+    <div>
+      <SectionTitle icon={HiOutlineComputerDesktop} iconColor="text-indigo-500">Work Breakdown</SectionTitle>
+      <div className="space-y-2">
+        {filtered.map((c, i) => (
+          <PercentBar key={c.category || i} label={c.category || 'Unknown'} value={c.percentage} color={palette[i % palette.length]} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AppsList({ applications }) {
+  if (!Array.isArray(applications) || applications.length === 0) return null
+  const items = applications.slice(0, 8).map((a) => {
+    const name = a?.name || a
+    const mins = Number(a?.estimatedMinutes)
+    return Number.isFinite(mins) && mins > 0 ? `${name} (${mins}m)` : `${name}`
+  })
+  return (
+    <div>
+      <SectionTitle icon={HiOutlineComputerDesktop} iconColor="text-green-500">Applications Used</SectionTitle>
+      <Chips items={items} color="green" />
+    </div>
+  )
+}
+
+function SitesList({ websites }) {
+  if (!Array.isArray(websites) || websites.length === 0) return null
+  const items = websites.slice(0, 8).map((w) => {
+    const dom = w?.domain || w
+    const mins = Number(w?.estimatedMinutes)
+    return Number.isFinite(mins) && mins > 0 ? `${dom} (${mins}m)` : `${dom}`
+  })
+  return (
+    <div>
+      <SectionTitle icon={HiOutlineMagnifyingGlass} iconColor="text-blue-500">Websites Visited</SectionTitle>
+      <Chips items={items} color="blue" />
+    </div>
+  )
+}
+
 function AnalysisCard({ analysis, lastAnalyzedAt }) {
   if (!analysis) return null
+  const oa = analysis.overallAssessment || {}
+  const fm = analysis.focusMetrics || {}
+  const taskAlignment = oa.taskAlignmentPercentage
+  const genuineWork = oa.genuineWorkPercentage
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="p-5 bg-gradient-to-r from-indigo-50 via-white to-white border-b border-gray-100">
+      {/* Header — flat (no gradient) */}
+      <div className="p-5 border-b border-gray-100">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
@@ -188,20 +325,114 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
         </div>
       </div>
 
-      <div className="p-5 space-y-5">
-        {analysis.summary ? (
-          <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{analysis.summary}</p>
-        ) : null}
-
-        <TimeDistribution td={analysis.timeDistribution} />
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <ListBlock title="Achievements" items={analysis.achievements} icon={HiOutlineTrophy} iconColor="text-green-500" />
-          <ListBlock title="Suggestions" items={analysis.suggestions} icon={HiOutlineChartBar} iconColor="text-blue-500" />
-          <ListBlock title="Insights" items={analysis.insights} icon={HiOutlineSparkles} iconColor="text-purple-500" />
-          <ListBlock title="Concerns" items={analysis.concerns} icon={HiOutlineExclamationCircle} iconColor="text-amber-500" />
+      <div className="p-5 space-y-6">
+        {/* Score tiles row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <ScoreTile label="Productivity" value={analysis.score ?? null} accent="green" />
+          <ScoreTile label="Focus" value={analysis.focusScore ?? null} accent="blue" />
+          <ScoreTile label="Task Progress" value={analysis.taskCompletionIndicators ?? null} accent="amber" />
         </div>
 
+        {/* AI Summary */}
+        {analysis.summary ? (
+          <div>
+            <SectionTitle icon={HiOutlineSparkles} iconColor="text-indigo-500">AI Summary</SectionTitle>
+            <p className="whitespace-pre-line rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm leading-relaxed text-gray-700">
+              {analysis.summary}
+            </p>
+          </div>
+        ) : null}
+
+        {/* Task Alignment banner */}
+        {Number.isFinite(Number(taskAlignment)) ? (
+          <div className="rounded-lg border border-purple-100 bg-purple-50 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-semibold text-purple-700">
+                <HiOutlineTrophy className="w-4 h-4" />
+                Task Alignment
+              </div>
+              <span className="text-sm font-bold text-purple-700">{Number(taskAlignment)}%</span>
+            </div>
+            {analysis.taskRelativity?.assessment ? (
+              <p className="text-sm text-gray-700">{analysis.taskRelativity.assessment}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Time distribution */}
+        <TimeDistribution td={analysis.timeDistribution} />
+
+        {/* Focus metric tiles */}
+        {(fm.longestFocusStreak || fm.contextSwitches != null || fm.distractionCount != null) ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <MetricTile label="Focus Streak" value={fm.longestFocusStreak || '—'} accent="indigo" />
+            <MetricTile label="Context Switches" value={fm.contextSwitches ?? '—'} accent="amber" />
+            <MetricTile label="Distractions" value={fm.distractionCount ?? '—'} accent="red" />
+          </div>
+        ) : null}
+
+        {/* Work breakdown */}
+        <WorkBreakdown categories={analysis.workCategories} />
+
+        {/* Achievements + Suggestions */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <BulletList
+            title="Achievements"
+            items={analysis.achievements}
+            icon={HiOutlineTrophy}
+            iconColor="text-green-500"
+            tone="green"
+            bullet="check"
+          />
+          <BulletList
+            title="Suggestions for Improvement"
+            items={analysis.suggestions}
+            icon={HiOutlineChartBar}
+            iconColor="text-blue-500"
+            tone="blue"
+            bullet="dot"
+          />
+        </div>
+
+        {/* Strengths + Concerns + Improvements */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <BulletList
+            title="Strengths"
+            items={oa.strengths}
+            icon={HiOutlineSparkles}
+            iconColor="text-green-500"
+            tone="green"
+            bullet="check"
+          />
+          <BulletList
+            title="Major Concerns"
+            items={oa.majorConcerns}
+            icon={HiOutlineExclamationCircle}
+            iconColor="text-red-500"
+            tone="red"
+            bullet="warn"
+          />
+          <BulletList
+            title="Areas for Improvement"
+            items={oa.areasForImprovement}
+            icon={HiOutlineChartBar}
+            iconColor="text-amber-500"
+            tone="amber"
+            bullet="dot"
+          />
+        </div>
+
+        {/* Insights */}
+        <BulletList
+          title="Key Insights"
+          items={analysis.insights}
+          icon={HiOutlineSparkles}
+          iconColor="text-purple-500"
+          tone="purple"
+          bullet="dot"
+        />
+
+        {/* Red flags */}
         {analysis.redFlags?.length ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3">
             <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-red-700">
@@ -214,10 +445,24 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
           </div>
         ) : null}
 
-        {analysis.overallAssessment?.recommendation ? (
-          <div className="rounded-md border border-gray-100 bg-gray-50 p-3 text-sm">
-            <div className="mb-1 font-semibold text-gray-700">Overall Recommendation</div>
-            <p className="text-gray-600">{analysis.overallAssessment.recommendation}</p>
+        {/* Apps & sites */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <AppsList applications={analysis.applications} />
+          <SitesList websites={analysis.websites} />
+        </div>
+
+        {/* Genuine work + recommendation */}
+        {(Number.isFinite(Number(genuineWork)) || oa.recommendation) ? (
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
+            {Number.isFinite(Number(genuineWork)) ? (
+              <PercentBar label="Genuine Work" value={genuineWork} color="bg-green-500" />
+            ) : null}
+            {oa.recommendation ? (
+              <div>
+                <div className="mb-1 text-sm font-semibold text-indigo-700">Recommendation</div>
+                <p className="text-sm italic text-gray-700">{oa.recommendation}</p>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -225,27 +470,103 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
   )
 }
 
-function Lightbox({ shot, onClose }) {
+function Lightbox({ shots, index, onClose, onIndexChange }) {
+  const total = shots?.length || 0
+  // `index` is null when closed. Treat any non-numeric / out-of-range value
+  // as closed so calling `onClose()` (which sets index = null) actually hides
+  // the modal instead of rendering shots[0].
+  const isOpenRequest = typeof index === 'number' && index >= 0 && index < total
+  const safeIndex = isOpenRequest ? index : 0
+  const shot = isOpenRequest ? shots[safeIndex] : null
+  const open = !!shot
+
+  // Keyboard navigation: ←/→ to change image, Esc handled by Modal itself.
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => {
+      if (e.key === 'ArrowLeft' && safeIndex > 0) onIndexChange(safeIndex - 1)
+      else if (e.key === 'ArrowRight' && safeIndex < total - 1) onIndexChange(safeIndex + 1)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, safeIndex, total, onIndexChange])
+
   if (!shot) return null
+
+  const goPrev = () => safeIndex > 0 && onIndexChange(safeIndex - 1)
+  const goNext = () => safeIndex < total - 1 && onIndexChange(safeIndex + 1)
+
   return (
-    <Modal isOpen={!!shot} onClose={onClose} size="4xl" backdrop="blur" scrollBehavior="inside">
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      size="full"
+      backdrop="blur"
+      hideCloseButton
+      classNames={{
+        wrapper: 'items-center justify-center',
+        base: 'bg-transparent shadow-none m-0 max-w-none',
+      }}
+    >
       <ModalContent>
-        {(close) => (
-          <ModalBody className="p-2">
-            <div className="flex items-center justify-between px-2 pb-2">
-              <div className="text-sm font-medium text-gray-700">
-                {shot.formattedTime}
-                {shot.analyzed ? <span className="ml-2 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-green-700">Analyzed</span>
-                  : <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700">Pending</span>}
+        <ModalBody className="p-0 flex items-center justify-center">
+          <div className="relative w-[90vw] h-[90vh] flex items-center justify-center">
+            {/* Header overlay */}
+            <div className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between">
+              <div className="flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 text-sm font-medium text-white backdrop-blur">
+                <span>{shot.formattedTime}</span>
+                {shot.analyzed
+                  ? <span className="rounded bg-green-500/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase">Analyzed</span>
+                  : <span className="rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase">Pending</span>}
+                {total > 1 ? (
+                  <span className="text-xs text-white/70 ml-1">{safeIndex + 1} / {total}</span>
+                ) : null}
               </div>
-              <Button isIconOnly variant="light" size="sm" onPress={close}>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70 backdrop-blur transition"
+              >
                 <HiOutlineXMark className="w-5 h-5" />
-              </Button>
+              </button>
             </div>
+
+            {/* Prev arrow */}
+            {total > 1 ? (
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={safeIndex === 0}
+                aria-label="Previous screenshot"
+                className="absolute left-4 z-20 rounded-full bg-black/50 p-3 text-white hover:bg-black/70 backdrop-blur transition disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <HiOutlineChevronLeft className="w-6 h-6" />
+              </button>
+            ) : null}
+
+            {/* Next arrow */}
+            {total > 1 ? (
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={safeIndex === total - 1}
+                aria-label="Next screenshot"
+                className="absolute right-4 z-20 rounded-full bg-black/50 p-3 text-white hover:bg-black/70 backdrop-blur transition disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <HiOutlineChevronRight className="w-6 h-6" />
+              </button>
+            ) : null}
+
+            {/* Image */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={shot.imageUrl} alt={shot.formattedTime} className="mx-auto max-h-[78vh] w-auto rounded-md" />
-          </ModalBody>
-        )}
+            <img
+              src={shot.imageUrl}
+              alt={shot.formattedTime}
+              className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
+            />
+          </div>
+        </ModalBody>
       </ModalContent>
     </Modal>
   )
@@ -261,7 +582,10 @@ export default function ProductivityPage() {
   const [activeTab, setActiveTab] = useState('my')
   const [selectedTeamUserId, setSelectedTeamUserId] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
-  const [lightbox, setLightbox] = useState(null)
+  const [lightboxIndex, setLightboxIndex] = useState(null)
+  // Bumped each time a fresh analysis completes so the composite viewer
+  // forcibly refetches.
+  const [compositeRefreshSignal, setCompositeRefreshSignal] = useState(0)
   const [teamSearch, setTeamSearch] = useState('')
 
   const { startAILoading, stopAILoading } = useAILoading()
@@ -305,9 +629,61 @@ export default function ProductivityPage() {
   const screenshots = dailyRes?.screenshots || []
   const analysis = dailyRes?.analysis?.aiAnalysis || null
   const lastAnalyzedAt = dailyRes?.analysis?.lastAnalyzedAt || null
-  const stats = dailyRes?.stats || { total: 0, analyzed: 0, pending: 0 }
+  const dailyStats = dailyRes?.stats || { total: 0, analyzed: 0, pending: 0 }
+
+  // Aggregate stats across the visible team when on Team tab with no member
+  // selected — so "Total Captures" reflects the whole organisation/team for
+  // the day instead of staying at 0.
+  const teamAggregate = useMemo(() => {
+    const list = teamRes?.data || []
+    if (list.length === 0) return null
+    let total = 0
+    let analyzed = 0
+    let pending = 0
+    let scoreSum = 0
+    let scoreCount = 0
+    for (const m of list) {
+      const ds = m.dailyStats || {}
+      total += ds.totalCaptures || 0
+      analyzed += ds.analyzedCaptures || 0
+      pending += ds.pendingCaptures || 0
+      if (typeof ds.productivityScore === 'number') {
+        scoreSum += ds.productivityScore
+        scoreCount += 1
+      }
+    }
+    return {
+      total,
+      analyzed,
+      pending,
+      avgScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null,
+    }
+  }, [teamRes])
+
+  // Decide which stats to show in the top cards.
+  const showTeamAggregate = activeTab === 'team' && !selectedTeamUserId && !!teamAggregate
+  const stats = showTeamAggregate
+    ? { total: teamAggregate.total, analyzed: teamAggregate.analyzed, pending: teamAggregate.pending }
+    : dailyStats
+  const headlineScore = showTeamAggregate
+    ? (teamAggregate.avgScore ?? '—')
+    : (analysis?.score ?? '—')
+
+  // The Analyse button always operates on a SINGLE user — never on the team
+  // aggregate. So its enable/label state must come from the per-target
+  // `dailyStats`, not the aggregated `stats`.
+  const targetPendingCount = dailyStats.pending || 0
+  const needsTeamSelection = activeTab === 'team' && !selectedTeamUserId
+  const analyseDisabled = analyzing || needsTeamSelection || targetPendingCount === 0
   const pendingShots = screenshots.filter((s) => !s.analyzed)
   const analyzedShots = screenshots.filter((s) => s.analyzed)
+  // Unified ordering for the lightbox slider: pending first (matches UI order),
+  // then analyzed.
+  const lightboxShots = [...pendingShots, ...analyzedShots]
+  const openLightbox = (shot) => {
+    const idx = lightboxShots.findIndex((s) => s.id === shot.id)
+    setLightboxIndex(idx >= 0 ? idx : 0)
+  }
   const today = new Date().toISOString().split('T')[0]
   const isFutureDisabled = selectedDate >= today
 
@@ -318,13 +694,15 @@ export default function ProductivityPage() {
   }
 
   const handleAnalyze = useCallback(async () => {
-    if (!dailyKey || analyzing) return
+    // Always require a concrete target user. On Team tab the user must pick a
+    // member first; on My Day we fall back to the viewer.
+    const target = activeTab === 'team' ? selectedTeamUserId : (user?._id || user?.userId)
+    if (!target || analyzing) return
     setAnalyzing(true)
-    startAILoading('MIRA is analyzing today\u2019s screenshots...')
+    startAILoading('MIRA is analyzing screenshots...')
     try {
       const token = localStorage.getItem('token')
-      const body = { date: selectedDate }
-      if (activeTab === 'team' && selectedTeamUserId) body.userId = selectedTeamUserId
+      const body = { date: selectedDate, userId: target }
       const res = await fetch('/api/productivity/daily/analyze', {
         method: 'POST',
         headers: {
@@ -333,19 +711,37 @@ export default function ProductivityPage() {
         },
         body: JSON.stringify(body),
       })
-      const data = await res.json().catch(() => ({}))
+      console.log('[handleAnalyze] Response status:', res.status);
+      const text = await res.text().catch(() => '');
+      console.log('[handleAnalyze] Response text:', text.slice(0, 1000));
+      const data = (() => {
+        try {
+          return text ? JSON.parse(text) : {};
+        } catch (parseErr) {
+          console.error('[handleAnalyze] JSON parse error:', parseErr, 'response:', text.slice(0, 500));
+          return {};
+        }
+      })();
       if (!res.ok || data?.success === false) {
-        console.error('Daily analyze failed:', data)
+        console.error('Daily analyze failed:', { 
+          status: res.status, 
+          statusText: res.statusText,
+          responseBody: text.slice(0, 500),
+          data 
+        });
       }
       await mutateDaily()
       if (activeTab === 'team') await mutateTeam()
+      // Tell the AnalyzedComposite to refetch — the composite was just
+      // re-stitched and old screenshots were deleted from the daily payload.
+      setCompositeRefreshSignal((n) => n + 1)
     } catch (err) {
       console.error('Daily analyze error:', err)
     } finally {
       stopAILoading()
       setAnalyzing(false)
     }
-  }, [dailyKey, analyzing, selectedDate, activeTab, selectedTeamUserId, mutateDaily, mutateTeam, startAILoading, stopAILoading])
+  }, [analyzing, selectedDate, activeTab, selectedTeamUserId, user, mutateDaily, mutateTeam, startAILoading, stopAILoading])
 
   /* -------------------- Team list -------------------- */
 
@@ -514,7 +910,7 @@ export default function ProductivityPage() {
         <StatCard
           icon={HiOutlineChartBar}
           label="Score"
-          value={analysis?.score ?? '—'}
+          value={headlineScore}
           iconBg="bg-purple-100"
           iconText="text-purple-600"
         />
@@ -591,12 +987,14 @@ export default function ProductivityPage() {
                   color="primary"
                   onPress={handleAnalyze}
                   isLoading={analyzing}
-                  isDisabled={analyzing || stats.pending === 0}
+                  isDisabled={analyseDisabled}
                   startContent={!analyzing ? <HiOutlineSparkles className="w-5 h-5" /> : null}
                 >
-                  {analysis
-                    ? `Analyse ${stats.pending} new with MIRA`
-                    : `Analyse ${stats.pending} captures with MIRA`}
+                  {needsTeamSelection
+                    ? 'Select a team member to analyse'
+                    : analysis
+                      ? `Analyse ${targetPendingCount} new with MIRA`
+                      : `Analyse ${targetPendingCount} captures with MIRA`}
                 </Button>
               </div>
             </div>
@@ -621,6 +1019,14 @@ export default function ProductivityPage() {
               {/* Analysis card */}
               <AnalysisCard analysis={analysis} lastAnalyzedAt={lastAnalyzedAt} />
 
+              {/* Stitched composite of every previously-analyzed screenshot.
+                  Lives in place of the old "Analyzed Captures" grid. */}
+              <AnalyzedComposite
+                userId={activeTab === 'team' ? (selectedTeamUserId || null) : null}
+                date={selectedDate}
+                refreshSignal={compositeRefreshSignal}
+              />
+
               {/* Pending captures */}
               {pendingShots.length > 0 ? (
                 <div>
@@ -631,28 +1037,13 @@ export default function ProductivityPage() {
                   <ScreenshotGrid
                     screenshots={pendingShots}
                     emptyHint="No pending captures."
-                    onPick={setLightbox}
-                  />
-                </div>
-              ) : null}
-
-              {/* Analyzed captures */}
-              {analyzedShots.length > 0 ? (
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                    <HiOutlineSparkles className="w-5 h-5 text-green-500" />
-                    Analyzed Captures ({analyzedShots.length})
-                  </h2>
-                  <ScreenshotGrid
-                    screenshots={analyzedShots}
-                    emptyHint="No analyzed captures yet."
-                    onPick={setLightbox}
+                    onPick={openLightbox}
                   />
                 </div>
               ) : null}
 
               {/* Truly empty */}
-              {screenshots.length === 0 ? (
+              {screenshots.length === 0 && !analysis ? (
                 <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
                   <HiOutlinePhoto className="w-16 h-16 mx-auto text-gray-300 mb-4" />
                   <h3 className="text-lg font-medium text-gray-800 mb-2">No captures for this day</h3>
@@ -666,7 +1057,12 @@ export default function ProductivityPage() {
         </div>
       ) : null}
 
-      <Lightbox shot={lightbox} onClose={() => setLightbox(null)} />
+      <Lightbox
+        shots={lightboxShots}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import path from 'path'
 import fs from 'fs/promises'
 import { uploadImage, deleteImage } from '@/lib/gridfs'
+import { processImage, ImagePipelineError } from '@/lib/imagePipeline'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,13 +68,29 @@ export async function POST(request) {
 
     // Extract base64 data and check size
     const base64Data = imageData.replace(base64Regex, '')
-    const imageBuffer = Buffer.from(base64Data, 'base64')
+    const rawBuffer = Buffer.from(base64Data, 'base64')
 
-    if (imageBuffer.length > MAX_FILE_SIZE) {
+    if (rawBuffer.length > MAX_FILE_SIZE) {
       return NextResponse.json({
         success: false,
         message: 'Image too large. Maximum size is 5MB.'
       }, { status: 400 })
+    }
+
+    // Run through unified pipeline: strips EXIF (PII!), normalizes to WebP.
+    let imageBuffer = rawBuffer
+    let processedExtension = imageData.match(/data:image\/(\w+);/)?.[1] || 'jpg'
+    let processedContentType = `image/${processedExtension}`
+    try {
+      const processed = await processImage(rawBuffer, { type: 'document' })
+      imageBuffer = processed.buffer
+      processedExtension = processed.format
+      processedContentType = processed.mimeType
+    } catch (pipelineErr) {
+      if (pipelineErr instanceof ImagePipelineError && pipelineErr.code === 'too_large') {
+        return NextResponse.json({ success: false, message: 'Image too large.' }, { status: 413 })
+      }
+      console.warn('[Aadhaar Upload] Pipeline failed, storing raw:', pipelineErr?.message || pipelineErr)
     }
 
     // Get employee info for folder structure
@@ -87,7 +104,7 @@ export async function POST(request) {
 
     // Generate secure filename with employee code
     const timestamp = Date.now()
-    const extension = imageData.match(/data:image\/(\w+);/)?.[1] || 'jpg'
+    const extension = processedExtension
     const employeeCode = employee?.employeeCode || 'UNKNOWN'
     const filename = `aadhaar_${side}_${employeeCode}_${timestamp}.${extension}`
 
@@ -99,7 +116,7 @@ export async function POST(request) {
       console.log('[Aadhaar Upload] Uploading to GridFS...')
       const gridfsResult = await uploadImage(imageBuffer, {
         category: 'aadhaar',
-        contentType: `image/${extension}`,
+        contentType: processedContentType,
         originalName: filename,
         userId: String(authUser._id || authUser.userId),
         employeeId: employee?._id ? String(employee._id) : undefined,

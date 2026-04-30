@@ -11,7 +11,52 @@ import crypto from 'crypto'
 import { getTenantByEmail, updateUserLoginStats, checkServiceStatus } from '@/lib/tenantContext'
 import { getTenantModels } from '@/lib/tenantModels'
 
+// Security
+import { rateLimit, buildRateLimitHeaders } from '@/lib/security/rateLimiter'
+import { recordSecurityEvent, extractClientIp } from '@/lib/security/auditLog'
+import { isIpBlocked, blockIp } from '@/lib/security/ipBlocklist'
+
+// Brute-force lockout policy
+const MAX_FAILED_ATTEMPTS = Number(process.env.LOGIN_MAX_FAILED_ATTEMPTS) || 5
+const LOCKOUT_DURATION_MS = Number(process.env.LOGIN_LOCKOUT_MS) || 15 * 60_000
+const IP_AUTOBLOCK_AFTER_LOCKOUTS = Number(process.env.LOGIN_IP_AUTOBLOCK) || 3
+const IP_AUTOBLOCK_DURATION_MS = Number(process.env.LOGIN_IP_AUTOBLOCK_MS) || 60 * 60_000
+
 export async function POST(request) {
+  const ipAddress = extractClientIp(request)
+  const userAgent = request.headers.get('user-agent') || 'Unknown'
+
+  // 1) Hard block check (cached): denies known-bad IPs without DB hits.
+  if (await isIpBlocked(ipAddress)) {
+    recordSecurityEvent({
+      type: 'permission.denied',
+      severity: 'high',
+      message: 'Login attempt from blocked IP',
+      ip: ipAddress,
+      userAgent,
+      method: 'POST',
+      path: '/api/auth/login',
+    })
+    return NextResponse.json(
+      { message: 'Access denied.' },
+      { status: 403 }
+    )
+  }
+
+  // 2) Per-IP rate limit (separate from per-IP+email so brute force across
+  //    accounts also throttles).
+  const ipRl = rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, {
+    ip: ipAddress,
+    path: '/api/auth/login',
+    method: 'POST',
+  })
+  if (!ipRl.allowed) {
+    return NextResponse.json(
+      { message: 'Too many login attempts. Please try again later.' },
+      { status: 429, headers: buildRateLimitHeaders(ipRl) }
+    )
+  }
+
   try {
     const body = await request.json().catch(() => ({}))
     const rawEmail = body.email
@@ -24,6 +69,20 @@ export async function POST(request) {
       return NextResponse.json(
         { message: 'Please provide email and password' },
         { status: 400 }
+      )
+    }
+
+    // Per-(IP+email) rate limit: tighter quota on a single account.
+    const pairRl = rateLimit('AUTH_LOGIN', `pair:${ipAddress}:${email}`, {
+      ip: ipAddress,
+      path: '/api/auth/login',
+      method: 'POST',
+      email,
+    })
+    if (!pairRl.allowed) {
+      return NextResponse.json(
+        { message: 'Too many login attempts for this account. Please try again later.' },
+        { status: 429, headers: buildRateLimitHeaders(pairRl) }
       )
     }
 
@@ -69,6 +128,17 @@ export async function POST(request) {
     if (!tenantInfo) {
       // SECURITY: No tenant mapping = no access
       console.warn(`[Login] No tenant mapping found for ${email} - access denied`);
+      recordSecurityEvent({
+        type: 'auth.login.failed',
+        severity: 'low',
+        message: 'Email not mapped to any tenant',
+        ip: ipAddress,
+        userAgent,
+        method: 'POST',
+        path: '/api/auth/login',
+        email,
+        metadata: { reason: 'email_not_found' },
+      })
       return NextResponse.json(
         { message: 'No account found with this email address. Please check and try again.', errorType: 'email_not_found' },
         { status: 401 }
@@ -100,9 +170,17 @@ export async function POST(request) {
     TenantNotification = tenantModels.Notification;
 
     // Find user and include password field (forcePasswordChange and isActive are included by default)
-    const user = await TenantUser.findOne({ email }).select('+password')
+    const user = await TenantUser.findOne({ email }).select('+password +loginAttempts +lockUntil +lastFailedLogin')
 
     if (!user) {
+      recordSecurityEvent({
+        type: 'auth.login.failed',
+        severity: 'low',
+        message: 'No matching user in tenant',
+        ip: ipAddress, userAgent, method: 'POST', path: '/api/auth/login',
+        email, databaseName: tenantInfo.databaseName,
+        metadata: { reason: 'email_not_found' },
+      })
       return NextResponse.json(
         { message: 'No account found with this email address. Please check and try again.', errorType: 'email_not_found' },
         { status: 401 }
@@ -111,9 +189,37 @@ export async function POST(request) {
 
     // Check if user is active
     if (!user.isActive) {
+      recordSecurityEvent({
+        type: 'auth.login.failed',
+        severity: 'low',
+        message: 'Login attempt on deactivated account',
+        ip: ipAddress, userAgent, method: 'POST', path: '/api/auth/login',
+        email, userId: user._id?.toString(), databaseName: tenantInfo.databaseName,
+        metadata: { reason: 'deactivated' },
+      })
       return NextResponse.json(
         { message: 'Your account has been deactivated' },
         { status: 401 }
+      )
+    }
+
+    // Lockout check
+    if (user.lockUntil && new Date(user.lockUntil).getTime() > Date.now()) {
+      const remainingMs = new Date(user.lockUntil).getTime() - Date.now()
+      recordSecurityEvent({
+        type: 'auth.login.failed',
+        severity: 'medium',
+        message: 'Login blocked: account locked',
+        ip: ipAddress, userAgent, method: 'POST', path: '/api/auth/login',
+        email, userId: user._id?.toString(), databaseName: tenantInfo.databaseName,
+        metadata: { reason: 'locked', remainingMs },
+      })
+      return NextResponse.json(
+        {
+          message: `Account temporarily locked due to too many failed attempts. Try again in ${Math.ceil(remainingMs / 60_000)} minute(s).`,
+          errorType: 'account_locked',
+        },
+        { status: 423, headers: { 'Retry-After': String(Math.ceil(remainingMs / 1000)) } }
       )
     }
 
@@ -126,11 +232,69 @@ export async function POST(request) {
     }
 
     if (!isPasswordMatch) {
+      // Increment failed-attempt counter and possibly lock the account.
+      const newAttempts = (user.loginAttempts || 0) + 1
+      const updates = { loginAttempts: newAttempts, lastFailedLogin: new Date() }
+      let locked = false
+      if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+        updates.lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MS)
+        locked = true
+      }
+      try {
+        await TenantUser.updateOne({ _id: user._id }, { $set: updates }, { timestamps: false })
+      } catch (e) {
+        console.warn('[Login] failed to record failed-attempt counter:', e?.message || e)
+      }
+
+      recordSecurityEvent({
+        type: locked ? 'auth.login.locked' : 'auth.login.failed',
+        severity: locked ? 'high' : 'medium',
+        message: locked ? 'Account locked after repeated failures' : 'Wrong password',
+        ip: ipAddress, userAgent, method: 'POST', path: '/api/auth/login',
+        email, userId: user._id?.toString(), databaseName: tenantInfo.databaseName,
+        metadata: { reason: 'wrong_password', attempts: newAttempts, lockUntil: updates.lockUntil || null },
+      })
+
+      // Auto-block IP after several lockouts trace back to same IP.
+      if (locked) {
+        // Heuristic: if the IP-scoped rate-limit bucket is heavy too, block IP.
+        // Use rateLimit to inspect (don't double-record).
+        const ipPressure = rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, { record: false, ip: ipAddress })
+        if (ipPressure.hits >= IP_AUTOBLOCK_AFTER_LOCKOUTS * MAX_FAILED_ATTEMPTS) {
+          blockIp(ipAddress, {
+            reason: 'Repeated brute-force lockouts',
+            source: 'auto',
+            eventType: 'auth.login.locked',
+            durationMs: IP_AUTOBLOCK_DURATION_MS,
+            metadata: { triggeredByEmail: email },
+          })
+        }
+      }
+
       return NextResponse.json(
         { message: 'The password you entered is incorrect. Please try again.', errorType: 'wrong_password' },
         { status: 401 }
       )
     }
+
+    // Successful login: reset brute-force counters.
+    if (user.loginAttempts || user.lockUntil) {
+      try {
+        await TenantUser.updateOne(
+          { _id: user._id },
+          { $set: { loginAttempts: 0, lockUntil: null } },
+          { timestamps: false }
+        )
+      } catch (_) { /* non-fatal */ }
+    }
+
+    recordSecurityEvent({
+      type: 'auth.login.success',
+      severity: 'info',
+      message: 'Login success',
+      ip: ipAddress, userAgent, method: 'POST', path: '/api/auth/login',
+      email, userId: user._id?.toString(), role: user.role, databaseName: tenantInfo.databaseName,
+    })
 
     // Update last login and set firstLoginAt if not set (for profile completion tracking)
     const lastLogin = new Date()

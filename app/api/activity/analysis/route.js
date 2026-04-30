@@ -1,244 +1,229 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { triggerScheduledTasks, analyzeUserDay } from '@/lib/screenshotAnalysis';
 import mongoose from 'mongoose';
+import { getAuthAndModels } from '@/lib/auth';
+import { canViewUserScreenshots } from '@/lib/productivityPermissions';
+import {
+  runDailyAnalysis,
+  DAILY_ANALYSIS_REQUIRED_MODELS,
+} from '@/lib/dailyAnalysisRunner';
 
-/**
- * Check if viewer can access target user's analysis
- * @param {Object} models - Tenant models (User, Employee, Department)
- */
-async function canViewAnalysis(viewerId, targetUserId, viewerRole, models) {
-  const { User, Employee, Department } = models;
-  
-  if (['admin', 'hr'].includes(viewerRole)) {
-    return true;
-  }
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 300;
 
-  if (viewerId === targetUserId) {
-    return true;
-  }
-
-  // Check department head access
-  const viewer = await User.findById(viewerId).select('employeeId');
-  const target = await User.findById(targetUserId).select('employeeId');
-
-  if (!viewer?.employeeId || !target?.employeeId) {
-    return false;
-  }
-
-  const targetEmployee = await Employee.findById(target.employeeId).select('department departments');
-  if (!targetEmployee) return false;
-
-  const targetDepartments = [];
-  if (targetEmployee.department) targetDepartments.push(targetEmployee.department);
-  if (targetEmployee.departments?.length) targetDepartments.push(...targetEmployee.departments);
-
-  const departments = await Department.find({
-    _id: { $in: targetDepartments },
-    $or: [
-      { head: viewer.employeeId },
-      { heads: viewer.employeeId }
-    ]
-  });
-
-  return departments.length > 0;
+function mapAnalysisDoc(doc) {
+  const ai = doc?.aiAnalysis || {};
+  return {
+    id: doc._id.toString(),
+    dateString: doc.dateString,
+    formattedDate: doc.date
+      ? new Date(doc.date).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      : doc.dateString,
+    status: doc.status || 'completed',
+    screenshotCount: doc.screenshotCount || doc.analyzedScreenshotIds?.length || 0,
+    totalActiveMinutes: doc.totalActiveMinutes || null,
+    workDuration: doc.totalActiveMinutes
+      ? `${Math.floor(doc.totalActiveMinutes / 60)}h ${doc.totalActiveMinutes % 60}m`
+      : null,
+    firstCapture: doc.firstCapture || null,
+    lastCapture: doc.lastCapture || null,
+    employeeContext: doc.employeeContext || null,
+    timeline: doc.timeline || [],
+    summary: ai.summary || doc.summary || null,
+    metrics: doc.metrics || {
+      score: ai.score ?? null,
+      focusScore: ai.focusScore ?? null,
+      taskCompletionIndicators: ai.taskCompletionIndicators ?? null,
+      timeDistribution: ai.timeDistribution || null,
+    },
+    applicationUsage: ai.applications || doc.applicationUsage || [],
+    categoryBreakdown: ai.workCategories || doc.categoryBreakdown || [],
+    hourlyActivity: doc.hourlyActivity || [],
+    analyzedAt: doc.lastAnalyzedAt || doc.analyzedAt || null,
+    aiModel: doc.provider || doc.aiModel || null,
+    error: doc.error || null,
+    aiAnalysis: ai,
+  };
 }
 
 /**
  * GET /api/activity/analysis
- * Get screenshot analysis for a user
- * 
- * Query params:
- * - userId: Target user ID (optional, defaults to current user)
- * - date: Date string YYYY-MM-DD (optional, defaults to yesterday)
- * - startDate: Start date for range query
- * - endDate: End date for range query
+ * Legacy compatibility endpoint. Reads the SAME ScreenshotAnalysis documents
+ * produced by the current /api/productivity/daily pipeline.
  */
 export async function GET(request) {
   try {
-    // Trigger scheduled tasks (cleanup, daily analysis)
-    triggerScheduledTasks().catch(err => console.error('[Analysis] Scheduler error:', err));
-
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ScreenshotAnalysis'])
+    const auth = await getAuthAndModels(request, [
+      'User',
+      'Employee',
+      'Department',
+      'ScreenshotAnalysis',
+    ]);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { User, Employee, Department, ScreenshotAnalysis } = models
+
+    const { user, models } = auth;
+    const { User, ScreenshotAnalysis } = models;
 
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
-
     if (!viewerId) {
       return NextResponse.json({ success: false, error: 'User ID not found' }, { status: 400 });
     }
 
     const { searchParams } = new URL(request.url);
-    const targetUserId = searchParams.get('userId') || viewerId;
+    const targetUserId = (searchParams.get('userId') || viewerId).toString();
     const date = searchParams.get('date');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    // Validate userId format if provided
-    if (targetUserId && targetUserId !== viewerId && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (targetUserId !== viewerId.toString() && !mongoose.Types.ObjectId.isValid(targetUserId)) {
       return NextResponse.json({ success: false, error: 'Invalid user ID format' }, { status: 400 });
     }
 
-    // Check access
-    const canView = await canViewAnalysis(viewerId, targetUserId, viewerRole, models);
-    if (!canView) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Access denied' 
-      }, { status: 403 });
+    if (targetUserId !== viewerId.toString()) {
+      const exists = await User.findById(targetUserId).select('_id');
+      if (!exists) {
+        return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+      }
     }
 
-    // Build query
-    const query = { user: targetUserId };
+    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
+    if (!canView) {
+      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+    }
 
+    const query = { user: targetUserId };
     if (date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return NextResponse.json({ success: false, error: 'Invalid date format (expected YYYY-MM-DD)' }, { status: 400 });
+      }
       query.dateString = date;
     } else if (startDate && endDate) {
       query.date = {
         $gte: new Date(startDate),
-        $lte: new Date(endDate + 'T23:59:59.999Z')
+        $lte: new Date(`${endDate}T23:59:59.999Z`),
       };
     } else if (startDate) {
       query.date = { $gte: new Date(startDate) };
     } else if (endDate) {
-      query.date = { $lte: new Date(endDate + 'T23:59:59.999Z') };
+      query.date = { $lte: new Date(`${endDate}T23:59:59.999Z`) };
     } else {
-      // Default to yesterday
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       query.dateString = yesterday.toISOString().split('T')[0];
     }
 
-    // Get analyses
     const analyses = await ScreenshotAnalysis.find(query)
       .sort({ date: -1 })
       .limit(30)
       .lean();
 
-    // Get user info
     const targetUser = await User.findById(targetUserId).select('name email');
 
     return NextResponse.json({
       success: true,
-      analyses: analyses.map(a => ({
-        id: a._id.toString(),
-        dateString: a.dateString,
-        formattedDate: a.date ? new Date(a.date).toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }) : a.dateString,
-        status: a.status,
-        screenshotCount: a.screenshotCount,
-        totalActiveMinutes: a.totalActiveMinutes,
-        workDuration: a.totalActiveMinutes ? `${Math.floor(a.totalActiveMinutes / 60)}h ${a.totalActiveMinutes % 60}m` : null,
-        firstCapture: a.firstCapture,
-        lastCapture: a.lastCapture,
-        employeeContext: a.employeeContext,
-        timeline: a.timeline,
-        summary: a.summary,
-        metrics: a.metrics,
-        applicationUsage: a.applicationUsage,
-        categoryBreakdown: a.categoryBreakdown,
-        hourlyActivity: a.hourlyActivity,
-        analyzedAt: a.analyzedAt,
-        aiModel: a.aiModel,
-        error: a.error
-      })),
-      user: targetUser ? {
-        id: targetUser._id.toString(),
-        name: targetUser.name,
-        email: targetUser.email
-      } : null
+      analyses: analyses.map(mapAnalysisDoc),
+      user: targetUser
+        ? {
+            id: targetUser._id.toString(),
+            name: targetUser.name,
+            email: targetUser.email,
+          }
+        : null,
+      compatibilityMode: 'productivity-daily',
     });
-
   } catch (error) {
-    console.error('[Analysis] GET error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    }, { status: 500 });
+    console.error('[Activity/Analysis] GET error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
 /**
  * POST /api/activity/analysis
- * Trigger analysis for a specific user and date
- * 
- * Body:
- * - userId: Target user ID (optional, defaults to current user)
- * - date: Date string YYYY-MM-DD (required)
+ * Legacy compatibility endpoint. Writes through the SAME stitch -> composite
+ * -> single AI call pipeline used by /api/productivity/daily/analyze.
  */
 export async function POST(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, []);
+    const auth = await getAuthAndModels(request, DAILY_ANALYSIS_REQUIRED_MODELS);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user } = auth;
 
+    const { user, models, tenant } = auth;
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
-
-    // Only admins can trigger analysis manually
-    if (!['admin', 'hr'].includes(viewerRole)) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Admin access required' 
-      }, { status: 403 });
+    if (!viewerId) {
+      return NextResponse.json({ success: false, error: 'User ID not found' }, { status: 400 });
     }
 
-    const body = await request.json();
-    const targetUserId = body.userId || viewerId;
+    const body = await request.json().catch(() => ({}));
+    const targetUserId = (body.userId || viewerId).toString();
     const dateString = body.date;
 
-    if (!dateString) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Date is required' 
-      }, { status: 400 });
+    if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return NextResponse.json({ success: false, error: 'Date is required (YYYY-MM-DD)' }, { status: 400 });
+    }
+    if (targetUserId !== viewerId.toString() && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return NextResponse.json({ success: false, error: 'Invalid userId' }, { status: 400 });
     }
 
-    ;
+    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
+    if (!canView) {
+      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+    }
 
-    // Run analysis
-    const analysis = await analyzeUserDay(targetUserId, dateString);
+    const result = await runDailyAnalysis({
+      userId: targetUserId,
+      dateString,
+      models,
+      tenant,
+      trigger: 'manual-legacy',
+      forceReanalyze: true,
+    });
 
-    if (!analysis) {
+    if (result.status === 'empty') {
       return NextResponse.json({
-        success: false,
-        error: 'No screenshots found for the specified date'
-      }, { status: 404 });
+        success: true,
+        message: result.message,
+        analysis: null,
+        pendingCount: 0,
+        stitched: 0,
+        compatibilityMode: 'productivity-daily',
+      });
+    }
+
+    if (result.status === 'no-composite') {
+      return NextResponse.json(
+        { success: false, error: result.message, ...result, compatibilityMode: 'productivity-daily' },
+        { status: 500 },
+      );
+    }
+
+    if (result.status === 'ai-failed') {
+      return NextResponse.json(
+        { success: false, error: result.error, ...result, compatibilityMode: 'productivity-daily' },
+        { status: 502 },
+      );
     }
 
     return NextResponse.json({
       success: true,
-      analysis: {
-        id: analysis._id.toString(),
-        dateString: analysis.dateString,
-        status: analysis.status,
-        screenshotCount: analysis.screenshotCount,
-        totalActiveMinutes: analysis.totalActiveMinutes,
-        metrics: analysis.metrics,
-        summary: analysis.summary,
-        analyzedAt: analysis.analyzedAt,
-        processingTime: analysis.processingTime
-      }
+      message: result.message || `Analysis refreshed for ${dateString}.`,
+      pendingCount: result.pendingCount || 0,
+      stitched: result.stitched || 0,
+      analysis: result.analysis || null,
+      compatibilityMode: 'productivity-daily',
     });
-
   } catch (error) {
-    console.error('[Analysis] POST error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    }, { status: 500 });
+    console.error('[Activity/Analysis] POST error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

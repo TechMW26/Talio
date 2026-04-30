@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { textToParticles, AI_MESSAGES, CHAR_WIDTH } from './particleFont'
+import { textToParticles, CHAR_WIDTH } from './particleFont'
 
 /**
  * Global AI Loading Animation Overlay
@@ -196,8 +196,69 @@ const PHASE = {
   MORPHING: 'morphing'      // Particles forming new shape
 }
 
+const FALLBACK_WORDS = [
+  'Analyzing data',
+  'Scanning captured activity',
+  'Mapping workflow patterns',
+  'Reading screen context',
+  'Understanding work intent',
+  'Refining productivity signals',
+  'Synthesizing key insights',
+  'Evaluating focus quality',
+  'Finalizing analysis summary',
+]
+
+function detectIntentFromPath(pathname = '') {
+  const path = `${pathname || ''}`.toLowerCase()
+  if (path.includes('/productivity')) return 'Productivity'
+  if (path.includes('/attendance')) return 'Attendance'
+  if (path.includes('/payroll')) return 'Payroll'
+  if (path.includes('/leave')) return 'Leave'
+  if (path.includes('/project')) return 'Projects'
+  if (path.includes('/task')) return 'Tasks'
+  if (path.includes('/meeting')) return 'Meetings'
+  if (path.includes('/chat')) return 'Communication'
+  if (path.includes('/expense')) return 'Expenses'
+  if (path.includes('/asset')) return 'Assets'
+  if (path.includes('/employee')) return 'Employees'
+  if (path.includes('/dashboard')) return 'Dashboard'
+  return 'General'
+}
+
+function getActiveModuleContext() {
+  if (typeof window === 'undefined') {
+    return { intentLabel: 'General', moduleTitle: '' }
+  }
+
+  const pathname = window.location?.pathname || ''
+  const headingText =
+    document.querySelector('main h1, section h1, h1')?.textContent?.trim() || ''
+  const titleText = (document.title || '').split('-')[0]?.trim() || ''
+  const moduleTitle = headingText || titleText
+  const intentByPath = detectIntentFromPath(pathname)
+
+  if (!moduleTitle) {
+    return { intentLabel: intentByPath, moduleTitle: '' }
+  }
+
+  const normalized = moduleTitle.toLowerCase()
+  if (normalized.includes('productivity')) return { intentLabel: 'Productivity', moduleTitle }
+  if (normalized.includes('attendance')) return { intentLabel: 'Attendance', moduleTitle }
+  if (normalized.includes('payroll')) return { intentLabel: 'Payroll', moduleTitle }
+  if (normalized.includes('leave')) return { intentLabel: 'Leave', moduleTitle }
+  if (normalized.includes('project')) return { intentLabel: 'Projects', moduleTitle }
+  if (normalized.includes('task')) return { intentLabel: 'Tasks', moduleTitle }
+  if (normalized.includes('meeting')) return { intentLabel: 'Meetings', moduleTitle }
+  if (normalized.includes('chat') || normalized.includes('message')) return { intentLabel: 'Communication', moduleTitle }
+  if (normalized.includes('expense')) return { intentLabel: 'Expenses', moduleTitle }
+  if (normalized.includes('asset')) return { intentLabel: 'Assets', moduleTitle }
+  if (normalized.includes('employee')) return { intentLabel: 'Employees', moduleTitle }
+
+  return { intentLabel: intentByPath, moduleTitle }
+}
+
 export default function GlobalAILoadingOverlay() {
-  const { isAILoading, transitionComplete } = useAILoading()
+  const { isAILoading, transitionComplete, aiMessage } = useAILoading()
   const { theme } = useTheme()
   const canvasRef = useRef(null)
   const overlayRef = useRef(null)
@@ -207,6 +268,40 @@ export default function GlobalAILoadingOverlay() {
   const [mounted, setMounted] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
+  const wordsQueueRef = useRef([...FALLBACK_WORDS])
+  const isFetchingWordsRef = useRef(false)
+
+  const fetchLiveWords = useCallback(async () => {
+    if (isFetchingWordsRef.current) return
+    isFetchingWordsRef.current = true
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const { intentLabel, moduleTitle } = getActiveModuleContext()
+      const res = await fetch('/api/ai/loading-words', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          context: aiMessage || 'AI processing request',
+          route: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
+          intentLabel,
+          moduleTitle,
+          count: 12,
+        }),
+      })
+      if (!res.ok) return
+      const data = await res.json().catch(() => null)
+      if (Array.isArray(data?.words) && data.words.length > 0) {
+        wordsQueueRef.current = data.words
+      }
+    } catch (_) {
+      // Keep local fallback words if AI generation is unavailable.
+    } finally {
+      isFetchingWordsRef.current = false
+    }
+  }, [aiMessage])
   
   // Get theme colors for particles - use primary 500 (lighter) and 800 (darker)
   const themeColorsRef = useRef({
@@ -257,6 +352,11 @@ export default function GlobalAILoadingOverlay() {
     setMounted(true)
   }, [])
 
+  useEffect(() => {
+    if (!isVisible) return
+    fetchLiveWords()
+  }, [isVisible, fetchLiveWords])
+
   // Morphing 3D Shape Animation
   useEffect(() => {
     if (!isVisible || !canvasRef.current || !mounted) return
@@ -270,8 +370,9 @@ export default function GlobalAILoadingOverlay() {
     }
     
     let baseRadius = getBaseRadius()
-    // Increased particles for denser text formations while maintaining performance
-    const PARTICLE_COUNT = 1500
+    // Start with a balanced count and increase dynamically if a text word
+    // needs more particles to render clearly.
+    const BASE_PARTICLE_COUNT = 1500
     const LERP_SPEED = 0.16
     const SCATTER_LERP_SPEED = 0.20
     const Z_PERSPECTIVE = 400
@@ -287,7 +388,7 @@ export default function GlobalAILoadingOverlay() {
     
     // Track current state
     let currentShapeIndex = 0
-    let currentMessageIndex = Math.floor(Math.random() * AI_MESSAGES.length)
+    let currentMessageIndex = Math.floor(Math.random() * Math.max(1, wordsQueueRef.current.length))
     let showTextNext = true
     let currentPhase = PHASE.HOLDING
     let phaseStartTime = Date.now()
@@ -314,9 +415,10 @@ export default function GlobalAILoadingOverlay() {
     const initParticles = () => {
       particlesRef.current = []
       const shapeFn = SHAPES.sphere
+      const particleCount = BASE_PARTICLE_COUNT
       
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const pos = shapeFn(i, PARTICLE_COUNT, baseRadius)
+      for (let i = 0; i < particleCount; i++) {
+        const pos = shapeFn(i, particleCount, baseRadius)
         particlesRef.current.push({
           x: pos.x, y: pos.y, z: pos.z,
           targetX: pos.x, targetY: pos.y, targetZ: pos.z,
@@ -337,8 +439,9 @@ export default function GlobalAILoadingOverlay() {
 
     // Set scatter targets - particles fly outward
     const setScatterTargets = () => {
+      const particleCount = particlesRef.current.length
       particlesRef.current.forEach((p) => {
-        const scatterPos = SHAPES.scatter(0, PARTICLE_COUNT, baseRadius)
+        const scatterPos = SHAPES.scatter(0, particleCount, baseRadius)
         p.scatterX = scatterPos.x
         p.scatterY = scatterPos.y
         p.scatterZ = scatterPos.z
@@ -349,21 +452,61 @@ export default function GlobalAILoadingOverlay() {
       })
     }
 
+    const ensureParticleCapacity = (requiredCount) => {
+      const currentCount = particlesRef.current.length
+      if (requiredCount <= currentCount) return
+
+      const extra = requiredCount - currentCount
+      for (let i = 0; i < extra; i++) {
+        const scatterPos = SHAPES.scatter(0, requiredCount, baseRadius)
+        particlesRef.current.push({
+          x: scatterPos.x,
+          y: scatterPos.y,
+          z: scatterPos.z,
+          targetX: scatterPos.x,
+          targetY: scatterPos.y,
+          targetZ: scatterPos.z,
+          baseTargetX: scatterPos.x,
+          baseTargetY: scatterPos.y,
+          baseTargetZ: scatterPos.z,
+          size: Math.random() * 0.8 + 0.5,
+          hueOffset: Math.random() * 60 - 30,
+          phaseOffset: Math.random() * Math.PI * 2,
+          oscillate: false,
+          oscillateSpeed: 1 + Math.random() * 2,
+          oscillateAmount: 3 + Math.random() * 5,
+          oscillatePhase: Math.random() * Math.PI * 2,
+          scatterX: scatterPos.x,
+          scatterY: scatterPos.y,
+          scatterZ: scatterPos.z,
+        })
+      }
+    }
+
     // Update particle targets for new shape or text
     const setNewShapeTargets = (isText) => {
       if (isText) {
         // Get next message (cycle through)
-        currentMessageIndex = (currentMessageIndex + 1) % AI_MESSAGES.length
-        const message = AI_MESSAGES[currentMessageIndex]
+        const queue = wordsQueueRef.current.length > 0 ? wordsQueueRef.current : FALLBACK_WORDS
+        currentMessageIndex = (currentMessageIndex + 1) % queue.length
+        const message = queue[currentMessageIndex]
+        if (queue.length <= 4) {
+          fetchLiveWords()
+        }
         
         // Calculate scale based on screen width - bezier font uses different scaling
         const maxWidth = window.innerWidth * 0.65
         const minDim = Math.min(window.innerWidth, window.innerHeight)
         // Scale factor for bezier curves (larger numbers = bigger text)
-        const scale = Math.min(Math.max(minDim * 0.045, 28), 50)
+        const baseScale = Math.min(Math.max(minDim * 0.045, 28), 50)
+        const messageChars = `${message}`.replace(/\s+/g, ' ').trim().length
+        const maxScaleByWordLength = Math.max(20, maxWidth / Math.max(1, messageChars * 0.72 * CHAR_WIDTH))
+        const scale = Math.min(baseScale, maxScaleByWordLength)
         
         // Get particle positions for text
         const textParticles = textToParticles(message, scale, 0, 0)
+        const requiredParticles = Math.max(BASE_PARTICLE_COUNT, Math.ceil(textParticles.length * 1.15))
+        ensureParticleCapacity(requiredParticles)
         
         // Assign text positions to particles
         particlesRef.current.forEach((p, i) => {
@@ -391,8 +534,9 @@ export default function GlobalAILoadingOverlay() {
         // Regular 3D shape - no oscillation
         const shapeName = BASE_SHAPES[currentShapeIndex % BASE_SHAPES.length]
         const shapeFn = SHAPES[shapeName]
+        const particleCount = particlesRef.current.length
         particlesRef.current.forEach((p, i) => {
-          const newPos = shapeFn(i, PARTICLE_COUNT, baseRadius)
+          const newPos = shapeFn(i, particleCount, baseRadius)
           p.targetX = newPos.x
           p.targetY = newPos.y
           p.targetZ = newPos.z

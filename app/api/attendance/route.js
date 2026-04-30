@@ -12,7 +12,7 @@ import { emitAttendanceUpdate, emitDashboardRefresh, emitRealtimeEvent, REALTIME
 import { getAuthAndModels } from '@/lib/auth'
 import { getTenantModels } from '@/lib/tenantModels'
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
-import { triggerAnalysisOnCheckout } from '@/lib/autoAnalysisTrigger'
+import { triggerDailyAnalysisOnCheckout } from '@/lib/autoAnalysisTrigger'
 import mongoose from 'mongoose'
 import {
   getTimezone,
@@ -1290,27 +1290,34 @@ export async function POST(request) {
         console.error('Failed to emit attendance socket events:', socketError)
       }
 
-      // Auto-trigger productivity analysis for any un-analyzed sessions on clock-out
-      // Run async — don't block the clock-out response
+      // Auto-trigger productivity analysis on clock-out (NEW pipeline:
+      // stitches every captured screenshot for the day into one composite
+      // and runs a single AI vision call). Async / fire-and-forget so the
+      // checkout response is not blocked by AI latency.
       try {
         const checkoutUserId = (user._id || user.userId)?.toString()
         if (checkoutUserId && tenant?.databaseName) {
-          const productivityModels = await getTenantModels(tenant.databaseName, ['Screenshot', 'ProductivitySession'])
-          triggerAnalysisOnCheckout({
+          const checkoutTimezone = getTimezone(settings?.timezone) || DEFAULT_TIMEZONE
+          triggerDailyAnalysisOnCheckout({
             userId: checkoutUserId,
             employeeId,
             databaseName: tenant.databaseName,
-            models: productivityModels
-          }).then(result => {
+            timezone: checkoutTimezone,
+            referenceDate: new Date(),
+            trigger: 'checkout',
+          }).then((result) => {
             if (result.triggered) {
-              console.log(`[Attendance] Auto-analysis on checkout: ${result.sessionsEnqueued} sessions enqueued for user ${checkoutUserId}`)
+              console.log(
+                `[Attendance] Daily analysis on checkout for ${checkoutUserId} (${result.dateString}): `
+                + `stitched ${result.stitched ?? 0}, score ${result.analysis?.aiAnalysis?.score ?? 'n/a'}`,
+              )
             }
-          }).catch(err => {
-            console.error('[Attendance] Auto-analysis trigger failed (non-blocking):', err.message)
+          }).catch((err) => {
+            console.error('[Attendance] Daily analysis trigger failed (non-blocking):', err.message)
           })
         }
       } catch (analysisError) {
-        console.error('[Attendance] Failed to trigger auto-analysis (non-blocking):', analysisError.message)
+        console.error('[Attendance] Failed to trigger daily analysis (non-blocking):', analysisError.message)
       }
 
       // Build response with optional warning

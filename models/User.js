@@ -102,6 +102,17 @@ const UserSchema = new mongoose.Schema({
   lastLogin: {
     type: Date,
   },
+  // Brute-force / lockout tracking. Reset on every successful login.
+  loginAttempts: {
+    type: Number,
+    default: 0,
+  },
+  lastFailedLogin: {
+    type: Date,
+  },
+  lockUntil: {
+    type: Date,
+  },
   passwordResetToken: String,
   passwordResetExpires: Date,
   // Firebase Cloud Messaging tokens for push notifications

@@ -5,6 +5,7 @@ import path from 'path';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import mongoose from 'mongoose';
 import { isWithinOfficeHours } from '@/lib/officeHours';
+import { processImage, ImagePipelineError } from '@/lib/imagePipeline';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -65,7 +66,35 @@ export async function POST(request) {
 
     // Get file buffer
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const rawBuffer = Buffer.from(arrayBuffer);
+
+    // Run through unified image pipeline: enforces size cap, strips EXIF,
+    // resizes to screenshot bounds, converts to WebP for storage savings.
+    let buffer;
+    let processedFormat = 'webp';
+    let processedMime = 'image/webp';
+    let processedWidth = 1920;
+    let processedHeight = 1080;
+    try {
+      const processed = await processImage(rawBuffer, { type: 'screenshot' });
+      buffer = processed.buffer;
+      processedFormat = processed.format;
+      processedMime = processed.mimeType;
+      processedWidth = processed.width || processedWidth;
+      processedHeight = processed.height || processedHeight;
+    } catch (pipelineErr) {
+      if (pipelineErr instanceof ImagePipelineError && pipelineErr.code === 'too_large') {
+        return NextResponse.json({
+          success: false,
+          error: 'Screenshot exceeds maximum allowed size',
+          meta: pipelineErr.meta,
+        }, { status: 413 });
+      }
+      console.warn('[Screenshot] Pipeline failed, storing raw buffer:', pipelineErr?.message || pipelineErr);
+      buffer = rawBuffer;
+      processedMime = file.type || 'image/png';
+      processedFormat = (processedMime.split('/')[1] || 'png').toLowerCase();
+    }
 
     // Parse activity data
     let activity = {};
@@ -93,9 +122,9 @@ export async function POST(request) {
       }
     }
 
-    // Determine file format from content type
-    const mimeType = file.type || 'image/png';
-    const format = mimeType.split('/')[1] || 'png';
+    // Determine file format from processed buffer (WebP after pipeline).
+    const mimeType = processedMime;
+    const format = processedFormat;
 
     const capturedAt = requestedTimestamp ? new Date(requestedTimestamp) : new Date()
     const safeCapturedAt = Number.isNaN(capturedAt.getTime()) ? new Date() : capturedAt
@@ -172,8 +201,8 @@ export async function POST(request) {
         sessionId,
         mimeType,
         format,
-        width: 1920,
-        height: 1080,
+        width: processedWidth,
+        height: processedHeight,
         activity
       });
       console.log(`[Screenshot] ✅ Uploaded to GridFS: ${gridfsResult._id}`);

@@ -58,7 +58,45 @@ const nextConfig = {
 
   // Headers for caching strategy
   async headers() {
+    // Inline the security headers (CSP/HSTS/X-Frame-Options/etc.) so Node 18+
+    // works without ESM interop in next.config.js. Keep in sync with
+    // lib/security/securityHeaders.js.
+    const securityHeaders = [
+      { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'geolocation=(self), camera=(self), microphone=(self), payment=(), usb=(), interest-cohort=()' },
+      { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      { key: 'X-DNS-Prefetch-Control', value: 'off' },
+      { key: 'X-XSS-Protection', value: '0' },
+      {
+        key: 'Content-Security-Policy',
+        value: [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com",
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+          "img-src 'self' data: blob: https://ik.imagekit.io https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com",
+          "font-src 'self' data: https://fonts.gstatic.com",
+          "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://ik.imagekit.io https://maps.googleapis.com https://maps.gstatic.com wss: ws:",
+          "frame-src 'self' https://www.google.com https://maps.google.com",
+          "media-src 'self' data: blob:",
+          "worker-src 'self' blob:",
+          "object-src 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+          "frame-ancestors 'none'",
+          'upgrade-insecure-requests',
+        ].join('; '),
+      },
+    ];
+
     return [
+      {
+        // Apply security headers to ALL routes
+        source: '/:path*',
+        headers: securityHeaders,
+      },
       {
         // Static assets (Next.js _next/static/) - cache aggressively (immutable hashed filenames)
         source: '/_next/static/:path*',

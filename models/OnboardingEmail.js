@@ -5,7 +5,11 @@ const onboardingEmailSchema = new mongoose.Schema({
   employee: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee',
-    required: true,
+    required: function employeeRequired() {
+      // Legacy/manual scripts may queue onboarding notifications without an
+      // employee link; keep strict requirement for all normal paths.
+      return this.triggeredBy !== 'manual_script'
+    },
   },
   
   // User reference (if user was created)
@@ -84,7 +88,7 @@ const onboardingEmailSchema = new mongoose.Schema({
   // Who triggered the email
   triggeredBy: {
     type: String,
-    enum: ['manual_creation', 'bulk_import', 'manual_retry'],
+    enum: ['manual_creation', 'bulk_import', 'manual_retry', 'manual_script'],
     default: 'manual_creation',
   },
   

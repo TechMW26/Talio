@@ -1,3 +1,6 @@
+// Load environment variables from .env before any other code runs
+require('dotenv').config();
+
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
@@ -6,6 +9,57 @@ const { Server } = require('socket.io');
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
+
+// ────────────────────────────────────────────────────────────────────────
+// Boot-time environment validation.
+// Fail fast when REQUIRED secrets are missing in production. In development
+// we warn (so local devs can still run with partial config). Optional
+// integrations are reported but not enforced.
+// ────────────────────────────────────────────────────────────────────────
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'MONGODB_URI'];
+const RECOMMENDED_ENV_VARS = [
+  'NEXT_PUBLIC_APP_URL',
+  'CRON_SECRET',
+  'SUPERADMIN_DB_NAME',
+];
+const OPTIONAL_INTEGRATIONS = [
+  ['CUSTOM_AI_BASE_URL', 'Custom AI provider'],
+  ['INFERENCE_BASE_URL', 'Inference AI fallback'],
+  ['GEMINI_API_KEY', 'Gemini AI fallback'],
+  ['IMAGEKIT_PUBLIC_KEY', 'ImageKit (legacy uploads)'],
+  ['SMTP_HOST', 'Outbound email'],
+  ['FCM_SERVER_KEY', 'Push notifications'],
+  ['SENTRY_DSN', 'Error monitoring'],
+];
+
+(function validateEnvironment() {
+  const missingRequired = REQUIRED_ENV_VARS.filter((k) => !process.env[k]);
+  const missingRecommended = RECOMMENDED_ENV_VARS.filter((k) => !process.env[k]);
+  const missingIntegrations = OPTIONAL_INTEGRATIONS.filter(([k]) => !process.env[k]);
+
+  if (missingRequired.length > 0) {
+    const msg = `❌ Missing REQUIRED env vars: ${missingRequired.join(', ')}`;
+    if (dev) {
+      console.warn(`[boot] ${msg} — continuing in dev, but APIs WILL fail.`);
+    } else {
+      console.error(`[boot] ${msg}`);
+      console.error('[boot] Refusing to start in production with missing required secrets.');
+      process.exit(1);
+    }
+  }
+  if (missingRecommended.length > 0) {
+    console.warn(`[boot] ⚠️  Missing recommended env vars: ${missingRecommended.join(', ')}`);
+  }
+  if (missingIntegrations.length > 0 && !dev) {
+    console.warn('[boot] ℹ️  Optional integrations not configured:');
+    for (const [, label] of missingIntegrations) console.warn(`        - ${label}`);
+  }
+  // Warn on insecure JWT secret
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    console.warn('[boot] ⚠️  JWT_SECRET is shorter than 32 chars — strongly recommend regenerating with `openssl rand -hex 32`.');
+  }
+  console.log('[boot] ✓ environment validation complete');
+})();
 
 // Latest desktop version – fetched from GitHub releases, refreshed every 5 min.
 const GITHUB_REPO = 'avirajsharma-ops/Talio';

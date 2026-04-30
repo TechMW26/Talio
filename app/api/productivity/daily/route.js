@@ -19,13 +19,14 @@ export async function GET(request) {
       'Department',
       'Screenshot',
       'ScreenshotAnalysis',
+      'ScreenshotComposite',
     ]);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
     const { user, models } = auth;
-    const { User, Screenshot, ScreenshotAnalysis } = models;
+    const { User, Screenshot, ScreenshotAnalysis, ScreenshotComposite } = models;
 
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
@@ -78,7 +79,24 @@ export async function GET(request) {
     }));
 
     const pendingCount = formatted.filter((s) => !s.analyzed).length;
-    const analyzedCount = formatted.length - pendingCount;
+    const livingAnalyzedCount = formatted.length - pendingCount;
+
+    // Analyzed screenshots are folded into the per-day composite and the
+    // originals are deleted, so they no longer appear in `formatted`. Pull
+    // the persisted tile count from the composite so the stats card stays
+    // accurate across days.
+    let compositeTileCount = 0;
+    try {
+      const compositeDoc = await ScreenshotComposite.findOne({
+        user: targetUserId,
+        dateString: date,
+      }).select('tileCount').lean();
+      compositeTileCount = compositeDoc?.tileCount || 0;
+    } catch (err) {
+      console.warn('[Productivity/Daily] Failed to load composite count:', err.message);
+    }
+
+    const analyzedCount = livingAnalyzedCount + compositeTileCount;
 
     let analysisDoc = null;
     try {
@@ -99,9 +117,10 @@ export async function GET(request) {
         ? { id: targetUser._id.toString(), name: targetUser.name, email: targetUser.email }
         : null,
       stats: {
-        total: formatted.length,
+        total: formatted.length + compositeTileCount,
         analyzed: analyzedCount,
         pending: pendingCount,
+        compositeTiles: compositeTileCount,
       },
       screenshots: formatted,
       analysis: analysisDoc

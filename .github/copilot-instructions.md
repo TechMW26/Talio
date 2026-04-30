@@ -21,9 +21,10 @@
 - Desktop app registration sets `socket.isDesktopApp = true` (see `server.js`).
 
 ## AI + productivity capture flow
-- MAYA AI calls route through `lib/gemini.js` (Gemini primary, OpenAI fallback).
-- Desktop app uploads screenshots to `/api/maya/screen-capture`, server analyzes, then notifies via Socket.IO.
-- Desktop app sources are in `desktop-app/src/` (rules in `desktop-app/README.md`); uploads go to ImageKit.
+- MAYA AI calls route through `lib/gemini.js` (Custom AI primary → Inference AI fallback → Gemini fallback).
+- Desktop app uploads screenshots to `/api/activity/screenshot`, server analyzes asynchronously, then notifies via Socket.IO.
+- Desktop app sources are in `desktop-app/src/` (rules in `desktop-app/README.md`); uploads go through GridFS (primary) with optional ImageKit.
+- All inbound user images should go through `lib/imagePipeline.js` (size cap, EXIF strip, WebP conversion).
 
 ## Auth, roles, and middleware
 - Allowlists live in `middleware.js` (`publicRoutes`, `publicApiRoutes`).

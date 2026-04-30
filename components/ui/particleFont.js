@@ -289,6 +289,18 @@ export const AI_MESSAGES = [
   "One moment"
 ]
 
+let sharedTextCanvas = null
+let sharedTextCtx = null
+
+function getTextCanvasContext() {
+  if (typeof document === 'undefined') return null
+  if (!sharedTextCanvas) {
+    sharedTextCanvas = document.createElement('canvas')
+    sharedTextCtx = sharedTextCanvas.getContext('2d', { willReadFrequently: true })
+  }
+  return sharedTextCtx
+}
+
 /**
  * Sample points along a bezier curve path
  */
@@ -351,7 +363,7 @@ function binomial(n, k) {
 /**
  * Convert text to particle positions using smooth bezier strokes
  */
-export function textToParticles(text, scale = 30, centerX = 0, centerY = 0) {
+function textToParticlesFromStrokes(text, scale = 30, centerX = 0, centerY = 0) {
   const particles = []
   const chars = text.split('')
   
@@ -392,9 +404,9 @@ export function textToParticles(text, scale = 30, centerX = 0, centerY = 0) {
         })
         
         // Add nearby particles for density (smooth fill)
-        const extraCount = Math.random() < 0.6 ? 2 : 1
+        const extraCount = Math.random() < 0.7 ? 3 : 2
         for (let i = 0; i < extraCount; i++) {
-          const spread = scale * 0.04
+          const spread = scale * 0.025
           particles.push({
             x: charX + point[0] * charScale + (Math.random() - 0.5) * spread,
             y: centerY + (point[1] * charScale) - (charScale * 0.5) + yOffset + (Math.random() - 0.5) * spread,
@@ -408,6 +420,84 @@ export function textToParticles(text, scale = 30, centerX = 0, centerY = 0) {
     })
   })
   
+  return particles
+}
+
+/**
+ * Convert text to particles using canvas glyph sampling.
+ * This produces accurate letter shapes for all characters and fixes
+ * malformed handcrafted glyphs (for example, 'E').
+ */
+export function textToParticles(text, scale = 30, centerX = 0, centerY = 0) {
+  const value = `${text || ''}`
+  if (!value.trim()) return []
+
+  const ctx = getTextCanvasContext()
+  if (!ctx) {
+    return textToParticlesFromStrokes(value, scale, centerX, centerY)
+  }
+
+  const fontSize = Math.max(28, Math.round(scale * 1.38))
+  const fontFamily = '"SF Pro Display", "Segoe UI", "Avenir Next", "Helvetica Neue", Arial, sans-serif'
+  ctx.font = `700 ${fontSize}px ${fontFamily}`
+
+  const metrics = ctx.measureText(value)
+  const textWidth = Math.max(1, Math.ceil(metrics.width))
+  const ascent = Math.max(1, Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.78))
+  const descent = Math.max(1, Math.ceil(metrics.actualBoundingBoxDescent || fontSize * 0.22))
+  const padding = Math.max(8, Math.ceil(fontSize * 0.35))
+
+  const width = textWidth + padding * 2
+  const height = ascent + descent + padding * 2
+
+  sharedTextCanvas.width = width
+  sharedTextCanvas.height = height
+
+  ctx.clearRect(0, 0, width, height)
+  ctx.fillStyle = '#ffffff'
+  ctx.textBaseline = 'alphabetic'
+  ctx.textAlign = 'left'
+  ctx.font = `700 ${fontSize}px ${fontFamily}`
+  ctx.fillText(value, padding, padding + ascent)
+
+  const image = ctx.getImageData(0, 0, width, height)
+  const data = image.data
+
+  const particles = []
+  const step = Math.max(1, Math.floor(fontSize / 16))
+  const spread = Math.max(0.2, step * 0.07)
+
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const idx = (y * width + x) * 4
+      const alpha = data[idx + 3]
+      if (alpha < 72) continue
+
+      // Slightly denser sampling in stronger ink regions.
+      const densityBoost = alpha > 180 ? 2 : 1
+      for (let i = 0; i < densityBoost; i++) {
+        const jitterX = (Math.random() - 0.5) * spread
+        const jitterY = (Math.random() - 0.5) * spread
+        const shouldOscillate = Math.random() < 0.18
+
+        particles.push({
+          x: centerX + (x - width / 2) + jitterX,
+          y: centerY + (y - height / 2) + jitterY,
+          z: (Math.random() - 0.5) * 3,
+          oscillate: shouldOscillate,
+          oscillateSpeed: 0.6 + Math.random() * 1.0,
+          oscillateAmount: scale * 0.07 * (0.5 + Math.random() * 0.5),
+        })
+      }
+    }
+  }
+
+  // If sampling produced too few points (rare anti-aliasing edge cases),
+  // fall back to the stroke map to keep text visible.
+  if (particles.length < 40) {
+    return textToParticlesFromStrokes(value, scale, centerX, centerY)
+  }
+
   return particles
 }
 

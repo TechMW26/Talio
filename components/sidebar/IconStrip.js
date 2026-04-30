@@ -264,11 +264,12 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     filteredMenuItems.forEach(item => {
       if (!item.isNew || !item.path) return
       if (dismissed[item.path]) return
+      // Only show once: the moment we record `firstSeen`, it's the first (and
+      // only) time this user will see the callout. Subsequent reloads will
+      // bail out via the dismissed-map check below.
       if (!firstSeen[item.path]) {
         firstSeen[item.path] = now
         firstSeenDirty = true
-      }
-      if (now - firstSeen[item.path] <= NEW_MENU_MAX_AGE_MS) {
         pending.add(item.path)
       }
     })
@@ -277,10 +278,13 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     if (pending.size === 0) return
     setOpenNewPaths(pending)
 
-    // Auto-hide the pulsing tooltip after 8s per page-load (but keep NEW badge
-    // visible in the expanded sidebar until dismissed or 7 days elapse).
+    // Auto-hide the pulsing tooltip after 8s and persist a dismissal so it
+    // never appears again on subsequent reloads.
     const timer = setTimeout(() => {
       setOpenNewPaths(new Set())
+      const persistedDismissed = readJsonMap(NEW_MENU_DISMISS_KEY)
+      pending.forEach((p) => { persistedDismissed[p] = Date.now() })
+      writeJsonMap(NEW_MENU_DISMISS_KEY, persistedDismissed)
     }, 8000)
     return () => clearTimeout(timer)
   }, [mounted, filteredMenuItems, readJsonMap, writeJsonMap])
