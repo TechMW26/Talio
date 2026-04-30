@@ -158,6 +158,21 @@ const nextConfig = {
     ];
   },
 
+  async redirects() {
+    return [
+      {
+        source: '/super-admin',
+        destination: '/superadmin',
+        permanent: true,
+      },
+      {
+        source: '/super-admin/:path*',
+        destination: '/superadmin/:path*',
+        permanent: true,
+      },
+    ];
+  },
+
   async rewrites() {
     return [
       {
