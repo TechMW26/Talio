@@ -27,6 +27,9 @@ const nextConfig = {
       'recharts',
       'lottie-react'
     ],
+    // Limit parallel webpack workers to reduce peak build-time heap.
+    // Default is CPU count; on a multi-core VPS this can spike memory significantly.
+    cpus: 2,
   },
 
   // Image optimization

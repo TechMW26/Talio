@@ -301,6 +301,24 @@ log "Nginx config ready for $DOMAIN"
 # =============================================================================
 header "Phase 3: Building & Starting Docker Containers"
 
+# ── Pre-build: confirm NODE_OPTIONS heap config is present in Dockerfile ─────
+info "Checking builder stage NODE_OPTIONS in Dockerfile..."
+DOCKERFILE_HEAP=$(grep -E 'NODE_OPTIONS.*max-old-space-size' Dockerfile | grep -v '^#' | head -1 || true)
+if [[ -z "$DOCKERFILE_HEAP" ]]; then
+  err "DOCKERFILE SAFETY CHECK FAILED: No --max-old-space-size found in Dockerfile."
+  err "Add ENV NODE_OPTIONS=\"--max-old-space-size=8192\" to the builder stage before 'RUN npm run build'."
+  err "Without this, Node.js will use its default heap ceiling and the build will OOM on large bundles."
+  exit 1
+fi
+HEAP_VALUE=$(echo "$DOCKERFILE_HEAP" | grep -oE 'max-old-space-size=[0-9]+' | grep -oE '[0-9]+' || echo "0")
+AVAIL_RAM_MB=$(free -m | awk '/^Mem:/{print $7}')
+RECOMMENDED_HEAP=$(( AVAIL_RAM_MB * 30 / 100 ))
+log "Dockerfile builder heap: ${HEAP_VALUE} MB  |  Available RAM: ${AVAIL_RAM_MB} MB  |  Recommended: ~${RECOMMENDED_HEAP} MB"
+if [[ "$HEAP_VALUE" -lt 4096 ]]; then
+  warn "Heap is set below 4096 MB. If the build OOMs, increase NODE_OPTIONS in the Dockerfile builder stage."
+  warn "Recommended for this VPS: ENV NODE_OPTIONS=\"--max-old-space-size=${RECOMMENDED_HEAP}\""
+fi
+
 # ── Full stack teardown before rebuild ───────────────────────────────────────
 # Always stop nginx and the app together before rebuilding so nginx cannot keep
 # a stale upstream container IP from a previous deployment.
@@ -311,10 +329,32 @@ if $CLEAN || $FRESH; then
   info "Pruning BuildKit cache to remove stale npm/sharp artifacts..."
   docker builder prune -af >/dev/null 2>&1 || true
   info "Building Docker image (full rebuild, no cache)..."
-  DOCKER_BUILDKIT=1 docker compose build --no-cache talio-app
+  BUILD_START=$(date +%s)
+  if ! DOCKER_BUILDKIT=1 docker compose build --no-cache talio-app; then
+    BUILD_EXIT=$?
+    BUILD_END=$(date +%s)
+    err "Docker build FAILED after $(( BUILD_END - BUILD_START ))s (exit code $BUILD_EXIT)."
+    err "If this was an OOM kill, consider increasing NODE_OPTIONS heap in Dockerfile builder stage."
+    err "Current setting: ${HEAP_VALUE} MB  |  Recommended next step: $(( HEAP_VALUE + 2048 )) MB"
+    err "Also consider: experimental.cpus=2 in next.config.js to reduce parallel worker memory."
+    exit $BUILD_EXIT
+  fi
+  BUILD_END=$(date +%s)
+  log "Build completed in $(( BUILD_END - BUILD_START ))s"
 else
   info "Building Docker image (cached - use --clean for full rebuild)..."
-  DOCKER_BUILDKIT=1 docker compose build talio-app
+  BUILD_START=$(date +%s)
+  if ! DOCKER_BUILDKIT=1 docker compose build talio-app; then
+    BUILD_EXIT=$?
+    BUILD_END=$(date +%s)
+    err "Docker build FAILED after $(( BUILD_END - BUILD_START ))s (exit code $BUILD_EXIT)."
+    err "If this was an OOM kill, consider increasing NODE_OPTIONS heap in Dockerfile builder stage."
+    err "Current setting: ${HEAP_VALUE} MB  |  Recommended next step: $(( HEAP_VALUE + 2048 )) MB"
+    err "Also consider: experimental.cpus=2 in next.config.js to reduce parallel worker memory."
+    exit $BUILD_EXIT
+  fi
+  BUILD_END=$(date +%s)
+  log "Build completed in $(( BUILD_END - BUILD_START ))s"
 fi
 
 info "Starting containers..."

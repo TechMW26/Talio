@@ -67,7 +67,7 @@ COPY public ./public
 ENV NEXT_TELEMETRY_DISABLED=1 \
     SKIP_ENV_VALIDATION=true \
     NODE_ENV=production \
-    NODE_OPTIONS="--max-old-space-size=4096"
+    NODE_OPTIONS="--max-old-space-size=8192"
 
 RUN npm run build
 
