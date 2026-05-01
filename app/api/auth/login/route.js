@@ -26,35 +26,51 @@ export async function POST(request) {
   const ipAddress = extractClientIp(request)
   const userAgent = request.headers.get('user-agent') || 'Unknown'
 
+  // Security guardrail: auth should fail-open if security telemetry/check
+  // infrastructure has a transient outage.
+  let securityChecksAvailable = true
+
   // 1) Hard block check (cached): denies known-bad IPs without DB hits.
-  if (await isIpBlocked(ipAddress)) {
-    recordSecurityEvent({
-      type: 'permission.denied',
-      severity: 'high',
-      message: 'Login attempt from blocked IP',
-      ip: ipAddress,
-      userAgent,
-      method: 'POST',
-      path: '/api/auth/login',
-    })
-    return NextResponse.json(
-      { message: 'Access denied.' },
-      { status: 403 }
-    )
+  try {
+    if (await isIpBlocked(ipAddress)) {
+      recordSecurityEvent({
+        type: 'permission.denied',
+        severity: 'high',
+        message: 'Login attempt from blocked IP',
+        ip: ipAddress,
+        userAgent,
+        method: 'POST',
+        path: '/api/auth/login',
+      })
+      return NextResponse.json(
+        { message: 'Access denied.' },
+        { status: 403 }
+      )
+    }
+  } catch (securityError) {
+    securityChecksAvailable = false
+    console.warn('[Login] Blocklist check unavailable, continuing without blocklist enforcement:', securityError?.message || securityError)
   }
 
   // 2) Per-IP rate limit (separate from per-IP+email so brute force across
   //    accounts also throttles).
-  const ipRl = rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, {
-    ip: ipAddress,
-    path: '/api/auth/login',
-    method: 'POST',
-  })
-  if (!ipRl.allowed) {
-    return NextResponse.json(
-      { message: 'Too many login attempts. Please try again later.' },
-      { status: 429, headers: buildRateLimitHeaders(ipRl) }
-    )
+  if (securityChecksAvailable) {
+    try {
+      const ipRl = rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, {
+        ip: ipAddress,
+        path: '/api/auth/login',
+        method: 'POST',
+      })
+      if (!ipRl.allowed) {
+        return NextResponse.json(
+          { message: 'Too many login attempts. Please try again later.' },
+          { status: 429, headers: buildRateLimitHeaders(ipRl) }
+        )
+      }
+    } catch (securityError) {
+      securityChecksAvailable = false
+      console.warn('[Login] IP rate limiter unavailable, continuing without rate-limit enforcement:', securityError?.message || securityError)
+    }
   }
 
   try {
@@ -73,17 +89,24 @@ export async function POST(request) {
     }
 
     // Per-(IP+email) rate limit: tighter quota on a single account.
-    const pairRl = rateLimit('AUTH_LOGIN', `pair:${ipAddress}:${email}`, {
-      ip: ipAddress,
-      path: '/api/auth/login',
-      method: 'POST',
-      email,
-    })
-    if (!pairRl.allowed) {
-      return NextResponse.json(
-        { message: 'Too many login attempts for this account. Please try again later.' },
-        { status: 429, headers: buildRateLimitHeaders(pairRl) }
-      )
+    if (securityChecksAvailable) {
+      try {
+        const pairRl = rateLimit('AUTH_LOGIN', `pair:${ipAddress}:${email}`, {
+          ip: ipAddress,
+          path: '/api/auth/login',
+          method: 'POST',
+          email,
+        })
+        if (!pairRl.allowed) {
+          return NextResponse.json(
+            { message: 'Too many login attempts for this account. Please try again later.' },
+            { status: 429, headers: buildRateLimitHeaders(pairRl) }
+          )
+        }
+      } catch (securityError) {
+        securityChecksAvailable = false
+        console.warn('[Login] Account rate limiter unavailable, continuing without rate-limit enforcement:', securityError?.message || securityError)
+      }
     }
 
     // ============================================
@@ -156,18 +179,28 @@ export async function POST(request) {
 
     console.log(`[Login] User ${email} belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`);
 
-    // Get models bound to tenant database
-    const tenantModels = await getTenantModels(tenantInfo.databaseName, [
-      'User', 'Employee', 'Department', 'Designation', 'UserSession', 'CompanySettings', 'Notification'
+    // Load mandatory login models first and tolerate optional model failures.
+    // This keeps auth working even if a non-critical model has a tenant-specific issue.
+    let tenantModels = await getTenantModels(tenantInfo.databaseName, [
+      'User', 'Employee', 'UserSession'
     ]);
+
+    try {
+      const optionalModels = await getTenantModels(tenantInfo.databaseName, [
+        'Department', 'Designation', 'CompanySettings', 'Notification'
+      ]);
+      tenantModels = { ...tenantModels, ...optionalModels };
+    } catch (optionalModelError) {
+      console.warn('[Login] Optional model load failed, continuing with core auth models:', optionalModelError?.message || optionalModelError);
+    }
 
     TenantUser = tenantModels.User;
     TenantEmployee = tenantModels.Employee;
-    TenantDepartment = tenantModels.Department;
-    TenantDesignation = tenantModels.Designation;
+    TenantDepartment = tenantModels.Department || null;
+    TenantDesignation = tenantModels.Designation || null;
     TenantUserSession = tenantModels.UserSession;
-    TenantCompanySettings = tenantModels.CompanySettings;
-    TenantNotification = tenantModels.Notification;
+    TenantCompanySettings = tenantModels.CompanySettings || null;
+    TenantNotification = tenantModels.Notification || null;
 
     // Find user and include password field (forcePasswordChange and isActive are included by default)
     const user = await TenantUser.findOne({ email }).select('+password +loginAttempts +lockUntil +lastFailedLogin')
@@ -259,15 +292,19 @@ export async function POST(request) {
       if (locked) {
         // Heuristic: if the IP-scoped rate-limit bucket is heavy too, block IP.
         // Use rateLimit to inspect (don't double-record).
-        const ipPressure = rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, { record: false, ip: ipAddress })
-        if (ipPressure.hits >= IP_AUTOBLOCK_AFTER_LOCKOUTS * MAX_FAILED_ATTEMPTS) {
-          blockIp(ipAddress, {
-            reason: 'Repeated brute-force lockouts',
-            source: 'auto',
-            eventType: 'auth.login.locked',
-            durationMs: IP_AUTOBLOCK_DURATION_MS,
-            metadata: { triggeredByEmail: email },
-          })
+        try {
+          const ipPressure = rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, { record: false, ip: ipAddress })
+          if (ipPressure.hits >= IP_AUTOBLOCK_AFTER_LOCKOUTS * MAX_FAILED_ATTEMPTS) {
+            blockIp(ipAddress, {
+              reason: 'Repeated brute-force lockouts',
+              source: 'auto',
+              eventType: 'auth.login.locked',
+              durationMs: IP_AUTOBLOCK_DURATION_MS,
+              metadata: { triggeredByEmail: email },
+            })
+          }
+        } catch (securityError) {
+          console.warn('[Login] Auto-block check skipped due to rate limiter error:', securityError?.message || securityError)
         }
       }
 
@@ -410,7 +447,9 @@ export async function POST(request) {
     // Best-effort: send login alert email to the user (controlled by admin settings) - fire and forget
     (async () => {
       try {
-        const companySettings = await TenantCompanySettings.findOne().lean().catch(() => null)
+        const companySettings = TenantCompanySettings
+          ? await TenantCompanySettings.findOne().lean().catch(() => null)
+          : null
 
         const emailNotificationsEnabled =
           companySettings?.notifications?.emailNotifications !== false
@@ -493,7 +532,7 @@ export async function POST(request) {
     let headOfDepartments = user.headOfDepartments || [];
 
     // If not in user meta, check Department model (fallback for existing data)
-    if (!isDepartmentHead && user.employeeId) {
+    if (!isDepartmentHead && user.employeeId && TenantDepartment) {
       try {
         const deptHeadCheck = await TenantDepartment.find({
           isActive: true,
@@ -644,6 +683,22 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Login error:', error)
+
+    const message = String(error?.message || '')
+    const isServiceError =
+      message.includes('ETIMEOUT') ||
+      message.includes('ECONNREFUSED') ||
+      message.includes('querySrv') ||
+      message.includes('server selection') ||
+      message.includes('MongoNetwork')
+
+    if (isServiceError) {
+      return NextResponse.json(
+        { message: 'Service temporarily unavailable. Please try again.', errorType: 'service_unavailable' },
+        { status: 503 }
+      )
+    }
+
     return NextResponse.json(
       { message: 'Internal server error' },
       { status: 500 }
