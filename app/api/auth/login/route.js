@@ -397,16 +397,17 @@ export async function POST(request) {
       .setExpirationTime('7d')
       .sign(secret)
 
-    // Get request info for session tracking
-    const userAgent = request.headers.get('user-agent') || 'Unknown'
+    // Get request info for session tracking.
+    // Use distinct variable names to avoid shadowing function-scope values used earlier in this try block.
+    const sessionUserAgent = request.headers.get('user-agent') || userAgent || 'Unknown'
     const forwarded = request.headers.get('x-forwarded-for')
-    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'Unknown'
+    const sessionIpAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || ipAddress || 'Unknown'
 
       // Create UserSession record (fire and forget)
       ; (async () => {
         try {
           const deviceInfo = TenantUserSession.parseUserAgent ?
-            TenantUserSession.parseUserAgent(userAgent) :
+            TenantUserSession.parseUserAgent(sessionUserAgent) :
             { browser: 'Unknown', isMobile: false, device: 'Unknown' }
           const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
@@ -414,8 +415,8 @@ export async function POST(request) {
             user: user._id,
             tokenId,
             deviceInfo,
-            userAgent,
-            ipAddress,
+            userAgent: sessionUserAgent,
+            ipAddress: sessionIpAddress,
             expiresAt,
             lastActivityAt: new Date(),
           })
