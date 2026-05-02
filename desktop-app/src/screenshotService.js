@@ -12,7 +12,8 @@ const offlineQueue = require('./offlineQueue');
 
 // Configuration
 const CAPTURE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
-const API_BASE_URL = 'https://app.talio.in';
+const DEFAULT_API_BASE_URL = 'https://app.talio.in';
+const API_BASE_URL = (process.env.TALIO_APP_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
 const JPEG_QUALITY = 80;
 
 class ScreenshotService {

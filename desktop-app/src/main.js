@@ -68,7 +68,10 @@ if (process.platform === 'win32') {
 }
 
 // Configuration
-const APP_URL = 'https://app.talio.in';
+const DEFAULT_APP_URL = 'https://app.talio.in';
+const APP_URL = (process.env.TALIO_APP_URL || DEFAULT_APP_URL).replace(/\/+$/, '');
+const APP_ORIGIN = new URL(APP_URL).origin;
+const APP_URL_PATTERN = APP_ORIGIN + '/*';
 const LOADER_TIMEOUT_MS = 30000; // 30 seconds max loading time
 const RETRY_DELAY_MS = 5000;
 const MAX_LOAD_RETRIES = 3;
@@ -897,7 +900,7 @@ function showOfflinePage(errorType, errorCode, errorDesc) {
     setTimeout(function () {
       if (mainWindow && !mainWindow.isDestroyed()) {
         var offlinePath = path.join(__dirname, 'offline.html');
-        var query = {};
+        var query = { appUrl: APP_URL };
         if (errorType) query.type = errorType;
         if (errorCode) query.code = String(errorCode);
         if (errorDesc) query.desc = encodeURIComponent(errorDesc);
@@ -908,7 +911,7 @@ function showOfflinePage(errorType, errorCode, errorDesc) {
   }
 
   var offlinePath = path.join(__dirname, 'offline.html');
-  var query = {};
+  var query = { appUrl: APP_URL };
   if (errorType) query.type = errorType;
   if (errorCode) query.code = String(errorCode);
   if (errorDesc) query.desc = encodeURIComponent(errorDesc);
@@ -998,7 +1001,7 @@ function setupWindowEvents() {
     logger.log('info', 'Main', 'Page loaded: ' + url);
 
     // Only inject auth listener for actual app pages, not data URLs
-    if (url.startsWith('https://app.talio.in')) {
+    if (url.startsWith(APP_URL)) {
       injectAuthListener();
       scheduleLaunchWhitescreenChecks();
     } else {
@@ -1072,7 +1075,7 @@ function setupWindowEvents() {
 
   // Also handle in-page HTTP errors via response interception
   mainWindow.webContents.session.webRequest.onCompleted(
-    { urls: ['https://app.talio.in/*'] },
+    { urls: [APP_URL_PATTERN] },
     function (details) {
       // Check for server errors on main frame navigation
       if (details.resourceType === 'mainFrame' && details.statusCode >= 500) {
@@ -1091,7 +1094,7 @@ function setupWindowEvents() {
   // before any page scripts execute. dom-ready is too late because React
   // hydration can trigger AudioContext before the patch lands.
   mainWindow.webContents.on('did-start-navigation', function (event, url, isInPlace, isMainFrame) {
-    if (isMainFrame && url.startsWith('https://app.talio.in')) {
+    if (isMainFrame && url.startsWith(APP_URL)) {
       injectAudioDisable();
     }
   });
@@ -1102,7 +1105,7 @@ function setupWindowEvents() {
 
     // Re-inject AudioContext disable at dom-ready as a safety net
     const url = mainWindow.webContents.getURL();
-    if (url.startsWith('https://app.talio.in')) {
+    if (url.startsWith(APP_URL)) {
       injectAudioDisable();
     }
   });
@@ -3114,7 +3117,7 @@ function setupSessionPermissions() {
   // Handle permission check requests
   session.defaultSession.setPermissionCheckHandler(function (webContents, permission, requestingOrigin, details) {
     // Allow all permission checks from our app
-    if (requestingOrigin.startsWith('https://app.talio.in') || requestingOrigin.startsWith('file://')) {
+    if (requestingOrigin.startsWith(APP_ORIGIN) || requestingOrigin.startsWith('file://')) {
       return true;
     }
 
@@ -3210,7 +3213,7 @@ function setupSessionPermissions() {
   // before showing anything. By adding stale-while-revalidate, Chromium shows the
   // cached page instantly while revalidating in the background.
   session.defaultSession.webRequest.onHeadersReceived(
-    { urls: ['https://app.talio.in/*'] },
+    { urls: [APP_URL_PATTERN] },
     function (details, callback) {
       var headers = details.responseHeaders;
       if (!headers) { callback({ responseHeaders: headers }); return; }
@@ -3504,7 +3507,7 @@ function setupNetworkMonitoring() {
     const currentUrl = mainWindow.webContents.getURL();
 
     // Only check on app pages, not offline/loader pages
-    if (!currentUrl.startsWith('https://app.talio.in')) return;
+    if (!currentUrl.startsWith(APP_URL)) return;
 
     const isBlank = await checkForWhitescreen();
 

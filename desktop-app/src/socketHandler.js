@@ -8,7 +8,8 @@ const { io } = require('socket.io-client');
 const { app } = require('electron');
 const logger = require('./logger');
 
-const SOCKET_URL = 'https://app.talio.in';
+const DEFAULT_SOCKET_URL = 'https://app.talio.in';
+const SOCKET_URL = (process.env.TALIO_APP_URL || DEFAULT_SOCKET_URL).replace(/\/+$/, '');
 const SOCKET_PATH = '/api/socketio';
 
 class SocketHandler {
@@ -24,14 +25,14 @@ class SocketHandler {
 
   initialize(userId, token) {
     this.userId = userId;
-    
+
     if (this.socket) {
       // Remove ALL old listeners before disconnecting to prevent accumulation
       this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
-    
+
     this.socket = io(SOCKET_URL, {
       path: SOCKET_PATH,
       transports: ['websocket', 'polling'],
@@ -44,7 +45,7 @@ class SocketHandler {
         token: token
       }
     });
-    
+
     this._token = token;
     this.setupEventHandlers();
     logger.log('info', 'SocketHandler', 'Initialized for user ' + userId);
@@ -52,25 +53,25 @@ class SocketHandler {
 
   setupEventHandlers() {
     var self = this;
-    
-    this.socket.on('connect', function() {
+
+    this.socket.on('connect', function () {
       self.isConnected = true;
       self.reconnectAttempts = 0;
       logger.log('info', 'SocketHandler', 'Connected: ' + self.socket.id);
-      
+
       // Register as desktop app with version info
       self.socket.emit('desktop-app-ready', { userId: self.userId, appVersion: app.getVersion() });
-      
+
       // Trigger callback
       if (self.callbacks.onConnect) {
         self.callbacks.onConnect();
       }
     });
-    
-    this.socket.on('disconnect', function(reason) {
+
+    this.socket.on('disconnect', function (reason) {
       self.isConnected = false;
       logger.log('warn', 'SocketHandler', 'Disconnected: ' + reason);
-      
+
       if (self.callbacks.onDisconnect) {
         self.callbacks.onDisconnect(reason);
       }
@@ -80,11 +81,11 @@ class SocketHandler {
         self.scheduleReconnect();
       }
     });
-    
-    this.socket.on('connect_error', function(error) {
+
+    this.socket.on('connect_error', function (error) {
       self.reconnectAttempts++;
       logger.log('error', 'SocketHandler', 'Connection error (attempt ' + self.reconnectAttempts + '): ' + error.message);
-      
+
       if (self.callbacks.onError) {
         self.callbacks.onError(error);
       }
@@ -94,57 +95,57 @@ class SocketHandler {
         self.scheduleReconnect();
       }
     });
-    
-    this.socket.on('reconnect', function(attemptNumber) {
+
+    this.socket.on('reconnect', function (attemptNumber) {
       logger.log('info', 'SocketHandler', 'Reconnected after ' + attemptNumber + ' attempts');
       self.socket.emit('desktop-app-ready', { userId: self.userId, appVersion: app.getVersion() });
     });
 
     // When built-in reconnection fails completely
-    this.socket.on('reconnect_failed', function() {
+    this.socket.on('reconnect_failed', function () {
       logger.log('warn', 'SocketHandler', 'Built-in reconnection failed, scheduling manual reconnect');
       self.scheduleReconnect();
     });
-    
+
     // Handle registration confirmation
-    this.socket.on('registration-confirmed', function(data) {
+    this.socket.on('registration-confirmed', function (data) {
       logger.log('debug', 'SocketHandler', 'Desktop app registered: ' + JSON.stringify(data));
     });
-    
+
     // Handle screenshot request from admin
-    this.socket.on('request-screenshot', function(data) {
+    this.socket.on('request-screenshot', function (data) {
       logger.log('debug', 'SocketHandler', 'Screenshot requested by admin');
       if (self.callbacks.onScreenshotRequest) {
         self.callbacks.onScreenshotRequest(data);
       }
     });
-    
+
     // Handle capture toggle from admin
-    this.socket.on('toggle-capture', function(data) {
+    this.socket.on('toggle-capture', function (data) {
       logger.log('debug', 'SocketHandler', 'Capture toggle requested: ' + JSON.stringify(data));
       if (self.callbacks.onCaptureToggle) {
         self.callbacks.onCaptureToggle(data);
       }
     });
-    
+
     // Handle new notification
-    this.socket.on('new-notification', function(data) {
+    this.socket.on('new-notification', function (data) {
       logger.log('debug', 'SocketHandler', 'New notification: ' + (data.title || 'Unknown'));
       if (self.callbacks.onNotification) {
         self.callbacks.onNotification(data);
       }
     });
-    
+
     // Handle call alert
-    this.socket.on('call-alert', function(data) {
+    this.socket.on('call-alert', function (data) {
       logger.log('debug', 'SocketHandler', 'Call alert received');
       if (self.callbacks.onCallAlert) {
         self.callbacks.onCallAlert(data);
       }
     });
-    
+
     // Handle attendance update
-    this.socket.on('attendance-update', function(data) {
+    this.socket.on('attendance-update', function (data) {
       self.isConnected = true;
       logger.log('debug', 'SocketHandler', 'Attendance update');
       if (self.callbacks.onAttendanceUpdate) {
@@ -153,7 +154,7 @@ class SocketHandler {
     });
 
     // Handle TicTacToe game invite
-    this.socket.on('tictactoe:invite', function(data) {
+    this.socket.on('tictactoe:invite', function (data) {
       logger.log('debug', 'SocketHandler', 'Game invite from: ' + (data.fromName || 'Unknown'));
       if (self.callbacks.onGameInvite) {
         self.callbacks.onGameInvite(data);
@@ -177,7 +178,7 @@ class SocketHandler {
     }
 
     // ── Attendance events ──
-    this.socket.on('attendance-check-in', function(data) {
+    this.socket.on('attendance-check-in', function (data) {
       logger.log('debug', 'SocketHandler', 'Attendance check-in');
       notify('Checked In ✅', data, 'You have been checked in');
       if (self.callbacks.onAttendanceCheckIn) {
@@ -185,7 +186,7 @@ class SocketHandler {
       }
     });
 
-    this.socket.on('attendance-check-out', function(data) {
+    this.socket.on('attendance-check-out', function (data) {
       logger.log('debug', 'SocketHandler', 'Attendance check-out');
       notify('Checked Out 👋', data, 'You have been checked out');
       if (self.callbacks.onAttendanceCheckOut) {
@@ -194,244 +195,244 @@ class SocketHandler {
     });
 
     // ── Leave events ──
-    this.socket.on('leave-request', function(data) {
+    this.socket.on('leave-request', function (data) {
       logger.log('debug', 'SocketHandler', 'Leave request');
       notify('Leave Request', data, 'New leave request received');
     });
 
-    this.socket.on('leave-status-update', function(data) {
+    this.socket.on('leave-status-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Leave status update');
       notify('Leave Update', data, 'Your leave request has been updated');
     });
 
-    this.socket.on('leave-cancelled', function(data) {
+    this.socket.on('leave-cancelled', function (data) {
       logger.log('debug', 'SocketHandler', 'Leave cancelled');
       notify('Leave Cancelled', data, 'A leave request has been cancelled');
     });
 
     // ── Expense events ──
-    this.socket.on('expense-submitted', function(data) {
+    this.socket.on('expense-submitted', function (data) {
       logger.log('debug', 'SocketHandler', 'Expense submitted');
       notify('Expense Submitted', data, 'An expense has been submitted for approval');
     });
 
-    this.socket.on('expense-status-update', function(data) {
+    this.socket.on('expense-status-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Expense status update');
       notify('Expense Update', data, 'Your expense request has been updated');
     });
 
     // ── Travel events ──
-    this.socket.on('travel-request', function(data) {
+    this.socket.on('travel-request', function (data) {
       logger.log('debug', 'SocketHandler', 'Travel request');
       notify('Travel Request', data, 'New travel request received');
     });
 
-    this.socket.on('travel-status-update', function(data) {
+    this.socket.on('travel-status-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Travel status update');
       notify('Travel Update', data, 'Your travel request has been updated');
     });
 
     // ── Task events ──
-    this.socket.on('task-created', function(data) {
+    this.socket.on('task-created', function (data) {
       logger.log('debug', 'SocketHandler', 'Task created');
       notify('New Task', data, 'A new task has been created');
     });
 
-    this.socket.on('task-assigned', function(data) {
+    this.socket.on('task-assigned', function (data) {
       logger.log('debug', 'SocketHandler', 'Task assigned');
       notify('Task Assigned', data, 'A task has been assigned to you');
     });
 
-    this.socket.on('task-updated', function(data) {
+    this.socket.on('task-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Task updated');
       notify('Task Updated', data, 'A task has been updated');
     });
 
-    this.socket.on('task-status-changed', function(data) {
+    this.socket.on('task-status-changed', function (data) {
       logger.log('debug', 'SocketHandler', 'Task status changed');
       notify('Task Status Changed', data, 'A task status has been updated');
     });
 
-    this.socket.on('task-deleted', function(data) {
+    this.socket.on('task-deleted', function (data) {
       logger.log('debug', 'SocketHandler', 'Task deleted');
       silentEvent('TaskDeleted', data);
     });
 
     // ── Project events ──
-    this.socket.on('project-created', function(data) {
+    this.socket.on('project-created', function (data) {
       logger.log('debug', 'SocketHandler', 'Project created');
       notify('New Project', data, 'A new project has been created');
     });
 
-    this.socket.on('project-updated', function(data) {
+    this.socket.on('project-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Project updated');
       silentEvent('ProjectUpdated', data);
     });
 
-    this.socket.on('project-deleted', function(data) {
+    this.socket.on('project-deleted', function (data) {
       logger.log('debug', 'SocketHandler', 'Project deleted');
       silentEvent('ProjectDeleted', data);
     });
 
-    this.socket.on('project-assignment', function(data) {
+    this.socket.on('project-assignment', function (data) {
       logger.log('debug', 'SocketHandler', 'Project assignment');
       notify('Project Assignment', data, 'You have been assigned to a project');
     });
 
     // ── Meeting events ──
-    this.socket.on('meeting-created', function(data) {
+    this.socket.on('meeting-created', function (data) {
       logger.log('debug', 'SocketHandler', 'Meeting created');
       notify('New Meeting 📅', data, 'A new meeting has been scheduled');
     });
 
-    this.socket.on('meeting-updated', function(data) {
+    this.socket.on('meeting-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Meeting updated');
       notify('Meeting Updated', data, 'A meeting has been updated');
     });
 
-    this.socket.on('meeting-cancelled', function(data) {
+    this.socket.on('meeting-cancelled', function (data) {
       logger.log('debug', 'SocketHandler', 'Meeting cancelled');
       notify('Meeting Cancelled', data, 'A meeting has been cancelled');
     });
 
     // ── Announcement events ──
-    this.socket.on('announcement-created', function(data) {
+    this.socket.on('announcement-created', function (data) {
       logger.log('debug', 'SocketHandler', 'Announcement created');
       notify('New Announcement 📢', data, 'A new announcement has been posted');
     });
 
-    this.socket.on('announcement-updated', function(data) {
+    this.socket.on('announcement-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Announcement updated');
       silentEvent('AnnouncementUpdated', data);
     });
 
     // ── Helpdesk events ──
-    this.socket.on('helpdesk-ticket', function(data) {
+    this.socket.on('helpdesk-ticket', function (data) {
       logger.log('debug', 'SocketHandler', 'Helpdesk ticket');
       notify('Helpdesk Ticket', data, 'New helpdesk ticket received');
     });
 
-    this.socket.on('helpdesk-ticket-updated', function(data) {
+    this.socket.on('helpdesk-ticket-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Helpdesk ticket updated');
       notify('Ticket Updated', data, 'A helpdesk ticket has been updated');
     });
 
     // ── Performance events ──
-    this.socket.on('performance-review', function(data) {
+    this.socket.on('performance-review', function (data) {
       logger.log('debug', 'SocketHandler', 'Performance review');
       notify('Performance Review ⭐', data, 'You have a new performance review');
     });
 
     // ── Payroll events ──
-    this.socket.on('payroll-update', function(data) {
+    this.socket.on('payroll-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Payroll update');
       notify('Payroll Update 💰', data, 'Payroll has been updated');
     });
 
     // ── Document events ──
-    this.socket.on('document-update', function(data) {
+    this.socket.on('document-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Document update');
       notify('Document Updated', data, 'A document has been updated');
     });
 
     // ── Asset events ──
-    this.socket.on('asset-update', function(data) {
+    this.socket.on('asset-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Asset update');
       notify('Asset Update', data, 'An asset record has been updated');
     });
 
     // ── Daily goals ──
-    this.socket.on('daily-goal-updated', function(data) {
+    this.socket.on('daily-goal-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Daily goal updated');
       notify('Goal Updated 🎯', data, 'A daily goal has been updated');
     });
 
     // ── Geofence events ──
-    this.socket.on('geofence-approval', function(data) {
+    this.socket.on('geofence-approval', function (data) {
       logger.log('debug', 'SocketHandler', 'Geofence approval');
       notify('Geofence Approved', data, 'Your geofence request has been approved');
     });
 
     // ── Recruitment events ──
-    this.socket.on('recruitment-update', function(data) {
+    this.socket.on('recruitment-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Recruitment update');
       notify('Recruitment Update', data, 'A recruitment update is available');
     });
 
-    this.socket.on('recruitment-job-created', function(data) {
+    this.socket.on('recruitment-job-created', function (data) {
       logger.log('debug', 'SocketHandler', 'Recruitment job created');
       notify('New Job Posted', data, 'A new job position has been posted');
     });
 
-    this.socket.on('recruitment-job-updated', function(data) {
+    this.socket.on('recruitment-job-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Recruitment job updated');
       silentEvent('RecruitmentJobUpdated', data);
     });
 
-    this.socket.on('recruitment-candidate-updated', function(data) {
+    this.socket.on('recruitment-candidate-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Recruitment candidate updated');
       notify('Candidate Update', data, 'A candidate record has been updated');
     });
 
-    this.socket.on('recruitment-candidate-stage-changed', function(data) {
+    this.socket.on('recruitment-candidate-stage-changed', function (data) {
       logger.log('debug', 'SocketHandler', 'Recruitment candidate stage changed');
       notify('Candidate Stage Changed', data, 'A candidate has moved to a new stage');
     });
 
-    this.socket.on('recruitment-interview-scheduled', function(data) {
+    this.socket.on('recruitment-interview-scheduled', function (data) {
       logger.log('debug', 'SocketHandler', 'Interview scheduled');
       notify('Interview Scheduled 📋', data, 'An interview has been scheduled');
     });
 
-    this.socket.on('recruitment-interview-updated', function(data) {
+    this.socket.on('recruitment-interview-updated', function (data) {
       logger.log('debug', 'SocketHandler', 'Interview updated');
       notify('Interview Updated', data, 'An interview has been updated');
     });
 
     // ── Holiday / Policy events ──
-    this.socket.on('holiday-update', function(data) {
+    this.socket.on('holiday-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Holiday update');
       notify('Holiday Update 🗓️', data, 'A holiday has been added or updated');
     });
 
-    this.socket.on('policy-update', function(data) {
+    this.socket.on('policy-update', function (data) {
       logger.log('debug', 'SocketHandler', 'Policy update');
       notify('Policy Update', data, 'A company policy has been updated');
     });
 
     // ── Employee events (silent - no notification popup) ──
-    this.socket.on('employee-created', function(data) {
+    this.socket.on('employee-created', function (data) {
       silentEvent('EmployeeCreated', data);
     });
 
-    this.socket.on('employee-updated', function(data) {
+    this.socket.on('employee-updated', function (data) {
       silentEvent('EmployeeUpdated', data);
     });
 
-    this.socket.on('employee-deleted', function(data) {
+    this.socket.on('employee-deleted', function (data) {
       silentEvent('EmployeeDeleted', data);
     });
 
-    this.socket.on('department-updated', function(data) {
+    this.socket.on('department-updated', function (data) {
       silentEvent('DepartmentUpdated', data);
     });
 
     // ── Dashboard / UI events (silent) ──
-    this.socket.on('dashboard-refresh', function(data) {
+    this.socket.on('dashboard-refresh', function (data) {
       logger.log('debug', 'SocketHandler', 'Dashboard refresh');
       silentEvent('DashboardRefresh', data);
     });
 
-    this.socket.on('chat.unread.updated', function(data) {
+    this.socket.on('chat.unread.updated', function (data) {
       silentEvent('ChatUnreadUpdated', data);
     });
 
-    this.socket.on('sidebar.counts.updated', function(data) {
+    this.socket.on('sidebar.counts.updated', function (data) {
       silentEvent('SidebarCountsUpdated', data);
     });
 
     // ── Chat message events (native notification for new messages) ──
-    this.socket.on('new-message', function(data) {
+    this.socket.on('new-message', function (data) {
       logger.log('debug', 'SocketHandler', 'New chat message received');
       var message = data.message || {};
       var senderFirstName = (message.sender && message.sender.firstName) || '';
@@ -453,21 +454,21 @@ class SocketHandler {
     });
 
     // ── Actionable notification events ──
-    this.socket.on('actionable-notification', function(data) {
+    this.socket.on('actionable-notification', function (data) {
       logger.log('debug', 'SocketHandler', 'Actionable notification: ' + (data.title || 'Unknown'));
       notify(data.title || 'Action Required', data, data.message || 'You have a new actionable notification');
     });
 
-    this.socket.on('actionable-notification-updated', function(data) {
+    this.socket.on('actionable-notification-updated', function (data) {
       silentEvent('ActionableNotificationUpdated', data);
     });
 
-    this.socket.on('actionable-notification-removed', function(data) {
+    this.socket.on('actionable-notification-removed', function (data) {
       silentEvent('ActionableNotificationRemoved', data);
     });
 
     // ── Force refresh from server ──
-    this.socket.on('force-refresh', function(data) {
+    this.socket.on('force-refresh', function (data) {
       logger.log('warn', 'SocketHandler', 'Force refresh requested from server');
       notify('App Update Required', data, 'Talio needs to refresh. Reloading...');
       if (self.callbacks.onForceRefresh) {
@@ -476,7 +477,7 @@ class SocketHandler {
     });
 
     // ── Server-triggered update check ──
-    this.socket.on('trigger-update-check', function(data) {
+    this.socket.on('trigger-update-check', function (data) {
       logger.log('info', 'SocketHandler', 'Server requested update check (latest: ' + (data?.latestVersion || 'unknown') + ')');
       if (self.callbacks.onTriggerUpdateCheck) {
         self.callbacks.onTriggerUpdateCheck(data);

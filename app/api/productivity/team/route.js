@@ -10,12 +10,12 @@ import mongoose from 'mongoose';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Screenshot', 'ScreenshotAnalysis', 'Team']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Screenshot', 'ScreenshotAnalysis', 'ScreenshotComposite', 'Team']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { User, Employee, Department, Screenshot, ScreenshotAnalysis, Team } = models;
+    const { User, Employee, Department, Screenshot, ScreenshotAnalysis, ScreenshotComposite, Team } = models;
 
     const currentUserId = (user._id || user.userId).toString();
     const currentUserRole = user.role;
@@ -231,18 +231,24 @@ export async function GET(request) {
     // Per-user counts (total + analyzed) using $facet via aggregation pipeline
     const screenshotCounts = allUserIds.length > 0
       ? await Screenshot.aggregate([
-          { $match: { user: { $in: allUserIds.map((id) => {
-            try { return new mongoose.Types.ObjectId(id); } catch { return id; }
-          }) }, dateString: dateParam } },
-          {
-            $group: {
-              _id: '$user',
-              total: { $sum: 1 },
-              analyzed: { $sum: { $cond: [{ $eq: ['$analyzed', true] }, 1, 0] } },
-              latestAt: { $max: '$capturedAt' },
-            },
+        {
+          $match: {
+            user: {
+              $in: allUserIds.map((id) => {
+                try { return new mongoose.Types.ObjectId(id); } catch { return id; }
+              })
+            }, dateString: dateParam
+          }
+        },
+        {
+          $group: {
+            _id: '$user',
+            total: { $sum: 1 },
+            analyzed: { $sum: { $cond: [{ $eq: ['$analyzed', true] }, 1, 0] } },
+            latestAt: { $max: '$capturedAt' },
           },
-        ])
+        },
+      ])
       : [];
 
     const countsByUser = new Map();
@@ -255,11 +261,34 @@ export async function GET(request) {
       });
     }
 
+    const composites = allUserIds.length > 0
+      ? await ScreenshotComposite.find({ user: { $in: allUserIds }, dateString: dateParam })
+        .select('user tileCount updatedAt createdAt')
+        .lean()
+      : [];
+    for (const composite of composites) {
+      const compositeUserId = composite.user?.toString();
+      if (!compositeUserId) continue;
+      const existing = countsByUser.get(compositeUserId) || {
+        total: 0,
+        analyzed: 0,
+        pending: 0,
+        latestAt: null,
+      };
+      const tileCount = composite.tileCount || 0;
+      countsByUser.set(compositeUserId, {
+        total: existing.total + tileCount,
+        analyzed: existing.analyzed + tileCount,
+        pending: existing.pending,
+        latestAt: existing.latestAt || composite.updatedAt || composite.createdAt || null,
+      });
+    }
+
     // Per-user analysis (one doc per user/day)
     const analyses = allUserIds.length > 0
       ? await ScreenshotAnalysis.find({ user: { $in: allUserIds }, dateString: dateParam })
-          .select('user aiAnalysis lastAnalyzedAt summary')
-          .lean()
+        .select('user aiAnalysis lastAnalyzedAt summary')
+        .lean()
       : [];
     const analysisByUser = new Map();
     for (const doc of analyses) {
