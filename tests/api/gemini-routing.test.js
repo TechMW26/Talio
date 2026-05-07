@@ -17,6 +17,14 @@ describe('custom AI routing in gemini library', () => {
         delete process.env.CUSTOM_AI_APP_TOKEN
         delete process.env.CUSTOM_AI_TOKEN
         delete process.env.CUSTOM_AI_BASE_URL
+        delete process.env.CUSTOM_AI_PUBLIC_PATH
+        delete process.env.CUSTOM_AI_PROTECTED_PATH
+        delete process.env.INFERENCE_API_KEY
+        delete process.env.INFERENCE_APP_TOKEN
+        delete process.env.INFERENCE_TOKEN
+        delete process.env.INFERENCE_BASE_URL
+        delete process.env.INFERENCE_PUBLIC_PATH
+        delete process.env.INFERENCE_PROTECTED_PATH
 
         // Ensure Gemini fallback does not interfere with custom-AI-only
         // assertions. The router is the new entry point and would otherwise

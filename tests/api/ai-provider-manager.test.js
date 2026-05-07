@@ -1,6 +1,6 @@
-// Multi-provider AI router tests. Validates Custom AI → Gemini fallback
-// ordering, multi-key rotation across Gemini keys, and that key material is
-// never included in log output.
+// Multi-provider AI router tests. Validates Custom AI → Inference AI → Gemini
+// fallback ordering, multi-key rotation across Gemini keys, and that key
+// material is never included in log output.
 
 const ORIGINAL_ENV = process.env
 
@@ -13,6 +13,14 @@ function clearAIKeys(env) {
     delete env.CUSTOM_AI_APP_TOKEN
     delete env.CUSTOM_AI_TOKEN
     delete env.CUSTOM_AI_BASE_URL
+    delete env.CUSTOM_AI_PUBLIC_PATH
+    delete env.CUSTOM_AI_PROTECTED_PATH
+    delete env.INFERENCE_API_KEY
+    delete env.INFERENCE_APP_TOKEN
+    delete env.INFERENCE_TOKEN
+    delete env.INFERENCE_BASE_URL
+    delete env.INFERENCE_PUBLIC_PATH
+    delete env.INFERENCE_PROTECTED_PATH
     for (const k of Object.keys(env)) {
         if (/^GEMINI_(API_)?KEY/i.test(k)) {
             delete env[k]
@@ -25,7 +33,7 @@ function reqRouter() {
     return require('@/lib/ai/aiProviderManager')
 }
 
-describe('AIProviderManager fallback routing (Custom AI → Gemini)', () => {
+describe('AIProviderManager fallback routing (Custom AI → Inference AI → Gemini)', () => {
     let warnSpy
 
     beforeEach(() => {
@@ -89,6 +97,53 @@ describe('AIProviderManager fallback routing (Custom AI → Gemini)', () => {
         for (const call of warnSpy.mock.calls) {
             expect(call.join(' ')).not.toContain('gem-1')
         }
+    })
+
+    test('falls back to Inference before Gemini when Custom AI fails', async () => {
+        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
+        process.env.CUSTOM_AI_APP_TOKEN = 'custom-token'
+        process.env.INFERENCE_BASE_URL = 'http://inference.test'
+        process.env.INFERENCE_APP_TOKEN = 'inference-token'
+        process.env.GEMINI_API_KEY = 'gem-1'
+
+        const netError = new Error('fetch failed')
+        netError.cause = { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' }
+
+        global.fetch
+            .mockRejectedValueOnce(netError)
+            .mockResolvedValueOnce({
+                ok: true,
+                json: jest.fn().mockResolvedValue({ success: true, result: 'inference rescue text' }),
+            })
+
+        const { generateContent } = reqRouter()
+        const result = await generateContent('hello')
+
+        expect(result).toBe('inference rescue text')
+        expect(global.fetch).toHaveBeenCalledTimes(2)
+        expect(global.fetch.mock.calls[0][0]).toBe('http://custom.test/public/analyze')
+        expect(global.fetch.mock.calls[1][0]).toBe('http://inference.test/public/analyze')
+    })
+
+    test('always attempts Custom AI first even when its circuit is open', async () => {
+        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
+        process.env.CUSTOM_AI_APP_TOKEN = 'tok'
+        process.env.GEMINI_API_KEY = 'gem-1'
+
+        const { ProviderHealthMonitor } = require('@/lib/ai/providerHealthMonitor')
+        jest.spyOn(ProviderHealthMonitor.prototype, 'isAvailable').mockReturnValue(false)
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: jest.fn().mockResolvedValue({ success: true, result: 'custom still first' }),
+        })
+
+        const { generateContent } = reqRouter()
+        const result = await generateContent('hello')
+
+        expect(result).toBe('custom still first')
+        expect(global.fetch).toHaveBeenCalledTimes(1)
+        expect(global.fetch.mock.calls[0][0]).toBe('http://custom.test/public/analyze')
     })
 
     test('falls back to a supported Gemini model when the preferred model returns 404', async () => {
