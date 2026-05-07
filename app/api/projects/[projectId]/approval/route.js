@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { 
-  requestCompletionApproval, 
+import {
+  requestCompletionApproval,
   respondToCompletionApproval,
   getProjectTaskStats
 } from '@/lib/projectService'
-import { 
+import {
   notifyProjectCompletionRequested,
   notifyProjectApproved,
   notifyProjectRejected,
@@ -84,9 +84,9 @@ export async function POST(request, { params }) {
     })
 
     if (!isAdmin && !membership) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You must be an accepted member to request completion' 
+      return NextResponse.json({
+        success: false,
+        message: 'You must be an accepted member to request completion'
       }, { status: 403 })
     }
 
@@ -97,7 +97,7 @@ export async function POST(request, { params }) {
 
     try {
       const approval = await requestCompletionApproval(projectId, employee, remark, models)
-      
+
       // Notify project head
       await notifyProjectCompletionRequested(project, employee, models)
 
@@ -124,7 +124,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project, User, Employee } = models
+    const { Project, ProjectMember, User, Employee } = models
 
     const { projectId } = await params
 
@@ -138,14 +138,27 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
     }
 
-    // Only project head can respond
-    const isProjectHead = project.projectHead.toString() === userRecord.employeeId.toString()
+    // Only project head(s) can respond. Support both legacy `projectHead`,
+    // multi-head `projectHeads`, and accepted ProjectMember head records.
+    const employeeId = userRecord.employeeId.toString()
+    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0
+      ? project.projectHeads.map(h => (h._id || h).toString())
+      : project.projectHead
+        ? [(project.projectHead._id || project.projectHead).toString()]
+        : []
+    const hasHeadMembership = !!(await ProjectMember.findOne({
+      project: projectId,
+      user: userRecord.employeeId,
+      role: 'head',
+      invitationStatus: 'accepted'
+    }).select('_id'))
+    const isProjectHead = projectHeadIds.includes(employeeId) || hasHeadMembership
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isProjectHead && !isAdmin) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Only the project head can respond to completion approvals' 
+      return NextResponse.json({
+        success: false,
+        message: 'Only the project head can respond to completion approvals'
       }, { status: 403 })
     }
 
@@ -157,9 +170,9 @@ export async function PUT(request, { params }) {
     }
 
     if (!action || !['approve', 'reject'].includes(action)) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Valid action (approve/reject) is required' 
+      return NextResponse.json({
+        success: false,
+        message: 'Valid action (approve/reject) is required'
       }, { status: 400 })
     }
 
@@ -167,8 +180,8 @@ export async function PUT(request, { params }) {
     const approve = action === 'approve'
 
     try {
-      const result = await respondToCompletionApproval(approvalId, employee, approve, remark, unmarkSubtasks, models)
-      
+      const result = await respondToCompletionApproval(approvalId, employee, approve, remark, unmarkSubtasks, models, { isAdmin })
+
       // Get all accepted members for notification
       const memberUserIds = await getProjectMemberUserIds(projectId, null, models)
 
