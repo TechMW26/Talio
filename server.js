@@ -62,7 +62,9 @@ const OPTIONAL_INTEGRATIONS = [
 })();
 
 // Latest desktop version – fetched from GitHub releases, refreshed every 5 min.
-const GITHUB_REPO = 'avirajsharma-ops/Talio';
+const GITHUB_OWNER = process.env.GITHUB_OWNER || 'avirajsharma-ops';
+const GITHUB_REPO_NAME = process.env.GITHUB_REPO || 'Talio';
+const GITHUB_REPO = `${GITHUB_OWNER}/${GITHUB_REPO_NAME}`;
 const FALLBACK_LATEST_DESKTOP = '5.0.5';
 let latestDesktopVersion = FALLBACK_LATEST_DESKTOP;
 
@@ -71,7 +73,13 @@ async function refreshLatestDesktopVersion() {
     const res = await fetch(
       `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
       {
-        headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'Talio-Server' },
+        headers: {
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'Talio-Server',
+          ...(process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+            ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN || process.env.GH_TOKEN}` }
+            : {}),
+        },
         signal: AbortSignal.timeout(5000),
       }
     );
@@ -544,6 +552,12 @@ app.prepare().then(() => {
       const { startDailyProductivityCron } = require('./lib/dailyProductivityCron');
       startDailyProductivityCron();
     } catch (e) { console.warn('⚠️ Daily productivity cron setup skipped:', e.message); }
+
+    // Fallback checker for latest GitHub release downloads.
+    try {
+      const { startLatestReleaseCron } = require('./lib/latestReleaseCron');
+      startLatestReleaseCron();
+    } catch (e) { console.warn('⚠️ Latest release cron setup skipped:', e.message); }
   });
 
   // Graceful shutdown handling for Docker
@@ -593,6 +607,11 @@ app.prepare().then(() => {
     try {
       const { stopDailyProductivityCron } = require('./lib/dailyProductivityCron');
       stopDailyProductivityCron();
+    } catch (e) { /* ignore if not loaded */ }
+
+    try {
+      const { stopLatestReleaseCron } = require('./lib/latestReleaseCron');
+      stopLatestReleaseCron();
     } catch (e) { /* ignore if not loaded */ }
 
     // Close database connections

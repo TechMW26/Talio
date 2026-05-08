@@ -14,6 +14,7 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - uploads_data:/app/public/uploads
+      - ./releases:/var/www/talio/releases
     networks:
       - talio-network
     healthcheck:
@@ -45,6 +46,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/maintenance.html:/usr/share/nginx/html/maintenance.html:ro
+      - ./releases:/var/www/talio/releases:ro
       - certbot_etc:/etc/letsencrypt:ro
       - certbot_var:/var/lib/letsencrypt
       - webroot:/var/www/certbot

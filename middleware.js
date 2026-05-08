@@ -79,6 +79,7 @@ export async function middleware(request) {
     '/api/setup/create-admin',
     '/api/setup/tenant', // Tenant setup with setup code
     '/api/images/', // GridFS image serving (loaded by img tags)
+    '/api/latest-release', // Public metadata for latest downloadable release
     '/api/cron/', // Cron routes use CRON_SECRET for auth
     '/api/notifications/config', // Firebase config for service worker (public=true)
     '/api/health', // Health check endpoint (load balancers, monitoring)

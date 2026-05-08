@@ -71,6 +71,7 @@ desktop-app/dist/
 desktop-app/release/
 
 # Binary releases
+releases/
 download/releases/
 public/releases/
 *.dmg

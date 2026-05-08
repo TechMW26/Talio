@@ -110,8 +110,9 @@ COPY --from=builder /app/sentry.edge.config.js ./sentry.edge.config.js
 COPY --from=builder /app/instrumentation.js ./instrumentation.js
 COPY --from=builder /app/instrumentation-client.js ./instrumentation-client.js
 
-# Upload directory (volume-mounted in docker-compose)
-RUN mkdir -p ./public/uploads && chown -R nextjs:nodejs ./public/uploads
+# Upload and release directories (volume-mounted in docker-compose)
+RUN mkdir -p ./public/uploads /var/www/talio/releases \
+    && chown -R nextjs:nodejs ./public/uploads /var/www/talio
 
 USER nextjs
 
