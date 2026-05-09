@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 const GITHUB_REPO = 'avirajsharma-ops/Talio'
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
+const GITHUB_TOKEN = process.env.GITHUB_RELEASE_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ''
 
 // Map platform slugs to asset filename patterns
 const PLATFORM_PATTERNS = {
@@ -10,6 +11,7 @@ const PLATFORM_PATTERNS = {
   'mac': /Talio-.*-arm64\.dmg$/, // Default Mac = Apple Silicon
   'windows': /Talio\.Setup\..*\.exe$/,
   'win': /Talio\.Setup\..*\.exe$/,
+  'linux': /Talio-.*\.(appimage|deb|rpm|tar\.gz)$/i,
 }
 
 export async function GET(request, { params }) {
@@ -18,17 +20,23 @@ export async function GET(request, { params }) {
   const pattern = PLATFORM_PATTERNS[platform]
   if (!pattern) {
     return NextResponse.json(
-      { error: 'Invalid platform. Use: mac-arm64, mac-intel, mac, windows, or win' },
+      { error: 'Invalid platform. Use: mac-arm64, mac-intel, mac, windows, win, or linux' },
       { status: 400 }
     )
   }
 
   try {
+    const headers = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'Talio-Download-Redirect',
+    }
+
+    if (GITHUB_TOKEN) {
+      headers.Authorization = `Bearer ${GITHUB_TOKEN}`
+    }
+
     const res = await fetch(GITHUB_API, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'Talio-Download-Redirect',
-      },
+      headers,
       cache: 'no-store', // Always fetch latest release so new versions reflect immediately
     })
 
