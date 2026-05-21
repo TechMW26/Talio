@@ -523,12 +523,6 @@ app.prepare().then(() => {
         .catch(() => { });
     }).catch(() => { });
 
-    // Start periodic Google Calendar holiday sync cron job
-    try {
-      const { startHolidaySyncCron } = require('./lib/holidaySyncCron');
-      startHolidaySyncCron();
-    } catch (e) { console.warn('⚠️ Holiday sync cron setup skipped:', e.message); }
-
     // Start background meeting finalizer + AI summary generation
     try {
       const { startMeetingFinalizerCron } = await import('./lib/meetingFinalizerCron.js');
@@ -584,11 +578,6 @@ app.prepare().then(() => {
     }
 
     // Stop scheduled cron jobs
-    try {
-      const { stopHolidaySyncCron } = require('./lib/holidaySyncCron');
-      stopHolidaySyncCron();
-    } catch (e) { /* ignore if not loaded */ }
-
     try {
       const { stopMeetingFinalizerCron } = await import('./lib/meetingFinalizerCron.js');
       stopMeetingFinalizerCron();

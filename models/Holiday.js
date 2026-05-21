@@ -14,15 +14,6 @@ const HolidaySchema = new mongoose.Schema({
     enum: ['public', 'company'],
     default: 'public',
   },
-  source: {
-    type: String,
-    enum: ['manual', 'google-calendar'],
-    default: 'manual',
-  },
-  googleEventId: {
-    type: String,
-    default: null,
-  },
   description: {
     type: String,
   },
