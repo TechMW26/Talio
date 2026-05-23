@@ -6,6 +6,7 @@ import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import mongoose from 'mongoose';
 import { isWithinOfficeHours } from '@/lib/officeHours';
 import { processImage, ImagePipelineError } from '@/lib/imagePipeline';
+import { scheduleDailyAnalysisAfterScreenshot } from '@/lib/autoAnalysisTrigger';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -135,9 +136,10 @@ export async function POST(request) {
 
     // Office-hours gate: drop captures taken outside the company's working window.
     // Manual admin captures (`captureType=manual`) bypass this gate.
+    let company = null;
     if (captureType !== 'manual') {
       try {
-        const company = Company ? await Company.findOne({}).select('workingHours timezone').lean() : null;
+        company = Company ? await Company.findOne({}).select('workingHours timezone').lean() : null;
         const officeCheck = isWithinOfficeHours(safeCapturedAt, company);
         if (!officeCheck.allowed) {
           console.log(
@@ -254,6 +256,23 @@ export async function POST(request) {
     await screenshot.save();
 
     console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${gridfsResult ? ` (GridFS: ${gridfsResult._id})` : ''}`);
+
+    try {
+      const scheduled = scheduleDailyAnalysisAfterScreenshot({
+        userId: userId.toString(),
+        databaseName: tenant.databaseName,
+        dateString,
+        trigger: 'auto-upload',
+      });
+      if (scheduled.scheduled) {
+        console.log(
+          `[Screenshot] Scheduled auto-analysis for user ${userId} on ${dateString} `
+          + `after ${scheduled.delayMs}ms`,
+        );
+      }
+    } catch (analysisError) {
+      console.warn('[Screenshot] Auto-analysis scheduling failed:', analysisError?.message || analysisError);
+    }
 
     return NextResponse.json({
       success: true,

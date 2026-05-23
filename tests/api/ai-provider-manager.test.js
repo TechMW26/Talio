@@ -13,6 +13,19 @@ function clearAIKeys(env) {
     delete env.CUSTOM_AI_APP_TOKEN
     delete env.CUSTOM_AI_TOKEN
     delete env.CUSTOM_AI_BASE_URL
+    delete env.CUSTOM_AI_API_URL
+    delete env.CUSTOM_AI_CHAT_URL
+    delete env.CUSTOM_AI_CHAT_API_KEY
+    delete env.CUSTOM_AI_API_KEY_HEADER
+    delete env.CUSTOM_AI_CHAT_IMAGE_FORMAT
+    delete env.CUSTOM_AI_IMAGE_FORMAT
+    delete env.CUSTOM_AI_ANALYSIS_ONLY
+    delete env.AI_ANALYSIS_CUSTOM_ONLY
+    delete env.CUSTOM_AI_REQUEST_FORMAT
+    delete env.CUSTOM_AI_PROTOCOL
+    delete env.CUSTOM_AI_MODEL
+    delete env.CUSTOM_AI_STREAM
+    delete env.CUSTOM_AI_MAX_TOKENS
     delete env.CUSTOM_AI_PUBLIC_PATH
     delete env.CUSTOM_AI_PROTECTED_PATH
     delete env.INFERENCE_API_KEY
@@ -234,6 +247,28 @@ describe('AIProviderManager fallback routing (Custom AI → Inference AI → Gem
         expect(parts[0]).toMatchObject({ text: 'describe' })
         expect(parts[1].inlineData).toMatchObject({ mimeType: 'image/svg+xml' })
         expect(parts[1].inlineData.data).toBe(svgBase64())
+    })
+
+    test('raw vision analysis can be locked to Custom AI only', async () => {
+        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
+        process.env.CUSTOM_AI_APP_TOKEN = 'tok'
+        process.env.CUSTOM_AI_ANALYSIS_ONLY = 'true'
+        process.env.GEMINI_API_KEY = 'gem-1'
+
+        const netError = new Error('fetch failed')
+        netError.cause = { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' }
+        global.fetch.mockRejectedValueOnce(netError)
+
+        const { generateStitchedVisionContent } = reqRouter()
+
+        await expect(generateStitchedVisionContent('describe', {
+            buffer: Buffer.from('image-bytes'),
+            mimeType: 'image/png',
+            filename: 'analysis.png',
+        })).rejects.toThrow('Custom AI service unreachable')
+
+        expect(global.fetch).toHaveBeenCalledTimes(1)
+        expect(global.fetch.mock.calls[0][0]).toBe('http://custom.test/public/analyze')
     })
 
     test('throws Custom AI config error when no providers are configured', async () => {

@@ -17,6 +17,19 @@ describe('custom AI routing in gemini library', () => {
         delete process.env.CUSTOM_AI_APP_TOKEN
         delete process.env.CUSTOM_AI_TOKEN
         delete process.env.CUSTOM_AI_BASE_URL
+        delete process.env.CUSTOM_AI_API_URL
+        delete process.env.CUSTOM_AI_CHAT_URL
+        delete process.env.CUSTOM_AI_CHAT_API_KEY
+        delete process.env.CUSTOM_AI_API_KEY_HEADER
+        delete process.env.CUSTOM_AI_CHAT_IMAGE_FORMAT
+        delete process.env.CUSTOM_AI_IMAGE_FORMAT
+        delete process.env.CUSTOM_AI_ANALYSIS_ONLY
+        delete process.env.AI_ANALYSIS_CUSTOM_ONLY
+        delete process.env.CUSTOM_AI_REQUEST_FORMAT
+        delete process.env.CUSTOM_AI_PROTOCOL
+        delete process.env.CUSTOM_AI_MODEL
+        delete process.env.CUSTOM_AI_STREAM
+        delete process.env.CUSTOM_AI_MAX_TOKENS
         delete process.env.CUSTOM_AI_PUBLIC_PATH
         delete process.env.CUSTOM_AI_PROTECTED_PATH
         delete process.env.INFERENCE_API_KEY
@@ -75,6 +88,76 @@ describe('custom AI routing in gemini library', () => {
             customAIMode: 'public',
             anyAvailable: true
         })
+    })
+
+    test('generateContent supports the chat-compatible custom AI protocol', async () => {
+        process.env.CUSTOM_AI_REQUEST_FORMAT = 'chat'
+        process.env.CUSTOM_AI_API_URL = 'https://salad.test/api/chat'
+        process.env.CUSTOM_AI_CHAT_API_KEY = 'salad-token'
+        process.env.CUSTOM_AI_API_KEY_HEADER = 'Salad-Api-Key'
+        process.env.CUSTOM_AI_MODEL = 'llama3.2-vision'
+        process.env.CUSTOM_AI_STREAM = 'true'
+        process.env.CUSTOM_AI_MAX_TOKENS = '128'
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            text: jest.fn().mockResolvedValue([
+                'data: {"choices":[{"delta":{"content":"deep "}}]}',
+                '',
+                'data: {"choices":[{"delta":{"content":"learning"}}]}',
+                '',
+                'data: [DONE]',
+            ].join('\n'))
+        })
+
+        const { generateContent } = require('@/lib/gemini')
+
+        const result = await generateContent('What is deep learning?', 'You are a helpful assistant.')
+
+        expect(result).toBe('deep learning')
+        expect(global.fetch).toHaveBeenCalledTimes(1)
+
+        const [url, request] = global.fetch.mock.calls[0]
+        const body = JSON.parse(request.body)
+
+        expect(url).toBe('https://salad.test/api/chat')
+        expect(request).toMatchObject({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Salad-Api-Key': 'salad-token'
+            }
+        })
+        expect(body).toMatchObject({
+            model: 'llama3.2-vision',
+            stream: true,
+            max_tokens: 128,
+        })
+        expect(body.messages).toEqual([
+            { role: 'system', content: 'You are a helpful assistant.' },
+            { role: 'user', content: 'What is deep learning?' },
+        ])
+    })
+
+    test('generateContent parses newline-delimited chat stream chunks', async () => {
+        process.env.CUSTOM_AI_REQUEST_FORMAT = 'chat'
+        process.env.CUSTOM_AI_API_URL = 'https://salad.test/api/chat'
+        process.env.CUSTOM_AI_CHAT_API_KEY = 'salad-token'
+        process.env.CUSTOM_AI_API_KEY_HEADER = 'Salad-Api-Key'
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            text: jest.fn().mockResolvedValue([
+                '{"message":{"role":"assistant","content":"Ready"},"done":false}',
+                '{"message":{"role":"assistant","content":""},"done":true}',
+            ].join('\n'))
+        })
+
+        const { generateContent } = require('@/lib/gemini')
+
+        const result = await generateContent('Reply with the word ready.')
+
+        expect(result).toBe('Ready')
     })
 
     test('generateContent fails when the custom AI environment is missing', async () => {
@@ -147,6 +230,39 @@ describe('custom AI routing in gemini library', () => {
         expect(upload).toBeTruthy()
         expect(upload.type).toBe('image/webp')
         expect(upload.size).toBeGreaterThan(0)
+    })
+
+    test('generateVisionContent sends images to chat-compatible custom AI endpoints', async () => {
+        process.env.CUSTOM_AI_REQUEST_FORMAT = 'chat'
+        process.env.CUSTOM_AI_API_URL = 'https://salad.test/api/chat'
+        process.env.CUSTOM_AI_CHAT_API_KEY = 'salad-token'
+        process.env.CUSTOM_AI_API_KEY_HEADER = 'Salad-Api-Key'
+        process.env.CUSTOM_AI_CHAT_IMAGE_FORMAT = 'ollama'
+        process.env.CUSTOM_AI_MODEL = 'llama3.2-vision'
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            text: jest.fn().mockResolvedValue(JSON.stringify({
+                choices: [{ message: { content: 'vision response' } }]
+            }))
+        })
+
+        const { generateVisionContent } = require('@/lib/gemini')
+
+        const result = await generateVisionContent('Describe this screenshot', [
+            { data: buildBase64Svg('#0EA5E9'), mimeType: 'image/svg+xml' }
+        ])
+
+        expect(result).toBe('vision response')
+        expect(global.fetch).toHaveBeenCalledTimes(1)
+
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+        const userMessage = body.messages[0]
+
+        expect(userMessage.content).toBe('Describe this screenshot')
+        expect(userMessage.images).toHaveLength(1)
+        expect(userMessage.images[0]).toEqual(expect.any(String))
+        expect(userMessage.images[0]).not.toContain('data:image')
     })
 
 
