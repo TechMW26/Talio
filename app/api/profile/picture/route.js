@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, clearCachePattern, deleteCache } from '@/lib/cache'
 import { uploadImage, deleteImage } from '@/lib/gridfs'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import path from 'path'
@@ -22,12 +23,19 @@ export async function POST(request) {
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 })
         }
-        const { user: authUser, models } = auth
+        const { user: authUser, models, tenant } = auth
         const { User, Employee } = models
 
-        const user = await User.findById(authUser._id || authUser.userId).populate('employeeId')
+        const authUserId = authUser._id || authUser.userId
+        const user = await User.findById(authUserId).populate('employeeId')
         if (!user) {
             return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
+        }
+
+        const getId = (value) => {
+            if (!value) return null
+            if (typeof value === 'object') return value._id || value.id || null
+            return value
         }
 
         // Parse the request - handle both FormData and JSON
@@ -106,9 +114,24 @@ export async function POST(request) {
 
         // Get employee info for folder structure
         let employee = user.employeeId
-        if (!employee) {
-            employee = await Employee.findOne({ userId: authUser._id || authUser.userId }).select('firstName lastName employeeCode')
+        if (employee && !employee.employeeCode) {
+            employee = await Employee.findById(getId(employee)).select('firstName lastName employeeCode profilePicture profilePictureFileId')
         }
+        if (!employee && authUser.employeeId) {
+            employee = await Employee.findById(getId(authUser.employeeId)).select('firstName lastName employeeCode profilePicture profilePictureFileId')
+        }
+        if (!employee) {
+            employee = await Employee.findOne({ userId: authUserId }).select('firstName lastName employeeCode profilePicture profilePictureFileId')
+        }
+
+        if (!employee) {
+            return NextResponse.json({
+                success: false,
+                message: 'Employee profile not found. Please contact HR/admin to link your account before uploading a profile picture.'
+            }, { status: 404 })
+        }
+
+        const employeeId = getId(employee)
 
         // Generate filename with employee code for easy identification
         const timestamp = Date.now()
@@ -125,8 +148,8 @@ export async function POST(request) {
                 category: 'profile',
                 contentType: 'image/webp',
                 originalName: filename,
-                userId: String(authUser._id || authUser.userId),
-                employeeId: employee?._id ? String(employee._id) : undefined,
+                userId: String(authUserId),
+                employeeId: String(employeeId),
             })
             fileUrl = gridfsResult.url
             fileId = String(gridfsResult._id)
@@ -151,25 +174,46 @@ export async function POST(request) {
         }
 
         // Get old profile picture info for cleanup
-        const oldProfilePicture = user.employeeId?.profilePicture
-        const oldProfilePictureFileId = user.employeeId?.profilePictureFileId
+        const oldProfilePicture = employee.profilePicture
+        const oldProfilePictureFileId = employee.profilePictureFileId
 
         // Update Employee model with new profile picture
-        if (user.employeeId) {
-            await Employee.findByIdAndUpdate(user.employeeId._id, {
-                $set: {
-                    profilePicture: fileUrl,
-                    ...(fileId && { profilePictureFileId: fileId }),
-                }
-            })
-        }
+        await Employee.findByIdAndUpdate(employeeId, {
+            $set: {
+                profilePicture: fileUrl,
+                ...(fileId && { profilePictureFileId: fileId }),
+            }
+        })
 
-        // Also update User model if it has avatar field
-        await User.findByIdAndUpdate(authUser._id || authUser.userId, {
+        // Also update User model and repair the employee link if it was missing.
+        await User.findByIdAndUpdate(authUserId, {
             $set: {
                 avatar: fileUrl,
+                employeeId,
                 ...(fileId && { avatarFileId: fileId }),
             }
+        })
+
+        const todayKey = new Date().toISOString().slice(0, 10)
+        const profileCacheKey = buildCacheKey({
+            tenantId: tenant?.databaseName,
+            role: authUser.role,
+            userId: authUserId,
+            namespace: 'profile'
+        })
+        const employeeDashboardCacheKey = buildCacheKey({
+            tenantId: tenant?.databaseName,
+            role: authUser.role,
+            userId: authUserId,
+            namespace: 'dashboard:employee-stats',
+            params: { date: todayKey }
+        })
+        await Promise.all([
+            deleteCache(profileCacheKey),
+            deleteCache(employeeDashboardCacheKey),
+            clearCachePattern(`tenant:${tenant?.databaseName || 'unknown'}:role:${authUser.role || 'any'}:user:${authUserId}:dashboard:unified:*`),
+        ]).catch((err) => {
+            console.log('[Profile Picture] Cache invalidation failed:', err.message)
         })
 
         // Delete old profile picture
