@@ -200,6 +200,32 @@ const isAdminLevel = (role) => {
     return ['admin', 'department_head'].includes(role)
 }
 
+async function syncDesktopAttendanceCapture(action) {
+    if (typeof window === 'undefined') return
+
+    const desktopAPI = window.talioDesktop || window.electronAPI
+    if (!desktopAPI) return
+
+    try {
+        if (action === 'clock-in') {
+            if (typeof desktopAPI.attendanceClockIn === 'function') {
+                await desktopAPI.attendanceClockIn()
+            } else if (typeof desktopAPI.startCapture === 'function') {
+                await desktopAPI.startCapture()
+            }
+            return
+        }
+
+        if (typeof desktopAPI.attendanceClockOut === 'function') {
+            await desktopAPI.attendanceClockOut()
+        } else if (typeof desktopAPI.stopCapture === 'function') {
+            await desktopAPI.stopCapture()
+        }
+    } catch (error) {
+        console.warn('[Dashboard] Desktop attendance capture sync failed:', error)
+    }
+}
+
 /**
  * Unified Dashboard Component
  * A single dashboard that adapts to user's role and permissions
@@ -620,6 +646,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             const data = await response.json()
             if (data.success) {
+                await syncDesktopAttendanceCapture('clock-in')
                 toast.success('Checked in successfully!')
                 // Replace optimistic data with real server data
                 attendanceVersionRef.current++
@@ -731,6 +758,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             const data = await response.json()
             if (data.success) {
+                await syncDesktopAttendanceCapture('clock-out')
                 toast.success('Checked out successfully!')
                 // Replace optimistic data with real server data
                 attendanceVersionRef.current++

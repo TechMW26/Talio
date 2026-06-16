@@ -48,6 +48,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCaptureStats: function() {
     return ipcRenderer.invoke('get-capture-stats');
   },
+
+  attendanceClockIn: function() {
+    return ipcRenderer.invoke('attendance-clock-in');
+  },
+
+  attendanceClockOut: function() {
+    return ipcRenderer.invoke('attendance-clock-out');
+  },
+
+  getClockInStatus: function() {
+    return ipcRenderer.invoke('get-clock-in-status');
+  },
   
   // Desktop capture for screen sharing (used by meetings)
   // Routes through main process IPC since desktopCapturer is main-process-only in Electron 35+
