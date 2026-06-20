@@ -81,38 +81,6 @@ export default function AddEmployeePage() {
     { level: 9, levelName: 'Director' },
   ]
 
-  const allDesignationOptions = useMemo(() => {
-    const existingTitles = new Set((designations || []).map((d) => (d.title || '').trim().toLowerCase()))
-    const presets = presetDesignationTitles
-      .filter((t) => !existingTitles.has(t.toLowerCase()))
-      .map((title) => ({ _id: `preset:${title}`, title, _preset: true }))
-    return [...(designations || []), ...presets]
-  }, [designations])
-
-  const managerCandidates = useMemo(
-    () => (assignmentEmployees || []).filter((e) => Number(e.designationLevel || e.designation?.level || 0) >= 5),
-    [assignmentEmployees]
-  )
-  const teamLeadCandidates = useMemo(
-    () => (assignmentEmployees || []).filter((e) => Number(e.designationLevel || e.designation?.level || 0) >= 4),
-    [assignmentEmployees]
-  )
-  // "Reports To" choices follow the strict hierarchy:
-  //   Asst. Director (L8) -> only Director (L9)
-  //   C-Suite (L7)        -> Asst. Director (L8) or Director (L9)
-  //   L1-L6               -> C-Suite, Asst. Director, or Director
-  const reportsToCandidates = useMemo(() => {
-    const lvl = Number(formData.designationLevel || 0)
-    let allowed
-    if (lvl === 8) allowed = new Set([9])
-    else if (lvl === 7) allowed = new Set([8, 9])
-    else allowed = new Set([7, 8, 9])
-    return (assignmentEmployees || []).filter((e) => {
-      const lv = Number(e.designationLevel || e.designation?.level || 0)
-      return allowed.has(lv)
-    })
-  }, [assignmentEmployees, formData.designationLevel])
-
   const [formData, setFormData] = useState({
     employeeCode: '',
     firstName: '',
@@ -170,6 +138,38 @@ export default function AddEmployeePage() {
       provider: '',
     },
   })
+
+  const allDesignationOptions = useMemo(() => {
+    const existingTitles = new Set((designations || []).map((d) => (d.title || '').trim().toLowerCase()))
+    const presets = presetDesignationTitles
+      .filter((t) => !existingTitles.has(t.toLowerCase()))
+      .map((title) => ({ _id: `preset:${title}`, title, _preset: true }))
+    return [...(designations || []), ...presets]
+  }, [designations])
+
+  const managerCandidates = useMemo(
+    () => (assignmentEmployees || []).filter((e) => Number(e.designationLevel || e.designation?.level || 0) >= 5),
+    [assignmentEmployees]
+  )
+  const teamLeadCandidates = useMemo(
+    () => (assignmentEmployees || []).filter((e) => Number(e.designationLevel || e.designation?.level || 0) >= 4),
+    [assignmentEmployees]
+  )
+  // "Reports To" choices follow the strict hierarchy:
+  //   Asst. Director (L8) -> only Director (L9)
+  //   C-Suite (L7)        -> Asst. Director (L8) or Director (L9)
+  //   L1-L6               -> C-Suite, Asst. Director, or Director
+  const reportsToCandidates = useMemo(() => {
+    const lvl = Number(formData.designationLevel || 0)
+    let allowed
+    if (lvl === 8) allowed = new Set([9])
+    else if (lvl === 7) allowed = new Set([8, 9])
+    else allowed = new Set([7, 8, 9])
+    return (assignmentEmployees || []).filter((e) => {
+      const lv = Number(e.designationLevel || e.designation?.level || 0)
+      return allowed.has(lv)
+    })
+  }, [assignmentEmployees, formData.designationLevel])
 
   useEffect(() => {
     // Check access control
