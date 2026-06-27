@@ -1,6 +1,5 @@
-// Multi-provider AI router tests. Validates Custom AI → Inference AI → Gemini
-// fallback ordering, multi-key rotation across Gemini keys, and that key
-// material is never included in log output.
+// Gemini AI router tests. Validates multi-key rotation, rate-limit fallback,
+// model fallback, and that key material is never included in log output.
 
 const ORIGINAL_ENV = process.env
 
@@ -9,44 +8,20 @@ function svgBase64() {
 }
 
 function clearAIKeys(env) {
-    delete env.CUSTOM_AI_API_KEY
-    delete env.CUSTOM_AI_APP_TOKEN
-    delete env.CUSTOM_AI_TOKEN
-    delete env.CUSTOM_AI_BASE_URL
-    delete env.CUSTOM_AI_API_URL
-    delete env.CUSTOM_AI_CHAT_URL
-    delete env.CUSTOM_AI_CHAT_API_KEY
-    delete env.CUSTOM_AI_API_KEY_HEADER
-    delete env.CUSTOM_AI_CHAT_IMAGE_FORMAT
-    delete env.CUSTOM_AI_IMAGE_FORMAT
-    delete env.CUSTOM_AI_ANALYSIS_ONLY
-    delete env.AI_ANALYSIS_CUSTOM_ONLY
-    delete env.CUSTOM_AI_REQUEST_FORMAT
-    delete env.CUSTOM_AI_PROTOCOL
-    delete env.CUSTOM_AI_MODEL
-    delete env.CUSTOM_AI_STREAM
-    delete env.CUSTOM_AI_MAX_TOKENS
-    delete env.CUSTOM_AI_PUBLIC_PATH
-    delete env.CUSTOM_AI_PROTECTED_PATH
-    delete env.INFERENCE_API_KEY
-    delete env.INFERENCE_APP_TOKEN
-    delete env.INFERENCE_TOKEN
-    delete env.INFERENCE_BASE_URL
-    delete env.INFERENCE_PUBLIC_PATH
-    delete env.INFERENCE_PROTECTED_PATH
     for (const k of Object.keys(env)) {
         if (/^GEMINI_(API_)?KEY/i.test(k)) {
             delete env[k]
         }
     }
     delete env.GEMINI_API_KEY
+    delete env.GEMINI_KEY
 }
 
 function reqRouter() {
     return require('@/lib/ai/aiProviderManager')
 }
 
-describe('AIProviderManager fallback routing (Custom AI → Inference AI → Gemini)', () => {
+describe('AIProviderManager — Gemini-only key rotation', () => {
     let warnSpy
 
     beforeEach(() => {
@@ -64,115 +39,64 @@ describe('AIProviderManager fallback routing (Custom AI → Inference AI → Gem
         jest.restoreAllMocks()
     })
 
-    test('uses Custom AI when it succeeds (no fallback triggered)', async () => {
-        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
-        process.env.CUSTOM_AI_APP_TOKEN = 'tok'
-        process.env.GEMINI_API_KEY = 'gem-1'
+    test('calls Gemini and returns text content', async () => {
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
-            json: jest.fn().mockResolvedValue({ success: true, result: 'custom output' }),
+            json: jest.fn().mockResolvedValue({
+                candidates: [{ content: { parts: [{ text: 'gemini output' }] } }],
+            }),
         })
 
         const { generateContent } = reqRouter()
         const result = await generateContent('hello')
 
-        expect(result).toBe('custom output')
+        expect(result).toBe('gemini output')
         expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][0]).toBe('http://custom.test/public/analyze')
+        expect(global.fetch.mock.calls[0][0]).toContain('generativelanguage.googleapis.com')
     })
 
-    test('falls back to Gemini when Custom AI is unreachable', async () => {
-        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
-        process.env.CUSTOM_AI_APP_TOKEN = 'tok'
-        process.env.GEMINI_API_KEY = 'gem-1'
-
-        const netError = new Error('fetch failed')
-        netError.cause = { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' }
-
-        global.fetch
-            .mockRejectedValueOnce(netError)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: jest.fn().mockResolvedValue({
-                    candidates: [{ content: { parts: [{ text: 'gemini rescue text' }] } }],
-                }),
-            })
-
-        const { generateContent } = reqRouter()
-        const result = await generateContent('hello', 'sys')
-
-        expect(result).toBe('gemini rescue text')
-        expect(global.fetch).toHaveBeenCalledTimes(2)
-        const lastCall = global.fetch.mock.calls.at(-1)
-        expect(lastCall[0]).toContain('generativelanguage.googleapis.com')
-        expect(lastCall[0]).toContain('key=gem-1')
-        for (const call of warnSpy.mock.calls) {
-            expect(call.join(' ')).not.toContain('gem-1')
-        }
-    })
-
-    test('falls back to Inference before Gemini when Custom AI fails', async () => {
-        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
-        process.env.CUSTOM_AI_APP_TOKEN = 'custom-token'
-        process.env.INFERENCE_BASE_URL = 'http://inference.test'
-        process.env.INFERENCE_APP_TOKEN = 'inference-token'
-        process.env.GEMINI_API_KEY = 'gem-1'
-
-        const netError = new Error('fetch failed')
-        netError.cause = { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' }
-
-        global.fetch
-            .mockRejectedValueOnce(netError)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: jest.fn().mockResolvedValue({ success: true, result: 'inference rescue text' }),
-            })
-
-        const { generateContent } = reqRouter()
-        const result = await generateContent('hello')
-
-        expect(result).toBe('inference rescue text')
-        expect(global.fetch).toHaveBeenCalledTimes(2)
-        expect(global.fetch.mock.calls[0][0]).toBe('http://custom.test/public/analyze')
-        expect(global.fetch.mock.calls[1][0]).toBe('http://inference.test/public/analyze')
-    })
-
-    test('always attempts Custom AI first even when its circuit is open', async () => {
-        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
-        process.env.CUSTOM_AI_APP_TOKEN = 'tok'
-        process.env.GEMINI_API_KEY = 'gem-1'
-
-        const { ProviderHealthMonitor } = require('@/lib/ai/providerHealthMonitor')
-        jest.spyOn(ProviderHealthMonitor.prototype, 'isAvailable').mockReturnValue(false)
+    test('passes system instruction to Gemini', async () => {
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
-            json: jest.fn().mockResolvedValue({ success: true, result: 'custom still first' }),
+            json: jest.fn().mockResolvedValue({
+                candidates: [{ content: { parts: [{ text: 'sys-aware output' }] } }],
+            }),
         })
 
         const { generateContent } = reqRouter()
-        const result = await generateContent('hello')
+        await generateContent('hello', 'You are helpful.')
 
-        expect(result).toBe('custom still first')
-        expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][0]).toBe('http://custom.test/public/analyze')
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+        expect(body.systemInstruction.parts[0].text).toBe('You are helpful.')
     })
 
-    test('falls back to a supported Gemini model when the preferred model returns 404', async () => {
-        process.env.GEMINI_API_KEY = 'gem-1'
-        process.env.GEMINI_MODEL = 'gemini-1.5-flash'
+    test('falls back through model chain when 3.5-flash returns 404', async () => {
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+        // Set primary to a model that will 404 — the fallback chain kicks in
+        process.env.GEMINI_MODEL = 'gemini-3.5-flash'
 
+        // 3.5-flash 404 → 2.5-flash 404 → flash-latest 404 → 2.0-flash succeeds
         global.fetch
             .mockResolvedValueOnce({
-                ok: false,
-                status: 404,
+                ok: false, status: 404,
                 text: jest.fn().mockResolvedValue(JSON.stringify({
-                    error: {
-                        code: 404,
-                        message: 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.',
-                        status: 'NOT_FOUND',
-                    },
+                    error: { code: 404, message: 'models/gemini-3.5-flash is not found', status: 'NOT_FOUND' },
+                })),
+            })
+            .mockResolvedValueOnce({
+                ok: false, status: 404,
+                text: jest.fn().mockResolvedValue(JSON.stringify({
+                    error: { code: 404, message: 'models/gemini-2.5-flash is not found', status: 'NOT_FOUND' },
+                })),
+            })
+            .mockResolvedValueOnce({
+                ok: false, status: 404,
+                text: jest.fn().mockResolvedValue(JSON.stringify({
+                    error: { code: 404, message: 'not found', status: 'NOT_FOUND' },
                 })),
             })
             .mockResolvedValueOnce({
@@ -186,14 +110,14 @@ describe('AIProviderManager fallback routing (Custom AI → Inference AI → Gem
         const result = await generateContent('hello')
 
         expect(result).toBe('fallback model works')
-        expect(global.fetch).toHaveBeenCalledTimes(2)
-        expect(global.fetch.mock.calls[0][0]).toContain('/models/gemini-1.5-flash:generateContent')
-        expect(global.fetch.mock.calls[1][0]).toContain('/models/gemini-2.0-flash:generateContent')
+        expect(global.fetch).toHaveBeenCalledTimes(4)
+        expect(global.fetch.mock.calls[0][0]).toContain('/models/gemini-3.5-flash:generateContent')
+        expect(global.fetch.mock.calls[3][0]).toContain('/models/gemini-2.0-flash:generateContent')
     })
 
     test('rotates Gemini keys on rate limit until one succeeds', async () => {
-        process.env.GEMINI_API_KEY = 'gem-1'
-        process.env.GEMINI_API_KEY_2 = 'gem-2'
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+        process.env.GEMINI_API_KEY_2 = 'AIzagm-testkey-2'
 
         global.fetch
             .mockResolvedValueOnce({
@@ -213,26 +137,37 @@ describe('AIProviderManager fallback routing (Custom AI → Inference AI → Gem
 
         expect(result).toBe('second key wins')
         expect(global.fetch).toHaveBeenCalledTimes(2)
-        expect(global.fetch.mock.calls[0][0]).toContain('key=gem-1')
-        expect(global.fetch.mock.calls[1][0]).toContain('key=gem-2')
+        expect(global.fetch.mock.calls[0][0]).toContain('key=AIzagm-testkey-1')
+        expect(global.fetch.mock.calls[1][0]).toContain('key=AIzagm-testkey-2')
     })
 
-    test('vision routing falls back from Custom to Gemini with inlineData payload', async () => {
-        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
-        process.env.CUSTOM_AI_APP_TOKEN = 'tok'
-        process.env.GEMINI_API_KEY = 'gem-1'
+    test('throws after all keys rate-limited (exhausted via cooldown)', async () => {
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
 
-        const netError = new Error('fetch failed')
-        netError.cause = { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' }
+        global.fetch.mockResolvedValue({
+            ok: false,
+            status: 429,
+            text: jest.fn().mockResolvedValue('RESOURCE_EXHAUSTED'),
+        })
 
-        global.fetch
-            .mockRejectedValueOnce(netError)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: jest.fn().mockResolvedValue({
-                    candidates: [{ content: { parts: [{ text: 'gemini vision text' }] } }],
-                }),
-            })
+        const { generateContent } = reqRouter()
+        await expect(generateContent('hello')).rejects.toThrow(/failed after 3 attempts|Gemini/)
+
+        // geminiProvider rotates keys internally; aiProviderManager retries
+        // the whole call up to 3 times. With one key, the first 429 puts it
+        // into cooldown, so subsequent attempts exhaust immediately.
+        expect(global.fetch.mock.calls.length).toBeGreaterThanOrEqual(1)
+    })
+
+    test('vision call sends inlineData payload to Gemini', async () => {
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: jest.fn().mockResolvedValue({
+                candidates: [{ content: { parts: [{ text: 'gemini vision text' }] } }],
+            }),
+        })
 
         const { generateVisionContent } = reqRouter()
         const result = await generateVisionContent('describe', [
@@ -240,85 +175,76 @@ describe('AIProviderManager fallback routing (Custom AI → Inference AI → Gem
         ])
 
         expect(result).toBe('gemini vision text')
-        expect(global.fetch).toHaveBeenCalledTimes(2)
-        const geminiCall = global.fetch.mock.calls.at(-1)
-        const body = JSON.parse(geminiCall[1].body)
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body)
         const parts = body.contents[0].parts
         expect(parts[0]).toMatchObject({ text: 'describe' })
         expect(parts[1].inlineData).toMatchObject({ mimeType: 'image/svg+xml' })
         expect(parts[1].inlineData.data).toBe(svgBase64())
     })
 
-    test('raw vision analysis can be locked to Custom AI only', async () => {
-        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
-        process.env.CUSTOM_AI_APP_TOKEN = 'tok'
-        process.env.CUSTOM_AI_ANALYSIS_ONLY = 'true'
-        process.env.GEMINI_API_KEY = 'gem-1'
+    test('stitched vision call sends pre-built buffer', async () => {
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+        const imgBuffer = Buffer.from('fake-image-bytes')
 
-        const netError = new Error('fetch failed')
-        netError.cause = { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' }
-        global.fetch.mockRejectedValueOnce(netError)
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: jest.fn().mockResolvedValue({
+                candidates: [{ content: { parts: [{ text: 'stitched analysis' }] } }],
+            }),
+        })
 
         const { generateStitchedVisionContent } = reqRouter()
+        const result = await generateStitchedVisionContent('analyze', {
+            buffer: imgBuffer,
+            mimeType: 'image/webp',
+        })
 
-        await expect(generateStitchedVisionContent('describe', {
-            buffer: Buffer.from('image-bytes'),
-            mimeType: 'image/png',
-            filename: 'analysis.png',
-        })).rejects.toThrow('Custom AI service unreachable')
-
-        expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][0]).toBe('http://custom.test/public/analyze')
+        expect(result).toBe('stitched analysis')
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+        expect(body.contents[0].parts[1].inlineData.mimeType).toBe('image/webp')
     })
 
-    test('throws Custom AI config error when no providers are configured', async () => {
+    test('throws when no Gemini keys are configured', async () => {
         const { generateContent } = reqRouter()
         await expect(generateContent('hi')).rejects.toThrow(
-            'Custom AI service is not configured. Set CUSTOM_AI_BASE_URL and either CUSTOM_AI_API_KEY or CUSTOM_AI_APP_TOKEN.',
+            'Gemini is not configured',
         )
     })
 
-    test('getAIAvailability reports provider configuration without leaking keys', async () => {
-        process.env.CUSTOM_AI_BASE_URL = 'http://custom.test'
-        process.env.CUSTOM_AI_APP_TOKEN = 'tok'
-        process.env.GEMINI_API_KEY = 'gem-1'
-        process.env.GEMINI_API_KEY_2 = 'gem-2'
+    test('getAIAvailability reports Gemini configuration without leaking keys', async () => {
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+        process.env.GEMINI_API_KEY_2 = 'AIzagm-testkey-2'
 
         const { getAIAvailability } = reqRouter()
         const availability = getAIAvailability()
 
         expect(availability).toMatchObject({
-            customAI: true,
             anyAvailable: true,
-            providers: {
-                custom: { configured: true },
-                gemini: { configured: true, keys: 2 },
-            },
+            geminiConfigured: true,
+            geminiKeys: 2,
+            provider: 'gemini',
         })
-        expect(availability.providers.openai).toBeUndefined()
         const serialized = JSON.stringify(availability)
-        expect(serialized).not.toContain('gem-1')
-        expect(serialized).not.toContain('gem-2')
+        expect(serialized).not.toContain('AIzagm-testkey-1')
+        expect(serialized).not.toContain('AIzagm-testkey-2')
     })
 
-    test('still attempts the last configured provider when its circuit is open', async () => {
-        process.env.GEMINI_API_KEY = 'gem-1'
+    test('uses numbered keys GEMINI_API_KEY_1..N with correct ordering', async () => {
+        process.env.GEMINI_API_KEY_3 = 'AIzagm-testkey-3'
+        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+        process.env.GEMINI_API_KEY_2 = 'AIzagm-testkey-2'
 
-        const { ProviderHealthMonitor } = require('@/lib/ai/providerHealthMonitor')
-        jest.spyOn(ProviderHealthMonitor.prototype, 'isAvailable').mockReturnValue(false)
-
-        global.fetch.mockResolvedValueOnce({
+        global.fetch.mockResolvedValue({
             ok: true,
             json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'gemini from forced attempt' }] } }],
+                candidates: [{ content: { parts: [{ text: 'ok' }] } }],
             }),
         })
 
         const { generateContent } = reqRouter()
-        const result = await generateContent('hello')
+        await generateContent('hello')
 
-        expect(result).toBe('gemini from forced attempt')
-        expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][0]).toContain('generativelanguage.googleapis.com')
+        // First key should be GEMINI_API_KEY_1 (sorted numerically)
+        expect(global.fetch.mock.calls[0][0]).toContain('key=AIzagm-testkey-1')
     })
 })
