@@ -5,13 +5,14 @@ describe('prompt engine', () => {
         jest.resetModules()
         process.env = {
             ...ORIGINAL_ENV,
-            CUSTOM_AI_APP_TOKEN: 'public-token',
-            CUSTOM_AI_BASE_URL: 'http://custom-ai.test'
+            GEMINI_API_KEY_1: 'AIzaprompt-test-key-ok',
         }
 
         global.fetch = jest.fn().mockResolvedValue({
             ok: true,
-            json: jest.fn().mockResolvedValue({ success: true, result: 'prompt-engine response' })
+            json: jest.fn().mockResolvedValue({
+                candidates: [{ content: { parts: [{ text: 'prompt-engine response' }] } }],
+            })
         })
     })
 
@@ -52,7 +53,8 @@ describe('prompt engine', () => {
 
         expect(result).toBe('prompt-engine response')
         expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][1].body.get('prompt')).toBe('Prepare a flowchart')
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+        expect(body.contents[0].parts[0].text).toBe('Prepare a flowchart')
         expect(connectDBMock).not.toHaveBeenCalled()
         expect(findMock).not.toHaveBeenCalled()
         expect(createMock).not.toHaveBeenCalled()

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { generateCustomAIPublicContent } from '@/lib/ai/providers/customProvider'
+import { generateContent } from '@/lib/gemini'
 import { buildDirectReportsFilter } from '@/lib/teamScope'
 
 // Get current month key in "YYYY-MM" format
@@ -43,9 +43,9 @@ async function checkAndDeductToken(MiraTokenUsage, userId) {
   }
 }
 
-// Route all MIRA generation through the shared custom AI provider.
+// Route all MIRA generation through the shared Gemini provider.
 async function generateContentWithSearch(prompt, systemInstruction) {
-  return generateCustomAIPublicContent(prompt, systemInstruction)
+  return generateContent(prompt, systemInstruction)
 }
 
 // Build role-aware system prompt with user context
