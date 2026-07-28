@@ -46,6 +46,8 @@ export default function GuestMeetingRoom({ params }) {
   const [meeting, setMeeting] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isJoined, setIsJoined] = useState(false)
+  const [isJoining, setIsJoining] = useState(false)
+  const [joinError, setJoinError] = useState('')
 
   // Meeting controls
   const [isMuted, setIsMuted] = useState(false)
@@ -80,6 +82,7 @@ export default function GuestMeetingRoom({ params }) {
   const connectionQualityRef = useRef('good')
   const connectionRecoverySamplesRef = useRef(0)
   const iceRestartingPeersRef = useRef(new Set())
+  const joiningRef = useRef(false)
 
   useEffect(() => {
     showChatRef.current = showChat
@@ -225,8 +228,15 @@ export default function GuestMeetingRoom({ params }) {
 
   // Join meeting
   const joinMeeting = useCallback(async () => {
-    if (!guestInfo || !meeting?.roomId) return
+    if (joiningRef.current) return
+    if (!guestInfo?.guestToken || !meeting?.roomId) {
+      setJoinError('Your guest session is not ready. Please return to the invite and try again.')
+      return
+    }
 
+    joiningRef.current = true
+    setIsJoining(true)
+    setJoinError('')
     try {
       // Use existing preview stream
       let joiningMuted = isMuted
@@ -251,7 +261,10 @@ export default function GuestMeetingRoom({ params }) {
       const { io } = await import('socket.io-client')
       socketRef.current = io({
         path: '/api/socketio',
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
+        tryAllTransports: true,
+        upgrade: true,
+        timeout: 20000,
         auth: { token: guestInfo.guestToken },
         autoConnect: false,
       })
@@ -450,7 +463,12 @@ export default function GuestMeetingRoom({ params }) {
       socketRef.current?.disconnect()
       socketRef.current = null
       meetingSocketJoinedRef.current = false
-      toast.error(error.message || 'Failed to join meeting')
+      const message = error.message || 'Failed to join meeting'
+      setJoinError(message)
+      toast.error(message)
+    } finally {
+      joiningRef.current = false
+      setIsJoining(false)
     }
   }, [meeting, guestInfo, isMuted])
 
@@ -746,7 +764,7 @@ export default function GuestMeetingRoom({ params }) {
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                 <button
                   onClick={togglePreviewMute}
-                  className={`p-3 rounded-full transition-colors ${isMuted ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
+                  className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors ${isMuted ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
                     }`}
                 >
                   <CutLineIcon isOff={isMuted}>
@@ -755,7 +773,7 @@ export default function GuestMeetingRoom({ params }) {
                 </button>
                 <button
                   onClick={togglePreviewVideo}
-                  className={`p-3 rounded-full transition-colors ${isVideoOff ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
+                  className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors ${isVideoOff ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
                     }`}
                 >
                   <CutLineIcon isOff={isVideoOff}>
@@ -768,14 +786,22 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={joinMeeting}
-            disabled={!previewReady && !previewError}
-            className={`w-full py-3 font-medium rounded-xl transition-colors ${previewReady || previewError
+            disabled={isJoining || (!previewReady && !previewError)}
+            aria-busy={isJoining}
+            className={`relative flex w-full items-center justify-center gap-2 py-3 font-medium rounded-xl transition-colors ${!isJoining && (previewReady || previewError)
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
           >
-            Join Meeting
+            {isJoining && <Loader size="xs" />}
+            <span>{isJoining ? 'Joining…' : 'Join Meeting'}</span>
           </button>
+
+          {joinError && (
+            <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">
+              {joinError}
+            </p>
+          )}
 
           <button
             onClick={() => {
@@ -921,10 +947,10 @@ export default function GuestMeetingRoom({ params }) {
 
       {/* Controls */}
       <div className="border-t border-slate-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-slate-900">
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-start gap-2 overflow-x-auto sm:justify-center sm:gap-3">
           <button
             onClick={toggleMute}
-            className={`p-4 rounded-full transition-colors ${isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+            className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
             <CutLineIcon isOff={isMuted} className={isMuted ? 'text-white' : 'text-slate-700 dark:text-white'}>
@@ -934,7 +960,7 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={toggleVideo}
-            className={`p-4 rounded-full transition-colors ${isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+            className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
             <CutLineIcon isOff={isVideoOff} className={isVideoOff ? 'text-white' : 'text-slate-700 dark:text-white'}>
@@ -944,16 +970,16 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={toggleHandRaise}
-            className={`p-4 rounded-full transition-colors ${handRaised ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+            className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${handRaised ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
             <HiOutlineHandRaised className={`h-6 w-6 ${handRaised ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
           </button>
 
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <button
               onClick={() => setShowReactions(!showReactions)}
-              className="rounded-full bg-slate-200 p-4 text-slate-700 transition-colors hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 text-slate-700 transition-colors hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600 sm:h-14 sm:w-14"
             >
               <BsEmojiSmile className="w-6 h-6 text-white" />
             </button>
@@ -976,7 +1002,7 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={() => setShowChat(!showChat)}
-            className={`relative p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+            className={`relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
             <HiOutlineChatBubbleLeftRight className={`h-6 w-6 ${showChat ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
@@ -989,7 +1015,7 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={() => setShowParticipants(!showParticipants)}
-            className={`p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+            className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
             <HiOutlineUserGroup className={`h-6 w-6 ${showParticipants ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
@@ -997,7 +1023,7 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={leaveMeeting}
-            className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-red-500 transition-colors hover:bg-red-600 sm:h-14 sm:w-14"
           >
             <HiOutlinePhoneXMark className="w-6 h-6 text-white" />
           </button>

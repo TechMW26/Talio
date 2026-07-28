@@ -11,6 +11,10 @@ describe('Socket.IO authentication boundaries', () => {
     path.join(process.cwd(), 'app', 'join', '[guestLink]', 'room', 'page.js'),
     'utf8'
   )
+  const guestEntrySource = fs.readFileSync(
+    path.join(process.cwd(), 'app', 'join', '[guestLink]', 'page.js'),
+    'utf8'
+  )
   const guestRouteSource = fs.readFileSync(
     path.join(process.cwd(), 'app', 'api', 'meetings', 'guest', '[guestLink]', 'route.js'),
     'utf8'
@@ -46,6 +50,13 @@ describe('Socket.IO authentication boundaries', () => {
     expect(serverSource).toContain('guest.roomId === String(roomId)')
     expect(serverSource).toContain('authorizeMeetingJoin(normalizedRoomId)')
     expect(serverSource).toContain('`meeting:${tenantDatabaseName}:${normalizedRoomId}`')
+  })
+
+  test('guest entry preserves its session and supports socket transport fallback', () => {
+    expect(guestEntrySource).toContain("sessionStorage.setItem('guestInfo'")
+    expect(guestEntrySource).toContain('window.location.assign(')
+    expect(guestClientSource).toContain("transports: ['polling', 'websocket']")
+    expect(guestClientSource).toContain('tryAllTransports: true')
   })
 
   test('meeting chat confirms delivery only for joined sockets', () => {

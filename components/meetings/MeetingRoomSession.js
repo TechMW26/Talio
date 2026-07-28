@@ -1512,7 +1512,7 @@ export default function MeetingRoomSession({
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                 <button
                   onClick={togglePreviewMute}
-                  className={`p-3 rounded-full transition-colors ${isMuted
+                  className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors ${isMuted
                     ? 'bg-red-500 hover:bg-red-600 text-white'
                     : 'bg-gray-800/80 hover:bg-gray-700 text-white'
                     }`}
@@ -1524,7 +1524,7 @@ export default function MeetingRoomSession({
                 </button>
                 <button
                   onClick={togglePreviewVideo}
-                  className={`p-3 rounded-full transition-colors ${isVideoOff
+                  className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors ${isVideoOff
                     ? 'bg-red-500 hover:bg-red-600 text-white'
                     : 'bg-gray-800/80 hover:bg-gray-700 text-white'
                     }`}
@@ -1793,7 +1793,7 @@ export default function MeetingRoomSession({
         <button
           type="button"
           onClick={() => onSetPipSize?.('expanded')}
-          className="fixed bottom-20 right-4 z-[130] flex h-14 w-14 items-center justify-center rounded-full border border-indigo-300/40 bg-indigo-600 text-white shadow-2xl transition hover:scale-105 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 sm:bottom-6 sm:right-6"
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-[130] flex h-14 w-14 items-center justify-center rounded-full border border-indigo-300/40 bg-indigo-600 text-white shadow-2xl ring-1 ring-black/10 transition hover:scale-105 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:ring-white/15 sm:bottom-6 sm:right-36"
           title="Expand Talio Meet"
           aria-label="Expand Talio Meet picture in picture"
         >
@@ -1809,45 +1809,56 @@ export default function MeetingRoomSession({
       <>
         {renderPipAudioSinks()}
         <section
-          className="fixed bottom-20 right-3 z-[130] flex w-[min(22rem,calc(100vw-1.5rem))] items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-slate-900 shadow-2xl backdrop-blur dark:border-white/15 dark:bg-slate-950/95 dark:text-white sm:bottom-5 sm:right-5"
+          className="fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex max-w-[23rem] items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2.5 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950/95 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:bottom-5 sm:right-20 sm:mx-0 sm:w-[23rem]"
           aria-label="Talio Meet compact picture in picture"
         >
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600">
-          <HiOutlineVideoCamera className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{meeting?.title || 'Talio Meet'}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{participants.length + 1} participants · {isMuted ? 'Muted' : 'Mic on'}</p>
-        </div>
-        <button
-          type="button"
-          onClick={toggleMute}
-          className={`rounded-full p-2 text-white ${isMuted ? 'bg-red-600' : 'bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600'}`}
-          title={isMuted ? 'Unmute' : 'Mute'}
-          aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
-        >
-          <CutLineIcon isOff={isMuted}>
-            <HiMiniMicrophone className="h-4 w-4" />
-          </CutLineIcon>
-        </button>
-        <button
-          type="button"
-          onClick={() => onSetPipSize?.('expanded')}
-          className="rounded-full bg-slate-200 p-2 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
-          title="Expand PiP"
-          aria-label="Expand picture in picture"
-        >
-          <HiOutlineArrowsPointingOut className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onSetPipSize?.('bubble')}
-          className="rounded-full bg-slate-200 p-2 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
-          title="Minimise to bubble"
-          aria-label="Minimise picture in picture to bubble"
-        >
-          <HiOutlineMinusSmall className="h-4 w-4" />
-        </button>
+          <button
+            type="button"
+            onClick={restoreFullMeeting}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1 text-left transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:hover:bg-white/10"
+            title="Return to meeting"
+            aria-label="Return to full meeting"
+          >
+            <span className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+              <HiOutlineVideoCamera className="h-5 w-5" />
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400 dark:border-slate-950" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">{meeting?.title || 'Talio Meet'}</span>
+              <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">
+                Live · {participants.length + 1} participants · {isMuted ? 'Muted' : 'Mic on'}
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={toggleMute}
+            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ${isMuted ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-700 hover:bg-slate-600'}`}
+            title={isMuted ? 'Unmute' : 'Mute'}
+            aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+          >
+            <CutLineIcon isOff={isMuted}>
+              <HiMiniMicrophone className="h-4 w-4" />
+            </CutLineIcon>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetPipSize?.('expanded')}
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-700 transition hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
+            title="Expand PiP"
+            aria-label="Expand picture in picture"
+          >
+            <HiOutlineArrowsPointingOut className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetPipSize?.('bubble')}
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-700 transition hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
+            title="Minimise to bubble"
+            aria-label="Minimise picture in picture to bubble"
+          >
+            <HiOutlineMinusSmall className="h-4 w-4" />
+          </button>
         </section>
       </>
     )
@@ -1862,19 +1873,22 @@ export default function MeetingRoomSession({
       <>
         {renderPipAudioSinks(isScreenSharing ? null : pipParticipant?.id)}
         <section
-          className="fixed bottom-20 right-3 z-[130] w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-white/15 dark:bg-slate-950 dark:text-white sm:bottom-5 sm:right-5"
+          className="fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[130] mx-auto max-h-[calc(100dvh-7rem)] max-w-[26rem] overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950/95 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:bottom-5 sm:right-20 sm:mx-0 sm:w-[24rem]"
           aria-label="Talio Meet picture in picture"
         >
-        <header className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-white/10">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
+        <header className="flex items-center gap-2 border-b border-slate-200/80 px-3 py-2.5 dark:border-white/10">
+          <span className="flex flex-shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" aria-hidden="true" />
+            Live
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-sm font-semibold">{meeting?.title || 'Talio Meet'}</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">{participants.length + 1} participants</p>
+            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{participants.length + 1} participants</p>
           </div>
           <button
             type="button"
             onClick={restoreFullMeeting}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
             title="Return to meeting"
             aria-label="Return to full meeting"
           >
@@ -1883,7 +1897,7 @@ export default function MeetingRoomSession({
           <button
             type="button"
             onClick={() => onSetPipSize?.('compact')}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
             title="Compact PiP"
             aria-label="Compact picture in picture"
           >
@@ -1892,7 +1906,7 @@ export default function MeetingRoomSession({
           <button
             type="button"
             onClick={() => onSetPipSize?.('bubble')}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
             title="Minimise to bubble"
             aria-label="Minimise picture in picture to bubble"
           >
@@ -1900,7 +1914,7 @@ export default function MeetingRoomSession({
           </button>
         </header>
 
-        <div className="aspect-video bg-slate-100 p-2 dark:bg-slate-900">
+        <div className="aspect-video bg-slate-100 p-1.5 dark:bg-slate-900">
           {isScreenSharing
             ? renderTile('screen')
             : pipParticipant
@@ -1908,11 +1922,14 @@ export default function MeetingRoomSession({
               : renderTile('local')}
         </div>
 
-        <footer className="flex items-center justify-center gap-2 border-t border-slate-200 p-2.5 dark:border-white/10">
+        <footer className="flex items-center gap-2 border-t border-slate-200/80 px-3 py-2.5 dark:border-white/10">
+          <p className="mr-auto min-w-0 flex-1 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            {isMuted ? 'Microphone muted' : 'Microphone on'} · {isVideoOff ? 'Camera off' : 'Camera on'}
+          </p>
           <button
             type="button"
             onClick={toggleMute}
-            className={`rounded-full p-2.5 ${isMuted ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-700 hover:bg-slate-600'}`}
+            className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ${isMuted ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-700 hover:bg-slate-600'}`}
             title={isMuted ? 'Unmute' : 'Mute'}
             aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
           >
@@ -1923,7 +1940,7 @@ export default function MeetingRoomSession({
           <button
             type="button"
             onClick={toggleVideo}
-            className={`rounded-full p-2.5 ${isVideoOff ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-700 hover:bg-slate-600'}`}
+            className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ${isVideoOff ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-700 hover:bg-slate-600'}`}
             title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
             aria-label={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
           >
@@ -1934,7 +1951,7 @@ export default function MeetingRoomSession({
           <button
             type="button"
             onClick={() => openPanelFromPip('chat')}
-            className="rounded-full bg-slate-700 p-2.5 hover:bg-slate-600"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-700 text-white transition hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
             title="Open meeting chat"
             aria-label="Open meeting chat"
           >
@@ -1943,7 +1960,7 @@ export default function MeetingRoomSession({
           <button
             type="button"
             onClick={leaveMeeting}
-            className="rounded-full bg-red-600 p-2.5 hover:bg-red-500"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-600 text-white transition hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-400"
             title="Leave meeting"
             aria-label="Leave meeting"
           >
@@ -2232,7 +2249,7 @@ export default function MeetingRoomSession({
         {/* Mute */}
         <button
           onClick={toggleMute}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={isMuted ? 'Unmute' : 'Mute'}
         >
@@ -2244,7 +2261,7 @@ export default function MeetingRoomSession({
         {/* Video */}
         <button
           onClick={toggleVideo}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${isVideoOff ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${isVideoOff ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
         >
@@ -2256,7 +2273,7 @@ export default function MeetingRoomSession({
         {/* Screen Share - Hidden on mobile */}
         <button
           onClick={toggleScreenShare}
-          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${isScreenSharing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+          className={`hidden h-14 w-14 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:flex ${isScreenSharing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
         >
@@ -2266,7 +2283,7 @@ export default function MeetingRoomSession({
         {/* Record - Hidden on mobile */}
         <button
           onClick={toggleRecording}
-          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+          className={`hidden h-14 w-14 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:flex ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={isRecording ? 'Stop recording' : 'Start recording'}
         >
@@ -2276,7 +2293,7 @@ export default function MeetingRoomSession({
         {/* Raise Hand */}
         <button
           onClick={raiseHand}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${handRaised ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${handRaised ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={handRaised ? 'Lower hand' : 'Raise hand'}
         >
@@ -2284,10 +2301,10 @@ export default function MeetingRoomSession({
         </button>
 
         {/* Reactions */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowReactions(!showReactions)}
-            className={`p-2.5 sm:p-4 rounded-full transition-colors ${showReactions ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+            className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${showReactions ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
             title="Reactions"
           >
@@ -2319,7 +2336,7 @@ export default function MeetingRoomSession({
             setShowChat(false)
             setShowParticipants(false)
           }}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showNotetaker ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${showNotetaker ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title="Mira"
         >
@@ -2333,7 +2350,7 @@ export default function MeetingRoomSession({
             setShowNotetaker(false)
             setShowParticipants(false)
           }}
-          className={`relative p-2.5 sm:p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+          className={`relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title="Chat"
         >
@@ -2352,7 +2369,7 @@ export default function MeetingRoomSession({
             setShowChat(false)
             setShowNotetaker(false)
           }}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
+          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title="Participants"
         >
@@ -2363,7 +2380,7 @@ export default function MeetingRoomSession({
         <button
           onClick={leaveMeeting}
           disabled={isEndingMeeting}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ml-2 sm:ml-4 ${isEndingMeeting ? 'bg-red-400 cursor-wait' : 'bg-red-600 hover:bg-red-700'}`}
+          className={`ml-2 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:ml-4 sm:h-14 sm:w-14 ${isEndingMeeting ? 'bg-red-400 cursor-wait' : 'bg-red-600 hover:bg-red-700'}`}
           title="Leave meeting"
         >
           <HiOutlinePhoneXMark className="w-5 h-5 sm:w-6 sm:h-6 text-white" />

@@ -64,14 +64,12 @@ export function MeetingSessionProvider({ children }) {
   const [activeRoomId, setActiveRoomId] = useState(routeRoomId)
   const [isJoined, setIsJoined] = useState(false)
   const [pipSize, setPipSize] = useState('expanded')
-  const [isMinimized, setIsMinimized] = useState(false)
 
   useEffect(() => {
     if (routeRoomId && routeRoomId !== activeRoomId) {
       setActiveRoomId(routeRoomId)
       setIsJoined(false)
       setPipSize('expanded')
-      setIsMinimized(false)
       return
     }
 
@@ -81,20 +79,18 @@ export function MeetingSessionProvider({ children }) {
   }, [activeRoomId, isJoined, routeRoomId])
 
   useEffect(() => {
-    if (routeRoomId) {
-      setIsMinimized(false)
+    if (activeRoomId) {
+      router.prefetch?.('/dashboard')
     }
-  }, [routeRoomId])
+  }, [activeRoomId, router])
 
   const minimizeToPip = useCallback(() => {
     setPipSize('expanded')
-    setIsMinimized(true)
-    router.push('/dashboard')
+    router.replace('/dashboard')
   }, [router])
 
   const restoreMeeting = useCallback(() => {
     if (activeRoomId) {
-      setIsMinimized(false)
       router.push(`/dashboard/meetings/room/${activeRoomId}`)
     }
   }, [activeRoomId, router])
@@ -103,7 +99,6 @@ export function MeetingSessionProvider({ children }) {
     setActiveRoomId(null)
     setIsJoined(false)
     setPipSize('expanded')
-    setIsMinimized(false)
   }, [])
 
   const value = useMemo(() => ({
@@ -114,7 +109,7 @@ export function MeetingSessionProvider({ children }) {
     setPipSize,
   }), [activeRoomId, isJoined, pipSize, restoreMeeting])
 
-  const isFullRoom = Boolean(routeRoomId && routeRoomId === activeRoomId && !isMinimized)
+  const isFullRoom = Boolean(routeRoomId && routeRoomId === activeRoomId)
   const shouldRenderSession = Boolean(activeRoomId && (isFullRoom || isJoined))
 
   return (

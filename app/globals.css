@@ -324,6 +324,12 @@ html, body {
   flex-shrink: 0 !important;
 }
 
+/* Inline loaders must not consume the free space inside flex buttons. */
+button .talio-loader,
+[role="button"] .talio-loader {
+  margin-inline: 0 !important;
+}
+
 /* Extra Small Loader (16px) - Buttons, inline */
 .talio-loader[data-loader-size="xs"] {
   width: 16px !important;

@@ -4,10 +4,18 @@ let mockPathname = '/dashboard/meetings/room/room-123'
 const mockPush = jest.fn(path => {
   mockPathname = path
 })
+const mockReplace = jest.fn(path => {
+  mockPathname = path
+})
+const mockPrefetch = jest.fn()
 
 jest.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    prefetch: mockPrefetch,
+  }),
 }))
 
 jest.mock('next/dynamic', () => ({
@@ -33,10 +41,12 @@ describe('MeetingSessionProvider', () => {
   beforeEach(() => {
     mockPathname = '/dashboard/meetings/room/room-123'
     mockPush.mockClear()
+    mockReplace.mockClear()
+    mockPrefetch.mockClear()
   })
 
   it('keeps the joined session mounted as PiP while navigating back to Talio', () => {
-    render(
+    const view = render(
       <MeetingSessionProvider>
         <div>Dashboard content</div>
       </MeetingSessionProvider>
@@ -48,7 +58,15 @@ describe('MeetingSessionProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Join test meeting' }))
     fireEvent.click(screen.getByRole('button', { name: 'Minimise test meeting' }))
 
-    expect(mockPush).toHaveBeenCalledWith('/dashboard')
+    expect(mockReplace).toHaveBeenCalledWith('/dashboard')
+    expect(screen.getByTestId('meeting-display-mode')).toHaveTextContent('full')
+
+    view.rerender(
+      <MeetingSessionProvider>
+        <div>Dashboard content</div>
+      </MeetingSessionProvider>
+    )
+
     expect(screen.getByTestId('meeting-display-mode')).toHaveTextContent('expanded')
     expect(screen.getByText('Dashboard content')).toBeInTheDocument()
   })
