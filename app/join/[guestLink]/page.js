@@ -64,6 +64,9 @@ export default function GuestJoinPage({ params }) {
         sessionStorage.setItem('guestInfo', JSON.stringify({
           guestName: data.data.guestName,
           guestToken: data.data.guestToken,
+          guestId: data.data.guestId,
+          roomId: data.data.roomId,
+          guestLink,
           isGuest: true
         }))
 
@@ -85,6 +88,7 @@ export default function GuestJoinPage({ params }) {
   // Format date/time
   const formatDateTime = (date) => {
     return new Date(date).toLocaleString('en-US', {
+      timeZone: 'Asia/Kolkata',
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -158,6 +162,7 @@ export default function GuestJoinPage({ params }) {
               <HiOutlineClock className="w-5 h-5 text-indigo-500" />
               <span>
                 Until {new Date(meeting?.scheduledEnd).toLocaleTimeString('en-US', {
+                  timeZone: 'Asia/Kolkata',
                   hour: 'numeric',
                   minute: '2-digit',
                   hour12: true

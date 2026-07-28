@@ -19,7 +19,7 @@ const IpBlockSchema = new mongoose.Schema({
     eventType: { type: String, default: '' },         // last triggering event type
     hits: { type: Number, default: 1 },               // consecutive triggering events
     blockedAt: { type: Date, default: Date.now, index: true },
-    expiresAt: { type: Date, default: null, index: true },
+    expiresAt: { type: Date, default: null },
     createdBySuperadminId: { type: String, default: null },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
 }, { strict: false });

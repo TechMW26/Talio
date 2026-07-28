@@ -20,6 +20,12 @@ import {
 import toast from '@/utils/toast'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import { getDateTimePartsInTimezone, parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
+
+const toISTDateTimeLocal = (date) => {
+  const parts = getDateTimePartsInTimezone(date, IST_TIMEZONE)
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}T${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`
+}
 
 export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState(1) // 1: Basic Info, 2: Invitees, 3: Review
@@ -79,17 +85,16 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
       
       // Auto-calculate end time from start time + duration
       if (field === 'scheduledStart' && value) {
-        const startDate = new Date(value)
+        const startDate = parseDateTimeInTimezone(value, IST_TIMEZONE)
         const endDate = new Date(startDate.getTime() + prev.duration * 60 * 1000)
-        // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-        updated.scheduledEnd = endDate.toISOString().slice(0, 16)
+        updated.scheduledEnd = toISTDateTimeLocal(endDate)
       }
       
       // Recalculate end time when duration changes
       if (field === 'duration' && prev.scheduledStart) {
-        const startDate = new Date(prev.scheduledStart)
+        const startDate = parseDateTimeInTimezone(prev.scheduledStart, IST_TIMEZONE)
         const endDate = new Date(startDate.getTime() + value * 60 * 1000)
-        updated.scheduledEnd = endDate.toISOString().slice(0, 16)
+        updated.scheduledEnd = toISTDateTimeLocal(endDate)
       }
       
       return updated
@@ -687,7 +692,8 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 <div className="flex items-center gap-2 text-sm text-gray-600 pl-9">
                   <HiOutlineCalendarDays className="w-4 h-4" />
                   <span>
-                    {new Date(formData.scheduledStart).toLocaleDateString('en-IN', {
+                    {parseDateTimeInTimezone(formData.scheduledStart, IST_TIMEZONE)?.toLocaleDateString('en-IN', {
+                      timeZone: IST_TIMEZONE,
                       weekday: 'long',
                       day: 'numeric',
                       month: 'long',
@@ -699,9 +705,9 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 <div className="flex items-center gap-2 text-sm text-gray-600 pl-9">
                   <HiOutlineClock className="w-4 h-4" />
                   <span>
-                    {new Date(formData.scheduledStart).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {parseDateTimeInTimezone(formData.scheduledStart, IST_TIMEZONE)?.toLocaleTimeString('en-IN', { timeZone: IST_TIMEZONE, hour: '2-digit', minute: '2-digit' })}
                     {' - '}
-                    {new Date(formData.scheduledEnd).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {parseDateTimeInTimezone(formData.scheduledEnd, IST_TIMEZONE)?.toLocaleTimeString('en-IN', { timeZone: IST_TIMEZONE, hour: '2-digit', minute: '2-digit' })}
                     {' '}
                     <span className="text-gray-500">
                       ({formData.duration >= 60 

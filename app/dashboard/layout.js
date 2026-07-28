@@ -21,6 +21,7 @@ import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { PageTransitionProvider, usePageTransition } from '@/contexts/PageTransitionContext'
 import { TicTacToeProvider } from '@/contexts/TicTacToeContext'
+import { MeetingSessionProvider } from '@/contexts/MeetingSessionContext'
 import RouteProgressBar from '@/components/ui/RouteProgressBar'
 import { getSkeletonForRoute } from '@/components/ui/PageSkeletons'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
@@ -411,29 +412,32 @@ export default function DashboardLayout({ children }) {
   // For meeting room pages, render children directly without any layout chrome
   if (isMeetingRoomPage) {
     return (
-      <SocketProvider>
-        <CompanyFeaturesProvider>
-          <CompanyFeatureRouteGuard />
-          <TicTacToeProvider>
-            <UnreadMessagesProvider>
-              <ChatWidgetProvider>
-                <InAppNotificationProvider>
-                  <ActionableToastProvider>
-                    {children}
-                    <CallAlertReceiver />
-                  </ActionableToastProvider>
-                </InAppNotificationProvider>
-              </ChatWidgetProvider>
-            </UnreadMessagesProvider>
-          </TicTacToeProvider>
-        </CompanyFeaturesProvider>
-      </SocketProvider>
+      <MeetingSessionProvider>
+        <SocketProvider>
+          <CompanyFeaturesProvider>
+            <CompanyFeatureRouteGuard />
+            <TicTacToeProvider>
+              <UnreadMessagesProvider>
+                <ChatWidgetProvider>
+                  <InAppNotificationProvider>
+                    <ActionableToastProvider>
+                      {children}
+                      <CallAlertReceiver />
+                    </ActionableToastProvider>
+                  </InAppNotificationProvider>
+                </ChatWidgetProvider>
+              </UnreadMessagesProvider>
+            </TicTacToeProvider>
+          </CompanyFeaturesProvider>
+        </SocketProvider>
+      </MeetingSessionProvider>
     )
   }
 
   return (
-    <SocketProvider>
-      <CompanyFeaturesProvider>
+    <MeetingSessionProvider>
+      <SocketProvider>
+        <CompanyFeaturesProvider>
         <CompanyFeatureRouteGuard />
         <TicTacToeProvider>
           <UnreadMessagesProvider>
@@ -536,7 +540,8 @@ export default function DashboardLayout({ children }) {
             </ChatWidgetProvider>
           </UnreadMessagesProvider>
         </TicTacToeProvider>
-      </CompanyFeaturesProvider>
-    </SocketProvider>
+        </CompanyFeaturesProvider>
+      </SocketProvider>
+    </MeetingSessionProvider>
   )
 }

@@ -1,4 +1,10 @@
-import { parseDateTimeInTimezone } from '@/lib/timezone'
+import {
+    getDateKeyInTimezone,
+    getISTEndOfDay,
+    getISTStartOfDay,
+    parseDateTimeInTimezone,
+    toISTString,
+} from '@/lib/timezone'
 
 function getTimeParts(date, timeZone) {
     const parts = new Intl.DateTimeFormat('en-GB', {
@@ -40,5 +46,18 @@ describe('attendance correction timezone parsing', () => {
 
         expect(parsed?.toISOString()).toBe('2026-07-04T13:00:00.000Z')
         expect(getTimeParts(parsed, 'America/New_York')).toMatchObject({ hour: '09', minute: '00' })
+    })
+
+    test('uses the IST calendar date across the UTC midnight boundary', () => {
+        expect(getDateKeyInTimezone('2026-07-28T20:30:00.000Z')).toBe('2026-07-29')
+    })
+
+    test('creates exact IST day boundaries without shifting the stored instant', () => {
+        expect(getISTStartOfDay('2026-07-29').toISOString()).toBe('2026-07-28T18:30:00.000Z')
+        expect(getISTEndOfDay('2026-07-29').toISOString()).toBe('2026-07-29T18:29:59.999Z')
+    })
+
+    test('serializes an IST value with its real offset', () => {
+        expect(toISTString('2026-07-28T20:30:00.123Z')).toBe('2026-07-29T02:00:00.123+05:30')
     })
 })

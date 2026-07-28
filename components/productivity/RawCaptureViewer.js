@@ -17,6 +17,7 @@ import {
 } from 'react-icons/hi2'
 import ModalPortal from '@/components/ModalPortal'
 import Loader from '@/components/ui/Loader'
+import { getDateKeyInTimezone, getTodayDateString, IST_TIMEZONE } from '@/lib/timezone'
 
 /**
  * RawCaptureViewer Component
@@ -26,7 +27,7 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
   const [captures, setCaptures] = useState([])
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState(date || new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(date || getTodayDateString())
   const [captureType, setCaptureType] = useState('all') // 'all', 'automatic', 'manual'
   const [selectedCapture, setSelectedCapture] = useState(null)
   const [user, setUser] = useState(null)
@@ -100,13 +101,14 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
   const changeDate = (direction) => {
     const d = new Date(selectedDate)
     d.setDate(d.getDate() + direction)
-    setSelectedDate(d.toISOString().split('T')[0])
+    setSelectedDate(getDateKeyInTimezone(d))
   }
 
   // Format time
   const formatTime = (timestamp) => {
     if (!timestamp) return '--:--'
     return new Date(timestamp).toLocaleTimeString('en-US', {
+      timeZone: IST_TIMEZONE,
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
@@ -170,12 +172,12 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={getTodayDateString()}
                 className="border-0 focus:ring-0 text-sm w-32 text-center"
               />
               <button
                 onClick={() => changeDate(1)}
-                disabled={selectedDate >= new Date().toISOString().split('T')[0]}
+                disabled={selectedDate >= getTodayDateString()}
                 className="p-2 hover:bg-gray-100 rounded-r-lg transition disabled:opacity-50"
               >
                 <HiOutlineChevronRight className="w-4 h-4" />

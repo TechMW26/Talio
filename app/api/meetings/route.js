@@ -4,6 +4,7 @@ import { sendPushToUser } from '@/lib/pushNotification'
 import { sendMeetingInviteEmail } from '@/lib/mailer'
 import { emitMeetingUpdate } from '@/lib/realtimeEvents'
 import { createMeetingInvitationNotification } from '@/lib/actionableNotifications'
+import { getEndOfDayInTimezone, getStartOfDayInTimezone, parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -30,9 +31,9 @@ export async function GET(request) {
     const view = searchParams.get('view') // my-meetings, invited, all
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
-    const roomIdParam = searchParams.get('roomId') // For fetching specific meeting by room ID
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const roomIdParam = searchParams.get('roomId')?.trim().slice(0, 160) // For fetching specific meeting by room ID
+    const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1)
+    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get('limit') || '20', 10) || 20))
 
     // Get employee ID from user - first check User.employeeId, then Employee.userId
     const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
@@ -57,6 +58,10 @@ export async function GET(request) {
     // If fetching by roomId, use that directly (for meeting room page)
     if (roomIdParam) {
       query.roomId = roomIdParam
+      query.$or = [
+        { organizer: employee._id },
+        { 'invitees.employee': employee._id }
+      ]
     }
 
     // Filter by type
@@ -73,14 +78,14 @@ export async function GET(request) {
     if (startDate || endDate) {
       query.scheduledStart = {}
       if (startDate) {
-        query.scheduledStart.$gte = new Date(startDate)
+        query.scheduledStart.$gte = getStartOfDayInTimezone(startDate, IST_TIMEZONE)
       }
       if (endDate) {
-        query.scheduledStart.$lte = new Date(endDate)
+        query.scheduledStart.$lte = getEndOfDayInTimezone(endDate, IST_TIMEZONE)
       }
     }
 
-    // Filter by view type (skip if searching by roomId - we want the specific meeting)
+    // Filter by view type. Room lookups already include an explicit access scope.
     if (!roomIdParam) {
       if (view === 'my-meetings') {
         query.organizer = employee._id
@@ -179,11 +184,11 @@ export async function POST(request) {
     }
 
     // Parse and validate times
-    let startTime = new Date(data.scheduledStart)
-    let endTime = new Date(data.scheduledEnd)
+    let startTime = parseDateTimeInTimezone(data.scheduledStart, IST_TIMEZONE)
+    let endTime = parseDateTimeInTimezone(data.scheduledEnd, IST_TIMEZONE)
 
     // Validate that dates are valid
-    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+    if (!startTime || !endTime || isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
       return NextResponse.json({ 
         success: false, 
         message: 'Invalid date format for start or end time' 

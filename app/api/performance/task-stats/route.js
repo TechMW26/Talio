@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import { getDateTimePartsInTimezone, getTodayDateString } from '@/lib/timezone';
 
 /**
  * GET /api/performance/task-stats
@@ -25,8 +26,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
 
     // Parse date range
-    const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-    const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
+    const currentYear = getDateTimePartsInTimezone().year;
+    const startDate = searchParams.get('startDate') || `${currentYear}-01-01`;
+    const endDate = searchParams.get('endDate') || getTodayDateString();
     const departmentFilter = searchParams.get('department');
     const departmentsFilter = searchParams.get('departments'); // Comma-separated list of department IDs
 

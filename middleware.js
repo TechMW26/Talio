@@ -4,6 +4,15 @@ import { jwtVerify } from 'jose'
 const TOKEN_CACHE = global.__tokenCache || new Map()
 const TOKEN_CACHE_TTL = 5 * 60 * 1000
 const TOKEN_CACHE_MAX_SIZE = 500 // Prevent unbounded memory growth
+const VERIFIED_HEADER_NAMES = [
+  'x-user-id',
+  'x-verified-user-id',
+  'x-verified-database',
+  'x-verified-email',
+  'x-verified-company-slug',
+  'x-verified-company-name',
+  'x-verified-role',
+]
 
 if (!global.__tokenCache) {
   global.__tokenCache = TOKEN_CACHE
@@ -136,19 +145,27 @@ export async function middleware(request) {
         setCachedPayload(token, payload)
       }
 
-      // For API routes, we can't easily check forcePasswordChange without DB access
-      // The frontend will handle the redirect, and individual API routes should check if needed
-      // However, we add a header to indicate we should check password change
-      const response = NextResponse.next()
-      response.headers.set('x-user-id', payload.userId)
-      // Pass verified payload data as headers so auth.js can skip re-verification
-      if (payload.userId) response.headers.set('x-verified-user-id', payload.userId)
-      if (payload.databaseName) response.headers.set('x-verified-database', payload.databaseName)
-      if (payload.email) response.headers.set('x-verified-email', payload.email)
-      if (payload.companySlug) response.headers.set('x-verified-company-slug', payload.companySlug)
-      if (payload.companyName) response.headers.set('x-verified-company-name', payload.companyName)
-      if (payload.role) response.headers.set('x-verified-role', payload.role)
-      return response
+      // Forward only server-verified identity data to route handlers. These must
+      // be request headers (not response headers), and any client-supplied values
+      // must be removed first to prevent cross-tenant header spoofing.
+      const requestHeaders = new Headers(request.headers)
+      VERIFIED_HEADER_NAMES.forEach((name) => requestHeaders.delete(name))
+
+      if (payload.userId) {
+        requestHeaders.set('x-user-id', String(payload.userId))
+        requestHeaders.set('x-verified-user-id', String(payload.userId))
+      }
+      if (payload.databaseName) requestHeaders.set('x-verified-database', String(payload.databaseName))
+      if (payload.email) requestHeaders.set('x-verified-email', String(payload.email))
+      if (payload.companySlug) requestHeaders.set('x-verified-company-slug', String(payload.companySlug))
+      if (payload.companyName) requestHeaders.set('x-verified-company-name', String(payload.companyName))
+      if (payload.role) requestHeaders.set('x-verified-role', String(payload.role))
+
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      })
     } catch (error) {
       return NextResponse.json(
         { message: 'Invalid token' },

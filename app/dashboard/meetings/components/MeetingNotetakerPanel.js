@@ -28,6 +28,7 @@ function formatTime(timestamp) {
   if (!timestamp) return '--:--'
 
   return new Date(timestamp).toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     hour: '2-digit',
     minute: '2-digit',
   })

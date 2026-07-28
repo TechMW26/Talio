@@ -22,6 +22,21 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+const EMPLOYEE_SORT_FIELDS = new Set([
+  'createdAt',
+  'updatedAt',
+  'firstName',
+  'lastName',
+  'employeeCode',
+  'dateOfJoining',
+  'designationLevel',
+  'status',
+])
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function makeDesignationCode(title) {
   return (title || '')
     .toString()
@@ -113,15 +128,16 @@ export async function GET(request) {
     const { models: { Employee: TenantEmployee, User: TenantUser, Department: TenantDepartment, Designation: TenantDesignation } } = auth;
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page')) || 1
-    const limit = parseInt(searchParams.get('limit')) || 10
-    const search = searchParams.get('search') || ''
+    const page = Math.max(1, Number.parseInt(searchParams.get('page'), 10) || 1)
+    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get('limit'), 10) || 10))
+    const search = (searchParams.get('search') || '').trim().slice(0, 100)
     const department = searchParams.get('department')
     const departmentsParam = searchParams.get('departments') // Comma-separated list of department IDs
     const designation = searchParams.get('designation')
     const level = searchParams.get('level')
     const status = searchParams.get('status')
-    const sortBy = searchParams.get('sortBy') || 'createdAt'
+    const requestedSortBy = searchParams.get('sortBy') || 'createdAt'
+    const sortBy = EMPLOYEE_SORT_FIELDS.has(requestedSortBy) ? requestedSortBy : 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
     // Redis-backed cache key (tenant-isolated)
@@ -138,7 +154,20 @@ export async function GET(request) {
     }
 
     // Fallback: in-memory queryCache
-    const cacheKey = queryCache.generateKey('employees', page, limit, search, department, departmentsParam, designation, level, status, sortBy, sortOrder)
+    const cacheKey = queryCache.generateKey(
+      auth.tenant.databaseName,
+      'employees',
+      page,
+      limit,
+      search,
+      department,
+      departmentsParam,
+      designation,
+      level,
+      status,
+      sortBy,
+      sortOrder
+    )
     const cached = queryCache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
@@ -148,11 +177,12 @@ export async function GET(request) {
     const query = {}
 
     if (search) {
+      const escapedSearch = escapeRegex(search)
       query.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { employeeCode: { $regex: search, $options: 'i' } },
+        { firstName: { $regex: escapedSearch, $options: 'i' } },
+        { lastName: { $regex: escapedSearch, $options: 'i' } },
+        { email: { $regex: escapedSearch, $options: 'i' } },
+        { employeeCode: { $regex: escapedSearch, $options: 'i' } },
       ]
     }
 
@@ -186,42 +216,45 @@ export async function GET(request) {
 
     // Optimized: Use select() to fetch only needed fields and lean() for plain objects
     // Include salary and statutory fields for payroll calculations
-    const employees = await TenantEmployee.find(query)
-      .select('employeeCode firstName lastName email phone department departments designation designationLevel designationLevelName reportingManager assignedManager assignedTeamLead dateOfJoining status profilePicture salary pfEnrollment esiEnrollment professionalTax healthInsurance basicSalary')
-      .populate({
-        path: 'department',
-        select: 'name _id',
-        options: { strictPopulate: false, lean: true }
-      })
-      .populate({
-        path: 'departments',
-        select: 'name code _id',
-        options: { strictPopulate: false, lean: true }
-      })
-      .populate({
-        path: 'designation',
-        select: 'title levelName level',
-        options: { strictPopulate: false, lean: true }
-      })
-      .populate({
-        path: 'reportingManager',
-        select: 'firstName lastName',
-        options: { strictPopulate: false, lean: true }
-      })
-      .populate({
-        path: 'assignedManager',
-        select: 'firstName lastName employeeCode designation designationLevel designationLevelName',
-        options: { strictPopulate: false, lean: true }
-      })
-      .populate({
-        path: 'assignedTeamLead',
-        select: 'firstName lastName employeeCode designation designationLevel designationLevelName',
-        options: { strictPopulate: false, lean: true }
-      })
-      .sort(sortObj)
-      .skip(skip)
-      .limit(limit)
-      .lean()
+    const [employees, total] = await Promise.all([
+      TenantEmployee.find(query)
+        .select('employeeCode firstName lastName email phone department departments designation designationLevel designationLevelName reportingManager assignedManager assignedTeamLead dateOfJoining status profilePicture salary pfEnrollment esiEnrollment professionalTax healthInsurance basicSalary')
+        .populate({
+          path: 'department',
+          select: 'name _id',
+          options: { strictPopulate: false, lean: true }
+        })
+        .populate({
+          path: 'departments',
+          select: 'name code _id',
+          options: { strictPopulate: false, lean: true }
+        })
+        .populate({
+          path: 'designation',
+          select: 'title levelName level',
+          options: { strictPopulate: false, lean: true }
+        })
+        .populate({
+          path: 'reportingManager',
+          select: 'firstName lastName',
+          options: { strictPopulate: false, lean: true }
+        })
+        .populate({
+          path: 'assignedManager',
+          select: 'firstName lastName employeeCode designation designationLevel designationLevelName',
+          options: { strictPopulate: false, lean: true }
+        })
+        .populate({
+          path: 'assignedTeamLead',
+          select: 'firstName lastName employeeCode designation designationLevel designationLevelName',
+          options: { strictPopulate: false, lean: true }
+        })
+        .sort(sortObj)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      TenantEmployee.countDocuments(query),
+    ])
 
     // Optimized: Single query to get all user data
     const employeeIds = employees.map(emp => emp._id)
@@ -247,8 +280,6 @@ export async function GET(request) {
       userId: userMap[emp._id.toString()] || null
     }))
 
-    const total = await TenantEmployee.countDocuments(query)
-
     const response = {
       success: true,
       data: employeesWithUsers,
@@ -261,7 +292,7 @@ export async function GET(request) {
     }
 
     // Store in Redis cache (30s TTL, tenant-isolated) AND in-memory fallback
-    await setCache(redisCacheKey, response, 30)
+    void setCache(redisCacheKey, response, 30).catch(() => {})
     queryCache.set(cacheKey, response, 30000)
 
     return NextResponse.json(response)

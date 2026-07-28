@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
 import mongoose from 'mongoose';
+import { getTodayDateString } from '@/lib/timezone';
 
 // Roles that can view all captures
 const ADMIN_ROLES = ['admin', 'hr'];
@@ -84,7 +85,7 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || currentUserId;
-    const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
+    const dateParam = searchParams.get('date') || getTodayDateString();
     const captureType = searchParams.get('type'); // 'automatic', 'manual', or null
     const departmentId = searchParams.get('departmentId'); // Filter by department
 

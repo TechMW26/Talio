@@ -29,6 +29,7 @@ import {
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import AnalyzedComposite from '@/components/productivity/AnalyzedComposite'
+import { getDateKeyInTimezone, getTodayDateString } from '@/lib/timezone'
 
 /* ------------------------------------------------------------------ */
 /* Small presentational helpers (matched to meetings page styling)    */
@@ -578,7 +579,7 @@ function Lightbox({ shots, index, onClose, onIndexChange }) {
 
 export default function ProductivityPage() {
   const [user, setUser] = useState(null)
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(getTodayDateString())
   const [activeTab, setActiveTab] = useState('my')
   const [selectedTeamUserId, setSelectedTeamUserId] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
@@ -684,13 +685,13 @@ export default function ProductivityPage() {
     const idx = lightboxShots.findIndex((s) => s.id === shot.id)
     setLightboxIndex(idx >= 0 ? idx : 0)
   }
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayDateString()
   const isFutureDisabled = selectedDate >= today
 
   const changeDate = (delta) => {
     const d = new Date(selectedDate)
     d.setDate(d.getDate() + delta)
-    setSelectedDate(d.toISOString().split('T')[0])
+    setSelectedDate(getDateKeyInTimezone(d))
   }
 
   const handleAnalyze = useCallback(async () => {

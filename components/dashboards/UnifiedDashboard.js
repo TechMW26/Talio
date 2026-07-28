@@ -10,6 +10,7 @@ import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import { CustomizableDashboard } from '@/components/dashboard'
 import CallAlertButton from '@/components/CallAlertButton'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
+import { getTodayDateString } from '@/lib/timezone'
 import {
     FaUsers, FaCalendarAlt, FaUserPlus,
     FaBriefcase, FaFileAlt, FaUserClock, FaUserTimes,
@@ -370,7 +371,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         try {
             setAttendanceLoading(true)
             const token = localStorage.getItem('token')
-            const today = new Date().toISOString().split('T')[0]
+            const today = getTodayDateString()
 
             const response = await fetch(`/api/attendance?employeeId=${employeeIdStr}&date=${today}`, {
                 headers: { 'Authorization': `Bearer ${token}` }

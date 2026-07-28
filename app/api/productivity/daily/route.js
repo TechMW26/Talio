@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import mongoose from 'mongoose';
 import { canViewUserScreenshots } from '@/lib/productivityPermissions';
+import { getTodayDateString } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,7 +36,7 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
+    const date = searchParams.get('date') || getTodayDateString();
     const targetUserId = searchParams.get('userId') || viewerId.toString();
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {

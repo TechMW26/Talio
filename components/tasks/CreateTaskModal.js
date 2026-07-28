@@ -10,6 +10,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import { getTodayDateString } from '@/lib/timezone'
 
 /**
  * CreateTaskModal - Standalone task creation modal.
@@ -349,7 +350,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
                     type="date"
                     value={taskForm.dueDate}
                     onChange={(e) => setTaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={getTodayDateString()}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>

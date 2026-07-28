@@ -16,6 +16,7 @@ import {
   HiOutlineDocumentText
 } from 'react-icons/hi2'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@heroui/react'
+import { IST_TIMEZONE } from '@/lib/timezone'
 
 export default function MeetingCard({ meeting, onRespond, showResponseActions = false }) {
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -24,6 +25,7 @@ export default function MeetingCard({ meeting, onRespond, showResponseActions = 
 
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-IN', {
+      timeZone: IST_TIMEZONE,
       weekday: 'short',
       day: 'numeric',
       month: 'short'
@@ -32,6 +34,7 @@ export default function MeetingCard({ meeting, onRespond, showResponseActions = 
 
   const formatTime = (date) => {
     return new Date(date).toLocaleTimeString('en-IN', {
+      timeZone: IST_TIMEZONE,
       hour: '2-digit',
       minute: '2-digit'
     })

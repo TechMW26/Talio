@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaTasks, FaExclamationTriangle, FaCheckCircle, FaSpinner } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow, Spinner } from '@heroui/react'
+import { getTodayDateString } from '@/lib/timezone'
 
 export default function TodayTasksWidget({ limit = 5 }) {
     const [tasks, setTasks] = useState([])
@@ -15,7 +16,7 @@ export default function TodayTasksWidget({ limit = 5 }) {
     const fetchTodayTasks = async () => {
         try {
             const token = localStorage.getItem('token')
-            const today = new Date().toISOString().split('T')[0]
+            const today = getTodayDateString()
 
             const response = await fetch(`/api/tasks?view=personal&dueDate=${today}&limit=${limit}`, {
                 headers: { 'Authorization': `Bearer ${token}` }

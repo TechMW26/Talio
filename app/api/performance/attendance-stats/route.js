@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import { getDateKeyInTimezone, getDateTimePartsInTimezone, getTodayDateString } from '@/lib/timezone';
 
 /**
  * GET /api/performance/attendance-stats
@@ -25,8 +26,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
 
     // Parse date range
-    const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-    const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
+    const currentYear = getDateTimePartsInTimezone().year;
+    const startDate = searchParams.get('startDate') || `${currentYear}-01-01`;
+    const endDate = searchParams.get('endDate') || getTodayDateString();
     const departmentFilter = searchParams.get('department');
     const departmentsFilter = searchParams.get('departments'); // Comma-separated list of department IDs
 
@@ -107,7 +109,7 @@ export async function GET(request) {
     ]);
 
     const employeeIds = employees.map(e => e._id);
-    const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]));
+    const holidayDates = new Set(holidays.map(h => getDateKeyInTimezone(h.date)));
     
     // Company working hours settings
     const workingDays = company?.workingHours?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -157,8 +159,8 @@ export async function GET(request) {
       const current = new Date(effectiveStart);
       
       while (current <= end) {
-        const dayName = dayNameMap[current.getDay()];
-        const dateStr = current.toISOString().split('T')[0];
+        const dayName = dayNameMap[current.getUTCDay()];
+        const dateStr = getDateKeyInTimezone(current);
         
         if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
           count++;

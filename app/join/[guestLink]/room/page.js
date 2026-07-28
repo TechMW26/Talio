@@ -21,6 +21,13 @@ import {
   createMeetingRtcConfiguration,
   flushQueuedIceCandidates,
 } from '@/lib/meetingRtc'
+import {
+  applyMeetingSenderQuality,
+  MEETING_AUDIO_CONSTRAINTS,
+  MEETING_CAMERA_CONSTRAINTS,
+  optimizeMeetingPeerConnections,
+  prepareMeetingMediaStream,
+} from '@/lib/meetingMediaQuality'
 // Slash icons for muted/off states
 import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsEmojiSmile } from 'react-icons/bs'
@@ -53,12 +60,16 @@ export default function GuestMeetingRoom({ params }) {
   const [showParticipants, setShowParticipants] = useState(false)
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
+  const [isSendingChat, setIsSendingChat] = useState(false)
+  const [chatError, setChatError] = useState('')
+  const [unreadChatCount, setUnreadChatCount] = useState(0)
   const [participants, setParticipants] = useState([])
   const [handRaised, setHandRaised] = useState(false)
   const [showReactions, setShowReactions] = useState(false)
   const [floatingReactions, setFloatingReactions] = useState([])
   const [previewReady, setPreviewReady] = useState(false)
   const [previewError, setPreviewError] = useState(null)
+  const [connectionQuality, setConnectionQuality] = useState('good')
 
   // Refs
   const localVideoRef = useRef(null)
@@ -67,6 +78,60 @@ export default function GuestMeetingRoom({ params }) {
   const peerConnectionsRef = useRef({})
   const pendingIceCandidatesRef = useRef({})
   const remoteStreamsRef = useRef({})
+  const showChatRef = useRef(false)
+  const isMutedRef = useRef(false)
+  const meetingSocketJoinedRef = useRef(false)
+  const connectionStatsRef = useRef(new WeakMap())
+  const connectionQualityRef = useRef('good')
+  const connectionRecoverySamplesRef = useRef(0)
+  const iceRestartingPeersRef = useRef(new Set())
+
+  useEffect(() => {
+    showChatRef.current = showChat
+    if (showChat) setUnreadChatCount(0)
+  }, [showChat])
+
+  useEffect(() => {
+    isMutedRef.current = isMuted
+  }, [isMuted])
+
+  useEffect(() => {
+    if (!isJoined) return undefined
+
+    let cancelled = false
+    const qualityRank = { good: 0, fair: 1, poor: 2 }
+    const monitorConnections = async () => {
+      const measuredQuality = await optimizeMeetingPeerConnections({
+        peerConnections: peerConnectionsRef.current,
+        previousSamples: connectionStatsRef.current,
+        qualityFloor: connectionQualityRef.current,
+      })
+      if (cancelled) return
+
+      const currentQuality = connectionQualityRef.current
+      if (qualityRank[measuredQuality] > qualityRank[currentQuality]) {
+        connectionRecoverySamplesRef.current = 0
+        connectionQualityRef.current = measuredQuality
+        setConnectionQuality(measuredQuality)
+      } else if (qualityRank[measuredQuality] < qualityRank[currentQuality]) {
+        connectionRecoverySamplesRef.current += 1
+        if (connectionRecoverySamplesRef.current >= 3) {
+          connectionRecoverySamplesRef.current = 0
+          connectionQualityRef.current = measuredQuality
+          setConnectionQuality(measuredQuality)
+        }
+      } else {
+        connectionRecoverySamplesRef.current = 0
+      }
+    }
+
+    void monitorConnections()
+    const intervalId = setInterval(() => void monitorConnections(), 5000)
+    return () => {
+      cancelled = true
+      clearInterval(intervalId)
+    }
+  }, [isJoined, participants.length])
 
   // Load guest info and validate
   useEffect(() => {
@@ -77,11 +142,21 @@ export default function GuestMeetingRoom({ params }) {
       return
     }
 
-    const info = JSON.parse(storedGuestInfo)
-    setGuestInfo(info)
+    try {
+      const info = JSON.parse(storedGuestInfo)
+      if (!info?.guestToken || (info.guestLink && info.guestLink !== guestLink)) {
+        throw new Error('Guest session does not match this meeting')
+      }
+      setGuestInfo(info)
+    } catch {
+      sessionStorage.removeItem('guestInfo')
+      toast.error('Your guest session is invalid. Please enter your name again.')
+      router.replace(`/join/${guestLink}`)
+      return
+    }
 
     // Fetch meeting info
-    fetchMeetingInfo()
+    void fetchMeetingInfo()
   }, [guestLink])
 
   const fetchMeetingInfo = async () => {
@@ -109,11 +184,11 @@ export default function GuestMeetingRoom({ params }) {
   const startCameraPreview = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
+        video: MEETING_CAMERA_CONSTRAINTS,
+        audio: MEETING_AUDIO_CONSTRAINTS,
       })
 
-      localStreamRef.current = stream
+      localStreamRef.current = prepareMeetingMediaStream(stream)
       setPreviewReady(true)
 
       if (localVideoRef.current) {
@@ -123,9 +198,9 @@ export default function GuestMeetingRoom({ params }) {
     } catch (error) {
       console.error('Error starting camera preview:', error)
       if (error.name === 'NotAllowedError') {
-        setPreviewError('Camera/microphone access denied')
+        setPreviewError('Camera/microphone access denied. You can still join in listen-only mode.')
       } else {
-        setPreviewError('Could not access camera')
+        setPreviewError('Could not access camera. You can still join in listen-only mode.')
       }
     }
   }
@@ -135,8 +210,10 @@ export default function GuestMeetingRoom({ params }) {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0]
       if (audioTrack) {
-        audioTrack.enabled = isMuted
-        setIsMuted(!isMuted)
+        const nextMuted = !isMuted
+        audioTrack.enabled = !nextMuted
+        isMutedRef.current = nextMuted
+        setIsMuted(nextMuted)
       }
     }
   }
@@ -157,27 +234,52 @@ export default function GuestMeetingRoom({ params }) {
 
     try {
       // Use existing preview stream
+      let joiningMuted = isMuted
       if (!localStreamRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
-        })
-        localStreamRef.current = stream
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: MEETING_CAMERA_CONSTRAINTS,
+            audio: MEETING_AUDIO_CONSTRAINTS,
+          })
+          localStreamRef.current = prepareMeetingMediaStream(stream)
+        } catch {
+          localStreamRef.current = new MediaStream()
+          joiningMuted = true
+          isMutedRef.current = true
+          setIsMuted(true)
+          setIsVideoOff(true)
+          toast('Joining in listen-only mode', { icon: '🎧' })
+        }
       }
 
       // Connect to socket
       const { io } = await import('socket.io-client')
       socketRef.current = io({
         path: '/api/socketio',
-        transports: ['websocket', 'polling']
+        transports: ['websocket', 'polling'],
+        auth: { token: guestInfo.guestToken },
+        autoConnect: false,
+      })
+
+      socketRef.current.on('disconnect', () => {
+        if (meetingSocketJoinedRef.current) {
+          setChatError('Meeting connection lost. Reconnecting…')
+        }
       })
 
       socketRef.current.on('connect', () => {
-        console.log('Guest connected to meeting socket')
+        if (!meetingSocketJoinedRef.current) return
         socketRef.current.emit('join-meeting', {
           roomId: meeting.roomId,
-          userId: `guest_${guestInfo.guestToken}`,
-          userName: `${guestInfo.guestName} (Guest)`
+          userName: `${guestInfo.guestName} (Guest)`,
+          isMuted: isMutedRef.current,
+        }, (response) => {
+          if (response?.success) {
+            setChatError('')
+            toast.success('Reconnected to meeting')
+          } else {
+            setChatError(response?.message || 'Could not reconnect to meeting')
+          }
         })
       })
 
@@ -211,7 +313,31 @@ export default function GuestMeetingRoom({ params }) {
       })
 
       socketRef.current.on('meeting-chat', (message) => {
-        setChatMessages(prev => [...prev, message])
+        const normalizedMessage = {
+          ...message,
+          isOwn: message.senderSocketId === socketRef.current?.id,
+        }
+        setChatMessages(prev => (
+          prev.some(existing => existing.id === normalizedMessage.id)
+            ? prev
+            : [...prev, normalizedMessage]
+        ))
+        setChatError('')
+        if (!showChatRef.current && !normalizedMessage.isOwn) {
+          setUnreadChatCount(count => count + 1)
+          toast(`${message.userName || 'Participant'}: ${message.message}`, {
+            icon: '💬',
+            duration: 5000,
+          })
+        }
+      })
+
+      socketRef.current.on('participant-mute-state', ({ id, isMuted: participantIsMuted }) => {
+        setParticipants(prev => prev.map(participant => (
+          participant.id === id
+            ? { ...participant, isMuted: Boolean(participantIsMuted) }
+            : participant
+        )))
       })
 
       socketRef.current.on('hand-raised', (userData) => {
@@ -219,7 +345,10 @@ export default function GuestMeetingRoom({ params }) {
       })
 
       socketRef.current.on('meeting-reaction', (data) => {
-        showFloatingReaction(data.reaction)
+        showFloatingReaction({
+          ...(typeof data.reaction === 'object' ? data.reaction : { emoji: data.reaction }),
+          sender: data.userName || data.reaction?.sender || 'Participant',
+        }, data.id)
       })
 
       // WebRTC Signaling
@@ -261,16 +390,53 @@ export default function GuestMeetingRoom({ params }) {
         }
       })
 
+      await new Promise((resolve, reject) => {
+        const socket = socketRef.current
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Meeting connection timed out'))
+        }, 15000)
+        const settle = (callback, value) => {
+          clearTimeout(timeoutId)
+          socket.off('connect_error', handleConnectionError)
+          socket.off('meeting-access-denied', handleAccessDenied)
+          callback(value)
+        }
+        const handleConnectionError = (error) => settle(reject, error)
+        const handleAccessDenied = () => settle(reject, new Error('Meeting access denied'))
+
+        socket.once('connect_error', handleConnectionError)
+        socket.once('meeting-access-denied', handleAccessDenied)
+        socket.once('connect', () => {
+          console.log('Guest connected to meeting socket')
+          socket.emit('join-meeting', {
+            roomId: meeting.roomId,
+            userName: `${guestInfo.guestName} (Guest)`,
+            isMuted: joiningMuted,
+          }, (response) => {
+            if (response?.success) {
+              settle(resolve)
+            } else {
+              settle(reject, new Error(response?.message || 'Unable to join meeting'))
+            }
+          })
+        })
+        socket.connect()
+      })
+
+      meetingSocketJoinedRef.current = true
       setIsJoined(true)
       toast.success('Joined meeting as guest')
     } catch (error) {
       console.error('Error joining meeting:', error)
-      toast.error('Failed to join meeting')
+      socketRef.current?.disconnect()
+      socketRef.current = null
+      meetingSocketJoinedRef.current = false
+      toast.error(error.message || 'Failed to join meeting')
     }
-  }, [meeting, guestInfo])
+  }, [meeting, guestInfo, isMuted])
 
   // Create peer connection
-  const createPeerConnection = (peerId, peerName) => {
+  const createPeerConnection = (peerId, peerName, shouldOffer = false) => {
     if (peerConnectionsRef.current[peerId]) {
       return peerConnectionsRef.current[peerId]
     }
@@ -282,6 +448,10 @@ export default function GuestMeetingRoom({ params }) {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         pc.addTrack(track, localStreamRef.current)
+      })
+      void applyMeetingSenderQuality(pc, {
+        quality: connectionQualityRef.current,
+        peerCount: Object.keys(peerConnectionsRef.current).length,
       })
     }
 
@@ -329,11 +499,41 @@ export default function GuestMeetingRoom({ params }) {
       }
     }
 
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') {
+        iceRestartingPeersRef.current.delete(peerId)
+        void applyMeetingSenderQuality(pc, {
+          quality: connectionQualityRef.current,
+          peerCount: Object.keys(peerConnectionsRef.current).length,
+        })
+      }
+
+      if (
+        pc.connectionState === 'failed'
+        && shouldOffer
+        && socketRef.current?.connected
+        && !iceRestartingPeersRef.current.has(peerId)
+      ) {
+        iceRestartingPeersRef.current.add(peerId)
+        void (async () => {
+          try {
+            pc.restartIce()
+            const offer = await pc.createOffer({ iceRestart: true })
+            await pc.setLocalDescription(offer)
+            socketRef.current?.emit('offer', { to: peerId, offer })
+          } catch (error) {
+            iceRestartingPeersRef.current.delete(peerId)
+            console.warn(`[Meeting] ICE restart failed for ${peerId}`, error)
+          }
+        })()
+      }
+    }
+
     return pc
   }
 
   const createPeerConnectionAndOffer = async (peerId, peerName) => {
-    const pc = createPeerConnection(peerId, peerName)
+    const pc = createPeerConnection(peerId, peerName, true)
 
     try {
       const offer = await pc.createOffer()
@@ -351,8 +551,14 @@ export default function GuestMeetingRoom({ params }) {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0]
       if (audioTrack) {
-        audioTrack.enabled = isMuted
-        setIsMuted(!isMuted)
+        const nextMuted = !isMuted
+        audioTrack.enabled = !nextMuted
+        isMutedRef.current = nextMuted
+        setIsMuted(nextMuted)
+        socketRef.current?.emit('meeting-mute-state', {
+          roomId: meeting?.roomId,
+          isMuted: nextMuted,
+        })
       }
     }
   }
@@ -375,16 +581,33 @@ export default function GuestMeetingRoom({ params }) {
   }
 
   const sendChatMessage = () => {
-    if (!chatInput.trim() || !socketRef.current) return
+    const message = chatInput.trim()
+    if (!message || isSendingChat) return
 
-    socketRef.current.emit('meeting-chat', {
+    const socket = socketRef.current
+    if (!socket?.connected) {
+      const connectionError = 'Meeting chat is reconnecting. Please try again.'
+      setChatError(connectionError)
+      toast.error(connectionError)
+      return
+    }
+
+    setIsSendingChat(true)
+    setChatError('')
+    socket.timeout(5000).emit('meeting-chat', {
       roomId: meeting?.roomId,
-      message: chatInput.trim(),
-      userName: `${guestInfo?.guestName} (Guest)`,
-      timestamp: new Date().toISOString()
-    })
+      message,
+    }, (error, response) => {
+      setIsSendingChat(false)
+      if (error || !response?.success) {
+        const deliveryError = response?.message || 'Message was not delivered. Please try again.'
+        setChatError(deliveryError)
+        toast.error(deliveryError)
+        return
+      }
 
-    setChatInput('')
+      setChatInput(current => current.trim() === message ? '' : current)
+    })
   }
 
   const sendReaction = (emoji) => {
@@ -393,14 +616,17 @@ export default function GuestMeetingRoom({ params }) {
         roomId: meeting?.roomId,
         reaction: emoji
       })
-      showFloatingReaction(emoji)
+      showFloatingReaction({
+        emoji,
+        sender: `${guestInfo?.guestName || 'You'} (Guest)`,
+      }, 'local')
     }
     setShowReactions(false)
   }
 
-  const showFloatingReaction = (emoji) => {
-    const id = Date.now()
-    setFloatingReactions(prev => [...prev, { id, emoji }])
+  const showFloatingReaction = (reaction, participantId) => {
+    const id = Date.now() + Math.random()
+    setFloatingReactions(prev => [...prev, { ...reaction, id, participantId }])
     setTimeout(() => {
       setFloatingReactions(prev => prev.filter(r => r.id !== id))
     }, 3000)
@@ -415,6 +641,7 @@ export default function GuestMeetingRoom({ params }) {
     pendingIceCandidatesRef.current = {}
     remoteStreamsRef.current = {}
     if (socketRef.current) {
+      meetingSocketJoinedRef.current = false
       socketRef.current.emit('leave-meeting', { roomId: meeting?.roomId })
       socketRef.current.disconnect()
     }
@@ -432,6 +659,7 @@ export default function GuestMeetingRoom({ params }) {
       pendingIceCandidatesRef.current = {}
       remoteStreamsRef.current = {}
       if (socketRef.current) {
+        meetingSocketJoinedRef.current = false
         socketRef.current.disconnect()
       }
     }
@@ -546,22 +774,12 @@ export default function GuestMeetingRoom({ params }) {
   // Meeting room UI
   return (
     <div className="h-screen w-screen bg-gray-900 flex flex-col overflow-hidden">
-      {/* Floating Reactions */}
-      <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-        {floatingReactions.map(({ id, emoji }) => (
-          <div
-            key={id}
-            className="absolute animate-bounce text-4xl"
-            style={{
-              left: `${Math.random() * 100 - 50}px`,
-              animation: 'float-up 3s ease-out forwards'
-            }}
-          >
-            {emoji}
-          </div>
-        ))}
+      <div className="pointer-events-none fixed right-3 top-3 z-30 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
+        <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${
+          connectionQuality === 'good' ? 'bg-emerald-400' : connectionQuality === 'fair' ? 'bg-amber-400' : 'bg-red-400'
+        }`} />
+        {connectionQuality === 'good' ? 'Good connection' : connectionQuality === 'fair' ? 'Adapting quality' : 'Low network'}
       </div>
-
       {/* Video Grid */}
       <div className="flex-1 p-4 overflow-auto">
         <div className={`grid gap-4 h-full ${participants.length === 0 ? 'grid-cols-1' :
@@ -595,6 +813,14 @@ export default function GuestMeetingRoom({ params }) {
             <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 rounded text-white text-xs">
               You (Guest) {isMuted && '🔇'} {handRaised && '✋'}
             </div>
+            <div className="pointer-events-none absolute inset-x-0 bottom-10 z-20 flex flex-col items-center">
+              {floatingReactions.filter(reaction => reaction.participantId === 'local').map(reaction => (
+                <div key={reaction.id} className="meeting-tile-reaction flex flex-col items-center">
+                  <span className="text-5xl drop-shadow-lg">{reaction.emoji}</span>
+                  <span className="rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white">{reaction.sender}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Remote Videos */}
@@ -610,19 +836,9 @@ export default function GuestMeetingRoom({ params }) {
                         el.srcObject = participant.stream
                         el.play().catch(() => { })
                       }
-                    }}
-                    className="w-full h-full object-cover"
-                  />
-                  <audio
-                    autoPlay
-                    playsInline
-                    ref={el => {
-                      if (el && participant.stream && el.srcObject !== participant.stream) {
-                        el.srcObject = participant.stream
-                        el.play().catch(() => { })
-                      }
-                    }}
-                  />
+                  }}
+                  className="w-full h-full object-cover"
+                />
                 </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -634,7 +850,15 @@ export default function GuestMeetingRoom({ params }) {
                 </div>
               )}
               <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 rounded text-white text-xs">
-                {participant.userName || 'Participant'}
+                {participant.userName || 'Participant'} {participant.isMuted && '🔇'}
+              </div>
+              <div className="pointer-events-none absolute inset-x-0 bottom-10 z-20 flex flex-col items-center">
+                {floatingReactions.filter(reaction => reaction.participantId === participant.id).map(reaction => (
+                  <div key={reaction.id} className="meeting-tile-reaction flex flex-col items-center">
+                    <span className="text-5xl drop-shadow-lg">{reaction.emoji}</span>
+                    <span className="max-w-[12rem] truncate rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white">{reaction.sender}</span>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
@@ -701,10 +925,15 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={() => setShowChat(!showChat)}
-            className={`p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+            className={`relative p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
               }`}
           >
             <HiOutlineChatBubbleLeftRight className="w-6 h-6 text-white" />
+            {unreadChatCount > 0 && !showChat && (
+              <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {Math.min(unreadChatCount, 99)}
+              </span>
+            )}
           </button>
 
           <button
@@ -734,28 +963,38 @@ export default function GuestMeetingRoom({ params }) {
             </button>
           </div>
           <div className="flex-1 overflow-auto p-4 space-y-3">
-            {chatMessages.map((msg, i) => (
-              <div key={i} className="text-sm">
-                <span className="font-medium text-indigo-600">{msg.userName}: </span>
-                <span className="text-gray-700">{msg.message}</span>
+            {chatMessages.map(msg => (
+              <div key={msg.id} className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm ${msg.isOwn ? 'rounded-br-md bg-indigo-600 text-white' : 'rounded-bl-md bg-gray-100 text-gray-800'}`}>
+                  <p className={`mb-0.5 text-xs font-semibold ${msg.isOwn ? 'text-indigo-100' : 'text-indigo-600'}`}>
+                    {msg.isOwn ? 'You' : (msg.userName || 'Participant')}
+                  </p>
+                  <p className="break-words">{msg.message}</p>
+                </div>
               </div>
             ))}
           </div>
-          <div className="p-4 border-t flex gap-2">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-              placeholder="Type a message..."
-              className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              onClick={sendChatMessage}
-              className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            >
-              <HiOutlinePaperAirplane className="w-5 h-5" />
-            </button>
+          <div className="border-t p-4">
+            {chatError && <p className="mb-2 text-xs text-red-600" role="alert">{chatError}</p>}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                placeholder="Type a message..."
+                disabled={isSendingChat}
+                className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                onClick={sendChatMessage}
+                disabled={isSendingChat || !chatInput.trim()}
+                className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Send meeting message"
+              >
+                <HiOutlinePaperAirplane className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -776,7 +1015,8 @@ export default function GuestMeetingRoom({ params }) {
                   {guestInfo?.guestName?.[0]?.toUpperCase() || 'G'}
                 </span>
               </div>
-              <span className="text-sm">{guestInfo?.guestName} (You - Guest)</span>
+              <span className="text-sm flex-1">{guestInfo?.guestName} (You - Guest)</span>
+              {isMuted && <HiOutlineMicrophoneSlash className="h-4 w-4 text-red-500" aria-label="Muted" />}
             </div>
             {participants.map(p => (
               <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
@@ -785,25 +1025,25 @@ export default function GuestMeetingRoom({ params }) {
                     {p.userName?.[0]?.toUpperCase() || '?'}
                   </span>
                 </div>
-                <span className="text-sm">{p.userName}</span>
+                <span className="text-sm flex-1">{p.userName}</span>
+                {p.isMuted && <HiOutlineMicrophoneSlash className="h-4 w-4 text-red-500" aria-label="Muted" />}
               </div>
             ))}
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes float-up {
-          0% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-          100% {
-            opacity: 0;
-            transform: translateY(-100px);
-          }
+      <style jsx global>{`
+        @keyframes meeting-reaction-rise {
+          0% { opacity: 0; transform: translateY(12px) scale(.72); }
+          18% { opacity: 1; transform: translateY(0) scale(1.08); }
+          75% { opacity: 1; transform: translateY(-34px) scale(1); }
+          100% { opacity: 0; transform: translateY(-58px) scale(.9); }
+        }
+        .meeting-tile-reaction {
+          animation: meeting-reaction-rise 3s ease-out forwards;
         }
       `}</style>
+
     </div>
   )
 }

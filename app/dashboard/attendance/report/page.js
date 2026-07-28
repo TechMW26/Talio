@@ -12,6 +12,7 @@ import {
   FaSearch, FaBuilding, FaUserTie, FaChevronDown, FaChevronUp
 } from 'react-icons/fa'
 import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
+import { getDateKeyInTimezone, getTodayDateString } from '@/lib/timezone'
 
 export default function AttendanceReportPage() {
   const [dateRange, setDateRange] = useState('month')
@@ -31,29 +32,28 @@ export default function AttendanceReportPage() {
 
   // Compute date range params (auto-updates SWR keys when filters change)
   const dateParams = useMemo(() => {
-    const today = new Date()
+    const today = getTodayDateString()
     let startDate, endDate
     switch (dateRange) {
       case 'today':
-        startDate = endDate = today.toISOString().split('T')[0]
+        startDate = endDate = today
         break
       case 'yesterday': {
-        const yesterday = new Date(today)
-        yesterday.setDate(yesterday.getDate() - 1)
-        startDate = endDate = yesterday.toISOString().split('T')[0]
+        const yesterday = new Date(`${today}T00:00:00Z`)
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1)
+        startDate = endDate = getDateKeyInTimezone(yesterday)
         break
       }
       case 'week': {
-        const weekStart = new Date(today)
-        weekStart.setDate(weekStart.getDate() - 7)
-        startDate = weekStart.toISOString().split('T')[0]
-        endDate = today.toISOString().split('T')[0]
+        const weekStart = new Date(`${today}T00:00:00Z`)
+        weekStart.setUTCDate(weekStart.getUTCDate() - 7)
+        startDate = getDateKeyInTimezone(weekStart)
+        endDate = today
         break
       }
       case 'month': {
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-        startDate = monthStart.toISOString().split('T')[0]
-        endDate = today.toISOString().split('T')[0]
+        startDate = `${today.slice(0, 7)}-01`
+        endDate = today
         break
       }
       case 'custom':
@@ -61,7 +61,7 @@ export default function AttendanceReportPage() {
         endDate = customEndDate
         break
       default:
-        startDate = endDate = today.toISOString().split('T')[0]
+        startDate = endDate = today
     }
     if (!startDate || !endDate) return null
     return { startDate, endDate }
@@ -93,20 +93,20 @@ export default function AttendanceReportPage() {
   // Helper function to count working days between two dates
   const countWorkingDays = (startDate, endDate, workingDays, holidays) => {
     const dayNameMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]))
+    const holidayDates = new Set(holidays.map(h => getDateKeyInTimezone(h.date)))
 
     let count = 0
     const current = new Date(startDate)
     const end = new Date(endDate)
 
     while (current <= end) {
-      const dayName = dayNameMap[current.getDay()]
-      const dateStr = current.toISOString().split('T')[0]
+      const dayName = dayNameMap[current.getUTCDay()]
+      const dateStr = getDateKeyInTimezone(current)
 
       if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
         count++
       }
-      current.setDate(current.getDate() + 1)
+      current.setUTCDate(current.getUTCDate() + 1)
     }
 
     return count

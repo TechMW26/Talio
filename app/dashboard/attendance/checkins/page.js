@@ -7,9 +7,10 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 import toast from '@/utils/toast'
 import { FaClock, FaUsers, FaCalendarAlt, FaSearch, FaDownload, FaMapMarkerAlt } from 'react-icons/fa'
 import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input } from '@heroui/react'
+import { getTodayDateString, IST_TIMEZONE } from '@/lib/timezone'
 
 export default function EmployeeCheckinsPage() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(getTodayDateString())
   const [searchTerm, setSearchTerm] = useState('')
 
   const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
@@ -31,6 +32,7 @@ export default function EmployeeCheckinsPage() {
   const formatTime = (timeString, timezone) => {
     if (!timeString) return 'Not checked in'
     return new Date(timeString).toLocaleTimeString('en-US', {
+      timeZone: IST_TIMEZONE,
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,

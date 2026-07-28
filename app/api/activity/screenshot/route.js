@@ -6,6 +6,7 @@ import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import mongoose from 'mongoose';
 import { isWithinOfficeHours } from '@/lib/officeHours';
 import { processImage, ImagePipelineError } from '@/lib/imagePipeline';
+import { getDateKeyInTimezone } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -128,7 +129,7 @@ export async function POST(request) {
 
     const capturedAt = requestedTimestamp ? new Date(requestedTimestamp) : new Date()
     const safeCapturedAt = Number.isNaN(capturedAt.getTime()) ? new Date() : capturedAt
-    const dateString = safeCapturedAt.toISOString().split('T')[0];
+    const dateString = getDateKeyInTimezone(safeCapturedAt);
     const timestamp = safeCapturedAt.getTime();
     const employeeCode = employee?.employeeCode || 'UNKNOWN';
     const filename = `screenshot_${employeeCode}_${timestamp}.webp`;

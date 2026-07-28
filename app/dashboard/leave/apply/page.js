@@ -11,6 +11,7 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { getTodayDateString } from '@/lib/timezone'
 
 export default function ApplyLeavePage() {
   const router = useRouter()
@@ -288,7 +289,7 @@ export default function ApplyLeavePage() {
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleChange}
-                      min={new Date().toISOString().split('T')[0]}
+                      min={getTodayDateString()}
                       isRequired
                     />
                     <Input
@@ -297,7 +298,7 @@ export default function ApplyLeavePage() {
                       name="endDate"
                       value={formData.endDate}
                       onChange={handleChange}
-                      min={formData.startDate || new Date().toISOString().split('T')[0]}
+                      min={formData.startDate || getTodayDateString()}
                       isDisabled={formData.isHalfDay}
                       isRequired
                     />

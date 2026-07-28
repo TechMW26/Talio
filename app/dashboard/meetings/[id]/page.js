@@ -29,6 +29,7 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { copyTextToClipboard } from '@/utils/clipboard'
 
 function getInsightItemClassName(tone = 'slate') {
   switch (tone) {
@@ -106,11 +107,7 @@ export default function MeetingDetailPage({ params }) {
   const toggleGuestMutation = useApiMutation({
     method: 'POST',
     invalidateKeys: [id ? `/api/meetings/${id}/guest-access` : null].filter(Boolean),
-    onSuccess: (data) => {
-      refreshGuestAccess()
-      toast.success(data.message)
-    },
-    onError: (err) => toast.error(err.message || 'Failed to update guest access'),
+    onError: (message) => toast.error(message || 'Failed to update guest access'),
   })
 
   const deleteMutation = useApiMutation({
@@ -137,15 +134,43 @@ export default function MeetingDetailPage({ params }) {
   })
 
   const toggleGuestAccess = async () => {
-    await toggleGuestMutation.execute(`/api/meetings/${id}/guest-access`, {
-      enabled: !guestAccess?.guestAccessEnabled
+    const enabled = !guestAccess?.guestAccessEnabled
+    const previousResponse = guestAccessRes
+
+    await refreshGuestAccess({
+      ...guestAccessRes,
+      success: true,
+      data: {
+        ...guestAccess,
+        guestAccessEnabled: enabled,
+      },
+    }, false)
+
+    const result = await toggleGuestMutation.execute(`/api/meetings/${id}/guest-access`, {
+      enabled,
     })
+
+    if (!result?.data) {
+      await refreshGuestAccess(previousResponse, false)
+      return
+    }
+
+    await refreshGuestAccess({
+      ...result,
+      data: {
+        ...guestAccess,
+        ...result.data,
+      },
+    }, false)
+    toast.success(result.message || (enabled ? 'Guest access enabled' : 'Guest access disabled'))
   }
 
-  const copyGuestLink = () => {
-    if (guestAccess?.guestUrl) {
-      navigator.clipboard.writeText(guestAccess.guestUrl)
+  const copyGuestLink = async () => {
+    try {
+      await copyTextToClipboard(guestAccess?.guestUrl)
       toast.success('Guest link copied to clipboard!')
+    } catch (error) {
+      toast.error(error.message || 'Unable to copy the guest link')
     }
   }
 
@@ -179,6 +204,7 @@ export default function MeetingDetailPage({ params }) {
 
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
       weekday: 'long',
       day: 'numeric',
       month: 'long',
@@ -188,6 +214,7 @@ export default function MeetingDetailPage({ params }) {
 
   const formatTime = (date) => {
     return new Date(date).toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
       hour: '2-digit',
       minute: '2-digit'
     })
@@ -197,6 +224,7 @@ export default function MeetingDetailPage({ params }) {
     if (!date) return null
 
     return new Date(date).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -517,6 +545,11 @@ export default function MeetingDetailPage({ params }) {
                           <span className="font-medium text-gray-800">Guest Access</span>
                         </div>
                         <button
+                          type="button"
+                          role="switch"
+                          aria-label="Allow guests to join with a shareable link"
+                          aria-checked={guestAccess.guestAccessEnabled}
+                          aria-busy={toggleGuestMutation.isLoading}
                           onClick={toggleGuestAccess}
                           disabled={toggleGuestMutation.isLoading}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${guestAccess.guestAccessEnabled ? 'bg-indigo-600' : 'bg-gray-300'
@@ -535,10 +568,15 @@ export default function MeetingDetailPage({ params }) {
 
                       {guestAccess.guestAccessEnabled && guestAccess.guestUrl && (
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 truncate">
-                            {guestAccess.guestUrl}
-                          </div>
+                          <input
+                            readOnly
+                            value={guestAccess.guestUrl}
+                            onFocus={event => event.target.select()}
+                            aria-label="Guest meeting link"
+                            className="min-w-0 flex-1 truncate rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                          />
                           <button
+                            type="button"
                             onClick={copyGuestLink}
                             className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                           >
@@ -601,9 +639,9 @@ export default function MeetingDetailPage({ params }) {
                       Accepted ({acceptedInvitees.length})
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {acceptedInvitees.map(inv => (
+                      {acceptedInvitees.map((inv, index) => (
                         <div
-                          key={inv.employee?._id}
+                          key={inv._id || inv.employee?._id || `accepted-${index}`}
                           className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full"
                         >
                           {inv.employee?.profilePicture ? (
@@ -635,9 +673,9 @@ export default function MeetingDetailPage({ params }) {
                       Pending ({pendingInvitees.length})
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {pendingInvitees.map(inv => (
+                      {pendingInvitees.map((inv, index) => (
                         <div
-                          key={inv.employee?._id}
+                          key={inv._id || inv.employee?._id || `pending-${index}`}
                           className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 rounded-full"
                         >
                           <span className="text-sm text-yellow-700">
@@ -656,9 +694,9 @@ export default function MeetingDetailPage({ params }) {
                       Declined ({rejectedInvitees.length})
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {rejectedInvitees.map(inv => (
+                      {rejectedInvitees.map((inv, index) => (
                         <div
-                          key={inv.employee?._id}
+                          key={inv._id || inv.employee?._id || `rejected-${index}`}
                           className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full"
                           title={inv.rejectionReason || 'No reason provided'}
                         >

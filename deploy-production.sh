@@ -56,6 +56,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 log "Working directory: $SCRIPT_DIR"
 
+# ─── Configure deployment repository ───────────────────────────────────────
+REPO_URL="${REPO_URL:-https://github.com/TechMW26/Talio.git}"
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git remote get-url origin >/dev/null 2>&1; then
+    git remote set-url origin "$REPO_URL"
+    log "Git remote origin set to $REPO_URL"
+  else
+    git remote add origin "$REPO_URL"
+    log "Git remote origin added: $REPO_URL"
+  fi
+fi
+
 # ─── Load .env ──────────────────────────────────────────────────────────────
 if [[ ! -f .env ]]; then
   err ".env file not found! Copy .env.example to .env and fill in your values."

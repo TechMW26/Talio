@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { buildDirectReportsFilter } from '@/lib/teamScope';
 import mongoose from 'mongoose';
+import { getTodayDateString } from '@/lib/timezone';
 
 /**
  * GET /api/productivity/team
@@ -21,7 +22,7 @@ export async function GET(request) {
     const currentUserRole = user.role;
 
     const { searchParams } = new URL(request.url);
-    const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
+    const dateParam = searchParams.get('date') || getTodayDateString();
     const departmentFilter = searchParams.get('department');
     const teamFilter = searchParams.get('team');
 
