@@ -6,27 +6,27 @@ import { Download, Check, Info } from 'lucide-react';
 // ============================================
 // RELEASE CONFIGURATION - Update for new releases
 // ============================================
-const RELEASE_VERSION = '3.1.0';
+const RELEASE_VERSION = '6.0.3';
 
 // GitHub Release Download URLs
 const DOWNLOADS = {
   mac: {
     arm64: {
-      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v3.1.0/Talio-3.1.0-arm64.dmg',
+      url: '/download/mac-arm64',
       label: 'Apple Silicon (M1/M2/M3/M4)',
-      size: '~83 MB'
+      size: '~105 MB'
     },
     x64: {
-      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v3.1.0/Talio-3.1.0.dmg',
+      url: '/download/mac-intel',
       label: 'Intel (x64)',
-      size: '~87 MB'
+      size: '~112 MB'
     }
   },
   windows: {
     x64: {
-      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v3.1.0/Talio.Setup.3.1.0.exe',
+      url: '/download/windows',
       label: 'Windows 10/11 (64-bit)',
-      size: '~147 MB'
+      size: '~83 MB'
     }
   }
 };
@@ -213,7 +213,7 @@ export default function ResourcesPage() {
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
                   <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-800">
-                    If you see "damaged" error, <a href="https://github.com/avirajsharma-ops/Talio/blob/main/MAC_INSTALLATION_GUIDE.md" target="_blank" className="underline font-medium">follow this guide</a>.
+                    If macOS blocks the app, <a href="https://github.com/TechMW26/Talio/blob/main/MAC_INSTALLATION_GUIDE.md" target="_blank" rel="noreferrer" className="underline font-medium">follow this guide</a>.
                   </p>
                 </div>
               </div>
@@ -299,4 +299,3 @@ export default function ResourcesPage() {
     </div>
   );
 }
-

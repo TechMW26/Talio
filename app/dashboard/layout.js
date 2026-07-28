@@ -21,7 +21,6 @@ import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { PageTransitionProvider, usePageTransition } from '@/contexts/PageTransitionContext'
 import { TicTacToeProvider } from '@/contexts/TicTacToeContext'
-import { MeetingSessionProvider } from '@/contexts/MeetingSessionContext'
 import RouteProgressBar from '@/components/ui/RouteProgressBar'
 import { getSkeletonForRoute } from '@/components/ui/PageSkeletons'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
@@ -412,7 +411,7 @@ export default function DashboardLayout({ children }) {
   // For meeting room pages, render children directly without any layout chrome
   if (isMeetingRoomPage) {
     return (
-      <MeetingSessionProvider>
+      <>
         <SocketProvider>
           <CompanyFeaturesProvider>
             <CompanyFeatureRouteGuard />
@@ -430,12 +429,12 @@ export default function DashboardLayout({ children }) {
             </TicTacToeProvider>
           </CompanyFeaturesProvider>
         </SocketProvider>
-      </MeetingSessionProvider>
+      </>
     )
   }
 
   return (
-    <MeetingSessionProvider>
+    <>
       <SocketProvider>
         <CompanyFeaturesProvider>
         <CompanyFeatureRouteGuard />
@@ -542,6 +541,6 @@ export default function DashboardLayout({ children }) {
         </TicTacToeProvider>
         </CompanyFeaturesProvider>
       </SocketProvider>
-    </MeetingSessionProvider>
+    </>
   )
 }

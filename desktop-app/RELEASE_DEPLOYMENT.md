@@ -18,7 +18,7 @@ The Talio desktop app uses **GitHub Releases** for distribution. The app checks 
 
 **IMPORTANT:** Before bumping the version, always check the latest release on GitHub to determine the next version number:
 
-1. Go to **https://github.com/avirajsharma-ops/Talio/releases** (or use `gh release list --limit 1`)
+1. Go to **https://github.com/TechMW26/Talio/releases** (or use `gh release list --limit 1`)
 2. Note the latest tag (e.g., `v5.2.0`)
 3. Decide the next version using semver:
    - **Patch** (bug fixes): `5.2.0` → `5.2.1`
@@ -369,7 +369,7 @@ This will:
 
 ### Using GitHub Web UI
 
-1. Go to https://github.com/avirajsharma-ops/Talio/releases/new
+1. Go to https://github.com/TechMW26/Talio/releases/new
 2. Tag: `vX.Y.Z` (create new tag)
 3. Title: `Talio Desktop vX.Y.Z`
 4. Upload the 5 files from `desktop-app/dist/` listed above
@@ -487,7 +487,7 @@ See the **Windows Code Signing** section above. You need an OV or EV code signin
 export GH_TOKEN="ghp_YOUR_TOKEN"
 
 # 0.5 Check latest release version on GitHub
-#     Visit: https://github.com/avirajsharma-ops/Talio/releases
+#     Visit: https://github.com/TechMW26/Talio/releases
 #     OR: gh release list --limit 1
 #     Then decide next version (e.g., v5.2.0 → v5.3.0)
 
@@ -510,6 +510,6 @@ node scripts/create-release.js X.Y.Z "Release notes here"
 node scripts/upload-assets.js X.Y.Z
 
 # 6. Verify
-#    Visit: https://github.com/avirajsharma-ops/Talio/releases/tag/vX.Y.Z
+#    Visit: https://github.com/TechMW26/Talio/releases/tag/vX.Y.Z
 #    OR: gh release view vX.Y.Z --json assets --jq '.assets[].name'
 ```

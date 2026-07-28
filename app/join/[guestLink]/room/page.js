@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   HiOutlineMicrophone,
   HiOutlineVideoCamera,
+  HiOutlineComputerDesktop,
   HiOutlinePhoneXMark,
   HiOutlineChatBubbleLeftRight,
   HiOutlineUserGroup,
@@ -28,20 +29,13 @@ import {
   optimizeMeetingPeerConnections,
   prepareMeetingMediaStream,
 } from '@/lib/meetingMediaQuality'
-// Slash icons for muted/off states
-import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsEmojiSmile } from 'react-icons/bs'
+import {
+  CutLineIcon,
+  MEETING_REACTIONS,
+  MeetingReactionIcon,
+} from '@/components/meetings/MeetingVisualIcons'
 import toast from '@/utils/toast'
-
-// Reaction emojis
-const REACTIONS = [
-  { emoji: '👍', label: 'Thumbs up' },
-  { emoji: '👏', label: 'Clap' },
-  { emoji: '❤️', label: 'Heart' },
-  { emoji: '😂', label: 'Laugh' },
-  { emoji: '😮', label: 'Wow' },
-  { emoji: '🎉', label: 'Celebrate' },
-]
 
 export default function GuestMeetingRoom({ params }) {
   const router = useRouter()
@@ -67,6 +61,7 @@ export default function GuestMeetingRoom({ params }) {
   const [handRaised, setHandRaised] = useState(false)
   const [showReactions, setShowReactions] = useState(false)
   const [floatingReactions, setFloatingReactions] = useState([])
+  const [pinnedParticipantId, setPinnedParticipantId] = useState(null)
   const [previewReady, setPreviewReady] = useState(false)
   const [previewError, setPreviewError] = useState(null)
   const [connectionQuality, setConnectionQuality] = useState('good')
@@ -248,7 +243,7 @@ export default function GuestMeetingRoom({ params }) {
           isMutedRef.current = true
           setIsMuted(true)
           setIsVideoOff(true)
-          toast('Joining in listen-only mode', { icon: '🎧' })
+          toast('Joining in listen-only mode')
         }
       }
 
@@ -288,6 +283,9 @@ export default function GuestMeetingRoom({ params }) {
         console.log('Existing participants:', existingUsers)
         for (const userData of existingUsers) {
           setParticipants(prev => [...prev.filter(p => p.id !== userData.id), userData])
+          if (userData.isScreenSharing) {
+            setPinnedParticipantId(userData.id)
+          }
           await createPeerConnectionAndOffer(userData.id, userData.userName)
         }
       })
@@ -296,12 +294,16 @@ export default function GuestMeetingRoom({ params }) {
       socketRef.current.on('user-joined', (userData) => {
         console.log('User joined:', userData)
         setParticipants(prev => [...prev.filter(p => p.id !== userData.id), userData])
+        if (userData.isScreenSharing) {
+          setPinnedParticipantId(userData.id)
+        }
         createPeerConnection(userData.id, userData.userName)
       })
 
       socketRef.current.on('user-left', (userData) => {
         console.log('User left:', userData)
         setParticipants(prev => prev.filter(p => p.id !== userData.id))
+        setPinnedParticipantId(current => current === userData.id ? null : current)
         clearQueuedIceCandidates(pendingIceCandidatesRef, userData.id)
         if (remoteStreamsRef.current[userData.id]) {
           delete remoteStreamsRef.current[userData.id]
@@ -326,7 +328,7 @@ export default function GuestMeetingRoom({ params }) {
         if (!showChatRef.current && !normalizedMessage.isOwn) {
           setUnreadChatCount(count => count + 1)
           toast(`${message.userName || 'Participant'}: ${message.message}`, {
-            icon: '💬',
+            icon: <HiOutlineChatBubbleLeftRight className="h-5 w-5 text-indigo-500" />,
             duration: 5000,
           })
         }
@@ -341,7 +343,9 @@ export default function GuestMeetingRoom({ params }) {
       })
 
       socketRef.current.on('hand-raised', (userData) => {
-        toast(`${userData.userName} raised their hand`, { icon: '✋' })
+        toast(`${userData.userName} raised their hand`, {
+          icon: <HiOutlineHandRaised className="h-5 w-5 text-amber-500" />,
+        })
       })
 
       socketRef.current.on('meeting-reaction', (data) => {
@@ -349,6 +353,21 @@ export default function GuestMeetingRoom({ params }) {
           ...(typeof data.reaction === 'object' ? data.reaction : { emoji: data.reaction }),
           sender: data.userName || data.reaction?.sender || 'Participant',
         }, data.id)
+      })
+
+      socketRef.current.on('participant-screen-share-state', ({ id, isScreenSharing }) => {
+        setParticipants(prev => prev.map(participant => (
+          participant.id === id
+            ? { ...participant, isScreenSharing: Boolean(isScreenSharing) }
+            : participant
+        )))
+        setPinnedParticipantId(current => (
+          isScreenSharing
+            ? id
+            : current === id
+              ? null
+              : current
+        ))
       })
 
       // WebRTC Signaling
@@ -667,10 +686,10 @@ export default function GuestMeetingRoom({ params }) {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen bg-gray-900 flex items-center justify-center">
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-100 dark:bg-slate-950">
         <div className="text-center">
           <Loader size="lg" className="mb-4" />
-          <p className="text-white">Loading meeting...</p>
+          <p className="text-slate-700 dark:text-white">Loading meeting...</p>
         </div>
       </div>
     )
@@ -679,15 +698,15 @@ export default function GuestMeetingRoom({ params }) {
   // Pre-join screen
   if (!isJoined) {
     return (
-      <div className="h-screen w-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="max-w-lg w-full bg-white rounded-2xl p-6 text-center shadow-xl border border-gray-200">
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-100 p-4 dark:bg-slate-950">
+        <div className="max-w-lg w-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xl dark:border-white/10 dark:bg-slate-900">
           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <HiOutlineVideoCamera className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+          <h1 className="mb-2 text-2xl font-bold text-slate-900 dark:text-white">
             {meeting?.title || 'Meeting Room'}
           </h1>
-          <p className="text-gray-500 mb-4">
+          <p className="mb-4 text-slate-500 dark:text-slate-300">
             Joining as: <span className="font-medium text-indigo-600">{guestInfo?.guestName} (Guest)</span>
           </p>
 
@@ -730,14 +749,18 @@ export default function GuestMeetingRoom({ params }) {
                   className={`p-3 rounded-full transition-colors ${isMuted ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
                     }`}
                 >
-                  {isMuted ? <HiOutlineMicrophoneSlash className="w-5 h-5" /> : <HiMiniMicrophone className="w-5 h-5" />}
+                  <CutLineIcon isOff={isMuted}>
+                    <HiMiniMicrophone className="h-5 w-5" />
+                  </CutLineIcon>
                 </button>
                 <button
                   onClick={togglePreviewVideo}
                   className={`p-3 rounded-full transition-colors ${isVideoOff ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
                     }`}
                 >
-                  {isVideoOff ? <HiOutlineVideoCameraSlash className="w-5 h-5" /> : <HiMiniVideoCamera className="w-5 h-5" />}
+                  <CutLineIcon isOff={isVideoOff}>
+                    <HiMiniVideoCamera className="h-5 w-5" />
+                  </CutLineIcon>
                 </button>
               </div>
             )}
@@ -762,7 +785,7 @@ export default function GuestMeetingRoom({ params }) {
               sessionStorage.removeItem('guestInfo')
               router.push(`/join/${guestLink}`)
             }}
-            className="w-full py-3 text-gray-500 hover:text-gray-700 mt-3"
+            className="mt-3 w-full py-3 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white"
           >
             Cancel
           </button>
@@ -773,8 +796,8 @@ export default function GuestMeetingRoom({ params }) {
 
   // Meeting room UI
   return (
-    <div className="h-screen w-screen bg-gray-900 flex flex-col overflow-hidden">
-      <div className="pointer-events-none fixed right-3 top-3 z-30 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white">
+      <div className="pointer-events-none fixed right-3 top-3 z-30 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-black/60 dark:text-white">
         <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${
           connectionQuality === 'good' ? 'bg-emerald-400' : connectionQuality === 'fair' ? 'bg-amber-400' : 'bg-red-400'
         }`} />
@@ -782,13 +805,17 @@ export default function GuestMeetingRoom({ params }) {
       </div>
       {/* Video Grid */}
       <div className="flex-1 p-4 overflow-auto">
-        <div className={`grid gap-4 h-full ${participants.length === 0 ? 'grid-cols-1' :
+        <div className={`grid gap-4 h-full ${pinnedParticipantId
+          ? 'grid-cols-2 grid-rows-[minmax(0,1fr)_7rem] sm:grid-cols-4'
+          : participants.length === 0 ? 'grid-cols-1' :
             participants.length === 1 ? 'grid-cols-1 sm:grid-cols-2' :
               participants.length <= 3 ? 'grid-cols-2' :
                 'grid-cols-2 sm:grid-cols-3'
           }`}>
           {/* Local Video */}
-          <div className="relative bg-gray-800 rounded-xl overflow-hidden aspect-video">
+          <div className={`relative overflow-hidden rounded-xl bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${
+            pinnedParticipantId ? 'order-2 h-28' : 'aspect-video'
+          }`}>
             <video
               ref={(el) => {
                 if (el && localStreamRef.current) {
@@ -802,7 +829,7 @@ export default function GuestMeetingRoom({ params }) {
               className={`w-full h-full object-cover -scale-x-100 ${isVideoOff ? 'hidden' : ''}`}
             />
             {isVideoOff && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-200 dark:bg-slate-800">
                 <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
                   <span className="text-2xl font-bold text-white">
                     {guestInfo?.guestName?.[0]?.toUpperCase() || 'G'}
@@ -810,13 +837,21 @@ export default function GuestMeetingRoom({ params }) {
                 </div>
               </div>
             )}
-            <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 rounded text-white text-xs">
-              You (Guest) {isMuted && '🔇'} {handRaised && '✋'}
+            <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/50 px-2 py-1 text-xs text-white">
+              <span>You (Guest)</span>
+              {isMuted && (
+                <CutLineIcon isOff className="text-red-300">
+                  <HiOutlineMicrophone className="h-3.5 w-3.5" />
+                </CutLineIcon>
+              )}
+              {handRaised && <HiOutlineHandRaised className="h-4 w-4 text-amber-300" aria-label="Hand raised" />}
             </div>
             <div className="pointer-events-none absolute inset-x-0 bottom-10 z-20 flex flex-col items-center">
               {floatingReactions.filter(reaction => reaction.participantId === 'local').map(reaction => (
                 <div key={reaction.id} className="meeting-tile-reaction flex flex-col items-center">
-                  <span className="text-5xl drop-shadow-lg">{reaction.emoji}</span>
+                  <span className="rounded-full bg-white/95 p-2 text-indigo-600 shadow-xl">
+                    <MeetingReactionIcon value={reaction.emoji} className="h-10 w-10" />
+                  </span>
                   <span className="rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white">{reaction.sender}</span>
                 </div>
               ))}
@@ -825,7 +860,16 @@ export default function GuestMeetingRoom({ params }) {
 
           {/* Remote Videos */}
           {participants.map(participant => (
-            <div key={participant.id} className="relative bg-gray-800 rounded-xl overflow-hidden aspect-video">
+            <div
+              key={participant.id}
+              className={`relative overflow-hidden rounded-xl bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${
+                participant.id === pinnedParticipantId
+                  ? 'order-1 col-span-full h-full min-h-0 ring-2 ring-indigo-400'
+                  : pinnedParticipantId
+                    ? 'order-2 h-28'
+                    : 'aspect-video'
+              }`}
+            >
               {participant.stream ? (
                 <>
                   <video
@@ -849,13 +893,23 @@ export default function GuestMeetingRoom({ params }) {
                   </div>
                 </div>
               )}
-              <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 rounded text-white text-xs">
-                {participant.userName || 'Participant'} {participant.isMuted && '🔇'}
+              <div className="absolute bottom-2 left-2 flex max-w-[80%] items-center gap-1.5 rounded bg-black/50 px-2 py-1 text-xs text-white">
+                <span className="truncate">{participant.userName || 'Participant'}</span>
+                {participant.isMuted && (
+                  <CutLineIcon isOff className="flex-shrink-0 text-red-300">
+                    <HiOutlineMicrophone className="h-3.5 w-3.5" />
+                  </CutLineIcon>
+                )}
+                {participant.isScreenSharing && (
+                  <HiOutlineComputerDesktop className="h-4 w-4 flex-shrink-0 text-indigo-300" aria-label="Sharing screen" />
+                )}
               </div>
               <div className="pointer-events-none absolute inset-x-0 bottom-10 z-20 flex flex-col items-center">
                 {floatingReactions.filter(reaction => reaction.participantId === participant.id).map(reaction => (
                   <div key={reaction.id} className="meeting-tile-reaction flex flex-col items-center">
-                    <span className="text-5xl drop-shadow-lg">{reaction.emoji}</span>
+                    <span className="rounded-full bg-white/95 p-2 text-indigo-600 shadow-xl">
+                      <MeetingReactionIcon value={reaction.emoji} className="h-10 w-10" />
+                    </span>
                     <span className="max-w-[12rem] truncate rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white">{reaction.sender}</span>
                   </div>
                 ))}
@@ -866,57 +920,54 @@ export default function GuestMeetingRoom({ params }) {
       </div>
 
       {/* Controls */}
-      <div className="bg-gray-800 p-4">
+      <div className="border-t border-slate-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-slate-900">
         <div className="flex items-center justify-center gap-3">
           <button
             onClick={toggleMute}
-            className={`p-4 rounded-full transition-colors ${isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-700 hover:bg-gray-600'
+            className={`p-4 rounded-full transition-colors ${isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
-            {isMuted ? (
-              <HiOutlineMicrophoneSlash className="w-6 h-6 text-white" />
-            ) : (
-              <HiMiniMicrophone className="w-6 h-6 text-white" />
-            )}
+            <CutLineIcon isOff={isMuted} className={isMuted ? 'text-white' : 'text-slate-700 dark:text-white'}>
+              <HiMiniMicrophone className="h-6 w-6" />
+            </CutLineIcon>
           </button>
 
           <button
             onClick={toggleVideo}
-            className={`p-4 rounded-full transition-colors ${isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-700 hover:bg-gray-600'
+            className={`p-4 rounded-full transition-colors ${isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
-            {isVideoOff ? (
-              <HiOutlineVideoCameraSlash className="w-6 h-6 text-white" />
-            ) : (
-              <HiMiniVideoCamera className="w-6 h-6 text-white" />
-            )}
+            <CutLineIcon isOff={isVideoOff} className={isVideoOff ? 'text-white' : 'text-slate-700 dark:text-white'}>
+              <HiMiniVideoCamera className="h-6 w-6" />
+            </CutLineIcon>
           </button>
 
           <button
             onClick={toggleHandRaise}
-            className={`p-4 rounded-full transition-colors ${handRaised ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-gray-700 hover:bg-gray-600'
+            className={`p-4 rounded-full transition-colors ${handRaised ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
-            <HiOutlineHandRaised className="w-6 h-6 text-white" />
+            <HiOutlineHandRaised className={`h-6 w-6 ${handRaised ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
           </button>
 
           <div className="relative">
             <button
               onClick={() => setShowReactions(!showReactions)}
-              className="p-4 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors"
+              className="rounded-full bg-slate-200 p-4 text-slate-700 transition-colors hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
             >
               <BsEmojiSmile className="w-6 h-6 text-white" />
             </button>
             {showReactions && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-xl shadow-lg p-2 flex gap-1">
-                {REACTIONS.map(({ emoji, label }) => (
+              <div className="absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                {MEETING_REACTIONS.map(({ value, label, Icon }) => (
                   <button
-                    key={emoji}
-                    onClick={() => sendReaction(emoji)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-xl"
+                    key={value}
+                    onClick={() => sendReaction(value)}
+                    className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-white/10"
                     title={label}
+                    aria-label={label}
                   >
-                    {emoji}
+                    <Icon className="h-7 w-7" aria-hidden="true" />
                   </button>
                 ))}
               </div>
@@ -925,10 +976,10 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={() => setShowChat(!showChat)}
-            className={`relative p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+            className={`relative p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
-            <HiOutlineChatBubbleLeftRight className="w-6 h-6 text-white" />
+            <HiOutlineChatBubbleLeftRight className={`h-6 w-6 ${showChat ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
             {unreadChatCount > 0 && !showChat && (
               <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                 {Math.min(unreadChatCount, 99)}
@@ -938,10 +989,10 @@ export default function GuestMeetingRoom({ params }) {
 
           <button
             onClick={() => setShowParticipants(!showParticipants)}
-            className={`p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+            className={`p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
           >
-            <HiOutlineUserGroup className="w-6 h-6 text-white" />
+            <HiOutlineUserGroup className={`h-6 w-6 ${showParticipants ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
           </button>
 
           <button
@@ -955,18 +1006,22 @@ export default function GuestMeetingRoom({ params }) {
 
       {/* Chat Panel */}
       {showChat && (
-        <div className="fixed right-0 top-0 bottom-0 w-80 bg-white shadow-xl z-40 flex flex-col">
-          <div className="p-4 border-b flex items-center justify-between">
+        <aside className="fixed bottom-0 right-0 top-0 z-40 flex w-80 flex-col border-l border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+          <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
             <h3 className="font-semibold">Chat</h3>
-            <button onClick={() => setShowChat(false)}>
+            <button
+              onClick={() => setShowChat(false)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
+              aria-label="Close chat"
+            >
               <HiOutlineXMark className="w-5 h-5" />
             </button>
           </div>
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {chatMessages.map(msg => (
               <div key={msg.id} className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm ${msg.isOwn ? 'rounded-br-md bg-indigo-600 text-white' : 'rounded-bl-md bg-gray-100 text-gray-800'}`}>
-                  <p className={`mb-0.5 text-xs font-semibold ${msg.isOwn ? 'text-indigo-100' : 'text-indigo-600'}`}>
+                <div className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm ${msg.isOwn ? 'rounded-br-md bg-indigo-600 text-white' : 'rounded-bl-md bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100'}`}>
+                  <p className={`mb-0.5 text-xs font-semibold ${msg.isOwn ? 'text-indigo-100' : 'text-indigo-600 dark:text-indigo-300'}`}>
                     {msg.isOwn ? 'You' : (msg.userName || 'Participant')}
                   </p>
                   <p className="break-words">{msg.message}</p>
@@ -974,7 +1029,7 @@ export default function GuestMeetingRoom({ params }) {
               </div>
             ))}
           </div>
-          <div className="border-t p-4">
+          <div className="border-t border-slate-200 p-4 dark:border-slate-800">
             {chatError && <p className="mb-2 text-xs text-red-600" role="alert">{chatError}</p>}
             <div className="flex gap-2">
               <input
@@ -984,7 +1039,7 @@ export default function GuestMeetingRoom({ params }) {
                 onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
                 placeholder="Type a message..."
                 disabled={isSendingChat}
-                className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
               />
               <button
                 onClick={sendChatMessage}
@@ -996,41 +1051,53 @@ export default function GuestMeetingRoom({ params }) {
               </button>
             </div>
           </div>
-        </div>
+        </aside>
       )}
 
       {/* Participants Panel */}
       {showParticipants && (
-        <div className="fixed right-0 top-0 bottom-0 w-80 bg-white shadow-xl z-40 flex flex-col">
-          <div className="p-4 border-b flex items-center justify-between">
+        <aside className="fixed bottom-0 right-0 top-0 z-40 flex w-80 flex-col border-l border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+          <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
             <h3 className="font-semibold">Participants ({participants.length + 1})</h3>
-            <button onClick={() => setShowParticipants(false)}>
+            <button
+              onClick={() => setShowParticipants(false)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
+              aria-label="Close participants"
+            >
               <HiOutlineXMark className="w-5 h-5" />
             </button>
           </div>
           <div className="flex-1 overflow-auto p-4 space-y-2">
-            <div className="flex items-center gap-3 p-2 rounded-lg bg-indigo-50">
+            <div className="flex items-center gap-3 rounded-xl bg-indigo-50 p-2 dark:bg-indigo-500/15">
               <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
                 <span className="text-white text-sm font-medium">
                   {guestInfo?.guestName?.[0]?.toUpperCase() || 'G'}
                 </span>
               </div>
               <span className="text-sm flex-1">{guestInfo?.guestName} (You - Guest)</span>
-              {isMuted && <HiOutlineMicrophoneSlash className="h-4 w-4 text-red-500" aria-label="Muted" />}
+              {isMuted && (
+                <CutLineIcon isOff className="text-red-500">
+                  <HiOutlineMicrophone className="h-4 w-4" />
+                </CutLineIcon>
+              )}
             </div>
             {participants.map(p => (
-              <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
-                <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center">
+              <div key={p.id} className="flex items-center gap-3 rounded-xl p-2 hover:bg-slate-100 dark:hover:bg-white/5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-400 dark:bg-slate-700">
                   <span className="text-white text-sm font-medium">
                     {p.userName?.[0]?.toUpperCase() || '?'}
                   </span>
                 </div>
                 <span className="text-sm flex-1">{p.userName}</span>
-                {p.isMuted && <HiOutlineMicrophoneSlash className="h-4 w-4 text-red-500" aria-label="Muted" />}
+                {p.isMuted && (
+                  <CutLineIcon isOff className="text-red-500">
+                    <HiOutlineMicrophone className="h-4 w-4" />
+                  </CutLineIcon>
+                )}
               </div>
             ))}
           </div>
-        </div>
+        </aside>
       )}
       <style jsx global>{`
         @keyframes meeting-reaction-rise {

@@ -20,7 +20,8 @@ import {
   HiOutlineSparkles,
   HiOutlineClipboardDocumentList,
   HiOutlineClipboard,
-  HiOutlineGlobeAlt
+  HiOutlineGlobeAlt,
+  HiOutlineExclamationTriangle
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea, Skeleton } from '@heroui/react'
@@ -998,8 +999,9 @@ export default function MeetingDetailPage({ params }) {
                       This will permanently delete <strong>"{meeting?.title}"</strong> from the database.
                       All associated data including invitees, transcripts, and AI summaries will be removed.
                     </p>
-                    <p className="text-sm text-red-600 mt-2 font-medium">
-                      ⚠️ This action cannot be undone.
+                    <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-red-600">
+                      <HiOutlineExclamationTriangle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                      This action cannot be undone.
                     </p>
                   </div>
                 </div>

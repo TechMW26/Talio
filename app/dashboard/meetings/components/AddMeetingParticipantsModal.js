@@ -165,7 +165,16 @@ export default function AddMeetingParticipantsModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={open => !open && onClose()} size="2xl" scrollBehavior="inside">
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={open => !open && onClose()}
+      size="2xl"
+      scrollBehavior="inside"
+      classNames={{
+        backdrop: 'z-[190]',
+        wrapper: 'z-[200]',
+      }}
+    >
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
           <span>Add participants</span>
@@ -248,7 +257,7 @@ export default function AddMeetingParticipantsModal({
                   size="sm"
                   color="primary"
                   variant="flat"
-                  startContent={<HiOutlineClipboardDocument className="h-4 w-4" />}
+                  startContent={<HiOutlineClipboardDocument key="copy-guest-link-icon" className="h-4 w-4" />}
                   onPress={copyGuestLink}
                 >
                   Copy link
@@ -273,7 +282,7 @@ export default function AddMeetingParticipantsModal({
             onPress={inviteSelected}
             isLoading={isInviting}
             isDisabled={selectedIds.length === 0}
-            startContent={!isInviting && <HiOutlineUserPlus className="h-4 w-4" />}
+            startContent={isInviting ? null : <HiOutlineUserPlus key="invite-participants-icon" className="h-4 w-4" />}
           >
             Invite {selectedIds.length || ''}
           </Button>

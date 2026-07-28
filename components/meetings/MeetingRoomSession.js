@@ -49,25 +49,18 @@ import {
   optimizeMeetingPeerConnections,
   prepareMeetingMediaStream,
 } from '@/lib/meetingMediaQuality'
-// Slash icons for muted/off states
-import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsPin, BsPinFill, BsEmojiSmile } from 'react-icons/bs'
+import {
+  CutLineIcon,
+  MEETING_REACTIONS,
+  MeetingReactionIcon,
+} from '@/components/meetings/MeetingVisualIcons'
 import toast from '@/utils/toast'
 
-// Reaction emojis
-const REACTIONS = [
-  { emoji: '👍', label: 'Thumbs up' },
-  { emoji: '👏', label: 'Clap' },
-  { emoji: '❤️', label: 'Heart' },
-  { emoji: '😂', label: 'Laugh' },
-  { emoji: '😮', label: 'Wow' },
-  { emoji: '🎉', label: 'Celebrate' },
-]
-
 const CONNECTION_QUALITY_META = {
-  good: { label: 'Good', dot: 'bg-emerald-400', text: 'text-emerald-300' },
-  fair: { label: 'Adapting', dot: 'bg-amber-400', text: 'text-amber-300' },
-  poor: { label: 'Low network', dot: 'bg-red-400', text: 'text-red-300' },
+  good: { label: 'Good', dot: 'bg-emerald-500 dark:bg-emerald-400', text: 'text-emerald-700 dark:text-emerald-300' },
+  fair: { label: 'Adapting', dot: 'bg-amber-500 dark:bg-amber-400', text: 'text-amber-700 dark:text-amber-300' },
+  poor: { label: 'Low network', dot: 'bg-red-500 dark:bg-red-400', text: 'text-red-700 dark:text-red-300' },
 }
 
 export default function MeetingRoomSession({
@@ -75,13 +68,19 @@ export default function MeetingRoomSession({
   displayMode = 'full',
   onJoinedChange,
   onMinimizeToPip,
+  onRestoreMeeting,
   onSetPipSize,
   onSessionEnded,
 }) {
   const router = useRouter()
 
   // --- SWR: Fetch meeting data ---
-  const { data: meetingsRes, isLoading: meetingLoading } = useAuthedSWR(
+  const {
+    data: meetingsRes,
+    error: meetingError,
+    isLoading: meetingLoading,
+    mutate: refreshMeeting,
+  } = useAuthedSWR(
     `/api/meetings?roomId=${roomId}`,
     { revalidateOnFocus: false, revalidateIfStale: false }
   )
@@ -89,8 +88,12 @@ export default function MeetingRoomSession({
   // Derive user from localStorage
   const user = useMemo(() => {
     if (typeof window === 'undefined') return null
-    const storedUser = localStorage.getItem('user')
-    return storedUser ? JSON.parse(storedUser) : null
+    try {
+      const storedUser = localStorage.getItem('user')
+      return storedUser ? JSON.parse(storedUser) : null
+    } catch {
+      return null
+    }
   }, [])
 
   const userDisplayName = useMemo(() => {
@@ -125,12 +128,9 @@ export default function MeetingRoomSession({
   const [showNotetaker, setShowNotetaker] = useState(false)
   const [liveTranscript, setLiveTranscript] = useState([])
   const [transcriptLanguages, setTranscriptLanguages] = useState([])
-  const [notetakerLoading, setNotetakerLoading] = useState(false)
   const [notetakerReady, setNotetakerReady] = useState(false)
   const [notetakerError, setNotetakerError] = useState(null)
   const [notetakerMode, setNotetakerMode] = useState('unsupported')
-  const [isTranscribingSegment, setIsTranscribingSegment] = useState(false)
-  const [activeSpeakers, setActiveSpeakers] = useState([])
   const [isEndingMeeting, setIsEndingMeeting] = useState(false)
   const [endingMeetingStatus, setEndingMeetingStatus] = useState('Saving your latest meeting activity...')
   const [connectionQuality, setConnectionQuality] = useState('good')
@@ -162,7 +162,6 @@ export default function MeetingRoomSession({
   const meetingSessionStartedAtRef = useRef(null)
   const transcriptionRecorderRef = useRef(null)
   const lastTranscriptionPromiseRef = useRef(Promise.resolve())
-  const speakerTimeoutsRef = useRef({})
   const isMutedRef = useRef(false)
   const showChatRef = useRef(false)
   const connectionStatsRef = useRef(new WeakMap())
@@ -235,36 +234,14 @@ export default function MeetingRoomSession({
     setTranscriptLanguages(prev => [...new Set([...prev, ...nextLanguages])])
   }, [])
 
-  const markSpeakerActive = useCallback((speakerName) => {
-    if (!speakerName) return
-
-    setActiveSpeakers(prev => prev.includes(speakerName) ? prev : [...prev, speakerName])
-
-    if (speakerTimeoutsRef.current[speakerName]) {
-      clearTimeout(speakerTimeoutsRef.current[speakerName])
-    }
-
-    speakerTimeoutsRef.current[speakerName] = setTimeout(() => {
-      delete speakerTimeoutsRef.current[speakerName]
-      setActiveSpeakers(prev => prev.filter(name => name !== speakerName))
-    }, 5000)
-  }, [])
-
   const applyPersistedTranscriptSegments = useCallback((segments = []) => {
     if (!Array.isArray(segments) || segments.length === 0) {
       return
     }
 
-    const speakerNames = [...new Set(
-      segments
-        .map(segment => segment?.speakerName)
-        .filter(Boolean)
-    )]
-
-    speakerNames.forEach(markSpeakerActive)
     setLiveTranscript(prev => mergeTranscriptSegments(prev, segments))
     updateTranscriptLanguages(segments)
-  }, [markSpeakerActive, updateTranscriptLanguages])
+  }, [updateTranscriptLanguages])
 
   const persistTranscriptSegments = useCallback(async (segments) => {
     if (!meeting?._id || !Array.isArray(segments) || segments.length === 0) {
@@ -355,15 +332,7 @@ export default function MeetingRoomSession({
       ])
     ])
 
-    nextTranscript
-      .slice(-3)
-      .filter(segment => segment?.timestamp && Date.now() - new Date(segment.timestamp).getTime() < 6000)
-      .forEach(segment => {
-        if (segment?.speakerName) {
-          markSpeakerActive(segment.speakerName)
-        }
-      })
-  }, [transcriptRes, markSpeakerActive])
+  }, [transcriptRes])
 
   useEffect(() => {
     if (!isJoined) return undefined
@@ -372,7 +341,6 @@ export default function MeetingRoomSession({
     setNotetakerMode(transcriptionMode)
 
     if (transcriptionMode === 'unsupported') {
-      setNotetakerLoading(false)
       setNotetakerReady(false)
       setNotetakerError(getMeetingTranscriptionUnavailableReason())
       return undefined
@@ -380,12 +348,10 @@ export default function MeetingRoomSession({
 
     if (transcriptionMode === 'elevenlabs') {
       setNotetakerError(null)
-      setNotetakerLoading(false)
       setNotetakerReady(true)
       return undefined
     }
 
-    setNotetakerLoading(false)
     setNotetakerReady(false)
     setNotetakerError(getMeetingTranscriptionUnavailableReason())
     return undefined
@@ -520,7 +486,6 @@ export default function MeetingRoomSession({
       return
     }
 
-    setIsTranscribingSegment(true)
     setNotetakerError(null)
 
     const processingPromise = lastTranscriptionPromiseRef.current
@@ -532,9 +497,6 @@ export default function MeetingRoomSession({
       .catch(error => {
         console.error('Failed to transcribe meeting audio segment:', error)
         setNotetakerError('Mira live transcription hit an issue for the last segment. Recording will continue and you can still generate the meeting summary afterwards.')
-      })
-      .finally(() => {
-        setIsTranscribingSegment(false)
       })
 
     lastTranscriptionPromiseRef.current = processingPromise
@@ -642,7 +604,7 @@ export default function MeetingRoomSession({
           isMutedRef.current = true
           setIsMuted(true)
           setIsVideoOff(true)
-          toast('Joining in listen-only mode', { icon: '🎧' })
+          toast('Joining in listen-only mode')
         }
         setHasLocalStream(true)
       }
@@ -675,6 +637,7 @@ export default function MeetingRoomSession({
           userId: user?._id,
           userName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Guest',
           isMuted: isMutedRef.current,
+          isScreenSharing: isScreenSharingRef.current,
         }, (response) => {
           if (response?.success) {
             setChatError('')
@@ -690,6 +653,9 @@ export default function MeetingRoomSession({
         console.log('Existing participants:', existingUsers)
         for (const userData of existingUsers) {
           upsertParticipant(userData)
+          if (userData.isScreenSharing) {
+            setPinnedTile(userData.id)
+          }
           // Create peer connection and send offer to existing user
           await createPeerConnectionAndOffer(userData.id, userData.userName)
         }
@@ -699,6 +665,9 @@ export default function MeetingRoomSession({
       socketRef.current.on('user-joined', (userData) => {
         console.log('User joined:', userData)
         upsertParticipant(userData)
+        if (userData.isScreenSharing) {
+          setPinnedTile(userData.id)
+        }
         // Don't create offer - wait for the new user to send us an offer
         // The new user will initiate connections with existing participants
         createPeerConnection(userData.id, userData.userName, false)
@@ -707,6 +676,7 @@ export default function MeetingRoomSession({
       socketRef.current.on('user-left', (userData) => {
         console.log('User left:', userData)
         setParticipants(prev => prev.filter(p => p.id !== userData.id))
+        setPinnedTile(current => current === userData.id ? null : current)
         if (remoteStreamsRef.current[userData.id]) {
           delete remoteStreamsRef.current[userData.id]
         }
@@ -737,7 +707,7 @@ export default function MeetingRoomSession({
         if (!showChatRef.current && !isOwnMessage) {
           setUnreadChatCount(count => count + 1)
           toast(`${normalizedMessage.sender}: ${normalizedMessage.text}`, {
-            icon: '💬',
+            icon: <HiOutlineChatBubbleLeftRight className="h-5 w-5 text-indigo-500" />,
             duration: 5000,
           })
         }
@@ -752,7 +722,9 @@ export default function MeetingRoomSession({
       })
 
       socketRef.current.on('hand-raised', (userData) => {
-        toast(`${userData.userName} raised their hand`, { icon: '✋' })
+        toast(`${userData.userName} raised their hand`, {
+          icon: <HiOutlineHandRaised className="h-5 w-5 text-amber-500" />,
+        })
       })
 
       socketRef.current.on('meeting-reaction', (data) => {
@@ -760,6 +732,21 @@ export default function MeetingRoomSession({
           ...(typeof data.reaction === 'object' ? data.reaction : { emoji: data.reaction }),
           sender: data.userName || data.reaction?.sender || 'Participant',
         }, data.id)
+      })
+
+      socketRef.current.on('participant-screen-share-state', ({ id, isScreenSharing: participantIsSharing }) => {
+        setParticipants(prev => prev.map(participant => (
+          participant.id === id
+            ? { ...participant, isScreenSharing: Boolean(participantIsSharing) }
+            : participant
+        )))
+        setPinnedTile(current => (
+          participantIsSharing
+            ? id
+            : current === id
+              ? null
+              : current
+        ))
       })
 
       // WebRTC Signaling
@@ -824,6 +811,7 @@ export default function MeetingRoomSession({
             userId: user?._id,
             userName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Guest',
             isMuted: isMutedRef.current,
+            isScreenSharing: isScreenSharingRef.current,
           }, (response) => {
             if (response?.success) {
               settle(resolve)
@@ -1062,6 +1050,11 @@ export default function MeetingRoomSession({
       }
       isScreenSharingRef.current = false
       setIsScreenSharing(false)
+      setPinnedTile(current => current === 'screen' ? null : current)
+      socketRef.current?.emit('meeting-screen-share-state', {
+        roomId,
+        isScreenSharing: false,
+      })
     } else {
       try {
         let screenStream = null
@@ -1144,6 +1137,11 @@ export default function MeetingRoomSession({
 
         isScreenSharingRef.current = true
         setIsScreenSharing(true)
+        setPinnedTile('screen')
+        socketRef.current?.emit('meeting-screen-share-state', {
+          roomId,
+          isScreenSharing: true,
+        })
       } catch (error) {
         console.error('Error sharing screen:', error)
         // Check for permission denied errors
@@ -1351,9 +1349,6 @@ export default function MeetingRoomSession({
       setEndingMeetingStatus('Closing meeting room...')
     } finally {
       meetingSessionStartedAtRef.current = null
-      Object.values(speakerTimeoutsRef.current).forEach(clearTimeout)
-      speakerTimeoutsRef.current = {}
-      setActiveSpeakers([])
 
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop())
@@ -1383,7 +1378,6 @@ export default function MeetingRoomSession({
   useEffect(() => {
     return () => {
       void stopTranscriptionRecorder().catch(() => { })
-      Object.values(speakerTimeoutsRef.current).forEach(clearTimeout)
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop())
       }
@@ -1402,9 +1396,13 @@ export default function MeetingRoomSession({
 
   if (meetingLoading) {
     return (
-      <div className="h-screen w-screen bg-gray-100 flex items-center justify-center overflow-hidden">
+      <div
+        className="fixed inset-0 z-[110] flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-950"
+        role="status"
+        aria-live="polite"
+      >
         <div className="max-w-lg w-full px-6">
-          <div className="bg-white rounded-2xl p-6 shadow-xl border border-gray-200">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-slate-900">
             <div className="flex flex-col items-center">
               <Skeleton className="w-16 h-16 rounded-2xl mb-4" />
               <Skeleton className="h-7 w-48 rounded-lg mb-2" />
@@ -1423,17 +1421,52 @@ export default function MeetingRoomSession({
     )
   }
 
+  if (meetingError) {
+    return (
+      <div
+        className="fixed inset-0 z-[110] flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-slate-100 p-4 text-slate-900 dark:bg-slate-950 dark:text-white"
+        role="alert"
+      >
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl dark:border-white/10 dark:bg-slate-900">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/15">
+            <HiOutlineVideoCamera className="h-7 w-7 text-amber-300" />
+          </div>
+          <h1 className="text-xl font-semibold">Unable to load this meeting</h1>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Check your connection and try again. Your camera and microphone have not been joined.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => void refreshMeeting()}
+              className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/meetings')}
+              className="flex-1 rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
+            >
+              Back to meetings
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!isJoined) {
     return (
-      <div className="h-screen w-screen bg-gray-100 flex items-center justify-center p-4 overflow-hidden">
-        <div className="max-w-lg w-full bg-white rounded-2xl p-6 text-center shadow-xl border border-gray-200">
+      <div className="fixed inset-0 z-[110] flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-slate-100 p-4 dark:bg-slate-950">
+        <div className="max-w-lg w-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xl dark:border-white/10 dark:bg-slate-900">
           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <HiOutlineVideoCamera className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+          <h1 className="mb-2 text-2xl font-bold text-slate-900 dark:text-white">
             {meeting?.title || 'Meeting Room'}
           </h1>
-          <p className="text-gray-500 mb-4">
+          <p className="mb-4 text-slate-500 dark:text-slate-300">
             Ready to join the meeting?
           </p>
 
@@ -1485,7 +1518,9 @@ export default function MeetingRoomSession({
                     }`}
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
-                  {isMuted ? <HiOutlineMicrophoneSlash className="w-5 h-5" /> : <HiMiniMicrophone className="w-5 h-5" />}
+                  <CutLineIcon isOff={isMuted}>
+                    <HiMiniMicrophone className="h-5 w-5" />
+                  </CutLineIcon>
                 </button>
                 <button
                   onClick={togglePreviewVideo}
@@ -1495,7 +1530,9 @@ export default function MeetingRoomSession({
                     }`}
                   title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
                 >
-                  {isVideoOff ? <HiOutlineVideoCameraSlash className="w-5 h-5" /> : <HiMiniVideoCamera className="w-5 h-5" />}
+                  <CutLineIcon isOff={isVideoOff}>
+                    <HiMiniVideoCamera className="h-5 w-5" />
+                  </CutLineIcon>
                 </button>
               </div>
             )}
@@ -1503,13 +1540,17 @@ export default function MeetingRoomSession({
 
           {/* Mic/Video status indicator */}
           {previewReady && (
-            <div className="flex items-center justify-center gap-4 mb-4 text-sm text-gray-600">
+            <div className="mb-4 flex items-center justify-center gap-4 text-sm text-slate-600 dark:text-slate-300">
               <span className={`flex items-center gap-1 ${isMuted ? 'text-red-500' : 'text-green-600'}`}>
-                {isMuted ? <HiOutlineMicrophoneSlash className="w-4 h-4" /> : <HiMiniMicrophone className="w-4 h-4" />}
+                <CutLineIcon isOff={isMuted}>
+                  <HiMiniMicrophone className="h-4 w-4" />
+                </CutLineIcon>
                 {isMuted ? 'Muted' : 'Mic on'}
               </span>
               <span className={`flex items-center gap-1 ${isVideoOff ? 'text-red-500' : 'text-green-600'}`}>
-                {isVideoOff ? <HiOutlineVideoCameraSlash className="w-4 h-4" /> : <HiMiniVideoCamera className="w-4 h-4" />}
+                <CutLineIcon isOff={isVideoOff}>
+                  <HiMiniVideoCamera className="h-4 w-4" />
+                </CutLineIcon>
                 {isVideoOff ? 'Camera off' : 'Camera on'}
               </span>
             </div>
@@ -1535,7 +1576,7 @@ export default function MeetingRoomSession({
               }
               router.push(meeting?._id ? `/dashboard/meetings/${meeting._id}` : '/dashboard/meetings')
             }}
-            className="w-full py-3 text-gray-500 hover:text-gray-700 mt-3"
+            className="mt-3 w-full py-3 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white"
           >
             Cancel
           </button>
@@ -1582,7 +1623,7 @@ export default function MeetingRoomSession({
     return (
       <div
         key={tileId}
-        className={`relative bg-slate-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/10 group ${getTileClasses()} ${isThisPinned && !isPinned ? 'ring-2 ring-indigo-400' : ''}`}
+        className={`group relative overflow-hidden rounded-2xl bg-slate-200 shadow-xl ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${getTileClasses()} ${isThisPinned && !isPinned ? 'ring-2 ring-indigo-500 dark:ring-indigo-400' : ''}`}
       >
         {/* Video Element */}
         {type === 'local' ? (
@@ -1602,7 +1643,7 @@ export default function MeetingRoomSession({
               className={`absolute inset-0 w-full h-full object-contain -scale-x-100 ${isVideoOff ? 'hidden' : ''}`}
             />
             {isVideoOff && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-200 dark:bg-slate-800">
                 <div className="w-12 h-12 sm:w-20 sm:h-20 bg-indigo-600 rounded-full flex items-center justify-center">
                   <span className="text-lg sm:text-2xl font-bold text-white">
                     {user?.firstName?.[0]?.toUpperCase() || 'Y'}
@@ -1610,8 +1651,14 @@ export default function MeetingRoomSession({
                 </div>
               </div>
             )}
-            <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 px-2 py-1 bg-black/50 rounded text-white text-xs sm:text-sm">
-              You {isMuted && '🔇'} {handRaised && '✋'}
+            <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/50 px-2 py-1 text-xs text-white sm:bottom-3 sm:left-3 sm:text-sm">
+              <span>You</span>
+              {isMuted && (
+                <CutLineIcon isOff className="text-red-300">
+                  <HiOutlineMicrophone className="h-3.5 w-3.5" />
+                </CutLineIcon>
+              )}
+              {handRaised && <HiOutlineHandRaised className="h-4 w-4 text-amber-300" aria-label="Hand raised" />}
             </div>
           </>
         ) : type === 'screen' ? (
@@ -1651,7 +1698,7 @@ export default function MeetingRoomSession({
                 />
               </>
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-200 dark:bg-slate-800">
                 <div className="w-12 h-12 sm:w-20 sm:h-20 bg-indigo-600 rounded-full flex items-center justify-center">
                   <span className="text-lg sm:text-2xl font-bold text-white">
                     {data?.userName?.[0]?.toUpperCase() || '?'}
@@ -1659,8 +1706,16 @@ export default function MeetingRoomSession({
                 </div>
               </div>
             )}
-            <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 px-2 py-1 bg-black/50 rounded text-white text-xs sm:text-sm truncate max-w-[80%]">
-              {data?.userName} {data?.isMuted && '🔇'}
+            <div className="absolute bottom-2 left-2 flex max-w-[80%] items-center gap-1.5 rounded bg-black/50 px-2 py-1 text-xs text-white sm:bottom-3 sm:left-3 sm:text-sm">
+              <span className="truncate">{data?.userName}</span>
+              {data?.isMuted && (
+                <CutLineIcon isOff className="flex-shrink-0 text-red-300">
+                  <HiOutlineMicrophone className="h-3.5 w-3.5" />
+                </CutLineIcon>
+              )}
+              {data?.isScreenSharing && (
+                <HiOutlineComputerDesktop className="h-4 w-4 flex-shrink-0 text-indigo-300" aria-label="Sharing screen" />
+              )}
             </div>
           </>
         )}
@@ -1670,7 +1725,9 @@ export default function MeetingRoomSession({
             .filter(reaction => reaction.participantId === tileId)
             .map(reaction => (
               <div key={reaction.animId} className="meeting-tile-reaction flex flex-col items-center">
-                <span className="text-4xl drop-shadow-lg sm:text-5xl">{reaction.emoji}</span>
+                <span className="rounded-full bg-white/95 p-2 text-indigo-600 shadow-xl">
+                  <MeetingReactionIcon value={reaction.emoji} className="h-8 w-8 sm:h-10 sm:w-10" />
+                </span>
                 <span className="mt-1 max-w-[12rem] truncate rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white">
                   {reaction.sender || (tileId === 'local' ? 'You' : 'Participant')}
                 </span>
@@ -1695,6 +1752,10 @@ export default function MeetingRoomSession({
   }
 
   const restoreFullMeeting = () => {
+    if (onRestoreMeeting) {
+      onRestoreMeeting()
+      return
+    }
     router.push(`/dashboard/meetings/room/${roomId}`)
   }
 
@@ -1748,7 +1809,7 @@ export default function MeetingRoomSession({
       <>
         {renderPipAudioSinks()}
         <section
-          className="fixed bottom-20 right-3 z-[130] flex w-[min(22rem,calc(100vw-1.5rem))] items-center gap-3 rounded-2xl border border-white/15 bg-slate-950/95 p-3 text-white shadow-2xl backdrop-blur sm:bottom-5 sm:right-5"
+          className="fixed bottom-20 right-3 z-[130] flex w-[min(22rem,calc(100vw-1.5rem))] items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-slate-900 shadow-2xl backdrop-blur dark:border-white/15 dark:bg-slate-950/95 dark:text-white sm:bottom-5 sm:right-5"
           aria-label="Talio Meet compact picture in picture"
         >
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600">
@@ -1756,21 +1817,23 @@ export default function MeetingRoomSession({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{meeting?.title || 'Talio Meet'}</p>
-          <p className="text-xs text-slate-400">{participants.length + 1} participants · {isMuted ? 'Muted' : 'Mic on'}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{participants.length + 1} participants · {isMuted ? 'Muted' : 'Mic on'}</p>
         </div>
         <button
           type="button"
           onClick={toggleMute}
-          className={`rounded-full p-2 ${isMuted ? 'bg-red-600' : 'bg-slate-700 hover:bg-slate-600'}`}
+          className={`rounded-full p-2 text-white ${isMuted ? 'bg-red-600' : 'bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600'}`}
           title={isMuted ? 'Unmute' : 'Mute'}
           aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
         >
-          {isMuted ? <HiOutlineMicrophoneSlash className="h-4 w-4" /> : <HiMiniMicrophone className="h-4 w-4" />}
+          <CutLineIcon isOff={isMuted}>
+            <HiMiniMicrophone className="h-4 w-4" />
+          </CutLineIcon>
         </button>
         <button
           type="button"
           onClick={() => onSetPipSize?.('expanded')}
-          className="rounded-full bg-slate-700 p-2 hover:bg-slate-600"
+          className="rounded-full bg-slate-200 p-2 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
           title="Expand PiP"
           aria-label="Expand picture in picture"
         >
@@ -1779,7 +1842,7 @@ export default function MeetingRoomSession({
         <button
           type="button"
           onClick={() => onSetPipSize?.('bubble')}
-          className="rounded-full bg-slate-700 p-2 hover:bg-slate-600"
+          className="rounded-full bg-slate-200 p-2 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
           title="Minimise to bubble"
           aria-label="Minimise picture in picture to bubble"
         >
@@ -1799,19 +1862,19 @@ export default function MeetingRoomSession({
       <>
         {renderPipAudioSinks(isScreenSharing ? null : pipParticipant?.id)}
         <section
-          className="fixed bottom-20 right-3 z-[130] w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-white/15 bg-slate-950 text-white shadow-2xl sm:bottom-5 sm:right-5"
+          className="fixed bottom-20 right-3 z-[130] w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-white/15 dark:bg-slate-950 dark:text-white sm:bottom-5 sm:right-5"
           aria-label="Talio Meet picture in picture"
         >
-        <header className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+        <header className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-white/10">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{meeting?.title || 'Talio Meet'}</p>
-            <p className="text-[11px] text-slate-400">{participants.length + 1} participants</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">{participants.length + 1} participants</p>
           </div>
           <button
             type="button"
             onClick={restoreFullMeeting}
-            className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
             title="Return to meeting"
             aria-label="Return to full meeting"
           >
@@ -1820,7 +1883,7 @@ export default function MeetingRoomSession({
           <button
             type="button"
             onClick={() => onSetPipSize?.('compact')}
-            className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
             title="Compact PiP"
             aria-label="Compact picture in picture"
           >
@@ -1829,7 +1892,7 @@ export default function MeetingRoomSession({
           <button
             type="button"
             onClick={() => onSetPipSize?.('bubble')}
-            className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
             title="Minimise to bubble"
             aria-label="Minimise picture in picture to bubble"
           >
@@ -1837,7 +1900,7 @@ export default function MeetingRoomSession({
           </button>
         </header>
 
-        <div className="aspect-video bg-slate-900 p-2">
+        <div className="aspect-video bg-slate-100 p-2 dark:bg-slate-900">
           {isScreenSharing
             ? renderTile('screen')
             : pipParticipant
@@ -1845,7 +1908,7 @@ export default function MeetingRoomSession({
               : renderTile('local')}
         </div>
 
-        <footer className="flex items-center justify-center gap-2 border-t border-white/10 p-2.5">
+        <footer className="flex items-center justify-center gap-2 border-t border-slate-200 p-2.5 dark:border-white/10">
           <button
             type="button"
             onClick={toggleMute}
@@ -1853,7 +1916,9 @@ export default function MeetingRoomSession({
             title={isMuted ? 'Unmute' : 'Mute'}
             aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
           >
-            {isMuted ? <HiOutlineMicrophoneSlash className="h-5 w-5" /> : <HiMiniMicrophone className="h-5 w-5" />}
+            <CutLineIcon isOff={isMuted}>
+              <HiMiniMicrophone className="h-5 w-5" />
+            </CutLineIcon>
           </button>
           <button
             type="button"
@@ -1862,7 +1927,9 @@ export default function MeetingRoomSession({
             title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
             aria-label={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
           >
-            {isVideoOff ? <HiOutlineVideoCameraSlash className="h-5 w-5" /> : <HiMiniVideoCamera className="h-5 w-5" />}
+            <CutLineIcon isOff={isVideoOff}>
+              <HiMiniVideoCamera className="h-5 w-5" />
+            </CutLineIcon>
           </button>
           <button
             type="button"
@@ -1889,14 +1956,14 @@ export default function MeetingRoomSession({
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex h-screen w-screen flex-col overflow-hidden bg-slate-950">
+    <div className="fixed inset-0 z-[110] isolate flex h-screen w-screen flex-col overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white">
       {isEndingMeeting && (
-        <div className="absolute inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm px-6">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/90 p-6 shadow-2xl">
+        <div className="absolute inset-0 z-[120] flex items-center justify-center bg-slate-100/80 px-6 backdrop-blur-sm dark:bg-slate-950/80">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-2xl dark:border-white/10 dark:bg-slate-900/90">
             <div className="flex flex-col items-center text-center">
               <div className="mb-4 h-14 w-14 rounded-full border-[3px] border-white/15 border-t-cyan-300 animate-spin" />
-              <h2 className="text-lg font-semibold text-white">Ending meeting...</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Ending meeting...</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
                 {endingMeetingStatus}
               </p>
             </div>
@@ -1905,10 +1972,10 @@ export default function MeetingRoomSession({
       )}
 
       {/* Header */}
-      <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-white/10 bg-slate-900 px-3 sm:px-4">
+      <div className="relative z-30 flex h-14 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:shadow-none sm:px-4">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-emerald-400" aria-label="Meeting connected" />
-          <h1 className="truncate text-sm font-semibold text-white sm:text-base">
+          <h1 className="truncate text-sm font-semibold text-slate-900 dark:text-white sm:text-base">
             {meeting?.title || 'Meeting'}
           </h1>
           {isRecording && (
@@ -1923,7 +1990,7 @@ export default function MeetingRoomSession({
             <button
               type="button"
               onClick={() => setShowAddParticipants(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/10"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
               title="Add participants"
             >
               <HiOutlineUserPlus className="h-4 w-4" />
@@ -1938,24 +2005,25 @@ export default function MeetingRoomSession({
               setShowNotetaker(false)
               onMinimizeToPip?.()
             }}
-            className="flex items-center gap-1.5 rounded-lg border border-indigo-400/30 bg-indigo-500/15 px-2.5 py-1.5 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/25"
-            title="Keep meeting open while using Talio"
+            className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-400/30 dark:bg-indigo-500/15 dark:text-indigo-200 dark:hover:bg-indigo-500/25"
+            title="Minimise meeting"
+            aria-label="Minimise meeting"
           >
             <HiOutlineArrowsPointingIn className="h-4 w-4" />
-            <span className="hidden sm:inline">Use Talio</span>
+            <span className="hidden sm:inline">Minimise</span>
           </button>
           <span
-            className={`hidden items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs sm:flex ${CONNECTION_QUALITY_META[connectionQuality].text}`}
+            className={`hidden items-center gap-1.5 rounded-full bg-slate-100 px-2 py-1 text-xs dark:bg-white/5 sm:flex ${CONNECTION_QUALITY_META[connectionQuality].text}`}
             title="Talio automatically adjusts video quality to your network"
           >
             <span className={`h-2 w-2 rounded-full ${CONNECTION_QUALITY_META[connectionQuality].dot}`} />
             {CONNECTION_QUALITY_META[connectionQuality].label}
           </span>
-          <span className="text-xs text-slate-400 sm:text-sm">
+          <span className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
             {participants.length + 1} <span className="hidden sm:inline">participants</span>
           </span>
           {liveTranscript.length > 0 && (
-            <span className="hidden text-xs text-slate-500 sm:inline">
+            <span className="hidden text-xs text-slate-500 dark:text-slate-400 sm:inline">
               {liveTranscript.length} transcript segments
             </span>
           )}
@@ -1963,9 +2031,9 @@ export default function MeetingRoomSession({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex min-h-0 overflow-hidden relative">
+      <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
         {/* Video Grid Area */}
-        <div className={`flex-1 p-2 sm:p-4 min-w-0 overflow-hidden ${showChat || showParticipants || showNotetaker ? 'hidden sm:block' : ''}`}>
+        <div className={`relative z-0 flex-1 p-2 sm:p-4 min-w-0 overflow-hidden ${showChat || showParticipants || showNotetaker ? 'hidden sm:block' : ''}`}>
           {pinnedTile ? (
             // Pinned Layout
             <div className="h-full flex flex-col gap-2 sm:gap-3">
@@ -2018,24 +2086,25 @@ export default function MeetingRoomSession({
 
         {/* Chat Sidebar */}
         {showChat && (
-          <div className="w-full sm:w-80 bg-white border-l border-gray-200 flex flex-col shadow-lg flex-shrink-0">
-            <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-gray-800 font-medium">Chat</h2>
+          <aside className="relative z-20 flex w-full flex-shrink-0 flex-col border-l border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900 sm:w-80">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 p-3 dark:border-slate-800 sm:p-4">
+              <h2 className="font-medium text-slate-900 dark:text-white">Chat</h2>
               <button
                 onClick={() => setShowChat(false)}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
+                aria-label="Close chat"
               >
-                <HiOutlineXMark className="w-5 h-5 text-gray-500" />
+                <HiOutlineXMark className="h-5 w-5" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 min-h-0">
               {chatMessages.length === 0 ? (
-                <p className="text-gray-400 text-center text-sm">No messages yet</p>
+                <p className="text-center text-sm text-slate-500 dark:text-slate-400">No messages yet</p>
               ) : (
                 chatMessages.map(msg => (
                   <div key={msg.id} className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm ${msg.isOwn ? 'rounded-br-md bg-indigo-600 text-white' : 'rounded-bl-md bg-gray-100 text-gray-800'}`}>
-                      <p className={`mb-0.5 text-xs font-semibold ${msg.isOwn ? 'text-indigo-100' : 'text-indigo-600'}`}>
+                    <div className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm ${msg.isOwn ? 'rounded-br-md bg-indigo-600 text-white' : 'rounded-bl-md bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100'}`}>
+                      <p className={`mb-0.5 text-xs font-semibold ${msg.isOwn ? 'text-indigo-100' : 'text-indigo-600 dark:text-indigo-300'}`}>
                         {msg.isOwn ? 'You' : msg.sender}
                       </p>
                       <p className="break-words">{msg.text}</p>
@@ -2044,7 +2113,7 @@ export default function MeetingRoomSession({
                 ))
               )}
             </div>
-            <div className="p-3 sm:p-4 border-t border-gray-200 flex-shrink-0">
+            <div className="flex-shrink-0 border-t border-slate-200 p-3 dark:border-slate-800 sm:p-4">
               {chatError && (
                 <p className="mb-2 text-xs text-red-600" role="alert">{chatError}</p>
               )}
@@ -2056,7 +2125,7 @@ export default function MeetingRoomSession({
                   onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
                   placeholder="Type a message..."
                   disabled={isSendingChat}
-                  className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 text-sm"
+                  className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder-slate-500"
                 />
                 <button
                   onClick={sendChatMessage}
@@ -2068,14 +2137,14 @@ export default function MeetingRoomSession({
                 </button>
               </div>
             </div>
-          </div>
+          </aside>
         )}
 
         {/* Participants Sidebar */}
         {showParticipants && (
-          <div className="w-full sm:w-80 bg-white border-l border-gray-200 shadow-lg flex flex-col flex-shrink-0">
-            <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-gray-800 font-medium">
+          <aside className="relative z-20 flex w-full flex-shrink-0 flex-col border-l border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900 sm:w-80">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 p-3 dark:border-slate-800 sm:p-4">
+              <h2 className="font-medium text-slate-900 dark:text-white">
                 Participants ({participants.length + 1})
               </h2>
               <div className="flex items-center gap-1">
@@ -2083,7 +2152,7 @@ export default function MeetingRoomSession({
                   <button
                     type="button"
                     onClick={() => setShowAddParticipants(true)}
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/15"
                     title="Add participants"
                   >
                     <HiOutlineUserPlus className="h-4 w-4" />
@@ -2092,52 +2161,54 @@ export default function MeetingRoomSession({
                 )}
                 <button
                   onClick={() => setShowParticipants(false)}
-                  className="p-1 hover:bg-gray-100 rounded"
+                  className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
                   aria-label="Close participants"
                 >
-                  <HiOutlineXMark className="w-5 h-5 text-gray-500" />
+                  <HiOutlineXMark className="h-5 w-5" />
                 </button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 sm:space-y-3 min-h-0">
               {/* You */}
-              <div className="flex items-center gap-3 p-2 rounded-lg bg-indigo-50">
+              <div className="flex items-center gap-3 rounded-xl bg-indigo-50 p-2 dark:bg-indigo-500/15">
                 <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-sm font-medium text-white">
                     {user?.firstName?.[0]?.toUpperCase()}
                   </span>
                 </div>
-                <span className="text-gray-800 flex-1 truncate text-sm sm:text-base">
+                <span className="flex-1 truncate text-sm text-slate-800 dark:text-slate-100 sm:text-base">
                   You {meeting?.isOrganizer ? '(Host)' : ''}
                 </span>
-                {isMuted && <HiOutlineMicrophoneSlash className="h-4 w-4 text-red-500" aria-label="Muted" />}
+                {isMuted && (
+                  <CutLineIcon isOff className="text-red-500">
+                    <HiOutlineMicrophone className="h-4 w-4" />
+                  </CutLineIcon>
+                )}
               </div>
               {/* Other participants */}
               {participants.map(p => (
-                <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100">
-                  <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <div key={p.id} className="flex items-center gap-3 rounded-xl p-2 hover:bg-slate-100 dark:hover:bg-white/5">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-400 dark:bg-slate-700">
                     <span className="text-sm font-medium text-white">
                       {p.userName?.[0]?.toUpperCase()}
                     </span>
                   </div>
-                  <span className="text-gray-800 flex-1 truncate text-sm sm:text-base">{p.userName}</span>
-                  {p.isMuted && <HiOutlineMicrophoneSlash className="h-4 w-4 text-red-500" aria-label="Muted" />}
+                  <span className="flex-1 truncate text-sm text-slate-800 dark:text-slate-100 sm:text-base">{p.userName}</span>
+                  {p.isMuted && (
+                    <CutLineIcon isOff className="text-red-500">
+                      <HiOutlineMicrophone className="h-4 w-4" />
+                    </CutLineIcon>
+                  )}
                 </div>
               ))}
             </div>
-          </div>
+          </aside>
         )}
 
         <MeetingNotetakerPanel
           isOpen={showNotetaker}
-          mode={notetakerMode}
-          isReady={notetakerReady}
-          isLoading={notetakerLoading}
-          isProcessing={isTranscribingSegment}
           error={notetakerError}
           transcript={liveTranscript}
-          languages={transcriptLanguages}
-          activeSpeakers={activeSpeakers}
           onClose={() => setShowNotetaker(false)}
         />
 
@@ -2157,81 +2228,84 @@ export default function MeetingRoomSession({
       </div>
 
       {/* Controls */}
-      <div className="flex h-16 flex-shrink-0 items-center justify-start gap-1 overflow-x-auto border-t border-white/10 bg-slate-900 px-2 shadow-2xl sm:h-20 sm:justify-center sm:gap-2 sm:px-4">
+      <div className="relative z-40 flex h-16 flex-shrink-0 items-center justify-start gap-1 overflow-x-auto border-t border-slate-200 bg-white px-2 shadow-2xl dark:border-white/10 dark:bg-slate-900 sm:h-20 sm:justify-center sm:gap-2 sm:overflow-visible sm:px-4">
         {/* Mute */}
         <button
           onClick={toggleMute}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={isMuted ? 'Unmute' : 'Mute'}
         >
-          {isMuted
-            ? <HiOutlineMicrophoneSlash className="h-5 w-5 text-white sm:h-6 sm:w-6" />
-            : <HiOutlineMicrophone className="h-5 w-5 text-white sm:h-6 sm:w-6" />}
+          <CutLineIcon isOff={isMuted} className={isMuted ? 'text-white' : 'text-slate-700 dark:text-white'}>
+            <HiOutlineMicrophone className="h-5 w-5 sm:h-6 sm:w-6" />
+          </CutLineIcon>
         </button>
 
         {/* Video */}
         <button
           onClick={toggleVideo}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${isVideoOff ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${isVideoOff ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
         >
-          <HiOutlineVideoCamera className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <CutLineIcon isOff={isVideoOff} className={isVideoOff ? 'text-white' : 'text-slate-700 dark:text-white'}>
+            <HiOutlineVideoCamera className="h-5 w-5 sm:h-6 sm:w-6" />
+          </CutLineIcon>
         </button>
 
         {/* Screen Share - Hidden on mobile */}
         <button
           onClick={toggleScreenShare}
-          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${isScreenSharing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${isScreenSharing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
         >
-          <HiOutlineComputerDesktop className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <HiOutlineComputerDesktop className={`h-5 w-5 sm:h-6 sm:w-6 ${isScreenSharing ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
         </button>
 
         {/* Record - Hidden on mobile */}
         <button
           onClick={toggleRecording}
-          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
+          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={isRecording ? 'Stop recording' : 'Start recording'}
         >
-          <HiOutlineStopCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <HiOutlineStopCircle className={`h-5 w-5 sm:h-6 sm:w-6 ${isRecording ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
         </button>
 
         {/* Raise Hand */}
         <button
           onClick={raiseHand}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${handRaised ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-700 hover:bg-gray-600'
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${handRaised ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title={handRaised ? 'Lower hand' : 'Raise hand'}
         >
-          <HiOutlineHandRaised className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <HiOutlineHandRaised className={`h-5 w-5 sm:h-6 sm:w-6 ${handRaised ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
         </button>
 
         {/* Reactions */}
         <div className="relative">
           <button
             onClick={() => setShowReactions(!showReactions)}
-            className={`p-2.5 sm:p-4 rounded-full transition-colors ${showReactions ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+            className={`p-2.5 sm:p-4 rounded-full transition-colors ${showReactions ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
               }`}
             title="Reactions"
           >
-            <BsEmojiSmile className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+            <BsEmojiSmile className={`h-5 w-5 sm:h-6 sm:w-6 ${showReactions ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
           </button>
 
           {/* Reactions Popup */}
           {showReactions && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 p-2 flex gap-1">
-              {REACTIONS.map(({ emoji, label }) => (
+            <div className="absolute bottom-full left-1/2 z-50 mb-2 flex -translate-x-1/2 gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+              {MEETING_REACTIONS.map(({ value, label, Icon }) => (
                 <button
-                  key={emoji}
-                  onClick={() => sendReaction(emoji)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-xl sm:text-2xl"
+                  key={value}
+                  onClick={() => sendReaction(value)}
+                  className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-white/10"
                   title={label}
+                  aria-label={label}
                 >
-                  {emoji}
+                  <Icon className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 </button>
               ))}
             </div>
@@ -2245,11 +2319,11 @@ export default function MeetingRoomSession({
             setShowChat(false)
             setShowParticipants(false)
           }}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showNotetaker ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showNotetaker ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title="Mira"
         >
-          <HiOutlineDocumentText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <HiOutlineDocumentText className={`h-5 w-5 sm:h-6 sm:w-6 ${showNotetaker ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
         </button>
 
         {/* Chat */}
@@ -2259,11 +2333,11 @@ export default function MeetingRoomSession({
             setShowNotetaker(false)
             setShowParticipants(false)
           }}
-          className={`relative p-2.5 sm:p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+          className={`relative p-2.5 sm:p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title="Chat"
         >
-          <HiOutlineChatBubbleLeftRight className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <HiOutlineChatBubbleLeftRight className={`h-5 w-5 sm:h-6 sm:w-6 ${showChat ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
           {unreadChatCount > 0 && !showChat && (
             <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
               {Math.min(unreadChatCount, 99)}
@@ -2278,11 +2352,11 @@ export default function MeetingRoomSession({
             setShowChat(false)
             setShowNotetaker(false)
           }}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
             }`}
           title="Participants"
         >
-          <HiOutlineUserGroup className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <HiOutlineUserGroup className={`h-5 w-5 sm:h-6 sm:w-6 ${showParticipants ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
         </button>
 
         {/* Leave */}

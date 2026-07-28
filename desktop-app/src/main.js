@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v6.0.2
+ * Talio Desktop App v6.0.3
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -17,6 +17,7 @@ const AutoLaunch = require('auto-launch');
 const logger = require('./logger');
 const screenshotService = require('./screenshotService');
 const socketHandler = require('./socketHandler');
+const { inspectRendererHealth, resolveAppNavigationUrl } = require('./rendererHealth');
 
 // PERFORMANCE: Optimized GPU and rendering settings
 const forceDisableGPU = process.env.TALIO_DISABLE_GPU === '1';
@@ -78,7 +79,7 @@ const MAX_LOAD_RETRIES = 3;
 const MAX_CRASH_RECOVERY = 10; // Max crash recovery attempts (generous to survive network flaps)
 const MIN_VERSION_CHECK_URL = APP_URL + '/api/desktop/min-version';
 const UPDATE_CHECK_INTERVAL = 2 * 60 * 60 * 1000; // Check for updates every 2 hours
-const GITHUB_REPO = 'avirajsharma-ops/Talio';
+const GITHUB_REPO = 'TechMW26/Talio';
 const GITHUB_RELEASES_URL = 'https://github.com/' + GITHUB_REPO + '/releases/download';
 
 // Global references
@@ -544,10 +545,18 @@ function createWindow() {
   });
 
   // Log renderer console errors for debugging (skip warnings to reduce overhead)
-  mainWindow.webContents.on('console-message', function (event, level, message, line, sourceId) {
-    if (level >= 3) { // errors only
-      logger.log('error', 'Renderer', message);
+  mainWindow.webContents.on('console-message', function (detailsOrEvent, legacyLevel, legacyMessage) {
+    var isModernEvent = detailsOrEvent && typeof detailsOrEvent.level === 'string';
+    var level = isModernEvent ? detailsOrEvent.level : legacyLevel;
+    var message = isModernEvent ? detailsOrEvent.message : legacyMessage;
+
+    if (level === 'error' || level >= 3) {
+      logger.log('error', 'Renderer', message || 'Unknown renderer error');
     }
+  });
+
+  mainWindow.webContents.on('preload-error', function (event, preloadPath, error) {
+    logger.log('error', 'Renderer', 'Preload failed: ' + (error?.message || error || preloadPath));
   });
 
   // Handle render process crashes - recreate window to avoid loading into dead renderer
@@ -770,7 +779,8 @@ function loadApp(options) {
   clearTimeout(navigationSafetyTimer);
   navigationSafetyTimer = setTimeout(function () { isNavigating = false; }, 20000);
   loadRetries++;
-  logger.log('info', 'Main', 'Loading app (attempt ' + loadRetries + '/' + MAX_LOAD_RETRIES + ')' + (options.forceFresh ? ' [fresh]' : ''));
+  var targetUrl = resolveAppNavigationUrl(APP_ORIGIN, APP_URL, options.url);
+  logger.log('info', 'Main', 'Loading app URL (attempt ' + loadRetries + '/' + MAX_LOAD_RETRIES + ')' + (options.forceFresh ? ' [fresh]' : '') + ': ' + targetUrl);
 
   // Set timeout for loading
   clearTimeout(loadTimeout);
@@ -784,8 +794,8 @@ function loadApp(options) {
     } : undefined;
 
     var loadPromise = loadOptions
-      ? mainWindow.loadURL(APP_URL, loadOptions)
-      : mainWindow.loadURL(APP_URL);
+      ? mainWindow.loadURL(targetUrl, loadOptions)
+      : mainWindow.loadURL(targetUrl);
 
     loadPromise.then(function () {
       clearTimeout(loadTimeout);
@@ -1093,7 +1103,11 @@ function setupWindowEvents() {
   // Inject AudioContext disable as EARLY as possible — at navigation start,
   // before any page scripts execute. dom-ready is too late because React
   // hydration can trigger AudioContext before the patch lands.
-  mainWindow.webContents.on('did-start-navigation', function (event, url, isInPlace, isMainFrame) {
+  mainWindow.webContents.on('did-start-navigation', function (detailsOrEvent, legacyUrl, legacyIsInPlace, legacyIsMainFrame) {
+    var isModernEvent = detailsOrEvent && typeof detailsOrEvent.url === 'string';
+    var url = isModernEvent ? detailsOrEvent.url : legacyUrl;
+    var isMainFrame = isModernEvent ? detailsOrEvent.isMainFrame : legacyIsMainFrame;
+
     if (isMainFrame && url.startsWith(APP_URL)) {
       injectAudioDisable();
     }
@@ -1294,6 +1308,10 @@ function injectAudioDisable() {
  */
 function injectAuthListener() {
   const script = '(' + (function () {
+    if (window.__TALIO_AUTH_LISTENER_INJECTED__) return;
+    window.__TALIO_AUTH_LISTENER_INJECTED__ = true;
+    var lastAuthSignature = '';
+
     // Check for stored auth data
     function checkAuth() {
       try {
@@ -1301,24 +1319,30 @@ function injectAuthListener() {
         var userStr = localStorage.getItem('user');
         if (token && userStr) {
           var user = JSON.parse(userStr);
+          var signature = token + ':' + (user.userId || user._id || user.id || '');
+          if (signature === lastAuthSignature) return true;
+          lastAuthSignature = signature;
           window.electronAPI.sendAuthData({ token: token, user: user });
+          return true;
         }
       } catch (e) {
         console.error('[Talio Desktop] Auth check error:', e);
       }
+      return false;
     }
 
     // Check immediately and on storage changes
-    checkAuth();
+    var foundAuth = checkAuth();
     window.addEventListener('storage', checkAuth);
 
-    // Also check periodically for initial load
-    var checkCount = 0;
-    var authInterval = setInterval(function () {
-      checkAuth();
-      checkCount++;
-      if (checkCount > 10) clearInterval(authInterval);
-    }, 1000);
+    // Login pages may populate storage shortly after the document loads.
+    if (!foundAuth) {
+      var checkCount = 0;
+      var authInterval = setInterval(function () {
+        checkCount++;
+        if (checkAuth() || checkCount > 10) clearInterval(authInterval);
+      }, 1000);
+    }
   }).toString() + ')()';
 
   mainWindow.webContents.executeJavaScript(script).catch(function () { });
@@ -3336,7 +3360,15 @@ async function recoverFromWhitescreen(reason) {
   isLoadingApp = false;
   isNavigating = false;
 
-  logger.log('warn', 'Main', 'Recovering from whitescreen: ' + reason);
+  var currentUrl = '';
+  try {
+    currentUrl = mainWindow.webContents.getURL();
+  } catch (error) {
+    // Use the application root below.
+  }
+  var recoveryUrl = resolveAppNavigationUrl(APP_ORIGIN, APP_URL, currentUrl);
+
+  logger.log('warn', 'Main', 'Recovering from whitescreen at ' + recoveryUrl + ': ' + reason);
 
   showLoader();
 
@@ -3356,7 +3388,7 @@ async function recoverFromWhitescreen(reason) {
 
   loadRetries = 0;
   setTimeout(function () {
-    loadApp({ forceFresh: true });
+    loadApp({ forceFresh: true, url: recoveryUrl });
   }, 300);
 }
 
@@ -3367,40 +3399,9 @@ async function checkForWhitescreen() {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
 
   try {
-    const result = await mainWindow.webContents.executeJavaScript(`
-      (function() {
-        // Check if body has any visible content
-        var body = document.body;
-        if (!body) return { isBlank: true, reason: 'no-body' };
-        
-        // Check if the page has meaningful content
-        var text = body.innerText || '';
-        var hasText = text.trim().length > 10;
-        
-        // Check for React root
-        var root = document.getElementById('__next') || document.getElementById('root');
-        var hasRoot = !!root;
-        var rootHasContent = hasRoot && root.innerHTML.trim().length > 50;
-        
-        // Check background color (whitescreen often has default white)
-        var bgColor = window.getComputedStyle(body).backgroundColor;
-        var isDefaultBg = bgColor === 'rgb(255, 255, 255)' || bgColor === 'rgba(0, 0, 0, 0)';
-        
-        // Check if page appears to be loading
-        var isLoading = document.querySelector('.loader, .loading, [class*="spinner"]') !== null;
-        
-        // Determine if whitescreen
-        var isBlank = !hasText && !rootHasContent && isDefaultBg && !isLoading;
-        
-        return {
-          isBlank: isBlank,
-          hasText: hasText,
-          hasRoot: hasRoot,
-          rootHasContent: rootHasContent,
-          isLoading: isLoading
-        };
-      })()
-    `);
+    const result = await mainWindow.webContents.executeJavaScript(
+      '(' + inspectRendererHealth.toString() + ')()'
+    );
 
     return result.isBlank;
   } catch (e) {

@@ -372,7 +372,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     }}
                     isDisabled={generatingDescription || !formData.title.trim()}
                     isLoading={generatingDescription}
-                    startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
+                    startContent={generatingDescription ? null : <HiOutlineSparkles key="generate-description-icon" className="w-3.5 h-3.5" />}
                     className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
                   >
                     {generatingDescription ? 'Writing...' : 'AI Write'}

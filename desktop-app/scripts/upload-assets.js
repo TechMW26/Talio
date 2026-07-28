@@ -31,8 +31,8 @@ if (!VERSION) {
   process.exit(1);
 }
 
-const OWNER = 'avirajsharma-ops';
-const REPO = 'Talio';
+const OWNER = process.env.GITHUB_OWNER || 'TechMW26';
+const REPO = process.env.GITHUB_REPO || 'Talio';
 const TAG = 'v' + VERSION;
 
 const ASSETS = [
@@ -101,6 +101,11 @@ function uploadAsset(releaseId, filePath, contentType) {
 
 async function main() {
   const distDir = path.join(__dirname, '..', 'dist');
+  const missingAssets = ASSETS.filter(asset => !fs.existsSync(path.join(distDir, asset.file)));
+  if (missingAssets.length) {
+    console.error('ERROR: Missing release assets:', missingAssets.map(asset => asset.file).join(', '));
+    process.exit(1);
+  }
 
   // Look up release by tag
   console.log('Looking up release for tag ' + TAG + '...');
@@ -136,12 +141,9 @@ async function main() {
   }
 
   // Upload each asset
+  let uploadFailed = false;
   for (const asset of ASSETS) {
     const filePath = path.join(distDir, asset.file);
-    if (!fs.existsSync(filePath)) {
-      console.log('SKIP (not found):', asset.file);
-      continue;
-    }
     const sizeMB = (fs.statSync(filePath).size / 1024 / 1024).toFixed(1);
     console.log(`Uploading ${asset.file} (${sizeMB} MB)...`);
     const result = await uploadAsset(releaseId, filePath, asset.type);
@@ -149,7 +151,13 @@ async function main() {
       console.log('  ✓ Uploaded:', result.data.name, '(' + result.data.state + ')');
     } else {
       console.error('  ✗ Failed:', result.status, JSON.stringify(result.data).substring(0, 300));
+      uploadFailed = true;
     }
+  }
+
+  if (uploadFailed) {
+    console.error('\nOne or more assets failed to upload.');
+    process.exit(1);
   }
 
   console.log('\nDone! Release: https://github.com/' + OWNER + '/' + REPO + '/releases/tag/' + TAG);

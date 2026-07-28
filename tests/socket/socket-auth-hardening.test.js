@@ -53,4 +53,11 @@ describe('Socket.IO authentication boundaries', () => {
     expect(serverSource).toContain("respond({ success: false, message: 'Join the meeting before sending messages' })")
     expect(serverSource).toContain('respond({ success: true, message: outgoingMessage })')
   })
+
+  test('screen-share state is scoped to the joined meeting room', () => {
+    expect(serverSource).toContain("socket.on('meeting-screen-share-state'")
+    expect(serverSource).toContain("socket.meetingRoomId !== String(roomId)")
+    expect(serverSource).toContain("emit('participant-screen-share-state'")
+    expect(serverSource).toContain('isScreenSharing: Boolean(participantSocket.meetingIsScreenSharing)')
+  })
 })

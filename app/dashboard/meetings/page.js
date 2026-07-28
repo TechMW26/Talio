@@ -149,7 +149,7 @@ export default function MeetingsPage() {
         <Button
           onPress={() => setShowCreateModal(true)}
           color="primary"
-          startContent={<HiOutlinePlus className="w-5 h-5" />}
+          startContent={<HiOutlinePlus key="create-meeting-icon" className="w-5 h-5" />}
         >
           Schedule Meeting
         </Button>
@@ -338,7 +338,7 @@ export default function MeetingsPage() {
             <Button
               onPress={() => setShowCreateModal(true)}
               color="primary"
-              startContent={<HiOutlinePlus className="w-5 h-5" />}
+              startContent={<HiOutlinePlus key="empty-create-meeting-icon" className="w-5 h-5" />}
             >
               Schedule Meeting
             </Button>

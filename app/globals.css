@@ -1770,6 +1770,8 @@ div[class*="backdrop-blur"] + div[role="dialog"],
 section[role="dialog"],
 div[role="dialog"] > section {
   border-radius: 30px !important;
+  overflow: hidden !important;
+  background-clip: padding-box;
 }
 
 [data-slot="backdrop"] {

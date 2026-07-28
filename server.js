@@ -132,7 +132,7 @@ const OPTIONAL_INTEGRATIONS = [
 })();
 
 // Latest desktop version – fetched from GitHub releases, refreshed every 5 min.
-const GITHUB_OWNER = process.env.GITHUB_OWNER || 'avirajsharma-ops';
+const GITHUB_OWNER = process.env.GITHUB_OWNER || 'TechMW26';
 const GITHUB_REPO_NAME = process.env.GITHUB_REPO || 'Talio';
 const GITHUB_REPO = `${GITHUB_OWNER}/${GITHUB_REPO_NAME}`;
 const FALLBACK_LATEST_DESKTOP = '5.0.5';
@@ -550,7 +550,7 @@ app.prepare().then(() => {
 
     // Join a meeting room
     socket.on('join-meeting', async (data, acknowledge) => {
-      const { roomId, userName, isMuted } = data || {};
+      const { roomId, userName, isMuted, isScreenSharing } = data || {};
       const respond = typeof acknowledge === 'function' ? acknowledge : () => {};
       if (!roomId) {
         respond({ success: false, message: 'Meeting room is required' });
@@ -580,6 +580,7 @@ app.prepare().then(() => {
       socket.meetingUserId = resolvedMeetingUserId;
       socket.meetingUserName = resolvedMeetingUserName;
       socket.meetingIsMuted = Boolean(isMuted);
+      socket.meetingIsScreenSharing = Boolean(isScreenSharing);
 
       socket.join(meetingRoom);
       console.log(`📹 [Socket.IO] User ${resolvedMeetingUserName} (${socket.id}) joined ${meetingRoom}`);
@@ -589,7 +590,8 @@ app.prepare().then(() => {
         id: socket.id,
         userId: resolvedMeetingUserId,
         userName: resolvedMeetingUserName,
-        isMuted: socket.meetingIsMuted
+        isMuted: socket.meetingIsMuted,
+        isScreenSharing: socket.meetingIsScreenSharing
       });
 
       // Send list of existing participants to the new user
@@ -603,7 +605,8 @@ app.prepare().then(() => {
               id: participantSocket.id,
               userId: participantSocket.meetingUserId,
               userName: participantSocket.meetingUserName,
-              isMuted: Boolean(participantSocket.meetingIsMuted)
+              isMuted: Boolean(participantSocket.meetingIsMuted),
+              isScreenSharing: Boolean(participantSocket.meetingIsScreenSharing)
             });
           }
         });
@@ -631,6 +634,7 @@ app.prepare().then(() => {
       socket.leave(meetingRoom);
       socket.meetingRoom = null;
       socket.meetingRoomId = null;
+      socket.meetingIsScreenSharing = false;
     });
 
     // WebRTC signaling: Offer
@@ -678,6 +682,19 @@ app.prepare().then(() => {
         id: socket.id,
         userId: socket.meetingUserId,
         isMuted: socket.meetingIsMuted
+      });
+    });
+
+    // Keep screen-share state synchronized so every client can auto-pin it.
+    socket.on('meeting-screen-share-state', (data) => {
+      const { roomId, isScreenSharing } = data || {};
+      if (!roomId || socket.meetingRoomId !== String(roomId) || !socket.meetingRoom) return;
+
+      socket.meetingIsScreenSharing = Boolean(isScreenSharing);
+      socket.to(socket.meetingRoom).emit('participant-screen-share-state', {
+        id: socket.id,
+        userId: socket.meetingUserId,
+        isScreenSharing: socket.meetingIsScreenSharing
       });
     });
 

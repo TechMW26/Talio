@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-const GITHUB_REPO = 'avirajsharma-ops/Talio'
+const GITHUB_REPO = 'TechMW26/Talio'
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
 const GITHUB_TOKEN = process.env.GITHUB_RELEASE_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ''
 

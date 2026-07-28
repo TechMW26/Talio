@@ -6,28 +6,28 @@
  */
 
 const RELEASE_CONFIG = {
-  version: '5.2.0',
+  version: '6.0.3',
   github: {
-    owner: 'avirajsharma-ops',
+    owner: 'TechMW26',
     repo: 'Talio'
   },
   downloads: {
     mac: {
       arm64: {
-        filename: 'Talio-5.2.0-arm64.dmg',
+        filename: 'Talio-6.0.3-arm64.dmg',
         size: '~105 MB',
         label: 'Apple Silicon (M1/M2/M3/M4)'
       },
       x64: {
-        filename: 'Talio-5.2.0-x64.dmg',
-        size: '~111 MB',
+        filename: 'Talio-6.0.3-x64.dmg',
+        size: '~112 MB',
         label: 'Intel (x64)'
       }
     },
     windows: {
       x64: {
-        filename: 'Talio.Setup.5.2.0.exe',
-        size: '~84 MB',
+        filename: 'Talio.Setup.6.0.3.exe',
+        size: '~83 MB',
         label: 'Windows (64-bit)'
       }
     }
@@ -71,4 +71,3 @@ if (typeof window !== 'undefined') {
 }
 
 export { RELEASE_CONFIG, getDownloadUrl, getPlatformDownloads };
-

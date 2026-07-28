@@ -176,7 +176,7 @@ export default function DownloadPage() {
           {/* GitHub Link */}
           <div className="mt-6 text-center">
             <a 
-              href="https://github.com/avirajsharma-ops/Talio/releases" 
+              href="https://github.com/TechMW26/Talio/releases"
               target="_blank" 
               rel="noopener noreferrer"
               className="text-sm text-blue-600 hover:underline"
