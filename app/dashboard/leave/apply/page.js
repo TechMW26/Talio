@@ -12,26 +12,18 @@ import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import { getTodayDateString } from '@/lib/timezone'
+import {
+  calculateLeaveDays,
+  normalizeLeaveBalances,
+} from '@/lib/leaveData'
 
 export default function ApplyLeavePage() {
   const router = useRouter()
+  const today = useMemo(() => getTodayDateString(), [])
 
   // Derive user/employeeId from localStorage
   const user = useMemo(() => getCurrentUser(), [])
   const employeeId = useMemo(() => user ? getEmployeeId(user) : null, [user])
-
-  // SWR data fetching
-  const { data: leaveTypesRes, error: leaveTypesError, isLoading: leaveTypesLoading, isValidating: leaveTypesValidating } = useAuthedSWR('/api/leave/types')
-  const { data: leaveBalanceRes, error: leaveBalanceError, isLoading: leaveBalanceLoading, isValidating: leaveBalanceValidating, mutate: refreshBalance } = useAuthedSWR(
-    employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${new Date().getFullYear()}` : null
-  )
-
-  const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
-  const leaveBalance = leaveBalanceRes?.data || []
-  const loading = leaveTypesLoading || leaveBalanceLoading
-  const isValidating = leaveTypesValidating || leaveBalanceValidating
-  const error = leaveTypesError || leaveBalanceError
-
   const [formData, setFormData] = useState({
     leaveType: '',
     startDate: '',
@@ -43,12 +35,38 @@ export default function ApplyLeavePage() {
     emergencyContact: '',
     handoverNotes: '',
   })
+  const balanceYear = Number(formData.startDate.slice(0, 4)) || new Date().getFullYear()
+
+  // SWR data fetching
+  const { data: leaveTypesRes, error: leaveTypesError, isLoading: leaveTypesLoading, isValidating: leaveTypesValidating } = useAuthedSWR('/api/leave/types')
+  const { data: leaveBalanceRes, error: leaveBalanceError, isLoading: leaveBalanceLoading, isValidating: leaveBalanceValidating, mutate: refreshBalance } = useAuthedSWR(
+    employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${balanceYear}` : null
+  )
+  const {
+    data: halfDayBalanceRes,
+    error: halfDayBalanceError,
+    isLoading: halfDayBalanceLoading,
+    isValidating: halfDayBalanceValidating,
+    mutate: refreshHalfDayBalance,
+  } = useAuthedSWR(
+    employeeId ? `/api/leave/half-day-balance?year=${balanceYear}` : null
+  )
+
+  const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
+  const leaveBalance = useMemo(
+    () => normalizeLeaveBalances(leaveBalanceRes?.data || []),
+    [leaveBalanceRes]
+  )
+  const loading = leaveTypesLoading || leaveBalanceLoading || halfDayBalanceLoading
+  const isValidating = leaveTypesValidating || leaveBalanceValidating || halfDayBalanceValidating
+  const error = leaveTypesError || leaveBalanceError || halfDayBalanceError
 
   // Submit mutation
   const submitLeave = useApiMutation({
     method: 'POST',
     invalidateKeys: [
-      employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${new Date().getFullYear()}` : null,
+      employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${balanceYear}` : null,
+      employeeId ? `/api/leave/half-day-balance?year=${balanceYear}` : null,
       /^\/api\/leave/,
     ].filter(Boolean),
     onSuccess: () => {
@@ -108,29 +126,26 @@ export default function ApplyLeavePage() {
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: type === 'checkbox' ? checked : value
+        [name]: type === 'checkbox' ? checked : value,
+        ...(name === 'startDate' && prev.isHalfDay ? { endDate: value } : {}),
       }))
     }
   }
 
-  const calculateDays = () => {
-    if (!formData.startDate || !formData.endDate) return 0
-
-    const start = new Date(formData.startDate)
-    const end = new Date(formData.endDate)
-
-    if (end < start) return 0
-
-    const diffTime = Math.abs(end - start)
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
-
-    return formData.isHalfDay ? 0.5 : diffDays
-  }
+  const calculateDays = () => calculateLeaveDays(
+    formData.startDate,
+    formData.endDate || formData.startDate,
+    formData.isHalfDay
+  )
 
   const getAvailableBalance = () => {
+    if (formData.isHalfDay) return halfDayBalanceRes?.data?.remaining ?? 0
+    if (formData.workFromHome) return 'Unlimited'
     if (!formData.leaveType) return 0
-    const balance = leaveBalance.find(b => b.leaveType._id === formData.leaveType)
-    return balance ? balance.remainingDays : 0
+    const balance = leaveBalance.find(balanceItem =>
+      String(balanceItem.leaveType?._id || balanceItem.leaveType) === String(formData.leaveType)
+    )
+    return balance?.remainingDays ?? 0
   }
 
   const handleSubmit = async (e) => {
@@ -145,18 +160,23 @@ export default function ApplyLeavePage() {
       return
     }
 
-    if (days > availableBalance) {
+    if (formData.leaveType && days > availableBalance) {
       toast.error(`Insufficient leave balance. Available: ${availableBalance} days`)
       return
     }
+    if (formData.isHalfDay && Number(availableBalance) < 1) {
+      toast.error('No half-day balance remains for the selected year')
+      return
+    }
 
-    if (new Date(formData.startDate) < new Date()) {
+    if (formData.startDate < today) {
       toast.error('Start date cannot be in the past')
       return
     }
 
     await submitLeave.execute('/api/leave', {
       ...formData,
+      requestType: formData.isHalfDay ? 'half_day' : formData.workFromHome ? 'work_from_home' : 'leave',
       employee: employeeId,
       numberOfDays: days,
     })
@@ -170,8 +190,8 @@ export default function ApplyLeavePage() {
     })
   }
 
-  if (error && !leaveTypes.length && !leaveBalance.length) {
-    return <DataErrorState error={error} onRetry={() => refreshBalance()} />
+  if (error) {
+    return <DataErrorState error={error} onRetry={() => { refreshBalance(); refreshHalfDayBalance() }} />
   }
 
   if (loading) {
@@ -244,7 +264,13 @@ export default function ApplyLeavePage() {
                     isSelected={formData.isHalfDay}
                     onValueChange={(checked) => {
                       if (checked) {
-                        setFormData(prev => ({ ...prev, isHalfDay: true, leaveType: '', workFromHome: false }))
+                        setFormData(prev => ({
+                          ...prev,
+                          isHalfDay: true,
+                          leaveType: '',
+                          workFromHome: false,
+                          endDate: prev.startDate || prev.endDate,
+                        }))
                       } else {
                         setFormData(prev => ({ ...prev, isHalfDay: false }))
                       }
@@ -289,7 +315,7 @@ export default function ApplyLeavePage() {
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleChange}
-                      min={getTodayDateString()}
+                      min={today}
                       isRequired
                     />
                     <Input
@@ -298,7 +324,7 @@ export default function ApplyLeavePage() {
                       name="endDate"
                       value={formData.endDate}
                       onChange={handleChange}
-                      min={formData.startDate || getTodayDateString()}
+                      min={formData.startDate || today}
                       isDisabled={formData.isHalfDay}
                       isRequired
                     />
@@ -312,7 +338,11 @@ export default function ApplyLeavePage() {
                           Total Days: {calculateDays()} day{calculateDays() !== 1 ? 's' : ''}
                         </span>
                         <span className="text-sm text-primary-600">
-                          Available Balance: {getAvailableBalance()} days
+                          {formData.isHalfDay
+                            ? `Half Days Remaining: ${getAvailableBalance()}`
+                            : formData.workFromHome
+                              ? 'Balance: Not deducted'
+                              : `Available Balance: ${getAvailableBalance()} days`}
                         </span>
                       </div>
                     </div>

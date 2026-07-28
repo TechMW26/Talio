@@ -282,6 +282,10 @@ const MeetingSchema = new mongoose.Schema({
       enum: ['daily', 'weekly', 'biweekly', 'monthly']
     },
     endDate: Date,
+    interval: { type: Number, default: 1 },
+    daysOfWeek: [Number],
+    seriesId: String,
+    occurrenceIndex: Number,
     parentMeeting: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Meeting'

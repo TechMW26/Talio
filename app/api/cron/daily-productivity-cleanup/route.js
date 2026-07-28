@@ -3,10 +3,7 @@ import connectDB from '@/lib/mongodb';
 import { connectSuperadminDB } from '@/lib/superadminDb';
 import getTenantCompanyModel from '@/models/TenantCompany';
 import { getTenantModels } from '@/lib/tenantModels';
-import {
-  runDailyAnalysis,
-  DAILY_ANALYSIS_REQUIRED_MODELS,
-} from '@/lib/dailyAnalysisRunner';
+import { createDailyMosaicOnCheckout } from '@/lib/productivityMosaic';
 import { getTimezone } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
@@ -101,7 +98,8 @@ async function processTenant({ company, now, dateOverride, force }) {
   const dateString = dateOverride || previousDateString(local);
 
   const models = await getTenantModels(databaseName, [
-    ...DAILY_ANALYSIS_REQUIRED_MODELS,
+    'Screenshot',
+    'ScreenshotComposite',
     'Attendance',
   ]);
 
@@ -122,25 +120,22 @@ async function processTenant({ company, now, dateOverride, force }) {
   ]));
 
   const perUser = [];
-  let analyzed = 0;
   let stitched = 0;
   let purged = 0;
   let failed = 0;
 
   for (const userId of userIds) {
     try {
-      const result = await runDailyAnalysis({
+      const result = await createDailyMosaicOnCheckout({
         userId,
-        dateString,
-        models,
-        tenant: { databaseName },
-        trigger: dateOverride || force ? 'cron-manual' : 'cron',
+        databaseName,
+        timezone: local.timezone,
+        dateStringOverride: dateString,
       });
-      perUser.push({ userId, status: result.status, stitched: result.stitched || 0, score: result.analysis?.aiAnalysis?.score ?? null });
-      if (result.status === 'analyzed') {
-        analyzed += 1;
+      perUser.push({ userId, status: result.created ? 'mosaicked' : 'empty', stitched: result.stitched || 0 });
+      if (result.created) {
         stitched += result.stitched || 0;
-        purged += result.purgedScreenshots || 0;
+        purged += result.purged || 0;
       }
     } catch (err) {
       failed += 1;
@@ -155,7 +150,7 @@ async function processTenant({ company, now, dateOverride, force }) {
     timezone: local.timezone,
     users: userIds.length,
     autoCheckedOut,
-    analyzed,
+    analyzed: 0,
     stitched,
     purged,
     failed,

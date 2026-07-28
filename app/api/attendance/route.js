@@ -12,7 +12,7 @@ import { emitAttendanceUpdate, emitDashboardRefresh, emitRealtimeEvent, REALTIME
 import { getAuthAndModels } from '@/lib/auth'
 import { getTenantModels } from '@/lib/tenantModels'
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
-import { triggerDailyAnalysisOnCheckout } from '@/lib/autoAnalysisTrigger'
+import { createDailyMosaicOnCheckout } from '@/lib/productivityMosaic'
 import mongoose from 'mongoose'
 import {
   getTimezone,
@@ -546,9 +546,17 @@ export async function POST(request) {
     const todayLeave = await TenantLeave.findOne({
       employee: employeeId,
       status: 'approved',
+      requestType: { $ne: 'early_leave' },
       startDate: { $lte: new Date() },
       endDate: { $gte: today }
     })
+    const todayEarlyLeave = await TenantLeave.findOne({
+      employee: employeeId,
+      status: 'approved',
+      requestType: 'early_leave',
+      startDate: { $lte: new Date() },
+      endDate: { $gte: today },
+    }).lean()
 
     // Check if attendance already exists for today
     let attendance = await TenantAttendance.findOne({
@@ -1117,6 +1125,12 @@ export async function POST(request) {
 
       attendance.status = statusResult.status
       attendance.statusReason = statusResult.reason
+      if (todayEarlyLeave) {
+        attendance.status = 'present'
+        attendance.earlyLeaveApproved = true
+        attendance.earlyLeaveRequest = todayEarlyLeave._id
+        attendance.statusReason = `Approved early leave at ${todayEarlyLeave.earlyLeaveTime || 'the requested time'}`
+      }
 
       // Calculate overtime if there was a confirmed overtime request
       try {
@@ -1291,34 +1305,31 @@ export async function POST(request) {
         console.error('Failed to emit attendance socket events:', socketError)
       }
 
-      // Auto-trigger productivity analysis on clock-out (NEW pipeline:
-      // stitches every captured screenshot for the day into one composite
-      // and runs a single AI vision call). Async / fire-and-forget so the
-      // checkout response is not blocked by AI latency.
+      // Build the retained daily mosaic on checkout. This is intentionally
+      // non-blocking and does not run AI; manual analysis remains available.
       try {
         const checkoutUserId = (user._id || user.userId)?.toString()
         if (checkoutUserId && tenant?.databaseName) {
           const checkoutTimezone = getTimezone(settings?.timezone) || DEFAULT_TIMEZONE
-          triggerDailyAnalysisOnCheckout({
+          createDailyMosaicOnCheckout({
             userId: checkoutUserId,
             employeeId,
             databaseName: tenant.databaseName,
             timezone: checkoutTimezone,
             referenceDate: new Date(),
-            trigger: 'checkout',
           }).then((result) => {
-            if (result.triggered) {
+            if (result.created) {
               console.log(
-                `[Attendance] Daily analysis on checkout for ${checkoutUserId} (${result.dateString}): `
-                + `stitched ${result.stitched ?? 0}, score ${result.analysis?.aiAnalysis?.score ?? 'n/a'}`,
+                `[Attendance] Daily mosaic on checkout for ${checkoutUserId} (${result.dateString}): `
+                + `stitched ${result.stitched ?? 0}, purged ${result.purged ?? 0}`,
               )
             }
           }).catch((err) => {
-            console.error('[Attendance] Daily analysis trigger failed (non-blocking):', err.message)
+            console.error('[Attendance] Daily mosaic creation failed (non-blocking):', err.message)
           })
         }
       } catch (analysisError) {
-        console.error('[Attendance] Failed to trigger daily analysis (non-blocking):', analysisError.message)
+        console.error('[Attendance] Failed to create daily mosaic (non-blocking):', analysisError.message)
       }
 
       // Build response with optional warning

@@ -151,6 +151,8 @@ export async function GET(request) {
     const leavesToday = await Leave.find({
       employee: { $in: employeeIds },
       status: 'approved',
+      workFromHome: { $ne: true },
+      requestType: { $ne: 'early_leave' },
       startDate: { $lte: today },
       endDate: { $gte: today }
     }).select('employee').lean()

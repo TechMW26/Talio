@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { normalizeLeaveType, normalizeLeaveTypes } from '@/lib/leaveData'
 // GET - List all leave types
 export async function GET(request) {
   try {
@@ -13,10 +14,11 @@ export async function GET(request) {
 
     const leaveTypes = await LeaveType.find({ isActive: true })
       .sort({ name: 1 })
+      .lean()
 
     return NextResponse.json({
       success: true,
-      data: leaveTypes,
+      data: normalizeLeaveTypes(leaveTypes),
     })
   } catch (error) {
     console.error('Get leave types error:', error)
@@ -53,7 +55,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       message: 'Leave type created successfully',
-      data: leaveType,
+      data: normalizeLeaveType(leaveType),
     }, { status: 201 })
   } catch (error) {
     console.error('Create leave type error:', error)

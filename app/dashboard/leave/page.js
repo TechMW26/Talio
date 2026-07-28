@@ -12,6 +12,7 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { normalizeLeaveBalances } from '@/lib/leaveData'
 
 // Skeleton for leave page
 function LeaveSkeleton() {
@@ -81,7 +82,10 @@ export default function LeavePage() {
   const { data: balanceRes, error: balanceError, isLoading: balanceLoading, mutate: refreshBalance } = useAuthedSWR(
     employeeId ? `/api/leave/balance?employeeId=${employeeId}` : null
   )
-  const leaveBalance = balanceRes?.data || []
+  const leaveBalance = useMemo(
+    () => normalizeLeaveBalances(balanceRes?.data || []),
+    [balanceRes]
+  )
 
   const { data: typesRes } = useAuthedSWRStatic('/api/leave/types')
   const leaveTypes = typesRes?.data || []

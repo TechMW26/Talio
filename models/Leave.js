@@ -9,7 +9,6 @@ const LeaveSchema = new mongoose.Schema({
   leaveType: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'LeaveType',
-    required: true,
   },
   startDate: {
     type: Date,
@@ -22,6 +21,9 @@ const LeaveSchema = new mongoose.Schema({
   numberOfDays: {
     type: Number,
     required: true,
+  },
+  days: {
+    type: Number,
   },
   reason: {
     type: String,
@@ -62,6 +64,12 @@ const LeaveSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  requestType: {
+    type: String,
+    enum: ['leave', 'half_day', 'work_from_home', 'early_leave'],
+    default: 'leave',
+  },
+  earlyLeaveTime: String,
   // Enhanced fields
   priority: {
     type: String,
@@ -148,6 +156,11 @@ const LeaveSchema = new mongoose.Schema({
 
 // Generate application number
 LeaveSchema.pre('save', function (next) {
+  const numberOfDays = Number(this.numberOfDays ?? this.days)
+  if (Number.isFinite(numberOfDays)) {
+    this.numberOfDays = numberOfDays
+    this.days = numberOfDays
+  }
   if (!this.applicationNumber) {
     const year = new Date().getFullYear()
     const month = String(new Date().getMonth() + 1).padStart(2, '0')

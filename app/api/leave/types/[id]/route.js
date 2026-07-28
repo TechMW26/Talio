@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { normalizeLeaveType } from '@/lib/leaveData'
 // GET - Get single leave type
 export async function GET(request, { params }) {
   try {
@@ -8,10 +9,11 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { LeaveType } = models
+    const { id } = await params
 
-    const leaveType = await LeaveType.findById(params.id)
+    const leaveType = await LeaveType.findById(id).lean()
 
     if (!leaveType) {
       return NextResponse.json(
@@ -22,7 +24,7 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      data: leaveType,
+      data: normalizeLeaveType(leaveType),
     })
   } catch (error) {
     console.error('Get leave type error:', error)
@@ -36,11 +38,34 @@ export async function GET(request, { params }) {
 // PUT - Update leave type
 export async function PUT(request, { params }) {
   try {
+    const auth = await getAuthAndModels(request, ['LeaveType'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { LeaveType } = models
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
+
+    const { id } = await params
     const data = await request.json()
+    const mirroredData = {
+      ...data,
+      ...(data.maxDaysPerYear !== undefined
+        ? { daysPerYear: data.maxDaysPerYear }
+        : {}),
+      ...(data.maxCarryForwardDays !== undefined
+        ? { maxCarryForward: data.maxCarryForwardDays }
+        : {}),
+      ...(data.minDaysNotice !== undefined
+        ? { minNoticeDays: data.minDaysNotice }
+        : {}),
+    }
 
     const leaveType = await LeaveType.findByIdAndUpdate(
-      params.id,
-      data,
+      id,
+      mirroredData,
       { new: true, runValidators: true }
     )
 
@@ -54,7 +79,7 @@ export async function PUT(request, { params }) {
     return NextResponse.json({
       success: true,
       message: 'Leave type updated successfully',
-      data: leaveType,
+      data: normalizeLeaveType(leaveType),
     })
   } catch (error) {
     console.error('Update leave type error:', error)
@@ -68,7 +93,18 @@ export async function PUT(request, { params }) {
 // DELETE - Delete leave type
 export async function DELETE(request, { params }) {
   try {
-    const leaveType = await LeaveType.findByIdAndDelete(params.id)
+    const auth = await getAuthAndModels(request, ['LeaveType'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { LeaveType } = models
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
+
+    const { id } = await params
+    const leaveType = await LeaveType.findByIdAndDelete(id)
 
     if (!leaveType) {
       return NextResponse.json(

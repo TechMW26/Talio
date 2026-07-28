@@ -18,6 +18,7 @@ const LeaveTypeSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  daysPerYear: Number,
   carryForward: {
     type: Boolean,
     default: false,
@@ -26,6 +27,7 @@ const LeaveTypeSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  maxCarryForward: Number,
   isPaid: {
     type: Boolean,
     default: true,
@@ -42,6 +44,7 @@ const LeaveTypeSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  minNoticeDays: Number,
   applicableGender: {
     type: String,
     enum: ['all', 'male', 'female'],
@@ -54,6 +57,16 @@ const LeaveTypeSchema = new mongoose.Schema({
 }, {
   timestamps: true,
 });
+
+LeaveTypeSchema.pre('validate', function (next) {
+  this.maxDaysPerYear = Number(this.maxDaysPerYear ?? this.daysPerYear ?? 0) || 0
+  this.daysPerYear = this.maxDaysPerYear
+  this.maxCarryForwardDays = Number(this.maxCarryForwardDays ?? this.maxCarryForward ?? 0) || 0
+  this.maxCarryForward = this.maxCarryForwardDays
+  this.minDaysNotice = Number(this.minDaysNotice ?? this.minNoticeDays ?? 0) || 0
+  this.minNoticeDays = this.minDaysNotice
+  next()
+})
 
 export default mongoose.models.LeaveType || mongoose.model('LeaveType', LeaveTypeSchema);
 

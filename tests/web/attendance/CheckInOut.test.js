@@ -115,6 +115,19 @@ jest.mock('@/contexts/ThemeContext', () => ({
     useTheme: () => ({ theme: { primary: { 500: '#3B82F6', 600: '#2563EB' } } }),
 }))
 
+// ── CompanyFeaturesContext ──
+jest.mock('@/contexts/CompanyFeaturesContext', () => ({
+    useCompanyFeatures: () => ({
+        plan: 'custom',
+        features: null,
+        miraTokens: { perUserAllocation: 0 },
+        loading: false,
+        isFeatureEnabled: () => true,
+        refreshFeatures: jest.fn(),
+    }),
+    CompanyFeaturesProvider: ({ children }) => children,
+}))
+
 // ── toast ──
 jest.mock('@/utils/toast', () => {
     const fn = jest.fn()

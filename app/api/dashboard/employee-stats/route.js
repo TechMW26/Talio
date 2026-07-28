@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
+import { normalizeLeaveBalance } from '@/lib/leaveData'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,15 +100,16 @@ export async function GET(request) {
     const leaveBalancesByYear = await LeaveBalance.find({
       employee: employee._id,
       year: { $in: Array.from(leaveYears) }
-    }).select('year allocated balance').lean()
+    }).select('year totalDays usedDays remainingDays allocated used pending balance carriedForward').lean()
 
     const leaveYearTotals = {}
-    for (const balance of leaveBalancesByYear) {
+    for (const rawBalance of leaveBalancesByYear) {
+      const balance = normalizeLeaveBalance(rawBalance)
       if (!leaveYearTotals[balance.year]) {
         leaveYearTotals[balance.year] = { totalBalance: 0, totalAllocated: 0 }
       }
-      leaveYearTotals[balance.year].totalBalance += balance.balance || 0
-      leaveYearTotals[balance.year].totalAllocated += balance.allocated || 0
+      leaveYearTotals[balance.year].totalBalance += balance.remainingDays
+      leaveYearTotals[balance.year].totalAllocated += balance.totalDays
     }
 
     const totalLeaveBalance = leaveYearTotals[currentYear]?.totalBalance || 0

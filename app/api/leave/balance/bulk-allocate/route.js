@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCachePattern, clearCachePattern } from '@/lib/cache'
+import { buildLeaveBalanceFields, normalizeLeaveType } from '@/lib/leaveData'
 // POST - Bulk allocate leave for all employees
 export async function POST(request) {
   try {
@@ -8,8 +10,11 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Employee, LeaveType, LeaveBalance } = models
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
 
     const { year } = await request.json()
     
@@ -46,6 +51,7 @@ export async function POST(request) {
     // Allocate leave for each employee and leave type combination
     for (const employee of employees) {
       for (const leaveType of leaveTypes) {
+        const normalizedLeaveType = normalizeLeaveType(leaveType)
         // Check if allocation already exists
         const existingBalance = await LeaveBalance.findOne({
           employee: employee._id,
@@ -63,14 +69,25 @@ export async function POST(request) {
           employee: employee._id,
           leaveType: leaveType._id,
           year: year,
-          totalDays: leaveType.maxDaysPerYear,
-          usedDays: 0,
-          remainingDays: leaveType.maxDaysPerYear,
+          ...buildLeaveBalanceFields({
+            totalDays: normalizedLeaveType.maxDaysPerYear,
+          }),
         })
 
         allocatedCount++
       }
     }
+
+    await clearCachePattern(buildCachePattern({
+      tenantId: tenant?.databaseName,
+      namespace: 'leave-balance',
+      userId: '*',
+    }))
+    await clearCachePattern(buildCachePattern({
+      tenantId: tenant?.databaseName,
+      namespace: 'dashboard:unified',
+      userId: '*',
+    }))
 
     return NextResponse.json({
       success: true,

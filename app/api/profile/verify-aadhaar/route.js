@@ -4,6 +4,7 @@ import { generateVisionContent } from '@/lib/gemini'
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 import fs from 'fs/promises'
 import path from 'path'
+import { getImage, getImageInfo } from '@/lib/gridfs'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,18 @@ function isRemoteUrl(url) {
 /**
  * Helper function to fetch image as base64 from URL or local path
  */
-async function fetchImageAsBase64(url) {
+async function fetchImageData(document) {
+  const url = document?.url
+  const gridFsId = document?.fileId || /^\/api\/images\/([a-f\d]{24})$/i.exec(String(url || ''))?.[1]
+
+  if (gridFsId) {
+    const [buffer, info] = await Promise.all([getImage(gridFsId), getImageInfo(gridFsId)])
+    return {
+      base64: buffer.toString('base64'),
+      mimeType: info?.contentType || 'image/webp',
+    }
+  }
+
   if (isRemoteUrl(url)) {
     // Fetch from remote URL
     const response = await fetch(url)
@@ -26,12 +38,15 @@ async function fetchImageAsBase64(url) {
     }
     const arrayBuffer = await response.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    return buffer.toString('base64')
+    return {
+      base64: buffer.toString('base64'),
+      mimeType: response.headers.get('content-type') || getMimeType(url),
+    }
   } else {
     // Read from local file path
-    const filePath = path.join(process.cwd(), url)
+    const filePath = path.join(process.cwd(), String(url || '').replace(/^\/+/, ''))
     const buffer = await fs.readFile(filePath)
-    return buffer.toString('base64')
+    return { base64: buffer.toString('base64'), mimeType: getMimeType(url) }
   }
 }
 
@@ -79,9 +94,14 @@ export async function POST(request) {
     }
 
     // Get employee data for comparison
-    const employee = await Employee.findById(user.employeeId)
-      .select('firstName lastName dateOfBirth address')
-      .lean()
+    let employee = user.employeeId
+      ? await Employee.findById(user.employeeId).select('firstName lastName dateOfBirth address').lean()
+      : null
+    if (!employee) {
+      employee = await Employee.findOne({ userId: user._id })
+        .select('firstName lastName dateOfBirth address')
+        .lean()
+    }
 
     if (!employee) {
       return NextResponse.json({
@@ -102,8 +122,8 @@ export async function POST(request) {
 
       // Fetch images in parallel
       const [frontData, backData] = await Promise.all([
-        fetchImageAsBase64(frontUrl),
-        fetchImageAsBase64(backUrl)
+        fetchImageData(user.profileCompletion.aadhaarFront),
+        fetchImageData(user.profileCompletion.aadhaarBack)
       ])
 
       frontImageData = frontData
@@ -121,8 +141,8 @@ export async function POST(request) {
     }
 
     // Determine mime types from URLs
-    const frontMime = getMimeType(frontUrl)
-    const backMime = getMimeType(backUrl)
+    const frontMime = frontImageData.mimeType
+    const backMime = backImageData.mimeType
 
     // OCR extraction prompt with detailed field extraction
     const ocrPrompt = `You are analyzing Indian Aadhaar card images (front and back).
@@ -151,8 +171,8 @@ Important:
     let ocrResult
     try {
       const response = await generateVisionContent(ocrPrompt, [
-        { mimeType: frontMime, data: frontImageData },
-        { mimeType: backMime, data: backImageData }
+        { mimeType: frontMime, data: frontImageData.base64 },
+        { mimeType: backMime, data: backImageData.base64 }
       ])
 
       ocrResult = parseAIJsonResponse(response, { expectedRoot: 'object' })
@@ -236,7 +256,8 @@ Important:
     }
 
     // Check for address
-    if (ocrResult.address && (!employee.address || employee.address.trim() === '')) {
+    const profileAddress = formatAddress(employee.address)
+    if (ocrResult.address && !profileAddress) {
       suggestions.push(`Your address from Aadhaar can be added to your profile: "${ocrResult.address}"`)
     }
 
@@ -273,10 +294,10 @@ Important:
 
     // Auto-fill address from Aadhaar OCR if employee address is missing
     let addressAutoFilled = false
-    if (ocrResult.address && (!employee.address || employee.address.trim() === '')) {
+    if (ocrResult.address && !profileAddress) {
       try {
-        await Employee.findByIdAndUpdate(user.employeeId, {
-          $set: { address: ocrResult.address }
+        await Employee.findByIdAndUpdate(employee._id, {
+          $set: { 'address.fullAddress': ocrResult.address }
         })
         addressAutoFilled = true
         console.log('[OCR] Auto-filled address from Aadhaar for employee:', user.employeeId)
@@ -371,6 +392,19 @@ function compareNames(name1, name2) {
   )
 
   return allWords1InWords2 || allWords2InWords1
+}
+
+function formatAddress(address) {
+  if (!address) return ''
+  if (typeof address === 'string') return address.trim()
+  return [
+    address.fullAddress,
+    address.street,
+    address.city,
+    address.state,
+    address.country,
+    address.postalCode,
+  ].filter(Boolean).join(', ').trim()
 }
 
 /**

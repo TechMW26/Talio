@@ -3,6 +3,7 @@
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { FaCalendarAlt } from 'react-icons/fa'
 import { Card, CardBody, Progress, Skeleton, ScrollShadow } from '@heroui/react'
+import { normalizeLeaveBalances } from '@/lib/leaveData'
 
 export default function LeaveBalanceWidget({ employeeId, initialData }) {
     // OPTIMIZED: If initialData is provided (from unified endpoint), use it as SWR fallbackData
@@ -16,7 +17,7 @@ export default function LeaveBalanceWidget({ employeeId, initialData }) {
         }
     )
 
-    const balances = data?.data || []
+    const balances = normalizeLeaveBalances(data?.data || [])
 
     if (isLoading) {
         return (

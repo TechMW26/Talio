@@ -222,7 +222,7 @@ export async function GET(request) {
     const { user: authUser, models } = auth
     const { User } = models
 
-    const user = await User.findById(authUser._id).select('profileCompletion')
+    const user = await User.findById(authUser._id || authUser.userId).select('profileCompletion')
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }

@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendLeaveApprovedNotification, sendLeaveRejectedNotification } from '@/lib/notificationService'
-import { emitLeaveUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
+import {
+  emitLeaveUpdate,
+  emitRealtimeEvent,
+  REALTIME_EVENTS,
+} from '@/lib/realtimeEvents'
 import { emitEvent, EVENTS } from '@/lib/eventBus'
 import { isDirectReport } from '@/lib/teamScope'
+import { buildCachePattern, clearCachePattern } from '@/lib/cache'
+import {
+  buildLeaveBalanceFields,
+  normalizeLeaveBalance,
+  normalizeLeaveRequest,
+} from '@/lib/leaveData'
 
 // PUT - Update leave status (Approve/Reject)
 export async function PUT(request, { params }) {
@@ -13,13 +23,21 @@ export async function PUT(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Leave, LeaveBalance, Employee, User, Department } = models
+    const { id } = await params
 
     const data = await request.json()
     const { status, approvedBy, rejectionReason } = data
 
-    const leave = await Leave.findById(params.id)
+    if (!['approved', 'rejected'].includes(status)) {
+      return NextResponse.json(
+        { success: false, message: 'Status must be approved or rejected' },
+        { status: 400 }
+      )
+    }
+
+    const leave = await Leave.findById(id)
     if (!leave) {
       return NextResponse.json(
         { success: false, message: 'Leave request not found' },
@@ -38,7 +56,9 @@ export async function PUT(request, { params }) {
     // Admin can approve all leaves
     if (userRole !== 'admin') {
       // Get the employee who requested leave
-      const leaveEmployee = await Employee.findById(leave.employee).select('department').lean()
+      const leaveEmployee = await Employee.findById(leave.employee)
+        .select('department reportingManager manager assignedManager supervisor')
+        .lean()
 
       if (userRole === 'hr') {
         // HR users can ONLY approve if they're a department head of the employee's department
@@ -108,7 +128,7 @@ export async function PUT(request, { params }) {
     }
 
     leave.status = status
-    leave.approvedBy = approvedBy
+    leave.approvedBy = userEmployeeId || approvedBy
     leave.approvalDate = new Date()
 
     if (status === 'rejected') {
@@ -117,14 +137,39 @@ export async function PUT(request, { params }) {
 
     if (status === 'approved') {
       // Deduct from leave balance
-      const leaveBalance = await LeaveBalance.findOne({
-        employee: leave.employee,
-        leaveType: leave.leaveType,
-      })
+      if (leave.leaveType) {
+        const leaveBalance = await LeaveBalance.findOne({
+          employee: leave.employee,
+          leaveType: leave.leaveType,
+          year: new Date(leave.startDate).getUTCFullYear(),
+        })
 
-      if (leaveBalance) {
-        leaveBalance.used += leave.numberOfDays
-        leaveBalance.available -= leave.numberOfDays
+        if (!leaveBalance) {
+          return NextResponse.json(
+            { success: false, message: 'No leave balance was found for this request' },
+            { status: 400 }
+          )
+        }
+
+        const normalizedBalance = normalizeLeaveBalance(leaveBalance)
+        const numberOfDays = Number(leave.numberOfDays ?? leave.days ?? 0)
+        if (normalizedBalance.remainingDays < numberOfDays) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Insufficient leave balance. Available: ${normalizedBalance.remainingDays} day(s)`,
+            },
+            { status: 400 }
+          )
+        }
+
+        leaveBalance.set(buildLeaveBalanceFields({
+          totalDays: normalizedBalance.totalDays,
+          usedDays: normalizedBalance.usedDays + numberOfDays,
+          pending: normalizedBalance.pending,
+          carriedForward: normalizedBalance.carriedForward,
+          remainingDays: normalizedBalance.remainingDays - numberOfDays,
+        }))
         await leaveBalance.save()
       }
     }
@@ -135,21 +180,37 @@ export async function PUT(request, { params }) {
       .populate('employee', 'firstName lastName employeeCode')
       .populate('leaveType', 'name')
       .populate('approvedBy', 'firstName lastName')
+      .lean()
+    const responseLeave = normalizeLeaveRequest(populatedLeave)
+    const employeeUser = await User.findOne({ employeeId: leave.employee }).select('_id').lean()
+    const employeeUserId = employeeUser?._id?.toString()
+
+    try {
+      await Promise.all([
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'leave-balance', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:unified', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: employeeUserId || '*' })),
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' })),
+      ])
+    } catch (cacheError) {
+      console.error('Failed to clear leave approval caches:', cacheError)
+    }
 
     // Send notification to employee
     try {
       const employee = await Employee.findById(leave.employee).select('userId')
-      const employeeUserId = employee?.userId
+      const notificationUserId = employee?.userId || employeeUserId
 
-      if (employeeUserId) {
-        const leaveTypeName = populatedLeave.leaveType?.name || 'Leave'
+      if (notificationUserId) {
+        const leaveTypeName = responseLeave.leaveType?.name || 'Leave'
         const startDate = new Date(leave.startDate).toLocaleDateString()
         const endDate = new Date(leave.endDate).toLocaleDateString()
 
         if (status === 'approved') {
           await sendLeaveApprovedNotification({
             leaveId: leave._id.toString(),
-            employeeId: employeeUserId,
+            employeeId: notificationUserId,
             leaveType: leaveTypeName,
             startDate,
             endDate,
@@ -158,7 +219,7 @@ export async function PUT(request, { params }) {
         } else if (status === 'rejected') {
           await sendLeaveRejectedNotification({
             leaveId: leave._id.toString(),
-            employeeId: employeeUserId,
+            employeeId: notificationUserId,
             leaveType: leaveTypeName,
             startDate,
             endDate,
@@ -170,15 +231,15 @@ export async function PUT(request, { params }) {
         // Emit Socket.IO event for realtime notification with sound
         const io = global.io
         if (io) {
-          io.to(`user:${employeeUserId}`).emit('leave-status-update', {
-            leave: populatedLeave,
+          io.to(`user:${notificationUserId}`).emit('leave-status-update', {
+            leave: responseLeave,
             action: status,
             message: status === 'approved'
               ? `Your ${leaveTypeName} has been approved (${startDate} - ${endDate})`
               : `Your ${leaveTypeName} has been rejected`,
             timestamp: new Date()
           })
-          console.log(`✅ [Socket.IO] Leave status update sent to user:${employeeUserId}`)
+          console.log(`✅ [Socket.IO] Leave status update sent to user:${notificationUserId}`)
         }
 
         // Send FCM push notification (for when app is closed)
@@ -186,7 +247,7 @@ export async function PUT(request, { params }) {
           const { sendPushToUser } = require('@/lib/pushNotification')
           const icon = status === 'approved' ? '✅' : '❌'
           await sendPushToUser(
-            employeeUserId,
+            notificationUserId,
             {
               title: `${icon} Leave ${status === 'approved' ? 'Approved' : 'Rejected'}`,
               body: status === 'approved'
@@ -203,7 +264,7 @@ export async function PUT(request, { params }) {
               }
             }
           )
-          console.log(`📲 [FCM] Leave notification sent to user:${employeeUserId}`)
+          console.log(`📲 [FCM] Leave notification sent to user:${notificationUserId}`)
         } catch (fcmError) {
           console.error('Failed to send FCM notification:', fcmError)
         }
@@ -220,13 +281,13 @@ export async function PUT(request, { params }) {
       emitLeaveUpdate(
         {
           _id: leave._id,
-          employee: populatedLeave.employee,
-          leaveType: populatedLeave.leaveType,
+          employee: responseLeave.employee,
+          leaveType: responseLeave.leaveType,
           startDate: leave.startDate,
           endDate: leave.endDate,
           numberOfDays: leave.numberOfDays,
           status: leave.status,
-          approvedBy: populatedLeave.approvedBy
+          approvedBy: responseLeave.approvedBy
         },
         targetUserIds,
         { action: status }
@@ -244,7 +305,7 @@ export async function PUT(request, { params }) {
         employeeId: leave.employee.toString(),
       }, {
         userIds: affectedUserIds,
-        databaseName: auth.tenant?.databaseName,
+        databaseName: tenant?.databaseName,
       })
     } catch (eventBusError) {
       console.error('Failed to emit eventBus leave event:', eventBusError)
@@ -253,7 +314,7 @@ export async function PUT(request, { params }) {
     return NextResponse.json({
       success: true,
       message: `Leave request ${status} successfully`,
-      data: populatedLeave,
+      data: responseLeave,
     })
   } catch (error) {
     console.error('Update leave error:', error)
@@ -267,11 +328,34 @@ export async function PUT(request, { params }) {
 // DELETE - Cancel leave request
 export async function DELETE(request, { params }) {
   try {
-    const leave = await Leave.findById(params.id)
+    const auth = await getAuthAndModels(request, ['Leave', 'LeaveBalance', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+
+    const { user, models, tenant } = auth
+    const { Leave, LeaveBalance, User } = models
+    const { id } = await params
+
+    const leave = await Leave.findById(id)
     if (!leave) {
       return NextResponse.json(
         { success: false, message: 'Leave request not found' },
         { status: 404 }
+      )
+    }
+
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId role')
+      .lean()
+    const userRole = userRecord?.role || user.role
+    const userEmployeeId = userRecord?.employeeId || user.employeeId
+    const isOwner = userEmployeeId && String(userEmployeeId) === String(leave.employee)
+
+    if (!isOwner && !['admin', 'hr'].includes(userRole)) {
+      return NextResponse.json(
+        { success: false, message: 'You can only cancel your own leave request' },
+        { status: 403 }
       )
     }
 
@@ -280,16 +364,64 @@ export async function DELETE(request, { params }) {
       const leaveBalance = await LeaveBalance.findOne({
         employee: leave.employee,
         leaveType: leave.leaveType,
+        year: new Date(leave.startDate).getUTCFullYear(),
       })
 
       if (leaveBalance) {
-        leaveBalance.used -= leave.numberOfDays
-        leaveBalance.available += leave.numberOfDays
+        const normalizedBalance = normalizeLeaveBalance(leaveBalance)
+        const numberOfDays = Number(leave.numberOfDays ?? leave.days ?? 0)
+        leaveBalance.set(buildLeaveBalanceFields({
+          totalDays: normalizedBalance.totalDays,
+          usedDays: Math.max(0, normalizedBalance.usedDays - numberOfDays),
+          pending: normalizedBalance.pending,
+          carriedForward: normalizedBalance.carriedForward,
+          remainingDays: Math.min(
+            normalizedBalance.totalDays + normalizedBalance.carriedForward,
+            normalizedBalance.remainingDays + numberOfDays
+          ),
+        }))
         await leaveBalance.save()
       }
     }
 
-    await Leave.findByIdAndDelete(params.id)
+    await Leave.findByIdAndDelete(id)
+
+    const employeeUser = await User.findOne({ employeeId: leave.employee }).select('_id').lean()
+    const employeeUserId = employeeUser?._id?.toString()
+    try {
+      await Promise.all([
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'leave-balance', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:unified', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: employeeUserId || '*' })),
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' })),
+      ])
+    } catch (cacheError) {
+      console.error('Failed to clear leave cancellation caches:', cacheError)
+    }
+
+    try {
+      emitRealtimeEvent(REALTIME_EVENTS.LEAVE_CANCELLED, {
+        leave: {
+          _id: leave._id,
+          employee: leave.employee,
+          leaveType: leave.leaveType,
+          status: 'cancelled',
+        },
+        action: 'cancelled',
+      }, { userIds: employeeUserId ? [employeeUserId] : [] })
+
+      emitEvent(EVENTS.LEAVE_STATUS_CHANGED, {
+        leaveId: leave._id.toString(),
+        status: 'cancelled',
+        employeeId: leave.employee.toString(),
+      }, {
+        userIds: [employeeUserId].filter(Boolean),
+        databaseName: tenant?.databaseName,
+      })
+    } catch (emitError) {
+      console.error('Failed to emit leave cancellation:', emitError)
+    }
 
     return NextResponse.json({
       success: true,

@@ -3,6 +3,11 @@ import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 import { emitEvent, EVENTS } from '@/lib/eventBus'
+import {
+  buildLeaveBalanceFields,
+  normalizeLeaveBalance,
+  normalizeLeaveRequest,
+} from '@/lib/leaveData'
 
 // PUT - Approve or reject leave request
 export async function PUT(request, { params }) {
@@ -56,27 +61,40 @@ export async function PUT(request, { params }) {
     }
 
     // If approving, update leave balance
-    if (action === 'approve') {
+    if (action === 'approve' && leaveRequest.leaveType) {
       const leaveBalance = await LeaveBalance.findOne({
         employee: leaveRequest.employee,
         leaveType: leaveRequest.leaveType,
-        year: new Date(leaveRequest.startDate).getFullYear(),
+        year: new Date(leaveRequest.startDate).getUTCFullYear(),
       })
 
-      if (leaveBalance) {
-        // Check if there's sufficient balance
-        if (leaveBalance.remainingDays < leaveRequest.numberOfDays) {
-          return NextResponse.json(
-            { success: false, message: 'Insufficient leave balance' },
-            { status: 400 }
-          )
-        }
-
-        // Update leave balance
-        leaveBalance.usedDays += leaveRequest.numberOfDays
-        leaveBalance.remainingDays -= leaveRequest.numberOfDays
-        await leaveBalance.save()
+      if (!leaveBalance) {
+        return NextResponse.json(
+          { success: false, message: 'No leave balance was found for this request' },
+          { status: 400 }
+        )
       }
+
+      const normalizedBalance = normalizeLeaveBalance(leaveBalance)
+      const numberOfDays = Number(leaveRequest.numberOfDays ?? leaveRequest.days ?? 0)
+      if (normalizedBalance.remainingDays < numberOfDays) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Insufficient leave balance. Available: ${normalizedBalance.remainingDays} day(s)`,
+          },
+          { status: 400 }
+        )
+      }
+
+      leaveBalance.set(buildLeaveBalanceFields({
+        totalDays: normalizedBalance.totalDays,
+        usedDays: normalizedBalance.usedDays + numberOfDays,
+        pending: normalizedBalance.pending,
+        carriedForward: normalizedBalance.carriedForward,
+        remainingDays: normalizedBalance.remainingDays - numberOfDays,
+      }))
+      await leaveBalance.save()
     }
 
     // Update the leave request
@@ -88,12 +106,15 @@ export async function PUT(request, { params }) {
       .populate('employee', 'firstName lastName employeeCode')
       .populate('leaveType', 'name code')
       .populate('approvedBy', 'firstName lastName')
+      .lean()
+    const responseLeave = normalizeLeaveRequest(updatedLeave)
 
     const tenantId = tenant?.databaseName
     const employeeUser = await User.findOne({ employeeId: leaveRequest.employee }).select('_id')
     const employeeUserId = employeeUser?._id?.toString() || '*'
 
     await clearCachePattern(buildCachePattern({ tenantId, namespace: 'leave-balance', userId: employeeUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:unified', userId: '*' }))
     await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: employeeUserId }))
     await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
     await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
@@ -105,7 +126,7 @@ export async function PUT(request, { params }) {
       if (employeeUser && approver) {
         const approverName = `${approver.firstName} ${approver.lastName}`
         const status = action === 'approve' ? 'approved' : 'rejected'
-        const leaveTypeName = updatedLeave.leaveType?.name || 'Leave'
+        const leaveTypeName = responseLeave.leaveType?.name || 'Leave'
 
         await sendPushToUser(
           employeeUser._id.toString(),
@@ -118,7 +139,7 @@ export async function PUT(request, { params }) {
             clickAction: `/dashboard/leave`,
             icon: '/icon-192x192.png',
             data: {
-              leaveId: updatedLeave._id.toString(),
+              leaveId: responseLeave._id.toString(),
               leaveType: leaveTypeName,
               status,
               approverName,
@@ -150,7 +171,7 @@ export async function PUT(request, { params }) {
     return NextResponse.json({
       success: true,
       message: `Leave request ${action}d successfully`,
-      data: updatedLeave,
+      data: responseLeave,
     })
   } catch (error) {
     console.error('Leave action error:', error)

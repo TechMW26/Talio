@@ -14,13 +14,22 @@ const MOBILE_CONTEXT_PATH = path.resolve(
     '../../../../talioapp/contexts/TicTacToeContext.tsx'
 );
 
+const mobileContextAvailable = fs.existsSync(MOBILE_CONTEXT_PATH);
 let source;
 
-beforeAll(() => {
+if (mobileContextAvailable) {
     source = fs.readFileSync(MOBILE_CONTEXT_PATH, 'utf8');
-});
+} else {
+    // eslint-disable-next-line no-console
+    console.warn(
+        `[SKIP] Mobile TicTacToeContext source not found at ${MOBILE_CONTEXT_PATH}. ` +
+        'Ensure the talioapp repo is checked out as a sibling directory.'
+    );
+}
 
-describe('TicTacToeContext - Mobile: Source Code Validation', () => {
+const suiteRunner = mobileContextAvailable ? describe : describe.skip;
+
+suiteRunner('TicTacToeContext - Mobile: Source Code Validation', () => {
 
     // ════════════════════════════════════════════════════════════════
     // CRITICAL: Zero Polling

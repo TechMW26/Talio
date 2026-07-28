@@ -231,6 +231,8 @@ export async function POST(request) {
       // Get employees on approved leave for this day
       const leavesForDay = await Leave.find({
         status: 'approved',
+        workFromHome: { $ne: true },
+        requestType: { $ne: 'early_leave' },
         startDate: { $lte: dayEnd },
         endDate: { $gte: dayStart }
       }).select('employee').lean()

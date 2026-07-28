@@ -149,6 +149,17 @@ const CompanySettingsSchema = new mongoose.Schema({
       type: Number,
       default: 10,
     },
+    halfDayPolicy: {
+      defaultAnnualLimit: {
+        type: Number,
+        default: 12,
+        min: 0,
+      },
+      limitsByLevel: [{
+        level: { type: Number, min: 1, max: 9 },
+        maxHalfDays: { type: Number, min: 0 },
+      }],
+    },
   },
 
   // Payroll Settings

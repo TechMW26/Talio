@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { generateContent } from '@/lib/gemini'
 import { clearCachePattern, buildCachePattern } from '@/lib/cache'
+import {
+  buildLeaveBalanceFields,
+  normalizeLeaveBalance,
+  normalizeLeaveTypes,
+} from '@/lib/leaveData'
 
 // POST - Bulk import leave balances from CSV/text data using AI parsing
 export async function POST(request) {
@@ -42,10 +47,11 @@ export async function POST(request) {
     }
 
     // Get all employees and leave types for matching
-    const [employees, leaveTypes] = await Promise.all([
+    const [employees, rawLeaveTypes] = await Promise.all([
       Employee.find({ status: 'active' }).select('firstName lastName employeeCode email department').lean(),
-      LeaveType.find({ isActive: true }).select('name code maxDaysPerYear').lean(),
+      LeaveType.find({ isActive: true }).select('name code maxDaysPerYear daysPerYear').lean(),
     ])
+    const leaveTypes = normalizeLeaveTypes(rawLeaveTypes)
 
     if (employees.length === 0) {
       return NextResponse.json({ success: false, message: 'No active employees found' }, { status: 400 })
@@ -176,8 +182,13 @@ ${fileContent.substring(0, 15000)}`
         })
 
         if (existing) {
-          existing.totalDays = totalDays
-          existing.remainingDays = totalDays - existing.usedDays
+          const currentBalance = normalizeLeaveBalance(existing)
+          existing.set(buildLeaveBalanceFields({
+            totalDays,
+            usedDays: currentBalance.usedDays,
+            pending: currentBalance.pending,
+            carriedForward: currentBalance.carriedForward,
+          }))
           await existing.save()
           updated++
         } else {
@@ -185,9 +196,7 @@ ${fileContent.substring(0, 15000)}`
             employee: alloc.employeeId,
             leaveType: alloc.leaveTypeId,
             year,
-            totalDays,
-            usedDays: 0,
-            remainingDays: totalDays,
+            ...buildLeaveBalanceFields({ totalDays }),
           })
           created++
         }
@@ -198,6 +207,7 @@ ${fileContent.substring(0, 15000)}`
     }
 
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'leave-balance', userId: '*' }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:unified', userId: '*' }))
 
     return NextResponse.json({
       success: true,

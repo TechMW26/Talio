@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getImageStream, getImageInfo } from '@/lib/gridfs'
 import sharp from 'sharp'
+import { verifyTokenFromRequest } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +27,16 @@ export async function GET(request, { params }) {
         if (!fileInfo) {
             return new NextResponse('Not found', { status: 404 })
         }
+        const isAadhaar = fileInfo.metadata?.category === 'aadhaar'
+        if (isAadhaar) {
+            const auth = await verifyTokenFromRequest(request)
+            const requesterId = String(auth?.user?._id || auth?.user?.userId || '')
+            const ownerId = String(fileInfo.metadata?.userId || '')
+            const privileged = ['admin', 'hr'].includes(auth?.user?.role)
+            if (!auth?.success || (!privileged && requesterId !== ownerId)) {
+                return new NextResponse('Forbidden', { status: 403 })
+            }
+        }
 
         const { searchParams } = new URL(request.url)
         const width = Math.min(parseInt(searchParams.get('w')) || 0, 2048) || null
@@ -50,7 +61,7 @@ export async function GET(request, { params }) {
             return new NextResponse(readableStream, {
                 headers: {
                     'Content-Type': contentType,
-                    'Cache-Control': 'public, max-age=31536000, immutable',
+                    'Cache-Control': isAadhaar ? 'private, no-store' : 'public, max-age=31536000, immutable',
                     'Content-Length': String(fileInfo.length),
                 }
             })
@@ -84,7 +95,7 @@ export async function GET(request, { params }) {
         return new NextResponse(resizedBuffer, {
             headers: {
                 'Content-Type': contentType,
-                'Cache-Control': 'public, max-age=31536000, immutable',
+                'Cache-Control': isAadhaar ? 'private, no-store' : 'public, max-age=31536000, immutable',
                 'Content-Length': String(resizedBuffer.length),
             }
         })

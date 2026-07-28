@@ -840,12 +840,6 @@ app.prepare().then(() => {
       startProductivityScreenshotRetentionCron();
     } catch (e) { console.warn('⚠️ Screenshot retention cron setup skipped:', e.message); }
 
-    // End-of-day analyze + purge for productivity screenshots.
-    try {
-      const { startDailyProductivityCron } = require('./lib/dailyProductivityCron');
-      startDailyProductivityCron();
-    } catch (e) { console.warn('⚠️ Daily productivity cron setup skipped:', e.message); }
-
     // Fallback checker for latest GitHub release downloads.
     try {
       const { startLatestReleaseCron } = require('./lib/latestReleaseCron');
@@ -890,11 +884,6 @@ app.prepare().then(() => {
     try {
       const { stopProductivityScreenshotRetentionCron } = require('./lib/productivityScreenshotRetentionCron');
       stopProductivityScreenshotRetentionCron();
-    } catch (e) { /* ignore if not loaded */ }
-
-    try {
-      const { stopDailyProductivityCron } = require('./lib/dailyProductivityCron');
-      stopDailyProductivityCron();
     } catch (e) { /* ignore if not loaded */ }
 
     try {

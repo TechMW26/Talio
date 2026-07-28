@@ -260,7 +260,7 @@ export default function LeaveApprovalsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">
-                        {leave.leaveType?.name || 'N/A'}
+                        {leave.requestLabel || leave.leaveType?.name || 'Leave'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">
                         {new Date(leave.startDate).toLocaleDateString()}
@@ -347,7 +347,7 @@ export default function LeaveApprovalsPage() {
                     </div>
                     <div>
                       <p className="text-sm text-default-500">Leave Type</p>
-                      <p className="font-medium text-default-800">{selectedLeave?.leaveType?.name || 'Unknown Leave Type'}</p>
+                      <p className="font-medium text-default-800">{selectedLeave?.requestLabel || selectedLeave?.leaveType?.name || 'Leave'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-default-500">Start Date</p>

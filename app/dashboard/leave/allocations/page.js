@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Card, CardBody, CardHeader, Button, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
-import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload, FaFileUpload, FaCheckCircle, FaTimesCircle, FaRobot } from 'react-icons/fa'
+import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload, FaFileUpload, FaCheckCircle, FaTimesCircle, FaRobot, FaClock } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -24,6 +24,11 @@ export default function LeaveAllocationsPage() {
   const fileInputRef = useRef(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [bulkMode, setBulkMode] = useState(false)
+  const hierarchyLevels = ['Entry Level', 'Mid Level', 'Senior', 'Team Lead', 'Assistant Manager', 'Manager', 'C-Suite', 'Assistant Director', 'Director']
+  const [halfDayPolicy, setHalfDayPolicy] = useState({
+    defaultAnnualLimit: 12,
+    limitsByLevel: hierarchyLevels.map((_, index) => ({ level: index + 1, maxHalfDays: 12 })),
+  })
 
   const [formData, setFormData] = useState({
     employee: '',
@@ -51,6 +56,13 @@ export default function LeaveAllocationsPage() {
   const { data: employeesRes, error: employeesError, isLoading: employeesLoading, isValidating: employeesValidating } = useAuthedSWR('/api/employees?limit=1000')
   const { data: leaveTypesRes, error: leaveTypesError, isLoading: leaveTypesLoading, isValidating: leaveTypesValidating } = useAuthedSWR('/api/leave/types')
   const { data: balancesRes, error: balancesError, isLoading: balancesLoading, isValidating: balancesValidating, mutate: refreshBalances } = useAuthedSWR(`/api/leave/balance?year=${selectedYear}`)
+  const { data: halfDayPolicyRes } = useAuthedSWR(`/api/leave/half-day-balance?year=${selectedYear}&includePolicy=1`)
+
+  useEffect(() => {
+    if (halfDayPolicyRes?.data?.policy) {
+      setHalfDayPolicy(halfDayPolicyRes.data.policy)
+    }
+  }, [halfDayPolicyRes])
 
   const employees = employeesRes?.data || []
   const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
@@ -78,6 +90,12 @@ export default function LeaveAllocationsPage() {
       toast.success(`Bulk allocation completed for ${data.allocated || 0} employees`)
     },
     onError: (err) => toast.error(err.message || 'Failed to perform bulk allocation'),
+  })
+  const saveHalfDayPolicy = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [/^\/api\/leave\/half-day-balance/],
+    onSuccess: () => toast.success('Hierarchy half-day limits updated'),
+    onError: err => toast.error(err.message || 'Failed to update half-day limits'),
   })
 
   const handleSubmit = async (e) => {
@@ -336,6 +354,55 @@ export default function LeaveAllocationsPage() {
         </div>
 
       </div>
+
+      <Card shadow="sm" className="mb-6">
+        <CardHeader className="px-6 py-4 border-b border-default-200 flex items-center gap-3">
+          <FaClock className="text-primary" />
+          <div>
+            <h2 className="text-lg font-semibold text-default-800">Half-Day Limits by Hierarchy</h2>
+            <p className="text-sm text-default-500">Annual half-day quota applied dynamically from each employee&apos;s designation level.</p>
+          </div>
+        </CardHeader>
+        <CardBody className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {hierarchyLevels.map((name, index) => {
+              const level = index + 1
+              const configured = halfDayPolicy.limitsByLevel?.find(item => Number(item.level) === level)
+              return (
+                <Input
+                  key={level}
+                  type="number"
+                  min={0}
+                  label={`L${level} · ${name}`}
+                  value={String(configured?.maxHalfDays ?? halfDayPolicy.defaultAnnualLimit)}
+                  onValueChange={value => setHalfDayPolicy(current => ({
+                    ...current,
+                    limitsByLevel: hierarchyLevels.map((_, itemIndex) => {
+                      const itemLevel = itemIndex + 1
+                      const existing = current.limitsByLevel?.find(item => Number(item.level) === itemLevel)
+                      return {
+                        level: itemLevel,
+                        maxHalfDays: itemLevel === level
+                          ? Math.max(0, Number(value) || 0)
+                          : Number(existing?.maxHalfDays ?? current.defaultAnnualLimit),
+                      }
+                    }),
+                  }))}
+                />
+              )
+            })}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <LoadingButton
+              color="primary"
+              isLoading={saveHalfDayPolicy.isLoading}
+              onPress={() => saveHalfDayPolicy.execute('/api/leave/half-day-balance', halfDayPolicy)}
+            >
+              Save Half-Day Limits
+            </LoadingButton>
+          </div>
+        </CardBody>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">

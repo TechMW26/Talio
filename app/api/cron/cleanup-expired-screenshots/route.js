@@ -38,6 +38,7 @@ async function runCleanup(request) {
             gridfsDeleted: 0,
             filesystemDeleted: 0,
             sessionsUpdated: 0,
+            mosaicsDeleted: 0,
             legacySharedBucketDeleted: 0,
             legacySharedBucketOrphanChunksDeleted: 0,
             legacySharedBucketOrphanFilesDeleted: 0,
@@ -49,7 +50,7 @@ async function runCleanup(request) {
 
         for (const company of companies) {
             try {
-                const tenantModels = await getTenantModels(company.databaseName, ['Screenshot', 'ProductivitySession']);
+                const tenantModels = await getTenantModels(company.databaseName, ['Screenshot', 'ProductivitySession', 'ScreenshotComposite']);
                 const tenantResult = await cleanupExpiredScreenshotsForTenant({
                     databaseName: company.databaseName,
                     models: tenantModels,
@@ -61,6 +62,7 @@ async function runCleanup(request) {
                 results.gridfsDeleted += tenantResult.gridfsDeleted;
                 results.filesystemDeleted += tenantResult.filesystemDeleted;
                 results.sessionsUpdated += tenantResult.sessionsUpdated;
+                results.mosaicsDeleted += tenantResult.mosaicsDeleted || 0;
                 results.tenants[company.slug || company.databaseName] = tenantResult;
             } catch (error) {
                 console.error(`[ScreenshotRetentionCron] Tenant cleanup failed for ${company.databaseName}:`, error.message);
@@ -72,7 +74,7 @@ async function runCleanup(request) {
         }
 
         try {
-            const legacyResult = await deleteOldScreenshots(cutoff);
+            const legacyResult = await deleteOldScreenshots(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
             results.legacySharedBucketDeleted = legacyResult?.deletedCount || 0;
             results.gridfsDeleted += results.legacySharedBucketDeleted;
         } catch (error) {

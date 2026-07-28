@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth';
 import { generateContent } from '@/lib/gemini';
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 import { formatDesignation, formatDepartments } from '@/lib/formatters';
+import { normalizeLeaveBalance } from '@/lib/leaveData';
 
 /**
  * GET /api/dashboard/ai-insights
@@ -100,12 +101,15 @@ export async function GET(request) {
     })).reverse();
 
     // Leave balance summary
-    const leavesSummary = leaveBalances.map(lb => ({
-      type: lb.leaveType?.name || 'Unknown',
-      used: lb.used || 0,
-      total: lb.total || 0,
-      remaining: (lb.total || 0) - (lb.used || 0),
-    }));
+    const leavesSummary = leaveBalances.map(rawBalance => {
+      const balance = normalizeLeaveBalance(rawBalance);
+      return {
+        type: balance.leaveType?.name || 'Unknown',
+        used: balance.usedDays,
+        total: balance.totalDays,
+        remaining: balance.remainingDays,
+      };
+    });
 
     // Tasks summary
     const overdueTasks = pendingTasks.filter(t => t.dueDate && new Date(t.dueDate) < now);

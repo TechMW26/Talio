@@ -124,6 +124,8 @@ async function processMarkAbsentForTenant(tenant, targetDate) {
         // Get employees on approved leave for target date
         const leavesForDay = await Leave.find({
             status: 'approved',
+            workFromHome: { $ne: true },
+            requestType: { $ne: 'early_leave' },
             startDate: { $lte: targetDateEnd },
             endDate: { $gte: targetDate }
         }).select('employee').lean()

@@ -6,6 +6,7 @@ import { emitMeetingUpdate } from '@/lib/realtimeEvents'
 import { createMeetingInvitationNotification } from '@/lib/actionableNotifications'
 import { getEndOfDayInTimezone, getStartOfDayInTimezone, parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
 import crypto from 'crypto'
+import { generateRecurringStarts } from '@/lib/meetingRecurrence'
 
 export const dynamic = 'force-dynamic'
 
@@ -212,6 +213,16 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
+    const recurrenceStarts = data.isRecurring
+      ? generateRecurringStarts(startTime, data.recurrence)
+      : [startTime]
+    if (data.isRecurring && (!data.recurrence?.endDate || recurrenceStarts.length === 0)) {
+      return NextResponse.json({
+        success: false,
+        message: 'A valid recurrence end date and schedule are required',
+      }, { status: 400 })
+    }
+
     // Prepare invitees with pending status
     const invitees = []
     
@@ -293,6 +304,47 @@ export async function POST(request) {
 
     await meeting.save()
 
+    const seriesMeetings = [meeting]
+    if (data.isRecurring) {
+      const seriesId = meeting._id.toString()
+      meeting.recurrence.seriesId = seriesId
+      meeting.recurrence.occurrenceIndex = 1
+      await meeting.save()
+
+      for (let index = 1; index < recurrenceStarts.length; index += 1) {
+        const occurrenceStart = recurrenceStarts[index]
+        const occurrenceEnd = new Date(occurrenceStart.getTime() + durationMinutes * 60 * 1000)
+        const occurrence = await Meeting.create({
+          title: data.title,
+          description: data.description || '',
+          type: data.type,
+          startTime: occurrenceStart,
+          endTime: occurrenceEnd,
+          scheduledStart: occurrenceStart,
+          scheduledEnd: occurrenceEnd,
+          duration: durationMinutes,
+          location: data.location,
+          isOnline: data.type === 'online',
+          roomId: data.type === 'online' ? generateRoomId() : undefined,
+          organizer: organizer._id,
+          invitees: invitees.map(item => ({ ...item })),
+          invitedDepartments,
+          priority: data.priority || 'medium',
+          agenda: data.agenda || [],
+          tags: data.tags || [],
+          isRecurring: true,
+          recurrence: {
+            ...data.recurrence,
+            parentMeeting: meeting._id,
+            seriesId,
+            occurrenceIndex: index + 1,
+          },
+          reminders: [{ time: new Date(occurrenceStart.getTime() - 15 * 60 * 1000), sent: false }],
+        })
+        seriesMeetings.push(occurrence)
+      }
+    }
+
     // Populate for response
     await meeting.populate([
       { path: 'organizer', select: 'firstName lastName email profilePicture' },
@@ -308,19 +360,19 @@ export async function POST(request) {
     // Send email to organizer (meeting creator)
     const organizerEmail = organizer.email || (organizer.userId && organizer.userId.email)
     if (organizerEmail) {
-      emailPromises.push(
+      for (const occurrence of seriesMeetings) emailPromises.push(
         sendMeetingInviteEmail({
           to: organizerEmail,
           inviteeName: `${organizer.firstName} ${organizer.lastName}`,
           organizerName: 'You',
           meetingTitle: meeting.title,
           meetingType: meeting.type,
-          startTime: meeting.scheduledStart,
-          endTime: meeting.scheduledEnd,
-          location: meeting.location,
-          description: meeting.description,
-          meetingLink: meeting.type === 'online' ? `${baseUrl}/dashboard/meetings/room/${meeting.roomId}` : null,
-          respondLink: `${baseUrl}/dashboard/meetings/${meeting._id}`
+          startTime: occurrence.scheduledStart,
+          endTime: occurrence.scheduledEnd,
+          location: occurrence.location,
+          description: occurrence.description,
+          meetingLink: occurrence.type === 'online' ? `${baseUrl}/dashboard/meetings/room/${occurrence.roomId}` : null,
+          respondLink: `${baseUrl}/dashboard/meetings/${occurrence._id}`
         }).catch(err => {
           console.error(`Failed to send email to organizer ${organizer._id}:`, err.message)
         })
@@ -357,23 +409,23 @@ export async function POST(request) {
         // Email invitation
         const inviteeEmail = emp.email || emp.userId?.email
         if (inviteeEmail) {
-          emailPromises.push(
+          for (const occurrence of seriesMeetings) emailPromises.push(
             sendMeetingInviteEmail({
               to: inviteeEmail,
               inviteeName: `${emp.firstName} ${emp.lastName}`,
               organizerName: `${organizer.firstName} ${organizer.lastName}`,
               meetingTitle: meeting.title,
               meetingType: meeting.type,
-              startTime: meeting.scheduledStart,
-              endTime: meeting.scheduledEnd,
-              location: meeting.location,
-              description: meeting.description,
-              meetingLink: meeting.type === 'online' ? `${baseUrl}/dashboard/meetings/room/${meeting.roomId}` : null,
-              respondLink: `${baseUrl}/dashboard/meetings/${meeting._id}`
+              startTime: occurrence.scheduledStart,
+              endTime: occurrence.scheduledEnd,
+              location: occurrence.location,
+              description: occurrence.description,
+              meetingLink: occurrence.type === 'online' ? `${baseUrl}/dashboard/meetings/room/${occurrence.roomId}` : null,
+              respondLink: `${baseUrl}/dashboard/meetings/${occurrence._id}`
             }).then(() => {
               // Mark email as sent
               Meeting.updateOne(
-                { _id: meeting._id, 'invitees.employee': invitee.employee },
+                { _id: occurrence._id, 'invitees.employee': invitee.employee },
                 { $set: { 'invitees.$.emailSent': true } }
               ).exec()
             }).catch(err => {
@@ -426,8 +478,11 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Meeting created successfully',
-      data: meeting
+      message: data.isRecurring
+        ? `Recurring meeting created with ${seriesMeetings.length} occurrence(s)`
+        : 'Meeting created successfully',
+      data: meeting,
+      recurrence: data.isRecurring ? { occurrenceCount: seriesMeetings.length } : undefined
     }, { status: 201 })
   } catch (error) {
     console.error('Create meeting error:', error)

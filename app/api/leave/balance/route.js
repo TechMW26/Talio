@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, buildCachePattern, clearCachePattern, getCache, setCache } from '@/lib/cache'
+import {
+  buildLeaveBalanceFields,
+  normalizeLeaveBalance,
+  normalizeLeaveBalances,
+} from '@/lib/leaveData'
 
 // GET - Get leave balances
 export async function GET(request) {
@@ -10,7 +15,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-  const { user, models, tenant } = auth
+    const { user, models, tenant } = auth
     const { LeaveBalance, Employee, LeaveType } = models
 
     const { searchParams } = new URL(request.url)
@@ -24,7 +29,7 @@ export async function GET(request) {
         role: user.role,
         userId: user._id || user.userId,
         namespace: 'leave-balance',
-        params: { employeeId, year }
+        params: { employeeId, year, formatVersion: 2 }
       })
 
       const cached = await getCache(cacheKey)
@@ -35,11 +40,11 @@ export async function GET(request) {
       const leaveBalances = await LeaveBalance.find({
         employee: employeeId,
         year: year
-      }).populate('leaveType', 'name color code')
+      }).populate('leaveType', 'name color code').lean()
 
       const response = {
         success: true,
-        data: leaveBalances,
+        data: normalizeLeaveBalances(leaveBalances),
       }
 
       await setCache(cacheKey, response, 5 * 60)
@@ -54,7 +59,7 @@ export async function GET(request) {
         role: user.role,
         userId: 'all',
         namespace: 'leave-balance',
-        params: { year, scope: 'all' }
+        params: { year, scope: 'all', formatVersion: 2 }
       })
 
       const cached = await getCache(cacheKey)
@@ -66,10 +71,11 @@ export async function GET(request) {
         .populate('employee', 'employeeCode firstName lastName email department')
         .populate('leaveType', 'name color code')
         .sort({ 'employee.employeeCode': 1 })
+        .lean()
 
       const response = {
         success: true,
-        data: leaveBalances,
+        data: normalizeLeaveBalances(leaveBalances),
       }
 
       await setCache(cacheKey, response, 5 * 60)
@@ -88,7 +94,7 @@ export async function GET(request) {
       role: user.role,
       userId: user._id || user.userId,
       namespace: 'leave-balance',
-      params: { employeeId: employee._id.toString(), year }
+      params: { employeeId: employee._id.toString(), year, formatVersion: 2 }
     })
 
     const cached = await getCache(cacheKey)
@@ -99,11 +105,11 @@ export async function GET(request) {
     const leaveBalances = await LeaveBalance.find({
       employee: employee._id,
       year: year
-    }).populate('leaveType', 'name color code')
+    }).populate('leaveType', 'name color code').lean()
 
     const response = {
       success: true,
-      data: leaveBalances,
+      data: normalizeLeaveBalances(leaveBalances),
     }
 
     await setCache(cacheKey, response, 5 * 60)
@@ -126,7 +132,7 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-  const { user, models, tenant } = auth
+    const { user, models, tenant } = auth
     const { LeaveBalance, Employee, LeaveType } = models
 
     // Only admin/hr can create/update leave balances
@@ -138,7 +144,15 @@ export async function POST(request) {
     const { employee, leaveType, totalDays, year } = body
 
     // Validate required fields
-    if (!employee || !leaveType || !totalDays || !year) {
+    const parsedTotalDays = Number(totalDays)
+    const parsedYear = Number(year)
+    if (
+      !employee ||
+      !leaveType ||
+      !Number.isFinite(parsedTotalDays) ||
+      parsedTotalDays < 0 ||
+      !Number.isInteger(parsedYear)
+    ) {
       return NextResponse.json(
         { success: false, message: 'Employee, leave type, total days, and year are required' },
         { status: 400 }
@@ -149,13 +163,18 @@ export async function POST(request) {
     const existingBalance = await LeaveBalance.findOne({
       employee,
       leaveType,
-      year
+      year: parsedYear
     })
 
     if (existingBalance) {
       // Update existing balance
-      existingBalance.totalDays = totalDays
-      existingBalance.remainingDays = totalDays - existingBalance.usedDays
+      const currentBalance = normalizeLeaveBalance(existingBalance)
+      existingBalance.set(buildLeaveBalanceFields({
+        totalDays: parsedTotalDays,
+        usedDays: currentBalance.usedDays,
+        pending: currentBalance.pending,
+        carriedForward: currentBalance.carriedForward,
+      }))
       await existingBalance.save()
 
       await existingBalance.populate('employee', 'employeeCode firstName lastName')
@@ -164,7 +183,7 @@ export async function POST(request) {
       const response = {
         success: true,
         message: 'Leave balance updated successfully',
-        data: existingBalance
+        data: normalizeLeaveBalance(existingBalance)
       }
 
       await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'leave-balance', userId: '*' }))
@@ -175,10 +194,8 @@ export async function POST(request) {
       const leaveBalance = new LeaveBalance({
         employee,
         leaveType,
-        totalDays,
-        usedDays: 0,
-        remainingDays: totalDays,
-        year
+        year: parsedYear,
+        ...buildLeaveBalanceFields({ totalDays: parsedTotalDays }),
       })
 
       await leaveBalance.save()
@@ -189,7 +206,7 @@ export async function POST(request) {
       const response = {
         success: true,
         message: 'Leave balance created successfully',
-        data: leaveBalance
+        data: normalizeLeaveBalance(leaveBalance)
       }
 
       await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'leave-balance', userId: '*' }))

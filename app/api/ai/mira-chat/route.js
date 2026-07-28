@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { generateContent } from '@/lib/gemini'
 import { buildDirectReportsFilter } from '@/lib/teamScope'
+import { normalizeLeaveBalance } from '@/lib/leaveData'
 
 // Get current month key in "YYYY-MM" format
 function getCurrentMonth() {
@@ -226,11 +227,19 @@ async function fetchContextData(models, user, role, query) {
       if (models.LeaveBalance) {
         const balFilter = isAdmin ? {} : { employee: user.employeeId }
         const balances = await models.LeaveBalance.find(balFilter)
-          .populate('employee', 'firstName lastName').lean().limit(20)
-        context.leaveBalances = balances.map(b => ({
-          employee: b.employee ? `${b.employee.firstName} ${b.employee.lastName}` : 'Unknown',
-          type: b.leaveType, total: b.totalAllotted, used: b.used, remaining: b.remaining
-        }))
+          .populate('employee', 'firstName lastName')
+          .populate('leaveType', 'name code')
+          .lean().limit(20)
+        context.leaveBalances = balances.map(rawBalance => {
+          const balance = normalizeLeaveBalance(rawBalance)
+          return {
+            employee: balance.employee ? `${balance.employee.firstName} ${balance.employee.lastName}` : 'Unknown',
+            type: balance.leaveType?.name || balance.leaveType,
+            total: balance.totalDays,
+            used: balance.usedDays,
+            remaining: balance.remainingDays,
+          }
+        })
       }
     }
 

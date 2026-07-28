@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
+import { normalizeLeaveBalances } from '@/lib/leaveData'
 
 export const dynamic = 'force-dynamic'
 
@@ -307,7 +308,7 @@ export async function GET(request) {
           .populate('leaveType', 'name code color')
           .lean()
           .then(balances => {
-            dashboardData.leaveBalance = balances
+            dashboardData.leaveBalance = normalizeLeaveBalances(balances)
           })
           .catch(() => { dashboardData.leaveBalance = [] })
       )

@@ -178,7 +178,7 @@ export default function LeaveRequestsPage() {
                     <tr key={leave._id} className="hover:bg-default-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-default-800">
-                          {leave?.leaveType?.name || 'Unknown Leave Type'}
+                          {leave?.requestLabel || leave?.leaveType?.name || 'Leave'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -241,7 +241,7 @@ export default function LeaveRequestsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-default-500 mb-2">Leave Type</label>
-                      <p className="text-default-800">{selectedLeave?.leaveType?.name || 'Unknown Leave Type'}</p>
+                      <p className="text-default-800">{selectedLeave?.requestLabel || selectedLeave?.leaveType?.name || 'Leave'}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-default-500 mb-2">Status</label>

@@ -43,7 +43,16 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
     duration: 60, // Duration in minutes (default 1 hour)
     location: '',
     priority: 'medium',
-    agenda: []
+    agenda: [],
+    isRecurring: false,
+    recurrence: {
+      pattern: 'weekly',
+      interval: 1,
+      startDate: '',
+      endDate: '',
+      time: '09:00',
+      daysOfWeek: [new Date().getDay()]
+    }
   })
 
   const [departmentGroups, setDepartmentGroups] = useState([])
@@ -52,6 +61,26 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
   const [expandedDepts, setExpandedDepts] = useState({})
   const [searchQuery, setSearchQuery] = useState('')
   const [agendaInput, setAgendaInput] = useState({ title: '', duration: 15 })
+  const weekdayOptions = [
+    { value: 0, label: 'Sun' },
+    { value: 1, label: 'Mon' },
+    { value: 2, label: 'Tue' },
+    { value: 3, label: 'Wed' },
+    { value: 4, label: 'Thu' },
+    { value: 5, label: 'Fri' },
+    { value: 6, label: 'Sat' }
+  ]
+  const effectiveScheduledStart = formData.isRecurring
+    ? (formData.recurrence.startDate && formData.recurrence.time
+      ? `${formData.recurrence.startDate}T${formData.recurrence.time}`
+      : '')
+    : formData.scheduledStart
+  const effectiveScheduledEnd = effectiveScheduledStart
+    ? toISTDateTimeLocal(new Date(
+      parseDateTimeInTimezone(effectiveScheduledStart, IST_TIMEZONE).getTime()
+      + formData.duration * 60 * 1000
+    ))
+    : ''
 
   // Fetch department-grouped employees
   useEffect(() => {
@@ -99,6 +128,13 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
       
       return updated
     })
+  }
+
+  const handleRecurrenceChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      recurrence: { ...prev.recurrence, [field]: value }
+    }))
   }
 
   const toggleDepartmentExpand = (deptId) => {
@@ -156,9 +192,19 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
       toast.error('Please enter a meeting title')
       return false
     }
-    if (!formData.scheduledStart) {
+    if (!effectiveScheduledStart) {
       toast.error('Please select start date and time')
       return false
+    }
+    if (formData.isRecurring) {
+      if (!formData.recurrence.endDate || formData.recurrence.endDate < formData.recurrence.startDate) {
+        toast.error('Please select a recurrence end date on or after the start date')
+        return false
+      }
+      if (formData.recurrence.pattern === 'weekly' && formData.recurrence.daysOfWeek.length === 0) {
+        toast.error('Please select at least one weekday')
+        return false
+      }
     }
     if (!formData.duration || formData.duration < 5) {
       toast.error('Please enter a valid duration (minimum 5 minutes)')
@@ -204,6 +250,14 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
         },
         body: JSON.stringify({
           ...formData,
+          scheduledStart: effectiveScheduledStart,
+          scheduledEnd: effectiveScheduledEnd,
+          recurrence: formData.isRecurring ? {
+            pattern: formData.recurrence.pattern,
+            interval: Number(formData.recurrence.interval) || 1,
+            endDate: formData.recurrence.endDate,
+            daysOfWeek: formData.recurrence.daysOfWeek
+          } : undefined,
           inviteeIds: selectedInvitees,
           departmentIds: selectedDepartments.filter(id => id !== 'no-department')
         })
@@ -387,8 +441,25 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 />
               </div>
 
+              <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
+                <div>
+                  <p className="font-medium text-gray-800">Recurring meeting</p>
+                  <p className="text-xs text-gray-500">Create the complete series and schedule invitations for every occurrence.</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.isRecurring}
+                  onClick={() => handleInputChange('isRecurring', !formData.isRecurring)}
+                  className={`relative h-7 w-12 rounded-full transition-colors ${formData.isRecurring ? 'bg-primary-600' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${formData.isRecurring ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+
               {/* Date & Time */}
-              <div className="grid grid-cols-2 gap-4">
+              {!formData.isRecurring ? (
+                <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Start Date & Time *
@@ -425,6 +496,115 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   </select>
                 </div>
               </div>
+              ) : (
+                <div className="space-y-4 rounded-xl bg-primary-50/60 p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Repeat *</label>
+                      <select
+                        value={formData.recurrence.pattern}
+                        onChange={(e) => handleRecurrenceChange('pattern', e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900"
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Every two weeks</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Repeat every *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="52"
+                        value={formData.recurrence.interval}
+                        onChange={(e) => handleRecurrenceChange('interval', Number(e.target.value))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Series Start *</label>
+                      <input
+                        type="date"
+                        min={new Date().toISOString().slice(0, 10)}
+                        value={formData.recurrence.startDate}
+                        onChange={(e) => {
+                          const startDate = e.target.value
+                          const weekday = startDate ? new Date(`${startDate}T12:00:00`).getDay() : null
+                          setFormData(prev => ({
+                            ...prev,
+                            recurrence: {
+                              ...prev.recurrence,
+                              startDate,
+                              daysOfWeek: weekday === null || prev.recurrence.daysOfWeek.includes(weekday)
+                                ? prev.recurrence.daysOfWeek
+                                : [...prev.recurrence.daysOfWeek, weekday],
+                            },
+                          }))
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Meeting Time *</label>
+                      <input
+                        type="time"
+                        value={formData.recurrence.time}
+                        onChange={(e) => handleRecurrenceChange('time', e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Series End *</label>
+                      <input
+                        type="date"
+                        min={formData.recurrence.startDate || new Date().toISOString().slice(0, 10)}
+                        value={formData.recurrence.endDate}
+                        onChange={(e) => handleRecurrenceChange('endDate', e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Duration *</label>
+                      <select
+                        value={formData.duration}
+                        onChange={(e) => handleInputChange('duration', parseInt(e.target.value))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900"
+                      >
+                        {[15, 30, 45, 60, 90, 120, 180, 240, 480].map(minutes => (
+                          <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes} minutes` : `${minutes / 60} hour${minutes > 60 ? 's' : ''}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {formData.recurrence.pattern === 'weekly' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Days of week *</label>
+                      <div className="flex flex-wrap gap-2">
+                        {weekdayOptions.map(day => {
+                          const selected = formData.recurrence.daysOfWeek.includes(day.value)
+                          return (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() => handleRecurrenceChange(
+                                'daysOfWeek',
+                                selected
+                                  ? formData.recurrence.daysOfWeek.filter(value => value !== day.value)
+                                  : [...formData.recurrence.daysOfWeek, day.value]
+                              )}
+                              className={`rounded-lg px-3 py-2 text-sm ${selected ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 border border-gray-300'}`}
+                            >
+                              {day.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Location (for offline) */}
               {formData.type === 'offline' && (
@@ -692,7 +872,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 <div className="flex items-center gap-2 text-sm text-gray-600 pl-9">
                   <HiOutlineCalendarDays className="w-4 h-4" />
                   <span>
-                    {parseDateTimeInTimezone(formData.scheduledStart, IST_TIMEZONE)?.toLocaleDateString('en-IN', {
+                    {parseDateTimeInTimezone(effectiveScheduledStart, IST_TIMEZONE)?.toLocaleDateString('en-IN', {
                       timeZone: IST_TIMEZONE,
                       weekday: 'long',
                       day: 'numeric',
@@ -705,9 +885,9 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 <div className="flex items-center gap-2 text-sm text-gray-600 pl-9">
                   <HiOutlineClock className="w-4 h-4" />
                   <span>
-                    {parseDateTimeInTimezone(formData.scheduledStart, IST_TIMEZONE)?.toLocaleTimeString('en-IN', { timeZone: IST_TIMEZONE, hour: '2-digit', minute: '2-digit' })}
+                    {parseDateTimeInTimezone(effectiveScheduledStart, IST_TIMEZONE)?.toLocaleTimeString('en-IN', { timeZone: IST_TIMEZONE, hour: '2-digit', minute: '2-digit' })}
                     {' - '}
-                    {parseDateTimeInTimezone(formData.scheduledEnd, IST_TIMEZONE)?.toLocaleTimeString('en-IN', { timeZone: IST_TIMEZONE, hour: '2-digit', minute: '2-digit' })}
+                    {parseDateTimeInTimezone(effectiveScheduledEnd, IST_TIMEZONE)?.toLocaleTimeString('en-IN', { timeZone: IST_TIMEZONE, hour: '2-digit', minute: '2-digit' })}
                     {' '}
                     <span className="text-gray-500">
                       ({formData.duration >= 60 
@@ -716,6 +896,12 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     </span>
                   </span>
                 </div>
+                {formData.isRecurring && (
+                  <div className="ml-9 rounded-lg bg-primary-50 p-3 text-sm text-primary-700">
+                    Repeats {formData.recurrence.pattern} every {formData.recurrence.interval} interval(s)
+                    {' '}until {new Date(`${formData.recurrence.endDate}T00:00`).toLocaleDateString('en-IN')}.
+                  </div>
+                )}
 
                 {formData.type === 'offline' && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 pl-9">
