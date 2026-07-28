@@ -13,7 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json* ./
+# Keep npm's peer-dependency policy identical on macOS, CI, and Linux images.
+# The lockfile is generated with legacy-peer-deps enabled in .npmrc.
+COPY package.json package-lock.json .npmrc ./
 
 # The lockfile contains Linux SWC/sharp optional packages, so npm ci is both
 # deterministic and faster than resolving the dependency tree on every build.
