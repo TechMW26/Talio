@@ -43,6 +43,7 @@ describe('MeetingSessionProvider', () => {
     )
 
     expect(screen.getByTestId('meeting-display-mode')).toHaveTextContent('full')
+    expect(screen.queryByText('Dashboard content')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Join test meeting' }))
     fireEvent.click(screen.getByRole('button', { name: 'Minimise test meeting' }))

@@ -119,7 +119,7 @@ export function MeetingSessionProvider({ children }) {
 
   return (
     <MeetingSessionContext.Provider value={value}>
-      {children}
+      {!isFullRoom && children}
       {shouldRenderSession && (
         <ErrorBoundaryWithRetry
           key={activeRoomId}
