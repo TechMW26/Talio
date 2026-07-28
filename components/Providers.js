@@ -15,6 +15,7 @@ import WebNetworkRecovery from '@/components/WebNetworkRecovery'
 import ScrollToTop from '@/components/ScrollToTop'
 import { FocusTimerProvider } from '@/contexts/FocusTimerContext'
 import { MiraChatProvider } from '@/contexts/MiraChatContext'
+import { MeetingSessionProvider } from '@/contexts/MeetingSessionContext'
 import {
     patchBrowserFetchForFreshness,
     revalidateAllApiQueries,
@@ -130,7 +131,9 @@ export function Providers({ children }) {
                         <AutoRefresh />
                         <AIAssistant />
                         <AIAssistantBridge />
-                        {children}
+                        <MeetingSessionProvider>
+                            {children}
+                        </MeetingSessionProvider>
                     </SWRConfig>
                 </MiraChatProvider>
                 </FocusTimerProvider>

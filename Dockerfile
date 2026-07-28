@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.7
 
 # ── Stage 1: deps ── ALL dependencies (dev + prod needed for Next.js build) ──
 # Use Debian slim instead of Alpine because onnxruntime-node segfaults on musl.
@@ -13,33 +13,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json* ./
+# Keep npm's peer-dependency policy identical on macOS, CI, and Linux images.
+# The lockfile is generated with legacy-peer-deps enabled in .npmrc.
+COPY package.json package-lock.json .npmrc ./
 
-# npm install (not ci) so Linux-native optional dependencies are resolved for the
-# current container platform even if the lockfile was generated on macOS.
-# Clear sharp/prebuild caches first because corrupted cached libvips downloads can
-# cause integrity-check failures on long-lived VPS builders.
-RUN --mount=type=cache,target=/root/.npm \
-    rm -rf /root/.npm/_libvips /root/.npm/_prebuilds && \
-    npm install --no-audit --no-fund
+# The lockfile contains Linux SWC/sharp optional packages, so npm ci is both
+# deterministic and faster than resolving the dependency tree on every build.
+RUN --mount=type=cache,id=talio-npm,target=/root/.npm,sharing=locked \
+    npm ci --no-audit --no-fund
 
-# ── Stage 2: prod-deps ── Production-only dependencies (no devDeps) ──────────
-# Runs in PARALLEL with builder stage — saves ~247s vs npm prune after build.
-FROM node:20-bookworm-slim AS prod-deps
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY package.json package-lock.json* ./
-
-RUN --mount=type=cache,target=/root/.npm \
-    rm -rf /root/.npm/_libvips /root/.npm/_prebuilds && \
-    npm install --no-audit --no-fund --omit=dev
+# ── Stage 2: prod-deps ── Reuse the resolved dependency layer ────────────────
+# This runs in parallel with the application build without downloading and
+# compiling the complete dependency tree a second time.
+FROM deps AS prod-deps
+RUN npm prune --omit=dev --no-audit --no-fund
 
 # ── Stage 3: builder ── Build Next.js production output ──────────────────────
 FROM node:20-bookworm-slim AS builder
@@ -69,7 +56,12 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=8192"
 
-RUN npm run build
+ARG NEXT_BUILD_CPUS
+
+# Keep the multi-gigabyte webpack/SWC cache in BuildKit rather than baking it
+# into the builder and runtime layers. It is reused by subsequent builds.
+RUN --mount=type=cache,id=talio-next-build,target=/app/.next/cache,sharing=locked \
+    npm run build
 
 # ── Stage 4: runner ── Minimal production image ─────────────────────────────
 FROM node:20-bookworm-slim AS runner

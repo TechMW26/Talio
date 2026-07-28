@@ -5,48 +5,39 @@ import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
 
 export const dynamic = 'force-dynamic'
 
+const EMPTY_COUNTS = Object.freeze({
+  projects: 0,
+  tasks: 0,
+  leaves: 0,
+  attendance: 0,
+  expenses: 0,
+  helpdesk: 0,
+  notifications: 0,
+})
+
 // GET - Get pending counts for sidebar badges
 export async function GET(request) {
   try {
     const auth = await getAuthAndModels(request, [
       'User', 'Employee', 'Department', 'ProjectMember', 'Leave', 'AttendanceCorrection',
-      'Expense', 'Helpdesk', 'Notification', 'Task', 'TaskAssignee'
+      'Expense', 'Helpdesk', 'Notification', 'TaskAssignee'
     ])
 
     if (!auth.success) {
       // Return empty counts instead of 401 to avoid console errors
       return NextResponse.json({
         success: true,
-        data: {
-          projects: 0,
-          tasks: 0,
-          leaves: 0,
-          attendance: 0,
-          expenses: 0,
-          helpdesk: 0,
-          notifications: 0
-        }
+        data: EMPTY_COUNTS
       })
     }
 
     const { user, models, tenant } = auth
     const {
       User, Employee, Department, ProjectMember, Leave, AttendanceCorrection,
-      Expense, Helpdesk, Notification, Task, TaskAssignee
+      Expense, Helpdesk, Notification, TaskAssignee
     } = models
 
-    let companyFeatures = null
-    try {
-      const featurePayload = await getTenantCompanyFeaturePayload({
-        companySlug: tenant?.companySlug,
-        databaseName: tenant?.databaseName,
-      })
-      companyFeatures = featurePayload?.features || null
-    } catch (featureError) {
-      console.error('Error resolving company features for sidebar counts:', featureError)
-    }
-
-    // Check Redis cache first (30s TTL - badge counts are near-real-time)
+    // Check the cache before user/feature lookups.
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: user.role || 'employee',
@@ -58,36 +49,31 @@ export async function GET(request) {
       return NextResponse.json(cached)
     }
 
-    const userRecord = await User.findById(user._id || user.userId)
-      .select('employeeId role isDepartmentHead headOfDepartments')
-      .lean()
+    const [featurePayload, userRecord] = await Promise.all([
+      getTenantCompanyFeaturePayload({
+        companySlug: tenant?.companySlug,
+        databaseName: tenant?.databaseName,
+      }).catch((featureError) => {
+        console.error('Error resolving company features for sidebar counts:', featureError)
+        return null
+      }),
+      User.findById(user._id || user.userId)
+        .select('employeeId role isDepartmentHead headOfDepartments')
+        .lean(),
+    ])
+    const companyFeatures = featurePayload?.features || null
+
     if (!userRecord?.employeeId) {
       return NextResponse.json({
         success: true,
-        data: {
-          projects: 0,
-          tasks: 0,
-          leaves: 0,
-          attendance: 0,
-          expenses: 0,
-          helpdesk: 0,
-          notifications: 0
-        }
+        data: EMPTY_COUNTS
       })
     }
 
     const employeeId = userRecord.employeeId
     const userRole = userRecord.role || user.role
 
-    const counts = {
-      projects: 0,      // Pending project invitations for current user
-      tasks: 0,         // Pending task assignments for current user
-      leaves: 0,        // Pending leave approvals (for managers/heads/hr/admin)
-      attendance: 0,    // Pending attendance corrections (for managers/heads/hr/admin)
-      expenses: 0,      // Pending expense approvals (for managers/heads/hr/admin)
-      helpdesk: 0,      // Pending helpdesk tickets (for assigned agents or admin)
-      notifications: 0  // Unread notifications
-    }
+    const counts = { ...EMPTY_COUNTS }
 
     // 1-3. Base counts in parallel
     const [projectCount, taskCount, notificationCount] = await Promise.all([
@@ -154,18 +140,21 @@ export async function GET(request) {
         }
 
         // Also check Department model for head/heads fields
-        const managedDepartments = await Department.find({
+        const managedDepartmentIds = await Department.find({
           $or: [
             { head: employeeId },
             { heads: employeeId },
             { _id: { $in: managedDeptIds } }
           ]
-        }).select('_id').lean()
+        }).distinct('_id')
 
-        if (managedDepartments.length > 0) {
-          const deptIds = managedDepartments.map(d => d._id)
-          const deptEmployees = await Employee.find({ department: { $in: deptIds } }).select('_id').lean()
-          departmentEmployeeIds = deptEmployees.map(e => e._id)
+        if (managedDepartmentIds.length > 0) {
+          departmentEmployeeIds = await Employee.find({
+            $or: [
+              { department: { $in: managedDepartmentIds } },
+              { departments: { $in: managedDepartmentIds } },
+            ],
+          }).distinct('_id')
         }
       }
 
@@ -232,7 +221,7 @@ export async function GET(request) {
 
     const responseData = { success: true, data: counts }
     // Cache for 30s - short enough to reflect real changes, long enough to reduce DB hits
-    await setCache(cacheKey, responseData, 60).catch(() => { }) // 60s TTL
+    void setCache(cacheKey, responseData, 60).catch(() => {}) // 60s TTL
 
     return NextResponse.json(responseData)
   } catch (error) {

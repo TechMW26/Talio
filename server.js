@@ -1,5 +1,6 @@
 // Load environment variables from .env before any other code runs
 require('dotenv').config();
+process.env.TZ = 'Asia/Kolkata';
 
 const { createServer } = require('http');
 const { parse } = require('url');
@@ -9,6 +10,33 @@ const { Server } = require('socket.io');
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
+let socketJwtSecret = null;
+
+function getSocketJwtSecret() {
+  if (!socketJwtSecret) {
+    socketJwtSecret = new TextEncoder().encode(process.env.JWT_SECRET);
+  }
+  return socketJwtSecret;
+}
+
+async function verifySocketToken(token) {
+  if (!token || !process.env.JWT_SECRET) return null;
+  const { jwtVerify } = await import('jose');
+  const { payload } = await jwtVerify(token, getSocketJwtSecret());
+  return payload;
+}
+
+function getAllowedSocketOrigins() {
+  return new Set(
+    [
+      process.env.NEXT_PUBLIC_APP_URL,
+      process.env.PUBLIC_BASE_URL,
+      ...(process.env.SOCKET_ALLOWED_ORIGINS || '').split(','),
+    ]
+      .map((origin) => origin?.trim().replace(/\/+$/, ''))
+      .filter(Boolean)
+  );
+}
 
 // ────────────────────────────────────────────────────────────────────────
 // Boot-time environment validation.
@@ -104,7 +132,7 @@ const OPTIONAL_INTEGRATIONS = [
 })();
 
 // Latest desktop version – fetched from GitHub releases, refreshed every 5 min.
-const GITHUB_OWNER = process.env.GITHUB_OWNER || 'avirajsharma-ops';
+const GITHUB_OWNER = process.env.GITHUB_OWNER || 'TechMW26';
 const GITHUB_REPO_NAME = process.env.GITHUB_REPO || 'Talio';
 const GITHUB_REPO = `${GITHUB_OWNER}/${GITHUB_REPO_NAME}`;
 const FALLBACK_LATEST_DESKTOP = '5.0.5';
@@ -204,14 +232,15 @@ app.prepare().then(() => {
     maxHttpBufferSize: 5e6, // 5MB - needed for base64 encoded voice audio
     cors: {
       origin: (origin, callback) => {
-        // Allow connections with no origin (mobile apps, curl, etc.)
-        // and connections from the app URL
-        const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL || '*';
-        if (!origin || allowedOrigin === '*' || origin === allowedOrigin) {
-          callback(null, true);
-        } else {
-          callback(null, true); // Allow all origins for Socket.IO (auth handled via token)
+        // Native clients do not send an Origin header. Browser clients must
+        // match an explicitly configured application origin.
+        if (!origin) return callback(null, true);
+        const normalizedOrigin = origin.replace(/\/+$/, '');
+        const isLocalDevelopment = dev && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalizedOrigin);
+        if (isLocalDevelopment || getAllowedSocketOrigins().has(normalizedOrigin)) {
+          return callback(null, true);
         }
+        return callback(new Error('Socket origin is not allowed'));
       },
       methods: ['GET', 'POST'],
       credentials: false
@@ -221,62 +250,187 @@ app.prepare().then(() => {
   // Make io accessible globally (for API routes)
   global.io = io;
 
+  // Verify handshake tokens once per connection. Employee identities are
+  // resolved from tenant storage; guest identities are short-lived signed
+  // tickets restricted to one meeting room.
+  io.use(async (socket, nextSocket) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) return nextSocket(new Error('Socket authentication required'));
+
+    try {
+      const payload = await verifySocketToken(token);
+      if (
+        payload?.type === 'meeting_guest' &&
+        payload?.roomId &&
+        payload?.guestId &&
+        payload?.guestName &&
+        payload?.tenantDatabaseName
+      ) {
+        socket.guestContext = {
+          roomId: payload.roomId.toString(),
+          guestId: payload.guestId.toString(),
+          guestName: payload.guestName.toString().slice(0, 80),
+          tenantDatabaseName: payload.tenantDatabaseName?.toString() || null,
+        };
+        return nextSocket();
+      }
+
+      if (!payload?.userId || !payload?.databaseName) {
+        return nextSocket(new Error('Invalid socket session'));
+      }
+
+      const { getTenantModels } = await import('./lib/tenantModels.js');
+      const { User, Employee } = await getTenantModels(payload.databaseName, ['User', 'Employee']);
+      const user = await User.findById(payload.userId)
+        .select('_id employeeId role isActive')
+        .populate({ path: 'employeeId', select: '_id firstName lastName' })
+        .lean();
+
+      if (!user || user.isActive === false) {
+        return nextSocket(new Error('Invalid socket session'));
+      }
+
+      const fallbackEmployee = user.employeeId
+        ? null
+        : await Employee.findOne({ userId: user._id })
+          .select('_id firstName lastName')
+          .lean();
+      const resolvedEmployee = user.employeeId || fallbackEmployee;
+
+      socket.authContext = {
+        userId: user._id.toString(),
+        employeeId: resolvedEmployee?._id?.toString() || null,
+        displayName: [resolvedEmployee?.firstName, resolvedEmployee?.lastName].filter(Boolean).join(' '),
+        role: user.role || payload.role || 'employee',
+        tenantDatabaseName: payload.databaseName.toString(),
+      };
+      return nextSocket();
+    } catch (error) {
+      console.warn('[Socket.IO] Handshake authentication rejected:', error?.code || error?.message);
+      return nextSocket(new Error('Invalid socket session'));
+    }
+  });
+
   io.on('connection', (socket) => {
     console.log('✅ [Socket.IO] Client connected:', socket.id);
 
-    // Authenticate user
-    socket.on('authenticate', (payload) => {
-      const resolvedUserId = typeof payload === 'object' ? payload?.userId || payload?.id : payload;
-      const resolvedEmployeeId = typeof payload === 'object' ? payload?.employeeId : null;
-      const resolvedTenantDatabaseName = typeof payload === 'object' ? payload?.tenantDatabaseName : null;
+    const registerAuthenticatedIdentity = () => {
+      const auth = socket.authContext;
+      if (!auth) return false;
 
-      if (resolvedUserId) {
-        socket.userId = resolvedUserId.toString();
-        socket.join(`user:${socket.userId}`);
-        console.log(`🔐 [Socket.IO] User ${socket.userId} authenticated`);
-        console.log(`[Socket:Server] userId ${socket.userId} joined room user:${socket.userId}`);
-        console.log('[Socket:Server] All current rooms:', [...io.sockets.adapter.rooms.keys()]);
+      socket.userId = auth.userId;
+      socket.employeeId = auth.employeeId;
+      socket.tenantDatabaseName = auth.tenantDatabaseName;
+      socket.join(`user:${socket.userId}`);
+      socket.join(`tenant:${socket.tenantDatabaseName}`);
 
-        // Track user presence by userId
-        const userEntry = presenceByUserId.get(socket.userId) || { sockets: new Set(), lastSeenAt: null };
-        userEntry.sockets.add(socket.id);
-        presenceByUserId.set(socket.userId, userEntry);
-      }
+      const userEntry = presenceByUserId.get(socket.userId) || { sockets: new Set(), lastSeenAt: null };
+      userEntry.sockets.add(socket.id);
+      presenceByUserId.set(socket.userId, userEntry);
 
-      if (resolvedTenantDatabaseName) {
-        socket.tenantDatabaseName = resolvedTenantDatabaseName.toString();
-        socket.join(`tenant:${socket.tenantDatabaseName}`);
-        console.log(`🏢 [Socket.IO] User ${socket.userId || socket.id} joined tenant:${socket.tenantDatabaseName}`);
-      }
-
-      if (resolvedEmployeeId) {
-        const employeeId = resolvedEmployeeId.toString();
-        socket.employeeId = employeeId;
-
-        const entry = presenceByEmployee.get(employeeId) || { sockets: new Set(), lastSeenAt: null };
-        const wasOnline = entry.sockets.size > 0;
-        entry.sockets.add(socket.id);
-        presenceByEmployee.set(employeeId, entry);
+      if (socket.employeeId) {
+        const employeeEntry = presenceByEmployee.get(socket.employeeId) || { sockets: new Set(), lastSeenAt: null };
+        const wasOnline = employeeEntry.sockets.size > 0;
+        employeeEntry.sockets.add(socket.id);
+        presenceByEmployee.set(socket.employeeId, employeeEntry);
 
         if (!wasOnline) {
           io.emit('presence-update', {
-            employeeId,
+            employeeId: socket.employeeId,
             isOnline: true,
-            lastSeenAt: entry.lastSeenAt || null
+            lastSeenAt: employeeEntry.lastSeenAt || null
           });
         }
       }
+
+      return true;
+    };
+
+    const authorizeRoomJoin = async (roomType, resourceId) => {
+      const auth = socket.authContext;
+      if (!auth?.employeeId || !resourceId) return false;
+      if (auth.role === 'admin') return true;
+
+      try {
+        const { getTenantModels } = await import('./lib/tenantModels.js');
+        if (roomType === 'chat') {
+          const { Chat } = await getTenantModels(auth.tenantDatabaseName, ['Chat']);
+          return Boolean(await Chat.exists({ _id: resourceId, participants: auth.employeeId }));
+        }
+
+        const { Project, ProjectMember } = await getTenantModels(
+          auth.tenantDatabaseName,
+          ['Project', 'ProjectMember']
+        );
+        const [membership, ownership] = await Promise.all([
+          ProjectMember.exists({
+            project: resourceId,
+            user: auth.employeeId,
+            invitationStatus: 'accepted',
+          }),
+          Project.exists({
+            _id: resourceId,
+            $or: [
+              { createdBy: auth.employeeId },
+              { projectHead: auth.employeeId },
+              { projectHeads: auth.employeeId },
+            ],
+          }),
+        ]);
+        return Boolean(membership || ownership);
+      } catch (error) {
+        console.warn(`[Socket.IO] ${roomType} room authorization failed:`, error.message);
+        return false;
+      }
+    };
+
+    const authorizeMeetingJoin = async (roomId) => {
+      const guest = socket.guestContext;
+      if (guest) return guest.roomId === String(roomId);
+
+      const auth = socket.authContext;
+      if (!auth?.employeeId || !roomId) return false;
+
+      try {
+        const { getTenantModel } = await import('./lib/tenantModels.js');
+        const Meeting = await getTenantModel(auth.tenantDatabaseName, 'Meeting');
+        return Boolean(await Meeting.exists({
+          roomId: String(roomId),
+          isLinkActive: true,
+          $or: [
+            { organizer: auth.employeeId },
+            { 'invitees.employee': auth.employeeId },
+          ],
+        }));
+      } catch (error) {
+        console.warn(`[Socket.IO] Failed to authorize meeting:${roomId}:`, error.message);
+        return false;
+      }
+    };
+
+    registerAuthenticatedIdentity();
+
+    // Authenticate user
+    socket.on('authenticate', () => {
+      if (!registerAuthenticatedIdentity()) {
+        socket.emit('authentication-error', { message: 'Valid session required' });
+        return;
+      }
+      socket.emit('authentication-confirmed', {
+        userId: socket.userId,
+        employeeId: socket.employeeId,
+      });
     });
 
     // Join user-specific notification room (for desktop apps)
     socket.on('join-user-room', (userId) => {
-      socket.userId = userId;
-      socket.join(`user:${userId}`);
-      console.log(`🔔 [Socket.IO] User ${userId} joined notification room`);
+      if (!socket.authContext || String(userId) !== socket.authContext.userId) return;
+      socket.join(`user:${socket.authContext.userId}`);
     });
 
     // Presence requests from clients
     socket.on('presence-request', (data) => {
+      if (!socket.authContext) return;
       const employeeIds = Array.isArray(data?.employeeIds) ? data.employeeIds : [];
       const statuses = employeeIds
         .map((id) => id?.toString?.())
@@ -295,11 +449,9 @@ app.prepare().then(() => {
 
     // Desktop app ready
     socket.on('desktop-app-ready', (data) => {
-      const userId = data?.userId;
       const appVersion = data?.appVersion;
-      if (userId) {
-        socket.userId = userId;
-        socket.join(`user:${userId}`);
+      if (registerAuthenticatedIdentity()) {
+        const userId = socket.userId;
 
         // CRITICAL FIX: Mark this socket as a desktop app
         socket.isDesktopApp = true;
@@ -317,7 +469,11 @@ app.prepare().then(() => {
     });
 
     // Join a chat room
-    socket.on('join-chat', (chatId) => {
+    socket.on('join-chat', async (chatId) => {
+      if (!await authorizeRoomJoin('chat', chatId)) {
+        socket.emit('room-access-denied', { type: 'chat', resourceId: chatId });
+        return;
+      }
       socket.join(`chat:${chatId}`);
       console.log(`👤 [Socket.IO] User ${socket.userId || socket.id} joined chat:${chatId}`);
 
@@ -329,7 +485,11 @@ app.prepare().then(() => {
     });
 
     // Join a project room
-    socket.on('join-project', (projectId) => {
+    socket.on('join-project', async (projectId) => {
+      if (!await authorizeRoomJoin('project', projectId)) {
+        socket.emit('room-access-denied', { type: 'project', resourceId: projectId });
+        return;
+      }
       socket.join(`project:${projectId}`);
       console.log(`📂 [Socket.IO] User ${socket.userId || socket.id} joined project:${projectId}`);
     });
@@ -355,6 +515,7 @@ app.prepare().then(() => {
     // Handle new message (broadcast to room)
     socket.on('send-message', (data) => {
       const { chatId, message } = data;
+      if (!socket.rooms.has(`chat:${chatId}`)) return;
       console.log(`💬 [Socket.IO] Broadcasting message to chat:${chatId}`);
 
       // Broadcast to all users in the chat room (including sender for confirmation)
@@ -366,9 +527,10 @@ app.prepare().then(() => {
 
     // Handle typing indicator
     socket.on('typing', (data) => {
-      const { chatId, userId, userName } = data;
+      const { chatId, userName } = data;
+      if (!socket.rooms.has(`chat:${chatId}`)) return;
       socket.to(`chat:${chatId}`).emit('user-typing', {
-        userId,
+        userId: socket.userId,
         userName,
         chatId
       });
@@ -376,9 +538,10 @@ app.prepare().then(() => {
 
     // Handle stop typing
     socket.on('stop-typing', (data) => {
-      const { chatId, userId } = data;
+      const { chatId } = data;
+      if (!socket.rooms.has(`chat:${chatId}`)) return;
       socket.to(`chat:${chatId}`).emit('user-stop-typing', {
-        userId,
+        userId: socket.userId,
         chatId
       });
     });
@@ -386,24 +549,53 @@ app.prepare().then(() => {
     // ========== MEETING ROOM HANDLERS ==========
 
     // Join a meeting room
-    socket.on('join-meeting', (data) => {
-      const { roomId, userId, userName } = data;
-      socket.meetingRoom = roomId;
-      socket.meetingUserId = userId;
-      socket.meetingUserName = userName;
+    socket.on('join-meeting', async (data, acknowledge) => {
+      const { roomId, userName, isMuted, isScreenSharing } = data || {};
+      const respond = typeof acknowledge === 'function' ? acknowledge : () => {};
+      if (!roomId) {
+        respond({ success: false, message: 'Meeting room is required' });
+        return;
+      }
+      const normalizedRoomId = String(roomId);
+      const guest = socket.guestContext;
+      if (!await authorizeMeetingJoin(normalizedRoomId)) {
+        socket.emit('meeting-access-denied', { roomId: normalizedRoomId });
+        respond({ success: false, message: 'You do not have access to this meeting' });
+        return;
+      }
 
-      socket.join(`meeting:${roomId}`);
-      console.log(`📹 [Socket.IO] User ${userName} (${socket.id}) joined meeting:${roomId}`);
+      const resolvedMeetingUserId = socket.authContext?.userId || guest.guestId;
+      const resolvedMeetingUserName = guest
+        ? `${guest.guestName} (Guest)`
+        : socket.authContext.displayName || String(userName || 'Participant').slice(0, 80);
+      const tenantDatabaseName = socket.authContext?.tenantDatabaseName || guest.tenantDatabaseName;
+      const meetingRoom = `meeting:${tenantDatabaseName}:${normalizedRoomId}`;
+
+      if (socket.meetingRoom && socket.meetingRoom !== meetingRoom) {
+        socket.leave(socket.meetingRoom);
+      }
+
+      socket.meetingRoom = meetingRoom;
+      socket.meetingRoomId = normalizedRoomId;
+      socket.meetingUserId = resolvedMeetingUserId;
+      socket.meetingUserName = resolvedMeetingUserName;
+      socket.meetingIsMuted = Boolean(isMuted);
+      socket.meetingIsScreenSharing = Boolean(isScreenSharing);
+
+      socket.join(meetingRoom);
+      console.log(`📹 [Socket.IO] User ${resolvedMeetingUserName} (${socket.id}) joined ${meetingRoom}`);
 
       // Notify others in the meeting room
-      socket.to(`meeting:${roomId}`).emit('user-joined', {
+      socket.to(meetingRoom).emit('user-joined', {
         id: socket.id,
-        userId: userId,
-        userName: userName
+        userId: resolvedMeetingUserId,
+        userName: resolvedMeetingUserName,
+        isMuted: socket.meetingIsMuted,
+        isScreenSharing: socket.meetingIsScreenSharing
       });
 
       // Send list of existing participants to the new user
-      const room = io.sockets.adapter.rooms.get(`meeting:${roomId}`);
+      const room = io.sockets.adapter.rooms.get(meetingRoom);
       if (room) {
         const existingParticipants = [];
         room.forEach((socketId) => {
@@ -412,7 +604,9 @@ app.prepare().then(() => {
             existingParticipants.push({
               id: participantSocket.id,
               userId: participantSocket.meetingUserId,
-              userName: participantSocket.meetingUserName
+              userName: participantSocket.meetingUserName,
+              isMuted: Boolean(participantSocket.meetingIsMuted),
+              isScreenSharing: Boolean(participantSocket.meetingIsScreenSharing)
             });
           }
         });
@@ -420,25 +614,34 @@ app.prepare().then(() => {
           socket.emit('existing-participants', existingParticipants);
         }
       }
+
+      respond({ success: true });
     });
 
     // Leave meeting room
     socket.on('leave-meeting', (data) => {
-      const { roomId } = data;
-      socket.leave(`meeting:${roomId}`);
-      console.log(`📹 [Socket.IO] User ${socket.meetingUserName || socket.id} left meeting:${roomId}`);
+      const { roomId } = data || {};
+      if (!roomId || socket.meetingRoomId !== String(roomId) || !socket.meetingRoom) return;
+      const meetingRoom = socket.meetingRoom;
+      console.log(`📹 [Socket.IO] User ${socket.meetingUserName || socket.id} left ${meetingRoom}`);
 
       // Notify others
-      socket.to(`meeting:${roomId}`).emit('user-left', {
+      socket.to(meetingRoom).emit('user-left', {
         id: socket.id,
         userId: socket.meetingUserId,
         userName: socket.meetingUserName
       });
+      socket.leave(meetingRoom);
+      socket.meetingRoom = null;
+      socket.meetingRoomId = null;
+      socket.meetingIsScreenSharing = false;
     });
 
     // WebRTC signaling: Offer
     socket.on('offer', (data) => {
-      const { to, offer } = data;
+      const { to, offer } = data || {};
+      const targetSocket = io.sockets.sockets.get(to);
+      if (!socket.meetingRoom || targetSocket?.meetingRoom !== socket.meetingRoom) return;
       console.log(`📹 [Socket.IO] Relaying offer from ${socket.id} to ${to}`);
       io.to(to).emit('offer', {
         from: socket.id,
@@ -448,7 +651,9 @@ app.prepare().then(() => {
 
     // WebRTC signaling: Answer
     socket.on('answer', (data) => {
-      const { to, answer } = data;
+      const { to, answer } = data || {};
+      const targetSocket = io.sockets.sockets.get(to);
+      if (!socket.meetingRoom || targetSocket?.meetingRoom !== socket.meetingRoom) return;
       console.log(`📹 [Socket.IO] Relaying answer from ${socket.id} to ${to}`);
       io.to(to).emit('answer', {
         from: socket.id,
@@ -458,29 +663,72 @@ app.prepare().then(() => {
 
     // WebRTC signaling: ICE Candidate
     socket.on('ice-candidate', (data) => {
-      const { to, candidate } = data;
+      const { to, candidate } = data || {};
+      const targetSocket = io.sockets.sockets.get(to);
+      if (!socket.meetingRoom || targetSocket?.meetingRoom !== socket.meetingRoom) return;
       io.to(to).emit('ice-candidate', {
         from: socket.id,
         candidate: candidate
       });
     });
 
-    // Meeting chat message
-    socket.on('meeting-chat', (data) => {
-      const { roomId, message, userName, timestamp } = data;
-      console.log(`💬 [Socket.IO] Meeting chat in ${roomId}: ${userName}: ${message}`);
-      io.to(`meeting:${roomId}`).emit('meeting-chat', {
-        message,
-        userName,
+    // Keep microphone state synchronized for every participant.
+    socket.on('meeting-mute-state', (data) => {
+      const { roomId, isMuted } = data || {};
+      if (!roomId || socket.meetingRoomId !== String(roomId) || !socket.meetingRoom) return;
+
+      socket.meetingIsMuted = Boolean(isMuted);
+      socket.to(socket.meetingRoom).emit('participant-mute-state', {
+        id: socket.id,
         userId: socket.meetingUserId,
-        timestamp: timestamp || new Date().toISOString()
+        isMuted: socket.meetingIsMuted
       });
+    });
+
+    // Keep screen-share state synchronized so every client can auto-pin it.
+    socket.on('meeting-screen-share-state', (data) => {
+      const { roomId, isScreenSharing } = data || {};
+      if (!roomId || socket.meetingRoomId !== String(roomId) || !socket.meetingRoom) return;
+
+      socket.meetingIsScreenSharing = Boolean(isScreenSharing);
+      socket.to(socket.meetingRoom).emit('participant-screen-share-state', {
+        id: socket.id,
+        userId: socket.meetingUserId,
+        isScreenSharing: socket.meetingIsScreenSharing
+      });
+    });
+
+    // Meeting chat message
+    socket.on('meeting-chat', (data, acknowledge) => {
+      const { roomId, message } = data || {};
+      const respond = typeof acknowledge === 'function' ? acknowledge : () => {};
+      if (!roomId || socket.meetingRoomId !== String(roomId) || !socket.meetingRoom) {
+        respond({ success: false, message: 'Join the meeting before sending messages' });
+        return;
+      }
+      const normalizedMessage = typeof message === 'string' ? message.trim().slice(0, 4000) : '';
+      if (!normalizedMessage) {
+        respond({ success: false, message: 'Message cannot be empty' });
+        return;
+      }
+      console.log(`💬 [Socket.IO] Meeting chat in ${roomId}: ${socket.meetingUserName}`);
+      const outgoingMessage = {
+        id: `${socket.id}:${Date.now()}`,
+        message: normalizedMessage,
+        userName: socket.meetingUserName,
+        userId: socket.meetingUserId,
+        senderSocketId: socket.id,
+        timestamp: new Date().toISOString()
+      };
+      io.to(socket.meetingRoom).emit('meeting-chat', outgoingMessage);
+      respond({ success: true, message: outgoingMessage });
     });
 
     // Hand raise
     socket.on('raise-hand', (data) => {
-      const { roomId } = data;
-      socket.to(`meeting:${roomId}`).emit('hand-raised', {
+      const { roomId } = data || {};
+      if (!roomId || socket.meetingRoomId !== String(roomId) || !socket.meetingRoom) return;
+      socket.to(socket.meetingRoom).emit('hand-raised', {
         id: socket.id,
         userId: socket.meetingUserId,
         userName: socket.meetingUserName
@@ -489,11 +737,20 @@ app.prepare().then(() => {
 
     // Meeting reaction
     socket.on('meeting-reaction', (data) => {
-      const { roomId, reaction } = data;
-      io.to(`meeting:${roomId}`).emit('meeting-reaction', {
+      const { roomId, reaction } = data || {};
+      if (!roomId || socket.meetingRoomId !== String(roomId) || !socket.meetingRoom) return;
+      const emoji = typeof reaction === 'string' ? reaction : reaction?.emoji;
+      const allowedReactions = new Set(['👍', '👏', '❤️', '😂', '😮', '🎉']);
+      if (!allowedReactions.has(emoji)) return;
+
+      socket.to(socket.meetingRoom).emit('meeting-reaction', {
         id: socket.id,
         userName: socket.meetingUserName,
-        reaction: reaction
+        reaction: {
+          id: Date.now(),
+          emoji,
+          sender: socket.meetingUserName
+        }
       });
     });
 
@@ -534,12 +791,12 @@ app.prepare().then(() => {
 
       // If user was in a meeting, notify others
       if (socket.meetingRoom) {
-        socket.to(`meeting:${socket.meetingRoom}`).emit('user-left', {
+        socket.to(socket.meetingRoom).emit('user-left', {
           id: socket.id,
           userId: socket.meetingUserId,
           userName: socket.meetingUserName
         });
-        console.log(`📹 [Socket.IO] User ${socket.meetingUserName || socket.id} disconnected from meeting:${socket.meetingRoom}`);
+        console.log(`📹 [Socket.IO] User ${socket.meetingUserName || socket.id} disconnected from ${socket.meetingRoom}`);
       }
     });
   });

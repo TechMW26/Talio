@@ -16,7 +16,7 @@ export async function GET(request) {
         const { models: { Employee: TenantEmployee } } = auth
 
         // Check cache
-        const cacheKey = queryCache.generateKey('employee-managers-list')
+        const cacheKey = queryCache.generateKey(auth.tenant.databaseName, 'employee-managers-list')
         const cached = queryCache.get(cacheKey)
         if (cached) {
             return NextResponse.json(cached)

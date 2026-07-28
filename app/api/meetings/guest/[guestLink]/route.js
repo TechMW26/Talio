@@ -1,7 +1,45 @@
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
+import { SignJWT } from 'jose'
 import { getTenantModel } from '@/lib/tenantModels'
 import { connectSuperadminDB } from '@/lib/superadminDb'
 import getTenantCompanyModel from '@/models/TenantCompany'
+
+const MAX_GUEST_NAME_LENGTH = 80
+const GUEST_SESSION_TTL_SECONDS = 4 * 60 * 60
+
+function getGuestSessionExpiry(meeting) {
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  const meetingEndSeconds = Math.floor(new Date(meeting.scheduledEnd).getTime() / 1000)
+  const maximumExpiry = nowSeconds + GUEST_SESSION_TTL_SECONDS
+
+  if (!Number.isFinite(meetingEndSeconds)) {
+    return maximumExpiry
+  }
+
+  return Math.max(nowSeconds + 5 * 60, Math.min(maximumExpiry, meetingEndSeconds + 30 * 60))
+}
+
+async function createGuestSessionToken({ meeting, tenantDatabase, guestName }) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is required to create a guest meeting session')
+  }
+
+  const guestId = `guest_${randomUUID()}`
+  const token = await new SignJWT({
+    type: 'meeting_guest',
+    roomId: meeting.roomId,
+    guestId,
+    guestName,
+    tenantDatabaseName: tenantDatabase,
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(getGuestSessionExpiry(meeting))
+    .sign(new TextEncoder().encode(process.env.JWT_SECRET))
+
+  return { guestId, token }
+}
 
 /**
  * Public API route for guest meeting access
@@ -14,6 +52,18 @@ import getTenantCompanyModel from '@/models/TenantCompany'
 
 // Helper to extract tenant from guest link (new format)
 function extractTenantFromLink(guestLink) {
+  if (guestLink.startsWith('v2.')) {
+    const [, encodedTenant] = guestLink.split('.')
+    if (!encodedTenant) return null
+
+    try {
+      const databaseName = Buffer.from(encodedTenant, 'base64url').toString('utf8')
+      return /^[a-zA-Z0-9_-]+$/.test(databaseName) ? databaseName : null
+    } catch {
+      return null
+    }
+  }
+
   // Old format starts with "guest-" - no tenant info available
   if (guestLink.startsWith('guest-')) {
     return null
@@ -179,9 +229,16 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (!guestName || guestName.trim().length < 2) {
+    const normalizedGuestName = typeof guestName === 'string' ? guestName.trim() : ''
+    if (
+      normalizedGuestName.length < 2 ||
+      normalizedGuestName.length > MAX_GUEST_NAME_LENGTH
+    ) {
       return NextResponse.json(
-        { success: false, message: 'Please enter your name (at least 2 characters)' },
+        {
+          success: false,
+          message: `Please enter a name between 2 and ${MAX_GUEST_NAME_LENGTH} characters`
+        },
         { status: 400 }
       )
     }
@@ -240,22 +297,27 @@ export async function POST(request, { params }) {
 
     // Add guest to meeting
     const guestEntry = {
-      name: guestName.trim(),
+      name: normalizedGuestName,
       joinedAt: new Date()
     }
 
-    await Meeting.findByIdAndUpdate(meeting._id, {
-      $push: { 'guestAccess.guests': guestEntry }
-    })
-
-    // Generate a temporary guest token for the session
-    const guestToken = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const [{ guestId, token: guestToken }] = await Promise.all([
+      createGuestSessionToken({
+        meeting,
+        tenantDatabase,
+        guestName: normalizedGuestName
+      }),
+      Meeting.findByIdAndUpdate(meeting._id, {
+        $push: { 'guestAccess.guests': guestEntry }
+      })
+    ])
 
     return NextResponse.json({
       success: true,
       data: {
         roomId: meeting.roomId,
-        guestName: guestName.trim(),
+        guestName: normalizedGuestName,
+        guestId,
         guestToken,
         meetingTitle: meeting.title
       }

@@ -29,6 +29,7 @@ import {
     FaUndo,
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import { getDateKeyInTimezone } from '@/lib/timezone'
 
 const ATTENDANCE_STATUSES = [
     { key: 'present', label: 'Present', color: 'success' },
@@ -83,7 +84,7 @@ export default function AttendanceCorrectionModal({
                 const existingCorrections = {}
                 sorted.forEach((record) => {
                     if (record.correctedAt) {
-                        const dateKey = new Date(record.date).toISOString().split('T')[0]
+                        const dateKey = getDateKeyInTimezone(record.date)
                         existingCorrections[dateKey] = true
                     }
                 })
@@ -117,7 +118,7 @@ export default function AttendanceCorrectionModal({
     const attendanceByDate = useMemo(() => {
         const map = {}
         attendanceRecords.forEach((record) => {
-            const dateKey = new Date(record.date).toISOString().split('T')[0]
+            const dateKey = getDateKeyInTimezone(record.date)
             map[dateKey] = record
         })
         return map
@@ -295,7 +296,7 @@ export default function AttendanceCorrectionModal({
 
                     // Find and update the existing record, or add new one
                     const existingIndex = prevRecords.findIndex(
-                        (r) => new Date(r.date).toISOString().split('T')[0] === dateKey
+                        (r) => getDateKeyInTimezone(r.date) === dateKey
                     )
 
                     if (existingIndex >= 0) {
@@ -408,7 +409,7 @@ export default function AttendanceCorrectionModal({
                                     </thead>
                                     <tbody className="divide-y divide-default-200">
                                         {daysInMonth.map((day) => {
-                                            const dateKey = day.toISOString().split('T')[0]
+                                            const dateKey = getDateKeyInTimezone(day)
                                             const record = attendanceByDate[dateKey]
                                             const isEditing = editingRecord === dateKey
                                             const isWeekend = day.getDay() === 0 || day.getDay() === 6

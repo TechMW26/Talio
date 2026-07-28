@@ -16,9 +16,10 @@ import { triggerDailyAnalysisOnCheckout } from '@/lib/autoAnalysisTrigger'
 import mongoose from 'mongoose'
 import {
   getTimezone,
-  toTimezoneDate,
   compareTimeToOfficeHours,
   getDayNameInTimezone,
+  getStartOfDayInTimezone,
+  getEndOfDayInTimezone,
   DEFAULT_TIMEZONE
 } from '@/lib/timezone'
 
@@ -178,7 +179,17 @@ export async function GET(request) {
     }
 
     // Generate cache key
-    const cacheKey = queryCache.generateKey('attendance', date, employeeId, month, year, startDateParam, endDateParam, department)
+    const cacheKey = queryCache.generateKey(
+      auth.tenant.databaseName,
+      'attendance',
+      date,
+      employeeId,
+      month,
+      year,
+      startDateParam,
+      endDateParam,
+      department
+    )
     const cached = queryCache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
@@ -217,20 +228,17 @@ export async function GET(request) {
 
     if (startDateParam && endDateParam) {
       // Support for date range queries (used by report page)
-      const startDate = new Date(startDateParam)
-      startDate.setHours(0, 0, 0, 0)
-      const endDate = new Date(endDateParam)
-      endDate.setHours(23, 59, 59, 999)
+      const startDate = getStartOfDayInTimezone(startDateParam, DEFAULT_TIMEZONE)
+      const endDate = getEndOfDayInTimezone(endDateParam, DEFAULT_TIMEZONE)
       query.date = { $gte: startDate, $lte: endDate }
     } else if (date) {
-      const startDate = new Date(date)
-      startDate.setHours(0, 0, 0, 0)
-      const endDate = new Date(date)
-      endDate.setHours(23, 59, 59, 999)
+      const startDate = getStartOfDayInTimezone(date, DEFAULT_TIMEZONE)
+      const endDate = getEndOfDayInTimezone(date, DEFAULT_TIMEZONE)
       query.date = { $gte: startDate, $lte: endDate }
     } else if (month && year) {
-      const startDate = new Date(year, month - 1, 1)
-      const endDate = new Date(year, month, 0, 23, 59, 59, 999)
+      const startDate = getStartOfDayInTimezone(`${year}-${String(month).padStart(2, '0')}-01`, DEFAULT_TIMEZONE)
+      const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
+      const endDate = getEndOfDayInTimezone(`${year}-${String(month).padStart(2, '0')}-${lastDay}`, DEFAULT_TIMEZONE)
       query.date = { $gte: startDate, $lte: endDate }
     }
 
@@ -410,10 +418,8 @@ export async function POST(request) {
       console.log(`📍 [Attendance] IP-based location used for ${type} - Employee: ${employeeId} - Coords: ${latitude}, ${longitude}`)
     }
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    const today = getStartOfDayInTimezone(new Date(), DEFAULT_TIMEZONE)
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)
 
     // Get employee data first to determine company
     const employee = await TenantEmployee.findById(employeeId)
@@ -444,10 +450,8 @@ export async function POST(request) {
         )
       }
 
-      const dayStart = new Date(date)
-      dayStart.setHours(0, 0, 0, 0)
-      const dayEnd = new Date(date)
-      dayEnd.setHours(23, 59, 59, 999)
+      const dayStart = getStartOfDayInTimezone(date, DEFAULT_TIMEZONE)
+      const dayEnd = getEndOfDayInTimezone(date, DEFAULT_TIMEZONE)
 
       let attendance = await TenantAttendance.findOne({
         employee: employeeId,
@@ -567,7 +571,6 @@ export async function POST(request) {
       // Use Company Timezone for day checks to align with business operations
       const companyTimezone = getTimezone(settings?.timezone);
       const currentDayName = getDayNameInTimezone(new Date(), companyTimezone);
-      const localNow = toTimezoneDate(new Date(), companyTimezone);
 
       // Default to Mon-Fri if not specified
       const workingDays = settings?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -583,10 +586,8 @@ export async function POST(request) {
       }
 
       // Check Holidays (using Company Timezone date range)
-      const localTodayStart = new Date(localNow);
-      localTodayStart.setHours(0, 0, 0, 0);
-      const localTodayEnd = new Date(localNow);
-      localTodayEnd.setHours(23, 59, 59, 999);
+      const localTodayStart = getStartOfDayInTimezone(new Date(), companyTimezone);
+      const localTodayEnd = getEndOfDayInTimezone(new Date(), companyTimezone);
 
       const TenantHoliday = models.Holiday;
       const holiday = await TenantHoliday.findOne({
@@ -758,7 +759,7 @@ export async function POST(request) {
 
       // Clear cached attendance queries for this employee to prevent stale UI
       try {
-        queryCache.clearPattern(`\\["attendance".*${employeeId}.*\\]`)
+        queryCache.clearPattern('"attendance"')
       } catch (cacheError) {
         console.warn('[Attendance] Failed to clear query cache:', cacheError)
       }
@@ -1148,7 +1149,7 @@ export async function POST(request) {
 
       // Clear cached attendance queries for this employee to prevent stale UI
       try {
-        queryCache.clearPattern(`\\["attendance".*${employeeId}.*\\]`)
+        queryCache.clearPattern('"attendance"')
       } catch (cacheError) {
         console.warn('[Attendance] Failed to clear query cache:', cacheError)
       }
@@ -1352,4 +1353,3 @@ export async function POST(request) {
     )
   }
 }
-

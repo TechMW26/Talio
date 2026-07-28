@@ -155,7 +155,7 @@ export async function GET(request, { params }) {
     }
 
     // Fallback: in-memory queryCache
-    const cacheKey = queryCache.generateKey('employee', id)
+    const cacheKey = queryCache.generateKey(auth.tenant.databaseName, 'employee', id)
     const cached = queryCache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
@@ -262,7 +262,7 @@ export async function GET(request, { params }) {
     }
 
     // Write to both Redis (2 min TTL) and in-memory queryCache
-    await setCache(redisCacheKey, response, 2 * 60).catch(() => { })
+    void setCache(redisCacheKey, response, 2 * 60).catch(() => { })
     queryCache.set(cacheKey, response, 60000)
 
     return NextResponse.json(response)
@@ -612,7 +612,7 @@ export async function PUT(request, { params }) {
     }
 
     // Clear cache for this employee and related user/auth state
-    queryCache.delete(queryCache.generateKey('employee', id))
+    queryCache.delete(queryCache.generateKey(auth.tenant.databaseName, 'employee', id))
     queryCache.clearPattern('employees')
     const employeeUserId = updatedLinkedUser?._id?.toString() || linkedUser?._id?.toString() || '*'
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'employee:detail' })).catch(() => { })
@@ -779,7 +779,7 @@ export async function DELETE(request, { params }) {
     console.log(`[Employee Delete] Deleted employee: ${id} (${employee.email})`)
 
     // Clear cache
-    queryCache.delete(queryCache.generateKey('employee', id))
+    queryCache.delete(queryCache.generateKey(auth.tenant.databaseName, 'employee', id))
     queryCache.clearPattern('employees')
 
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'employees:list' })).catch(() => { })
@@ -981,7 +981,7 @@ export async function PATCH(request, { params }) {
     }
 
     // Clear cache - individual employee + employee list caches
-    queryCache.delete(queryCache.generateKey('employee', id))
+    queryCache.delete(queryCache.generateKey(auth.tenant.databaseName, 'employee', id))
     queryCache.clearPattern('employees')
 
     const employeeUser = await User.findOne({ employeeId: id }).select('_id')

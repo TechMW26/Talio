@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { getAuthAndModels } from '@/lib/auth'
+
+function getGuestBaseUrl(request) {
+  if (process.env.NODE_ENV !== 'production') {
+    return request.nextUrl.origin
+  }
+  return (process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin).replace(/\/+$/, '')
+}
 
 /**
  * Toggle guest access for a meeting
@@ -16,6 +24,13 @@ export async function POST(request, { params }) {
     const { id } = await params
     const body = await request.json()
     const { enabled } = body
+
+    if (typeof enabled !== 'boolean') {
+      return NextResponse.json(
+        { success: false, message: 'Guest access state must be true or false' },
+        { status: 400 }
+      )
+    }
 
     // Find the meeting
     const meeting = await models.Meeting.findById(id)
@@ -59,38 +74,48 @@ export async function POST(request, { params }) {
       )
     }
 
-    // Initialize guestAccess if not exists
-    if (!meeting.guestAccess) {
-      meeting.guestAccess = {
-        enabled: false,
-        guests: []
-      }
+    // Generate a stable guest link once, then atomically persist the nested
+    // guest-access state. The tenant model previously treated this as an
+    // untyped object, so mutating only `.enabled` was not reliably tracked.
+    let guestLink = meeting.guestAccess?.guestLink || null
+    const guestAccessUpdates = {
+      'guestAccess.enabled': enabled,
     }
 
-    // Toggle guest access
-    meeting.guestAccess.enabled = enabled
-
-    // Generate guest link if enabling and doesn't exist
-    // Include tenant database name in the link for multi-tenant support
-    if (enabled && !meeting.guestAccess.guestLink) {
-      const tenantId = auth.tenant.databaseName.replace('talio_', '') // Remove prefix for shorter URLs
-      meeting.guestAccess.guestLink = `${tenantId}-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`
-      meeting.guestAccess.guestLinkCreatedAt = new Date()
-      meeting.guestAccess.tenantDatabase = auth.tenant.databaseName // Store full database name
+    // Encode the exact tenant database name so guest lookup never has to guess it.
+    if (enabled && !guestLink) {
+      const encodedTenant = Buffer.from(auth.tenant.databaseName, 'utf8').toString('base64url')
+      guestLink = `v2.${encodedTenant}.${randomUUID()}`
+      guestAccessUpdates['guestAccess.guestLink'] = guestLink
+      guestAccessUpdates['guestAccess.guestLinkCreatedAt'] = new Date()
+      guestAccessUpdates['guestAccess.tenantDatabase'] = auth.tenant.databaseName
     }
 
-    await meeting.save()
+    const updatedMeeting = await models.Meeting.findByIdAndUpdate(
+      id,
+      { $set: guestAccessUpdates },
+      { new: true, runValidators: true }
+    ).select('guestAccess')
+
+    if (!updatedMeeting) {
+      return NextResponse.json(
+        { success: false, message: 'Meeting not found' },
+        { status: 404 }
+      )
+    }
 
     // Generate full guest URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const guestUrl = enabled ? `${baseUrl}/join/${meeting.guestAccess.guestLink}` : null
+    const baseUrl = getGuestBaseUrl(request)
+    const guestUrl = enabled && guestLink ? `${baseUrl}/join/${guestLink}` : null
 
     return NextResponse.json({
       success: true,
       data: {
-        guestAccessEnabled: meeting.guestAccess.enabled,
-        guestLink: meeting.guestAccess.guestLink,
-        guestUrl
+        guestAccessEnabled: Boolean(updatedMeeting.guestAccess?.enabled),
+        guestLink: updatedMeeting.guestAccess?.guestLink || guestLink,
+        guestUrl,
+        guests: updatedMeeting.guestAccess?.guests || [],
+        canEnableGuestAccess: true,
       },
       message: enabled ? 'Guest access enabled' : 'Guest access disabled'
     })
@@ -124,7 +149,7 @@ export async function GET(request, { params }) {
       )
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const baseUrl = getGuestBaseUrl(request)
     const guestUrl = meeting.guestAccess?.enabled && meeting.guestAccess?.guestLink 
       ? `${baseUrl}/join/${meeting.guestAccess.guestLink}` 
       : null

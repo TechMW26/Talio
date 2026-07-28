@@ -1,13 +1,11 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
 import { HiOutlineVideoCamera, HiOutlineUser, HiOutlineClock, HiOutlineCalendar } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 
 export default function GuestJoinPage({ params }) {
-  const router = useRouter()
   const { guestLink } = use(params)
   
   const [loading, setLoading] = useState(true)
@@ -59,25 +57,30 @@ export default function GuestJoinPage({ params }) {
 
       const data = await response.json()
 
-      if (data.success) {
-        // Store guest info in sessionStorage for the meeting room
-        sessionStorage.setItem('guestInfo', JSON.stringify({
-          guestName: data.data.guestName,
-          guestToken: data.data.guestToken,
-          isGuest: true
-        }))
-
-        toast.success('Joining meeting...')
-        
-        // Redirect to meeting room
-        router.push(`/join/${guestLink}/room`)
-      } else {
+      if (!response.ok || !data.success) {
         toast.error(data.message || 'Failed to join meeting')
+        setJoining(false)
+        return
       }
+
+      // Store the signed, room-scoped guest session before leaving pre-join.
+      sessionStorage.setItem('guestInfo', JSON.stringify({
+        guestName: data.data.guestName,
+        guestToken: data.data.guestToken,
+        guestId: data.data.guestId,
+        roomId: data.data.roomId,
+        guestLink,
+        isGuest: true
+      }))
+
+      toast.success('Joining meeting...')
+
+      // A document navigation reliably carries sessionStorage into the room,
+      // including when this public route is opened outside the authenticated app.
+      window.location.assign(`/join/${encodeURIComponent(guestLink)}/room`)
     } catch (err) {
       console.error('Error joining meeting:', err)
       toast.error('Failed to join meeting')
-    } finally {
       setJoining(false)
     }
   }
@@ -85,6 +88,7 @@ export default function GuestJoinPage({ params }) {
   // Format date/time
   const formatDateTime = (date) => {
     return new Date(date).toLocaleString('en-US', {
+      timeZone: 'Asia/Kolkata',
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -158,6 +162,7 @@ export default function GuestJoinPage({ params }) {
               <HiOutlineClock className="w-5 h-5 text-indigo-500" />
               <span>
                 Until {new Date(meeting?.scheduledEnd).toLocaleTimeString('en-US', {
+                  timeZone: 'Asia/Kolkata',
                   hour: 'numeric',
                   minute: '2-digit',
                   hour12: true

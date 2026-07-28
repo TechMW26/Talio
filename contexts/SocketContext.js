@@ -61,6 +61,7 @@ export function SocketProvider({ children }) {
   useEffect(() => {
     // Get user ID from localStorage
     const userData = localStorage.getItem('user')
+    const token = localStorage.getItem('token')
     let userId = null
     let employeeId = null
     let tenantDatabaseName = null
@@ -100,7 +101,8 @@ export function SocketProvider({ children }) {
       reconnectionAttempts: 3,
       timeout: 10000,
       autoConnect: true,
-      forceNew: false
+      forceNew: false,
+      auth: token ? { token } : undefined,
     })
 
     // =============================================

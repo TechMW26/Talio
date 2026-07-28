@@ -10,6 +10,7 @@ import { Toaster } from 'react-hot-toast'
 import { Providers } from '@/components/Providers'
 import ErrorPageCache from '@/components/ErrorPageCache'
 import SplashVideo from '@/components/SplashVideo'
+import ImageRecovery from '@/components/ImageRecovery'
 
 // Primary font - Montserrat
 const montserrat = Montserrat({ 
@@ -140,6 +141,7 @@ export default function RootLayout({ children }) {
       <body className={`${montserrat.className} ${montserrat.variable} ${inter.variable}`} suppressHydrationWarning>
         <Providers>
           <SplashVideo>
+            <ImageRecovery />
             <ErrorPageCache />
             {children}
             <Toaster

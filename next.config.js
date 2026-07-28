@@ -1,7 +1,23 @@
 /** @type {import('next').NextConfig} */
+const isDevelopment = process.env.NODE_ENV === 'development'
+const configuredBuildCpus = Number.parseInt(process.env.NEXT_BUILD_CPUS || '', 10)
+const buildCpus = Number.isInteger(configuredBuildCpus) && configuredBuildCpus > 0
+  ? configuredBuildCpus
+  : undefined
+
 const nextConfig = {
+  // Keep development modules isolated from production output. Reusing the same
+  // directory across `next dev` and `next build` can leave incompatible
+  // Webpack factories behind and surface as `undefined.call` at runtime.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
+  // Use a distinct browser URL namespace in development so clients that
+  // previously cached dev chunks as immutable cannot execute stale factories.
+  assetPrefix: process.env.NEXT_ASSET_PREFIX || undefined,
   // Production optimizations
   poweredByHeader: false,
+  // Multiple sibling projects share the parent directory. Keep file tracing
+  // scoped to this application to avoid scanning unrelated workspaces.
+  outputFileTracingRoot: __dirname,
   // Disable Next.js compression - nginx handles gzip in production.
   // Having both causes double-compression that corrupts CSS/JS responses.
   compress: false,
@@ -27,9 +43,9 @@ const nextConfig = {
       'recharts',
       'lottie-react'
     ],
-    // Limit parallel webpack workers to reduce peak build-time heap.
-    // Default is CPU count; on a multi-core VPS this can spike memory significantly.
-    cpus: 2,
+    // Use every available CPU by default. Memory-constrained builders can opt
+    // into a lower limit with NEXT_BUILD_CPUS=2 (or another positive integer).
+    ...(buildCpus ? { cpus: buildCpus } : {}),
   },
 
   // Image optimization
@@ -101,12 +117,15 @@ const nextConfig = {
         headers: securityHeaders,
       },
       {
-        // Static assets (Next.js _next/static/) - cache aggressively (immutable hashed filenames)
+        // Development chunk names are reusable and must never be cached as
+        // immutable. Production chunks are content-hashed and safe to cache.
         source: '/_next/static/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            value: isDevelopment
+              ? 'no-store, no-cache, must-revalidate'
+              : 'public, max-age=31536000, immutable',
           },
         ],
       },
@@ -244,7 +263,7 @@ module.exports = withSentryConfig(module.exports, {
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
   // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
+  widenClientFileUpload: Boolean(process.env.SENTRY_AUTH_TOKEN),
 
   // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
   // This can increase your server load as well as your hosting bill.

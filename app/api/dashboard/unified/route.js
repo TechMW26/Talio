@@ -5,6 +5,36 @@ import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
 
 export const dynamic = 'force-dynamic'
 
+const DASHBOARD_WIDGETS = new Set([
+  'holidays',
+  'announcements',
+  'assets',
+  'expenses',
+  'helpdesk',
+  'policies',
+  'attendance',
+  'leaveBalance',
+  'leaveRequests',
+  'departments',
+  'attendanceSummary',
+])
+
+function parseWidgetSelection(searchParams) {
+  const requested = (searchParams.get('widgets') || 'all')
+    .split(',')
+    .map((widget) => widget.trim())
+    .filter(Boolean)
+
+  if (requested.includes('all')) {
+    return { includeAll: true, includeWidgets: ['all'] }
+  }
+
+  return {
+    includeAll: false,
+    includeWidgets: [...new Set(requested.filter((widget) => DASHBOARD_WIDGETS.has(widget)))].sort(),
+  }
+}
+
 /**
  * Unified Dashboard API
  * Aggregates all widget data in a single request to reduce network calls
@@ -14,8 +44,7 @@ export async function GET(request) {
   try {
     // Parse query params for which widgets to include
     const { searchParams } = new URL(request.url)
-    const includeWidgets = searchParams.get('widgets')?.split(',') || ['all']
-    const includeAll = includeWidgets.includes('all')
+    const { includeWidgets, includeAll } = parseWidgetSelection(searchParams)
 
     // Get authenticated user and tenant-specific models
     // Only load models that are actually queried in this route
@@ -42,34 +71,7 @@ export async function GET(request) {
     const isManagement = ['admin', 'department_head', 'hr', 'manager'].includes(userRole)
     const isHRLevel = ['admin', 'department_head', 'hr'].includes(userRole)
 
-    let companyFeatures = null
-    try {
-      const featurePayload = await getTenantCompanyFeaturePayload({
-        companySlug: tenant?.companySlug,
-        databaseName: tenant?.databaseName,
-      })
-      companyFeatures = featurePayload?.features || null
-    } catch (featureError) {
-      console.error('[Dashboard Unified API] Failed to resolve company features:', featureError)
-    }
-
-    // Get user with employee data (lean for performance)
-    const userWithEmployee = await User.findById(user._id || user.userId)
-      .populate({
-        path: 'employeeId',
-        select: 'firstName lastName employeeCode designation department profilePicture status email phone dateOfJoining employmentType reportingManager _id',
-        populate: [
-          { path: 'designation', select: 'title' },
-          { path: 'department', select: 'name' },
-          { path: 'reportingManager', select: 'firstName lastName' }
-        ]
-      })
-      .lean()
-
-    const employee = userWithEmployee?.employeeId
-    const employeeId = employee?._id
-
-    // Build cache key
+    // Build and check the cache before feature/profile database work.
     const todayKey = new Date().toISOString().slice(0, 10)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
@@ -84,6 +86,31 @@ export async function GET(request) {
     if (cached) {
       return NextResponse.json(cached)
     }
+
+    const [featurePayload, userWithEmployee] = await Promise.all([
+      getTenantCompanyFeaturePayload({
+        companySlug: tenant?.companySlug,
+        databaseName: tenant?.databaseName,
+      }).catch((featureError) => {
+        console.error('[Dashboard Unified API] Failed to resolve company features:', featureError)
+        return null
+      }),
+      User.findById(user._id || user.userId)
+        .populate({
+          path: 'employeeId',
+          select: 'firstName lastName employeeCode designation department profilePicture status email phone dateOfJoining employmentType reportingManager _id',
+          populate: [
+            { path: 'designation', select: 'title' },
+            { path: 'department', select: 'name' },
+            { path: 'reportingManager', select: 'firstName lastName' }
+          ]
+        })
+        .lean(),
+    ])
+
+    const companyFeatures = featurePayload?.features || null
+    const employee = userWithEmployee?.employeeId
+    const employeeId = employee?._id
 
     // Initialize response object
     const dashboardData = {
@@ -372,8 +399,9 @@ export async function GET(request) {
     // Wait for all parallel fetches to complete
     await Promise.allSettled(fetchPromises)
 
-    // Cache the result for 2 minutes
-    await setCache(cacheKey, dashboardData, 5 * 60) // 5 min TTL
+    // Populate L1 synchronously and persist to Redis without adding network
+    // latency to the dashboard response.
+    void setCache(cacheKey, dashboardData, 5 * 60).catch(() => {})
 
     return NextResponse.json(dashboardData)
 

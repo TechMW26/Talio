@@ -3,6 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Leave unset to use all CPUs available to BuildKit. Set to 2-4 only
+        # when building on a memory-constrained server.
+        NEXT_BUILD_CPUS: ${NEXT_BUILD_CPUS:-}
     container_name: talio-app
     restart: unless-stopped
     env_file:

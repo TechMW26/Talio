@@ -6,6 +6,7 @@ import {
   runDailyAnalysis,
   DAILY_ANALYSIS_REQUIRED_MODELS,
 } from '@/lib/dailyAnalysisRunner';
+import { getTodayDateString } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -38,7 +39,7 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const date = body.date || new Date().toISOString().split('T')[0];
+    const date = body.date || getTodayDateString();
     const targetUserId = (body.userId || viewerId).toString();
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {

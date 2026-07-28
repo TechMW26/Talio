@@ -56,6 +56,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 log "Working directory: $SCRIPT_DIR"
 
+# ─── Configure deployment repository ───────────────────────────────────────
+REPO_URL="${REPO_URL:-https://github.com/TechMW26/Talio.git}"
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git remote get-url origin >/dev/null 2>&1; then
+    git remote set-url origin "$REPO_URL"
+    log "Git remote origin set to $REPO_URL"
+  else
+    git remote add origin "$REPO_URL"
+    log "Git remote origin added: $REPO_URL"
+  fi
+fi
+
 # ─── Load .env ──────────────────────────────────────────────────────────────
 if [[ ! -f .env ]]; then
   err ".env file not found! Copy .env.example to .env and fill in your values."
@@ -319,11 +331,10 @@ if [[ "$HEAP_VALUE" -lt 4096 ]]; then
   warn "Recommended for this VPS: ENV NODE_OPTIONS=\"--max-old-space-size=${RECOMMENDED_HEAP}\""
 fi
 
-# ── Full stack teardown before rebuild ───────────────────────────────────────
-# Always stop nginx and the app together before rebuilding so nginx cannot keep
-# a stale upstream container IP from a previous deployment.
-info "Bringing down existing stack to prevent stale nginx upstream state..."
-docker compose down --remove-orphans
+# Keep the current healthy stack serving traffic while BuildKit prepares the
+# replacement image. Stopping first turns the entire build duration into
+# production downtime and can strand desktop clients between HTML and JS loads.
+info "Keeping the current stack online while the replacement image builds..."
 
 if $CLEAN || $FRESH; then
   info "Pruning BuildKit cache to remove stale npm/sharp artifacts..."
@@ -336,7 +347,7 @@ if $CLEAN || $FRESH; then
     err "Docker build FAILED after $(( BUILD_END - BUILD_START ))s (exit code $BUILD_EXIT)."
     err "If this was an OOM kill, consider increasing NODE_OPTIONS heap in Dockerfile builder stage."
     err "Current setting: ${HEAP_VALUE} MB  |  Recommended next step: $(( HEAP_VALUE + 2048 )) MB"
-    err "Also consider: experimental.cpus=2 in next.config.js to reduce parallel worker memory."
+    err "Also consider: NEXT_BUILD_CPUS=2 ./deploy-production.sh to reduce parallel worker memory."
     exit $BUILD_EXIT
   fi
   BUILD_END=$(date +%s)
@@ -350,15 +361,15 @@ else
     err "Docker build FAILED after $(( BUILD_END - BUILD_START ))s (exit code $BUILD_EXIT)."
     err "If this was an OOM kill, consider increasing NODE_OPTIONS heap in Dockerfile builder stage."
     err "Current setting: ${HEAP_VALUE} MB  |  Recommended next step: $(( HEAP_VALUE + 2048 )) MB"
-    err "Also consider: experimental.cpus=2 in next.config.js to reduce parallel worker memory."
+    err "Also consider: NEXT_BUILD_CPUS=2 ./deploy-production.sh to reduce parallel worker memory."
     exit $BUILD_EXIT
   fi
   BUILD_END=$(date +%s)
   log "Build completed in $(( BUILD_END - BUILD_START ))s"
 fi
 
-info "Starting containers..."
-docker compose up -d
+info "Applying the new image..."
+docker compose up -d --remove-orphans
 
 # Clean up old Docker images/layers to prevent storage bloat
 info "Pruning old Docker images..."
@@ -413,8 +424,12 @@ if [[ "$HEALTH" != "healthy" ]]; then
   exit 1
 fi
 
-# Also verify nginx is running (not crash-looping)
-if ! docker compose exec -T nginx nginx -t 2>/dev/null; then
+# Verify and reload nginx after the app is healthy so its upstream resolves the
+# replacement container. This limits interruption to the container handover.
+if docker compose exec -T nginx nginx -t 2>/dev/null; then
+  docker compose exec -T nginx nginx -s reload >/dev/null 2>&1 || docker compose restart nginx
+  log "Nginx upstream refreshed"
+else
   warn "Nginx config test failed - checking logs..."
   docker compose logs nginx --tail 20
 fi

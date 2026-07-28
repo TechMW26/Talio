@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import { sortMeetingTranscript } from '@/lib/meetingLanguage'
+import { parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -120,8 +121,15 @@ export async function PUT(request, { params }) {
 
     for (const field of updateableFields) {
       if (data[field] !== undefined) {
-        meeting[field] = data[field]
+        const isMeetingDate = ['scheduledStart', 'scheduledEnd'].includes(field)
+        meeting[field] = isMeetingDate
+          ? parseDateTimeInTimezone(data[field], IST_TIMEZONE)
+          : data[field]
       }
+    }
+
+    if ((data.scheduledStart && !meeting.scheduledStart) || (data.scheduledEnd && !meeting.scheduledEnd)) {
+      return NextResponse.json({ success: false, message: 'Invalid meeting date or time' }, { status: 400 })
     }
 
     // Handle adding new invitees
@@ -131,7 +139,8 @@ export async function PUT(request, { params }) {
         if (!exists && empId.toString() !== employee._id.toString()) {
           meeting.invitees.push({
             employee: empId,
-            status: 'pending',
+            status: meeting.status === 'in-progress' ? 'accepted' : 'pending',
+            ...(meeting.status === 'in-progress' ? { respondedAt: new Date() } : {}),
             notificationSent: false,
             emailSent: false,
             pushSent: false
@@ -148,6 +157,16 @@ export async function PUT(request, { params }) {
               clickAction: `/dashboard/meetings/${meeting._id}`,
               data: { meetingId: meeting._id.toString() }
             }).catch(console.error)
+
+            if (global.io) {
+              global.io.to(`user:${inviteeEmp.userId}`).emit('meeting-invite', {
+                meetingId: meeting._id.toString(),
+                roomId: meeting.roomId,
+                title: meeting.title,
+                status: meeting.status,
+                invitedDuringMeeting: meeting.status === 'in-progress',
+              })
+            }
           }
         }
       }

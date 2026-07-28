@@ -6,6 +6,7 @@ import {
   runDailyAnalysis,
   DAILY_ANALYSIS_REQUIRED_MODELS,
 } from '@/lib/dailyAnalysisRunner';
+import { getDateKeyInTimezone, getStartOfDayInTimezone, IST_TIMEZONE } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -115,9 +116,8 @@ export async function GET(request) {
     } else if (endDate) {
       query.date = { $lte: new Date(`${endDate}T23:59:59.999Z`) };
     } else {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      query.dateString = yesterday.toISOString().split('T')[0];
+      const todayStart = getStartOfDayInTimezone(new Date(), IST_TIMEZONE);
+      query.dateString = getDateKeyInTimezone(new Date(todayStart.getTime() - 1), IST_TIMEZONE);
     }
 
     const analyses = await ScreenshotAnalysis.find(query)

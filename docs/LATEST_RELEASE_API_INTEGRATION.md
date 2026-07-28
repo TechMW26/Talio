@@ -87,7 +87,7 @@ Previous release folders are kept unless manually removed.
 Production `.env` must contain these values:
 
 ```env
-GITHUB_OWNER=avirajsharma-ops
+GITHUB_OWNER=TechMW26
 GITHUB_REPO=Talio
 GITHUB_TOKEN=your-private-github-token
 GITHUB_WEBHOOK_SECRET=your-github-webhook-secret
@@ -163,7 +163,7 @@ curl -sS https://app.talio.in/api/latest-release
   "asset_size": 109762349,
   "content_type": "application/octet-stream",
   "downloaded_at": "2026-05-08T08:17:49.050Z",
-  "release_url": "https://github.com/avirajsharma-ops/Talio/releases/tag/v6.0.2"
+  "release_url": "https://github.com/TechMW26/Talio/releases/tag/v6.0.2"
 }
 ```
 
@@ -720,7 +720,7 @@ The repo is private and the token lacks permission.
 Fix:
 
 ```text
-Confirm GITHUB_OWNER=avirajsharma-ops and GITHUB_REPO=Talio.
+Confirm GITHUB_OWNER=TechMW26 and GITHUB_REPO=Talio.
 Confirm the token can access the private repository releases.
 ```
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getDateKeyInTimezone } from '@/lib/timezone'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildDirectReportsFilter } from '@/lib/teamScope'
 export const dynamic = 'force-dynamic'
@@ -11,8 +12,8 @@ function countWorkingDays(startDate, endDate, workingDays, holidayDates) {
   const end = new Date(endDate)
   
   while (current <= end) {
-    const dayName = dayNameMap[current.getDay()]
-    const dateStr = current.toISOString().split('T')[0]
+    const dayName = dayNameMap[current.getUTCDay()]
+    const dateStr = getDateKeyInTimezone(current)
     
     if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
       count++
@@ -70,7 +71,7 @@ export async function GET(request) {
     const holidays = await Holiday.find({
       date: { $gte: startDate, $lte: endDate }
     }).lean()
-    const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]))
+    const holidayDates = new Set(holidays.map(h => getDateKeyInTimezone(h.date)))
 
     // Get employeeId - could be object or string
     const currentEmployeeId = user.employeeId?._id || user.employeeId

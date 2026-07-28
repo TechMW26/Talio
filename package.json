@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_ENV=development NODE_OPTIONS=--max-old-space-size=4096 NEXT_DISABLE_REACT_DEV_OVERLAY=1 node server.js",
-    "build": "SKIP_ENV_VALIDATION=true next build",
-    "start": "next start",
+    "dev": "cross-env TZ=Asia/Kolkata NODE_ENV=development NODE_OPTIONS=--max-old-space-size=4096 NEXT_DISABLE_REACT_DEV_OVERLAY=1 NEXT_DIST_DIR=.next-dev NEXT_ASSET_PREFIX=/__talio_dev_assets node server.js",
+    "build": "cross-env TZ=Asia/Kolkata NODE_OPTIONS=--max-old-space-size=8192 SKIP_ENV_VALIDATION=true next build",
+    "start": "cross-env TZ=Asia/Kolkata node server.js",
+    "start:next": "cross-env TZ=Asia/Kolkata next start",
     "lint": "next lint",
     "seed": "node scripts/seed.js",
     "migrate:designation-levels": "node scripts/migrate-designation-levels.js",
