@@ -19,6 +19,7 @@ import {
   allowedReportsToLevels,
   DIRECTOR_LEVEL,
 } from '@/lib/designationLevels'
+import { buildEmployeeLifecycle, createInitialLifecycleWorkflows } from '@/lib/hrms/employeeLifecycle.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -310,7 +311,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get auth and tenant-aware models
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'OnboardingEmail', 'CompanySettings', 'Role']);
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'OnboardingEmail', 'CompanySettings', 'Role', 'HrmsWorkflow', 'HrmsWorkflowEvent']);
     if (!auth.success) {
       return NextResponse.json(
         { success: false, message: auth.message || 'Unauthorized' },
@@ -369,6 +370,20 @@ export async function POST(request) {
 
     // Prepare employee data - ensure company is properly set
     const employeeData = { ...data }
+
+    // Lifecycle choices are entered as part of employee creation. Persist one
+    // canonical lifecycle object and keep the orchestration cases invisible.
+    try {
+      employeeData.lifecycle = buildEmployeeLifecycle(data)
+    } catch (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+    }
+    for (const formOnlyField of ['onboardingTemplate', 'onboardingOwner', 'probationApplicable', 'probationDurationMonths', 'noticePeriodDays', 'backgroundVerificationRequired', 'assetProvisioningRequired']) {
+      delete employeeData[formOnlyField]
+    }
+    if (employeeData.status === 'active' && employeeData.lifecycle.stage !== 'preboarding' && employeeData.lifecycle.probation.applicable) {
+      employeeData.status = 'probation'
+    }
 
     // Sanitize ObjectId fields - convert empty strings to null/undefined
     const objectIdFields = ['company', 'department', 'designation', 'reportingManager', 'assignedManager', 'assignedTeamLead'];
@@ -446,6 +461,13 @@ export async function POST(request) {
     // Create employee first
     const employee = await TenantEmployee.create(employeeData)
 
+    await createInitialLifecycleWorkflows({
+      models: auth.models,
+      actor: auth.user,
+      employee,
+      features: auth.companyFeatures,
+    }).catch((error) => console.error('[Employee Create] Lifecycle workflow initialization failed:', error))
+
     // Create user account for the employee
     const password = data.password || 'employee123' // Default password if not provided
 
@@ -503,7 +525,7 @@ export async function POST(request) {
     }).catch(err => console.error('[Employee Create] Backup sync failed:', err))
 
     const populatedEmployee = await TenantEmployee.findById(employee._id)
-      .select('employeeCode firstName lastName email phone department departments designation designationLevel designationLevelName reportingManager assignedManager assignedTeamLead dateOfJoining status salary pfEnrollment esiEnrollment professionalTax healthInsurance basicSalary')
+      .select('employeeCode firstName lastName email phone department departments designation designationLevel designationLevelName reportingManager assignedManager assignedTeamLead dateOfJoining status lifecycle salary pfEnrollment esiEnrollment professionalTax healthInsurance basicSalary')
       .populate({
         path: 'department',
         select: 'name',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { getRuntimeCapabilities } from '@/lib/platform/runtime'
 
 // Note: This endpoint provides status info only
 // The actual scheduler runs in server.js using node-schedule
@@ -24,12 +25,15 @@ export async function GET(request) {
             )
         }
 
+        const runtime = getRuntimeCapabilities()
         // Return scheduler info
         return NextResponse.json({
             success: true,
             data: {
-                type: 'node-schedule',
-                description: 'In-house scheduler running in server.js',
+                type: runtime.isVercel ? 'vercel-cron-and-queues' : 'node-schedule',
+                description: runtime.isVercel
+                    ? 'Vercel Cron invokes bounded jobs; Vercel Queues handles durable work'
+                    : 'In-house scheduler running in server.js',
                 jobs: [
                     {
                         id: 'notification-processor',
@@ -48,7 +52,10 @@ export async function GET(request) {
                     }
                 ],
                 cronSecretConfigured: !!process.env.CRON_SECRET,
-                note: 'Scheduler is managed by server.js, not by external cron jobs'
+                managedQueue: process.env.VERCEL === '1',
+                note: runtime.isVercel
+                    ? 'Schedules are declared in vercel.json and protected by CRON_SECRET'
+                    : 'Scheduler is managed by server.js'
             }
         })
     } catch (error) {

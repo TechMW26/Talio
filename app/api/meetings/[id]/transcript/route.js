@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { transcribeAudio } from '@/lib/elevenLabs'
+import { transcribeAudio } from '@/lib/audio'
 import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import {
   detectMeetingLanguage,
@@ -177,7 +177,7 @@ export async function POST(request, { params }) {
       payload = {
         text: transcription.text,
         language: transcription.languageCode || parsedPayload.language || 'auto',
-        source: parsedPayload.source || 'live-elevenlabs',
+        source: parsedPayload.source || 'live-pollinations',
         segmentId: parsedPayload.segmentId,
         timestamp: parsedPayload.startedAt || parsedPayload.timestamp,
         startOffsetMs: 0,
@@ -204,7 +204,7 @@ export async function POST(request, { params }) {
       data: {
         transcriptCount: meeting.transcript.length,
         languages: meeting.transcriptLanguages || [],
-        provider: usingAudioUpload ? 'elevenlabs' : 'client',
+        provider: usingAudioUpload ? 'pollinations' : 'client',
         segments,
       },
     })

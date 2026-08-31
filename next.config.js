@@ -18,17 +18,14 @@ const nextConfig = {
   // Multiple sibling projects share the parent directory. Keep file tracing
   // scoped to this application to avoid scanning unrelated workspaces.
   outputFileTracingRoot: __dirname,
-  // Disable Next.js compression - nginx handles gzip in production.
-  // Having both causes double-compression that corrupts CSS/JS responses.
-  compress: false,
+  // Nginx handles compression on the legacy VPS. Vercel deployments do not
+  // pass through that proxy, so allow Next/Vercel to negotiate compression.
+  compress: process.env.VERCEL === '1',
 
   reactStrictMode: false,
 
   // Transpile ESM packages
   transpilePackages: ['react-markdown'],
-
-  // Exclude native ONNX runtime from server bundling (causes segfault on Alpine/musl)
-  serverExternalPackages: ['onnxruntime-node', '@xenova/transformers'],
 
   // Increase body size limit for file uploads (10MB)
   experimental: {
@@ -97,7 +94,7 @@ const nextConfig = {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: blob: https://ik.imagekit.io https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com",
           "font-src 'self' data: https://fonts.gstatic.com",
-          "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://ik.imagekit.io https://maps.googleapis.com https://maps.gstatic.com wss: ws:",
+          "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://ik.imagekit.io https://maps.googleapis.com https://maps.gstatic.com https://*.pusher.com wss://*.pusher.com wss: ws:",
           "frame-src 'self' https://www.google.com https://maps.google.com",
           "media-src 'self' data: blob:",
           "worker-src 'self' blob:",
@@ -215,18 +212,6 @@ const nextConfig = {
         ...config.resolve.alias,
         moment: 'moment/moment.js',
       };
-    }
-
-    // Prevent onnxruntime-node native binary from being loaded server-side (segfaults on Alpine/musl)
-    // The @xenova/transformers library is only used client-side for meeting transcription,
-    // but Next.js SSR can still trigger native binary loading which crashes the process.
-    if (isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        'onnxruntime-node': false,
-      };
-      config.externals = config.externals || [];
-      config.externals.push('onnxruntime-node');
     }
 
     // Exclude server-only packages from client bundle

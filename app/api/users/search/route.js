@@ -1,98 +1,34 @@
-import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { NextResponse } from 'next/server'
+import { withTenantApi } from '@/lib/api/route'
+import { listDirectory } from '@/lib/services/directoryService.server'
 
-// GET /api/users/search - Search for users
-export async function GET(request) {
-  try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { User, Employee } = models
+// Compatibility endpoint. New consumers should use GET /api/directory.
+export const GET = withTenantApi({
+  models: ['Employee', 'User', 'Designation', 'Department'],
+  features: { allOf: ['employees'] },
+  errorMessage: 'Failed to search users',
+}, async ({ request, auth, models }) => {
+  const { searchParams } = new URL(request.url)
+  const items = await listDirectory({
+    Employee: models.Employee,
+    User: models.User,
+    tenantId: auth.tenant.databaseName,
+    currentUserId: auth.user.id || auth.user._id,
+    query: searchParams.get('q') || '',
+    limit: searchParams.get('limit') || 10,
+    includeAdmins: true,
+    includeSelf: false,
+  })
 
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q') || '';
-    const limit = parseInt(searchParams.get('limit') || '10');
+  const users = items
+    .filter((item) => item.userId)
+    .map((item) => ({
+      _id: item.userId,
+      name: item.name,
+      email: item.email,
+      avatar: item.avatar,
+      role: item.role,
+    }))
 
-    // Build aggregation pipeline to search users and their linked employee data
-    const pipeline = [
-      // Exclude current user
-      { $match: { _id: { $ne: new (await import('mongoose')).default.Types.ObjectId(user.id) } } },
-      // Lookup employee data
-      {
-        $lookup: {
-          from: 'employees',
-          localField: 'employeeId',
-          foreignField: '_id',
-          as: 'employee'
-        }
-      },
-      // Unwind employee (will be null if no employee linked)
-      {
-        $unwind: {
-          path: '$employee',
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      // Add computed name field
-      {
-        $addFields: {
-          name: {
-            $cond: {
-              if: { $and: ['$employee.firstName', '$employee.lastName'] },
-              then: { $concat: ['$employee.firstName', ' ', '$employee.lastName'] },
-              else: {
-                $cond: {
-                  if: '$employee.firstName',
-                  then: '$employee.firstName',
-                  else: { $ifNull: ['$email', 'Unknown User'] }
-                }
-              }
-            }
-          },
-          avatar: { $ifNull: ['$employee.avatar', null] }
-        }
-      }
-    ];
-
-    // Add search filter if query provided
-    if (query) {
-      pipeline.push({
-        $match: {
-          $or: [
-            { 'employee.firstName': { $regex: query, $options: 'i' } },
-            { 'employee.lastName': { $regex: query, $options: 'i' } },
-            { email: { $regex: query, $options: 'i' } },
-            { name: { $regex: query, $options: 'i' } }
-          ]
-        }
-      });
-    }
-
-    // Project only needed fields
-    pipeline.push({
-      $project: {
-        _id: 1,
-        name: 1,
-        email: 1,
-        avatar: 1,
-        role: 1
-      }
-    });
-
-    // Limit results
-    pipeline.push({ $limit: limit });
-
-    const users = await User.aggregate(pipeline);
-
-    return NextResponse.json({
-      users,
-      count: users.length
-    });
-  } catch (error) {
-    console.error('Error searching users:', error);
-    return NextResponse.json({ error: 'Failed to search users' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ users, count: users.length })
+})

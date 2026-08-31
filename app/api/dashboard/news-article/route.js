@@ -196,7 +196,7 @@ export async function POST(request) {
         const prompt = `You are reading this news article. Write a clear, detailed summary covering all the key points.\n\nTitle: ${title}\nSource: ${source || 'News'}\n\nFull article text:\n${articleText}`
         const systemInstruction = 'You are a professional news analyst. Write a comprehensive summary of the article in 4-6 well-structured sentences. Cover the who, what, when, where, why and impact. Output only the summary text, no headings or markdown formatting.'
 
-        const result = await generateContent(prompt, systemInstruction)
+        const result = await generateContent(prompt, systemInstruction, { useCase: 'creative' })
         if (typeof result === 'string' && result.length > 30) {
           summary = result.trim()
         }
@@ -205,7 +205,7 @@ export async function POST(request) {
         const prompt = `Write a detailed, factual news briefing about this story:\n\nHeadline: ${title}\nSource: ${source || 'News'}\nDescription: ${articleDescription || 'N/A'}\n\nProvide:\n1. A 3-4 sentence executive summary\n2. Then a detailed breakdown covering the key facts, context, implications, and what this means for the industry or people involved. Write 3-4 substantive paragraphs.\n\nBase your analysis on the headline and publicly known facts about this topic. Be factual and informative.`
         const systemInstruction = 'You are a senior news analyst writing an in-depth briefing for professionals. Write in a professional journalistic style. Structure your response as:\n\nSUMMARY:\n[3-4 sentence executive summary]\n\nDETAILS:\n[3-4 detailed paragraphs]\n\nUse plain text only, no markdown. Be thorough but factual. Do not fabricate specific quotes or statistics you are not sure about.'
 
-        const result = await generateContent(prompt, systemInstruction)
+        const result = await generateContent(prompt, systemInstruction, { useCase: 'creative' })
         if (typeof result === 'string' && result.length > 50) {
           const fullText = result.trim()
 

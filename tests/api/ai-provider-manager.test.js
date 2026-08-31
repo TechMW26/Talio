@@ -1,5 +1,6 @@
-// Gemini AI router tests. Validates multi-key rotation, rate-limit fallback,
-// model fallback, and that key material is never included in log output.
+// Pollinations AI router tests. Validates text + vision calls via the
+// OpenAI-compatible REST API, retry on rate-limit, and that key material is
+// never included in log output.
 
 const ORIGINAL_ENV = process.env
 
@@ -8,20 +9,14 @@ function svgBase64() {
 }
 
 function clearAIKeys(env) {
-    for (const k of Object.keys(env)) {
-        if (/^GEMINI_(API_)?KEY/i.test(k)) {
-            delete env[k]
-        }
-    }
-    delete env.GEMINI_API_KEY
-    delete env.GEMINI_KEY
+    delete env.POLLINATIONS_API_KEY
 }
 
 function reqRouter() {
     return require('@/lib/ai/aiProviderManager')
 }
 
-describe('AIProviderManager — Gemini-only key rotation', () => {
+describe('AIProviderManager — Pollinations-only', () => {
     let warnSpy
 
     beforeEach(() => {
@@ -39,31 +34,32 @@ describe('AIProviderManager — Gemini-only key rotation', () => {
         jest.restoreAllMocks()
     })
 
-    test('calls Gemini and returns text content', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+    test('calls Pollinations and returns text content', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
             json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'gemini output' }] } }],
+                choices: [{ message: { content: 'pollinations output' } }],
             }),
         })
 
         const { generateContent } = reqRouter()
         const result = await generateContent('hello')
 
-        expect(result).toBe('gemini output')
+        expect(result).toBe('pollinations output')
         expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][0]).toContain('generativelanguage.googleapis.com')
+        expect(global.fetch.mock.calls[0][0]).toContain('gen.pollinations.ai/v1/chat/completions')
+        expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer sk_test-pollinations-key')
     })
 
-    test('passes system instruction to Gemini', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+    test('passes system instruction to Pollinations', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
             json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'sys-aware output' }] } }],
+                choices: [{ message: { content: 'sys-aware output' } }],
             }),
         })
 
@@ -71,101 +67,109 @@ describe('AIProviderManager — Gemini-only key rotation', () => {
         await generateContent('hello', 'You are helpful.')
 
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
-        expect(body.systemInstruction.parts[0].text).toBe('You are helpful.')
+        expect(body.messages[0]).toEqual({ role: 'system', content: 'You are helpful.' })
+        expect(body.messages[1].content).toBe('hello')
+        expect(body.model).toBe('openai')
     })
 
-    test('falls back through model chain when 3.5-flash returns 404', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
-        // Set primary to a model that will 404 — the fallback chain kicks in
-        process.env.GEMINI_MODEL = 'gemini-3.5-flash'
+    test('routes analysis use case to gpt-5.4 dynamically', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
-        // 3.5-flash 404 → 2.5-flash 404 → flash-latest 404 → 2.0-flash succeeds
-        global.fetch
-            .mockResolvedValueOnce({
-                ok: false, status: 404,
-                text: jest.fn().mockResolvedValue(JSON.stringify({
-                    error: { code: 404, message: 'models/gemini-3.5-flash is not found', status: 'NOT_FOUND' },
-                })),
-            })
-            .mockResolvedValueOnce({
-                ok: false, status: 404,
-                text: jest.fn().mockResolvedValue(JSON.stringify({
-                    error: { code: 404, message: 'models/gemini-2.5-flash is not found', status: 'NOT_FOUND' },
-                })),
-            })
-            .mockResolvedValueOnce({
-                ok: false, status: 404,
-                text: jest.fn().mockResolvedValue(JSON.stringify({
-                    error: { code: 404, message: 'not found', status: 'NOT_FOUND' },
-                })),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: jest.fn().mockResolvedValue({
-                    candidates: [{ content: { parts: [{ text: 'fallback model works' }] } }],
-                }),
-            })
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: jest.fn().mockResolvedValue({
+                choices: [{ message: { content: 'deep analysis' } }],
+            }),
+        })
 
         const { generateContent } = reqRouter()
-        const result = await generateContent('hello')
+        await generateContent('analyze this', '', { useCase: 'analysis' })
 
-        expect(result).toBe('fallback model works')
-        expect(global.fetch).toHaveBeenCalledTimes(4)
-        expect(global.fetch.mock.calls[0][0]).toContain('/models/gemini-3.5-flash:generateContent')
-        expect(global.fetch.mock.calls[3][0]).toContain('/models/gemini-2.0-flash:generateContent')
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+        expect(body.model).toBe('gpt-5.4')
     })
 
-    test('rotates Gemini keys on rate limit until one succeeds', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
-        process.env.GEMINI_API_KEY_2 = 'AIzagm-testkey-2'
+    test('routes spellcheck use case to openai dynamically', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: jest.fn().mockResolvedValue({
+                choices: [{ message: { content: 'corrected' } }],
+            }),
+        })
+
+        const { generateContent } = reqRouter()
+        await generateContent('fix these names', '', { useCase: 'spellcheck' })
+
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+        expect(body.model).toBe('openai')
+    })
+
+    test('allows explicit model override', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: jest.fn().mockResolvedValue({
+                choices: [{ message: { content: 'custom model output' } }],
+            }),
+        })
+
+        const { generateContent } = reqRouter()
+        await generateContent('hello', '', { model: 'gpt-5.6-sol' })
+
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+        expect(body.model).toBe('gpt-5.6-sol')
+    })
+
+    test('retries on rate limit until success', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch
             .mockResolvedValueOnce({
                 ok: false,
                 status: 429,
-                text: jest.fn().mockResolvedValue('RESOURCE_EXHAUSTED'),
+                text: jest.fn().mockResolvedValue('rate limited'),
+                headers: { get: () => null },
             })
             .mockResolvedValueOnce({
                 ok: true,
                 json: jest.fn().mockResolvedValue({
-                    candidates: [{ content: { parts: [{ text: 'second key wins' }] } }],
+                    choices: [{ message: { content: 'recovered' } }],
                 }),
             })
 
         const { generateContent } = reqRouter()
         const result = await generateContent('hello')
 
-        expect(result).toBe('second key wins')
+        expect(result).toBe('recovered')
         expect(global.fetch).toHaveBeenCalledTimes(2)
-        expect(global.fetch.mock.calls[0][0]).toContain('key=AIzagm-testkey-1')
-        expect(global.fetch.mock.calls[1][0]).toContain('key=AIzagm-testkey-2')
     })
 
-    test('throws after all keys rate-limited (exhausted via cooldown)', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+    test('throws after exhausting retries', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValue({
             ok: false,
             status: 429,
-            text: jest.fn().mockResolvedValue('RESOURCE_EXHAUSTED'),
+            text: jest.fn().mockResolvedValue('rate limited'),
+            headers: { get: () => null },
         })
 
         const { generateContent } = reqRouter()
-        await expect(generateContent('hello')).rejects.toThrow(/failed after 3 attempts|Gemini/)
+        await expect(generateContent('hello')).rejects.toThrow(/failed after 3 attempts|Pollinations/)
 
-        // geminiProvider rotates keys internally; aiProviderManager retries
-        // the whole call up to 3 times. With one key, the first 429 puts it
-        // into cooldown, so subsequent attempts exhaust immediately.
         expect(global.fetch.mock.calls.length).toBeGreaterThanOrEqual(1)
     })
 
-    test('vision call sends inlineData payload to Gemini', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+    test('vision call sends image_url data URL to Pollinations', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
             json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'gemini vision text' }] } }],
+                choices: [{ message: { content: 'pollinations vision text' } }],
             }),
         })
 
@@ -174,22 +178,22 @@ describe('AIProviderManager — Gemini-only key rotation', () => {
             { data: svgBase64(), mimeType: 'image/svg+xml' },
         ])
 
-        expect(result).toBe('gemini vision text')
+        expect(result).toBe('pollinations vision text')
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
-        const parts = body.contents[0].parts
-        expect(parts[0]).toMatchObject({ text: 'describe' })
-        expect(parts[1].inlineData).toMatchObject({ mimeType: 'image/svg+xml' })
-        expect(parts[1].inlineData.data).toBe(svgBase64())
+        expect(body.model).toBe('gemini')
+        const content = body.messages[0].content
+        expect(content[0]).toMatchObject({ type: 'text', text: 'describe' })
+        expect(content[1].image_url.url).toBe(`data:image/svg+xml;base64,${svgBase64()}`)
     })
 
     test('stitched vision call sends pre-built buffer', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
         const imgBuffer = Buffer.from('fake-image-bytes')
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
             json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'stitched analysis' }] } }],
+                choices: [{ message: { content: 'stitched analysis' } }],
             }),
         })
 
@@ -201,50 +205,30 @@ describe('AIProviderManager — Gemini-only key rotation', () => {
 
         expect(result).toBe('stitched analysis')
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
-        expect(body.contents[0].parts[1].inlineData.mimeType).toBe('image/webp')
-    })
-
-    test('throws when no Gemini keys are configured', async () => {
-        const { generateContent } = reqRouter()
-        await expect(generateContent('hi')).rejects.toThrow(
-            'Gemini is not configured',
+        expect(body.messages[0].content[1].image_url.url).toBe(
+            `data:image/webp;base64,${imgBuffer.toString('base64')}`
         )
     })
 
-    test('getAIAvailability reports Gemini configuration without leaking keys', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
-        process.env.GEMINI_API_KEY_2 = 'AIzagm-testkey-2'
+    test('throws when Pollinations is not configured', async () => {
+        const { generateContent } = reqRouter()
+        await expect(generateContent('hi')).rejects.toThrow(
+            'Pollinations is not configured',
+        )
+    })
+
+    test('getAIAvailability reports Pollinations configuration without leaking keys', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         const { getAIAvailability } = reqRouter()
         const availability = getAIAvailability()
 
         expect(availability).toMatchObject({
             anyAvailable: true,
-            geminiConfigured: true,
-            geminiKeys: 2,
-            provider: 'gemini',
+            pollinationsConfigured: true,
+            provider: 'pollinations',
         })
         const serialized = JSON.stringify(availability)
-        expect(serialized).not.toContain('AIzagm-testkey-1')
-        expect(serialized).not.toContain('AIzagm-testkey-2')
-    })
-
-    test('uses numbered keys GEMINI_API_KEY_1..N with correct ordering', async () => {
-        process.env.GEMINI_API_KEY_3 = 'AIzagm-testkey-3'
-        process.env.GEMINI_API_KEY_1 = 'AIzagm-testkey-1'
-        process.env.GEMINI_API_KEY_2 = 'AIzagm-testkey-2'
-
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'ok' }] } }],
-            }),
-        })
-
-        const { generateContent } = reqRouter()
-        await generateContent('hello')
-
-        // First key should be GEMINI_API_KEY_1 (sorted numerically)
-        expect(global.fetch.mock.calls[0][0]).toContain('key=AIzagm-testkey-1')
+        expect(serialized).not.toContain('sk_test-pollinations-key')
     })
 })

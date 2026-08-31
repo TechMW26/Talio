@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
-import * as XLSX from 'xlsx'
+import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
 import { generateContent } from '@/lib/gemini'
 
 const VALID_CATEGORIES = ['laptop', 'desktop', 'mobile', 'tablet', 'monitor', 'keyboard', 'mouse', 'furniture', 'vehicle', 'other']
@@ -169,7 +169,7 @@ RULES:
 Return ONLY a JSON object mapping column index (string) to field name or "null":
 JSON only:`
 
-    const response = await generateContent(prompt, 'Return only valid JSON, no markdown.')
+    const response = await generateContent(prompt, 'Return only valid JSON, no markdown.', { useCase: 'json' })
     let jsonStr = response.trim().replace(/```json\s*/gi, '').replace(/```\s*/gi, '')
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/)
     if (jsonMatch) return JSON.parse(jsonMatch[0])
@@ -204,10 +204,7 @@ export async function POST(request) {
 
     // Read the Excel file
     const buffer = Buffer.from(await file.arrayBuffer())
-    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true })
-    const sheetName = workbook.SheetNames[0]
-    const sheet = workbook.Sheets[sheetName]
-    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+    const rawData = await readFirstWorksheetRows(buffer)
 
     if (rawData.length < 2) {
       return NextResponse.json({ success: false, message: 'File has no data rows' }, { status: 400 })

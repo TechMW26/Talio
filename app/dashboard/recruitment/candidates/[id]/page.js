@@ -52,7 +52,11 @@ export default function CandidateDetailPage() {
 
   // Convert modal
   const { isOpen: isConvertOpen, onOpen: onConvertOpen, onClose: onConvertClose } = useDisclosure();
-  const [convertData, setConvertData] = useState({ employeeCode: '', joiningDate: '' });
+  const [convertData, setConvertData] = useState({
+    employeeCode: '', joiningDate: '', onboardingTemplate: 'standard',
+    probationApplicable: true, probationDurationMonths: 3, noticePeriodDays: 30,
+    backgroundVerificationRequired: true, assetProvisioningRequired: true,
+  });
 
   const { socket, isConnected, subscribe } = useSocket();
 
@@ -598,6 +602,53 @@ export default function CandidateDetailPage() {
                 onValueChange={(v) => setConvertData((prev) => ({ ...prev, joiningDate: v }))}
                 className="mt-3"
               />
+              <div className="mt-4 rounded-xl border border-default-200 p-4">
+                <p className="text-sm font-semibold text-default-800">Employment lifecycle</p>
+                <p className="mb-3 mt-1 text-xs text-default-500">Onboarding and probation will start automatically after conversion.</p>
+                <Select
+                  label="Onboarding plan"
+                  selectedKeys={new Set([convertData.onboardingTemplate])}
+                  onSelectionChange={(keys) => setConvertData((prev) => ({ ...prev, onboardingTemplate: String(Array.from(keys)[0] || 'standard') }))}
+                >
+                  <SelectItem key="standard">Standard employee</SelectItem>
+                  <SelectItem key="experienced">Experienced hire</SelectItem>
+                  <SelectItem key="intern">Intern or trainee</SelectItem>
+                  <SelectItem key="contractor">Contractor</SelectItem>
+                </Select>
+                <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-lg bg-default-50 px-3 py-2">
+                  <input type="checkbox" checked={convertData.probationApplicable} onChange={(event) => setConvertData((prev) => ({ ...prev, probationApplicable: event.target.checked }))} className="h-4 w-4 rounded text-primary" />
+                  <span className="text-sm text-default-700">Probation applies</span>
+                </label>
+                {convertData.probationApplicable && (
+                  <Select
+                    className="mt-3"
+                    label="Probation duration"
+                    selectedKeys={new Set([String(convertData.probationDurationMonths)])}
+                    onSelectionChange={(keys) => setConvertData((prev) => ({ ...prev, probationDurationMonths: Number(Array.from(keys)[0] || 3) }))}
+                  >
+                    <SelectItem key="1">1 month</SelectItem>
+                    <SelectItem key="3">3 months</SelectItem>
+                    <SelectItem key="6">6 months</SelectItem>
+                    <SelectItem key="12">12 months</SelectItem>
+                  </Select>
+                )}
+                <Select
+                  className="mt-3"
+                  label="Notice period"
+                  selectedKeys={new Set([String(convertData.noticePeriodDays)])}
+                  onSelectionChange={(keys) => setConvertData((prev) => ({ ...prev, noticePeriodDays: Number(Array.from(keys)[0] || 0) }))}
+                >
+                  <SelectItem key="0">No notice period</SelectItem>
+                  <SelectItem key="15">15 days</SelectItem>
+                  <SelectItem key="30">30 days</SelectItem>
+                  <SelectItem key="60">60 days</SelectItem>
+                  <SelectItem key="90">90 days</SelectItem>
+                </Select>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-default-50 px-3 py-2 text-sm text-default-700"><input type="checkbox" checked={convertData.backgroundVerificationRequired} onChange={(event) => setConvertData((prev) => ({ ...prev, backgroundVerificationRequired: event.target.checked }))} />Background verification</label>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-default-50 px-3 py-2 text-sm text-default-700"><input type="checkbox" checked={convertData.assetProvisioningRequired} onChange={(event) => setConvertData((prev) => ({ ...prev, assetProvisioningRequired: event.target.checked }))} />Equipment and access</label>
+                </div>
+              </div>
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={onConvertClose}>Cancel</Button>

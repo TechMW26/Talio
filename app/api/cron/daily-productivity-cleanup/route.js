@@ -5,6 +5,7 @@ import getTenantCompanyModel from '@/models/TenantCompany';
 import { getTenantModels } from '@/lib/tenantModels';
 import { createDailyMosaicOnCheckout } from '@/lib/productivityMosaic';
 import { getTimezone } from '@/lib/timezone';
+import { getCronAuthErrorResponse } from '@/lib/cronAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,14 +15,6 @@ const MIDNIGHT_WINDOW_MIN = Math.max(
   1,
   Math.min(60, parseInt(process.env.DAILY_PRODUCTIVITY_MIDNIGHT_WINDOW_MIN || '20', 10) || 20),
 );
-
-function isAuthorizedCronRequest(request) {
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || authHeader === `Bearer ${cronSecret}`) return true;
-  const host = request.headers.get('host') || '';
-  return host.includes('localhost') || host.includes('127.0.0.1');
-}
 
 function getLocalParts(date, timezone) {
   const tz = getTimezone(timezone) || 'UTC';
@@ -160,9 +153,8 @@ async function processTenant({ company, now, dateOverride, force }) {
 
 async function runCron(request) {
   try {
-    if (!isAuthorizedCronRequest(request)) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
+    const authError = getCronAuthErrorResponse(request);
+    if (authError) return authError;
 
     await connectDB();
     await connectSuperadminDB();

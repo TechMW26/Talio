@@ -26,7 +26,6 @@ import {
   HiOutlineSignal,
   HiOutlineLightBulb,
   HiOutlineShieldCheck,
-  HiOutlineShare,
 } from 'react-icons/hi2'
 import { TbHierarchy3 } from 'react-icons/tb'
 
@@ -534,6 +533,7 @@ const annotateIsNew = (items) => items.map(item => {
 
 export const getMenuItemsForRole = (role) => {
   const base = roleBasedMenus[role] || roleBasedMenus.employee
+
   const hasHierarchy = base.some((item) => item.path === '/dashboard/hierarchy')
   if (hasHierarchy) return annotateIsNew(base)
 

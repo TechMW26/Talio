@@ -11,6 +11,17 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import useRoles from '@/hooks/useRoles'
 
+function addMonthsToDateKey(dateKey, months) {
+  if (!dateKey) return ''
+  const source = new Date(`${dateKey}T12:00:00.000Z`)
+  if (Number.isNaN(source.getTime())) return ''
+  const day = source.getUTCDate()
+  const target = new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + Number(months || 0), 1, 12))
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0, 12)).getUTCDate()
+  target.setUTCDate(Math.min(day, lastDay))
+  return target.toISOString().slice(0, 10)
+}
+
 export default function AddEmployeePage() {
   const router = useRouter()
   const [accessDenied, setAccessDenied] = useState(false)
@@ -99,6 +110,12 @@ export default function AddEmployeePage() {
     company: '',
     employmentType: 'full-time',
     status: 'active',
+    onboardingTemplate: 'standard',
+    probationApplicable: true,
+    probationDurationMonths: 3,
+    noticePeriodDays: 30,
+    backgroundVerificationRequired: true,
+    assetProvisioningRequired: true,
     password: '',
     role: 'employee',
     assignedManager: '',
@@ -319,6 +336,10 @@ export default function AddEmployeePage() {
   const allowTeamLeadAssignment = selectedLevel > 0 && selectedLevel <= 3
   // Everyone except Director (L9) needs to report to a higher exec.
   const requireReportsTo = selectedLevel > 0 && selectedLevel <= 8
+  const probationReviewDate = useMemo(
+    () => formData.probationApplicable ? addMonthsToDateKey(formData.dateOfJoining, formData.probationDurationMonths) : '',
+    [formData.dateOfJoining, formData.probationApplicable, formData.probationDurationMonths],
+  )
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -874,33 +895,11 @@ export default function AddEmployeePage() {
                   </Select>
                 </div>
 
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-medium text-default-700 mb-2">
-                    Status
-                  </label>
-                  <Select
-                    name="status"
-                    selectedKeys={formData.status ? new Set([String(formData.status)]) : new Set()}
-                    onSelectionChange={(keys) => {
-                      if (keys === 'all') return
-                      const value = Array.from(keys)[0] || ''
-                      setFormData((prev) => ({ ...prev, status: String(value) }))
-                    }}
-                    aria-label="Status"
-                    className="text-default-900"
-                    classNames={{
-                      trigger: "bg-white border border-default-300 text-default-900 data-[hover=true]:border-default-400",
-                      value: "text-default-900",
-                      innerWrapper: "text-default-900",
-                      selectorIcon: "text-default-600",
-                      listbox: "text-default-900",
-                      popoverContent: "bg-white text-default-900"
-                    }}
-                  >
-                    <SelectItem key="active">Active</SelectItem>
-                    <SelectItem key="inactive">Inactive</SelectItem>
-                  </Select>
+                <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 dark:border-primary-800 dark:bg-primary-950/30">
+                  <p className="text-sm font-semibold text-primary-800 dark:text-primary-200">Employment status is automatic</p>
+                  <p className="mt-1 text-xs text-primary-700 dark:text-primary-300">
+                    The employee starts in pre-boarding, onboarding or probation based on the joining date and choices below.
+                  </p>
                 </div>
 
                 {/* Password */}
@@ -960,6 +959,89 @@ export default function AddEmployeePage() {
                   <p className="text-xs text-default-500 mt-1">
                     Determines access level in the system
                   </p>
+                </div>
+              </div>
+
+              <div className="mt-8 border-t border-default-200 pt-6">
+                <div className="mb-5">
+                  <h3 className="text-lg font-semibold text-default-800">Employment lifecycle</h3>
+                  <p className="mt-1 text-sm text-default-500">These choices automatically start the employee’s onboarding, probation and future exit workflow.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-default-700">Onboarding plan</label>
+                    <Select
+                      selectedKeys={new Set([formData.onboardingTemplate])}
+                      onSelectionChange={(keys) => setFormData((prev) => ({ ...prev, onboardingTemplate: String(Array.from(keys)[0] || 'standard') }))}
+                      aria-label="Onboarding plan"
+                      classNames={{ trigger: 'bg-white dark:bg-default-100 border border-default-300', popoverContent: 'bg-content1' }}
+                    >
+                      <SelectItem key="standard">Standard employee</SelectItem>
+                      <SelectItem key="experienced">Experienced hire</SelectItem>
+                      <SelectItem key="intern">Intern or trainee</SelectItem>
+                      <SelectItem key="contractor">Contractor</SelectItem>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-default-700">Notice period</label>
+                    <Select
+                      selectedKeys={new Set([String(formData.noticePeriodDays)])}
+                      onSelectionChange={(keys) => setFormData((prev) => ({ ...prev, noticePeriodDays: Number(Array.from(keys)[0] || 0) }))}
+                      aria-label="Notice period"
+                      classNames={{ trigger: 'bg-white dark:bg-default-100 border border-default-300', popoverContent: 'bg-content1' }}
+                    >
+                      <SelectItem key="0">No notice period</SelectItem>
+                      <SelectItem key="15">15 days</SelectItem>
+                      <SelectItem key="30">30 days</SelectItem>
+                      <SelectItem key="60">60 days</SelectItem>
+                      <SelectItem key="90">90 days</SelectItem>
+                    </Select>
+                  </div>
+
+                  <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={formData.probationApplicable}
+                      onChange={(event) => setFormData((prev) => ({ ...prev, probationApplicable: event.target.checked }))}
+                      className="h-4 w-4 rounded border-default-300 text-primary focus:ring-primary"
+                    />
+                    <span><span className="block text-sm font-medium text-default-800">Probation applies</span><span className="text-xs text-default-500">Track review and confirmation</span></span>
+                  </label>
+
+                  {formData.probationApplicable && (
+                    <>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-default-700">Probation duration</label>
+                        <Select
+                          selectedKeys={new Set([String(formData.probationDurationMonths)])}
+                          onSelectionChange={(keys) => setFormData((prev) => ({ ...prev, probationDurationMonths: Number(Array.from(keys)[0] || 3) }))}
+                          aria-label="Probation duration"
+                          classNames={{ trigger: 'bg-white dark:bg-default-100 border border-default-300', popoverContent: 'bg-content1' }}
+                        >
+                          <SelectItem key="1">1 month</SelectItem>
+                          <SelectItem key="3">3 months</SelectItem>
+                          <SelectItem key="6">6 months</SelectItem>
+                          <SelectItem key="12">12 months</SelectItem>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-default-700">Probation review date</label>
+                        <input value={probationReviewDate} readOnly className="w-full rounded-lg border border-default-200 bg-default-100 px-4 py-2 text-default-700" aria-label="Calculated probation review date" />
+                        <p className="mt-1 text-xs text-default-500">Calculated from the joining date</p>
+                      </div>
+                    </>
+                  )}
+
+                  <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3">
+                    <input type="checkbox" checked={formData.backgroundVerificationRequired} onChange={(event) => setFormData((prev) => ({ ...prev, backgroundVerificationRequired: event.target.checked }))} className="h-4 w-4 rounded border-default-300 text-primary focus:ring-primary" />
+                    <span><span className="block text-sm font-medium text-default-800">Background verification</span><span className="text-xs text-default-500">Add it to onboarding</span></span>
+                  </label>
+
+                  <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3">
+                    <input type="checkbox" checked={formData.assetProvisioningRequired} onChange={(event) => setFormData((prev) => ({ ...prev, assetProvisioningRequired: event.target.checked }))} className="h-4 w-4 rounded border-default-300 text-primary focus:ring-primary" />
+                    <span><span className="block text-sm font-medium text-default-800">Equipment and access</span><span className="text-xs text-default-500">Create provisioning tasks</span></span>
+                  </label>
                 </div>
               </div>
 

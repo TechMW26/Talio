@@ -146,7 +146,7 @@ Rules:
 
     let aiInsights = [];
     try {
-      const aiResponse = await generateContent(dataContext, systemPrompt);
+      const aiResponse = await generateContent(dataContext, systemPrompt, { useCase: 'analysis' });
       aiInsights = parseAIJsonResponse(aiResponse, { expectedRoot: 'array' });
     } catch {
       // Fallback insights if AI fails

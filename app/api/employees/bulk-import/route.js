@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
-import * as XLSX from 'xlsx'
+import { createWorkbookBuffer, readFirstWorksheetRows } from '@/lib/spreadsheets.server'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { generateContent } from '@/lib/gemini'
 import { syncUserToBackup } from '@/lib/backupDb'
@@ -366,7 +366,7 @@ Rules:
 Respond with ONLY a JSON object containing the corrected values:
 {"department": "corrected", "designation": "corrected", "role": "corrected", "company": "corrected"}`
 
-    const response = await generateContent(prompt, 'You are a spell-check assistant. Respond only with valid JSON containing corrected values.')
+    const response = await generateContent(prompt, 'You are a spell-check assistant. Respond only with valid JSON containing corrected values.', { useCase: 'spellcheck' })
 
     // Parse the JSON response
     const jsonMatch = response.match(/\{[\s\S]*\}/)
@@ -459,7 +459,7 @@ Example: {"0": "employeeCode", "1": "fullName", "2": "email", "3": "phone", "4":
 
 JSON only:`
 
-    const response = await generateContent(prompt, 'Return only valid JSON object, no markdown, no explanation.')
+    const response = await generateContent(prompt, 'Return only valid JSON object, no markdown, no explanation.', { useCase: 'json' })
 
     // Extract JSON from response (handle various formats)
     let jsonStr = response.trim()
@@ -1786,9 +1786,9 @@ export async function POST(request) {
 
     // Validate file type
     const fileName = file.name || ''
-    if (!fileName.match(/\.(xlsx|xls)$/i)) {
+    if (!fileName.match(/\.xlsx$/i)) {
       return NextResponse.json(
-        { success: false, message: 'Invalid file format. Please upload an Excel file (.xlsx or .xls)' },
+        { success: false, message: 'Invalid file format. Please upload an Excel workbook (.xlsx)' },
         { status: 400 }
       )
     }
@@ -1798,15 +1798,7 @@ export async function POST(request) {
     const buffer = Buffer.from(arrayBuffer)
 
     // Parse Excel file
-    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true })
-    const sheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[sheetName]
-
-    // Convert to array of arrays (with header)
-    // Using raw: true to get actual numeric values instead of formatted strings
-    // This prevents issues like "8,000" being truncated to "8" when parsed
-    // The parseSalaryValue function handles both raw numbers and formatted strings as fallback
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true, dateNF: 'yyyy-mm-dd' })
+    const rawData = await readFirstWorksheetRows(buffer)
 
     if (rawData.length < 2) {
       return NextResponse.json(
@@ -2066,34 +2058,7 @@ export async function GET(request) {
       ],
     ]
 
-    // Create workbook
-    const workbook = XLSX.utils.book_new()
-    const worksheet = XLSX.utils.aoa_to_sheet(sampleData)
-
-    // Set column widths
-    worksheet['!cols'] = [
-      { wch: 15 }, // Employee Code
-      { wch: 15 }, // First Name
-      { wch: 15 }, // Last Name
-      { wch: 28 }, // Email
-      { wch: 15 }, // Phone
-      { wch: 10 }, // Gender
-      { wch: 15 }, // Date of Birth
-      { wch: 15 }, // Date of Joining
-      { wch: 15 }, // Department
-      { wch: 20 }, // Designation
-      { wch: 12 }, // Role
-      { wch: 15 }, // Employment Type
-      { wch: 10 }, // Status
-      { wch: 15 }, // Gross Salary
-      { wch: 18 }, // Company
-      { wch: 15 }, // Password
-    ]
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Employees')
-
-    // Generate buffer
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+    const buffer = await createWorkbookBuffer([{ name: 'Employees', rows: sampleData, widths: [15, 15, 15, 28, 15, 10, 15, 15, 15, 20, 12, 15, 10, 15, 18, 15] }])
 
     // Return file
     return new NextResponse(buffer, {

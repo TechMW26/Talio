@@ -65,7 +65,7 @@ Talio is a **multi-tenant Human Resource Management System (HRMS)** with workfor
 | `GOOGLE_CLIENT_ID/SECRET`         | OPT      | Google OAuth sign-in                                   | Google Cloud Console → OAuth 2.0                  |
 | `LINKEDIN_CLIENT_ID/SECRET`       | OPT      | LinkedIn recruitment integration                       | LinkedIn Developer Portal                         |
 | `IMAGEKIT_PUBLIC/PRIVATE_KEY`     | OPT      | ImageKit for legacy image uploads                      | ImageKit Dashboard                                |
-| `ELEVENLABS_API_KEY`              | OPT      | ElevenLabs TTS for AI voice                            | ElevenLabs Dashboard                              |
+| `POLLINATIONS_API_KEY`            | OPT      | Pollinations.ai for all AI (text, vision, TTS, STT)    | Pollinations Dashboard                            |
 | `NEXT_PUBLIC_MEETING_STUN_URLS`   | OPT      | STUN servers for WebRTC                                | Google STUN (free) or your own                    |
 | `GITHUB_TOKEN`                    | OPT      | GitHub API for release downloads                       | GitHub → Settings → Developer Settings → PAT      |
 | `GITHUB_WEBHOOK_SECRET`           | OPT      | Webhook secret for GitHub release events               | `openssl rand -hex 32`                            |

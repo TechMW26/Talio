@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import releaseManagerModule from '@/lib/latestReleaseManager';
-
-const releaseManager = releaseManagerModule.default || releaseManagerModule;
+import {
+    selectDefaultReleaseAsset,
+    verifyGitHubWebhookSignature,
+} from '@/lib/platform/releaseCatalog.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Webhook secret is not configured' }, { status: 500 });
     }
 
-    if (!releaseManager.verifyGitHubSignature(rawBody, signature, process.env.GITHUB_WEBHOOK_SECRET)) {
+    if (!verifyGitHubWebhookSignature(rawBody, signature, process.env.GITHUB_WEBHOOK_SECRET)) {
         console.warn('[GitHubReleaseWebhook] Signature verification failure', { deliveryId });
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
@@ -44,16 +45,13 @@ export async function POST(request) {
     }
 
     try {
-        const result = await releaseManager.syncReleaseFromWebhookPayload(payload.release, {
-            source: 'webhook',
-            deliveryId,
-        });
+        const asset = selectDefaultReleaseAsset(payload.release);
 
         return NextResponse.json({
             ok: true,
-            updated: !!result.updated,
-            version: result.metadata?.version || null,
-            file_name: result.metadata?.file_name || null,
+            updated: true,
+            version: payload.release.tag_name || null,
+            file_name: asset?.name || null,
         });
     } catch (error) {
         console.error('[GitHubReleaseWebhook] Release processing failed:', error.message);

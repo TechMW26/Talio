@@ -4,6 +4,37 @@
   padding-bottom: 1rem;
 }
 
+/* Shared workspace primitives. These deliberately use Talio's theme tokens so
+   the visual hierarchy improves across light/dark and tenant colour themes. */
+.talio-surface {
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+  border-radius: 1.25rem;
+  background: var(--color-bg-card);
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .talio-surface {
+    padding: 1.25rem;
+  }
+}
+
+.page-title {
+  color: var(--color-text-primary);
+  letter-spacing: -0.025em;
+}
+
+.page-subtitle {
+  color: var(--color-text-secondary);
+}
+
+.talio-settings-page input:focus-visible,
+[data-vt-sidebar] button:focus-visible,
+[data-vt-sidebar] a:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
 /* Mobile: Add extra padding for bottom navigation */
 @media (max-width: 767px) {
   .page-container {
@@ -29,12 +60,13 @@
 .page-title {
   font-size: 1.875rem;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--color-text-primary);
+  letter-spacing: -0.025em;
 }
 
 .page-subtitle {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--color-text-secondary);
   margin-top: 0.25rem;
 }
 
@@ -1229,4 +1261,203 @@ html.dark .toggle-slider {
 html.dark .toggle-switch,
 html.dark .toggle-btn {
   background-color: #3f3f46;
+}
+/* Talio application navigation
+   Compact two-level hierarchy based on established shell navigation patterns. */
+.talio-sidebar-shell {
+  border-right: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
+  background: color-mix(in srgb, var(--color-bg-sidebar) 96%, var(--color-bg-main));
+}
+
+.talio-sidebar-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+}
+
+.talio-sidebar-search {
+  min-height: 38px;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent) !important;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-bg-main) 72%, transparent);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.talio-sidebar-search:focus-within {
+  border-color: color-mix(in srgb, var(--color-primary-500) 60%, transparent) !important;
+  background: var(--color-bg-sidebar);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-500) 12%, transparent);
+}
+
+.talio-sidebar-section-label {
+  color: color-mix(in srgb, var(--color-text-secondary) 82%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.talio-sidebar-row {
+  position: relative;
+  display: flex;
+  min-height: 44px;
+  width: 100%;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 9px;
+  color: var(--color-text-primary);
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.talio-sidebar-row:hover {
+  background: color-mix(in srgb, var(--color-primary-500) 7%, transparent);
+}
+
+.talio-sidebar-row[data-active='true'],
+.talio-sidebar-row[data-expanded='true'] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 16%, transparent);
+  background: color-mix(in srgb, var(--color-primary-500) 10%, transparent);
+}
+
+.talio-sidebar-row[data-active='true']::before {
+  position: absolute;
+  inset-block: 9px;
+  left: -1px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primary-500);
+  content: '';
+}
+
+.talio-sidebar-icon {
+  display: grid;
+  height: 32px;
+  width: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-primary-500) 10%, transparent);
+  color: var(--color-primary-500);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.talio-sidebar-row[data-active='true'] .talio-sidebar-icon,
+.talio-sidebar-row[data-expanded='true'] .talio-sidebar-icon {
+  background: var(--color-primary-500);
+  color: white;
+}
+
+.talio-sidebar-badge {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding-inline: 6px;
+  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.talio-sidebar-badge--danger {
+  background: color-mix(in srgb, #f43f5e 16%, transparent);
+  color: #f43f5e;
+}
+
+.talio-sidebar-new {
+  display: inline-flex;
+  height: 18px;
+  align-items: center;
+  border-radius: 999px;
+  padding-inline: 7px;
+  background: color-mix(in srgb, #10b981 14%, transparent);
+  color: #10b981;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.talio-sidebar-subnav {
+  position: relative;
+  margin: 3px 0 5px 25px;
+  padding-left: 13px;
+}
+
+.talio-sidebar-subnav::before {
+  position: absolute;
+  inset-block: 4px;
+  left: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+  content: '';
+}
+
+.talio-sidebar-leaf,
+.talio-sidebar-module,
+.talio-sidebar-child {
+  position: relative;
+  display: flex;
+  min-height: 36px;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.talio-sidebar-leaf:hover,
+.talio-sidebar-module:hover,
+.talio-sidebar-child:hover {
+  background: color-mix(in srgb, var(--color-primary-500) 7%, transparent);
+  color: var(--color-text-primary);
+}
+
+.talio-sidebar-leaf[data-active='true'],
+.talio-sidebar-module[data-active='true'],
+.talio-sidebar-module[data-open='true'],
+.talio-sidebar-child[data-active='true'] {
+  background: color-mix(in srgb, var(--color-primary-500) 11%, transparent);
+  color: var(--color-primary-600);
+  font-weight: 600;
+}
+
+.talio-sidebar-leaf[data-active='true']::before,
+.talio-sidebar-child[data-active='true']::before {
+  position: absolute;
+  left: -14px;
+  width: 2px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--color-primary-500);
+  content: '';
+}
+
+.talio-sidebar-module-items {
+  margin: 2px 0 3px 9px;
+  padding-left: 9px;
+  border-left: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
+}
+
+.talio-sidebar-row:focus-visible,
+.talio-sidebar-leaf:focus-visible,
+.talio-sidebar-module:focus-visible,
+.talio-sidebar-child:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talio-sidebar-row,
+  .talio-sidebar-icon,
+  .talio-sidebar-leaf,
+  .talio-sidebar-module,
+  .talio-sidebar-child {
+    transition: none;
+  }
 }

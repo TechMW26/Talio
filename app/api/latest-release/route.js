@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
-import releaseManagerModule from '@/lib/latestReleaseManager';
-
-const releaseManager = releaseManagerModule.default || releaseManagerModule;
+import { getPublicReleaseMetadata } from '@/lib/platform/releaseCatalog.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
     try {
-        const metadata = await releaseManager.getPublicReleaseMetadata(request);
+        const metadata = await getPublicReleaseMetadata(request);
 
         if (!metadata) {
             return NextResponse.json(
@@ -24,7 +22,7 @@ export async function GET(request) {
         console.error('[LatestReleaseAPI] Failed to read metadata:', error.message);
         return NextResponse.json(
             { error: 'Unable to read latest release metadata' },
-            { status: 500, headers: { 'Cache-Control': 'no-store' } }
+            { status: 502, headers: { 'Cache-Control': 'no-store' } }
         );
     }
 }

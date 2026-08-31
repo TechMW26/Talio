@@ -107,7 +107,7 @@ ${fileContent.substring(0, 15000)}`
 
     let parsedData
     try {
-      const aiResponse = await generateContent(prompt, systemInstruction)
+      const aiResponse = await generateContent(prompt, systemInstruction, { useCase: 'json' })
       // Clean up response - remove markdown fences if present
       let cleanResponse = aiResponse.trim()
       if (cleanResponse.startsWith('```')) {

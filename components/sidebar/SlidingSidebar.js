@@ -4,34 +4,37 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   HiOutlineChevronRight,
-  HiOutlineXMark,
-  HiOutlineCog6Tooth,
-  HiOutlineArrowRightOnRectangle,
-  HiOutlineChatBubbleLeftRight,
   HiOutlineUsers,
-  HiOutlineUserCircle,
-  HiOutlineInformationCircle,
+  HiOutlineMagnifyingGlass,
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
 import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
 import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
 import { filterMenuByPermissions } from '@/utils/permissionFilters'
+import {
+  buildNavigationSections,
+  filterNavigationSections,
+  getNavigationBadgeCount,
+  isNavigationPathActive,
+  SIDEBAR_ACTION_ICONS,
+} from '@/utils/menuInformationArchitecture'
 import { getCurrentUser } from '@/utils/userHelper'
 import toast from '@/utils/toast'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
 import UnreadBadge from '@/components/UnreadBadge'
-import { Button, Chip, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Avatar } from '@heroui/react'
+import SidebarSubmenu from '@/components/sidebar/SidebarSubmenu'
+import { Button, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Avatar } from '@heroui/react'
 
 // Inline badge component for expanded menu items
 function InlineBadge({ count }) {
   if (!count || count <= 0) return null
   return (
-    <Chip size="sm" color="danger" variant="flat" className="min-w-5 h-5 text-[10px]">
+    <span className="talio-sidebar-badge talio-sidebar-badge--danger">
       {count > 99 ? '99+' : count}
-    </Chip>
+    </span>
   )
 }
 
@@ -53,6 +56,7 @@ export default function SlidingSidebar({
   const [mounted, setMounted] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [isDesktopApp, setIsDesktopApp] = useState(false)
+  const [menuQuery, setMenuQuery] = useState('')
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
@@ -100,10 +104,7 @@ export default function SlidingSidebar({
   // Auto-expand submenu when activeSubmenu changes
   useEffect(() => {
     if (activeSubmenu) {
-      setExpandedMenus(prev => ({
-        ...prev,
-        [activeSubmenu]: true
-      }))
+      setExpandedMenus({ [activeSubmenu]: true })
     }
   }, [activeSubmenu])
 
@@ -251,11 +252,23 @@ export default function SlidingSidebar({
     return filterMenuByPermissions(featureFilteredMenuItems, rbacPermissions, user.role)
   }, [featureFilteredMenuItems, user])
 
+  const navigationItems = useMemo(
+    () => buildNavigationSections(filteredMenuItems),
+    [filteredMenuItems]
+  )
+  const visibleNavigationItems = useMemo(
+    () => filterNavigationSections(navigationItems, menuQuery),
+    [navigationItems, menuQuery]
+  )
+
+  useEffect(() => {
+    if (menuQuery) {
+      setExpandedMenus(Object.fromEntries(visibleNavigationItems.map((item) => [item.name, true])))
+    }
+  }, [menuQuery, visibleNavigationItems])
+
   const toggleSubmenu = (menuName) => {
-    setExpandedMenus(prev => ({
-      ...prev,
-      [menuName]: !prev[menuName]
-    }))
+    setExpandedMenus((current) => current[menuName] ? {} : { [menuName]: true })
   }
 
   const handleLinkClick = (path) => {
@@ -287,12 +300,14 @@ export default function SlidingSidebar({
   // Helper to check if a menu item is active (optimistic highlight during navigation)
   const effectivePath = (isNavigating && targetPath) ? targetPath : pathname
   const isMenuItemActive = (item) => {
-    if (item.path === effectivePath) return true
-    if (item.submenu) {
-      return item.submenu.some(subItem => subItem.path === effectivePath)
-    }
-    return false
+    return isNavigationPathActive(item, effectivePath)
   }
+
+  useEffect(() => {
+    if (menuQuery) return
+    const activeItem = navigationItems.find((item) => item.submenu && isNavigationPathActive(item, effectivePath))
+    if (activeItem) setExpandedMenus({ [activeItem.name]: true })
+  }, [effectivePath, menuQuery, navigationItems])
 
   // Helper to get badge count for a menu item
   const getBadgeCount = (itemName) => {
@@ -354,7 +369,7 @@ export default function SlidingSidebar({
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
         className={`
-          hidden lg:flex fixed inset-y-0 left-0 z-[70] flex-col h-screen w-[17rem] shadow-[0_6px_24px_rgba(15,23,42,0.08)]
+          talio-sidebar-shell hidden lg:flex fixed inset-y-0 left-0 z-[70] flex-col h-screen w-[18rem] shadow-[0_12px_32px_rgba(15,23,42,0.12)]
           transition-transform duration-300 ease-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
@@ -364,12 +379,12 @@ export default function SlidingSidebar({
       >
         {/* Header with close button */}
         <div
-          className="h-[60.5px] px-4 flex items-center justify-between flex-shrink-0"
+          className="talio-sidebar-header h-16 px-4 flex items-center justify-between flex-shrink-0"
         >
           <img
             src="/assets/logo.png"
             alt="Talio Logo"
-            className="h-10 w-auto object-contain"
+            className="h-9 w-auto object-contain"
           />
           <button
             onClick={() => {
@@ -384,16 +399,13 @@ export default function SlidingSidebar({
         </div>
 
         {/* Scrollable Menu Section */}
-        <ScrollShadow ref={scrollContainerRef} className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-1">
+        <ScrollShadow ref={scrollContainerRef} className="flex-1 space-y-0.5 px-3 pb-6 pt-3 scrollbar-hide">
           {/* Profile - top of menu */}
           <Link
             href="/dashboard/profile"
             onClick={() => handleLinkClick('/dashboard/profile')}
-            className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
-            style={{
-              backgroundColor: effectivePath === '/dashboard/profile' ? 'var(--color-primary-500)' : 'transparent',
-              color: effectivePath === '/dashboard/profile' ? 'white' : 'var(--color-text-primary)'
-            }}
+            data-active={effectivePath === '/dashboard/profile'}
+            className="talio-sidebar-row"
           >
             <div className="flex items-center gap-3 flex-1">
               <Avatar
@@ -403,73 +415,65 @@ export default function SlidingSidebar({
                   const fn = user?.firstName || '', ln = user?.lastName || ''
                   return (fn || ln) ? `${fn[0] || ''}${ln[0] || ''}`.toUpperCase() : (user?.email?.[0]?.toUpperCase() || 'U')
                 })()}
-                className="w-9 h-9 text-xs"
+                className="h-8 w-8 text-xs"
                 style={{
-                  backgroundColor: effectivePath === '/dashboard/profile' ? 'white' : 'var(--color-primary-500)',
-                  color: effectivePath === '/dashboard/profile' ? 'var(--color-primary-500)' : 'white',
+                  backgroundColor: 'var(--color-primary-500)',
+                  color: 'white',
                 }}
               />
-              <span className="text-sm font-medium truncate">
+              <span className="truncate text-[13px] font-semibold">
                 {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'My Profile'}
               </span>
             </div>
           </Link>
 
-          <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
+          <div className="mx-2 my-2 border-t" style={{ borderColor: 'color-mix(in srgb, var(--color-text-secondary) 12%, transparent)' }} />
 
-          {filteredMenuItems.map((item, index) => {
+          <label className="talio-sidebar-search mx-1 mb-3 flex items-center gap-2 px-3 py-2">
+            <HiOutlineMagnifyingGlass className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
+            <input
+              value={menuQuery}
+              onChange={(event) => setMenuQuery(event.target.value)}
+              placeholder="Find a tool"
+              aria-label="Find a tool"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-default-400"
+              style={{ color: 'var(--color-text-primary)' }}
+            />
+          </label>
+
+          {visibleNavigationItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
             const isTargeted = activeSubmenu === item.name
-            const showGroupHeader = item.group && (index === 0 || filteredMenuItems[index - 1]?.group !== item.group)
+            const showGroupHeader = item.group && item.group !== 'Main' && (index === 0 || visibleNavigationItems[index - 1]?.group !== item.group)
             return (
               <div key={item.name} ref={el => menuItemRefs.current[index] = el} className="w-full">
                 {showGroupHeader && (
-                  <div className={`px-4 ${index === 0 ? 'pt-0 pb-2' : 'pt-4 pb-2'}`}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary, var(--color-text-secondary))' }}>
+                  <div className={`px-2 ${index === 0 ? 'pb-2 pt-1' : 'pb-2 pt-4'}`}>
+                    <p className="talio-sidebar-section-label">
                       {item.group}
                     </p>
                   </div>
                 )}
-                <div className="rounded-xl transition-all duration-300" style={{
-                  boxShadow: isTargeted ? '0 0 0 2px var(--color-primary-300)' : 'none',
-                  backgroundColor: isTargeted ? 'color-mix(in srgb, var(--color-primary-100) 40%, transparent)' : 'transparent',
-                  paddingBottom: isTargeted ? '4px' : '0',
-                }}>
+                <div>
                   {item.submenu ? (
                     <div className="w-full">
                       <button
                         type="button"
                         onClick={() => toggleSubmenu(item.name)}
-                        className="w-full flex items-center text-left rounded-xl transition-all duration-200 group relative justify-between px-4 py-3"
-                        style={{
-                          backgroundColor: expandedMenus[item.name] ? 'var(--color-bg-hover)' : isTargeted ? 'var(--color-primary-50)' : 'transparent',
-                          color: 'var(--color-text-primary)'
-                        }}
+                        aria-expanded={Boolean(expandedMenus[item.name])}
+                        data-active={isActive || isTargeted}
+                        data-expanded={Boolean(expandedMenus[item.name])}
+                        className="talio-sidebar-row justify-between text-left"
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <div
-                            className="transition-colors p-2 rounded-lg"
-                            style={{
-                              backgroundColor: expandedMenus[item.name] ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
-                              color: expandedMenus[item.name] ? 'white' : 'var(--color-primary-700)'
-                            }}
-                          >
-                            <item.icon className="w-5 h-5" />
+                          <div className="talio-sidebar-icon">
+                            <item.icon className="h-[18px] w-[18px]" />
                           </div>
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            {item.name === 'Attendance & Leaves' ? (
-                              <span className="text-sm font-medium leading-tight text-left">
-                                Attendance &<br />Leaves
-                              </span>
-                            ) : (
-                              <span className="text-sm font-medium truncate">{item.name}</span>
-                            )}
-                            {item.isNew && (
-                              <Chip size="sm" color="success" variant="flat" className="h-4 text-[9px] px-1.5 font-semibold">
-                                NEW
-                              </Chip>
-                            )}
-                            <InlineBadge count={getBadgeCount(item.name)} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-[13px] font-semibold">{item.name}</span>
+                              <InlineBadge count={getNavigationBadgeCount(item, getBadgeCount)} />
+                            </div>
                           </div>
                         </div>
                         <div className={`transition-transform duration-200 flex-shrink-0 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
@@ -477,30 +481,13 @@ export default function SlidingSidebar({
                         </div>
                       </button>
                       {expandedMenus[item.name] && (
-                        <div className="mt-2 space-y-1 ml-8 pl-3" style={{ borderLeft: '2px solid var(--color-primary-200)' }}>
-                          {item.submenu.map((subItem) => (
-                            <Link
-                              key={subItem.path}
-                              href={subItem.path}
-                              onClick={() => handleLinkClick(subItem.path)}
-                              className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
-                              style={{
-                                backgroundColor: effectivePath === subItem.path ? 'var(--color-primary-500)' : 'transparent',
-                                color: effectivePath === subItem.path ? 'white' : 'var(--color-text-secondary)'
-                              }}
-                            >
-                              <span className="flex items-center gap-2">
-                                {subItem.name}
-                                {subItem.isNew && (
-                                  <Chip size="sm" color="success" variant="flat" className="h-4 text-[9px] px-1.5 font-semibold">
-                                    NEW
-                                  </Chip>
-                                )}
-                              </span>
-                              <InlineBadge count={getSubmenuBadgeCount(subItem.name)} />
-                            </Link>
-                          ))}
-                        </div>
+                        <SidebarSubmenu
+                          item={item}
+                          effectivePath={effectivePath}
+                          onNavigate={handleLinkClick}
+                          getBadgeCount={getSubmenuBadgeCount}
+                          expandAll={Boolean(menuQuery)}
+                        />
                       )}
                     </div>
                   ) : item.name === 'Chat' ? (
@@ -509,25 +496,15 @@ export default function SlidingSidebar({
                         toggleWidget('sidebar')
                         handleLinkClick(null)
                       }}
-                      className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
-                      style={{
-                        backgroundColor: 'transparent',
-                        color: 'var(--color-text-primary)'
-                      }}
+                      className="talio-sidebar-row text-left"
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <div
-                          className="transition-colors relative p-2 rounded-lg"
-                          style={{
-                            backgroundColor: 'var(--color-primary-100)',
-                            color: 'var(--color-primary-600)'
-                          }}
-                        >
-                          <item.icon className="w-5 h-5" />
+                        <div className="talio-sidebar-icon relative">
+                          <item.icon className="h-[18px] w-[18px]" />
                           {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
                         </div>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="text-sm font-medium truncate">{item.name}</span>
+                          <span className="truncate text-[13px] font-medium">{item.name}</span>
                         </div>
                       </div>
                     </button>
@@ -535,29 +512,16 @@ export default function SlidingSidebar({
                     <Link
                       href={item.path}
                       onClick={() => handleLinkClick(item.path)}
-                      className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
-                      style={{
-                        backgroundColor: isActive ? 'var(--color-primary-500)' : 'transparent',
-                        color: isActive ? 'white' : 'var(--color-text-primary)'
-                      }}
+                      aria-current={isActive ? 'page' : undefined}
+                      data-active={isActive}
+                      className="talio-sidebar-row text-left"
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <div
-                          className="transition-colors p-2 rounded-lg"
-                          style={{
-                            backgroundColor: isActive ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
-                            color: isActive ? 'white' : 'var(--color-primary-700)'
-                          }}
-                        >
-                          <item.icon className="w-5 h-5" />
+                        <div className="talio-sidebar-icon">
+                          <item.icon className="h-[18px] w-[18px]" />
                         </div>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="text-sm font-medium truncate">{item.name}</span>
-                          {item.isNew && (
-                            <Chip size="sm" color="success" variant="flat" className="h-4 text-[9px] px-1.5 font-semibold">
-                              NEW
-                            </Chip>
-                          )}
+                          <span className="truncate text-[13px] font-medium">{item.name}</span>
                           {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
                         </div>
                       </div>
@@ -568,29 +532,28 @@ export default function SlidingSidebar({
             )
           })}
 
+          {visibleNavigationItems.length === 0 && (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>No tools found</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--color-text-secondary)' }}>Try a module, action, or page name.</p>
+            </div>
+          )}
+
           {/* Divider + Settings / Logout - bottom of menu */}
-          <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
+          <div className="mx-2 my-2 border-t" style={{ borderColor: 'color-mix(in srgb, var(--color-text-secondary) 12%, transparent)' }} />
 
           <Link
             href="/dashboard/settings"
             onClick={() => handleLinkClick('/dashboard/settings')}
-            className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
-            style={{
-              backgroundColor: effectivePath === '/dashboard/settings' ? 'var(--color-primary-500)' : 'transparent',
-              color: effectivePath === '/dashboard/settings' ? 'white' : 'var(--color-text-primary)'
-            }}
+            aria-current={effectivePath === '/dashboard/settings' ? 'page' : undefined}
+            data-active={effectivePath === '/dashboard/settings'}
+            className="talio-sidebar-row text-left"
           >
             <div className="flex items-center gap-3 flex-1">
-              <div
-                className="transition-colors p-2 rounded-lg"
-                style={{
-                  backgroundColor: effectivePath === '/dashboard/settings' ? 'var(--color-primary-600)' : 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
-                  color: effectivePath === '/dashboard/settings' ? 'white' : 'var(--color-primary-600)'
-                }}
-              >
-                <HiOutlineCog6Tooth className="w-5 h-5" />
+              <div className="talio-sidebar-icon">
+                <SIDEBAR_ACTION_ICONS.settings className="h-[18px] w-[18px]" />
               </div>
-              <span className="text-sm font-medium truncate">Settings</span>
+              <span className="truncate text-[13px] font-medium">Settings</span>
             </div>
           </Link>
 
@@ -598,39 +561,28 @@ export default function SlidingSidebar({
             <Link
               href="/dashboard/app-info"
               onClick={() => handleLinkClick('/dashboard/app-info')}
-              className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
-              style={{
-                backgroundColor: effectivePath === '/dashboard/app-info' ? 'var(--color-primary-500)' : 'transparent',
-                color: effectivePath === '/dashboard/app-info' ? 'white' : 'var(--color-text-primary)'
-              }}
+              aria-current={effectivePath === '/dashboard/app-info' ? 'page' : undefined}
+              data-active={effectivePath === '/dashboard/app-info'}
+              className="talio-sidebar-row text-left"
             >
               <div className="flex items-center gap-3 flex-1">
-                <div
-                  className="transition-colors p-2 rounded-lg"
-                  style={{
-                    backgroundColor: effectivePath === '/dashboard/app-info' ? 'var(--color-primary-600)' : 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
-                    color: effectivePath === '/dashboard/app-info' ? 'white' : 'var(--color-primary-600)'
-                  }}
-                >
-                  <HiOutlineInformationCircle className="w-5 h-5" />
+                <div className="talio-sidebar-icon">
+                  <SIDEBAR_ACTION_ICONS.appInfo className="h-[18px] w-[18px]" />
                 </div>
-                <span className="text-sm font-medium truncate">App Info</span>
+                <span className="truncate text-[13px] font-medium">App Info</span>
               </div>
             </Link>
           )}
 
           <button
             onClick={() => setShowLogoutConfirm(true)}
-            className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3 hover:bg-danger-50 dark:hover:bg-danger-900/20"
-            style={{
-              color: 'var(--color-text-primary)'
-            }}
+            className="talio-sidebar-row text-left hover:!bg-danger-50 dark:hover:!bg-danger-900/20"
           >
             <div className="flex items-center gap-3 flex-1">
-              <div className="transition-colors p-2 rounded-lg" style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)' }}>
-                <HiOutlineArrowRightOnRectangle className="w-5 h-5 text-danger-500" />
+              <div className="talio-sidebar-icon !bg-danger-50 !text-danger-500 dark:!bg-danger-900/20">
+                <SIDEBAR_ACTION_ICONS.logout className="h-[18px] w-[18px]" />
               </div>
-              <span className="text-sm font-medium truncate text-danger-500">Logout</span>
+              <span className="truncate text-[13px] font-medium text-danger-500">Logout</span>
             </div>
           </button>
         </ScrollShadow>

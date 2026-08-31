@@ -51,7 +51,7 @@ const RECOMMENDED_ENV_VARS = [
   'SUPERADMIN_DB_NAME',
 ];
 const OPTIONAL_INTEGRATIONS = [
-  ['GEMINI_API_KEY', 'Gemini AI (set GEMINI_API_KEY_1..N for key rotation)'],
+  ['POLLINATIONS_API_KEY', 'Pollinations.ai (AI text + vision)'],
   ['IMAGEKIT_PUBLIC_KEY', 'ImageKit (legacy uploads)'],
   ['SMTP_HOST', 'Outbound email'],
   ['FCM_SERVER_KEY', 'Push notifications'],
@@ -87,48 +87,15 @@ const OPTIONAL_INTEGRATIONS = [
   console.log('[boot] ✓ environment validation complete');
 })();
 
-// ── Startup Gemini key audit ──────────────────────────────────────────
-// Collect all GEMINI_API_KEY_* env vars and log their status.
-(function auditGeminiKeys() {
-  const keyPattern = /^GEMINI_API_KEY_\d+$/i;
-  const numbered = Object.keys(process.env)
-    .filter((k) => keyPattern.test(k))
-    .sort((a, b) => {
-      const na = parseInt(a.match(/\d+$/)?.[0] || '0', 10);
-      const nb = parseInt(b.match(/\d+$/)?.[0] || '0', 10);
-      return na - nb;
-    });
-
-  const validKeys = [];
-  const emptySlots = [];
-
-  for (const k of numbered) {
-    const v = (process.env[k] || '').trim();
-    if (!v) {
-      emptySlots.push(k);
-    } else if (v.length >= 10) {
-      validKeys.push({ slot: k, value: v });
-    } else {
-      console.warn(`[boot] ⚠️  ${k} is too short (${v.length} chars) — skipping.`);
-    }
+// ── Startup Pollinations key audit ───────────────────────────────────
+(function auditPollinationsKey() {
+  const key = (process.env.POLLINATIONS_API_KEY || '').trim();
+  if (!key) {
+    console.error('[boot] ❌ POLLINATIONS_API_KEY is not set. AI features will fail. Get a key from https://enter.pollinations.ai/keys');
+    return;
   }
-
-  // Legacy fallback
-  const legacy = (process.env.GEMINI_API_KEY || '').trim();
-  if (legacy && legacy.length >= 10) {
-    validKeys.push({ slot: 'GEMINI_API_KEY (legacy)', value: legacy });
-  }
-
-  console.log(`[boot] 🔑 Gemini keys: ${validKeys.length} loaded, ${emptySlots.length} empty`);
-  if (validKeys.length === 0) {
-    console.error('[boot] ❌ ZERO Gemini API keys configured. Get keys from https://aistudio.google.com/apikey');
-  } else if (validKeys.length < 2) {
-    console.warn('[boot] ⚠️  Only 1 Gemini key — rate-limit resilience is reduced.');
-  }
-  for (const vk of validKeys) {
-    const masked = vk.value.length > 10 ? `${vk.value.slice(0, 6)}…${vk.value.slice(-2)}` : '***';
-    console.log(`[boot]    ${vk.slot}=${masked}`);
-  }
+  const masked = key.length > 10 ? `${key.slice(0, 6)}…${key.slice(-2)}` : '***';
+  console.log(`[boot] 🔑 Pollinations key loaded: ${masked}`);
 })();
 
 // Latest desktop version – fetched from GitHub releases, refreshed every 5 min.

@@ -7,6 +7,7 @@ import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 import ModalPortal from '@/components/ui/ModalPortal'
 import { FEATURE_DEFINITIONS, FEATURE_BUNDLES, ALL_BUNDLE_KEYS, ALL_FEATURE_KEYS, getFeaturesForPlan, PLAN_TEMPLATES, isBundleEnabled, toggleBundle } from '@/lib/planFeatures'
+import HrmsModuleControls from '@/components/superadmin/HrmsModuleControls'
 
 export default function CompanyDetailPage({ params }) {
   const router = useRouter()
@@ -1892,6 +1893,11 @@ function FeaturesTab({ company, id, onUpdate }) {
           })}
         </div>
       </div>
+
+      <HrmsModuleControls
+        features={features}
+        onChange={(nextFeatures) => { setFeatures(nextFeatures); setHasChanges(true) }}
+      />
 
       {/* MIRA Tokens Editing */}
       <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">

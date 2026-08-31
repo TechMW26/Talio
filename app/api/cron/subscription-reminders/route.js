@@ -11,6 +11,7 @@
 
 import { NextResponse } from 'next/server';
 import { connectSuperadminDB } from '@/lib/superadminDb';
+import { getCronAuthErrorResponse } from '@/lib/cronAuth';
 import getTenantCompanyModel from '@/models/TenantCompany';
 import nodemailer from 'nodemailer';
 
@@ -234,14 +235,8 @@ async function sendSuperAdminAlert(transporter, companies) {
 
 export async function POST(request) {
   try {
-    // Verify cron secret
-    const cronSecret = request.headers.get('x-cron-secret');
-    if (cronSecret !== process.env.CRON_SECRET) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const authError = getCronAuthErrorResponse(request);
+    if (authError) return authError;
 
     console.log('[Subscription Reminder] Starting subscription reminder job...');
 
@@ -354,13 +349,8 @@ export async function POST(request) {
 export async function GET(request) {
   // For testing - show current subscription status
   try {
-    const cronSecret = request.headers.get('x-cron-secret');
-    if (cronSecret !== process.env.CRON_SECRET) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const authError = getCronAuthErrorResponse(request);
+    if (authError) return authError;
 
     await connectSuperadminDB();
     const TenantCompany = await getTenantCompanyModel();

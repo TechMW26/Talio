@@ -11,6 +11,7 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 export default function DocumentsPage() {
   const { user, employeeId } = useMemo(() => {
@@ -110,24 +111,10 @@ export default function DocumentsPage() {
     try {
       const token = localStorage.getItem('token')
 
-      // Upload the file via the upload API
-      const formData = new FormData()
-      formData.append('file', selectedFile)
-      formData.append('folder', 'documents')
-
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
+      const uploadData = await uploadAuthenticatedFile(selectedFile, {
+        category: 'documents',
+        token,
       })
-
-      const uploadData = await uploadResponse.json()
-
-      if (!uploadData.success) {
-        throw new Error(uploadData.message || 'Failed to upload file')
-      }
 
       // Now create the document record
       const docResponse = await fetch('/api/documents', {

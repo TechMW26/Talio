@@ -3,8 +3,31 @@ import { getAuthAndModels } from '@/lib/auth'
 import { generateContent, generateVisionContent } from '@/lib/gemini';
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 import { generateSmartContent } from '@/lib/promptEngine';
+import { compressScreenshot } from '@/lib/imageCompression';
 
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+/**
+ * Downscale/compress the client screenshot before sending it to the vision
+ * model. Keeps the payload small and consistent so vision calls stay fast.
+ */
+async function prepareVisionImage(canvasScreenshot) {
+  try {
+    const compressed = await compressScreenshot(canvasScreenshot, {
+      maxWidth: 1280,
+      maxHeight: 720,
+      quality: 80,
+      returnDataUri: true,
+    });
+    const match = compressed.fullData.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      return { mimeType: match[1], data: match[2] };
+    }
+  } catch (error) {
+    console.error('[Whiteboard] Screenshot compression failed:', error.message);
+  }
+  return { mimeType: 'image/png', data: canvasScreenshot.replace(/^data:image\/\w+;base64,/, '') };
+}
 
 // Convert canvas objects to a text description for AI
 function describeCanvasObjects(pages) {
@@ -93,7 +116,16 @@ function describeCanvasObjects(pages) {
     });
   });
 
-  return descriptions.join('\n');
+  const description = descriptions.join('\n');
+
+  // Cap the description so very large canvases don't produce an unbounded
+  // prompt (which slows down the vision model and can exceed route timeouts).
+  const MAX_DESCRIPTION_CHARS = 8000;
+  if (description.length > MAX_DESCRIPTION_CHARS) {
+    return `${description.slice(0, MAX_DESCRIPTION_CHARS)}\n... (canvas truncated for analysis)`;
+  }
+
+  return description;
 }
 
 // Analyze layout patterns from existing objects
@@ -331,8 +363,8 @@ Be genuinely helpful and insightful rather than just describing what you see. Sh
       // Use vision API if screenshot provided, otherwise text-only API
       let summary;
       if (hasScreenshot) {
-        const base64Data = canvasScreenshot.replace(/^data:image\/\w+;base64,/, '');
-        summary = await generateVisionContent(prompt, [{ mimeType: 'image/png', data: base64Data }]);
+        const visionImage = await prepareVisionImage(canvasScreenshot);
+        summary = await generateVisionContent(prompt, [visionImage]);
       } else {
         // Use Smart Content for text-only analysis to get better human-like responses
         summary = await generateSmartContent(prompt, {
@@ -395,8 +427,8 @@ ${hasScreenshot ? 'I can see your canvas now. ' : ''}Respond helpfully and natur
       let response;
       if (hasScreenshot) {
         const fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
-        const base64Data = canvasScreenshot.replace(/^data:image\/\w+;base64,/, '');
-        response = await generateVisionContent(fullPrompt, [{ mimeType: 'image/png', data: base64Data }]);
+        const visionImage = await prepareVisionImage(canvasScreenshot);
+        response = await generateVisionContent(fullPrompt, [visionImage]);
       } else {
         // Use Smart Content for chat to handle crude user inputs better
         response = await generateSmartContent(message, {

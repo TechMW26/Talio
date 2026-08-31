@@ -12,7 +12,7 @@ import {
   FaUniversity, FaFileDownload, FaSync
 } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import * as XLSX from 'xlsx'
+import { downloadExcelWorkbook } from '@/lib/client/spreadsheetExport'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -292,7 +292,7 @@ export default function PayrollPage() {
   }
 
   // Export to Excel
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (filteredPayrolls.length === 0) {
       toast.error('No payroll records to export')
       return
@@ -325,22 +325,16 @@ export default function PayrollPage() {
       'Status': p.status || 'draft',
     }))
 
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Payroll')
-
-    // Auto-size columns
-    const colWidths = Object.keys(exportData[0] || {}).map(key => ({
-      wch: Math.max(key.length, 15)
-    }))
-    ws['!cols'] = colWidths
-
     // Include venture code in filename if a specific venture is selected
     const selectedVentureData = ventures.find(v => v._id === selectedVenture)
     const ventureCode = selectedVentureData?.code ? `_${selectedVentureData.code}` : ''
     const fileName = `Payroll_${getMonthName(selectedMonth)}_${selectedYear}${ventureCode}.xlsx`
-    XLSX.writeFile(wb, fileName)
-    toast.success('Excel file downloaded!')
+    try {
+      await downloadExcelWorkbook(fileName, [{ name: 'Payroll', records: exportData }])
+      toast.success('Excel file downloaded!')
+    } catch (error) {
+      toast.error(error?.message || 'Could not export payroll')
+    }
   }
 
   // Bank formats for different Indian banks
@@ -363,7 +357,7 @@ export default function PayrollPage() {
   ]
 
   // Export bank sheet based on selected bank format
-  const exportBankSheet = () => {
+  const exportBankSheet = async () => {
     if (!selectedBank) {
       toast.error('Please select a bank')
       return
@@ -486,24 +480,18 @@ export default function PayrollPage() {
       })
     }
 
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Bank Sheet')
-
-    // Auto-size columns
-    const colWidths = Object.keys(exportData[0] || {}).map(key => ({
-      wch: Math.max(key.length + 2, 18)
-    }))
-    ws['!cols'] = colWidths
-
     // Include venture code in filename if a specific venture is selected
     const selectedVentureData = ventures.find(v => v._id === selectedVenture)
     const ventureCode = selectedVentureData?.code ? `_${selectedVentureData.code}` : ''
     const fileName = `BankSheet_${bankFormat?.format || 'GENERIC'}_${getMonthName(selectedMonth)}_${selectedYear}${ventureCode}.xlsx`
-    XLSX.writeFile(wb, fileName)
-    toast.success(`Bank sheet downloaded for ${bankFormat?.name || 'Generic'}!`)
-    bankSheetModal.onClose()
-    setSelectedBank('')
+    try {
+      await downloadExcelWorkbook(fileName, [{ name: 'Bank Sheet', records: exportData }])
+      toast.success(`Bank sheet downloaded for ${bankFormat?.name || 'Generic'}!`)
+      bankSheetModal.onClose()
+      setSelectedBank('')
+    } catch (error) {
+      toast.error(error?.message || 'Could not export the bank sheet')
+    }
   }
 
   // Delete single payroll

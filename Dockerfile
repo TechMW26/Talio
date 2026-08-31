@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ── Stage 1: deps ── ALL dependencies (dev + prod needed for Next.js build) ──
-# Use Debian slim instead of Alpine because onnxruntime-node segfaults on musl.
+# Debian slim keeps native image-processing builds predictable across CI hosts.
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 

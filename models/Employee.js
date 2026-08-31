@@ -116,6 +116,55 @@ const EmployeeSchema = new mongoose.Schema({
   dateOfLeaving: {
     type: Date,
   },
+  lifecycle: {
+    stage: {
+      type: String,
+      enum: ['preboarding', 'onboarding', 'probation', 'confirmed', 'notice_period', 'offboarding', 'alumni'],
+      default: 'onboarding',
+    },
+    onboarding: {
+      template: { type: String, enum: ['standard', 'experienced', 'intern', 'contractor'], default: 'standard' },
+      status: { type: String, enum: ['not_started', 'in_progress', 'completed'], default: 'not_started' },
+      owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', default: null },
+      targetDate: Date,
+      completedAt: Date,
+      checklist: [{
+        key: String,
+        label: String,
+        required: { type: Boolean, default: true },
+        completed: { type: Boolean, default: false },
+        completedAt: Date,
+        completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      }],
+    },
+    probation: {
+      applicable: { type: Boolean, default: true },
+      durationMonths: { type: Number, min: 1, max: 24, default: 3 },
+      status: { type: String, enum: ['not_started', 'in_progress', 'extended', 'confirmed', 'waived'], default: 'not_started' },
+      startDate: Date,
+      reviewDate: Date,
+      endDate: Date,
+      confirmedAt: Date,
+      extendedAt: Date,
+      extensionReason: { type: String, trim: true, maxlength: 1000 },
+    },
+    noticePeriodDays: { type: Number, min: 0, max: 365, default: 30 },
+    backgroundVerificationRequired: { type: Boolean, default: true },
+    assetProvisioningRequired: { type: Boolean, default: true },
+    offboarding: {
+      status: { type: String, enum: ['not_started', 'in_progress', 'clearance_pending', 'completed'], default: 'not_started' },
+      separationType: { type: String, enum: ['resignation', 'termination', 'retirement', 'contract_end', 'other'] },
+      resignationDate: Date,
+      lastWorkingDate: Date,
+      reason: { type: String, trim: true, maxlength: 2000 },
+      exitInterviewCompleted: { type: Boolean, default: false },
+      assetsReturned: { type: Boolean, default: false },
+      accessRevoked: { type: Boolean, default: false },
+      fullAndFinalStatus: { type: String, enum: ['not_started', 'pending', 'completed'], default: 'not_started' },
+      experienceLetterStatus: { type: String, enum: ['not_started', 'pending', 'issued'], default: 'not_started' },
+      completedAt: Date,
+    },
+  },
   employmentType: {
     type: String,
     enum: ['full-time', 'part-time', 'contract', 'intern'],
@@ -306,6 +355,7 @@ EmployeeSchema.index({ assignedTeamLead: 1 }); // Explicit team lead assignment 
 EmployeeSchema.index({ reportsTo: 1 }); // Executive reporting chain queries
 EmployeeSchema.index({ firstName: 'text', lastName: 'text', email: 'text' }); // Text search
 EmployeeSchema.index({ designation: 1 }); // Designation queries
+EmployeeSchema.index({ 'lifecycle.stage': 1, 'lifecycle.probation.reviewDate': 1 });
 
 export default mongoose.models.Employee || mongoose.model('Employee', EmployeeSchema);
 

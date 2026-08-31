@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { connectSuperadminDB } from '@/lib/superadminDb'
 import getTenantCompanyModel from '@/models/TenantCompany'
 import { getTenantModels } from '@/lib/tenantModels'
+import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -84,23 +85,8 @@ async function checkProfileDeadlinesForTenant(tenant, now) {
  */
 export async function GET(request) {
   try {
-    // Verify cron secret
-    const cronSecret = request.headers.get('x-cron-secret')
-    const authHeader = request.headers.get('authorization')
-    const expectedSecret = process.env.CRON_SECRET
-
-    // Accept either x-cron-secret header or Bearer token with cron secret
-    const isValidSecret =
-      (expectedSecret && cronSecret === expectedSecret) ||
-      (expectedSecret && authHeader === `Bearer ${expectedSecret}`)
-
-    if (expectedSecret && !isValidSecret) {
-      console.log('[Profile Deadline Check] Invalid cron secret')
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    const authError = getCronAuthErrorResponse(request)
+    if (authError) return authError
 
     const now = new Date()
     console.log(`[Profile Deadline Check] Starting multi-tenant processing at ${now.toISOString()}`)

@@ -9,6 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { connectSuperadminDB } from '@/lib/superadminDb';
+import { getCronAuthErrorResponse } from '@/lib/cronAuth';
 import getTenantCompanyModel from '@/models/TenantCompany';
 import { getTenantConnection } from '@/lib/tenantDb';
 import nodemailer from 'nodemailer';
@@ -135,14 +136,8 @@ async function sendLimitNotification(transporter, company, currentCount, maxUser
 
 export async function POST(request) {
   try {
-    // Verify cron secret
-    const cronSecret = request.headers.get('x-cron-secret');
-    if (cronSecret !== process.env.CRON_SECRET) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const authError = getCronAuthErrorResponse(request);
+    if (authError) return authError;
 
     console.log('[User Limit Check] Starting user limit check job...');
 
@@ -258,13 +253,8 @@ export async function POST(request) {
 export async function GET(request) {
   // Get current user counts for all companies
   try {
-    const cronSecret = request.headers.get('x-cron-secret');
-    if (cronSecret !== process.env.CRON_SECRET) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const authError = getCronAuthErrorResponse(request);
+    if (authError) return authError;
 
     await connectSuperadminDB();
     const TenantCompany = await getTenantCompanyModel();

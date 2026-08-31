@@ -12,6 +12,7 @@ import { playNotificationSound } from '@/utils/audio'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Checkbox, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { useAuthedSWRStatic } from '@/hooks/useAuthedSWR'
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 export default function ChatPage() {
   const router = useRouter()
@@ -486,15 +487,7 @@ export default function ChatPage() {
     setUploadingFile(true)
     try {
       const token = localStorage.getItem('token')
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      })
-      const uploadResult = await uploadResponse.json()
+      const uploadResult = await uploadAuthenticatedFile(file, { category: 'chat', token })
 
       if (uploadResult.success) {
         const response = await fetch(`/api/chat/${selectedChat._id}/messages`, {

@@ -28,6 +28,7 @@ import {
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import { formatDesignation, formatDepartments } from '@/lib/formatters'
 import { Button, Chip, Skeleton, Tooltip } from '@heroui/react'
+import EmployeeLifecyclePanel from '@/components/employees/EmployeeLifecyclePanel'
 
 function StatTile({ icon: Icon, label, value, accent = 'sky' }) {
   const accents = {
@@ -310,6 +311,7 @@ export default function EmployeeDetailPage() {
 
       {activeTab === 'overview' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          <EmployeeLifecyclePanel employeeId={employee._id} onEmployeeRefresh={refresh} />
           {/* Bio */}
           <div className="lg:col-span-2 rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 sm:p-8 relative overflow-hidden">
             <FaQuoteLeft className="absolute top-4 right-4 w-12 h-12 text-slate-100 dark:text-zinc-800" />

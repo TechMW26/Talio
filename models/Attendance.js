@@ -150,7 +150,7 @@ const AttendanceSchema = new mongoose.Schema({
   // Audit fields for tracking system-generated records
   source: {
     type: String,
-    enum: ['user_checkin', 'manual_entry', 'system_auto_absent', 'system_backfill', 'correction', 'import', 'auto_checkout'],
+    enum: ['user_checkin', 'manual_entry', 'system_auto_absent', 'system_backfill', 'correction', 'import', 'auto_checkout', 'attendance_machine'],
     default: 'user_checkin',
   },
   createdBySystem: {

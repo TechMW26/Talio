@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PREBUILT_MESSAGES, getMessagesByCategory } from '@/lib/elevenLabs';
+import { PREBUILT_MESSAGES, getMessagesByCategory } from '@/lib/audio';
 
 /**
  * GET /api/call-alert/templates

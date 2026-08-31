@@ -35,7 +35,7 @@ export async function POST(request) {
     [{"name": "New Year's Day", "date": "${year}-01-01", "type": "public", "description": "First day of the year", "category": "public"}]`
 
     // Use shared Gemini integration
-    const text = await generateContent(prompt)
+    const text = await generateContent(prompt, '', { useCase: 'json' })
     
     // Clean up markdown if present
     let cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim()

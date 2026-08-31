@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Select, SelectItem, Button, Skeleton } from '@heroui/react'
-import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaPalette, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop } from 'react-icons/fa'
+import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaPalette, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
@@ -11,6 +11,9 @@ import { useTheme } from '@/contexts/ThemeContext'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
+import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
+import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 
 // Dynamically import map component (client-side only)
 const GeofenceMap = dynamic(() => import('@/components/GeofenceMap'), { ssr: false })
@@ -99,6 +102,7 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('company')
+  const [settingsQuery, setSettingsQuery] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -110,6 +114,7 @@ export default function SettingsPage() {
     return userData ? JSON.parse(userData) : null
   }, [])
   const userRole = user?.role || ''
+  const { isFeatureEnabled } = useCompanyFeatures()
 
   const { data: deptHeadData } = useAuthedSWR('/api/team/check-head')
   const isDepartmentHead = deptHeadData?.success && deptHeadData?.isDepartmentHead
@@ -120,27 +125,51 @@ export default function SettingsPage() {
     // Admin and HR get company settings
     if (userRole === 'admin' || userRole === 'hr') {
       baseTabs.push(
-        { id: 'company', name: 'Company Settings', icon: FaBuilding },
-        { id: 'recruitment', name: 'Recruitment', icon: FaBriefcase },
-        { id: 'geofencing', name: 'Geofencing', icon: FaMapMarkerAlt },
-        { id: 'payroll', name: 'Payroll Settings', icon: FaMoneyBillWave },
+        { id: 'company', name: 'Organisation', description: 'Companies, identity and workplace defaults', group: 'Organisation', icon: FaBuilding },
+        { id: 'recruitment', name: 'Recruitment', description: 'Hiring channels and candidate workflows', group: 'People & lifecycle', icon: FaBriefcase },
+        { id: 'geofencing', name: 'Work locations', description: 'Geofences and attendance boundaries', group: 'Attendance & workplace', icon: FaMapMarkerAlt },
+        ...(isFeatureEnabled('attendanceMachines')
+          ? [{ id: 'attendance-machines', name: 'Attendance machines', description: 'Organisation and company biometric devices', group: 'Attendance & workplace', icon: FaFingerprint }]
+          : []),
+        { id: 'payroll', name: 'Payroll', description: 'Salary, deductions and processing rules', group: 'Payroll & finance', icon: FaMoneyBillWave },
       )
     }
 
     // Admin, HR, and Department Heads get notifications (check both role and isDepartmentHead flag)
     if (userRole === 'admin' || userRole === 'hr' || userRole === 'department_head' || isDepartmentHead) {
       baseTabs.push(
-        { id: 'notifications', name: 'Notifications', icon: FaBell }
+        { id: 'notifications', name: 'Notifications', description: 'Delivery channels and alerts', group: 'Communication', icon: FaBell }
       )
     }
 
     // All users get personalization
     baseTabs.push(
-      { id: 'personalization', name: 'Personalization', icon: FaPalette }
+      { id: 'personalization', name: 'Appearance', description: 'Theme and personal display preferences', group: 'Personal', icon: FaPalette }
     )
 
     return baseTabs
-  }, [userRole, isDepartmentHead])
+  }, [userRole, isDepartmentHead, isFeatureEnabled])
+
+  const visibleTabs = useMemo(() => {
+    const query = settingsQuery.trim().toLocaleLowerCase()
+    if (!query) return tabs
+    return tabs.filter((tab) => [tab.name, tab.description, tab.group]
+      .some((value) => value?.toLocaleLowerCase().includes(query)))
+  }, [settingsQuery, tabs])
+
+  const groupedTabs = useMemo(() => visibleTabs.reduce((groups, tab) => {
+    if (!groups[tab.group]) groups[tab.group] = []
+    groups[tab.group].push(tab)
+    return groups
+  }, {}), [visibleTabs])
+
+  const selectTab = (tabId) => {
+    setActiveTab(tabId)
+    if (typeof window === 'undefined') return
+    const searchParams = new URLSearchParams(window.location.search)
+    searchParams.set('tab', tabId)
+    window.history.replaceState({}, '', `${window.location.pathname}?${searchParams.toString()}`)
+  }
 
   // Set default active tab based on role
   useEffect(() => {
@@ -213,50 +242,93 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="page-container">
+    <div className="page-container talio-settings-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="page-header mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <FaCog className="w-6 h-6 text-indigo-600" />
-            Settings
-          </h1>
-          <p className="text-gray-600 mt-1">Configure your Talio system</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-600">Workspace controls</p>
+          <h1 className="page-title mt-1">Settings</h1>
+          <p className="page-subtitle">Manage organisation policies, integrations, and your preferences.</p>
         </div>
       </div>
 
-      {/* Horizontal Tabs */}
-      <div className="mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1">
-          <nav className="flex space-x-1 overflow-x-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${activeTab === tab.id
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.name}</span>
-                </button>
-              )
-            })}
+      <div className="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <label className="talio-surface block lg:hidden">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-default-400">Settings section</span>
+          <select
+            value={activeTab}
+            onChange={(event) => selectTab(event.target.value)}
+            className="w-full rounded-xl border border-default-200 bg-default-50 px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-primary-500"
+          >
+            {tabs.map((tab) => <option key={tab.id} value={tab.id}>{tab.name}</option>)}
+          </select>
+        </label>
+
+        <aside className="talio-surface hidden lg:sticky lg:top-5 lg:block">
+          <label className="flex items-center gap-2 rounded-xl border border-default-200 bg-default-50 px-3 py-2.5">
+            <FaSearch className="h-3.5 w-3.5 flex-shrink-0 text-default-400" />
+            <input
+              value={settingsQuery}
+              onChange={(event) => setSettingsQuery(event.target.value)}
+              placeholder="Search settings"
+              aria-label="Search settings"
+              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-default-400"
+            />
+          </label>
+
+          <nav className="mt-4 space-y-4" aria-label="Settings sections">
+            {Object.entries(groupedTabs).map(([group, groupTabs]) => (
+              <div key={group}>
+                <p className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-default-400">{group}</p>
+                <div className="space-y-1">
+                  {groupTabs.map((tab) => {
+                    const Icon = tab.icon
+                    const selected = activeTab === tab.id
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => selectTab(tab.id)}
+                        aria-current={selected ? 'page' : undefined}
+                        className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${selected ? 'bg-primary-500 text-white' : 'text-foreground hover:bg-default-100'}`}
+                      >
+                        <span className="flex items-start gap-3">
+                          <Icon className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'text-white' : 'text-primary-500'}`} />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{tab.name}</span>
+                            <span className={`mt-0.5 block text-xs leading-4 ${selected ? 'text-white/75' : 'text-default-500'}`}>{tab.description}</span>
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
-        </div>
-      </div>
 
-      {/* Content */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
-        {activeTab === 'company' && <CompanySettingsTab />}
-        {activeTab === 'recruitment' && <RecruitmentSettingsTab />}
-        {activeTab === 'geofencing' && <GeofencingTab />}
-        {activeTab === 'payroll' && <PayrollSettingsTab />}
-        {activeTab === 'notifications' && <NotificationsTab />}
-        {activeTab === 'personalization' && <PersonalizationTab />}
+          {visibleTabs.length === 0 && (
+            <div className="py-8 text-center">
+              <p className="text-sm font-medium text-foreground">No settings found</p>
+              <button type="button" onClick={() => setSettingsQuery('')} className="mt-2 text-xs font-semibold text-primary-600">Clear search</button>
+            </div>
+          )}
+        </aside>
+
+        {/* Content */}
+        <section className="talio-surface min-w-0" aria-live="polite">
+          <div className="mb-6 border-b border-default-200 pb-4">
+            <h2 className="text-xl font-bold text-foreground">{tabs.find((tab) => tab.id === activeTab)?.name}</h2>
+            <p className="mt-1 text-sm text-default-500">{tabs.find((tab) => tab.id === activeTab)?.description}</p>
+          </div>
+          {activeTab === 'company' && <CompanySettingsTab />}
+          {activeTab === 'recruitment' && <RecruitmentSettingsTab />}
+          {activeTab === 'geofencing' && <GeofencingTab />}
+          {activeTab === 'attendance-machines' && <AttendanceMachinesSettings />}
+          {activeTab === 'payroll' && <PayrollSettingsTab />}
+          {activeTab === 'notifications' && <NotificationsTab />}
+          {activeTab === 'personalization' && <PersonalizationTab />}
+        </section>
       </div>
     </div>
   )
@@ -722,19 +794,9 @@ function CompanySettingsTab() {
   const uploadLogo = async () => {
     if (!logoFile) return null
 
-    const uploadFormData = new FormData()
-    uploadFormData.append('file', logoFile)
-
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: uploadFormData
-      })
-      const data = await response.json()
+      const data = await uploadAuthenticatedFile(logoFile, { category: 'company', token })
       if (data.success) {
         // Handle both response formats (direct fileUrl or nested in data object)
         return data.fileUrl || (data.data && data.data.fileUrl)

@@ -3,6 +3,7 @@ import { connectSuperadminDB } from '@/lib/superadminDb'
 import getTenantCompanyModel from '@/models/TenantCompany'
 import { getTenantModels } from '@/lib/tenantModels'
 import { sendPushToUser } from '@/lib/pushNotification'
+import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // Allow up to 120 seconds for processing (auto-checkout + rectification)
@@ -472,13 +473,8 @@ async function rectifyAttendanceForTenant(tenant, targetDate) {
  */
 export async function GET(request) {
   try {
-    // Verify cron secret for security
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = getCronAuthErrorResponse(request)
+    if (authError) return authError
 
     console.log('[Auto-Checkout Cron] Starting midnight auto-checkout process...')
 

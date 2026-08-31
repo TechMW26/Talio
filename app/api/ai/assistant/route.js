@@ -101,7 +101,7 @@ export async function POST(request) {
       prompt += `Please guide the user through resolving this situation.\n`;
     }
 
-    const response = await generateContent(prompt, TALIO_SYSTEM_PROMPT);
+    const response = await generateContent(prompt, TALIO_SYSTEM_PROMPT, { useCase: 'assistant' });
 
     return NextResponse.json({
       success: true,

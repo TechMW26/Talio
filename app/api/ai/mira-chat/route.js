@@ -46,7 +46,7 @@ async function checkAndDeductToken(MiraTokenUsage, userId) {
 
 // Route all MIRA generation through the shared Gemini provider.
 async function generateContentWithSearch(prompt, systemInstruction) {
-  return generateContent(prompt, systemInstruction)
+  return generateContent(prompt, systemInstruction, { useCase: 'chat' })
 }
 
 // Build role-aware system prompt with user context

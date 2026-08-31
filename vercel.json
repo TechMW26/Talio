@@ -1,0 +1,30 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "regions": ["bom1"],
+  "functions": {
+    "app/api/queues/webhooks/route.js": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "talio-webhooks",
+          "retryAfterSeconds": 60,
+          "initialDelaySeconds": 0
+        }
+      ]
+    }
+  },
+  "crons": [
+    { "path": "/api/cron/process-email-queue", "schedule": "* * * * *" },
+    { "path": "/api/cron/process-scheduled-notifications", "schedule": "* * * * *" },
+    { "path": "/api/cron/finalize-meetings", "schedule": "* * * * *" },
+    { "path": "/api/cron/todo-reminders", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/auto-checkout", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/daily-productivity-cleanup", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/check-profile-deadlines", "schedule": "15 * * * *" },
+    { "path": "/api/cron/cleanup-expired-screenshots", "schedule": "10 * * * *" },
+    { "path": "/api/cron/mark-absent", "schedule": "0 19 * * *" },
+    { "path": "/api/cron/subscription-reminders/run", "schedule": "30 3 * * *" },
+    { "path": "/api/cron/user-limit-check/run", "schedule": "0 4 * * *" }
+  ]
+}

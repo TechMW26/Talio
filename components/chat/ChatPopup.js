@@ -8,6 +8,7 @@ import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { playNotificationSound } from '@/utils/audio'
 import Loader from '@/components/ui/Loader'
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 export default function ChatPopup({ chat, index }) {
   const { closeChat, chatPositions, updateChatPosition, bringToFront, triggerSource, widgetPosition, getZIndex, focusedChatId, sidebarCollapsed, isAutoMinimized } = useChatWidget()
@@ -716,22 +717,7 @@ export default function ChatPopup({ chat, index }) {
     try {
       const token = localStorage.getItem('token')
       
-      // Upload file first
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      })
-
-      const uploadData = await uploadResponse.json()
-      if (!uploadResponse.ok || !uploadData.success) {
-        throw new Error(uploadData.message || 'Failed to upload file')
-      }
+      const uploadData = await uploadAuthenticatedFile(file, { category: 'chat', token })
 
       // Determine if it's an image
       const isImage = file.type.startsWith('image/')
@@ -739,9 +725,9 @@ export default function ChatPopup({ chat, index }) {
       // Send message with file attachment
       const messagePayload = {
         content: isImage ? '' : file.name,
-        ...(isImage ? { image: uploadData.url } : { 
+        ...(isImage ? { image: uploadData.data.fileUrl } : {
           file: {
-            url: uploadData.url,
+            url: uploadData.data.fileUrl,
             name: file.name,
             size: file.size,
             type: file.type

@@ -55,7 +55,7 @@ Please respond in the following JSON format:
 
     try {
       console.log('[Ideas Expand] Using centralized custom AI...');
-      const text = await generateContent(prompt, systemInstruction);
+      const text = await generateContent(prompt, systemInstruction, { useCase: 'creative' });
 
       if (text) {
         expansion = parseAIJsonResponse(text, { expectedRoot: 'object' });

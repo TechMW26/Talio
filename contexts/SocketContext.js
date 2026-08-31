@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { io } from 'socket.io-client'
+import { createRealtimeClient } from '@/lib/client/realtimeSocketAdapter'
 import toast from '@/utils/toast'
 import { clearAllSessionCaches, validateAuthBackground } from '@/utils/sessionCache'
 
@@ -92,17 +92,24 @@ export function SocketProvider({ children }) {
 
     // Initialize Socket.IO connection
     // Use window.location.origin to connect to the same server
-    const socketInstance = io(window.location.origin, {
-      path: '/api/socketio',
-      transports: ['websocket', 'polling'], // Try websocket first, then fall back to polling
-      reconnection: true,
-      reconnectionDelay: 2000,
-      reconnectionDelayMax: 10000,
-      reconnectionAttempts: 3,
-      timeout: 10000,
-      autoConnect: true,
-      forceNew: false,
-      auth: token ? { token } : undefined,
+    const socketInstance = createRealtimeClient({
+      origin: window.location.origin,
+      token,
+      userId,
+      employeeId,
+      tenantId: tenantDatabaseName,
+      socketOptions: {
+        path: '/api/socketio',
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 2000,
+        reconnectionDelayMax: 10000,
+        reconnectionAttempts: 3,
+        timeout: 10000,
+        autoConnect: true,
+        forceNew: false,
+        auth: token ? { token } : undefined,
+      },
     })
 
     // =============================================
@@ -173,7 +180,7 @@ export function SocketProvider({ children }) {
     }
 
     const startHeartbeat = () => {
-      if (heartbeatTimer || socketConnectedOnce) return
+      if (heartbeatTimer || (socketConnectedOnce && !socketInstance.isManagedRealtime)) return
       sendHeartbeat() // Send immediately
       heartbeatTimer = setInterval(sendHeartbeat, 60000) // Then every 60s
     }
@@ -266,7 +273,11 @@ export function SocketProvider({ children }) {
       setIsConnected(true)
       socketConnectedOnce = true
       stopRefreshPolling() // No need to poll if Socket.IO works
-      stopHeartbeat() // Socket.IO handles presence natively
+      if (socketInstance.isManagedRealtime) {
+        startHeartbeat()
+      } else {
+        stopHeartbeat() // Socket.IO handles presence natively
+      }
 
       // Authenticate user if we have userId
       if (userId) {

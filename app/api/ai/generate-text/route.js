@@ -325,7 +325,7 @@ Write only the description, no headers or labels.`;
         );
     }
 
-    const generatedText = await generateContent(prompt, systemInstruction);
+    const generatedText = await generateContent(prompt, systemInstruction, { useCase: 'chat' });
 
     if (!generatedText) {
       return NextResponse.json(

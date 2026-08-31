@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import mongoose from 'mongoose'
 import { sendNotificationToMultipleDevices } from '@/lib/firebaseNotification'
+import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 
 // Import schemas directly for cron job (runs without user context)
 const PersonalTodoSchema = new mongoose.Schema({
@@ -42,16 +43,8 @@ const PersonalTodoSchema = new mongoose.Schema({
  */
 export async function GET(request) {
   try {
-    // Verify cron secret
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    const authError = getCronAuthErrorResponse(request)
+    if (authError) return authError
 
     await connectDB()
 

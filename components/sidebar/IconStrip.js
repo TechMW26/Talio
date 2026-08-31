@@ -4,10 +4,6 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   HiOutlineChevronRight,
-  HiOutlineCog6Tooth,
-  HiOutlineArrowRightOnRectangle,
-  HiOutlineUserCircle,
-  HiOutlineInformationCircle,
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
@@ -16,6 +12,12 @@ import { getMenuItemsForRole, NEW_MENU_PATHS } from '@/utils/roleBasedMenus'
 import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
 import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
 import { filterMenuByPermissions } from '@/utils/permissionFilters'
+import {
+  buildNavigationSections,
+  getNavigationBadgeCount,
+  isNavigationPathActive,
+  SIDEBAR_ACTION_ICONS,
+} from '@/utils/menuInformationArchitecture'
 import { getCurrentUser } from '@/utils/userHelper'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
@@ -96,9 +98,6 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
-  const [tooltipContent, setTooltipContent] = useState(null)
-  const tooltipY = useRef(0)
-  const tooltipRef = useRef(null)
   const menuContainerRef = useRef(null)
 
   // Load user only once on mount
@@ -222,6 +221,11 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     return filterMenuByPermissions(featureFilteredMenuItems, rbacPermissions, user.role)
   }, [featureFilteredMenuItems, user])
 
+  const navigationItems = useMemo(
+    () => buildNavigationSections(filteredMenuItems),
+    [filteredMenuItems]
+  )
+
   const handleLinkClick = (path) => {
     if (path && path !== pathname) {
       startNavigation(path)
@@ -261,7 +265,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     let firstSeenDirty = false
     const pending = new Set()
 
-    filteredMenuItems.forEach(item => {
+    navigationItems.forEach(item => {
       if (!item.isNew || !item.path) return
       if (dismissed[item.path]) return
       // Only show once: the moment we record `firstSeen`, it's the first (and
@@ -287,7 +291,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
       writeJsonMap(NEW_MENU_DISMISS_KEY, persistedDismissed)
     }, 8000)
     return () => clearTimeout(timer)
-  }, [mounted, filteredMenuItems, readJsonMap, writeJsonMap])
+  }, [mounted, navigationItems, readJsonMap, writeJsonMap])
 
   const dismissNewTooltip = useCallback((path) => {
     if (!path) return
@@ -305,11 +309,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
   // Helper to check if a menu item is active (optimistic highlight during navigation)
   const effectivePath = (isNavigating && targetPath) ? targetPath : pathname
   const isMenuItemActive = (item) => {
-    if (item.path === effectivePath) return true
-    if (item.submenu) {
-      return item.submenu.some(subItem => subItem.path === effectivePath)
-    }
-    return false
+    return isNavigationPathActive(item, effectivePath)
   }
 
   // Helper to get badge count for a menu item
@@ -416,10 +416,10 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
 
           <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
 
-          {filteredMenuItems.map((item, index) => {
+          {navigationItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
-            const badgeCount = getBadgeCount(item.name)
-            const showGroupDivider = item.group && index > 0 && filteredMenuItems[index - 1]?.group !== item.group
+            const badgeCount = getNavigationBadgeCount(item, getBadgeCount)
+            const showGroupDivider = item.group && index > 0 && navigationItems[index - 1]?.group !== item.group
             const isNewHighlighted = item.isNew && openNewPaths.has(item.path)
             const newRingClass = isNewHighlighted
               ? 'ring-2 ring-success-400 ring-offset-1 ring-offset-transparent animate-pulse'
@@ -551,7 +551,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
                 backgroundColor: effectivePath === '/dashboard/settings' ? 'var(--color-primary-500)' : 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
               }}
             >
-              <HiOutlineCog6Tooth
+              <SIDEBAR_ACTION_ICONS.settings
                 className="w-5 h-5 group-hover:text-white transition-colors"
                 style={{ color: effectivePath === '/dashboard/settings' ? 'white' : 'var(--color-primary-600)' }}
               />
@@ -568,7 +568,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
                   backgroundColor: effectivePath === '/dashboard/app-info' ? 'var(--color-primary-500)' : 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
                 }}
               >
-                <HiOutlineInformationCircle
+                <SIDEBAR_ACTION_ICONS.appInfo
                   className="w-5 h-5 group-hover:text-white transition-colors"
                   style={{ color: effectivePath === '/dashboard/app-info' ? 'white' : 'var(--color-primary-600)' }}
                 />
@@ -584,24 +584,12 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
                 backgroundColor: 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
               }}
             >
-              <HiOutlineArrowRightOnRectangle className="w-5 h-5 text-danger-500 group-hover:text-danger-600 transition-colors" />
+              <SIDEBAR_ACTION_ICONS.logout className="w-5 h-5 text-danger-500 group-hover:text-danger-600 transition-colors" />
             </button>
           </Tooltip>
         </div>
 
       </aside>
-
-      {/* Tooltip for hover state */}
-      {tooltipContent && (
-        <div
-          ref={tooltipRef}
-          className="fixed left-[4.5rem] ml-2 px-2 py-1 bg-default-900 text-white text-xs rounded pointer-events-none whitespace-nowrap z-[100] shadow-lg"
-          style={{ top: tooltipY.current, transform: 'translateY(-50%)' }}
-        >
-          {tooltipContent}
-          <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-default-900"></div>
-        </div>
-      )}
     </>
   )
 }

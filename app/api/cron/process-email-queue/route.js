@@ -6,6 +6,7 @@ import { getTenantModels } from '@/lib/tenantModels'
 import { processProjectEmailNotificationLog } from '@/lib/projectEmailNotifications'
 import getTenantCompanyModel from '@/models/TenantCompany'
 import { connectSuperadminDB } from '@/lib/superadminDb'
+import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 
 // Rate limiting configuration
 const EMAIL_RATE_LIMIT = {
@@ -149,17 +150,8 @@ async function processQueuedEmail(emailLog) {
  */
 export async function GET(request) {
   try {
-    // Verify cron secret to prevent unauthorized access
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      // Allow localhost/internal calls without secret for dev
-      const host = request.headers.get('host') || ''
-      if (!host.includes('localhost') && !host.includes('127.0.0.1')) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-    }
+    const authError = getCronAuthErrorResponse(request)
+    if (authError) return authError
 
     await connectDB()
     await connectSuperadminDB()

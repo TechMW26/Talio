@@ -11,6 +11,7 @@ import getTenantCompanyModel from '@/models/TenantCompany';
 import getUserTenantMappingModel from '@/models/UserTenantMapping';
 import { getTenantConnection, dropTenantDatabase } from '@/lib/tenantDb';
 import { mergeCompanyFeatures } from '@/lib/planFeatures';
+import { normalizeHrmsFeatures } from '@/lib/hrms/moduleRegistry';
 import { clearTenantCompanyFeaturesCache } from '@/lib/companyFeatures.server';
 import { buildCachePattern, clearCachePattern } from '@/lib/cache';
 
@@ -107,6 +108,9 @@ export async function PATCH(request, { params }) {
 
     const { id } = await params;
     const body = await request.json();
+    if (body.features && typeof body.features === 'object') {
+      body.features = normalizeHrmsFeatures(body.features)
+    }
     const TenantCompany = await getTenantCompanyModel();
 
     const company = await TenantCompany.findById(id);

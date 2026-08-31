@@ -84,6 +84,7 @@ export async function middleware(request) {
     '/api/recruitment/webhooks/linkedin',
     '/api/assetlinks',
     '/api/meetings/guest/', // Guest meeting access (public)
+    '/api/attendance-machines/ingest/', // Machine webhooks authenticate with a per-device token
     '/api/setup/check',
     '/api/setup/create-admin',
     '/api/setup/tenant', // Tenant setup with setup code

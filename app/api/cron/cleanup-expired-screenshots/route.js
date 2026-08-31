@@ -6,24 +6,12 @@ import { getTenantModels } from '@/lib/tenantModels';
 import { cleanupOrphanedScreenshots, deleteOldScreenshots } from '@/lib/gridfs';
 import { cleanupExpiredScreenshotsForTenant } from '@/lib/productivityScreenshotRetention';
 import { getScreenshotRetentionCutoff } from '@/lib/productivitySessionRules';
-
-function isAuthorizedCronRequest(request) {
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (!cronSecret || authHeader === `Bearer ${cronSecret}`) {
-        return true;
-    }
-
-    const host = request.headers.get('host') || '';
-    return host.includes('localhost') || host.includes('127.0.0.1');
-}
+import { getCronAuthErrorResponse } from '@/lib/cronAuth';
 
 async function runCleanup(request) {
     try {
-        if (!isAuthorizedCronRequest(request)) {
-            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-        }
+        const authError = getCronAuthErrorResponse(request);
+        if (authError) return authError;
 
         await connectDB();
         await connectSuperadminDB();

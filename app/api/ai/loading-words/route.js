@@ -99,7 +99,7 @@ export async function POST(request) {
       'Output format strictly: {"words":["Word1","Word2"]}',
     ].join('\n');
 
-    const raw = await generateContent(prompt, systemInstruction);
+    const raw = await generateContent(prompt, systemInstruction, { useCase: 'creative' });
 
     let parsed = null;
     try {

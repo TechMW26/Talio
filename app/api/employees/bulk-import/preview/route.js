@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import * as XLSX from 'xlsx'
+import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
 import { generateContent } from '@/lib/gemini'
 import { LEVEL_NAMES, inferLevelFromTitle } from '@/lib/designationLevels'
 
@@ -183,7 +183,7 @@ Example: {"0": "employeeCode", "1": "split:firstName,lastName", "2": "email", "3
 
 JSON only:`
 
-    const response = await generateContent(prompt, 'Return only valid JSON object, no markdown, no explanation, no code blocks.')
+    const response = await generateContent(prompt, 'Return only valid JSON object, no markdown, no explanation, no code blocks.', { useCase: 'json' })
     
     // Extract JSON from response (handle various formats)
     let jsonStr = response.trim()
@@ -737,18 +737,14 @@ export async function POST(request) {
     }
 
     const fileName = file.name || ''
-    if (!fileName.match(/\.(xlsx|xls)$/i)) {
+    if (!fileName.match(/\.xlsx$/i)) {
       return NextResponse.json({ success: false, message: 'Invalid file format' }, { status: 400 })
     }
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
     
-    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false })
-    const sheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[sheetName]
-    
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true })
+    const rawData = await readFirstWorksheetRows(buffer)
     
     if (rawData.length < 2) {
       return NextResponse.json({ success: false, message: 'Excel file is empty' }, { status: 400 })

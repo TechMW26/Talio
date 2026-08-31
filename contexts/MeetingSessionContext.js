@@ -7,8 +7,11 @@ import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
 
 const MeetingSessionContext = createContext(null)
 const ROOM_PATH_PATTERN = /^\/dashboard\/meetings\/room\/([^/]+)/
+const useManagedMeetings = process.env.NEXT_PUBLIC_MEETING_TRANSPORT === 'livekit'
 const MeetingRoomSession = dynamic(
-  () => import('@/components/meetings/MeetingRoomSession'),
+  () => useManagedMeetings
+    ? import('@/components/meetings/ManagedMeetingRoomSession')
+    : import('@/components/meetings/MeetingRoomSession'),
   {
     ssr: false,
     loading: () => (

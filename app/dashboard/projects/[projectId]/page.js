@@ -34,6 +34,7 @@ import Portal from '@/components/ui/Portal'
 import ModalPortal from '@/components/ui/ModalPortal'
 import Loader from '@/components/ui/Loader'
 import SubtaskCompletionButton from '@/components/tasks/SubtaskCompletionButton'
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 const statusColors = {
   planned: 'bg-blue-100 text-blue-800',
@@ -226,22 +227,7 @@ export default function ProjectDetailPage() {
       setUploadingTaskAttachments(true)
       const token = localStorage.getItem('token')
       const uploads = await Promise.all(Array.from(files).map(async (file) => {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('folder', 'tasks')
-
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        })
-
-        const result = await response.json()
-        if (!result.success) {
-          throw new Error(result.message || 'Upload failed')
-        }
+        const result = await uploadAuthenticatedFile(file, { category: 'tasks', token })
 
         return {
           name: result.data.fileName || file.name,

@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server'
+import crypto from 'node:crypto'
 import { getAuthAndModels } from '@/lib/auth'
 import { logActivity } from '@/lib/activityLogger'
 import { emitRecruitmentUpdate, emitEmployeeUpdate } from '@/lib/realtimeEvents'
+import { buildEmployeeLifecycle, createInitialLifecycleWorkflows } from '@/lib/hrms/employeeLifecycle.server'
+import { sendAndLogOnboardingEmail } from '@/lib/mailer'
+import { checkUserLimit, getTenantCompanyByDbName, registerUserTenantMapping } from '@/lib/tenantContext'
 
 // POST - Convert hired candidate to employee
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Candidate', 'JobPosting', 'Employee', 'Department', 'Designation', 'User'])
+    const auth = await getAuthAndModels(request, ['Candidate', 'JobPosting', 'Employee', 'Department', 'Designation', 'User', 'Role', 'OnboardingEmail', 'CompanySettings', 'HrmsWorkflow', 'HrmsWorkflowEvent'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models, tenant } = auth
-    const { Candidate, JobPosting, Employee, User } = models
+    const { Candidate, Employee, User, Role, OnboardingEmail, CompanySettings } = models
 
     if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
@@ -44,22 +48,94 @@ export async function POST(request) {
       )
     }
 
+    const effectiveEmployeeCode = employeeCode || `EMP-${Date.now().toString(36).toUpperCase()}`
+    const [existingEmployee, existingUser, limitCheck] = await Promise.all([
+      Employee.findOne({ $or: [{ email: candidate.email }, { employeeCode: effectiveEmployeeCode }] }).select('_id').lean(),
+      User.findOne({ email: candidate.email }).select('_id').lean(),
+      tenant?.databaseName ? checkUserLimit(tenant.databaseName) : Promise.resolve({ allowed: true }),
+    ])
+    if (existingEmployee || existingUser) {
+      return NextResponse.json({ success: false, message: 'An employee or user with this email/code already exists' }, { status: 409 })
+    }
+    if (!limitCheck.allowed) {
+      return NextResponse.json({ success: false, message: limitCheck.message || 'User limit reached' }, { status: 403 })
+    }
+
     // Create employee record
     const employeeData = {
       firstName: candidate.firstName,
       lastName: candidate.lastName,
       email: candidate.email,
       phone: candidate.phone,
-      employeeCode: employeeCode || `EMP-${Date.now().toString(36).toUpperCase()}`,
+      employeeCode: effectiveEmployeeCode,
       department: department || candidate.jobPosting?.department,
       designation: designation || candidate.jobPosting?.designation,
-      joiningDate: joiningDate || candidate.offer?.joiningDate || new Date(),
-      status: 'active',
+      dateOfJoining: joiningDate || candidate.offer?.joiningDate || new Date(),
       skills: candidate.skills,
-      salary: candidate.offer?.salary || candidate.expectedSalary,
+      salary: (candidate.offer?.salary || candidate.expectedSalary)
+        ? { grossSalary: Number(candidate.offer?.salary || candidate.expectedSalary) }
+        : undefined,
     }
 
+    try {
+      employeeData.lifecycle = buildEmployeeLifecycle({ ...data, dateOfJoining: employeeData.dateOfJoining })
+    } catch (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+    }
+    employeeData.status = employeeData.lifecycle.stage !== 'preboarding' && employeeData.lifecycle.probation.applicable ? 'probation' : 'active'
+
     const employee = await Employee.create(employeeData)
+    const temporaryPassword = `${crypto.randomBytes(12).toString('base64url')}aA1!`
+    let employeeUser
+    try {
+      const employeeRole = await Role.findOne({ name: 'employee' }).select('_id').lean()
+      employeeUser = await User.create({
+        email: candidate.email,
+        password: temporaryPassword,
+        role: 'employee',
+        roleId: employeeRole?._id,
+        employeeId: employee._id,
+        forcePasswordChange: true,
+      })
+      employee.userId = employeeUser._id
+      await employee.save()
+    } catch (error) {
+      await Employee.deleteOne({ _id: employee._id }).catch(() => {})
+      throw error
+    }
+    await createInitialLifecycleWorkflows({
+      models,
+      actor: user,
+      employee,
+      features: auth.companyFeatures,
+    }).catch((error) => console.error('[Candidate Convert] Lifecycle workflow initialization failed:', error))
+
+    const tenantCompany = tenant?.databaseName ? await getTenantCompanyByDbName(tenant.databaseName) : null
+    if (tenantCompany) {
+      await registerUserTenantMapping({
+        email: candidate.email,
+        tenantCompanyId: tenantCompany._id,
+        databaseName: tenant.databaseName,
+        companyName: tenantCompany.name,
+        companySlug: tenantCompany.slug,
+        role: 'employee',
+      }).catch((error) => console.error('[Candidate Convert] Tenant mapping failed:', error))
+    }
+
+    await sendAndLogOnboardingEmail({
+      employeeId: employee._id,
+      userId: employeeUser._id,
+      to: candidate.email,
+      firstName: candidate.firstName,
+      lastName: candidate.lastName,
+      email: candidate.email,
+      password: temporaryPassword,
+      employeeCode: employee.employeeCode,
+      designation: candidate.jobPosting?.jobTitle,
+      dateOfJoining: employee.dateOfJoining,
+      triggeredBy: 'candidate_conversion',
+      models: { OnboardingEmail, CompanySettings },
+    }).catch((error) => console.error('[Candidate Convert] Onboarding email failed:', error))
 
     // Update candidate with employee reference
     candidate.convertedEmployeeId = employee._id
@@ -88,6 +164,7 @@ export async function POST(request) {
     }
 
     emitRecruitmentUpdate({ candidate: candidateId, employee: employee._id }, { action: 'hire' })
+    emitEmployeeUpdate({ action: 'created', employee, departmentId: employee.department })
 
     return NextResponse.json({
       success: true,

@@ -11,6 +11,7 @@ import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificatio
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { getTodayDateString } from '@/lib/timezone'
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 /**
  * CreateTaskModal - Standalone task creation modal.
@@ -100,18 +101,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
       setUploadingAttachments(true)
       const token = localStorage.getItem('token')
       const uploads = await Promise.all(Array.from(files).map(async (file) => {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('folder', 'tasks')
-
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        })
-
-        const result = await response.json()
-        if (!result.success) throw new Error(result.message || 'Upload failed')
+        const result = await uploadAuthenticatedFile(file, { category: 'tasks', token })
 
         return {
           name: result.data.fileName || file.name,

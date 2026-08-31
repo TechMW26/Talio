@@ -3,6 +3,7 @@ import { connectSuperadminDB } from '@/lib/superadminDb'
 import getTenantCompanyModel from '@/models/TenantCompany'
 import { getTenantModels } from '@/lib/tenantModels'
 import { sendPushToUsers } from '@/lib/pushNotification'
+import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -314,25 +315,8 @@ async function processNotificationsForTenant(tenant, now) {
  */
 export async function GET(request) {
   try {
-    // Verify cron secret
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (!cronSecret) {
-      console.error('[Cron] CRON_SECRET not configured')
-      return NextResponse.json(
-        { success: false, message: 'Cron secret not configured' },
-        { status: 500 }
-      )
-    }
-
-    if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
-      console.error('[Cron] Unauthorized access attempt')
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    const authError = getCronAuthErrorResponse(request)
+    if (authError) return authError
 
     const now = new Date()
     console.log(`[Cron] Starting multi-tenant notification processing at ${now.toISOString()}`)

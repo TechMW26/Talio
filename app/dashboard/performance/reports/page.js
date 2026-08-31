@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import toast from '@/utils/toast'
-import * as XLSX from 'xlsx'
+import { downloadExcelWorkbook } from '@/lib/client/spreadsheetExport'
 import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle, FaRocket, FaUserFriends } from 'react-icons/fa'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart, ComposedChart } from 'recharts'
 import CustomTooltip from '@/components/charts/CustomTooltip'
@@ -727,10 +727,10 @@ export default function PerformanceReportsPage() {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
   }
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (!reportData) return
 
-    const wb = XLSX.utils.book_new()
+    const sheets = []
 
     // Overview Sheet
     const overviewData = [
@@ -757,8 +757,7 @@ export default function PerformanceReportsPage() {
       ['AI Session Productivity', reportData.sessionProductivityScore != null ? reportData.sessionProductivityScore + '%' : 'N/A'],
       ['Employees with AI Data', reportData.employeesWithSessionData || 0]
     ]
-    const ws1 = XLSX.utils.aoa_to_sheet(overviewData)
-    XLSX.utils.book_append_sheet(wb, ws1, 'Overview')
+    sheets.push({ name: 'Overview', rows: overviewData })
 
     // Department Performance
     const deptData = [
@@ -770,8 +769,7 @@ export default function PerformanceReportsPage() {
         d.projectCompletion, d.productivity, d.sessionProductivity != null ? d.sessionProductivity + '%' : 'N/A', d.quality, d.innovation
       ])
     ]
-    const ws2 = XLSX.utils.aoa_to_sheet(deptData)
-    XLSX.utils.book_append_sheet(wb, ws2, 'Department Performance')
+    sheets.push({ name: 'Department Performance', rows: deptData })
 
     // Employee Metrics
     const empData = [
@@ -784,8 +782,7 @@ export default function PerformanceReportsPage() {
         e.productivity, e.sessionProductivity != null ? e.sessionProductivity + '%' : 'N/A', e.sessionCount || 0, e.quality, e.innovation, e.engagement
       ])
     ]
-    const ws3 = XLSX.utils.aoa_to_sheet(empData)
-    XLSX.utils.book_append_sheet(wb, ws3, 'Employee Metrics')
+    sheets.push({ name: 'Employee Metrics', rows: empData })
 
     // Attendance Stats Sheet
     if (attendanceStats) {
@@ -811,8 +808,7 @@ export default function PerformanceReportsPage() {
           e.lateArrivals, e.presentDays, e.absentDays
         ])
       ]
-      const ws4 = XLSX.utils.aoa_to_sheet(attendanceData)
-      XLSX.utils.book_append_sheet(wb, ws4, 'Attendance')
+      sheets.push({ name: 'Attendance', rows: attendanceData })
     }
 
     // Task Stats Sheet
@@ -836,12 +832,15 @@ export default function PerformanceReportsPage() {
           e.onTimeDeliveryRate + '%', e.overdueTasks, e.inProgressTasks
         ])
       ]
-      const ws5 = XLSX.utils.aoa_to_sheet(taskData)
-      XLSX.utils.book_append_sheet(wb, ws5, 'Tasks')
+      sheets.push({ name: 'Tasks', rows: taskData })
     }
 
-    XLSX.writeFile(wb, `performance-report-${dateRange.startDate}-to-${dateRange.endDate}.xlsx`)
-    toast.success('Excel report exported successfully')
+    try {
+      await downloadExcelWorkbook(`performance-report-${dateRange.startDate}-to-${dateRange.endDate}.xlsx`, sheets)
+      toast.success('Excel report exported successfully')
+    } catch (error) {
+      toast.error(error?.message || 'Could not export the Excel report')
+    }
   }
 
   const filteredEmployees = reportData?.employeePerformance.filter(emp => {

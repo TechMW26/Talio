@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { generateVisionContent } from '@/lib/gemini'
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
+import { compressScreenshot } from '@/lib/imageCompression'
 import fs from 'fs/promises'
 import path from 'path'
 import { getImage, getImageInfo } from '@/lib/gridfs'
@@ -59,6 +60,28 @@ function getMimeType(url) {
   if (lowerUrl.includes('.webp')) return 'image/webp'
   if (lowerUrl.includes('.gif')) return 'image/gif'
   return 'image/jpeg' // Default to JPEG
+}
+
+/**
+ * Downscale/compress an uploaded document image before OCR so large photos
+ * don't slow down or exceed the vision model's request budget.
+ */
+async function compressForOCR(imageData) {
+  try {
+    const compressed = await compressScreenshot(imageData.base64, {
+      maxWidth: 1600,
+      maxHeight: 1200,
+      quality: 85,
+      returnDataUri: true,
+    });
+    const match = compressed.fullData.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      return { mimeType: match[1], data: match[2] };
+    }
+  } catch (error) {
+    console.error('[OCR] Image compression failed:', error.message);
+  }
+  return { mimeType: imageData.mimeType, data: imageData.base64 };
 }
 
 /**
@@ -140,10 +163,6 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // Determine mime types from URLs
-    const frontMime = frontImageData.mimeType
-    const backMime = backImageData.mimeType
-
     // OCR extraction prompt with detailed field extraction
     const ocrPrompt = `You are analyzing Indian Aadhaar card images (front and back).
 Extract the following information and return it as JSON only, with no additional text:
@@ -170,10 +189,12 @@ Important:
     // Call Gemini Vision API with both images
     let ocrResult
     try {
-      const response = await generateVisionContent(ocrPrompt, [
-        { mimeType: frontMime, data: frontImageData.base64 },
-        { mimeType: backMime, data: backImageData.base64 }
+      const [frontImage, backImage] = await Promise.all([
+        compressForOCR(frontImageData),
+        compressForOCR(backImageData)
       ])
+
+      const response = await generateVisionContent(ocrPrompt, [frontImage, backImage])
 
       ocrResult = parseAIJsonResponse(response, { expectedRoot: 'object' })
     } catch (error) {

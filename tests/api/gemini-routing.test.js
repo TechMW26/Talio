@@ -1,22 +1,17 @@
-// Tests that lib/gemini.js correctly re-exports from the Gemini-only
+// Tests that lib/gemini.js correctly re-exports from the Pollinations-only
 // aiProviderManager. All consumer imports from @/lib/gemini should work.
 
 const ORIGINAL_ENV = process.env
 
-function clearGeminiKeys(env) {
-    for (const k of Object.keys(env)) {
-        if (/^GEMINI_(API_)?KEY/i.test(k)) {
-            delete env[k]
-        }
-    }
-    delete env.GEMINI_KEY
+function clearAIKeys(env) {
+    delete env.POLLINATIONS_API_KEY
 }
 
-describe('lib/gemini.js shim (Gemini-only)', () => {
+describe('lib/gemini.js shim (Pollinations-only)', () => {
     beforeEach(() => {
         jest.resetModules()
         process.env = { ...ORIGINAL_ENV }
-        clearGeminiKeys(process.env)
+        clearAIKeys(process.env)
         global.fetch = jest.fn()
         jest.spyOn(console, 'warn').mockImplementation(() => { })
         jest.spyOn(console, 'log').mockImplementation(() => { })
@@ -28,13 +23,13 @@ describe('lib/gemini.js shim (Gemini-only)', () => {
         jest.restoreAllMocks()
     })
 
-    test('generateContent from lib/gemini calls Gemini REST API', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagmshim-testkey-1'
+    test('generateContent from lib/gemini calls Pollinations', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
             json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'shim works' }] } }],
+                choices: [{ message: { content: 'shim works' } }],
             }),
         })
 
@@ -43,17 +38,17 @@ describe('lib/gemini.js shim (Gemini-only)', () => {
 
         expect(result).toBe('shim works')
         expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][0]).toContain('generativelanguage.googleapis.com')
+        expect(global.fetch.mock.calls[0][0]).toContain('gen.pollinations.ai/v1/chat/completions')
     })
 
-    test('generateVisionContent from lib/gemini sends inline images to flash-lite', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagmshim-testkey-1'
+    test('generateVisionContent from lib/gemini sends inline images', async () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
         const imgB64 = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>').toString('base64')
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
             json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'vision works' }] } }],
+                choices: [{ message: { content: 'vision works' } }],
             }),
         })
 
@@ -64,16 +59,16 @@ describe('lib/gemini.js shim (Gemini-only)', () => {
 
         expect(result).toBe('vision works')
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
-        expect(body.contents[0].parts[1].inlineData.data).toBe(imgB64)
+        expect(body.messages[0].content[1].image_url.url).toBe(`data:image/svg+xml;base64,${imgB64}`)
     })
 
     test('generateStitchedVisionContent from lib/gemini accepts buffer payload', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagmshim-testkey-1'
+        process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
             json: jest.fn().mockResolvedValue({
-                candidates: [{ content: { parts: [{ text: 'stitched' }] } }],
+                choices: [{ message: { content: 'stitched' } }],
             }),
         })
 
@@ -86,40 +81,18 @@ describe('lib/gemini.js shim (Gemini-only)', () => {
         expect(result).toBe('stitched')
     })
 
-    test('getAIAvailability reports Gemini status via lib/gemini', () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzagmshim-testkey-1'
+    test('getAIAvailability reports Pollinations status via lib/gemini', () => {
+        process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
 
         const { getAIAvailability } = require('@/lib/gemini')
         const avail = getAIAvailability()
 
         expect(avail.anyAvailable).toBe(true)
-        expect(avail.provider).toBe('gemini')
-        expect(avail.geminiKeys).toBe(1)
+        expect(avail.provider).toBe('pollinations')
     })
 
-    test('throws when no Gemini keys configured via lib/gemini', async () => {
+    test('throws when no Pollinations key configured via lib/gemini', async () => {
         const { generateContent } = require('@/lib/gemini')
-        await expect(generateContent('hi')).rejects.toThrow('Gemini is not configured')
-    })
-
-    test('key rotation via lib/gemini shim', async () => {
-        process.env.GEMINI_API_KEY_1 = 'AIzak1-testkey'
-        process.env.GEMINI_API_KEY_2 = 'AIzak2-testkey'
-
-        global.fetch
-            .mockResolvedValueOnce({ ok: false, status: 429, text: async () => 'rate limited' })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: jest.fn().mockResolvedValue({
-                    candidates: [{ content: { parts: [{ text: 'second key' }] } }],
-                }),
-            })
-
-        const { generateContent } = require('@/lib/gemini')
-        const result = await generateContent('hello')
-
-        expect(result).toBe('second key')
-        expect(global.fetch.mock.calls[0][0]).toContain('key=AIzak1-testkey')
-        expect(global.fetch.mock.calls[1][0]).toContain('key=AIzak2-testkey')
+        await expect(generateContent('hi')).rejects.toThrow('Pollinations is not configured')
     })
 })

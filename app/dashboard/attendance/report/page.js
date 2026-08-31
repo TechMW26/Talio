@@ -5,7 +5,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import toast from '@/utils/toast'
-import * as XLSX from 'xlsx'
+import { downloadExcelWorkbook } from '@/lib/client/spreadsheetExport'
 import {
   FaUsers, FaChartLine, FaClock, FaCalendarAlt, FaExclamationTriangle,
   FaCheckCircle, FaTimesCircle, FaChartPie, FaDownload, FaFileExcel,
@@ -450,11 +450,10 @@ export default function AttendanceReportPage() {
     toast.success('CSV Report exported successfully')
   }
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (!reportData) return
 
-    // Create workbook
-    const wb = XLSX.utils.book_new()
+    const sheets = []
 
     // Sheet 1: Overview & Summary
     const overviewData = [
@@ -489,8 +488,7 @@ export default function AttendanceReportPage() {
       ['Early Departures', reportData.performance.earlyDepartures],
       ['Needs Attention (<80%)', reportData.performance.needsAttention]
     ]
-    const ws1 = XLSX.utils.aoa_to_sheet(overviewData)
-    XLSX.utils.book_append_sheet(wb, ws1, 'Overview')
+    sheets.push({ name: 'Overview', rows: overviewData })
 
     // Sheet 2: Shrinkage Analysis
     const shrinkageData = [
@@ -508,8 +506,7 @@ export default function AttendanceReportPage() {
       ['Early Departures', reportData.shrinkage.breakdown.earlyDeparture + ' instances'],
       ['Other Unproductive', reportData.shrinkage.breakdown.unproductive + 'h']
     ]
-    const ws2 = XLSX.utils.aoa_to_sheet(shrinkageData)
-    XLSX.utils.book_append_sheet(wb, ws2, 'Shrinkage Analysis')
+    sheets.push({ name: 'Shrinkage Analysis', rows: shrinkageData })
 
     // Sheet 3: Department Breakdown
     if (reportData.departments.length > 0) {
@@ -528,8 +525,7 @@ export default function AttendanceReportPage() {
           dept.totalHours.toFixed(2)
         ])
       ]
-      const ws3 = XLSX.utils.aoa_to_sheet(deptData)
-      XLSX.utils.book_append_sheet(wb, ws3, 'Department Breakdown')
+      sheets.push({ name: 'Department Breakdown', rows: deptData })
     }
 
     // Sheet 4: Individual Employee Details
@@ -553,12 +549,14 @@ export default function AttendanceReportPage() {
         emp.attendanceRate + '%'
       ])
     ]
-    const ws4 = XLSX.utils.aoa_to_sheet(employeeData)
-    XLSX.utils.book_append_sheet(wb, ws4, 'Employee Details')
+    sheets.push({ name: 'Employee Details', rows: employeeData })
 
-    // Generate file and download
-    XLSX.writeFile(wb, `attendance-report-${reportData.period.startDate}-to-${reportData.period.endDate}.xlsx`)
-    toast.success('Excel Report exported successfully')
+    try {
+      await downloadExcelWorkbook(`attendance-report-${reportData.period.startDate}-to-${reportData.period.endDate}.xlsx`, sheets)
+      toast.success('Excel Report exported successfully')
+    } catch (error) {
+      toast.error(error?.message || 'Could not export the Excel report')
+    }
   }
 
   const filteredEmployees = reportData?.employees.filter(emp => {

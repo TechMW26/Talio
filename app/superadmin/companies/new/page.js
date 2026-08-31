@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 import { PLAN_TEMPLATES, FEATURE_DEFINITIONS, FEATURE_BUNDLES, ALL_BUNDLE_KEYS, ALL_FEATURE_KEYS, getFeaturesForPlan, isBundleEnabled, toggleBundle } from '@/lib/planFeatures'
+import HrmsModuleControls from '@/components/superadmin/HrmsModuleControls'
 
 export default function NewCompanyPage() {
   const router = useRouter()
@@ -756,6 +757,8 @@ export default function NewCompanyPage() {
                 })}
               </div>
             </div>
+
+            <HrmsModuleControls features={features} onChange={setFeatures} />
 
             {/* MIRA Tokens Per User */}
             <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">

@@ -1126,6 +1126,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             <CustomizableDashboard
                 userId={user?._id || user?.userId || 'user'}
                 userRole={userRole}
+                displayName={user?.firstName || employeeData?.firstName || ''}
                 widgetComponents={widgetComponents}
             />
         </div>

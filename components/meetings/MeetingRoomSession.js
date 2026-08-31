@@ -290,7 +290,7 @@ export default function MeetingRoomSession({
     return recorderState.stopPromise
   }, [])
 
-  const transcribeRecordedSegmentWithElevenLabs = useCallback(async ({ blob, startedAt, durationMs }) => {
+  const transcribeRecordedSegmentWithPollinations = useCallback(async ({ blob, startedAt, durationMs }) => {
     if (!meeting?._id || !blob || isMutedRef.current) {
       return
     }
@@ -300,7 +300,7 @@ export default function MeetingRoomSession({
     formData.append('startedAt', new Date(startedAt).toISOString())
     formData.append('durationMs', String(durationMs))
     formData.append('language', transcriptLanguages[0] || 'auto')
-    formData.append('source', 'live-elevenlabs')
+    formData.append('source', 'live-pollinations')
 
     const response = await apiMutate(`/api/meetings/${meeting._id}/transcript`, {
       method: 'POST',
@@ -346,7 +346,7 @@ export default function MeetingRoomSession({
       return undefined
     }
 
-    if (transcriptionMode === 'elevenlabs') {
+    if (transcriptionMode === 'pollinations') {
       setNotetakerError(null)
       setNotetakerReady(true)
       return undefined
@@ -492,7 +492,7 @@ export default function MeetingRoomSession({
       .catch(() => { })
       .then(async () => {
         if (isMutedRef.current) return
-        await transcribeRecordedSegmentWithElevenLabs({ blob, startedAt, durationMs })
+        await transcribeRecordedSegmentWithPollinations({ blob, startedAt, durationMs })
       })
       .catch(error => {
         console.error('Failed to transcribe meeting audio segment:', error)
@@ -501,10 +501,10 @@ export default function MeetingRoomSession({
 
     lastTranscriptionPromiseRef.current = processingPromise
     return processingPromise
-  }, [meeting?._id, transcribeRecordedSegmentWithElevenLabs])
+  }, [meeting?._id, transcribeRecordedSegmentWithPollinations])
 
   useEffect(() => {
-    if (!isJoined || !hasLocalStream || !notetakerReady || isMuted || notetakerMode !== 'elevenlabs') {
+    if (!isJoined || !hasLocalStream || !notetakerReady || isMuted || notetakerMode !== 'pollinations') {
       return undefined
     }
 
@@ -531,7 +531,7 @@ export default function MeetingRoomSession({
         ? new MediaRecorder(recordingStream, { mimeType })
         : new MediaRecorder(recordingStream)
     } catch (error) {
-      console.error('Failed to start ElevenLabs meeting recorder:', error)
+      console.error('Failed to start Pollinations meeting recorder:', error)
       recordingTrack.stop()
       setNotetakerError('Mira could not start cloud transcription capture for this meeting.')
       return undefined
