@@ -55,7 +55,6 @@ const OPTIONAL_INTEGRATIONS = [
   ['IMAGEKIT_PUBLIC_KEY', 'ImageKit (legacy uploads)'],
   ['SMTP_HOST', 'Outbound email'],
   ['FCM_SERVER_KEY', 'Push notifications'],
-  ['SENTRY_DSN', 'Error monitoring'],
 ];
 
 (function validateEnvironment() {

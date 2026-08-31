@@ -36,7 +36,7 @@ COPY --from=deps /app/node_modules ./node_modules
 
 # Copy config files first (changes less often → better layer caching)
 COPY package.json next.config.js server.js jsconfig.json tailwind.config.js postcss.config.js ./
-COPY sentry.server.config.js sentry.edge.config.js instrumentation.js instrumentation-client.js ./
+COPY instrumentation.js ./
 
 # Copy source (changes most often)
 COPY app ./app
@@ -54,7 +54,7 @@ COPY public ./public
 ENV NEXT_TELEMETRY_DISABLED=1 \
     SKIP_ENV_VALIDATION=true \
     NODE_ENV=production \
-    NODE_OPTIONS="--max-old-space-size=8192"
+    NODE_OPTIONS="--max-old-space-size=6144"
 
 ARG NEXT_BUILD_CPUS
 
@@ -96,11 +96,7 @@ COPY --from=builder /app/config ./config
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/styles ./styles
 
-# Sentry config
-COPY --from=builder /app/sentry.server.config.js ./sentry.server.config.js
-COPY --from=builder /app/sentry.edge.config.js ./sentry.edge.config.js
 COPY --from=builder /app/instrumentation.js ./instrumentation.js
-COPY --from=builder /app/instrumentation-client.js ./instrumentation-client.js
 
 # Upload and release directories (volume-mounted in docker-compose)
 RUN mkdir -p ./public/uploads /var/www/talio/releases \

@@ -23,7 +23,7 @@ Talio is a **multi-tenant Human Resource Management System (HRMS)** with workfor
 | Real-time    | Socket.IO **4.8.1** (WebSocket + polling)     |
 | AI           | Gemini (exclusive, multi-key rotation via REST API) |
 | Email        | Nodemailer **7.0.7** (SMTP)                   |
-| Monitoring   | Sentry **10.37.0**                            |
+| Monitoring   | Vercel runtime and function logs              |
 | Testing      | Jest **30.3.0** + @swc/jest + mongodb-memory-server |
 | Container    | Docker multi-stage (Debian Bookworm) + nginx + certbot |
 
@@ -60,7 +60,6 @@ Talio is a **multi-tenant Human Resource Management System (HRMS)** with workfor
 | `GEMINI_API_KEY_2` – `_7`        | OPT      | Additional Gemini keys for rotation                    | Multiple Google Cloud projects                    |
 | `SMTP_HOST` / `EMAIL_*`           | OPT      | Outbound email (Hostinger SMTP or similar)             | Email provider SMTP settings                      |
 | `FCM_SERVER_KEY`                  | OPT      | Firebase Cloud Messaging for push notifications        | Firebase Console → Project Settings → Cloud Messaging |
-| `SENTRY_DSN`                      | OPT      | Error monitoring                                       | Sentry → Projects → Settings → DSN                |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | OPT      | Google Maps for geofencing                             | Google Cloud Console → Maps API                   |
 | `GOOGLE_CLIENT_ID/SECRET`         | OPT      | Google OAuth sign-in                                   | Google Cloud Console → OAuth 2.0                  |
 | `LINKEDIN_CLIENT_ID/SECRET`       | OPT      | LinkedIn recruitment integration                       | LinkedIn Developer Portal                         |
@@ -296,7 +295,7 @@ erDiagram
 | Nginx          | `/var/log/nginx/access.log`, `error.log` | Standard combined format |
 | Docker         | JSON file logs (10MB max, 3 files)     | `docker logs talio-app` |
 | Slow APIs      | `stdout` — `🐌 SLOW API [Xms]`        | Warns if >2 seconds    |
-| Sentry         | Sentry ingest endpoint                 | Error + performance    |
+| Vercel         | Runtime and function logs              | Errors + performance   |
 
 ### 4.2 Health Checks
 

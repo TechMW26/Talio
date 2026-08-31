@@ -15,6 +15,10 @@ const nextConfig = {
   assetPrefix: process.env.NEXT_ASSET_PREFIX || undefined,
   // Production optimizations
   poweredByHeader: false,
+  // Keep production source maps out of the build. Talio no longer uploads
+  // artifacts to an external error tracker, and generating them adds material
+  // time and memory pressure on Vercel's build workers.
+  productionBrowserSourceMaps: false,
   // Multiple sibling projects share the parent directory. Keep file tracing
   // scoped to this application to avoid scanning unrelated workspaces.
   outputFileTracingRoot: __dirname,
@@ -40,6 +44,10 @@ const nextConfig = {
       'recharts',
       'lottie-react'
     ],
+    // A custom Webpack rule is still required for 3D assets, so opt back into
+    // Next's isolated build worker to keep compiler memory bounded on Vercel.
+    webpackBuildWorker: true,
+    serverSourceMaps: false,
     // Use every available CPU by default. Memory-constrained builders can opt
     // into a lower limit with NEXT_BUILD_CPUS=2 (or another positive integer).
     ...(buildCpus ? { cpus: buildCpus } : {}),
@@ -94,7 +102,7 @@ const nextConfig = {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: blob: https://ik.imagekit.io https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com",
           "font-src 'self' data: https://fonts.gstatic.com",
-          "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://ik.imagekit.io https://maps.googleapis.com https://maps.gstatic.com https://*.pusher.com wss://*.pusher.com wss: ws:",
+          "connect-src 'self' https://ik.imagekit.io https://maps.googleapis.com https://maps.gstatic.com https://*.pusher.com wss://*.pusher.com wss: ws:",
           "frame-src 'self' https://www.google.com https://maps.google.com",
           "media-src 'self' data: blob:",
           "worker-src 'self' blob:",
@@ -228,39 +236,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-
-
-// Injected content via Sentry wizard below
-
-const { withSentryConfig } = require("@sentry/nextjs");
-
-module.exports = withSentryConfig(module.exports, {
-  // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
-
-  org: "mw-futuretech",
-  project: "javascript-nextjs",
-
-  // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
-
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: Boolean(process.env.SENTRY_AUTH_TOKEN),
-
-  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  tunnelRoute: "/monitoring",
-
-  webpack: {
-    // Tree-shaking options for reducing bundle size
-    treeshake: {
-      // Automatically tree-shake Sentry logger statements to reduce bundle size
-      removeDebugLogging: true,
-    },
-  },
-});
