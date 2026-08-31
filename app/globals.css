@@ -110,17 +110,126 @@ html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-20
   border: none !important;
 }
 
-/* Page transition spinner */
-@keyframes page-spin {
-  to { transform: rotate(360deg); }
+/* Dashboard route transitions: CSS-driven to avoid per-frame React updates. */
+@keyframes dashboard-route-enter {
+  0% {
+    opacity: 0;
+    filter: blur(8px) saturate(0.75);
+    transform: perspective(1100px) translate3d(0, 14px, -36px) scale(0.985);
+  }
+  55% { opacity: 1; }
+  100% {
+    opacity: 1;
+    filter: blur(0) saturate(1);
+    transform: perspective(1100px) translate3d(0, 0, 0) scale(1);
+  }
 }
-.page-transition-spinner {
-  width: 2.5rem;
-  height: 2.5rem;
+
+@keyframes dashboard-route-scan {
+  0% { transform: translate3d(-115%, 0, 0) skewX(-18deg); }
+  100% { transform: translate3d(215%, 0, 0) skewX(-18deg); }
+}
+
+@keyframes dashboard-route-orbit {
+  0% { transform: translate3d(-8%, -6%, 0) scale(0.88); opacity: 0.35; }
+  50% { transform: translate3d(8%, 4%, 0) scale(1.04); opacity: 0.72; }
+  100% { transform: translate3d(-8%, -6%, 0) scale(0.88); opacity: 0.35; }
+}
+
+@keyframes dashboard-widget-enter {
+  0% { opacity: 0; filter: blur(3px); }
+  100% { opacity: 1; filter: blur(0); }
+}
+
+.dashboard-widget-enter {
+  animation: dashboard-widget-enter 360ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  animation-delay: var(--widget-enter-delay, 0ms);
+}
+
+.dashboard-route-stage {
+  min-height: 100%;
+  position: relative;
+  isolation: isolate;
+}
+
+.dashboard-route-page {
+  min-height: 100%;
+  transform-origin: 50% 18%;
+  animation: dashboard-route-enter 460ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  transition: opacity 180ms ease, filter 180ms ease, transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-route-stage.is-navigating .dashboard-route-page {
+  opacity: 0.62;
+  filter: blur(2.5px) saturate(0.82);
+  transform: perspective(1100px) translate3d(0, 5px, -28px) scale(0.988);
+}
+
+.dashboard-route-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  border-radius: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.dashboard-route-veil.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dashboard-route-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(99, 102, 241, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(circle at 50% 30%, black, transparent 72%);
+}
+
+.dashboard-route-orb {
+  position: absolute;
+  inset: 8% 12%;
   border-radius: 9999px;
-  border: 3px solid rgba(148, 163, 184, 0.3);
-  border-top-color: var(--color-primary-500, #3B82F6);
-  animation: page-spin 0.75s linear infinite;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.16), rgba(56, 189, 248, 0.07) 38%, transparent 70%);
+  filter: blur(22px);
+  animation: dashboard-route-orbit 2.2s ease-in-out infinite;
+}
+
+.dashboard-route-scan {
+  position: absolute;
+  inset: -8% auto -8% 0;
+  width: 34%;
+  background: linear-gradient(90deg, transparent, rgba(129, 140, 248, 0.12), rgba(56, 189, 248, 0.22), transparent);
+  filter: blur(3px);
+  animation: dashboard-route-scan 1.15s cubic-bezier(0.25, 0.85, 0.35, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-route-page {
+    animation: none;
+    transition: opacity 80ms linear;
+  }
+
+  .dashboard-widget-enter {
+    animation: none;
+  }
+
+  .dashboard-route-stage.is-navigating .dashboard-route-page {
+    opacity: 0.72;
+    filter: none;
+    transform: none;
+  }
+
+  .dashboard-route-grid,
+  .dashboard-route-orb,
+  .dashboard-route-scan {
+    display: none;
+  }
 }
 
 /* MIRA pill animated gradient */

@@ -312,24 +312,6 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     return isNavigationPathActive(item, effectivePath)
   }
 
-  // Helper to get badge count for a menu item
-  const getBadgeCount = (itemName) => {
-    switch (itemName) {
-      case 'Projects':
-        return (sidebarCounts.projects || 0) + (sidebarCounts.tasks || 0)
-      case 'Attendance & Leaves':
-        return (sidebarCounts.leaves || 0) + (sidebarCounts.attendance || 0)
-      case 'Expenses':
-        return sidebarCounts.expenses || 0
-      case 'Helpdesk':
-        return sidebarCounts.helpdesk || 0
-      case 'Notifications':
-        return sidebarCounts.notifications || 0
-      default:
-        return 0
-    }
-  }
-
   if (!mounted) {
     return null
   }
@@ -418,7 +400,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
 
           {navigationItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
-            const badgeCount = getNavigationBadgeCount(item, getBadgeCount)
+            const badgeCount = getNavigationBadgeCount(item, sidebarCounts)
             const showGroupDivider = item.group && index > 0 && navigationItems[index - 1]?.group !== item.group
             const isNewHighlighted = item.isNew && openNewPaths.has(item.path)
             const newRingClass = isNewHighlighted

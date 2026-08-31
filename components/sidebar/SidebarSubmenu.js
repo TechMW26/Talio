@@ -46,7 +46,7 @@ export default function SidebarSubmenu({
         const isSingleDestination = group.items.length === 1
         const isOpen = Boolean(openSections[group.name])
         const hasActiveChild = group.items.some((child) => child.path === activeChildPath)
-        const groupBadge = group.items.reduce((total, child) => total + (Number(getBadgeCount(child.name)) || 0), 0)
+        const groupBadge = group.items.reduce((total, child) => total + (Number(getBadgeCount(child)) || 0), 0)
 
         if (isSingleDestination) {
           const child = group.items[0]
@@ -54,7 +54,7 @@ export default function SidebarSubmenu({
             <Link
               key={`${group.name}-${child.path}`}
               href={child.path}
-              onClick={() => onNavigate(child.path)}
+              onClick={(event) => onNavigate(child.path, event)}
               aria-current={hasActiveChild ? 'page' : undefined}
               data-active={hasActiveChild}
               className="talio-sidebar-leaf"
@@ -82,7 +82,7 @@ export default function SidebarSubmenu({
             >
               <span className="min-w-0 truncate font-semibold">{group.name}</span>
               <span className="flex flex-shrink-0 items-center gap-2">
-                {groupBadge > 0 && <span className="talio-sidebar-badge talio-sidebar-badge--danger">{groupBadge > 99 ? '99+' : groupBadge}</span>}
+                {!isOpen && groupBadge > 0 && <span className="talio-sidebar-badge talio-sidebar-badge--danger">{groupBadge > 99 ? '99+' : groupBadge}</span>}
                 <HiOutlineChevronRight className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
               </span>
             </button>
@@ -91,12 +91,12 @@ export default function SidebarSubmenu({
               <div id={regionId} className="talio-sidebar-module-items space-y-0.5">
                 {group.items.map((child) => {
                   const active = child.path === activeChildPath
-                  const badge = getBadgeCount(child.name)
+                  const badge = getBadgeCount(child)
                   return (
                     <Link
                       key={`${child.path}-${child.name}`}
                       href={child.path}
-                      onClick={() => onNavigate(child.path)}
+                      onClick={(event) => onNavigate(child.path, event)}
                       aria-current={active ? 'page' : undefined}
                       data-active={active}
                       className="talio-sidebar-child"

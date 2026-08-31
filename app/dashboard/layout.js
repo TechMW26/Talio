@@ -1,17 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { Spinner } from '@heroui/react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 import OfflineIndicator from '@/components/OfflineIndicator'
-import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
-import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
-import ProfileCompletionModal from '@/components/ProfileCompletionModal'
-import { WebPushPrompt } from '@/components/WebPushNotification'
-import DesktopNotificationPrompt from '@/components/DesktopNotificationPrompt'
 
 import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
@@ -19,10 +15,10 @@ import { UnreadMessagesProvider } from '@/contexts/UnreadMessagesContext'
 import { InAppNotificationProvider } from '@/contexts/InAppNotificationContext'
 import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
-import { PageTransitionProvider, usePageTransition } from '@/contexts/PageTransitionContext'
+import { PageTransitionProvider } from '@/contexts/PageTransitionContext'
 import { TicTacToeProvider } from '@/contexts/TicTacToeContext'
 import RouteProgressBar from '@/components/ui/RouteProgressBar'
-import { getSkeletonForRoute } from '@/components/ui/PageSkeletons'
+import DashboardRouteTransition from '@/components/ui/DashboardRouteTransition'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
 import toast from '@/utils/toast'
 import { getCurrentUser, getEmployeeId, syncUserData, getToken } from '@/utils/userHelper'
@@ -39,54 +35,19 @@ import {
 } from '@/utils/sessionCache'
 import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebAccessRestriction'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
-import MiraChatSidebar from '@/components/MiraChatSidebar'
-import CelebrationPopup from '@/components/CelebrationPopup'
 
-// Page transition skeleton overlay - renders target page's skeleton with a spinner
-function PageTransitionOverlay() {
-  const { isNavigating, targetPath } = usePageTransition()
-
-  if (!isNavigating) return null
-
-  const SkeletonComponent = getSkeletonForRoute(targetPath)
-
-  return (
-    <div className="absolute inset-0 z-[50] bg-background overflow-y-auto">
-      <SkeletonComponent />
-      {/* Centered spinner overlay with radial vignette */}
-      <div className="fixed inset-0 z-[51] flex items-center justify-center pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 40%, transparent 70%)' }}>
-        <div className="page-transition-spinner" />
-      </div>
-    </div>
-  )
-}
-
-// Wraps page children with a subtle fade-in when the route settles
-function PageContentWrapper({ children }) {
-  const pathname = usePathname()
-  const [show, setShow] = useState(false)
-  const prevPathRef = useRef(pathname)
-
-  useEffect(() => {
-    if (prevPathRef.current !== pathname) {
-      setShow(false)
-      prevPathRef.current = pathname
-    }
-    // Show content immediately once the route has landed
-    requestAnimationFrame(() => setShow(true))
-  }, [pathname])
-
-  return (
-    <div
-      style={{
-        opacity: show ? 1 : 0,
-        transition: 'opacity 150ms ease-in',
-      }}
-    >
-      {children}
-    </div>
-  )
-}
+// Keep non-critical dashboard features out of the initial route bundle. They
+// load as independent chunks after the persistent shell becomes interactive.
+const OutOfPremisesPopup = dynamic(() => import('@/components/OutOfPremisesPopup'), { ssr: false })
+const ChatWidgetContainer = dynamic(() => import('@/components/chat/ChatWidgetContainer'), { ssr: false })
+const ProfileCompletionModal = dynamic(() => import('@/components/ProfileCompletionModal'), { ssr: false })
+const WebPushPrompt = dynamic(
+  () => import('@/components/WebPushNotification').then((module) => module.WebPushPrompt),
+  { ssr: false }
+)
+const DesktopNotificationPrompt = dynamic(() => import('@/components/DesktopNotificationPrompt'), { ssr: false })
+const MiraChatSidebar = dynamic(() => import('@/components/MiraChatSidebar'), { ssr: false })
+const CelebrationPopup = dynamic(() => import('@/components/CelebrationPopup'), { ssr: false })
 
 // Component to sync sidebar state with chat widget context
 function SidebarStateSync({ sidebarCollapsed }) {
@@ -284,12 +245,12 @@ export default function DashboardLayout({ children }) {
   }
 
   // Handle modal close
-  const handleProfileModalClose = () => {
+  const handleProfileModalClose = useCallback(() => {
     setShowProfileCompletionModal(false)
     // Remember that user dismissed modal today (resets daily)
     const dismissedKey = `profileModal_dismissed_${new Date().toDateString()}`
     sessionStorage.setItem(dismissedKey, 'true')
-  }
+  }, [])
 
   // Sync user data on mount to ensure employee info is complete (with caching)
   useEffect(() => {
@@ -370,9 +331,9 @@ export default function DashboardLayout({ children }) {
   // Initialize geofencing
   useGeofencing()
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen)
-  }
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((open) => !open)
+  }, [])
 
   // Check if current page is a bottom nav page (excluding chat which doesn't show fade)
   const isBottomNavPage =
@@ -471,14 +432,11 @@ export default function DashboardLayout({ children }) {
 
                         {/* Main Content Area - Scrollable */}
                         <main ref={mainRef} className={`z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
-                          {/* Navigation skeleton overlay */}
-                          <PageTransitionOverlay />
-
                           <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
                             <ErrorBoundaryWithRetry>
-                              <PageContentWrapper>
+                              <DashboardRouteTransition>
                                 {children}
-                              </PageContentWrapper>
+                              </DashboardRouteTransition>
                             </ErrorBoundaryWithRetry>
                           </div>
 

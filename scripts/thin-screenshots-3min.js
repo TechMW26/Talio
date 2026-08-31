@@ -1,20 +1,3 @@
-/**
- * Thin Screenshots to 3-Minute Intervals
- *
- * Within each ProductivitySession, keeps only screenshots that are ≥3 minutes
- * apart. Removes the extras from:
- *   1. The session's screenshots[] subdocument array
- *   2. The Screenshot collection in MongoDB
- *   3. GridFS storage (via bucket.delete)
- *
- * This ensures consistency: sessions now have ~60 screenshots per 180-min window
- * (1 every 3 minutes). After the 60-min reassembly, some sessions ended up with
- * 50-70 screenshots because the original capture interval was shorter.
- *
- * Run:      node scripts/thin-screenshots-3min.js
- * Dry run:  node scripts/thin-screenshots-3min.js --dry-run
- */
-
 const mongoose = require('mongoose');
 require('dotenv').config();
 

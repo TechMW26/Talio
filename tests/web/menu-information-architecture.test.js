@@ -1,6 +1,8 @@
 import {
   buildNavigationSections,
   filterNavigationSections,
+  getNavigationBadgeCount,
+  getNavigationLeafBadgeCount,
   groupNavigationChildren,
   isNavigationPathActive,
   SIDEBAR_ACTION_ICONS,
@@ -107,6 +109,54 @@ describe('menu information architecture', () => {
         ],
       }),
     ])
+  })
+
+  test('maps pending counts to the exact lowest actionable route', () => {
+    const counts = {
+      projects: 2,
+      tasks: 3,
+      attendance: 4,
+      leaves: 5,
+      expenses: 6,
+      helpdesk: 10,
+    }
+
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/projects' }, counts)).toBe(2)
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/projects/my-tasks' }, counts)).toBe(3)
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/team/regularisation' }, counts)).toBe(4)
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/leave/approvals' }, counts)).toBe(5)
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/expenses/approvals' }, counts)).toBe(6)
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/helpdesk' }, counts)).toBe(10)
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/documents' }, counts)).toBe(0)
+  })
+
+  test('aggregates only visible actionable leaves and never hidden source modules', () => {
+    const counts = { helpdesk: 10, expenses: 7 }
+    const resources = {
+      name: 'Resources',
+      sourceItems: [{ name: 'Helpdesk' }, { name: 'Documents' }],
+      submenu: [
+        { name: 'Documents', path: '/dashboard/documents' },
+        { name: 'Helpdesk', path: '/dashboard/helpdesk' },
+      ],
+    }
+
+    expect(getNavigationBadgeCount(resources, counts)).toBe(10)
+    expect(getNavigationBadgeCount({ ...resources, submenu: resources.submenu.slice(0, 1) }, counts)).toBe(0)
+    expect(getNavigationBadgeCount({
+      name: 'Finance',
+      submenu: [
+        { name: 'My Expenses', path: '/dashboard/expenses' },
+        { name: 'Approvals', path: '/dashboard/expenses/approvals' },
+        { name: 'Duplicate approvals', path: '/dashboard/expenses/approvals' },
+      ],
+    }, counts)).toBe(7)
+  })
+
+  test('normalizes invalid and stale badge values to zero', () => {
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/helpdesk' }, { helpdesk: -2 })).toBe(0)
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/helpdesk' }, { helpdesk: 'invalid' })).toBe(0)
+    expect(getNavigationLeafBadgeCount({ path: '/dashboard/helpdesk' }, { helpdesk: 2.9 })).toBe(2)
   })
 
   test.each(Object.keys(roleBasedMenus))('preserves every %s role route', (role) => {

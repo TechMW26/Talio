@@ -10,6 +10,8 @@ const { Server } = require('socket.io');
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
+const backgroundJobsEnabled = process.env.ENABLE_BACKGROUND_JOBS === 'true' ||
+  (!dev && process.env.ENABLE_BACKGROUND_JOBS !== 'false');
 let socketJwtSecret = null;
 
 function getSocketJwtSecret() {
@@ -788,29 +790,33 @@ app.prepare().then(() => {
         .catch(() => { });
     }).catch(() => { });
 
-    // Start background meeting finalizer + AI summary generation
-    try {
-      const { startMeetingFinalizerCron } = await import('./lib/meetingFinalizerCron.js');
-      startMeetingFinalizerCron();
-    } catch (e) { console.warn('⚠️ Meeting finalizer cron setup skipped:', e.message); }
+    if (backgroundJobsEnabled) {
+      // Start background meeting finalizer + AI summary generation
+      try {
+        const { startMeetingFinalizerCron } = await import('./lib/meetingFinalizerCron.js');
+        startMeetingFinalizerCron();
+      } catch (e) { console.warn('⚠️ Meeting finalizer cron setup skipped:', e.message); }
 
-    // Start in-process email queue drain (onboarding + project notifications)
-    try {
-      const { startEmailQueueCron } = require('./lib/emailQueueCron');
-      startEmailQueueCron();
-    } catch (e) { console.warn('⚠️ Email queue cron setup skipped:', e.message); }
+      // Start in-process email queue drain (onboarding + project notifications)
+      try {
+        const { startEmailQueueCron } = require('./lib/emailQueueCron');
+        startEmailQueueCron();
+      } catch (e) { console.warn('⚠️ Email queue cron setup skipped:', e.message); }
 
-    // Enforce 48-hour screenshot retention for productivity captures (legacy safety net).
-    try {
-      const { startProductivityScreenshotRetentionCron } = require('./lib/productivityScreenshotRetentionCron');
-      startProductivityScreenshotRetentionCron();
-    } catch (e) { console.warn('⚠️ Screenshot retention cron setup skipped:', e.message); }
+      // Enforce 48-hour screenshot retention for productivity captures (legacy safety net).
+      try {
+        const { startProductivityScreenshotRetentionCron } = require('./lib/productivityScreenshotRetentionCron');
+        startProductivityScreenshotRetentionCron();
+      } catch (e) { console.warn('⚠️ Screenshot retention cron setup skipped:', e.message); }
 
-    // Fallback checker for latest GitHub release downloads.
-    try {
-      const { startLatestReleaseCron } = require('./lib/latestReleaseCron');
-      startLatestReleaseCron();
-    } catch (e) { console.warn('⚠️ Latest release cron setup skipped:', e.message); }
+      // Fallback checker for latest GitHub release downloads.
+      try {
+        const { startLatestReleaseCron } = require('./lib/latestReleaseCron');
+        startLatestReleaseCron();
+      } catch (e) { console.warn('⚠️ Latest release cron setup skipped:', e.message); }
+    } else {
+      console.log('[boot] Background jobs disabled in development; set ENABLE_BACKGROUND_JOBS=true to opt in.');
+    }
   });
 
   // Graceful shutdown handling for Docker

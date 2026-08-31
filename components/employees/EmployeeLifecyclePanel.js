@@ -4,7 +4,7 @@ import { useState } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import toast from '@/utils/toast'
 import { Button, Chip, Progress, Skeleton } from '@heroui/react'
-import { FaCheck, FaClock, FaFlagCheckered, FaHourglassHalf, FaRoute, FaUserCheck } from 'react-icons/fa'
+import { FaCheck, FaClock, FaFlagCheckered, FaHourglassHalf, FaRoute, FaSyncAlt, FaUserCheck } from 'react-icons/fa'
 
 const STAGE_LABELS = {
   preboarding: 'Pre-boarding', onboarding: 'Onboarding', probation: 'Probation', confirmed: 'Confirmed',
@@ -36,7 +36,18 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
         body: JSON.stringify({ action, ...payload }),
       })
-      const result = await response.json()
+      const responseText = await response.text()
+      let result
+      try {
+        result = responseText ? JSON.parse(responseText) : null
+      } catch {
+        result = null
+      }
+      if (!result) {
+        throw new Error(response.ok
+          ? 'The lifecycle service returned an invalid response'
+          : `Lifecycle update failed (${response.status})`)
+      }
       if (!response.ok || !result.success) throw new Error(result.message || 'Lifecycle update failed')
       toast.success(result.message || 'Lifecycle updated')
       await mutate()
@@ -79,6 +90,11 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
             <div>
               <h3 className="font-semibold text-slate-900 dark:text-zinc-100">Onboarding checklist</h3>
               <p className="text-xs text-slate-500 dark:text-zinc-400">Target {formatIstDate(lifecycle.onboarding.targetDate)} · {lifecycle.onboarding.template} plan</p>
+              {details.automation?.enabled && (
+                <p className="mt-1 flex items-center gap-1.5 text-[11px] text-primary-600 dark:text-primary-400">
+                  <FaSyncAlt className="h-2.5 w-2.5" /> Progress syncs automatically from employee records and linked HR workflows.
+                </p>
+              )}
             </div>
             <span className="text-sm font-semibold text-primary">{details.progress?.completed || 0}/{details.progress?.total || 0}</span>
           </div>
@@ -86,6 +102,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
           <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
             {(lifecycle.onboarding.checklist || []).map((item) => {
               const actionKey = `complete_onboarding_item${item.key}`
+              const isAutomatic = Object.prototype.hasOwnProperty.call(details.automation?.signals || {}, item.key)
               return (
                 <button
                   key={item.key}
@@ -97,7 +114,14 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
                   <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${item.completed ? 'border-success bg-success text-white' : 'border-slate-300 dark:border-zinc-600'}`}>
                     {item.completed && <FaCheck className="h-3 w-3" />}
                   </span>
-                  <span className={`text-sm ${item.completed ? 'text-slate-400 line-through dark:text-zinc-500' : 'text-slate-700 dark:text-zinc-200'}`}>{item.label}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-sm ${item.completed ? 'text-slate-400 line-through dark:text-zinc-500' : 'text-slate-700 dark:text-zinc-200'}`}>{item.label}</span>
+                    {isAutomatic && (
+                      <span className="mt-0.5 block text-[10px] text-slate-400 dark:text-zinc-500">
+                        {item.completionSource === 'system' ? 'Automatically verified' : 'Automatically monitored · manual override available'}
+                      </span>
+                    )}
+                  </span>
                 </button>
               )
             })}

@@ -135,6 +135,7 @@ const EmployeeSchema = new mongoose.Schema({
         completed: { type: Boolean, default: false },
         completedAt: Date,
         completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        completionSource: { type: String, enum: ['manual', 'system'], default: null },
       }],
     },
     probation: {

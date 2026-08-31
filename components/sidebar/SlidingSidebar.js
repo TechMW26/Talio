@@ -16,6 +16,7 @@ import {
   buildNavigationSections,
   filterNavigationSections,
   getNavigationBadgeCount,
+  getNavigationLeafBadgeCount,
   isNavigationPathActive,
   SIDEBAR_ACTION_ICONS,
 } from '@/utils/menuInformationArchitecture'
@@ -58,7 +59,7 @@ export default function SlidingSidebar({
   const [isDesktopApp, setIsDesktopApp] = useState(false)
   const [menuQuery, setMenuQuery] = useState('')
   const { unreadCount } = useUnreadMessages()
-  const { toggleWidget } = useChatWidget()
+  const { toggleWidget, openWidget } = useChatWidget()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
   const sidebarRef = useRef(null)
   const menuItemRefs = useRef({})
@@ -271,7 +272,17 @@ export default function SlidingSidebar({
     setExpandedMenus((current) => current[menuName] ? {} : { [menuName]: true })
   }
 
-  const handleLinkClick = (path) => {
+  const handleLinkClick = (path, event) => {
+    // Chat is a desktop overlay action. Keep the current page mounted instead
+    // of following the grouped menu link to the dedicated mobile chat route.
+    if (path === '/dashboard/chat') {
+      event?.preventDefault()
+      openWidget('sidebar')
+      setIsOpen(false)
+      setActiveSubmenu(null)
+      return
+    }
+
     // Close sidebar when link is clicked
     setIsOpen(false)
     setActiveSubmenu(null)
@@ -309,42 +320,7 @@ export default function SlidingSidebar({
     if (activeItem) setExpandedMenus({ [activeItem.name]: true })
   }, [effectivePath, menuQuery, navigationItems])
 
-  // Helper to get badge count for a menu item
-  const getBadgeCount = (itemName) => {
-    switch (itemName) {
-      case 'Projects':
-        return (sidebarCounts.projects || 0) + (sidebarCounts.tasks || 0)
-      case 'Attendance & Leaves':
-        return (sidebarCounts.leaves || 0) + (sidebarCounts.attendance || 0)
-      case 'Expenses':
-        return sidebarCounts.expenses || 0
-      case 'Helpdesk':
-        return sidebarCounts.helpdesk || 0
-      case 'Notifications':
-        return sidebarCounts.notifications || 0
-      default:
-        return 0
-    }
-  }
-
-  // Helper to get badge count for submenu items
-  const getSubmenuBadgeCount = (subItemName) => {
-    switch (subItemName) {
-      case 'Attendance Regularisation':
-        return sidebarCounts.attendance || 0
-      case 'Leave Approvals':
-        return sidebarCounts.leaves || 0
-      case 'My Projects':
-      case 'Project Invitations':
-        return sidebarCounts.projects || 0
-      case "To-Do's":
-        return sidebarCounts.tasks || 0
-      case 'Approvals':
-        return sidebarCounts.expenses || 0
-      default:
-        return 0
-    }
-  }
+  const getLeafBadgeCount = (item) => getNavigationLeafBadgeCount(item, sidebarCounts)
 
   if (!mounted) {
     return null
@@ -472,7 +448,9 @@ export default function SlidingSidebar({
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="truncate text-[13px] font-semibold">{item.name}</span>
-                              <InlineBadge count={getNavigationBadgeCount(item, getBadgeCount)} />
+                              {!expandedMenus[item.name] && (
+                                <InlineBadge count={getNavigationBadgeCount(item, sidebarCounts)} />
+                              )}
                             </div>
                           </div>
                         </div>
@@ -485,7 +463,7 @@ export default function SlidingSidebar({
                           item={item}
                           effectivePath={effectivePath}
                           onNavigate={handleLinkClick}
-                          getBadgeCount={getSubmenuBadgeCount}
+                          getBadgeCount={getLeafBadgeCount}
                           expandAll={Boolean(menuQuery)}
                         />
                       )}
@@ -522,7 +500,7 @@ export default function SlidingSidebar({
                         </div>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <span className="truncate text-[13px] font-medium">{item.name}</span>
-                          {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
+                          {item.name !== 'Chat' && <InlineBadge count={getLeafBadgeCount(item)} />}
                         </div>
                       </div>
                     </Link>

@@ -3,7 +3,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { FaGripVertical, FaTimes } from 'react-icons/fa'
-import { useState, useEffect } from 'react'
 
 export default function DraggableWidget({
   id,
@@ -14,17 +13,6 @@ export default function DraggableWidget({
   colorIndex = 0,
   removable = true,
 }) {
-  const [showControls, setShowControls] = useState(false)
-  const [isVisible, setIsVisible] = useState(false)
-
-  // Trigger entrance animation on mount with staggered delay based on index
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(true)
-    }, colorIndex * 80) // Stagger by 80ms per widget
-    return () => clearTimeout(timer)
-  }, [colorIndex])
-
   const {
     attributes,
     listeners,
@@ -36,34 +24,28 @@ export default function DraggableWidget({
 
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
-    // No transition during drag for instant movement, smooth transition after drop
-    transition: isDragging ? 'none' : (transition || 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'),
+    // Track only the transform after a drop. `transition: all` forces every
+    // widget to watch unrelated style changes during dashboard updates.
+    transition: isDragging ? 'none' : (transition || 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)'),
     zIndex: isDragging ? 50 : 'auto',
+    '--widget-enter-delay': `${Math.min(colorIndex, 10) * 45}ms`,
   }
-
-  // Separate entrance animation classes from drag classes
-  const entranceClasses = isVisible 
-    ? 'opacity-100 translate-y-0 scale-100' 
-    : 'opacity-0 translate-y-4 scale-[0.97]'
 
   return (
     <div
       ref={setNodeRef}
       style={sortableStyle}
       className={`
-        relative group bg-white dark:bg-[#18181b] border border-gray-100/50 dark:border-zinc-800/50 h-full rounded-2xl
-        ${isDragging ? '' : 'transition-all duration-500 ease-out'}
-        ${entranceClasses}
+        dashboard-widget-enter relative group bg-white dark:bg-[#18181b] border border-gray-100/50 dark:border-zinc-800/50 h-full rounded-2xl
+        ${isDragging ? '' : 'transition-[box-shadow,border-color] duration-300 ease-out'}
         ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : 'shadow-sm dark:shadow-none hover:shadow-xl dark:hover:shadow-lg dark:hover:shadow-black/20 hover:scale-[1.01]'}
         ${className}
       `}
-      onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
     >
       
       {/* Widget Controls - appears on hover */}
       <div
-        className={`absolute top-3 right-2 flex items-center gap-1 z-10 transition-opacity duration-200 ${showControls || isDragging ? 'opacity-100' : 'opacity-0'
+        className={`absolute top-3 right-2 flex items-center gap-1 z-10 transition-opacity duration-200 ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
           }`}
       >
         {/* Remove Button */}

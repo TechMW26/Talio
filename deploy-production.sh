@@ -1,20 +1,3 @@
-#!/usr/bin/env bash
-# =============================================================================
-# Talio HRMS - Production Deployment Script for Hostinger VPS (Ubuntu)
-# =============================================================================
-# Usage:
-#   chmod +x deploy-production.sh
-#   ./deploy-production.sh --fresh --ssl        # First-time full setup
-#   ./deploy-production.sh                      # Redeploy / update (fast cached rebuild)
-#   ./deploy-production.sh --ssl                # Redeploy + renew/issue SSL
-#   ./deploy-production.sh --clean               # Full rebuild from scratch (no Docker cache)
-#
-# Flags:
-#   --fresh   Install all system dependencies (Docker, Docker Compose, etc.)
-#   --ssl     Provision or renew SSL certificate via Let's Encrypt
-#   --clean   Force a full Docker rebuild with no layer cache
-# =============================================================================
-
 set -euo pipefail
 IFS=$'\n\t'
 

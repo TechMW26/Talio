@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
 import { FaUserPlus, FaUsers, FaTimes, FaFile, FaImage, FaFilePdf, FaUser, FaComments, FaArrowDown, FaArrowLeft } from 'react-icons/fa'
 import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
@@ -16,7 +15,6 @@ import { useAuthedSWRStatic } from '@/hooks/useAuthedSWR'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 export default function ChatPage() {
-  const router = useRouter()
   const { openWidget } = useChatWidget()
   // --- SWR: Initial data loads ---
   const { data: chatsRes, isLoading: chatsLoading, mutate: refreshChats } = useAuthedSWR('/api/chat')
@@ -56,13 +54,14 @@ export default function ChatPage() {
   const longPressTimer = useRef(null)
   const { currentTheme, themes } = useTheme()
 
-  // Redirect desktop users to dashboard and open chat widget
+  // A direct desktop chat URL opens the overlay in place. Sidebar launches are
+  // intercepted before navigation, so the page the user is working on remains
+  // mounted behind the widget.
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-      openWidget()
-      router.push('/dashboard')
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      openWidget('route')
     }
-  }, [openWidget, router])
+  }, [openWidget])
 
   // Available reactions
   const reactions = ['👍', '❤️', '😂', '😮', '😢', '🙏']

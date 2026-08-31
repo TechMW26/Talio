@@ -4,8 +4,10 @@ import {
   buildEmployeeLifecycle,
   getLifecycleProgress,
   hydrateEmployeeLifecycle,
+  reconcileOnboardingChecklist,
   toIstDateKey,
 } from '@/lib/hrms/employeeLifecycle.server'
+import { getOnboardingCompletionSignals } from '@/lib/hrms/onboardingProgress.server'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -58,6 +60,68 @@ describe('employee lifecycle', () => {
     expect(getLifecycleProgress(lifecycle).percentage).toBe(100)
     expect(lifecycle.onboarding.status).toBe('completed')
     expect(lifecycle.stage).toBe('probation')
+    expect(lifecycle.onboarding.checklist.every((item) => item.completionSource === 'manual')).toBe(true)
+  })
+
+  test('automatically reconciles completed onboarding work from linked HRMS records', () => {
+    const lifecycle = buildEmployeeLifecycle({ dateOfJoining: '2026-08-01' })
+    const signals = Object.fromEntries(lifecycle.onboarding.checklist.map((item) => [item.key, true]))
+    const result = reconcileOnboardingChecklist(lifecycle, signals, { now: '2026-08-31' })
+
+    expect(result.changed).toBe(true)
+    expect(result.completedKeys).toHaveLength(lifecycle.onboarding.checklist.length)
+    expect(result.lifecycle.onboarding.checklist.every((item) => item.completed && item.completionSource === 'system')).toBe(true)
+    expect(result.lifecycle.onboarding.status).toBe('completed')
+    expect(result.lifecycle.stage).toBe('probation')
+  })
+
+  test('does not undo previously verified work when a linked record is later unavailable', () => {
+    const lifecycle = buildEmployeeLifecycle({ dateOfJoining: '2026-08-01' })
+    const completed = reconcileOnboardingChecklist(lifecycle, { profile: true }, { now: '2026-08-31' }).lifecycle
+    const result = reconcileOnboardingChecklist(completed, { profile: false }, { now: '2026-09-01' })
+
+    expect(result.changed).toBe(false)
+    expect(result.lifecycle.onboarding.checklist.find((item) => item.key === 'profile')).toMatchObject({
+      completed: true,
+      completionSource: 'system',
+    })
+  })
+
+  test('derives automatic signals from employee records and linked module completion', async () => {
+    const employeeId = '6a74712f87b6bf60ff871f97'
+    const query = (value) => ({
+      select() { return this },
+      lean() { return Promise.resolve(value) },
+    })
+    const models = {
+      Document: { exists: jest.fn() },
+      Asset: { exists: jest.fn(() => Promise.resolve({ _id: 'asset-1' })) },
+      Payroll: { exists: jest.fn(() => Promise.resolve({ _id: 'payroll-1' })) },
+      HrmsWorkflow: { find: jest.fn(() => query([{ module: 'backgroundVerification' }, { module: 'departmentInduction' }])) },
+      Policy: { find: jest.fn(() => query([{ acknowledgments: [{ employee: employeeId }] }])) },
+    }
+    const signals = await getOnboardingCompletionSignals({
+      models,
+      employee: {
+        _id: employeeId,
+        firstName: 'Muskan', lastName: 'Adwani', email: 'muskan@example.com', phone: '7000000000',
+        dateOfJoining: new Date('2026-08-01'), emergencyContact: { name: 'Contact', phone: '7000000001' },
+        documents: [{ url: '/document.pdf' }],
+        bankDetails: { bankName: 'Bank', accountNumber: '123', ifscCode: 'BANK0001' },
+        salary: { basic: 10000 },
+      },
+    })
+
+    expect(signals).toEqual({
+      profile: true,
+      documents: true,
+      background_verification: true,
+      payroll: true,
+      policies: true,
+      induction: true,
+      assets: true,
+    })
+    expect(models.Document.exists).not.toHaveBeenCalled()
   })
 
   test('requires a reason to extend probation and updates the review date', () => {
@@ -100,5 +164,14 @@ describe('employee lifecycle', () => {
     expect(source).toContain('buildEmployeeLifecycle')
     expect(source).toContain('createInitialLifecycleWorkflows')
     expect(source).not.toMatch(/\n\s+joiningDate:\s+joiningDate/)
+  })
+
+  test('lifecycle API and UI keep non-JSON failures user-safe', () => {
+    const route = fs.readFileSync(path.join(process.cwd(), 'app/api/employees/[id]/lifecycle/route.js'), 'utf8')
+    const panel = fs.readFileSync(path.join(process.cwd(), 'components/employees/EmployeeLifecyclePanel.js'), 'utf8')
+    expect(route).toContain("code: 'LIFECYCLE_ERROR'")
+    expect(route).toContain("message: 'Invalid JSON request body'")
+    expect(panel).toContain('const responseText = await response.text()')
+    expect(panel).toContain('The lifecycle service returned an invalid response')
   })
 })

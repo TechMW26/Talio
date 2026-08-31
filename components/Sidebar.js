@@ -18,6 +18,7 @@ import {
   buildNavigationSections,
   filterNavigationSections,
   getNavigationBadgeCount,
+  getNavigationLeafBadgeCount,
   isNavigationPathActive,
   SIDEBAR_ACTION_ICONS,
 } from '@/utils/menuInformationArchitecture'
@@ -393,42 +394,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     if (activeItem) setExpandedMenus({ [activeItem.name]: true })
   }, [effectivePath, menuQuery, navigationItems])
 
-  // Helper to get badge count for a menu item
-  const getBadgeCount = (itemName) => {
-    switch (itemName) {
-      case 'Projects':
-        return sidebarCounts.projects + sidebarCounts.tasks
-      case 'Attendance & Leaves':
-        return sidebarCounts.leaves + sidebarCounts.attendance
-      case 'Expenses':
-        return sidebarCounts.expenses
-      case 'Helpdesk':
-        return sidebarCounts.helpdesk
-      case 'Notifications':
-        return sidebarCounts.notifications
-      default:
-        return 0
-    }
-  }
-
-  // Helper to get badge count for submenu items
-  const getSubmenuBadgeCount = (subItemName) => {
-    switch (subItemName) {
-      case 'Attendance Regularisation':
-        return sidebarCounts.attendance
-      case 'Leave Approvals':
-        return sidebarCounts.leaves
-      case 'My Projects':
-      case 'Project Invitations':
-        return sidebarCounts.projects
-      case "To-Do's":
-        return sidebarCounts.tasks
-      case 'Approvals':
-        return sidebarCounts.expenses
-      default:
-        return 0
-    }
-  }
+  const getLeafBadgeCount = (item) => getNavigationLeafBadgeCount(item, sidebarCounts)
 
   // Handle expand click from icon strip
   const handleIconStripExpand = (submenuName, menuIndex) => {
@@ -555,7 +521,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="truncate text-[13px] font-semibold">{item.name}</span>
-                                <InlineBadge count={getNavigationBadgeCount(item, getBadgeCount)} />
+                                {!expandedMenus[item.name] && (
+                                  <InlineBadge count={getNavigationBadgeCount(item, sidebarCounts)} />
+                                )}
                               </div>
                             </div>
                           </div>
@@ -568,7 +536,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                             item={item}
                             effectivePath={effectivePath}
                             onNavigate={handleLinkClick}
-                            getBadgeCount={getSubmenuBadgeCount}
+                            getBadgeCount={getLeafBadgeCount}
                             expandAll={Boolean(menuQuery)}
                           />
                         )}
@@ -605,7 +573,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                           </div>
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="truncate text-[13px] font-medium">{item.name}</span>
-                            {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
+                            {item.name !== 'Chat' && <InlineBadge count={getLeafBadgeCount(item)} />}
                           </div>
                         </div>
                       </Link>

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 
 const PageTransitionContext = createContext()
@@ -44,6 +44,16 @@ export function PageTransitionProvider({ children }) {
   // Intercept all internal link clicks globally so every navigation shows the spinner
   useEffect(() => {
     const handleClick = (e) => {
+      if (
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey ||
+        e.altKey ||
+        !(e.target instanceof Element)
+      ) return
+
       // Find the closest anchor tag
       const anchor = e.target.closest('a')
       if (!anchor) return
@@ -137,10 +147,10 @@ export function PageTransitionProvider({ children }) {
   // Call this when starting navigation
   const startNavigation = useCallback((path) => {
     // Don't show loading for same page navigation
-    if (path === pathname) return
+    if (path === pathnameRef.current) return
     setTargetPath(path)
     setIsNavigating(true)
-  }, [pathname])
+  }, [])
 
   // Call this when navigation is cancelled or complete
   const endNavigation = useCallback(() => {
@@ -148,8 +158,13 @@ export function PageTransitionProvider({ children }) {
     setTargetPath(null)
   }, [])
 
+  const value = useMemo(
+    () => ({ isNavigating, targetPath, startNavigation, endNavigation }),
+    [endNavigation, isNavigating, startNavigation, targetPath]
+  )
+
   return (
-    <PageTransitionContext.Provider value={{ isNavigating, targetPath, startNavigation, endNavigation }}>
+    <PageTransitionContext.Provider value={value}>
       {children}
     </PageTransitionContext.Provider>
   )

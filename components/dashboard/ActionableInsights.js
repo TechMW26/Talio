@@ -9,7 +9,6 @@ import {
   HiOutlineSparkles,
   HiOutlineClock,
   HiOutlineMapPin,
-  HiOutlineArrowTopRightOnSquare,
   HiOutlineCalculator,
   HiOutlinePlayCircle,
   HiOutlinePauseCircle,
@@ -20,6 +19,7 @@ import {
   HiOutlineUserPlus,
   HiOutlineTrophy,
 } from 'react-icons/hi2'
+import LocationGlobe from './LocationGlobe'
 
 // ─── Tic-Tac-Toe Card (invite trigger only - game plays in popup) ───
 function TicTacToeCard() {
@@ -203,20 +203,6 @@ function getLocationErrorMessage(error) {
   return 'Your location is currently unavailable. Please try again.'
 }
 
-function buildMapUrls({ lat, lon }) {
-  const bbox = [lon - 0.01, lat - 0.01, lon + 0.01, lat + 0.01].join(',')
-  const embedParams = new URLSearchParams({
-    bbox,
-    layer: 'mapnik',
-    marker: `${lat},${lon}`,
-  })
-
-  return {
-    embed: `https://www.openstreetmap.org/export/embed.html?${embedParams}`,
-    external: `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lon)}#map=15/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}`,
-  }
-}
-
 // ─── Location Map Card ───
 export function LocationMapCard() {
   const { isDarkMode } = useTheme()
@@ -224,14 +210,14 @@ export function LocationMapCard() {
   const [location, setLocation] = useState(null)
   const [status, setStatus] = useState('locating')
   const [errorMessage, setErrorMessage] = useState('')
-  const [mapFailed, setMapFailed] = useState(false)
+  const [globeZoomedIn, setGlobeZoomedIn] = useState(false)
   const requestIdRef = useRef(0)
 
   const locate = useCallback(() => {
     const requestId = ++requestIdRef.current
     setStatus('locating')
     setErrorMessage('')
-    setMapFailed(false)
+    setGlobeZoomedIn(false)
     setCoords(null)
     setLocation(null)
 
@@ -275,7 +261,7 @@ export function LocationMapCard() {
             `${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}`
           )
         } catch {
-          // The map remains useful even if the optional place-name lookup fails.
+          // The globe remains useful even if the optional place-name lookup fails.
         }
       },
       (error) => {
@@ -292,24 +278,27 @@ export function LocationMapCard() {
     return () => { requestIdRef.current += 1 }
   }, [locate])
 
-  const mapUrls = coords ? buildMapUrls(coords) : null
-
   return (
-    <div className="rounded-2xl bg-white dark:bg-zinc-800/60 border border-gray-100 dark:border-zinc-700/50 shadow-sm overflow-hidden flex flex-col min-h-[140px]">
-      <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+    <div
+      data-testid="location-card"
+      className="relative min-h-[260px] self-stretch overflow-hidden rounded-2xl border border-gray-100 shadow-sm dark:border-zinc-700/50"
+      style={{ backgroundColor: 'var(--color-bg-card, #ffffff)' }}
+    >
+      <div className="pointer-events-none absolute inset-x-4 top-4 z-20 flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-shrink-0 items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
           <HiOutlineMapPin className="w-4 h-4" />
           <span>Your Location</span>
         </div>
         {location && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+          <span className="max-w-[52%] truncate rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" title={location}>
             {location}
           </span>
         )}
       </div>
-      <div className="relative flex-1 min-h-[100px]">
+
+      <div className="absolute inset-0">
         {status === 'denied' || status === 'unavailable' ? (
-          <div className="h-full min-h-[100px] flex flex-col items-center justify-center gap-2 px-4 py-3 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 pb-4 pt-14 text-center">
             <p className="text-xs text-gray-500 dark:text-gray-400">{errorMessage}</p>
             <button
               type="button"
@@ -321,61 +310,33 @@ export function LocationMapCard() {
             </button>
           </div>
         ) : status === 'locating' ? (
-          <div className="h-full min-h-[100px] flex flex-col items-center justify-center gap-2" role="status">
+          <div className="flex h-full flex-col items-center justify-center gap-2 pt-10" role="status">
             <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
             <span className="text-xs text-gray-400 dark:text-gray-500">Finding your location…</span>
           </div>
-        ) : mapFailed ? (
-          <div className="h-full min-h-[100px] flex flex-col items-center justify-center gap-2 px-4 py-3 text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400">The map preview could not load.</p>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setMapFailed(false)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-zinc-700 dark:text-gray-200 dark:hover:bg-zinc-600"
-              >
-                <HiOutlineArrowPath className="h-3.5 w-3.5" aria-hidden="true" />
-                Reload map
-              </button>
-              <a
-                href={mapUrls.external}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300"
-              >
-                Open map
-                <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
-            </div>
-          </div>
         ) : (
-          <>
-            <iframe
-              title="Map showing your current location"
-              width="100%"
-              height="100%"
-              className="block min-h-[100px]"
+          <div className="relative h-full w-full overflow-hidden" data-testid="location-globe-frame">
+            <div className="absolute inset-0">
+              <LocationGlobe
+                lat={coords.lat}
+                lon={coords.lon}
+                isDarkMode={isDarkMode}
+                onZoomChange={setGlobeZoomedIn}
+              />
+            </div>
+            <div
+              aria-hidden="true"
+              data-testid="location-edge-fade"
+              data-zoomed={String(globeZoomedIn)}
+              className={`pointer-events-none absolute inset-0 z-10 transition-opacity duration-700 ${globeZoomedIn ? 'opacity-100' : 'opacity-80'}`}
               style={{
-                border: 0,
-                ...(isDarkMode && {
-                  filter: 'invert(1) hue-rotate(180deg) contrast(0.9) brightness(0.8)',
-                }),
+                background: [
+                  'linear-gradient(90deg, var(--color-bg-card, #ffffff) 0%, transparent 24%, transparent 76%, var(--color-bg-card, #ffffff) 100%)',
+                  'linear-gradient(180deg, var(--color-bg-card, #ffffff) 0%, transparent 24%, transparent 76%, var(--color-bg-card, #ffffff) 100%)',
+                ].join(', '),
               }}
-              loading="lazy"
-              referrerPolicy="strict-origin-when-cross-origin"
-              onError={() => setMapFailed(true)}
-              src={mapUrls.embed}
             />
-            <a
-              href={mapUrls.external}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open your location in OpenStreetMap"
-              className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white/90 text-gray-700 shadow-sm backdrop-blur transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800/90 dark:text-gray-200"
-            >
-              <HiOutlineArrowTopRightOnSquare className="h-4 w-4" aria-hidden="true" />
-            </a>
-          </>
+          </div>
         )}
       </div>
     </div>

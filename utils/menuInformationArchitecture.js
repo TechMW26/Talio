@@ -187,9 +187,38 @@ export function isNavigationPathActive(item, pathname) {
   })
 }
 
-export function getNavigationBadgeCount(item, getCount) {
-  const names = item.sourceItems?.map((source) => source.name) || [item.name]
-  return names.reduce((total, name) => total + (Number(getCount(name)) || 0), 0)
+// Counts are attached to the route where the pending work can actually be
+// handled. Keeping this path-based avoids label collisions (for example,
+// several modules call a child "Approvals") and prevents a category badge from
+// including a route that RBAC or feature filtering removed from the menu.
+const BADGE_COUNT_KEY_BY_PATH = Object.freeze({
+  '/dashboard/projects': 'projects',
+  '/dashboard/projects/my-tasks': 'tasks',
+  '/dashboard/team/regularisation': 'attendance',
+  '/dashboard/leave/approvals': 'leaves',
+  '/dashboard/expenses/approvals': 'expenses',
+  '/dashboard/helpdesk': 'helpdesk',
+})
+
+function toBadgeCount(value) {
+  const count = Number(value)
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+}
+
+export function getNavigationLeafBadgeCount(item, counts = {}) {
+  const countKey = BADGE_COUNT_KEY_BY_PATH[item?.path]
+  return countKey ? toBadgeCount(counts[countKey]) : 0
+}
+
+export function getNavigationBadgeCount(item, counts = {}) {
+  const destinations = item?.submenu?.length ? item.submenu : [item]
+  const countedPaths = new Set()
+
+  return destinations.reduce((total, destination) => {
+    if (!destination?.path || countedPaths.has(destination.path)) return total
+    countedPaths.add(destination.path)
+    return total + getNavigationLeafBadgeCount(destination, counts)
+  }, 0)
 }
 
 export function groupNavigationChildren(children = []) {
