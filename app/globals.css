@@ -78,6 +78,22 @@ html.dark button[data-slot="trigger"].border-default-200 {
   pointer-events: none;
 }
 
+/*
+ * HeroUI treats date and time inputs as pre-filled, but the installed version
+ * omits datetime-local. Chromium still renders a native date/time hint, so an
+ * inside label otherwise sits on top of that hint. Keep the same compact
+ * floated-label geometry for every HeroUI datetime-local field, including
+ * future fields that do not explicitly opt into outside label placement.
+ */
+[data-slot="input-wrapper"]:has([data-slot="inner-wrapper"] input[type="datetime-local"]) > [data-slot="label"] {
+  transform: translateY(-0.6875rem) scale(0.85) !important;
+  transform-origin: top left;
+}
+
+[dir="rtl"] [data-slot="input-wrapper"]:has([data-slot="inner-wrapper"] input[type="datetime-local"]) > [data-slot="label"] {
+  transform-origin: top right;
+}
+
 /* Search overlay input - no borders at all */
 .search-overlay-input div[data-slot="input-wrapper"],
 html.dark .search-overlay-input div[data-slot="input-wrapper"],

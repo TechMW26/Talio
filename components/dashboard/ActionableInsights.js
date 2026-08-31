@@ -9,6 +9,7 @@ import {
   HiOutlineSparkles,
   HiOutlineClock,
   HiOutlineMapPin,
+  HiOutlineArrowTopRightOnSquare,
   HiOutlineCalculator,
   HiOutlinePlayCircle,
   HiOutlinePauseCircle,
@@ -186,34 +187,112 @@ function TicTacToeCard() {
   )
 }
 
+const GEOLOCATION_OPTIONS = {
+  enableHighAccuracy: false,
+  timeout: 10000,
+  maximumAge: 300000,
+}
+
+function formatCoordinate(value) {
+  return Number(value).toFixed(4)
+}
+
+function getLocationErrorMessage(error) {
+  if (error?.code === 1) return 'Allow location access in your browser to show your position.'
+  if (error?.code === 3) return 'Finding your location took too long. Please try again.'
+  return 'Your location is currently unavailable. Please try again.'
+}
+
+function buildMapUrls({ lat, lon }) {
+  const bbox = [lon - 0.01, lat - 0.01, lon + 0.01, lat + 0.01].join(',')
+  const embedParams = new URLSearchParams({
+    bbox,
+    layer: 'mapnik',
+    marker: `${lat},${lon}`,
+  })
+
+  return {
+    embed: `https://www.openstreetmap.org/export/embed.html?${embedParams}`,
+    external: `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lon)}#map=15/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}`,
+  }
+}
+
 // ─── Location Map Card ───
-function LocationMapCard() {
+export function LocationMapCard() {
   const { isDarkMode } = useTheme()
   const [coords, setCoords] = useState(null)
   const [location, setLocation] = useState(null)
-  const [error, setError] = useState(false)
+  const [status, setStatus] = useState('locating')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [mapFailed, setMapFailed] = useState(false)
+  const requestIdRef = useRef(0)
 
-  useEffect(() => {
-    if (!navigator.geolocation) { setError(true); return }
+  const locate = useCallback(() => {
+    const requestId = ++requestIdRef.current
+    setStatus('locating')
+    setErrorMessage('')
+    setMapFailed(false)
+    setCoords(null)
+    setLocation(null)
+
+    if (!navigator.geolocation) {
+      setStatus('unavailable')
+      setErrorMessage('Location is not supported by this browser.')
+      return
+    }
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        if (requestId !== requestIdRef.current) return
         const { latitude, longitude } = pos.coords
-        setCoords({ lat: latitude, lon: longitude })
+        const nextCoords = { lat: latitude, lon: longitude }
+        setCoords(nextCoords)
+        setLocation(`${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}`)
+        setStatus('ready')
+
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { 'Accept-Language': 'en' } }
-          )
+          const params = new URLSearchParams({
+            lat: String(latitude),
+            lon: String(longitude),
+            format: 'jsonv2',
+            zoom: '12',
+            addressdetails: '1',
+          })
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`, {
+            headers: { 'Accept-Language': 'en' },
+          })
+          if (!res.ok) throw new Error(`Reverse geocoding failed with ${res.status}`)
           const geo = await res.json()
-          setLocation(geo.address?.city || geo.address?.town || geo.address?.village || geo.address?.state || 'Your Location')
+          if (requestId !== requestIdRef.current) return
+          setLocation(
+            geo.address?.city ||
+            geo.address?.town ||
+            geo.address?.village ||
+            geo.address?.municipality ||
+            geo.address?.county ||
+            geo.address?.state ||
+            geo.display_name?.split(',')[0] ||
+            `${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}`
+          )
         } catch {
-          setLocation('Your Location')
+          // The map remains useful even if the optional place-name lookup fails.
         }
       },
-      () => setError(true),
-      { timeout: 10000 }
+      (error) => {
+        if (requestId !== requestIdRef.current) return
+        setStatus(error?.code === 1 ? 'denied' : 'unavailable')
+        setErrorMessage(getLocationErrorMessage(error))
+      },
+      GEOLOCATION_OPTIONS
     )
   }, [])
+
+  useEffect(() => {
+    locate()
+    return () => { requestIdRef.current += 1 }
+  }, [locate])
+
+  const mapUrls = coords ? buildMapUrls(coords) : null
 
   return (
     <div className="rounded-2xl bg-white dark:bg-zinc-800/60 border border-gray-100 dark:border-zinc-700/50 shadow-sm overflow-hidden flex flex-col min-h-[140px]">
@@ -228,31 +307,75 @@ function LocationMapCard() {
           </span>
         )}
       </div>
-      <div className="flex-1 min-h-[100px]">
-        {error ? (
-          <div className="h-full flex items-center justify-center text-xs text-gray-400 dark:text-gray-500 p-4">
-            Location access denied
+      <div className="relative flex-1 min-h-[100px]">
+        {status === 'denied' || status === 'unavailable' ? (
+          <div className="h-full min-h-[100px] flex flex-col items-center justify-center gap-2 px-4 py-3 text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400">{errorMessage}</p>
+            <button
+              type="button"
+              onClick={locate}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+            >
+              <HiOutlineArrowPath className="h-3.5 w-3.5" aria-hidden="true" />
+              Retry location
+            </button>
           </div>
-        ) : !coords ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+        ) : status === 'locating' ? (
+          <div className="h-full min-h-[100px] flex flex-col items-center justify-center gap-2" role="status">
+            <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+            <span className="text-xs text-gray-400 dark:text-gray-500">Finding your location…</span>
+          </div>
+        ) : mapFailed ? (
+          <div className="h-full min-h-[100px] flex flex-col items-center justify-center gap-2 px-4 py-3 text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400">The map preview could not load.</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMapFailed(false)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-zinc-700 dark:text-gray-200 dark:hover:bg-zinc-600"
+              >
+                <HiOutlineArrowPath className="h-3.5 w-3.5" aria-hidden="true" />
+                Reload map
+              </button>
+              <a
+                href={mapUrls.external}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300"
+              >
+                Open map
+                <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            </div>
           </div>
         ) : (
-          <iframe
-            title="Your location"
-            width="100%"
-            height="100%"
-            style={{
-              border: 0,
-              minHeight: 100,
-              ...(isDarkMode && {
-                filter: 'invert(1) hue-rotate(180deg) contrast(0.9) brightness(0.8)',
-              }),
-            }}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=${coords.lon - 0.01},${coords.lat - 0.01},${coords.lon + 0.01},${coords.lat + 0.01}&layer=mapnik&marker=${coords.lat},${coords.lon}`}
-          />
+          <>
+            <iframe
+              title="Map showing your current location"
+              width="100%"
+              height="100%"
+              className="block min-h-[100px]"
+              style={{
+                border: 0,
+                ...(isDarkMode && {
+                  filter: 'invert(1) hue-rotate(180deg) contrast(0.9) brightness(0.8)',
+                }),
+              }}
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              onError={() => setMapFailed(true)}
+              src={mapUrls.embed}
+            />
+            <a
+              href={mapUrls.external}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open your location in OpenStreetMap"
+              className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white/90 text-gray-700 shadow-sm backdrop-blur transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800/90 dark:text-gray-200"
+            >
+              <HiOutlineArrowTopRightOnSquare className="h-4 w-4" aria-hidden="true" />
+            </a>
+          </>
         )}
       </div>
     </div>

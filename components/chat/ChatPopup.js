@@ -8,6 +8,7 @@ import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { playNotificationSound } from '@/utils/audio'
 import Loader from '@/components/ui/Loader'
+import MemberAvatar from '@/components/chat/MemberAvatar'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 export default function ChatPopup({ chat, index }) {
@@ -867,6 +868,20 @@ export default function ChatPopup({ chat, index }) {
   }
 
   const position = chatPositions?.[chat._id] || getDefaultPosition()
+  const desiredPopupWidth = isExpanded ? 480 : 360
+  const desiredPopupHeight = isExpanded ? 580 : 450
+  const popupWidth = typeof window === 'undefined'
+    ? desiredPopupWidth
+    : Math.min(desiredPopupWidth, Math.max(280, window.innerWidth - 40))
+  const popupHeight = typeof window === 'undefined'
+    ? desiredPopupHeight
+    : Math.min(desiredPopupHeight, Math.max(320, window.innerHeight - 40))
+  const safePosition = typeof window === 'undefined'
+    ? position
+    : {
+        x: Math.max(20, Math.min(position.x, window.innerWidth - popupWidth - 20)),
+        y: Math.max(20, Math.min(position.y, window.innerHeight - popupHeight - 20)),
+      }
 
   // Typing indicator
   const typingText = Object.values(typingUsers).length > 0
@@ -980,10 +995,10 @@ export default function ChatPopup({ chat, index }) {
         ref={popupRef}
         className="fixed rounded-2xl overflow-hidden flex flex-col"
         style={{
-          width: isExpanded ? '480px' : '360px',
-          height: isExpanded ? '580px' : '450px',
-          left: `${position.x}px`,
-          top: `${position.y}px`,
+          width: `${popupWidth}px`,
+          height: `${popupHeight}px`,
+          left: `${safePosition.x}px`,
+          top: `${safePosition.y}px`,
           zIndex,
           ...glassStyle,
           transition: 'width 0.3s ease, height 0.3s ease, box-shadow 0.2s ease',
@@ -1096,26 +1111,28 @@ export default function ChatPopup({ chat, index }) {
         {/* Group Members Panel - Slide over messages when open */}
         {showMembersPanel && chat.isGroup && (
           <div
-            className="absolute inset-x-0 top-[52px] bottom-0 z-10 overflow-hidden rounded-b-2xl"
+            className="absolute inset-x-0 bottom-0 top-[52px] z-10 flex min-h-0 flex-col overflow-hidden rounded-b-2xl"
             style={{
               background: isDarkMode ? 'rgba(24, 24, 27, 0.98)' : 'rgba(255, 255, 255, 0.98)',
               animation: 'slideIn 0.2s ease-out',
             }}
           >
             {/* Panel Header */}
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50/50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900/60">
+              <div className="flex min-w-0 items-center gap-2">
                 <FaUsers className="w-4 h-4" style={{ color: primaryColor }} />
-                <span className="font-semibold text-sm text-gray-800">Group Members</span>
-                <span className="text-xs text-gray-500">({chat.participants?.length || 0})</span>
+                <span className="truncate text-sm font-semibold text-gray-800 dark:text-zinc-100">Group Members</span>
+                <span className="flex-shrink-0 text-xs text-gray-500 dark:text-zinc-400">({chat.participants?.length || 0})</span>
               </div>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation()
                   setShowMembersPanel(false)
                   setMemberSearchQuery('')
                 }}
-                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+                className="rounded-lg p-1.5 transition-colors hover:bg-gray-200 dark:hover:bg-zinc-700"
+                aria-label="Close group members"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" className="w-3 h-3" fill="#6B7280">
                   <path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z" />
@@ -1124,7 +1141,7 @@ export default function ChatPopup({ chat, index }) {
             </div>
 
             {/* Search Bar */}
-            <div className="px-3 pt-2 pb-1">
+            <div className="flex-shrink-0 px-3 pb-1 pt-2">
               <div className="input-with-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="input-icon" fill="#9CA3AF">
                   <path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z" />
@@ -1134,14 +1151,14 @@ export default function ChatPopup({ chat, index }) {
                   value={memberSearchQuery}
                   onChange={(e) => setMemberSearchQuery(e.target.value)}
                   placeholder="Search members..."
-                  className="input input-search text-xs"
+                  className="input input-search text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
             </div>
 
             {/* Members List */}
-            <div className="overflow-y-auto p-3 pt-2 space-y-2" style={{ maxHeight: 'calc(100% - 96px)' }}>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 pt-2">
               {chat.participants?.filter((member) => {
                 if (!memberSearchQuery.trim()) return true
                 const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase()
@@ -1156,46 +1173,37 @@ export default function ChatPopup({ chat, index }) {
                 return (
                   <div
                     key={memberId}
-                    className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${isCurrentUser ? 'bg-blue-50' : 'hover:bg-gray-50'
+                    className={`flex items-center gap-3 rounded-xl p-2.5 transition-colors ${isCurrentUser ? 'bg-blue-50 dark:bg-blue-950/50' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'
                       }`}
                   >
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
-                      style={{
-                        background: `linear-gradient(135deg, ${primaryColor}, ${primaryDark})`,
-                      }}
-                    >
-                      {member.profilePicture ? (
-                        <img src={member.profilePicture} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-white font-semibold text-xs">
-                          {member.firstName?.[0]}{member.lastName?.[0]}
-                        </span>
-                      )}
-                    </div>
+                    <MemberAvatar
+                      member={member}
+                      background={`linear-gradient(135deg, ${primaryColor}, ${primaryDark})`}
+                    />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-medium text-gray-900 text-sm truncate">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <p className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-zinc-100">
                           {member.firstName || 'Unknown'} {member.lastName || ''}
                         </p>
                         {isCurrentUser && (
-                          <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                          <span className="flex-shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                             You
                           </span>
                         )}
                         {isAdmin && (
-                          <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
+                          <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                             Admin
                           </span>
                         )}
                       </div>
                       {member.employeeCode && (
-                        <p className="text-[10px] text-gray-500 truncate">{member.employeeCode}</p>
+                        <p className="truncate text-[10px] text-gray-500 dark:text-zinc-400">{member.employeeCode}</p>
                       )}
                     </div>
                     {/* Send Message Button - Only for other members */}
                     {!isCurrentUser && (
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation()
                           // Close the members panel and the popup will remain for future DM feature
@@ -1206,6 +1214,7 @@ export default function ChatPopup({ chat, index }) {
                         className="flex-shrink-0 transition-colors hover:opacity-70"
                         style={{ color: primaryColor }}
                         title={`Message ${member.firstName || 'User'}`}
+                        aria-label={`Message ${member.firstName || 'user'}`}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-4 h-4" fill="currentColor">
                           <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />

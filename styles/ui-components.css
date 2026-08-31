@@ -250,6 +250,19 @@
   transform: translateY(-50%);
   color: #9ca3af;
   pointer-events: none;
+  flex-shrink: 0;
+  max-width: 1.25rem;
+  max-height: 1.25rem;
+}
+
+/* Raw SVGs do not have an intrinsic UI size. Keep shared field icons compact
+   while preserving explicit Tailwind width/height utilities on callers. */
+.input-with-icon .input-icon:not([class*="w-"]) {
+  width: 1rem;
+}
+
+.input-with-icon .input-icon:not([class*="h-"]) {
+  height: 1rem;
 }
 
 /* Search Input */

@@ -514,13 +514,13 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
 
             {/* Scrollable Menu Section */}
             <ScrollShadow className="flex-1 space-y-0.5 px-3 pb-6 pt-3 scrollbar-hide">
-              <label className="talio-sidebar-search mb-3 flex items-center gap-2 px-3 py-2">
+              <label className="talio-sidebar-search mb-5 flex items-center gap-2 px-3 py-2">
                 <HiOutlineMagnifyingGlass className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
                 <input
                   value={menuQuery}
                   onChange={(event) => setMenuQuery(event.target.value)}
-                  placeholder="Find a tool"
-                  aria-label="Find a tool"
+                  placeholder="Search"
+                  aria-label="Search"
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-default-400"
                   style={{ color: 'var(--color-text-primary)' }}
                 />

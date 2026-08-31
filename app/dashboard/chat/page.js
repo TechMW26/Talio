@@ -8,6 +8,7 @@ import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import UnreadBadge from '@/components/UnreadBadge'
+import MemberAvatar from '@/components/chat/MemberAvatar'
 import { playNotificationSound } from '@/utils/audio'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Checkbox, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -1390,20 +1391,12 @@ export default function ChatPage() {
                     className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${isCurrentUser ? 'bg-blue-50' : 'hover:bg-gray-50'
                       }`}
                   >
-                    <div
-                      className="w-11 h-11 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
-                      style={{
-                        background: `linear-gradient(135deg, ${themes[currentTheme]?.primary?.[600] || '#2563EB'} 0%, ${themes[currentTheme]?.primary?.[500] || '#3B82F6'} 100%)`
-                      }}
-                    >
-                      {member.profilePicture ? (
-                        <img src={member.profilePicture} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-white font-semibold text-sm">
-                          {member.firstName?.[0]}{member.lastName?.[0]}
-                        </span>
-                      )}
-                    </div>
+                    <MemberAvatar
+                      member={member}
+                      className="h-11 w-11"
+                      textClassName="text-sm"
+                      background={`linear-gradient(135deg, ${themes[currentTheme]?.primary?.[600] || '#2563EB'} 0%, ${themes[currentTheme]?.primary?.[500] || '#3B82F6'} 100%)`}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-gray-900 text-sm truncate">

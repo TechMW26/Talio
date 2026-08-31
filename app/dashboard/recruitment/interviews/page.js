@@ -386,7 +386,7 @@ export default function InterviewsPage() {
                   <SelectItem key="panel">Panel</SelectItem>
                   <SelectItem key="assignment">Assignment</SelectItem>
                 </Select>
-                <Input label="Date & Time" type="datetime-local" isRequired
+                <Input label="Date & Time" labelPlacement="outside-top" type="datetime-local" isRequired
                   value={scheduleData.scheduledDate}
                   onValueChange={(v) => setScheduleData((prev) => ({ ...prev, scheduledDate: v }))}
                 />
