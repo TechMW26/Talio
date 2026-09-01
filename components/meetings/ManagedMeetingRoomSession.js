@@ -26,7 +26,9 @@ import {
 import { BsEmojiSmile } from 'react-icons/bs'
 import { CutLineIcon, MEETING_REACTIONS, MeetingReactionIcon } from '@/components/meetings/MeetingVisualIcons'
 import AddMeetingParticipantsModal from '@/app/dashboard/meetings/components/AddMeetingParticipantsModal'
+import MeetingNotetakerPanel from '@/app/dashboard/meetings/components/MeetingNotetakerPanel'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { mergeTranscriptSegments } from '@/lib/meetingLanguage'
 import { getSupportedAudioMimeType, isMeetingAudioUploadSupported } from '@/lib/meetingTranscriber'
 import { getManagedMeetingJoinError } from '@/lib/meetings/transport'
 import toast from '@/utils/toast'
@@ -118,6 +120,10 @@ export default function ManagedMeetingRoomSession({
   const recorderRef = useRef(null)
   const mutedRef = useRef(false)
   const joiningRef = useRef(false)
+  const leavingRef = useRef(false)
+  const meetingSessionStartedAtRef = useRef(null)
+  const recorderStopPromiseRef = useRef(Promise.resolve())
+  const lastTranscriptUploadRef = useRef(Promise.resolve())
   const reactionTimers = useRef(new Map())
   const [meeting, setMeeting] = useState(meetingData)
   const [room, setRoom] = useState(null)
@@ -130,6 +136,7 @@ export default function ManagedMeetingRoomSession({
   const [screenSharing, setScreenSharing] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showParticipants, setShowParticipants] = useState(false)
+  const [showNotetaker, setShowNotetaker] = useState(false)
   const [showReactions, setShowReactions] = useState(false)
   const [showAddParticipants, setShowAddParticipants] = useState(false)
   const [messages, setMessages] = useState([])
@@ -138,6 +145,10 @@ export default function ManagedMeetingRoomSession({
   const [raisedHands, setRaisedHands] = useState({})
   const [handRaised, setHandRaised] = useState(false)
   const [transcriptStatus, setTranscriptStatus] = useState('off')
+  const [liveTranscript, setLiveTranscript] = useState([])
+  const [notetakerError, setNotetakerError] = useState('')
+  const [isEndingMeeting, setIsEndingMeeting] = useState(false)
+  const [endingMeetingStatus, setEndingMeetingStatus] = useState('Saving your latest meeting notes...')
   const [connectionLabel, setConnectionLabel] = useState('Connecting')
 
   const { data: meetingResponse } = useAuthedSWR(
@@ -147,6 +158,27 @@ export default function ManagedMeetingRoomSession({
   useEffect(() => {
     if (meetingResponse?.success && meetingResponse.data?.[0]) setMeeting(meetingResponse.data[0])
   }, [meetingResponse])
+
+  const {
+    data: transcriptResponse,
+    error: transcriptFetchError,
+    mutate: refreshTranscript,
+  } = useAuthedSWR(
+    joined && meeting?._id && !guestToken ? `/api/meetings/${meeting._id}/transcript` : null,
+    {
+      refreshInterval: joined && !guestToken ? 5000 : 0,
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+    }
+  )
+
+  useEffect(() => {
+    if (!transcriptResponse?.success) return
+    setLiveTranscript((current) => mergeTranscriptSegments(
+      current,
+      transcriptResponse.data?.transcript || []
+    ))
+  }, [transcriptResponse])
 
   const refreshParticipants = useCallback((activeRoom = roomRef.current) => {
     if (!activeRoom) return
@@ -239,6 +271,7 @@ export default function ManagedMeetingRoomSession({
       ])
       setRoom(liveRoom)
       setJoined(true)
+      meetingSessionStartedAtRef.current = new Date().toISOString()
       setConnectionLabel('Connected')
       refreshParticipants(liveRoom)
       onJoinedChange?.(true)
@@ -293,32 +326,62 @@ export default function ManagedMeetingRoomSession({
 
     recorderRef.current = recorder
     setTranscriptStatus('listening')
+    setNotetakerError('')
     let startedAt = Date.now()
-    recorder.ondataavailable = async (event) => {
+    let resolveRecorderStop
+    const recorderStopPromise = new Promise((resolve) => {
+      resolveRecorderStop = resolve
+    })
+    recorderStopPromiseRef.current = recorderStopPromise
+
+    recorder.ondataavailable = (event) => {
       const durationMs = Date.now() - startedAt
       const segmentStartedAt = startedAt
       startedAt = Date.now()
       if (mutedRef.current || !event.data || event.data.size < 2048 || durationMs < 1200) return
 
-      const formData = new FormData()
-      formData.append('audio', event.data, `meeting-${meeting._id}-${segmentStartedAt}.webm`)
-      formData.append('startedAt', new Date(segmentStartedAt).toISOString())
-      formData.append('durationMs', String(durationMs))
-      formData.append('language', 'auto')
-      formData.append('source', 'live-pollinations')
-      try {
-        const response = await fetch(`/api/meetings/${meeting._id}/transcript`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-          body: formData,
+      const audioBlob = event.data
+      const uploadPromise = lastTranscriptUploadRef.current
+        .catch(() => { })
+        .then(async () => {
+          if (mutedRef.current) return
+          const formData = new FormData()
+          formData.append('audio', audioBlob, `meeting-${meeting._id}-${segmentStartedAt}.webm`)
+          formData.append('startedAt', new Date(segmentStartedAt).toISOString())
+          formData.append('durationMs', String(durationMs))
+          formData.append('language', 'auto')
+          formData.append('source', 'live-pollinations')
+
+          const response = await fetch(`/api/meetings/${meeting._id}/transcript`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+            body: formData,
+          })
+          const payload = await response.json().catch(() => null)
+          if (!response.ok || payload?.success === false) {
+            throw new Error(payload?.message || 'Transcription upload failed')
+          }
+
+          setLiveTranscript((current) => mergeTranscriptSegments(
+            current,
+            payload?.data?.segments || []
+          ))
+          setNotetakerError('')
+          await refreshTranscript?.()
+          if (!mutedRef.current) setTranscriptStatus('listening')
         })
-        if (!response.ok) throw new Error('Transcription upload failed')
-        if (!mutedRef.current) setTranscriptStatus('listening')
-      } catch {
-        if (!mutedRef.current) setTranscriptStatus('retrying')
-      }
+        .catch((error) => {
+          console.error('[Managed meeting] Transcript upload failed:', error)
+          setNotetakerError('The latest speech segment could not be saved. Mira will keep listening and retry with the next segment.')
+          if (!mutedRef.current) setTranscriptStatus('retrying')
+        })
+
+      lastTranscriptUploadRef.current = uploadPromise
     }
-    recorder.onstop = () => recordingTrack.stop()
+    recorder.onstop = () => {
+      recordingTrack.stop()
+      resolveRecorderStop?.()
+    }
     recorder.start(10_000)
 
     return () => {
@@ -329,7 +392,7 @@ export default function ManagedMeetingRoomSession({
       }
       if (recorderRef.current === recorder) recorderRef.current = null
     }
-  }, [guestToken, joined, meeting?._id, muted, room])
+  }, [guestToken, joined, meeting?._id, muted, refreshTranscript, room])
 
   const toggleMute = async () => {
     const next = !muted
@@ -379,12 +442,94 @@ export default function ManagedMeetingRoomSession({
     setRaisedHands((current) => ({ ...current, [room.localParticipant.identity]: next }))
     await publishData('talio-hand', { raised: next, senderId: room.localParticipant.identity })
   }
-  const leave = () => {
-    roomRef.current?.disconnect()
-    onJoinedChange?.(false)
-    onSessionEnded?.()
-    if (guestToken) router.push('/')
-    else router.push('/dashboard/meetings')
+  const leave = async () => {
+    if (leavingRef.current) return
+    leavingRef.current = true
+    setIsEndingMeeting(true)
+    setEndingMeetingStatus('Saving your latest meeting notes...')
+
+    try {
+      const activeRecorder = recorderRef.current
+      if (activeRecorder?.state && activeRecorder.state !== 'inactive') {
+        try { activeRecorder.stop() } catch { /* recorder was already stopping */ }
+      }
+      await recorderStopPromiseRef.current.catch(() => { })
+      await lastTranscriptUploadRef.current.catch(() => { })
+
+      if (meeting?._id && meeting.isOrganizer && !guestToken) {
+        const token = localStorage.getItem('token')
+        const actualEnd = new Date().toISOString()
+        const sessionStartedAt = meetingSessionStartedAtRef.current
+          || meeting.actualStart
+          || meeting.scheduledStart
+          || actualEnd
+        const completed = !meeting.scheduledEnd || new Date(actualEnd) >= new Date(meeting.scheduledEnd)
+        const nextStatus = completed ? 'completed' : 'in-progress'
+
+        setEndingMeetingStatus('Saving meeting status...')
+        const meetingUpdateResponse = await fetch(`/api/meetings/${meeting._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            status: nextStatus,
+            actualStart: meeting.actualStart || meeting.scheduledStart || sessionStartedAt,
+            ...(completed ? { actualEnd } : {}),
+          }),
+        })
+        if (!meetingUpdateResponse.ok) {
+          console.error('[Managed meeting] Meeting status could not be updated')
+        }
+
+        setEndingMeetingStatus('Generating Mira meeting notes...')
+        const summaryResponse = await fetch(`/api/meetings/${meeting._id}/summary`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            language: 'auto',
+            allowNoContent: true,
+            sendMomEmails: completed,
+            sessionStartedAt,
+            sessionEndedAt: actualEnd,
+          }),
+        })
+        const summaryPayload = await summaryResponse.json().catch(() => null)
+        if (!summaryResponse.ok || summaryPayload?.success === false) {
+          throw new Error(summaryPayload?.message || 'Mira meeting notes could not be generated')
+        }
+        if (summaryPayload?.data?.generated) {
+          toast.success('Mira meeting notes were saved to the meeting record')
+        }
+      }
+    } catch (error) {
+      console.error('[Managed meeting] Note finalisation failed:', error)
+      toast.error('The meeting ended, but Mira notes could not be finalised. You can retry from meeting details.')
+    } finally {
+      setEndingMeetingStatus('Closing meeting room...')
+      meetingSessionStartedAtRef.current = null
+      roomRef.current?.disconnect()
+      onJoinedChange?.(false)
+      onSessionEnded?.()
+      if (guestToken) router.push('/')
+      else router.push(meeting?._id ? `/dashboard/meetings/${meeting._id}` : '/dashboard/meetings')
+    }
+  }
+
+  const toggleNotetaker = () => {
+    setShowChat(false)
+    setShowParticipants(false)
+    setShowReactions(false)
+    if (isPip) {
+      setShowNotetaker(true)
+      onRestoreMeeting?.()
+      return
+    }
+    setShowNotetaker((current) => !current)
   }
 
   const localIdentity = room?.localParticipant.identity
@@ -393,7 +538,21 @@ export default function ManagedMeetingRoomSession({
     return presenter ? [presenter, ...participants.filter((participant) => participant.identity !== presenter.identity)] : participants
   }, [participants])
   const isCompact = displayMode === 'compact'
+  const isBubble = displayMode === 'bubble'
   const isPip = displayMode !== 'full'
+  const participantLabel = `${participants.length} participant${participants.length === 1 ? '' : 's'}`
+  const transcriptLabel = !guestToken && transcriptStatus !== 'off'
+    ? (transcriptStatus === 'listening' ? 'Mira listening' : transcriptStatus)
+    : null
+  const endingMeetingOverlay = isEndingMeeting ? (
+    <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-100/80 px-6 backdrop-blur-sm dark:bg-slate-950/80">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white/95 p-6 text-center shadow-2xl dark:border-white/10 dark:bg-slate-900/95">
+        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-[3px] border-indigo-200 border-t-indigo-600 dark:border-white/15 dark:border-t-indigo-400" />
+        <h2 className="mt-4 text-lg font-semibold">Ending meeting...</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{endingMeetingStatus}</p>
+      </div>
+    </div>
+  ) : null
 
   if (!joined) {
     return (
@@ -413,13 +572,113 @@ export default function ManagedMeetingRoomSession({
     )
   }
 
+  if (isPip && isBubble) {
+    return (
+      <>
+        {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
+          <RemoteAudio key={`audio-${participant.identity}`} participant={participant.participant} />
+        ))}
+        <button
+          type="button"
+          onClick={() => onSetPipSize?.('compact')}
+          className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-[130] flex h-14 w-14 items-center justify-center rounded-full border border-indigo-300/40 bg-indigo-600 text-white shadow-2xl ring-1 ring-black/10 transition hover:scale-105 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:ring-white/15"
+          title="Expand Talio Meet"
+          aria-label="Expand Talio Meet picture in picture"
+          data-meeting-pip="bubble"
+        >
+          <HiOutlineVideoCamera className="h-6 w-6" />
+          <span className={`absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white ${muted ? 'bg-red-500' : 'bg-emerald-400'}`} aria-hidden="true" />
+        </button>
+      </>
+    )
+  }
+
+  if (isPip && isCompact) {
+    return (
+      <>
+        {endingMeetingOverlay}
+        <section
+          className="fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex min-h-[5.25rem] w-[min(94vw,22rem)] items-center gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 px-3 py-2.5 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950/95 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0"
+          aria-label="Talio Meet compact picture in picture"
+          data-meeting-pip="compact"
+        >
+        {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
+          <RemoteAudio key={`audio-${participant.identity}`} participant={participant.participant} />
+        ))}
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold leading-5">{meeting?.title || 'Talio Meet'}</p>
+          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+            <span className="truncate">
+              {connectionLabel} · {participantLabel}{transcriptLabel ? ` · ${transcriptLabel}` : ''}
+            </span>
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onRestoreMeeting}
+            aria-label="Restore meeting"
+            title="Restore meeting"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-700 transition hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+          >
+            <HiOutlineArrowsPointingOut className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetPipSize?.('bubble')}
+            aria-label="Minimise picture in picture to bubble"
+            title="Minimise to bubble"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-700 transition hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+          >
+            <HiOutlineMinusSmall className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-label={muted ? 'Turn microphone on' : 'Mute microphone'}
+            title={muted ? 'Unmute' : 'Mute'}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ${muted ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-700 hover:bg-slate-600'}`}
+          >
+            <CutLineIcon isOff={muted}><HiOutlineMicrophone className="h-5 w-5" /></CutLineIcon>
+          </button>
+          <button
+            type="button"
+            onClick={leave}
+            disabled={isEndingMeeting}
+            aria-label="Leave meeting"
+            title="Leave meeting"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-600 text-white transition hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-400"
+          >
+            <HiOutlinePhoneXMark className="h-5 w-5" />
+          </button>
+        </div>
+        </section>
+      </>
+    )
+  }
+
   return (
-    <div className={isPip ? `fixed bottom-4 right-4 z-[100] overflow-hidden rounded-2xl border border-slate-300 bg-slate-100 text-slate-900 shadow-2xl dark:border-white/10 dark:bg-slate-950 dark:text-white ${isCompact ? 'h-20 w-72' : 'h-[26rem] w-[min(92vw,28rem)]'}` : 'fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white'}>
-      <header className="flex min-h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 dark:border-white/10 dark:bg-slate-900/90">
-        <div className="min-w-0"><p className="truncate text-sm font-semibold">{meeting?.title || 'Talio Meet'}</p><p className="flex items-center gap-1 text-xs text-slate-500">{connectionLabel} · {participants.length} participant{participants.length === 1 ? '' : 's'}{!guestToken && transcriptStatus !== 'off' && <><span>·</span><HiOutlineDocumentText className="h-3.5 w-3.5" /><span>{transcriptStatus === 'listening' ? 'Mira listening' : transcriptStatus}</span></>}</p></div>
+    <div
+      className={isPip
+        ? 'fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex h-[min(26rem,calc(100dvh-2rem))] w-[min(94vw,28rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-100 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0'
+        : 'fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white'}
+      data-meeting-pip={isPip ? 'expanded' : undefined}
+    >
+      {endingMeetingOverlay}
+      <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 dark:border-white/10 dark:bg-slate-900/90">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{meeting?.title || 'Talio Meet'}</p>
+          <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+            <span className="truncate">{connectionLabel} · {participantLabel}</span>
+            {transcriptLabel && <><span className="shrink-0">·</span><HiOutlineDocumentText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{transcriptLabel}</span></>}
+          </p>
+        </div>
         <div className="flex items-center gap-1">
-          {isPip ? <button onClick={onRestoreMeeting} aria-label="Restore meeting" className="rounded-full p-2 hover:bg-slate-200 dark:hover:bg-white/10"><HiOutlineArrowsPointingOut className="h-5 w-5" /></button> : <button onClick={onMinimizeToPip} aria-label="Minimise meeting" className="rounded-full p-2 hover:bg-slate-200 dark:hover:bg-white/10"><HiOutlineArrowsPointingIn className="h-5 w-5" /></button>}
-          {isPip && <button onClick={() => onSetPipSize?.(isCompact ? 'expanded' : 'compact')} aria-label={isCompact ? 'Expand picture in picture' : 'Minimise picture in picture'} className="rounded-full p-2 hover:bg-slate-200 dark:hover:bg-white/10"><HiOutlineMinusSmall className="h-5 w-5" /></button>}
+          {isPip ? <button onClick={onRestoreMeeting} aria-label="Restore meeting" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:hover:bg-white/10"><HiOutlineArrowsPointingOut className="h-5 w-5" /></button> : <button onClick={onMinimizeToPip} aria-label="Minimise meeting" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:hover:bg-white/10"><HiOutlineArrowsPointingIn className="h-5 w-5" /></button>}
+          {isPip && <button onClick={() => onSetPipSize?.('compact')} aria-label="Minimise picture in picture" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:hover:bg-white/10"><HiOutlineMinusSmall className="h-5 w-5" /></button>}
         </div>
       </header>
 
@@ -431,16 +690,35 @@ export default function ManagedMeetingRoomSession({
           <div className="flex items-center justify-between"><h2 className="font-semibold">{showChat ? 'In-meeting chat' : 'Participants'}</h2><button onClick={() => { setShowChat(false); setShowParticipants(false) }} aria-label="Close panel"><HiOutlineXMark className="h-5 w-5" /></button></div>
           {showChat ? <><div className="mt-4 flex h-[calc(100%-5rem)] flex-col gap-2 overflow-y-auto">{messages.length ? messages.map((message) => <div key={message.id} className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${message.senderId === localIdentity ? 'ml-auto bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}><p className="text-xs font-medium opacity-75">{message.senderId === localIdentity ? 'You' : message.senderName}</p><p>{message.message}</p></div>) : <p className="mt-8 text-center text-sm text-slate-500">No messages yet</p>}</div><form onSubmit={sendChat} className="mt-3 flex gap-2"><input value={chatInput} onChange={(event) => setChatInput(event.target.value)} maxLength={2000} placeholder="Message everyone" className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-transparent px-3 dark:border-white/15" /><button aria-label="Send message" className="rounded-xl bg-indigo-600 p-3 text-white"><HiOutlinePaperAirplane className="h-5 w-5" /></button></form></> : <div className="mt-4 space-y-2">{participants.map((participant) => <div key={participant.identity} className="flex items-center justify-between rounded-xl bg-slate-100 p-3 text-sm dark:bg-slate-800"><span>{participant.identity === localIdentity ? 'You' : participant.name}</span>{participant.isMuted && <HiOutlineMicrophone className="h-4 w-4 text-red-500" />}</div>)}{meeting?._id && !guestToken && <button onClick={() => setShowAddParticipants(true)} className="mt-3 w-full rounded-xl border border-indigo-300 px-3 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300">Add people</button>}</div>}
         </aside>}
+        {!isPip && !guestToken && (
+          <MeetingNotetakerPanel
+            isOpen={showNotetaker}
+            error={notetakerError || transcriptFetchError?.message}
+            transcript={liveTranscript}
+            onClose={() => setShowNotetaker(false)}
+          />
+        )}
       </main>}
 
       {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
         <RemoteAudio key={`audio-${participant.identity}`} participant={participant.participant} />
       ))}
 
-      <footer className={`flex items-center justify-center gap-2 border-t border-slate-200 bg-white/90 px-3 dark:border-white/10 dark:bg-slate-900/90 ${isCompact ? 'absolute bottom-2 right-2 border-0 bg-transparent p-0 dark:bg-transparent' : 'min-h-20'}`}>
+      <footer className="flex min-h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-slate-200 bg-white/90 px-3 dark:border-white/10 dark:bg-slate-900/90">
         <button onClick={toggleMute} aria-label={muted ? 'Turn microphone on' : 'Mute microphone'} className={`flex h-11 w-11 items-center justify-center rounded-full ${muted ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={muted}><HiOutlineMicrophone className="h-5 w-5" /></CutLineIcon></button>
-        {!isCompact && <><button onClick={toggleVideo} aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'} className={`flex h-11 w-11 items-center justify-center rounded-full ${videoOff ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={videoOff}><HiOutlineVideoCamera className="h-5 w-5" /></CutLineIcon></button><button onClick={toggleScreen} aria-label={screenSharing ? 'Stop presenting' : 'Present screen'} className={`flex h-11 w-11 items-center justify-center rounded-full ${screenSharing ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineComputerDesktop className="h-5 w-5" /></button><button onClick={() => { setShowChat(!showChat); setShowParticipants(false) }} aria-label="Open chat" className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800"><HiOutlineChatBubbleLeftRight className="h-5 w-5" /></button><button onClick={() => { setShowParticipants(!showParticipants); setShowChat(false) }} aria-label="Open participants" className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800"><HiOutlineUserGroup className="h-5 w-5" /></button><button onClick={toggleHand} aria-label={handRaised ? 'Lower hand' : 'Raise hand'} className={`flex h-11 w-11 items-center justify-center rounded-full ${handRaised ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineHandRaised className="h-5 w-5" /></button><div className="relative"><button onClick={() => setShowReactions(!showReactions)} aria-label="Open reactions" className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800"><BsEmojiSmile className="h-5 w-5" /></button>{showReactions && <div className="absolute bottom-14 left-1/2 flex -translate-x-1/2 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-slate-800">{MEETING_REACTIONS.map((reaction) => <button key={reaction.value} onClick={() => sendReaction(reaction.value)} aria-label={`React with ${reaction.label}`} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/10"><MeetingReactionIcon value={reaction.value} className="h-5 w-5" /></button>)}</div>}</div></>}
-        <button onClick={leave} aria-label="Leave meeting" className="flex h-11 w-11 items-center justify-center rounded-full bg-red-600 text-white"><HiOutlinePhoneXMark className="h-5 w-5" /></button>
+        {!isCompact && <>
+          <button onClick={toggleVideo} aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'} className={`flex h-11 w-11 items-center justify-center rounded-full ${videoOff ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={videoOff}><HiOutlineVideoCamera className="h-5 w-5" /></CutLineIcon></button>
+          <button onClick={toggleScreen} aria-label={screenSharing ? 'Stop presenting' : 'Present screen'} className={`flex h-11 w-11 items-center justify-center rounded-full ${screenSharing ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineComputerDesktop className="h-5 w-5" /></button>
+          {!guestToken && <button onClick={toggleNotetaker} aria-label={showNotetaker ? 'Close meeting notes' : 'Open meeting notes'} title="Meeting notes" className={`flex h-11 w-11 items-center justify-center rounded-full ${showNotetaker ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineDocumentText className="h-5 w-5" /></button>}
+          <button onClick={() => { setShowChat(!showChat); setShowParticipants(false); setShowNotetaker(false) }} aria-label="Open chat" className={`flex h-11 w-11 items-center justify-center rounded-full ${showChat ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineChatBubbleLeftRight className="h-5 w-5" /></button>
+          <button onClick={() => { setShowParticipants(!showParticipants); setShowChat(false); setShowNotetaker(false) }} aria-label="Open participants" className={`flex h-11 w-11 items-center justify-center rounded-full ${showParticipants ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineUserGroup className="h-5 w-5" /></button>
+          <button onClick={toggleHand} aria-label={handRaised ? 'Lower hand' : 'Raise hand'} className={`flex h-11 w-11 items-center justify-center rounded-full ${handRaised ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineHandRaised className="h-5 w-5" /></button>
+          <div className="relative">
+            <button onClick={() => setShowReactions(!showReactions)} aria-label="Open reactions" className={`flex h-11 w-11 items-center justify-center rounded-full ${showReactions ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><BsEmojiSmile className="h-5 w-5" /></button>
+            {showReactions && <div className="absolute bottom-14 left-1/2 z-40 flex -translate-x-1/2 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-slate-800">{MEETING_REACTIONS.map((reaction) => <button key={reaction.value} onClick={() => sendReaction(reaction.value)} aria-label={`React with ${reaction.label}`} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/10"><MeetingReactionIcon value={reaction.value} className="h-5 w-5" /></button>)}</div>}
+          </div>
+        </>}
+        <button onClick={leave} disabled={isEndingMeeting} aria-label="Leave meeting" className="flex h-11 w-11 items-center justify-center rounded-full bg-red-600 text-white disabled:cursor-wait disabled:opacity-60"><HiOutlinePhoneXMark className="h-5 w-5" /></button>
       </footer>
       {showAddParticipants && meeting?._id && <AddMeetingParticipantsModal isOpen meeting={meeting} onClose={() => setShowAddParticipants(false)} onAdded={() => setShowAddParticipants(false)} />}
     </div>

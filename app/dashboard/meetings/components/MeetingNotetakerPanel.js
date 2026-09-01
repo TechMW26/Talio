@@ -28,7 +28,7 @@ export default function MeetingNotetakerPanel({
   const latestTranscript = [...transcript].slice(-24).reverse()
 
   return (
-    <aside className="relative z-20 flex min-h-0 w-full flex-shrink-0 flex-col border-l border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900 sm:w-[26rem] xl:w-[30rem]">
+    <aside className="absolute inset-0 z-20 flex min-h-0 w-full flex-shrink-0 flex-col border-l border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900 sm:relative sm:inset-auto sm:w-[26rem] xl:w-[30rem]">
       <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-slate-900">
         <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 dark:border-slate-800 sm:px-5">
           <div>

@@ -34,6 +34,16 @@ describe('managed meeting implementation', () => {
     expect(source).toContain("setTranscriptStatus(muted ? 'paused' : 'off')")
   })
 
+  test('restores the persisted meeting notetaker and finalises notes on exit', () => {
+    expect(source).toContain("import MeetingNotetakerPanel")
+    expect(source).toContain('<MeetingNotetakerPanel')
+    expect(source).toContain('/api/meetings/${meeting._id}/transcript')
+    expect(source).toContain("refreshInterval: joined && !guestToken ? 5000 : 0")
+    expect(source).toContain('await lastTranscriptUploadRef.current')
+    expect(source).toContain('/api/meetings/${meeting._id}/summary')
+    expect(source).toContain("setEndingMeetingStatus('Generating Mira meeting notes...')")
+  })
+
   test('does not build peer-to-peer mesh connections', () => {
     expect(source).not.toContain('RTCPeerConnection')
     expect(source).not.toContain('socket.io-client')
@@ -49,5 +59,16 @@ describe('managed meeting implementation', () => {
     expect(source).toContain('pendingRoom?.disconnect()')
     expect(source).toContain("role=\"alert\"")
     expect(source).toContain("joinError ? 'Try again' : 'Join meeting'")
+  })
+
+  test('keeps compact and expanded picture-in-picture layouts collision free', () => {
+    expect(source).toContain('data-meeting-pip="bubble"')
+    expect(source).toContain('data-meeting-pip="compact"')
+    expect(source).toContain("data-meeting-pip={isPip ? 'expanded' : undefined}")
+    expect(source).toContain("onSetPipSize?.('bubble')")
+    expect(source).toContain('min-h-[5.25rem]')
+    expect(source).toContain('flex-col overflow-hidden rounded-3xl')
+    expect(source).toContain('min-h-20 shrink-0')
+    expect(source).not.toContain("isCompact ? 'absolute bottom-2 right-2")
   })
 })
