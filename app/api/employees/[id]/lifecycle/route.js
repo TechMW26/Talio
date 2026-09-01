@@ -103,16 +103,18 @@ async function patchLifecycle(request, { params }) {
     return NextResponse.json({ success: false, message: 'This lifecycle feature is disabled for the tenant' }, { status: 403 })
   }
 
+  // Keep this read lean. Some older tenant records still contain legacy field
+  // shapes (for example, a string address), and hydrating the whole document can
+  // attach unrelated cast errors to it before a lifecycle action is applied.
   const employee = await auth.models.Employee.findById(id)
+    .select('firstName lastName email phone dateOfJoining employmentType lifecycle status dateOfLeaving createdAt emergencyContact bankDetails salary documents department company __v')
+    .lean()
   if (!employee) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
 
-  const currentLifecycle = hydrateEmployeeLifecycle({
-    ...employee.toObject(),
-    lifecycle: employee.lifecycle?.toObject?.() || employee.lifecycle,
-  })
+  const currentLifecycle = hydrateEmployeeLifecycle(employee)
   const onboardingEnabled = isFeatureEnabled(auth.companyFeatures, 'onboarding')
   const signals = onboardingEnabled
-    ? await getOnboardingCompletionSignals({ models: auth.models, employee: employee.toObject() })
+    ? await getOnboardingCompletionSignals({ models: auth.models, employee })
     : {}
   const reconciledLifecycle = reconcileOnboardingChecklist(currentLifecycle, signals).lifecycle
   let result
@@ -122,13 +124,28 @@ async function patchLifecycle(request, { params }) {
     return NextResponse.json({ success: false, message: error.message }, { status: 400 })
   }
 
-  employee.lifecycle = result.lifecycle
-  Object.assign(employee, result.employeeUpdates)
-  await employee.save()
+  // Persist only fields owned by the lifecycle action. Calling document.save()
+  // here revalidates unrelated legacy employee fields and previously made every
+  // lifecycle action fail when, for example, address was stored as a string.
+  const persistedEmployee = await auth.models.Employee.findOneAndUpdate(
+    { _id: employee._id, ...(Number.isInteger(employee.__v) ? { __v: employee.__v } : {}) },
+    {
+      $set: { lifecycle: result.lifecycle, ...result.employeeUpdates },
+      $inc: { __v: 1 },
+    },
+    { new: true, runValidators: true, context: 'query' },
+  ).select('_id firstName lastName').lean()
+
+  if (!persistedEmployee) {
+    return NextResponse.json(
+      { success: false, message: 'Employee changed while this action was being saved. Refresh and try again.', code: 'LIFECYCLE_CONFLICT' },
+      { status: 409 },
+    )
+  }
 
   let workflowWarning = null
   try {
-    let workflow = await auth.models.HrmsWorkflow.findOne({ subjectEmployee: employee._id, module }).sort({ createdAt: -1 })
+    let workflow = await auth.models.HrmsWorkflow.findOne({ subjectEmployee: persistedEmployee._id, module }).sort({ createdAt: -1 })
     if (!workflow) {
       const moduleData = module === 'exitManagement'
         ? result.lifecycle.offboarding
@@ -148,12 +165,12 @@ async function patchLifecycle(request, { params }) {
         allowIncompleteData: true,
         payload: {
           module,
-          title: `${module === 'exitManagement' ? 'Offboarding' : module === 'probation' ? 'Probation' : 'Onboarding'}: ${employee.firstName} ${employee.lastName}`,
-          subjectEmployee: employee._id,
+          title: `${module === 'exitManagement' ? 'Offboarding' : module === 'probation' ? 'Probation' : 'Onboarding'}: ${persistedEmployee.firstName} ${persistedEmployee.lastName}`,
+          subjectEmployee: persistedEmployee._id,
           dueAt,
           data: moduleData,
-          source: { entityType: 'Employee', entityId: employee._id },
-          idempotencyKey: `employee:${employee._id}:${module}`,
+          source: { entityType: 'Employee', entityId: persistedEmployee._id },
+          idempotencyKey: `employee:${persistedEmployee._id}:${module}`,
         },
       })
       if (!created.success || !created.workflow) {

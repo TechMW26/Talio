@@ -20,6 +20,7 @@ import {
   DIRECTOR_LEVEL,
 } from '@/lib/designationLevels'
 import { buildEmployeeLifecycle, createInitialLifecycleWorkflows } from '@/lib/hrms/employeeLifecycle.server'
+import { normalizeEmployeeAddress } from '@/lib/employeeAddress'
 
 export const dynamic = 'force-dynamic'
 
@@ -370,6 +371,13 @@ export async function POST(request) {
 
     // Prepare employee data - ensure company is properly set
     const employeeData = { ...data }
+    if (Object.prototype.hasOwnProperty.call(employeeData, 'address')) {
+      try {
+        employeeData.address = normalizeEmployeeAddress(employeeData.address)
+      } catch (error) {
+        return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+      }
+    }
 
     // Lifecycle choices are entered as part of employee creation. Persist one
     // canonical lifecycle object and keep the orchestration cases invisible.

@@ -10,6 +10,7 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import useRoles from '@/hooks/useRoles'
 import { recalcSalary } from '@/utils/salaryRecalc'
+import { formatEmployeeAddress } from '@/lib/employeeAddress'
 
 export default function EditEmployeePage() {
   const params = useParams()
@@ -207,7 +208,7 @@ export default function EditEmployeePage() {
       phone: emp.phone || '',
       dateOfBirth: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().split('T')[0] : '',
       gender: emp.gender || '',
-      address: emp.address || '',
+      address: formatEmployeeAddress(emp.address),
       departments: deptIds.length > 0 ? deptIds : (primaryDept ? [primaryDept] : []),
       department: primaryDept,
       designation: emp.designation?._id?.toString() || emp.designation?.toString() || '',

@@ -16,6 +16,7 @@ import {
   allowedReportsToLevels,
   DIRECTOR_LEVEL,
 } from '@/lib/designationLevels'
+import { normalizeEmployeeAddress } from '@/lib/employeeAddress'
 
 export const dynamic = 'force-dynamic'
 
@@ -325,6 +326,14 @@ export async function PUT(request, { params }) {
     }
 
     const data = await request.json()
+
+    if (Object.prototype.hasOwnProperty.call(data, 'address')) {
+      try {
+        data.address = normalizeEmployeeAddress(data.address)
+      } catch (error) {
+        return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+      }
+    }
 
     // Check if employee exists
     const employee = await Employee.findById(id).lean()

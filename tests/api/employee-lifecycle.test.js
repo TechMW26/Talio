@@ -8,6 +8,8 @@ import {
   toIstDateKey,
 } from '@/lib/hrms/employeeLifecycle.server'
 import { getOnboardingCompletionSignals } from '@/lib/hrms/onboardingProgress.server'
+import Employee from '@/models/Employee'
+import { formatEmployeeAddress, normalizeEmployeeAddress } from '@/lib/employeeAddress'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -173,5 +175,41 @@ describe('employee lifecycle', () => {
     expect(route).toContain("message: 'Invalid JSON request body'")
     expect(panel).toContain('const responseText = await response.text()')
     expect(panel).toContain('The lifecycle service returned an invalid response')
+  })
+
+  test('persists lifecycle changes without saving and revalidating unrelated legacy fields', () => {
+    const route = fs.readFileSync(path.join(process.cwd(), 'app/api/employees/[id]/lifecycle/route.js'), 'utf8')
+
+    expect(route).toContain('.findOneAndUpdate(')
+    expect(route).toContain("$set: { lifecycle: result.lifecycle, ...result.employeeUpdates }")
+    expect(route).toContain("code: 'LIFECYCLE_CONFLICT'")
+    expect(route).not.toContain('await employee.save()')
+  })
+
+  test('employee schemas accept legacy string and structured address shapes', () => {
+    const tenantModels = fs.readFileSync(path.join(process.cwd(), 'lib/tenantModels.js'), 'utf8')
+    const employeeModel = fs.readFileSync(path.join(process.cwd(), 'models/Employee.js'), 'utf8')
+
+    expect(tenantModels).toMatch(/address:\s*\{ type: mongoose\.Schema\.Types\.Mixed \}/)
+    expect(employeeModel).toMatch(/address:\s*\{ type: mongoose\.Schema\.Types\.Mixed \}/)
+
+    const baseEmployee = {
+      employeeCode: 'EMP-LEGACY-1',
+      firstName: 'Legacy',
+      lastName: 'Employee',
+      email: 'legacy.employee@example.com',
+    }
+    expect(new Employee({ ...baseEmployee, address: 'A legacy formatted address' }).validateSync()).toBeUndefined()
+    expect(new Employee({ ...baseEmployee, address: { street: '1 Test Road', city: 'Bhopal' } }).validateSync()).toBeUndefined()
+  })
+
+  test('normalizes both employee address formats without allowing arbitrary payload shapes', () => {
+    expect(normalizeEmployeeAddress('  1 Test Road, Bhopal  ')).toBe('1 Test Road, Bhopal')
+    expect(normalizeEmployeeAddress({ street: ' 1 Test Road ', city: ' Bhopal ', ignored: 'value' })).toEqual({
+      street: '1 Test Road',
+      city: 'Bhopal',
+    })
+    expect(formatEmployeeAddress({ street: '1 Test Road', city: 'Bhopal', state: 'MP' })).toBe('1 Test Road, Bhopal, MP')
+    expect(() => normalizeEmployeeAddress(['invalid'])).toThrow('Address must be text or a structured address')
   })
 })

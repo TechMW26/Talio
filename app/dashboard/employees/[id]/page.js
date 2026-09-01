@@ -27,6 +27,7 @@ import {
 } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import { formatDesignation, formatDepartments } from '@/lib/formatters'
+import { formatEmployeeAddress } from '@/lib/employeeAddress'
 import { Button, Chip, Skeleton, Tooltip } from '@heroui/react'
 import EmployeeLifecyclePanel from '@/components/employees/EmployeeLifecyclePanel'
 
@@ -327,7 +328,7 @@ export default function EmployeeDetailPage() {
             <InfoRow icon={FaEnvelope} label="Email" value={employee.email} />
             <InfoRow icon={FaPhone} label="Phone" value={employee.phone} />
             <InfoRow icon={FaCalendarAlt} label="Date of Birth" value={employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : null} />
-            <InfoRow icon={FaMapMarkerAlt} label="Address" value={employee.address} />
+            <InfoRow icon={FaMapMarkerAlt} label="Address" value={formatEmployeeAddress(employee.address)} />
           </div>
 
           {/* Employment info card */}

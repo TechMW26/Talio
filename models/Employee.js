@@ -40,13 +40,9 @@ const EmployeeSchema = new mongoose.Schema({
     type: String,
     enum: ['single', 'married', 'divorced', 'widowed'],
   },
-  address: {
-    street: String,
-    city: String,
-    state: String,
-    country: String,
-    zipCode: String,
-  },
+  // Support both legacy formatted strings and newer structured address data.
+  // Tenant records contain both shapes and employee updates must preserve them.
+  address: { type: mongoose.Schema.Types.Mixed },
   emergencyContact: {
     name: String,
     relationship: String,
