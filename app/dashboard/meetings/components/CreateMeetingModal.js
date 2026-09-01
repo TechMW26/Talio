@@ -21,6 +21,7 @@ import toast from '@/utils/toast'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { getDateTimePartsInTimezone, parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
+import { filterDepartmentGroupEmployees, hasActiveGroupSearch, isDepartmentGroupExpanded } from '@/lib/departmentGroupSearch'
 
 const toISTDateTimeLocal = (date) => {
   const parts = getDateTimePartsInTimezone(date, IST_TIMEZONE)
@@ -138,6 +139,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
   }
 
   const toggleDepartmentExpand = (deptId) => {
+    if (hasActiveGroupSearch(searchQuery)) return
     setExpandedDepts(prev => ({ ...prev, [deptId]: !prev[deptId] }))
   }
 
@@ -279,15 +281,19 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
 
   const filteredDeptGroups = departmentGroups.map(group => ({
     ...group,
-    employees: group.employees.filter(emp => {
-      if (!searchQuery) return true
-      const query = searchQuery.toLowerCase()
-      return (
-        emp.fullName?.toLowerCase().includes(query) ||
-        emp.email?.toLowerCase().includes(query) ||
-        emp.designation?.toLowerCase().includes(query)
-      )
-    })
+    employees: filterDepartmentGroupEmployees({
+      departmentName: group.department?.name,
+      employees: group.employees,
+      searchQuery,
+      matchesEmployee: (employee, query) => [
+        employee.fullName,
+        employee.firstName,
+        employee.lastName,
+        employee.email,
+        employee.employeeCode,
+        employee.designation,
+      ].some(value => String(value || '').toLocaleLowerCase().includes(query)),
+    }),
   })).filter(group => group.employees.length > 0)
 
   const getSelectedInviteesList = () => {
@@ -737,7 +743,11 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   <div className="space-y-3">
                     {filteredDeptGroups.map(group => {
                       const deptId = group.department._id
-                      const isExpanded = expandedDepts[deptId]
+                      const isExpanded = isDepartmentGroupExpanded({
+                        searchQuery,
+                        expandedDepartments: expandedDepts,
+                        departmentId: deptId,
+                      })
                       const deptEmployeeIds = group.employees.map(e => e._id)
                       const selectedCount = deptEmployeeIds.filter(id => selectedInvitees.includes(id)).length
                       const allSelected = selectedCount === group.employees.length

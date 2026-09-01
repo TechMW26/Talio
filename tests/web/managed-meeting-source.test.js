@@ -5,6 +5,15 @@ const path = require('path')
 
 describe('managed meeting implementation', () => {
   const source = fs.readFileSync(path.join(process.cwd(), 'components/meetings/ManagedMeetingRoomSession.js'), 'utf8')
+  const signedInSelector = fs.readFileSync(path.join(process.cwd(), 'contexts/MeetingSessionContext.js'), 'utf8')
+  const guestSelector = fs.readFileSync(path.join(process.cwd(), 'app/join/[guestLink]/room/page.js'), 'utf8')
+
+  test('uses the Vercel-compatible managed transport by default for employees and guests', () => {
+    for (const selector of [signedInSelector, guestSelector]) {
+      expect(selector).toContain('usesManagedMeetingTransport()')
+      expect(selector).not.toContain("NEXT_PUBLIC_MEETING_TRANSPORT === 'livekit'")
+    }
+  })
 
   test('uses an SFU with adaptive streams, dynacast and simulcast', () => {
     expect(source).toContain('adaptiveStream: true')
@@ -34,5 +43,11 @@ describe('managed meeting implementation', () => {
     expect(source).toContain('<RemoteAudio')
     expect(source).toContain('item.isScreenSharing')
     expect(source).toContain("sm:col-span-2 sm:min-h-[55vh]")
+  })
+
+  test('keeps join failures recoverable without leaving a partial room connected', () => {
+    expect(source).toContain('pendingRoom?.disconnect()')
+    expect(source).toContain("role=\"alert\"")
+    expect(source).toContain("joinError ? 'Try again' : 'Join meeting'")
   })
 })

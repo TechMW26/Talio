@@ -24,6 +24,7 @@ import {
 } from 'react-icons/hi2';
 import toast from '@/utils/toast';
 import ModalPortal from '@/components/ModalPortal';
+import { filterDepartmentGroupEmployees, hasActiveGroupSearch, isDepartmentGroupExpanded } from '@/lib/departmentGroupSearch';
 
 // Priority badge colors matching project's theme
 const priorityColors = {
@@ -202,22 +203,24 @@ export default function CallAlertButton({ user }) {
   // Filter by search and department
   const filteredDeptGroups = departmentGroups.map(group => ({
     ...group,
-    employees: group.employees.filter(emp => {
-      if (selectedDepartment !== 'all' && group.department._id !== selectedDepartment) {
-        return false;
-      }
-      if (!searchQuery) return true;
-      const query = searchQuery.toLowerCase();
-      return (
-        emp.name?.toLowerCase().includes(query) ||
-        emp.employeeCode?.toLowerCase().includes(query) ||
-        emp.designation?.toLowerCase().includes(query)
-      );
-    })
+    employees: selectedDepartment !== 'all' && group.department._id !== selectedDepartment
+      ? []
+      : filterDepartmentGroupEmployees({
+        departmentName: group.department?.name,
+        employees: group.employees,
+        searchQuery,
+        matchesEmployee: (employee, query) => [
+          employee.name,
+          employee.email,
+          employee.employeeCode,
+          employee.designation,
+        ].some(value => String(value || '').toLocaleLowerCase().includes(query)),
+      }),
   })).filter(group => group.employees.length > 0);
 
   // Toggle department expand
   const toggleDepartmentExpand = (deptId) => {
+    if (hasActiveGroupSearch(searchQuery)) return;
     setExpandedDepts(prev => ({ ...prev, [deptId]: !prev[deptId] }));
   };
 
@@ -452,7 +455,12 @@ export default function CallAlertButton({ user }) {
                     ) : (
                       filteredDeptGroups.map(group => {
                         const deptId = group.department._id;
-                        const isExpanded = expandedDepts[deptId] !== false; // Default expanded
+                        const isExpanded = isDepartmentGroupExpanded({
+                          searchQuery,
+                          expandedDepartments: expandedDepts,
+                          departmentId: deptId,
+                          defaultExpanded: true,
+                        });
                         const deptEmployeeIds = group.employees.map(e => e.userId);
                         const allSelected = deptEmployeeIds.every(id => selectedRecipients.some(r => r.userId === id));
                         const someSelected = deptEmployeeIds.some(id => selectedRecipients.some(r => r.userId === id));

@@ -26,7 +26,15 @@ describe('platform runtime capabilities', () => {
       PUSHER_KEY: 'key',
       PUSHER_SECRET: 'secret',
       PUSHER_CLUSTER: 'ap2',
-    })).toMatchObject({ blobStorage: true, distributedCache: true, managedRealtime: true })
+      LIVEKIT_URL: 'wss://livekit.example',
+      LIVEKIT_API_KEY: 'key',
+      LIVEKIT_API_SECRET: 'secret',
+    })).toMatchObject({
+      blobStorage: true,
+      distributedCache: true,
+      managedRealtime: true,
+      managedMeetings: true,
+    })
   })
 })
 
@@ -36,7 +44,7 @@ describe('Vercel readiness', () => {
     BLOB_READ_WRITE_TOKEN: 'blob', CRON_SECRET: 'cron', PUSHER_APP_ID: 'app', PUSHER_KEY: 'key',
     PUSHER_SECRET: 'secret', PUSHER_CLUSTER: 'ap2', NEXT_PUBLIC_PUSHER_KEY: 'key',
     NEXT_PUBLIC_PUSHER_CLUSTER: 'ap2', LIVEKIT_URL: 'wss://livekit', LIVEKIT_API_KEY: 'key',
-    LIVEKIT_API_SECRET: 'secret', NEXT_PUBLIC_LIVEKIT_URL: 'wss://livekit',
+    LIVEKIT_API_SECRET: 'secret',
     NEXT_PUBLIC_REALTIME_PROVIDER: 'pusher', NEXT_PUBLIC_MEETING_TRANSPORT: 'livekit',
   }
 

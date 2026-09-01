@@ -8,6 +8,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { hasActiveGroupSearch, isDepartmentGroupExpanded } from '@/lib/departmentGroupSearch'
 import {
   HiOutlineSignal,
   HiOutlineUserGroup,
@@ -101,6 +102,7 @@ export default function LiveUsersPage() {
   }
 
   const toggleDepartmentExpand = (deptId) => {
+    if (hasActiveGroupSearch(searchQuery)) return
     setExpandedDepartments(prev => ({
       ...prev,
       [deptId]: !prev[deptId]
@@ -151,6 +153,26 @@ export default function LiveUsersPage() {
 
   const filteredUsers = getFilteredUsers()
   const departments = getDepartments()
+  const visibleDepartments = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase()
+    if (!normalizedSearch) return departments
+
+    return departments
+      .map(department => {
+        const departmentMatches = department.name?.toLowerCase().includes(normalizedSearch)
+        const users = departmentMatches
+          ? (department.users || [])
+          : (department.users || []).filter(user => [
+              user.fullName,
+              user.email,
+              user.employeeCode,
+              user.designation,
+              user.departmentName,
+            ].some(value => value?.toLowerCase().includes(normalizedSearch)))
+        return { ...department, users }
+      })
+      .filter(department => department.users.length > 0)
+  }, [departments, searchQuery])
 
   // Stats for cards
   const stats = [
@@ -375,15 +397,25 @@ export default function LiveUsersPage() {
       {activeTab === 'byDepartment' ? (
         /* By Department View */
         <div className="space-y-4">
-          {departments.length === 0 ? (
+          {visibleDepartments.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 text-center">
               <HiOutlineBuildingOffice2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-800 mb-2">No Departments Found</h3>
-              <p className="text-gray-600">No department data available.</p>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">
+                {hasActiveGroupSearch(searchQuery) ? 'No matching employees' : 'No Departments Found'}
+              </h3>
+              <p className="text-gray-600">
+                {hasActiveGroupSearch(searchQuery) ? 'Try another name, email, role, or department.' : 'No department data available.'}
+              </p>
             </div>
           ) : (
-            departments.map(dept => (
-              <div key={dept.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            visibleDepartments.map(dept => {
+              const isExpanded = isDepartmentGroupExpanded({
+                searchQuery,
+                expandedDepartments,
+                departmentId: dept.id,
+              })
+              return (
+                <div key={dept.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 {/* Department Header */}
                 <div
                   onClick={() => toggleDepartmentExpand(dept.id)}
@@ -411,7 +443,7 @@ export default function LiveUsersPage() {
                         Refresh Dept
                       </button>
                     )}
-                    {expandedDepartments[dept.id] ? (
+                    {isExpanded ? (
                       <HiOutlineChevronUp className="h-5 w-5 text-gray-400" />
                     ) : (
                       <HiOutlineChevronDown className="h-5 w-5 text-gray-400" />
@@ -419,7 +451,7 @@ export default function LiveUsersPage() {
                   </div>
                 </div>
                 {/* Department Users */}
-                {expandedDepartments[dept.id] && (
+                {isExpanded && (
                   <div className="border-t border-gray-100">
                     {dept.users?.length === 0 ? (
                       <div className="p-4 text-center text-gray-600">No users in this department</div>
@@ -471,8 +503,9 @@ export default function LiveUsersPage() {
                     )}
                   </div>
                 )}
-              </div>
-            ))
+                </div>
+              )
+            })
           )}
         </div>
       ) : (

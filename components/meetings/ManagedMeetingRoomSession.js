@@ -28,6 +28,7 @@ import { CutLineIcon, MEETING_REACTIONS, MeetingReactionIcon } from '@/component
 import AddMeetingParticipantsModal from '@/app/dashboard/meetings/components/AddMeetingParticipantsModal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { getSupportedAudioMimeType, isMeetingAudioUploadSupported } from '@/lib/meetingTranscriber'
+import { getManagedMeetingJoinError } from '@/lib/meetings/transport'
 import toast from '@/utils/toast'
 
 const encoder = new TextEncoder()
@@ -116,12 +117,14 @@ export default function ManagedMeetingRoomSession({
   const roomRef = useRef(null)
   const recorderRef = useRef(null)
   const mutedRef = useRef(false)
+  const joiningRef = useRef(false)
   const reactionTimers = useRef(new Map())
   const [meeting, setMeeting] = useState(meetingData)
   const [room, setRoom] = useState(null)
   const [participants, setParticipants] = useState([])
   const [joined, setJoined] = useState(false)
   const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState('')
   const [muted, setMuted] = useState(false)
   const [videoOff, setVideoOff] = useState(false)
   const [screenSharing, setScreenSharing] = useState(false)
@@ -183,8 +186,11 @@ export default function ManagedMeetingRoomSession({
   }, [showReaction])
 
   const join = useCallback(async () => {
-    if (joining || joined) return
+    if (joiningRef.current || joined) return
+    joiningRef.current = true
     setJoining(true)
+    setJoinError('')
+    let pendingRoom = null
     try {
       const authorization = guestToken ? `Guest ${guestToken}` : `Bearer ${localStorage.getItem('token')}`
       const response = await fetch('/api/meetings/livekit/token', {
@@ -192,8 +198,17 @@ export default function ManagedMeetingRoomSession({
         headers: { 'Content-Type': 'application/json', Authorization: authorization },
         body: JSON.stringify({ roomId }),
       })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.message || 'Unable to join managed meeting')
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        const requestError = new Error(payload?.message || 'Unable to join managed meeting')
+        requestError.code = payload?.code || 'TOKEN_REQUEST_FAILED'
+        throw requestError
+      }
+      if (!payload?.data?.serverUrl || !payload?.data?.token) {
+        const responseError = new Error('The meeting service returned an invalid connection response')
+        responseError.code = 'INVALID_CONNECTION_RESPONSE'
+        throw responseError
+      }
 
       const liveRoom = new Room({
         adaptiveStream: true,
@@ -201,6 +216,7 @@ export default function ManagedMeetingRoomSession({
         videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
         publishDefaults: { simulcast: true, videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360] },
       })
+      pendingRoom = liveRoom
       roomRef.current = liveRoom
       liveRoom
         .on(RoomEvent.ParticipantConnected, () => refreshParticipants(liveRoom))
@@ -228,11 +244,16 @@ export default function ManagedMeetingRoomSession({
       onJoinedChange?.(true)
     } catch (error) {
       console.error('[Managed meeting] Join failed:', error)
-      toast.error(error.message)
+      pendingRoom?.disconnect()
+      if (roomRef.current === pendingRoom) roomRef.current = null
+      const message = getManagedMeetingJoinError(error)
+      setJoinError(message)
+      toast.error(message)
     } finally {
+      joiningRef.current = false
       setJoining(false)
     }
-  }, [guestToken, handleData, joined, joining, muted, onJoinedChange, refreshParticipants, roomId, videoOff])
+  }, [guestToken, handleData, joined, muted, onJoinedChange, refreshParticipants, roomId, videoOff])
 
   useEffect(() => () => {
     for (const timer of reactionTimers.current.values()) clearTimeout(timer)
@@ -385,7 +406,8 @@ export default function ManagedMeetingRoomSession({
             <button onClick={() => setMuted(!muted)} aria-label={muted ? 'Turn microphone on' : 'Mute microphone'} className={`flex h-12 w-12 items-center justify-center rounded-full ${muted ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={muted}><HiOutlineMicrophone className="h-6 w-6" /></CutLineIcon></button>
             <button onClick={() => setVideoOff(!videoOff)} aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'} className={`flex h-12 w-12 items-center justify-center rounded-full ${videoOff ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={videoOff}><HiOutlineVideoCamera className="h-6 w-6" /></CutLineIcon></button>
           </div>
-          <button onClick={join} disabled={joining} className="relative mt-6 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"><span className={joining ? 'invisible' : ''}>Join meeting</span>{joining && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
+          {joinError && <p className="mt-5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200" role="alert">{joinError}</p>}
+          <button onClick={join} disabled={joining} className="relative mt-6 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"><span className={joining ? 'invisible' : ''}>{joinError ? 'Try again' : 'Join meeting'}</span>{joining && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
         </div>
       </div>
     )

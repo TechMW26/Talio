@@ -4,10 +4,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
+import { usesManagedMeetingTransport } from '@/lib/meetings/transport'
 
 const MeetingSessionContext = createContext(null)
 const ROOM_PATH_PATTERN = /^\/dashboard\/meetings\/room\/([^/]+)/
-const useManagedMeetings = process.env.NEXT_PUBLIC_MEETING_TRANSPORT === 'livekit'
+const useManagedMeetings = usesManagedMeetingTransport()
 const MeetingRoomSession = dynamic(
   () => useManagedMeetings
     ? import('@/components/meetings/ManagedMeetingRoomSession')

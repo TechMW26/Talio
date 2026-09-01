@@ -37,8 +37,9 @@ import {
 } from '@/components/meetings/MeetingVisualIcons'
 import toast from '@/utils/toast'
 import ManagedMeetingRoomSession from '@/components/meetings/ManagedMeetingRoomSession'
+import { usesManagedMeetingTransport } from '@/lib/meetings/transport'
 
-const useManagedMeetings = process.env.NEXT_PUBLIC_MEETING_TRANSPORT === 'livekit'
+const useManagedMeetings = usesManagedMeetingTransport()
 
 export default function GuestMeetingRoom(props) {
   return useManagedMeetings ? <ManagedGuestMeetingRoom {...props} /> : <LegacyGuestMeetingRoom {...props} />

@@ -3,6 +3,10 @@ import {
   getLiveKitConfig,
   toLiveKitRoomName,
 } from '@/lib/meetings/livekit.server'
+import {
+  getManagedMeetingJoinError,
+  usesManagedMeetingTransport,
+} from '@/lib/meetings/transport'
 
 describe('managed meeting token service', () => {
   const originalEnv = { ...process.env }
@@ -44,5 +48,24 @@ describe('managed meeting token service', () => {
     })
     expect(result.token.split('.')).toHaveLength(3)
     expect(JSON.stringify(result)).not.toContain(process.env.LIVEKIT_API_SECRET)
+  })
+})
+
+describe('meeting transport selection', () => {
+  test('defaults to managed LiveKit when the public transport flag is absent', () => {
+    expect(usesManagedMeetingTransport()).toBe(true)
+    expect(usesManagedMeetingTransport('livekit')).toBe(true)
+  })
+
+  test.each(['socket', 'socketio', 'socket.io', 'legacy'])(
+    'requires explicit opt-in for the legacy %s transport',
+    (transport) => expect(usesManagedMeetingTransport(transport)).toBe(false),
+  )
+
+  test('turns missing configuration and network failures into actionable messages', () => {
+    expect(getManagedMeetingJoinError({ code: 'LIVEKIT_NOT_CONFIGURED' }))
+      .toContain('configure the meeting service')
+    expect(getManagedMeetingJoinError(new TypeError('Failed to fetch')))
+      .toContain('Check your connection')
   })
 })

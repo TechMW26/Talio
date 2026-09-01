@@ -19,7 +19,7 @@
 1. Link the Git repository and select Next.js with Node 20.
 2. Place the project in `bom1` (or change both `vercel.json` and queue configuration to the region nearest MongoDB).
 3. Link a private Vercel Blob store.
-4. Create Pusher and LiveKit projects and set every variable documented in `.env.example`.
+4. Create Pusher and LiveKit projects and set every variable documented in `.env.example`. Talio Meet defaults to LiveKit and requires only the server-side `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET`; do not enable the legacy Socket.IO transport on Vercel.
 5. Configure MongoDB Atlas network access and keep pool overrides conservative.
 6. Configure Vercel Queues and allow `vercel.json` to provision the `talio-webhooks` trigger.
 7. Use a Vercel plan that supports the configured per-minute cron cadence.

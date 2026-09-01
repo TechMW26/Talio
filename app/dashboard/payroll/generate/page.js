@@ -28,6 +28,7 @@ import { Input, Checkbox, Button, Divider, Chip, Progress, Tooltip } from '@hero
 import AttendanceCorrectionModal from '@/components/payroll/AttendanceCorrectionModal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import LoadingButton from '@/components/ui/LoadingButton'
+import { hasActiveGroupSearch, isDepartmentGroupExpanded } from '@/lib/departmentGroupSearch'
 
 export default function GeneratePayrollPage() {
   const router = useRouter()
@@ -549,6 +550,7 @@ export default function GeneratePayrollPage() {
   }, [filteredEmployees])
 
   const toggleDepartmentExpand = (deptId) => {
+    if (hasActiveGroupSearch(searchQuery)) return
     setExpandedDepartments(prev => ({
       ...prev,
       [deptId]: !prev[deptId]
@@ -1042,15 +1044,21 @@ export default function GeneratePayrollPage() {
                   </p>
                 </div>
               ) : (
-                employeesByDepartment.map((dept) => (
-                  <div key={dept.id} className="border-b border-gray-100 last:border-b-0">
+                employeesByDepartment.map((dept) => {
+                  const isExpanded = isDepartmentGroupExpanded({
+                    searchQuery,
+                    expandedDepartments,
+                    departmentId: dept.id,
+                  })
+                  return (
+                    <div key={dept.id} className="border-b border-gray-100 last:border-b-0">
                     {/* Department Header */}
                     <div
                       className="flex items-center justify-between px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100"
                       onClick={() => toggleDepartmentExpand(dept.id)}
                     >
                       <div className="flex items-center space-x-3">
-                        {expandedDepartments[dept.id] ? <FaChevronUp className="text-gray-400 w-3 h-3" /> : <FaChevronDown className="text-gray-400 w-3 h-3" />}
+                        {isExpanded ? <FaChevronUp className="text-gray-400 w-3 h-3" /> : <FaChevronDown className="text-gray-400 w-3 h-3" />}
                         <span className="font-medium text-gray-800">{dept.name}</span>
                         <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{dept.employees.length} employees</span>
                       </div>
@@ -1068,7 +1076,7 @@ export default function GeneratePayrollPage() {
                     </div>
 
                     {/* Employees in Department */}
-                    {expandedDepartments[dept.id] && (
+                    {isExpanded && (
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead className="bg-gray-50 border-b border-gray-200">
@@ -1161,8 +1169,9 @@ export default function GeneratePayrollPage() {
                         </table>
                       </div>
                     )}
-                  </div>
-                ))
+                    </div>
+                  )
+                })
               )}
             </div>
 
