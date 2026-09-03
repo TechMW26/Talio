@@ -63,7 +63,7 @@ function RemoteAudio({ participant }) {
   return <audio ref={ref} autoPlay />
 }
 
-function ParticipantTile({ item, local = false, reaction, handRaised = false, featured = false }) {
+function ParticipantTile({ item, local = false, reaction, handRaised = false, featured = false, compact = false }) {
   const videoRef = useRef(null)
   const screenPublication = item.participant.getTrackPublication(Track.Source.ScreenShare)
   const cameraPublication = item.participant.getTrackPublication(Track.Source.Camera)
@@ -77,19 +77,34 @@ function ParticipantTile({ item, local = false, reaction, handRaised = false, fe
     return () => track.detach(element)
   }, [publication?.track])
 
+  const tileSize = featured
+    ? 'h-full min-h-0 w-full'
+    : compact
+      ? 'h-24 w-36 shrink-0 sm:h-28 sm:w-44'
+      : 'min-h-44'
+
   return (
-    <div className={`relative flex min-h-44 overflow-hidden rounded-2xl bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${featured ? 'sm:col-span-2 sm:min-h-[55vh]' : ''}`}>
+    <div
+      className={`relative flex overflow-hidden bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${compact ? 'rounded-xl' : 'rounded-2xl'} ${tileSize}`}
+      data-participant-tile={featured ? 'presenter' : compact ? 'rail' : 'grid'}
+    >
       {publication?.track && !publication.isMuted ? (
-        <video ref={videoRef} autoPlay playsInline muted={local} className={`h-full w-full object-cover ${local && !item.isScreenSharing ? '-scale-x-100' : ''}`} />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={local}
+          className={`h-full w-full ${item.isScreenSharing ? 'bg-black object-contain' : 'object-cover'} ${local && !item.isScreenSharing ? '-scale-x-100' : ''}`}
+        />
       ) : (
         <div className="flex h-full w-full flex-1 items-center justify-center">
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-600 text-xl font-semibold text-white">
+          <span className={`flex items-center justify-center rounded-full bg-indigo-600 font-semibold text-white ${compact ? 'h-10 w-10 text-sm' : 'h-16 w-16 text-xl'}`}>
             {item.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
           </span>
         </div>
       )}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg bg-black/65 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur">
-        <span>{local ? 'You' : item.name}</span>
+      <div className={`absolute flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-lg bg-black/65 text-xs font-medium text-white backdrop-blur ${compact ? 'bottom-2 left-2 px-2 py-1' : 'bottom-3 left-3 px-2.5 py-1.5'}`}>
+        <span className="truncate">{local ? 'You' : item.name}</span>
         {item.isMuted && <CutLineIcon isOff><HiOutlineMicrophone className="h-4 w-4" /></CutLineIcon>}
       </div>
       {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
@@ -537,6 +552,8 @@ export default function ManagedMeetingRoomSession({
     const presenter = participants.find((participant) => participant.isScreenSharing)
     return presenter ? [presenter, ...participants.filter((participant) => participant.identity !== presenter.identity)] : participants
   }, [participants])
+  const presenter = orderedParticipants[0]?.isScreenSharing ? orderedParticipants[0] : null
+  const railParticipants = presenter ? orderedParticipants.slice(1) : []
   const isCompact = displayMode === 'compact'
   const isBubble = displayMode === 'bubble'
   const isPip = displayMode !== 'full'
@@ -683,9 +700,24 @@ export default function ManagedMeetingRoomSession({
       </header>
 
       {!isCompact && <main className="relative flex min-h-0 flex-1 gap-3 p-3">
-        <div className={`grid min-w-0 flex-1 gap-3 overflow-y-auto ${orderedParticipants.length <= 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-          {orderedParticipants.map((item, index) => <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} featured={index === 0 && item.isScreenSharing} />)}
-        </div>
+        {presenter ? (
+          <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden" data-meeting-layout="presentation">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
+              <ParticipantTile item={presenter} local={presenter.identity === localIdentity} reaction={reactions[presenter.identity]} handRaised={raisedHands[presenter.identity]} featured />
+            </div>
+            {railParticipants.length > 0 && (
+              <div className="flex h-24 shrink-0 gap-2 overflow-x-auto overflow-y-hidden px-0.5 py-0.5 sm:h-28" data-meeting-participant-rail>
+                {railParticipants.map((item) => (
+                  <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} compact />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className={`grid min-w-0 flex-1 gap-3 overflow-y-auto ${orderedParticipants.length <= 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`} data-meeting-layout="grid">
+            {orderedParticipants.map((item) => <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} />)}
+          </div>
+        )}
         {(showChat || showParticipants) && !isPip && <aside className="w-80 shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
           <div className="flex items-center justify-between"><h2 className="font-semibold">{showChat ? 'In-meeting chat' : 'Participants'}</h2><button onClick={() => { setShowChat(false); setShowParticipants(false) }} aria-label="Close panel"><HiOutlineXMark className="h-5 w-5" /></button></div>
           {showChat ? <><div className="mt-4 flex h-[calc(100%-5rem)] flex-col gap-2 overflow-y-auto">{messages.length ? messages.map((message) => <div key={message.id} className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${message.senderId === localIdentity ? 'ml-auto bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}><p className="text-xs font-medium opacity-75">{message.senderId === localIdentity ? 'You' : message.senderName}</p><p>{message.message}</p></div>) : <p className="mt-8 text-center text-sm text-slate-500">No messages yet</p>}</div><form onSubmit={sendChat} className="mt-3 flex gap-2"><input value={chatInput} onChange={(event) => setChatInput(event.target.value)} maxLength={2000} placeholder="Message everyone" className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-transparent px-3 dark:border-white/15" /><button aria-label="Send message" className="rounded-xl bg-indigo-600 p-3 text-white"><HiOutlinePaperAirplane className="h-5 w-5" /></button></form></> : <div className="mt-4 space-y-2">{participants.map((participant) => <div key={participant.identity} className="flex items-center justify-between rounded-xl bg-slate-100 p-3 text-sm dark:bg-slate-800"><span>{participant.identity === localIdentity ? 'You' : participant.name}</span>{participant.isMuted && <HiOutlineMicrophone className="h-4 w-4 text-red-500" />}</div>)}{meeting?._id && !guestToken && <button onClick={() => setShowAddParticipants(true)} className="mt-3 w-full rounded-xl border border-indigo-300 px-3 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300">Add people</button>}</div>}

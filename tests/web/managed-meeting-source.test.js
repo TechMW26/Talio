@@ -49,10 +49,14 @@ describe('managed meeting implementation', () => {
     expect(source).not.toContain('socket.io-client')
   })
 
-  test('renders remote audio and automatically features screen share', () => {
+  test('renders remote audio and uses an uncropped presentation layout with a thumbnail rail', () => {
     expect(source).toContain('<RemoteAudio')
     expect(source).toContain('item.isScreenSharing')
-    expect(source).toContain("sm:col-span-2 sm:min-h-[55vh]")
+    expect(source).toContain("item.isScreenSharing ? 'bg-black object-contain' : 'object-cover'")
+    expect(source).toContain('data-meeting-layout="presentation"')
+    expect(source).toContain('data-meeting-participant-rail')
+    expect(source).toContain('railParticipants.map')
+    expect(source).toContain('compact />')
   })
 
   test('keeps join failures recoverable without leaving a partial room connected', () => {
