@@ -42,6 +42,35 @@ function serializeProbationApproval(approval) {
   }
 }
 
+async function persistOnboardingEvidenceDocuments({ Document, employee, actor, item }) {
+  const documents = item?.verification?.documents || []
+  if (!documents.length) return []
+  const uploadedBy = mongoose.Types.ObjectId.isValid(actor?.employeeId)
+    ? actor.employeeId
+    : employee._id
+
+  return Promise.all(documents.map((document) => Document.findOneAndUpdate(
+    { employee: employee._id, fileId: document.fileId },
+    {
+      $setOnInsert: {
+        name: document.fileName,
+        type: document.fileType,
+        url: document.fileUrl,
+        fileName: document.fileName,
+        fileType: document.fileType,
+        fileUrl: document.fileUrl,
+        fileId: document.fileId,
+        fileSize: document.fileSize,
+        employee: employee._id,
+        uploadedBy,
+        category: `onboarding_${document.requirementKey}`,
+        isActive: true,
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  ).lean()))
+}
+
 async function authorize(request, id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return { response: NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 }) }
@@ -168,7 +197,10 @@ async function patchLifecycle(request, { params }) {
   }
   let result
   try {
-    result = applyLifecycleAction(reconciledLifecycle, action, body, { actorId: actorId(auth.user) })
+    result = applyLifecycleAction(reconciledLifecycle, action, body, {
+      actorId: actorId(auth.user),
+      employee,
+    })
     if (action === 'start_offboarding') {
       const clearance = await loadOffboardingAssetClearance({
         Asset: auth.models.Asset,
@@ -179,6 +211,25 @@ async function patchLifecycle(request, { params }) {
     }
   } catch (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+  }
+
+  if (action === 'complete_onboarding_item' && body.completed !== false) {
+    const item = result.lifecycle.onboarding?.checklist?.find((entry) => entry.key === body.itemKey)
+    try {
+      await persistOnboardingEvidenceDocuments({
+        Document: auth.models.Document,
+        employee,
+        actor: auth.user,
+        item,
+      })
+    } catch (error) {
+      console.error('[EmployeeLifecycle] Evidence document persistence failed:', error)
+      return NextResponse.json({
+        success: false,
+        message: 'Verification files were uploaded, but could not be attached to the employee record. Please try again.',
+        code: 'EVIDENCE_PERSISTENCE_FAILED',
+      }, { status: 500 })
+    }
   }
 
   // Persist only fields owned by the lifecycle action. Calling document.save()
@@ -256,7 +307,12 @@ async function patchLifecycle(request, { params }) {
         toStatus: workflow.status,
         actor: actorId(auth.user),
         comment: String(body.reason || '').slice(0, 2000),
-        metadata: { source: 'employee_profile' },
+        metadata: {
+          source: 'employee_profile',
+          itemKey: body.itemKey || null,
+          verificationMethod: body.verification ? 'manual' : null,
+          evidenceDocumentCount: body.verification?.documents?.length || 0,
+        },
       })
     }
   } catch (error) {

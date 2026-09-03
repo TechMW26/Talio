@@ -9,10 +9,38 @@ import {
 } from '@/lib/hrms/employeeLifecycle.server'
 import { getOnboardingCompletionSignals } from '@/lib/hrms/onboardingProgress.server'
 import { reconcileOffboardingAssetChecklist } from '@/lib/hrms/offboardingAssets.server'
+import {
+  getOnboardingVerificationRequirement,
+  normalizeOnboardingVerification,
+} from '@/lib/hrms/onboardingVerification'
 import Employee from '@/models/Employee'
 import { formatEmployeeAddress, normalizeEmployeeAddress } from '@/lib/employeeAddress'
 import fs from 'node:fs'
 import path from 'node:path'
+
+function validVerification(itemKey) {
+  const requirement = getOnboardingVerificationRequirement(itemKey)
+  return {
+    details: Object.fromEntries(requirement.fields.map((field) => [
+      field.key,
+      field.type === 'checkbox'
+        ? true
+        : field.type === 'date'
+          ? '2026-09-03'
+          : `${field.label} verified`,
+    ])),
+    documents: requirement.uploads.map((upload) => ({
+      requirementKey: upload.key,
+      label: upload.label,
+      fileName: `${upload.key}.pdf`,
+      fileUrl: `/api/files/${upload.key}`,
+      fileId: `file-${upload.key}`,
+      fileType: 'application/pdf',
+      fileSize: 1024,
+    })),
+    remarks: 'Checked against the employee record',
+  }
+}
 
 describe('employee lifecycle', () => {
   test('clamps probation dates at month end without timezone drift', () => {
@@ -58,12 +86,71 @@ describe('employee lifecycle', () => {
   test('completes onboarding and advances to probation only after all required items', () => {
     let lifecycle = buildEmployeeLifecycle({ dateOfJoining: '2026-08-01', probationApplicable: true, backgroundVerificationRequired: false, assetProvisioningRequired: false })
     for (const item of lifecycle.onboarding.checklist) {
-      lifecycle = applyLifecycleAction(lifecycle, 'complete_onboarding_item', { itemKey: item.key }, { actorId: 'u1' }).lifecycle
+      lifecycle = applyLifecycleAction(lifecycle, 'complete_onboarding_item', {
+        itemKey: item.key,
+        verification: validVerification(item.key),
+      }, { actorId: 'u1', employee: {} }).lifecycle
     }
     expect(getLifecycleProgress(lifecycle).percentage).toBe(100)
     expect(lifecycle.onboarding.status).toBe('completed')
     expect(lifecycle.stage).toBe('probation')
     expect(lifecycle.onboarding.checklist.every((item) => item.completionSource === 'manual')).toBe(true)
+    expect(lifecycle.onboarding.checklist.every((item) => item.verification?.status === 'verified')).toBe(true)
+  })
+
+  test('blocks manual completion until all step-specific evidence is supplied', () => {
+    const lifecycle = buildEmployeeLifecycle({
+      dateOfJoining: '2026-08-01',
+      backgroundVerificationRequired: false,
+      assetProvisioningRequired: false,
+    })
+
+    expect(() => applyLifecycleAction(lifecycle, 'complete_onboarding_item', {
+      itemKey: 'documents',
+      verification: { details: {}, documents: [] },
+    }, { actorId: 'u1', employee: {} })).toThrow('Identity proof must be uploaded')
+  })
+
+  test('updates canonical bank details but masks the account number in lifecycle evidence', () => {
+    const accountNumber = '123456789012'
+    const verification = validVerification('payroll')
+    verification.details.accountNumber = accountNumber
+    verification.details.ifscCode = 'bank0001234'
+
+    const normalized = normalizeOnboardingVerification('payroll', verification, {
+      actorId: 'u1',
+      employee: { bankDetails: { branch: 'Main branch' } },
+      now: '2026-09-03T12:00:00.000Z',
+    })
+
+    expect(normalized.employeeUpdates.bankDetails).toMatchObject({
+      accountNumber,
+      ifscCode: 'BANK0001234',
+      branch: 'Main branch',
+    })
+    expect(normalized.verification.details).not.toHaveProperty('accountNumber')
+    expect(normalized.verification.details.accountNumberLast4).toBe('9012')
+  })
+
+  test('requires an audit reason before reopening a manually verified step', () => {
+    const lifecycle = buildEmployeeLifecycle({ dateOfJoining: '2026-08-01' })
+    const completed = applyLifecycleAction(lifecycle, 'complete_onboarding_item', {
+      itemKey: 'profile',
+      verification: validVerification('profile'),
+    }, { actorId: 'u1', employee: {} }).lifecycle
+
+    expect(() => applyLifecycleAction(completed, 'complete_onboarding_item', {
+      itemKey: 'profile', completed: false,
+    }, { actorId: 'u2' })).toThrow('reason is required')
+
+    const reopened = applyLifecycleAction(completed, 'complete_onboarding_item', {
+      itemKey: 'profile', completed: false, reason: 'Emergency contact needs correction',
+    }, { actorId: 'u2' }).lifecycle
+    expect(reopened.onboarding.checklist.find((item) => item.key === 'profile')).toMatchObject({
+      completed: false,
+      completionSource: null,
+      verification: { status: 'reopened', reopenReason: 'Emergency contact needs correction' },
+    })
   })
 
   test('automatically reconciles completed onboarding work from linked HRMS records', () => {
@@ -74,6 +161,7 @@ describe('employee lifecycle', () => {
     expect(result.changed).toBe(true)
     expect(result.completedKeys).toHaveLength(lifecycle.onboarding.checklist.length)
     expect(result.lifecycle.onboarding.checklist.every((item) => item.completed && item.completionSource === 'system')).toBe(true)
+    expect(result.lifecycle.onboarding.checklist.every((item) => item.verification?.method === 'linked_record')).toBe(true)
     expect(result.lifecycle.onboarding.status).toBe('completed')
     expect(result.lifecycle.stage).toBe('probation')
   })
@@ -97,7 +185,7 @@ describe('employee lifecycle', () => {
       lean() { return Promise.resolve(value) },
     })
     const models = {
-      Document: { exists: jest.fn() },
+      Document: { find: jest.fn(() => query([])) },
       Asset: { exists: jest.fn(() => Promise.resolve({ _id: 'asset-1' })) },
       Payroll: { exists: jest.fn(() => Promise.resolve({ _id: 'payroll-1' })) },
       HrmsWorkflow: { find: jest.fn(() => query([{ module: 'backgroundVerification' }, { module: 'departmentInduction' }])) },
@@ -109,7 +197,13 @@ describe('employee lifecycle', () => {
         _id: employeeId,
         firstName: 'Muskan', lastName: 'Adwani', email: 'muskan@example.com', phone: '7000000000',
         dateOfJoining: new Date('2026-08-01'), emergencyContact: { name: 'Contact', phone: '7000000001' },
-        documents: [{ url: '/document.pdf' }],
+        documents: [
+          { name: 'Aadhaar identity proof', url: '/identity.pdf' },
+          { name: 'PAN tax document', url: '/tax.pdf' },
+          { name: 'Signed employment contract', url: '/employment.pdf' },
+          { name: 'Background verification report', url: '/background.pdf' },
+          { name: 'Cancelled cheque bank proof', url: '/bank.pdf' },
+        ],
         bankDetails: { bankName: 'Bank', accountNumber: '123', ifscCode: 'BANK0001' },
         salary: { basic: 10000 },
       },
@@ -124,7 +218,37 @@ describe('employee lifecycle', () => {
       induction: true,
       assets: true,
     })
-    expect(models.Document.exists).not.toHaveBeenCalled()
+    expect(models.Document.find).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not auto-complete document-dependent steps from an unrelated upload', async () => {
+    const employeeId = '6a74712f87b6bf60ff871f97'
+    const query = (value) => ({
+      select() { return this },
+      lean() { return Promise.resolve(value) },
+    })
+    const models = {
+      Document: { find: jest.fn(() => query([{ name: 'Profile photo', url: '/photo.jpg' }])) },
+      Asset: { exists: jest.fn(() => Promise.resolve(null)) },
+      Payroll: { exists: jest.fn(() => Promise.resolve(null)) },
+      HrmsWorkflow: { find: jest.fn(() => query([{ module: 'backgroundVerification' }])) },
+      Policy: { find: jest.fn(() => query([])) },
+    }
+    const signals = await getOnboardingCompletionSignals({
+      models,
+      employee: {
+        _id: employeeId,
+        firstName: 'Test', lastName: 'Employee', email: 'test@example.com', phone: '7000000000',
+        dateOfJoining: new Date('2026-08-01'), emergencyContact: { name: 'Contact', phone: '7000000001' },
+        documents: [],
+        bankDetails: { bankName: 'Bank', accountNumber: '123', ifscCode: 'BANK0001' },
+        salary: { basic: 10000 },
+      },
+    })
+
+    expect(signals.documents).toBe(false)
+    expect(signals.background_verification).toBe(false)
+    expect(signals.payroll).toBe(false)
   })
 
   test('requires a reason to extend probation and updates the review date', () => {
@@ -230,6 +354,19 @@ describe('employee lifecycle', () => {
     expect(route).toContain("message: 'Invalid JSON request body'")
     expect(panel).toContain('const responseText = await response.text()')
     expect(panel).toContain('The lifecycle service returned an invalid response')
+  })
+
+  test('onboarding UI and API require, persist and expose verification evidence', () => {
+    const route = fs.readFileSync(path.join(process.cwd(), 'app/api/employees/[id]/lifecycle/route.js'), 'utf8')
+    const panel = fs.readFileSync(path.join(process.cwd(), 'components/employees/EmployeeLifecyclePanel.js'), 'utf8')
+    const modal = fs.readFileSync(path.join(process.cwd(), 'components/employees/OnboardingVerificationModal.js'), 'utf8')
+
+    expect(panel).toContain('<OnboardingVerificationModal')
+    expect(panel).toContain('evidence required for manual completion')
+    expect(modal).toContain('Required evidence')
+    expect(modal).toContain('Verify and complete')
+    expect(route).toContain('persistOnboardingEvidenceDocuments')
+    expect(route).toContain("category: `onboarding_${document.requirementKey}`")
   })
 
   test('offboarding UI and API use the tenant asset register for clearance', () => {

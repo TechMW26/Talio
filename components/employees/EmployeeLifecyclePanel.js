@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import OffboardingAssetChecklistModal from '@/components/employees/OffboardingAssetChecklistModal'
+import OnboardingVerificationModal from '@/components/employees/OnboardingVerificationModal'
 import toast from '@/utils/toast'
 import { Button, Chip, Progress, Skeleton } from '@heroui/react'
 import { FaCheck, FaClock, FaCommentDots, FaFlagCheckered, FaHourglassHalf, FaPaperPlane, FaRoute, FaSyncAlt } from 'react-icons/fa'
@@ -30,6 +31,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
   const [showExtension, setShowExtension] = useState(false)
   const [showOffboarding, setShowOffboarding] = useState(false)
   const [showAssetClearance, setShowAssetClearance] = useState(false)
+  const [verificationItem, setVerificationItem] = useState(null)
   const [extension, setExtension] = useState({ months: 1, reason: '' })
   const [offboarding, setOffboarding] = useState({ separationType: 'resignation', resignationDate: '', lastWorkingDate: '', reason: '' })
 
@@ -58,8 +60,10 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
       await mutate()
       onEmployeeRefresh?.()
       if (action === 'start_offboarding') setShowOffboarding(false)
+      return true
     } catch (error) {
       toast.error(error.message)
+      return false
     } finally {
       setProcessing('')
     }
@@ -147,7 +151,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
                   key={item.key}
                   type="button"
                   disabled={!canManage || processing === actionKey}
-                  onClick={() => runAction('complete_onboarding_item', { itemKey: item.key, completed: !item.completed })}
+                  onClick={() => setVerificationItem(item)}
                   className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-3 text-left transition hover:border-primary-300 disabled:cursor-default dark:border-zinc-800 dark:hover:border-primary-700"
                 >
                   <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${item.completed ? 'border-success bg-success text-white' : 'border-slate-300 dark:border-zinc-600'}`}>
@@ -157,7 +161,11 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
                     <span className={`block text-sm ${item.completed ? 'text-slate-400 line-through dark:text-zinc-500' : 'text-slate-700 dark:text-zinc-200'}`}>{item.label}</span>
                     {isAutomatic && (
                       <span className="mt-0.5 block text-[10px] text-slate-400 dark:text-zinc-500">
-                        {item.completionSource === 'system' ? 'Automatically verified' : 'Automatically monitored · manual override available'}
+                        {item.completionSource === 'system'
+                          ? 'Automatically verified from a linked record · View verification'
+                          : item.completionSource === 'manual'
+                            ? 'Verified with supporting evidence · View verification'
+                            : 'Automatically monitored · evidence required for manual completion'}
                       </span>
                     )}
                   </span>
@@ -304,6 +312,22 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
           await mutate()
           onEmployeeRefresh?.()
         }}
+      />
+      <OnboardingVerificationModal
+        isOpen={Boolean(verificationItem)}
+        item={verificationItem}
+        isProcessing={processing === `complete_onboarding_item${verificationItem?.key || ''}`}
+        onClose={() => setVerificationItem(null)}
+        onVerify={(verification) => runAction('complete_onboarding_item', {
+          itemKey: verificationItem?.key,
+          completed: true,
+          verification,
+        })}
+        onReopen={(reason) => runAction('complete_onboarding_item', {
+          itemKey: verificationItem?.key,
+          completed: false,
+          reason,
+        })}
       />
     </section>
   )
