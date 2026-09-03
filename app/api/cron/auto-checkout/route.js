@@ -4,6 +4,12 @@ import getTenantCompanyModel from '@/models/TenantCompany'
 import { getTenantModels } from '@/lib/tenantModels'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { getCronAuthErrorResponse } from '@/lib/cronAuth'
+import {
+  buildOpenAttendanceQuery,
+  getAttendanceDayRange,
+  previousDateKey,
+  resolveScheduledCheckout,
+} from '@/lib/attendanceAutoCheckout'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // Allow up to 120 seconds for processing (auto-checkout + rectification)
@@ -61,41 +67,6 @@ function getTimeInTimezone(timezone) {
     }
   } catch (error) {
     console.error(`Invalid timezone: ${timezone}`, error)
-    return null
-  }
-}
-
-/**
- * Create a date object for a specific time in a timezone
- */
-function createDateInTimezone(dateStr, timeStr, timezone) {
-  try {
-    // Parse the date and time
-    const [year, month, day] = dateStr.split('-').map(Number)
-    const [hour, minute] = timeStr.split(':').map(Number)
-    
-    // Create a date string that we can parse
-    const dateTimeStr = `${dateStr}T${timeStr}:00`
-    
-    // Get the timezone offset for this specific date/time
-    const tempDate = new Date(dateTimeStr)
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      timeZoneName: 'shortOffset'
-    })
-    
-    // Create date in the target timezone
-    // We use a workaround: create date in UTC and adjust
-    const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, 0))
-    
-    // Get offset for this timezone
-    const tzDate = new Date(tempDate.toLocaleString('en-US', { timeZone: timezone }))
-    const utcRefDate = new Date(tempDate.toLocaleString('en-US', { timeZone: 'UTC' }))
-    const offsetMs = utcRefDate - tzDate
-    
-    return new Date(utcDate.getTime() + offsetMs)
-  } catch (error) {
-    console.error(`Error creating date in timezone: ${timezone}`, error)
     return null
   }
 }
@@ -180,7 +151,7 @@ function determineStatus(workHours, fullDayHours = 8, halfDayHours = 4) {
 /**
  * Process auto-checkout for a single tenant
  */
-async function processAutoCheckoutForTenant(tenant, targetDate) {
+async function processAutoCheckoutForTenant(tenant, targetDate, { includeBacklog = false } = {}) {
   const results = {
     tenantName: tenant.name,
     tenantSlug: tenant.slug,
@@ -213,19 +184,19 @@ async function processAutoCheckoutForTenant(tenant, targetDate) {
     const halfDayHours = company.workingHours?.halfDayHours || 4
     const breakTimings = Array.isArray(company.breakTimings) ? company.breakTimings : []
 
-    // Calculate the date range for the target date in the company's timezone
-    const targetDateStart = new Date(targetDate)
-    targetDateStart.setHours(0, 0, 0, 0)
-    const targetDateEnd = new Date(targetDate)
-    targetDateEnd.setHours(23, 59, 59, 999)
+    // Resolve exact tenant-local bounds. Vercel functions run in UTC, so using
+    // Date#setHours here can include the next tenant workday around midnight.
+    const { start: targetDateStart, end: targetDateEnd } = getAttendanceDayRange(targetDate, timezone)
 
     // Find all in-progress attendance records for the target date
-    const inProgressRecords = await Attendance.find({
-      date: { $gte: targetDateStart, $lte: targetDateEnd },
-      checkIn: { $exists: true, $ne: null },
-      checkOut: { $exists: false },
-      status: 'in-progress'
-    }).populate({
+    const inProgressRecords = await Attendance.find(buildOpenAttendanceQuery({
+      targetDateStart,
+      targetDateEnd,
+      includeBacklog,
+    }))
+      .sort({ date: 1, _id: 1 })
+      .limit(500)
+      .populate({
       path: 'employee',
       select: 'firstName lastName employeeCode userId',
       populate: { path: 'userId', select: '_id email' }
@@ -245,23 +216,16 @@ async function processAutoCheckoutForTenant(tenant, targetDate) {
           continue
         }
 
-        // Get the date string from the attendance date
-        const attDate = new Date(attendance.date)
-        const dateStr = attDate.toISOString().split('T')[0]
-        
-        // Create checkout time using company's configured checkout time
-        const checkoutDateTime = createDateInTimezone(dateStr, checkOutTime, timezone)
-        
-        if (!checkoutDateTime) {
+        const finalCheckoutTime = resolveScheduledCheckout({
+          attendanceDate: attendance.date,
+          checkIn: attendance.checkIn,
+          checkOutTime,
+          timezone,
+        })
+
+        if (!finalCheckoutTime) {
           results.errors.push(`Attendance ${attendance._id}: Could not create checkout datetime`)
           continue
-        }
-
-        // If check-in was after checkout time, use check-in time + 1 minute as checkout
-        // This handles edge cases where someone checked in very late
-        let finalCheckoutTime = checkoutDateTime
-        if (attendance.checkIn > checkoutDateTime) {
-          finalCheckoutTime = new Date(attendance.checkIn.getTime() + 60000) // 1 minute after check-in
         }
 
         // Calculate work hours
@@ -281,6 +245,8 @@ async function processAutoCheckoutForTenant(tenant, targetDate) {
         attendance.autoCheckedOut = true
         attendance.autoCheckoutReason = 'midnight_cutoff'
         attendance.autoCheckoutAt = new Date()
+        attendance.source = 'auto_checkout'
+        attendance.createdBySystem = true
         attendance.remarks = (attendance.remarks || '') + ` | Auto-checked out at midnight. Checkout time set to company logout time (${checkOutTime}).`
         
         await attendance.save()
@@ -303,7 +269,7 @@ async function processAutoCheckoutForTenant(tenant, targetDate) {
               userId,
               {
                 title: '🔒 Auto Clock-Out',
-                body: `You were automatically checked out at ${checkOutTime} (company logout time) as you didn't clock out yesterday. Work hours: ${workCalc.workHours.toFixed(2)}h. Status: ${statusResult.status}.`,
+                body: `You were automatically checked out at ${checkOutTime} (company logout time) for an incomplete previous workday. Work hours: ${workCalc.workHours.toFixed(2)}h. Status: ${statusResult.status}.`,
               },
               {
                 eventType: 'autoCheckout',
@@ -379,11 +345,8 @@ async function rectifyAttendanceForTenant(tenant, targetDate) {
     const fullDayHours = company.workingHours?.fullDayHours || 8
     const breakTimings = Array.isArray(company.breakTimings) ? company.breakTimings : []
 
-    // Calculate the date range for the target date
-    const targetDateStart = new Date(targetDate)
-    targetDateStart.setHours(0, 0, 0, 0)
-    const targetDateEnd = new Date(targetDate)
-    targetDateEnd.setHours(23, 59, 59, 999)
+    const timezone = company.timezone || 'Asia/Kolkata'
+    const { dateKey: targetDateKey, start: targetDateStart, end: targetDateEnd } = getAttendanceDayRange(targetDate, timezone)
 
     // Find all attendance records with both check-in AND check-out for the target date
     const records = await Attendance.find({
@@ -399,7 +362,7 @@ async function rectifyAttendanceForTenant(tenant, targetDate) {
       return results
     }
 
-    console.log(`[Rectification] Found ${records.length} completed records for ${tenant.name} on ${targetDate.toISOString().split('T')[0]}`)
+    console.log(`[Rectification] Found ${records.length} completed records for ${tenant.name} on ${targetDateKey}`)
 
     for (const record of records) {
       try {
@@ -529,15 +492,13 @@ export async function GET(request) {
           continue
         }
 
-        // Process for yesterday's date (since we run at/after midnight)
-        const yesterday = new Date(tzTime.fullDate)
-        yesterday.setDate(yesterday.getDate() - 1)
-        yesterday.setHours(0, 0, 0, 0)
+        // Process the previous calendar day in the tenant's own timezone.
+        const yesterday = previousDateKey(tzTime.date)
 
-        console.log(`[Auto-Checkout] Processing ${tenant.name} (${timezone}) for date: ${yesterday.toISOString().split('T')[0]}`)
+        console.log(`[Auto-Checkout] Processing ${tenant.name} (${timezone}) for date: ${yesterday}`)
 
         // PHASE 1: Auto-checkout in-progress records
-        const tenantResult = await processAutoCheckoutForTenant(tenant, yesterday)
+        const tenantResult = await processAutoCheckoutForTenant(tenant, yesterday, { includeBacklog: true })
         results.tenantResults.push(tenantResult)
         
         if (tenantResult.success) {
@@ -651,48 +612,44 @@ export async function POST(request) {
 
     for (const tenant of tenants) {
       try {
+        const companyModels = await getTenantModels(tenant.databaseName, ['Company'])
+        const company = await companyModels.Company.findOne().lean()
+        const timezone = company?.timezone || 'Asia/Kolkata'
+
         // Determine target date
         let targetDate
         if (date) {
-          targetDate = new Date(date)
+          targetDate = date
         } else {
           // Default to yesterday in company timezone
-          const models = await getTenantModels(tenant.databaseName, ['Company'])
-          const company = await models.Company.findOne().lean()
-          const timezone = company?.timezone || 'Asia/Kolkata'
           const tzTime = getTimeInTimezone(timezone)
-          
-          targetDate = new Date(tzTime.fullDate)
-          targetDate.setDate(targetDate.getDate() - 1)
+
+          targetDate = previousDateKey(tzTime.date)
         }
-        targetDate.setHours(0, 0, 0, 0)
 
         if (dryRun) {
           // Just count how many would be processed
           const models = await getTenantModels(tenant.databaseName, ['Attendance'])
           const { Attendance } = models
           
-          const targetDateEnd = new Date(targetDate)
-          targetDateEnd.setHours(23, 59, 59, 999)
+          const { start: targetDateStart, end: targetDateEnd } = getAttendanceDayRange(targetDate, timezone)
           
           // Count in-progress records for auto-checkout
-          const autoCheckoutCount = await Attendance.countDocuments({
-            date: { $gte: targetDate, $lte: targetDateEnd },
-            checkIn: { $exists: true, $ne: null },
-            checkOut: { $exists: false },
-            status: 'in-progress'
-          })
+          const autoCheckoutCount = await Attendance.countDocuments(buildOpenAttendanceQuery({
+            targetDateStart,
+            targetDateEnd,
+          }))
 
           // Count completed records for rectification preview
           const completedCount = await Attendance.countDocuments({
-            date: { $gte: targetDate, $lte: targetDateEnd },
+            date: { $gte: targetDateStart, $lte: targetDateEnd },
             checkIn: { $exists: true, $ne: null },
             checkOut: { $exists: true, $ne: null }
           })
           
           results.tenantResults.push({
             tenantName: tenant.name,
-            targetDate: targetDate.toISOString().split('T')[0],
+            targetDate,
             wouldAutoCheckout: autoCheckoutCount,
             wouldRectify: completedCount,
             dryRun: true

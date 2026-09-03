@@ -61,7 +61,7 @@ describe('FloatingChatWidget group creation', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 })
 
     global.fetch = jest.fn(async (url, options = {}) => {
-      if (url === '/api/employees/list?includeAdmins=true') {
+      if (String(url).startsWith('/api/directory?')) {
         return {
           ok: true,
           json: async () => ({

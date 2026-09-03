@@ -11,17 +11,14 @@ import MemberAvatar from '@/components/chat/MemberAvatar'
 import { playNotificationSound } from '@/utils/audio'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Checkbox, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
-import { useAuthedSWRStatic } from '@/hooks/useAuthedSWR'
+import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 export default function ChatPage() {
   const { openWidget } = useChatWidget()
   // --- SWR: Initial data loads ---
   const { data: chatsRes, isLoading: chatsLoading, mutate: refreshChats } = useAuthedSWR('/api/chat')
-  const { data: employeesRes, isLoading: employeesLoading } = useAuthedSWRStatic('/api/employees/list?includeAdmins=true')
-
   const currentUserId = useMemo(() => chatsRes?.currentUserId || null, [chatsRes])
-  const employees = useMemo(() => employeesRes?.data || [], [employeesRes])
 
   const [chats, setChats] = useState([])
   const [selectedChat, setSelectedChat] = useState(null)
@@ -45,6 +42,12 @@ export default function ChatPage() {
   const [swipedMessage, setSwipedMessage] = useState(null)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  const { employees, isLoading: employeesLoading } = useEmployeeDirectorySearch({
+    enabled: showNewChatModal || showGroupModal,
+    query: employeeSearchQuery,
+    limit: 100,
+    includeAdmins: true,
+  })
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
   const fileInputRef = useRef(null)

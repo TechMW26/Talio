@@ -10,6 +10,7 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
   const [employees, setEmployees] = useState([])
   const [filteredEmployees, setFilteredEmployees] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedEmployees, setSelectedEmployees] = useState(currentAssignees)
   const [loading, setLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -26,11 +27,17 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
     if (userData) {
       setUser(JSON.parse(userData))
     }
-    fetchEmployees()
     checkDepartmentHead()
   }, [])
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 250)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
+  useEffect(() => {
+    fetchEmployees(1, false, debouncedSearch)
+  }, [debouncedSearch])
 
   useEffect(() => {
     filterEmployees()
@@ -38,9 +45,12 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
 
   useEffect(() => {
     if (user && employees.length) {
-      const myId = user.employeeId || user.id || user._id
+      const employeeId = typeof user.employeeId === 'object'
+        ? (user.employeeId?._id || user.employeeId?.id)
+        : user.employeeId
+      const myId = employeeId || user.id || user._id
       const me = employees.find(e => e._id === myId)
-      setCurrentEmp(me || null)
+      setCurrentEmp(previous => me || previous || (typeof user.employeeId === 'object' ? user.employeeId : null))
     }
   }, [user, employees])
 
@@ -88,11 +98,13 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
     }
   }
 
-  const fetchEmployees = async (page = 1, append = false) => {
+  const fetchEmployees = async (page = 1, append = false, query = debouncedSearch) => {
     try {
       setEmployeeLoading(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/employees?status=active&limit=50&page=${page}`, {
+      const params = new URLSearchParams({ status: 'active', limit: '50', page: String(page) })
+      if (query) params.set('search', query)
+      const response = await fetch(`/api/employees?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -119,7 +131,7 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
 
   const loadMoreEmployees = () => {
     if (!employeeLoading && employeeHasMore) {
-      fetchEmployees(employeePage + 1, true)
+      fetchEmployees(employeePage + 1, true, debouncedSearch)
     }
   }
 
@@ -161,7 +173,9 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
 
   const canAssignTo = (employee) => {
     if (!user || !currentEmp) return false
-    const myId = user.employeeId || user.id || user._id
+    const myId = (typeof user.employeeId === 'object'
+      ? (user.employeeId?._id || user.employeeId?.id)
+      : user.employeeId) || user.id || user._id
 
     // Self assignment is always allowed
     if (employee._id === myId) return true
@@ -371,7 +385,9 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
 
   const getAssignmentTypeLabel = (employee) => {
     if (!user || !employee || !currentEmp) return ''
-    const myId = user.employeeId || user.id || user._id
+    const myId = (typeof user.employeeId === 'object'
+      ? (user.employeeId?._id || user.employeeId?.id)
+      : user.employeeId) || user.id || user._id
 
     if (employee._id === myId) return 'Self'
 

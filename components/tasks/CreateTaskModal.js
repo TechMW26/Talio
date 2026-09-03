@@ -7,6 +7,7 @@ import { HiOutlineSparkles } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import ModalPortal from '@/components/ui/ModalPortal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import { useAILoading } from '@/contexts/AILoadingContext'
@@ -55,10 +56,13 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
   const attachmentInputRef = useRef(null)
 
   // Fetch employees for assignee selection
-  const { data: employeesData } = useAuthedSWR(
-    isOpen ? '/api/employees/list?includeAdmins=true&includeSelf=true' : null
-  )
-  const employees = employeesData?.data || []
+  const { employees } = useEmployeeDirectorySearch({
+    enabled: isOpen && !taskForm.projectId,
+    query: employeeSearch,
+    limit: 100,
+    includeAdmins: true,
+    includeSelf: true,
+  })
 
   // Fetch user's projects for optional project link
   const { data: projectsData } = useAuthedSWR(

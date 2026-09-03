@@ -23,7 +23,7 @@ const AttendanceSchema = new mongoose.Schema({
   },
   checkOutStatus: {
     type: String,
-    enum: ['early', 'on-time', 'late'],
+    enum: ['early', 'on-time', 'late', 'auto-checkout'],
     default: 'on-time',
   },
   status: {

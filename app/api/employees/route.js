@@ -21,6 +21,7 @@ import {
 } from '@/lib/designationLevels'
 import { buildEmployeeLifecycle, createInitialLifecycleWorkflows } from '@/lib/hrms/employeeLifecycle.server'
 import { normalizeEmployeeAddress } from '@/lib/employeeAddress'
+import { clampEmployeeListLimit } from '@/lib/employeeListQuery'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,23 +122,27 @@ function validateHierarchyAssignmentPayload(payload, level, selfEmployeeId) {
 export async function GET(request) {
   try {
     // Get auth and tenant-aware models
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation']);
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'Team']);
 
     if (!auth.success) {
       return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
     }
 
-    const { models: { Employee: TenantEmployee, User: TenantUser, Department: TenantDepartment, Designation: TenantDesignation } } = auth;
+    const { models: { Employee: TenantEmployee, User: TenantUser, Department: TenantDepartment, Designation: TenantDesignation, Team: TenantTeam } } = auth;
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, Number.parseInt(searchParams.get('page'), 10) || 1)
-    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get('limit'), 10) || 10))
+    // Larger administrative selectors intentionally request up to 1,000 rows.
+    // Search-first pickers use /api/directory, while this endpoint preserves the
+    // requested page size for reports and forms that need the full tenant roster.
+    const limit = clampEmployeeListLimit(searchParams.get('limit'))
     const search = (searchParams.get('search') || '').trim().slice(0, 100)
     const department = searchParams.get('department')
     const departmentsParam = searchParams.get('departments') // Comma-separated list of department IDs
     const designation = searchParams.get('designation')
     const level = searchParams.get('level')
     const status = searchParams.get('status')
+    const team = searchParams.get('team')
     const requestedSortBy = searchParams.get('sortBy') || 'createdAt'
     const sortBy = EMPLOYEE_SORT_FIELDS.has(requestedSortBy) ? requestedSortBy : 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
@@ -148,7 +153,7 @@ export async function GET(request) {
       role: auth.user?.role || 'any',
       userId: 'all',
       namespace: 'employees:list',
-      params: { page, limit, search, department, departmentsParam, designation, level, status, sortBy, sortOrder },
+      params: { page, limit, search, department, departmentsParam, designation, level, status, team, sortBy, sortOrder },
     })
     const redisCached = await getCache(redisCacheKey)
     if (redisCached) {
@@ -167,6 +172,7 @@ export async function GET(request) {
       designation,
       level,
       status,
+      team,
       sortBy,
       sortOrder
     )
@@ -179,13 +185,19 @@ export async function GET(request) {
     const query = {}
 
     if (search) {
-      const escapedSearch = escapeRegex(search)
-      query.$or = [
-        { firstName: { $regex: escapedSearch, $options: 'i' } },
-        { lastName: { $regex: escapedSearch, $options: 'i' } },
-        { email: { $regex: escapedSearch, $options: 'i' } },
-        { employeeCode: { $regex: escapedSearch, $options: 'i' } },
-      ]
+      const searchTerms = search.split(/\s+/).filter(Boolean)
+      query.$and = searchTerms.map((term) => {
+        const matcher = { $regex: escapeRegex(term), $options: 'i' }
+        return {
+          $or: [
+            { firstName: matcher },
+            { lastName: matcher },
+            { email: matcher },
+            { employeeCode: matcher },
+            { designationLevelName: matcher },
+          ],
+        }
+      })
     }
 
     // Handle multiple departments filter (comma-separated)
@@ -208,6 +220,15 @@ export async function GET(request) {
 
     if (status) {
       query.status = status
+    }
+
+    if (team && TenantTeam && mongoose.Types.ObjectId.isValid(team)) {
+      const selectedTeam = await TenantTeam.findById(team).select('members teamLeaders').lean()
+      const teamMemberIds = [
+        ...(selectedTeam?.members || []),
+        ...(selectedTeam?.teamLeaders || []),
+      ]
+      query._id = { $in: teamMemberIds }
     }
 
     const skip = (page - 1) * limit

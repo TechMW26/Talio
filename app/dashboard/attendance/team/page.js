@@ -30,6 +30,9 @@ export default function TeamAttendancePage() {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [employeePage, setEmployeePage] = useState(1)
+  const [employeePagination, setEmployeePagination] = useState({ total: 0, pages: 1 })
   const [departmentColorMap, setDepartmentColorMap] = useState({})
   const [employeesLoading, setEmployeesLoading] = useState(true)
 
@@ -64,9 +67,22 @@ export default function TeamAttendancePage() {
   const { data: teamsRes } = useAuthedSWR(teamsFetchKey)
   const availableTeams = teamsRes?.data || []
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim())
+      setEmployeePage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  useEffect(() => {
+    setEmployeePage(1)
+  }, [selectedDepartmentFilter, selectedTeamFilter])
+
   // Fetch employees when head-check resolves (dependent effect - branching fetch logic)
   useEffect(() => {
     if (!headCheckRes) return
+    const controller = new AbortController()
 
     const fetchEmployees = async () => {
       setEmployeesLoading(true)
@@ -74,46 +90,60 @@ export default function TeamAttendancePage() {
       const headers = { 'Authorization': `Bearer ${token}` }
 
       try {
-        if (isAdmin) {
-          const response = await fetch('/api/employees?status=active&limit=1000', { headers })
+        if (isAdmin || (isDepartmentHead && headedDepartments.length > 0)) {
+          const query = new URLSearchParams({
+            status: 'active',
+            limit: '48',
+            page: String(employeePage),
+            sortBy: 'firstName',
+            sortOrder: 'asc',
+          })
+          if (debouncedSearch) query.set('search', debouncedSearch)
+          if (selectedDepartmentFilter !== 'all') {
+            query.set('department', selectedDepartmentFilter)
+          } else if (!isAdmin) {
+            query.set('departments', headedDepartments.map((department) => department._id).join(','))
+          }
+          if (selectedTeamFilter !== 'all') query.set('team', selectedTeamFilter)
+
+          const response = await fetch(`/api/employees?${query.toString()}`, { headers, signal: controller.signal })
           const data = await response.json()
           if (data.success) {
-            const allEmployees = data.data || []
-            setEmployees(allEmployees)
-            buildDepartmentColorMap(allEmployees)
+            const pageEmployees = data.data || []
+            setEmployees(pageEmployees)
+            setEmployeePagination({
+              total: data.pagination?.total || pageEmployees.length,
+              pages: Math.max(1, data.pagination?.pages || 1),
+            })
+            buildDepartmentColorMap(pageEmployees)
           }
-        } else if (isDepartmentHead && headedDepartments.length > 0) {
-          const allEmployees = []
-          for (const dept of headedDepartments) {
-            const response = await fetch(`/api/employees?department=${dept._id}&status=active&limit=500`, { headers })
-            const data = await response.json()
-            if (data.success) allEmployees.push(...(data.data || []))
-          }
-          const uniqueEmployees = allEmployees.filter((emp, i, self) => i === self.findIndex(e => e._id === emp._id))
-          setEmployees(uniqueEmployees)
-          buildDepartmentColorMap(uniqueEmployees)
         } else if (isTeamLeader) {
           // Team leader: fetch team members via team/members API
-          const response = await fetch('/api/team/members', { headers })
+          const response = await fetch('/api/team/members', { headers, signal: controller.signal })
           const data = await response.json()
           if (data.success) {
             setEmployees(data.data || [])
+            setEmployeePagination({ total: data.data?.length || 0, pages: 1 })
             buildDepartmentColorMap(data.data || [])
           }
         } else {
           toast.error('You do not have permission to view team attendance')
         }
       } catch (error) {
+        if (error.name === 'AbortError') return
         console.error('Error fetching employees:', error)
         toast.error('Failed to fetch employees')
       } finally {
-        setEmployeesLoading(false)
-        setView('employees')
+        if (!controller.signal.aborted) {
+          setEmployeesLoading(false)
+          setView('employees')
+        }
       }
     }
 
     fetchEmployees()
-  }, [headCheckRes, isAdmin, isDepartmentHead, isTeamLeader, headedDepartments])
+    return () => controller.abort()
+  }, [headCheckRes, isAdmin, isDepartmentHead, isTeamLeader, headedDepartments, employeePage, debouncedSearch, selectedDepartmentFilter, selectedTeamFilter])
 
   const buildDepartmentColorMap = (employeeList) => {
     const uniqueDepts = [...new Set(employeeList.map(e => e.department?._id || e.department).filter(Boolean))]
@@ -301,16 +331,9 @@ export default function TeamAttendancePage() {
 
   // Get unique departments from employees for filter dropdown
   const availableDepartments = useMemo(() => {
-    const depts = new Map()
-    employees.forEach(emp => {
-      const deptId = emp.department?._id || emp.department
-      const deptName = emp.department?.name
-      if (deptId && deptName) {
-        depts.set(deptId.toString(), { _id: deptId, name: deptName })
-      }
-    })
-    return Array.from(depts.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [employees])
+    const source = isAdmin ? departments : headedDepartments
+    return [...source].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  }, [isAdmin, departments, headedDepartments])
 
   if (headCheckError) return <DataErrorState message="Failed to check team permissions" onRetry={() => window.location.reload()} />
 
@@ -350,7 +373,7 @@ export default function TeamAttendancePage() {
             </h1>
             <p className="text-default-500 mt-1">
               {view === 'employees' && (isAdmin
-                ? <>{`View attendance for all ${employees.length} employees${isDepartmentHead ? ' (your department shown first)' : ''}`} <BackgroundRefreshIndicator isValidating={attValidating} /></>
+                ? <>{`View attendance for all ${employeePagination.total} employees${isDepartmentHead ? ' (your department shown first)' : ''}`} <BackgroundRefreshIndicator isValidating={attValidating} /></>
                 : 'Select an employee to view their attendance calendar'
               )}
               {view === 'calendar' && <>'View attendance calendar and work hours' <BackgroundRefreshIndicator isValidating={attValidating} /></>}
@@ -383,15 +406,14 @@ export default function TeamAttendancePage() {
               <div className="sm:w-72">
                 <Select
                   selectedKeys={[selectedDepartmentFilter]}
-                  onChange={(e) => { setSelectedDepartmentFilter(e.target.value); setSelectedTeamFilter('all') }}
+                  onChange={(e) => { setSelectedDepartmentFilter(e.target.value); setSelectedTeamFilter('all'); setEmployeePage(1) }}
                   aria-label="Department Filter"
                   placeholder="Filter by department"
                   startContent={<FaFilter className="text-default-400" />}
                   classNames={{ trigger: "bg-content1" }}
                 >
-                  <SelectItem key="all">All Departments ({employees.length})</SelectItem>
+                  <SelectItem key="all">All Departments ({employeePagination.total})</SelectItem>
                   {availableDepartments.map((dept) => {
-                    const count = employees.filter(e => (e.department?._id || e.department)?.toString() === dept._id.toString()).length
                     return (
                       <SelectItem key={dept._id} textValue={dept.name}>
                         <div className="flex items-center gap-2">
@@ -399,7 +421,6 @@ export default function TeamAttendancePage() {
                             className={`w-3 h-3 rounded-full ${departmentColorMap[dept._id]?.badge || 'bg-gray-500'}`}
                           />
                           <span>{dept.name}</span>
-                          <span className="text-default-400 ml-auto">({count})</span>
                         </div>
                       </SelectItem>
                     )
@@ -413,7 +434,7 @@ export default function TeamAttendancePage() {
               <div className="sm:w-60">
                 <Select
                   selectedKeys={[selectedTeamFilter]}
-                  onChange={(e) => setSelectedTeamFilter(e.target.value)}
+                  onChange={(e) => { setSelectedTeamFilter(e.target.value); setEmployeePage(1) }}
                   aria-label="Team Filter"
                   placeholder="Filter by team"
                   startContent={<FaUserFriends className="text-default-400" />}
@@ -533,6 +554,31 @@ export default function TeamAttendancePage() {
                   )
                 })
               )}
+            </div>
+          )}
+          {employeePagination.pages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <Button
+                isIconOnly
+                variant="flat"
+                aria-label="Previous employee page"
+                isDisabled={employeePage <= 1 || employeesLoading}
+                onPress={() => setEmployeePage((current) => Math.max(1, current - 1))}
+              >
+                <FaChevronLeft />
+              </Button>
+              <span className="text-sm text-default-500">
+                Page {employeePage} of {employeePagination.pages} · {employeePagination.total} employees
+              </span>
+              <Button
+                isIconOnly
+                variant="flat"
+                aria-label="Next employee page"
+                isDisabled={employeePage >= employeePagination.pages || employeesLoading}
+                onPress={() => setEmployeePage((current) => Math.min(employeePagination.pages, current + 1))}
+              >
+                <FaChevronRight />
+              </Button>
             </div>
           )}
         </>

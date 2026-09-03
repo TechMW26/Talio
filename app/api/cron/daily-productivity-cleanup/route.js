@@ -4,8 +4,10 @@ import { connectSuperadminDB } from '@/lib/superadminDb';
 import getTenantCompanyModel from '@/models/TenantCompany';
 import { getTenantModels } from '@/lib/tenantModels';
 import { createDailyMosaicOnCheckout } from '@/lib/productivityMosaic';
-import { getTimezone } from '@/lib/timezone';
+import { getTimezone, parseDateTimeInTimezone } from '@/lib/timezone';
 import { getCronAuthErrorResponse } from '@/lib/cronAuth';
+import { buildOpenAttendanceQuery, resolveScheduledCheckout } from '@/lib/attendanceAutoCheckout';
+import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -48,36 +50,65 @@ function previousDateString({ year, month, day }) {
   return d.toISOString().split('T')[0];
 }
 
-async function autoCheckoutOpenAttendance({ models, dateString, timezone, now }) {
+async function autoCheckoutOpenAttendance({ models, dateString, timezone, now, companySettings }) {
   const { Attendance } = models;
   if (!Attendance) return { autoCheckedOut: 0 };
 
-  const dayStart = new Date(`${dateString}T00:00:00.000Z`);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const dayStart = parseDateTimeInTimezone(`${dateString}T00:00:00`, timezone);
+  const dayEnd = parseDateTimeInTimezone(`${dateString}T23:59:59.999`, timezone);
 
-  const openRows = await Attendance.find({
-    date: { $gte: dayStart, $lt: dayEnd },
-    checkIn: { $ne: null },
-    $or: [{ checkOut: null }, { checkOut: { $exists: false } }],
-  })
-    .select('_id')
+  const openRows = await Attendance.find(buildOpenAttendanceQuery({
+    targetDateStart: dayStart,
+    targetDateEnd: dayEnd,
+  }))
+    .select('_id date checkIn')
     .lean();
 
   if (openRows.length === 0) return { autoCheckedOut: 0 };
 
-  const result = await Attendance.updateMany(
-    { _id: { $in: openRows.map((r) => r._id) } },
-    {
-      $set: {
-        checkOut: now,
-        checkOutStatus: 'auto-checkout',
-        autoCheckedOut: true,
-        autoCheckoutReason: 'midnight_cutoff',
-        autoCheckoutAt: now,
+  const checkOutTime = companySettings?.workingHours?.checkOutTime || '18:00';
+  const breakTimings = companySettings?.breakTimings || [];
+  const fullDayHours = companySettings?.workingHours?.fullDayHours || 8;
+  const halfDayHours = companySettings?.workingHours?.halfDayHours || 4;
+
+  const operations = openRows.map((row) => {
+    const checkOut = resolveScheduledCheckout({
+      attendanceDate: row.date,
+      checkIn: row.checkIn,
+      checkOutTime,
+      timezone,
+    });
+    const work = calculateEffectiveWorkHours(row.checkIn, checkOut, breakTimings);
+    const finalStatus = determineAttendanceStatus(work.effectiveWorkHours, { fullDayHours, halfDayHours });
+
+    return {
+      updateOne: {
+        filter: {
+          _id: row._id,
+          status: 'in-progress',
+          $or: [{ checkOut: null }, { checkOut: { $exists: false } }],
+        },
+        update: { $set: {
+          checkOut,
+          status: finalStatus.status,
+          statusReason: `${finalStatus.reason} (Midnight auto-checkout)`,
+          workHours: work.effectiveWorkHours,
+          totalLoggedHours: work.totalLoggedHours,
+          breakMinutes: work.breakMinutes,
+          shrinkagePercentage: work.shrinkagePercentage,
+          source: 'auto_checkout',
+          createdBySystem: true,
+          checkOutStatus: 'auto-checkout',
+          autoCheckedOut: true,
+          autoCheckoutReason: 'midnight_cutoff',
+          autoCheckoutAt: now,
+        } },
       },
-    },
-  );
-  return { autoCheckedOut: result.modifiedCount };
+    };
+  });
+
+  const result = await Attendance.bulkWrite(operations, { ordered: false });
+  return { autoCheckedOut: result.modifiedCount || 0 };
 }
 
 async function processTenant({ company, now, dateOverride, force }) {
@@ -95,13 +126,17 @@ async function processTenant({ company, now, dateOverride, force }) {
     'Screenshot',
     'ScreenshotComposite',
     'Attendance',
+    'Company',
   ]);
+
+  const companySettings = await models.Company.findOne().lean();
 
   const { autoCheckedOut } = await autoCheckoutOpenAttendance({
     models,
     dateString,
     timezone: local.timezone,
     now,
+    companySettings,
   });
 
   // Find every user who captured at least one screenshot for that day.

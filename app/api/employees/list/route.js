@@ -14,6 +14,8 @@ export const GET = withTenantApi({
   const data = await listDirectory({
     Employee: models.Employee,
     User: models.User,
+    Department: models.Department,
+    Designation: models.Designation,
     tenantId: auth.tenant.databaseName,
     currentUserId: auth.user.id || auth.user._id,
     query: searchParams.get('q') || searchParams.get('search') || '',

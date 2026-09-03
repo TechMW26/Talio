@@ -8,6 +8,7 @@ import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
+import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
 
 export default function FloatingChatWidget() {
   const { 
@@ -25,9 +26,7 @@ export default function FloatingChatWidget() {
   const { isConnected, requestPresence, onPresenceStatus, onPresenceUpdate } = useSocket()
   
   const [chats, setChats] = useState([])
-  const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(false)
-  const [loadingEmployees, setLoadingEmployees] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showNewChat, setShowNewChat] = useState(false)
   const [showNewGroup, setShowNewGroup] = useState(false)
@@ -39,6 +38,12 @@ export default function FloatingChatWidget() {
   const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
   const [isDesktop, setIsDesktop] = useState(false)
   const [presenceByEmployee, setPresenceByEmployee] = useState({})
+  const { employees, isLoading: loadingEmployees } = useEmployeeDirectorySearch({
+    enabled: isWidgetOpen && (showNewChat || showNewGroup),
+    query: searchQuery,
+    limit: 100,
+    includeAdmins: true,
+  })
   
   const widgetRef = useRef(null)
   const isDragging = useRef(false)
@@ -102,26 +107,6 @@ export default function FloatingChatWidget() {
     }
   }
 
-  const fetchEmployees = async () => {
-    try {
-      setLoadingEmployees(true)
-      const token = localStorage.getItem('token')
-      // Include admins for chat - we want all users to be searchable
-      const response = await fetch('/api/employees/list?includeAdmins=true', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        // The API already filters out the current user
-        setEmployees(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-    } finally {
-      setLoadingEmployees(false)
-    }
-  }
-
   const startNewChat = async (employeeId) => {
     try {
       setComposeError('')
@@ -161,7 +146,6 @@ export default function FloatingChatWidget() {
       setSelectedEmployees([])
       setGroupName('')
     }
-    fetchEmployees()
   }
 
   const closeComposer = () => {
