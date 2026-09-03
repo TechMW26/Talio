@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from '@/utils/toast'
 import { handleSessionExpired } from '@/utils/userHelper'
 import { getCurrentISTDate, getCurrentISTMinutesSinceMidnight, getCurrentISTDayName } from '@/lib/timezone'
@@ -10,24 +10,13 @@ export default function useGeofencing() {
   const [currentLocation, setCurrentLocation] = useState(null)
   const [geofenceSettings, setGeofenceSettings] = useState(null)
   const [isWithinGeofence, setIsWithinGeofence] = useState(true)
-  const [lastCheckTime, setLastCheckTime] = useState(null)
-  const [watchId, setWatchId] = useState(null)
-
-  // Calculate distance between two coordinates (Haversine formula)
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3 // Earth's radius in meters
-    const φ1 = lat1 * Math.PI / 180
-    const φ2 = lat2 * Math.PI / 180
-    const Δφ = (lat2 - lat1) * Math.PI / 180
-    const Δλ = (lon2 - lon1) * Math.PI / 180
-
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-
-    return R * c // Distance in meters
-  }
+  const [, setLastCheckTime] = useState(null)
+  const [, setWatchId] = useState(null)
+  const settingsRef = useRef(null)
+  const lastCheckRef = useRef(null)
+  const withinRef = useRef(true)
+  const watchIdRef = useRef(null)
+  const activeRef = useRef(false)
 
   // Check if current time is during work hours (IST)
   const isDuringWorkHours = (checkInTime, checkOutTime) => {
@@ -77,7 +66,7 @@ export default function useGeofencing() {
   const fetchGeofenceSettings = useCallback(async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/settings/company', {
+      const response = await fetch('/api/company/settings', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -92,6 +81,7 @@ export default function useGeofencing() {
       const data = await response.json()
       if (data.success && data.data.geofence) {
         setGeofenceSettings(data.data)
+        settingsRef.current = data.data
         return data.data
       }
     } catch (error) {
@@ -145,17 +135,18 @@ export default function useGeofencing() {
       timestamp: new Date(position.timestamp)
     })
 
-    if (!geofenceSettings || !geofenceSettings.geofence.enabled) {
+    const activeSettings = settingsRef.current
+    if (!activeSettings?.geofence?.enabled) {
       return
     }
 
     const duringWorkHours = isDuringWorkHours(
-      geofenceSettings.checkInTime,
-      geofenceSettings.checkOutTime
+      activeSettings.workingHours?.checkInTime,
+      activeSettings.workingHours?.checkOutTime
     )
 
     // Check if during break time - skip geofencing if true
-    const duringBreak = isDuringBreakTime(geofenceSettings.breakTimings)
+    const duringBreak = isDuringBreakTime(activeSettings.breakTimings)
     if (duringBreak) {
       return // Don't track during break times
     }
@@ -163,26 +154,28 @@ export default function useGeofencing() {
     // The API will handle checking multiple locations
     // We just need to log the location and get the response
     const now = getCurrentISTDate().getTime()
-    const shouldLog = !lastCheckTime || (now - lastCheckTime) > 15 * 60 * 1000 // Every 15 minutes
+    const shouldLog = !lastCheckRef.current || (now - lastCheckRef.current) > 15 * 60 * 1000 // Every 15 minutes
 
-    if (shouldLog || !isWithinGeofence) {
+    if (shouldLog || !withinRef.current) {
       const eventType = 'location_update'
       const logData = await logLocation(position, eventType)
 
       setLastCheckTime(now)
+      lastCheckRef.current = now
 
       if (logData) {
-        const wasWithinGeofence = isWithinGeofence
+        const wasWithinGeofence = withinRef.current
         const nowWithinGeofence = logData.isWithinGeofence
         const statusChanged = wasWithinGeofence !== nowWithinGeofence
 
         setIsWithinGeofence(nowWithinGeofence)
+        withinRef.current = nowWithinGeofence
 
         // If outside geofence during work hours and requires approval
         if (!nowWithinGeofence && duringWorkHours && logData.requiresApproval && statusChanged) {
           // Show popup asking for reason
           showOutOfPremisesPopup(position)
-        } else if (!nowWithinGeofence && duringWorkHours && geofenceSettings.geofence.notifyOnExit && statusChanged) {
+        } else if (!nowWithinGeofence && duringWorkHours && activeSettings.geofence.notifyOnExit && statusChanged) {
           // Just notify
           const locationMsg = logData.locationName ? ` (Closest: ${logData.locationName})` : ''
           toast.error(`You are outside the office premises during work hours${locationMsg}`, {
@@ -192,7 +185,7 @@ export default function useGeofencing() {
         }
       }
     }
-  }, [geofenceSettings, isWithinGeofence, lastCheckTime, logLocation])
+  }, [logLocation])
 
   // Show popup for out-of-premises reason
   const showOutOfPremisesPopup = useCallback((position) => {
@@ -213,6 +206,7 @@ export default function useGeofencing() {
 
     // Fetch settings first
     const settings = await fetchGeofenceSettings()
+    if (!activeRef.current) return
     if (!settings || !settings.geofence.enabled) {
       console.log('Geofencing is not enabled')
       return
@@ -235,22 +229,28 @@ export default function useGeofencing() {
     )
 
     setWatchId(id)
+    watchIdRef.current = id
     setIsTracking(true)
   }, [fetchGeofenceSettings, handleLocationUpdate])
 
   // Stop tracking
   const stopTracking = useCallback(() => {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId)
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
       setWatchId(null)
+      watchIdRef.current = null
       setIsTracking(false)
     }
-  }, [watchId])
+  }, [])
 
   // Auto-start tracking on mount
   useEffect(() => {
+    activeRef.current = true
     startTracking()
-    return () => stopTracking()
+    return () => {
+      activeRef.current = false
+      stopTracking()
+    }
   }, [])
 
   return {

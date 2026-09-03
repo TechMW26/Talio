@@ -83,6 +83,7 @@ const AttendanceSchema = new mongoose.Schema({
       },
       capturedAt: Date, // Timestamp when location was captured
       accuracy: Number, // GPS accuracy in meters
+      source: String,
       warning: String, // Warning message if location not captured
       geofenceLocation: {
         type: mongoose.Schema.Types.ObjectId,
@@ -110,6 +111,7 @@ const AttendanceSchema = new mongoose.Schema({
       },
       capturedAt: Date, // Timestamp when location was captured
       accuracy: Number, // GPS accuracy in meters
+      source: String,
       warning: String, // Warning message if location not captured
       geofenceLocation: {
         type: mongoose.Schema.Types.ObjectId,
@@ -150,7 +152,7 @@ const AttendanceSchema = new mongoose.Schema({
   // Audit fields for tracking system-generated records
   source: {
     type: String,
-    enum: ['user_checkin', 'manual_entry', 'system_auto_absent', 'system_backfill', 'correction', 'import', 'auto_checkout', 'attendance_machine'],
+    enum: ['manual', 'user_checkin', 'manual_entry', 'geofence', 'system', 'system_auto_absent', 'system_backfill', 'correction', 'import', 'auto_checkout', 'attendance_machine'],
     default: 'user_checkin',
   },
   createdBySystem: {

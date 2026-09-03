@@ -53,7 +53,7 @@ export async function GET(request) {
       'Attendance', 'LeaveBalance', 'LeaveType', 'Leave',
       'Employee', 'Department', 'User',
       'Holiday', 'Announcement', 'Asset', 'Expense', 'Ticket', 'Policy',
-      'CompanySettings'
+      'CompanySettings', 'Company'
     ])
 
     if (!auth.success) {
@@ -65,7 +65,7 @@ export async function GET(request) {
       Attendance, LeaveBalance, LeaveType, Leave,
       Employee, Department, User,
       Holiday, Announcement, Asset, Expense, Ticket, Policy,
-      CompanySettings
+      CompanySettings, Company
     } = models
 
     const userRole = user.role || 'employee'
@@ -99,7 +99,7 @@ export async function GET(request) {
       User.findById(user._id || user.userId)
         .populate({
           path: 'employeeId',
-          select: 'firstName lastName employeeCode designation department profilePicture status email phone dateOfJoining employmentType reportingManager _id',
+          select: 'firstName lastName employeeCode designation department company profilePicture status email phone dateOfJoining employmentType reportingManager _id',
           populate: [
             { path: 'designation', select: 'title' },
             { path: 'department', select: 'name' },
@@ -144,6 +144,7 @@ export async function GET(request) {
         dateOfJoining: employee.dateOfJoining,
         employmentType: employee.employmentType,
         reportingManager: employee.reportingManager,
+        company: employee.company,
       }
     }
 
@@ -151,9 +152,18 @@ export async function GET(request) {
     // === COMPANY SETTINGS (for CheckInOutWidget work hours config) ===
     if (!companyFeatures || companyFeatures.gpsAttendance !== false) {
       fetchPromises.push(
-        CompanySettings.findOne().lean()
+        (employee?.company
+          ? Company.findById(employee.company).select('name timezone workingHours geofence breakTimings').lean()
+          : CompanySettings.findOne().lean())
           .then(settings => {
-            dashboardData.companySettings = settings || null
+            dashboardData.companySettings = settings
+              ? {
+                  ...settings,
+                  checkInTime: settings.checkInTime || settings.workingHours?.checkInTime,
+                  checkOutTime: settings.checkOutTime || settings.workingHours?.checkOutTime,
+                  absentThresholdMinutes: settings.absentThresholdMinutes || settings.workingHours?.absentThresholdMinutes,
+                }
+              : null
           })
           .catch(() => { dashboardData.companySettings = null })
       )

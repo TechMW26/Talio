@@ -76,7 +76,8 @@ const CompanySchema = new mongoose.Schema({
     strictMode: { type: Boolean, default: false },
     notifyOnExit: { type: Boolean, default: true },
     requireApproval: { type: Boolean, default: true },
-    useMultipleLocations: { type: Boolean, default: true }
+    useMultipleLocations: { type: Boolean, default: true },
+    maxAccuracyMeters: { type: Number, default: 150, min: 10, max: 5000 }
   },
   // Break Timings (when geofencing is paused)
   breakTimings: [{

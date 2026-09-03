@@ -1,24 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-
-// Calculate distance between two coordinates (Haversine formula)
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3 // Earth's radius in meters
-  const φ1 = lat1 * Math.PI / 180
-  const φ2 = lat2 * Math.PI / 180
-  const Δφ = (lat2 - lat1) * Math.PI / 180
-  const Δλ = (lon2 - lon1) * Math.PI / 180
-
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ/2) * Math.sin(Δλ/2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-
-  return R * c // Distance in meters
-}
+import { evaluateEmployeeGeofence, isValidCoordinate } from '@/lib/geofencing'
 
 // Check if current time is during work hours
 function isDuringWorkHours(checkInTime, checkOutTime) {
+  if (!checkInTime || !checkOutTime) return false
   const now = new Date()
   const currentTime = now.getHours() * 60 + now.getMinutes() // Minutes since midnight
 
@@ -61,61 +47,6 @@ function isDuringBreakTime(breakTimings) {
   return { isDuringBreak: false }
 }
 
-// Check employee against multiple geofence locations
-async function checkMultipleGeofences(latitude, longitude, employeeId, departmentId) {
-  const locations = await GeofenceLocation.find({ isActive: true })
-
-  const checkedLocations = []
-  let closestLocation = null
-  let minDistance = Infinity
-  let isWithinAnyGeofence = false
-
-  for (const location of locations) {
-    // Check if employee is allowed at this location
-    const isAllowed =
-      location.allowedDepartments.length === 0 ||
-      location.allowedDepartments.some(dept => dept.toString() === departmentId?.toString()) ||
-      location.allowedEmployees.some(emp => emp.toString() === employeeId.toString())
-
-    if (!isAllowed) continue
-
-    const distance = calculateDistance(
-      latitude,
-      longitude,
-      location.center.latitude,
-      location.center.longitude
-    )
-
-    const isWithin = distance <= location.radius
-
-    checkedLocations.push({
-      locationId: location._id,
-      locationName: location.name,
-      distance: Math.round(distance),
-      isWithin
-    })
-
-    if (isWithin) {
-      isWithinAnyGeofence = true
-      if (distance < minDistance) {
-        minDistance = distance
-        closestLocation = location
-      }
-    } else if (!isWithinAnyGeofence && distance < minDistance) {
-      // Track closest location even if not within
-      minDistance = distance
-      closestLocation = location
-    }
-  }
-
-  return {
-    isWithinAnyGeofence,
-    closestLocation,
-    closestDistance: Math.round(minDistance),
-    checkedLocations
-  }
-}
-
 // POST - Log geofence event
 export async function POST(request) {
   try {
@@ -129,7 +60,7 @@ export async function POST(request) {
 
     const { latitude, longitude, accuracy, eventType, reason } = await request.json();
 
-    if (!latitude || !longitude) {
+    if (!isValidCoordinate(latitude, longitude)) {
       return NextResponse.json(
         { success: false, message: 'Location coordinates are required' },
         { status: 400 }
@@ -149,10 +80,20 @@ export async function POST(request) {
     const employee = await Employee.findById(userRecord.employeeId)
       .populate('department')
       .populate('reportingManager')
+      .populate('company')
 
     // Get company settings for geofence
-    const settings = await CompanySettings.findOne()
-    if (!settings || !settings.geofence.enabled) {
+    const globalSettings = await CompanySettings.findOne().lean()
+    const settings = employee.company?.geofence
+      ? {
+          ...globalSettings,
+          geofence: employee.company.geofence,
+          checkInTime: employee.company.workingHours?.checkInTime || globalSettings?.checkInTime || '09:00',
+          checkOutTime: employee.company.workingHours?.checkOutTime || globalSettings?.checkOutTime || '18:00',
+          breakTimings: employee.company.breakTimings || globalSettings?.breakTimings || [],
+        }
+      : globalSettings
+    if (!settings?.geofence?.enabled) {
       return NextResponse.json(
         { success: false, message: 'Geofencing is not enabled' },
         { status: 400 }
@@ -164,59 +105,32 @@ export async function POST(request) {
     // Check if during break time
     const breakCheck = isDuringBreakTime(settings.breakTimings)
 
-    let isWithinGeofence = false
-    let distance = 0
-    let geofenceCenter = null
-    let geofenceRadius = 0
-    let geofenceLocation = null
-    let geofenceLocationName = null
-    let checkedLocations = []
-
-    // Check if using multiple locations
-    if (settings.geofence.useMultipleLocations) {
-      const multiCheck = await checkMultipleGeofences(
-        latitude,
-        longitude,
-        employee._id,
-        employee.department?._id
-      )
-
-      isWithinGeofence = multiCheck.isWithinAnyGeofence
-      distance = multiCheck.closestDistance
-      checkedLocations = multiCheck.checkedLocations
-
-      if (multiCheck.closestLocation) {
-        geofenceLocation = multiCheck.closestLocation._id
-        geofenceLocationName = multiCheck.closestLocation.name
-        geofenceCenter = {
-          latitude: multiCheck.closestLocation.center.latitude,
-          longitude: multiCheck.closestLocation.center.longitude,
-        }
-        geofenceRadius = multiCheck.closestLocation.radius
-      }
-    } else {
-      // Legacy single location check
-      if (settings.geofence.center?.latitude && settings.geofence.center?.longitude) {
-        distance = calculateDistance(
-          latitude,
-          longitude,
-          settings.geofence.center.latitude,
-          settings.geofence.center.longitude
-        )
-        isWithinGeofence = distance <= settings.geofence.radius
-        geofenceCenter = {
-          latitude: settings.geofence.center.latitude,
-          longitude: settings.geofence.center.longitude,
-        }
-        geofenceRadius = settings.geofence.radius
-      }
-    }
+    const geofenceCheck = await evaluateEmployeeGeofence({
+      GeofenceLocation,
+      settings,
+      latitude,
+      longitude,
+      accuracy,
+      locationSource: 'gps',
+      employeeId: employee._id,
+      departmentId: employee.department?._id,
+      companyId: employee.company?._id,
+    })
+    const isWithinGeofence = geofenceCheck.withinGeofence
+    const distance = geofenceCheck.closestDistance || 0
+    const geofenceCenter = geofenceCheck.closestLocation?.center || null
+    const geofenceRadius = geofenceCheck.closestLocation?.radius || 0
+    const geofenceLocation = geofenceCheck.closestLocation?._id || null
+    const geofenceLocationName = geofenceCheck.closestLocation?.name || null
+    const checkedLocations = geofenceCheck.checkedLocations
 
     // Create geofence log
     const logData = {
       employee: employee._id,
       user: user._id,
-      eventType: eventType || (isWithinGeofence ? 'entry' : 'exit'),
+      eventType: ['exit', 'entry', 'outside_during_hours', 'location_update'].includes(eventType)
+        ? eventType
+        : (isWithinGeofence ? 'entry' : 'exit'),
       location: {
         latitude,
         longitude,

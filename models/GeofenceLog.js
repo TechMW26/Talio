@@ -15,7 +15,7 @@ const GeofenceLogSchema = new mongoose.Schema({
   // Event Type
   eventType: {
     type: String,
-    enum: ['exit', 'entry', 'outside_during_hours', 'location_update'],
+    enum: ['exit', 'entry', 'outside_during_hours', 'location_update', 'attendance_check_in', 'attendance_check_out'],
     required: true,
   },
   

@@ -1368,7 +1368,7 @@ function CompanySettingsTab() {
 
 
 // Geofence Locations Manager Component (must be defined before GeofencingTab)
-function GeofenceLocationsManager() {
+function GeofenceLocationsManager({ companyId }) {
   const [showModal, setShowModal] = useState(false)
   const [editingLocation, setEditingLocation] = useState(null)
   const [isMounted, setIsMounted] = useState(false)
@@ -1383,12 +1383,15 @@ function GeofenceLocationsManager() {
     strictMode: false,
   })
 
-  const { data: locationsData, isLoading: loading, mutate: mutateLocations } = useAuthedSWR('/api/geofence/locations?activeOnly=true')
+  const locationsUrl = companyId
+    ? `/api/geofence/locations?activeOnly=true&company=${companyId}`
+    : '/api/geofence/locations?activeOnly=true'
+  const { data: locationsData, isLoading: loading, mutate: mutateLocations } = useAuthedSWR(locationsUrl)
   const locations = locationsData?.data || []
 
   const deleteLocationMutation = useApiMutation({
     method: 'DELETE',
-    invalidateKeys: ['/api/geofence/locations?activeOnly=true'],
+    invalidateKeys: [locationsUrl],
     onSuccess: () => toast.success('Location deleted successfully'),
     onError: (error) => toast.error(error.message || 'Failed to delete location')
   })
@@ -1467,7 +1470,7 @@ function GeofenceLocationsManager() {
       return
     }
 
-    if (!formData.center || !formData.center.latitude || !formData.center.longitude) {
+    if (!formData.center || !Number.isFinite(Number(formData.center.latitude)) || !Number.isFinite(Number(formData.center.longitude))) {
       toast.error('Please set valid coordinates')
       return
     }
@@ -1489,7 +1492,7 @@ function GeofenceLocationsManager() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, company: companyId || null })
       })
 
       const data = await response.json()
@@ -1963,6 +1966,7 @@ function GeofencingTab() {
           strictMode: formData.get('strictMode') === 'on',
           notifyOnExit: formData.get('notifyOnExit') === 'on',
           requireApproval: formData.get('requireApproval') === 'on',
+          maxAccuracyMeters: Math.min(5000, Math.max(10, Number(formData.get('maxAccuracyMeters')) || 150)),
           useMultipleLocations: true, // Always use multiple locations
         },
         breakTimings: breakTimings
@@ -2063,7 +2067,7 @@ function GeofencingTab() {
         </div>
 
         {/* Office Locations */}
-        <GeofenceLocationsManager />
+        <GeofenceLocationsManager companyId={selectedCompany._id} />
 
         {/* Geofence Options */}
         <div className="bg-white rounded-lg">
@@ -2110,6 +2114,28 @@ function GeofencingTab() {
                 <p className="text-sm text-gray-600 mt-1">Require department head approval when employee is detected outside geofence during work hours</p>
               </div>
             </label>
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <label htmlFor="maxAccuracyMeters" className="block text-sm font-semibold text-gray-900">
+                Required GPS accuracy
+              </label>
+              <p className="text-sm text-gray-600 mt-1 mb-3">
+                In strict mode, readings less accurate than this are rejected.
+              </p>
+              <div className="flex items-center gap-3 max-w-sm">
+                <input
+                  id="maxAccuracyMeters"
+                  name="maxAccuracyMeters"
+                  type="number"
+                  min="10"
+                  max="5000"
+                  step="10"
+                  defaultValue={settings?.geofence?.maxAccuracyMeters || 150}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-600">meters</span>
+              </div>
+            </div>
           </div>
         </div>
 

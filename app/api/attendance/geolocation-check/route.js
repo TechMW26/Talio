@@ -2,24 +2,9 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { sendPushToUser } from '@/lib/pushNotification'
+import { evaluateEmployeeGeofence } from '@/lib/geofencing'
 
 export const dynamic = 'force-dynamic'
-
-// Calculate distance between two coordinates (Haversine formula)
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3 // Earth's radius in meters
-  const φ1 = lat1 * Math.PI / 180
-  const φ2 = lat2 * Math.PI / 180
-  const Δφ = (lat2 - lat1) * Math.PI / 180
-  const Δλ = (lon2 - lon1) * Math.PI / 180
-
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) *
-    Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-
-  return R * c // Distance in meters
-}
 
 /**
  * POST - Check if user is within geofence and auto-checkout if not
@@ -35,7 +20,7 @@ export async function POST(request) {
     const { user, models } = auth
     const { Attendance, Employee, CompanySettings, GeofenceLocation, OvertimeRequest, User, Notification } = models
 
-    const { latitude, longitude } = await request.json()
+    const { latitude, longitude, accuracy, locationSource = 'gps' } = await request.json()
 
     if (latitude === undefined || longitude === undefined) {
       return NextResponse.json(
@@ -58,7 +43,7 @@ export async function POST(request) {
     const employee = await Employee.findOne({ user: user._id }).populate({
       path: 'department',
       options: { strictPopulate: false }
-    })
+    }).populate({ path: 'company', options: { strictPopulate: false } })
     if (!employee) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
@@ -88,7 +73,16 @@ export async function POST(request) {
     }
 
     // Get company settings
-    const settings = await CompanySettings.findOne().lean()
+    const globalSettings = await CompanySettings.findOne().lean()
+    const settings = employee.company?.geofence
+      ? {
+          ...globalSettings,
+          geofence: employee.company.geofence,
+          breakTimings: employee.company.breakTimings || globalSettings?.breakTimings || [],
+          fullDayHours: employee.company.workingHours?.fullDayHours || globalSettings?.fullDayHours || 8,
+          halfDayHours: employee.company.workingHours?.halfDayHours || globalSettings?.halfDayHours || 4,
+        }
+      : globalSettings
 
     // Check if geofence is enabled
     if (!settings?.geofence?.enabled) {
@@ -100,50 +94,29 @@ export async function POST(request) {
       })
     }
 
-    // Get active geofence locations
-    const locations = await GeofenceLocation.find({ isActive: true })
-
-    if (locations.length === 0) {
+    const geofenceCheck = await evaluateEmployeeGeofence({
+      GeofenceLocation,
+      settings,
+      latitude: latNum,
+      longitude: lonNum,
+      accuracy,
+      locationSource,
+      employeeId: employee._id,
+      departmentId: employee.department?._id,
+      companyId: employee.company?._id,
+    })
+    if (!['WITHIN_GEOFENCE', 'OUTSIDE_GEOFENCE'].includes(geofenceCheck.code)) {
       return NextResponse.json({
         success: true,
-        message: 'No geofence locations configured',
-        withinGeofence: true,
-        isCheckedIn: true
+        message: geofenceCheck.message,
+        withinGeofence: null,
+        isCheckedIn: true,
+        geofenceEvaluated: false,
       })
     }
-
-    // Check if user is within any geofence
-    let isWithinGeofence = false
-    let closestLocation = null
-    let minDistance = Infinity
-
-    for (const location of locations) {
-      // Check if employee is allowed at this location
-      const isAllowed =
-        location.allowedDepartments.length === 0 ||
-        location.allowedDepartments.some(dept => dept.toString() === employee.department?._id?.toString()) ||
-        location.allowedEmployees.some(emp => emp.toString() === employee._id.toString())
-
-      if (!isAllowed) continue
-
-      const distance = calculateDistance(
-        latNum,
-        lonNum,
-        location.center.latitude,
-        location.center.longitude
-      )
-
-      if (distance <= location.radius) {
-        isWithinGeofence = true
-        closestLocation = location
-        break
-      }
-
-      if (distance < minDistance) {
-        minDistance = distance
-        closestLocation = location
-      }
-    }
+    const isWithinGeofence = geofenceCheck.withinGeofence
+    const closestLocation = geofenceCheck.closestLocation
+    const minDistance = geofenceCheck.closestDistance
 
     // If user is within geofence, they're still in office
     if (isWithinGeofence) {
@@ -171,7 +144,11 @@ export async function POST(request) {
       autoCheckout: true
     }
 
-    attendance.checkOutStatus = 'auto-geofence'
+    attendance.checkOutStatus = 'auto-checkout'
+    attendance.autoCheckedOut = true
+    attendance.autoCheckoutReason = 'geofence_exit'
+    attendance.autoCheckoutAt = checkOutTime
+    attendance.source = 'auto_checkout'
 
     // Calculate work hours using shrinkage method - ensure breakTimings is an array
     const breakTimings = Array.isArray(settings?.breakTimings) ? settings.breakTimings : []
@@ -241,7 +218,7 @@ export async function POST(request) {
       checkOutTime: checkOutTime.toISOString(),
       workHours: attendance.workHours,
       status: attendance.status,
-      distance: Math.round(minDistance),
+      distance: Number.isFinite(Number(minDistance)) ? Math.round(minDistance) : null,
       closestLocation: closestLocation?.name
     })
 

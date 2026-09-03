@@ -30,6 +30,16 @@ const GeofenceLocationSchema = new mongoose.Schema({
     default: 100,
     min: 10,
   },
+  scope: {
+    type: String,
+    enum: ['organisation', 'company'],
+    default: 'organisation',
+  },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    default: null,
+  },
   isActive: {
     type: Boolean,
     default: true,
@@ -107,6 +117,7 @@ const GeofenceLocationSchema = new mongoose.Schema({
 
 // Index for efficient queries
 GeofenceLocationSchema.index({ isActive: 1, isPrimary: 1 });
+GeofenceLocationSchema.index({ company: 1, isActive: 1 });
 GeofenceLocationSchema.index({ 'center.latitude': 1, 'center.longitude': 1 });
 
 // Ensure only one primary location

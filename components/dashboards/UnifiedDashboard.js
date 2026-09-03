@@ -11,6 +11,7 @@ import { CustomizableDashboard } from '@/components/dashboard'
 import CallAlertButton from '@/components/CallAlertButton'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import { getTodayDateString } from '@/lib/timezone'
+import useLocationCapture from '@/hooks/useLocationCapture'
 import {
     FaUsers, FaCalendarAlt, FaUserPlus,
     FaBriefcase, FaFileAlt, FaUserClock, FaUserTimes,
@@ -247,6 +248,14 @@ export default function UnifiedDashboard({ user: userProp }) {
     const [remainingTime, setRemainingTime] = useState(28800) // 8 hours in seconds
     const [isCountingDown, setIsCountingDown] = useState(false)
     const [companySettings, setCompanySettings] = useState(null)
+    const {
+        location: capturedLocation,
+        captureLocation,
+        loading: locationLoading,
+        error: locationError,
+        permissionStatus,
+        checkPermission,
+    } = useLocationCapture()
 
     // Dashboard data states
     const [dashboardStats, setDashboardStats] = useState(null)
@@ -563,6 +572,51 @@ export default function UnifiedDashboard({ user: userProp }) {
         return () => clearInterval(interval)
     }, [isCountingDown, remainingTime])
 
+    const getAttendanceLocation = useCallback(async (token) => {
+        const geofence = companySettings?.geofence
+        try {
+            const preciseLocation = await captureLocation({
+                maxAccuracyMeters: geofence?.maxAccuracyMeters || 150,
+                requireAccurate: geofence?.enabled === true && geofence?.strictMode === true,
+            })
+            return { ...preciseLocation, locationSource: 'gps' }
+        } catch (geoError) {
+            if (geofence?.enabled && geofence?.strictMode) throw geoError
+        }
+
+        try {
+            const ipRes = await fetch('/api/attendance/ip-location', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const ipData = await ipRes.json()
+            if (ipData.success && Number.isFinite(Number(ipData.latitude)) && Number.isFinite(Number(ipData.longitude))) {
+                toast.info('Using approximate location. Enable precise location for reliable attendance verification.')
+                return {
+                    latitude: Number(ipData.latitude),
+                    longitude: Number(ipData.longitude),
+                    accuracy: null,
+                    locationSource: 'ip',
+                }
+            }
+        } catch (ipError) {
+            console.warn('IP location fallback failed:', ipError)
+        }
+
+        return { latitude: null, longitude: null, accuracy: null, locationSource: null }
+    }, [captureLocation, companySettings?.geofence])
+
+    const refreshAttendanceLocation = useCallback(async () => {
+        try {
+            await checkPermission()
+            await captureLocation({
+                maxAccuracyMeters: companySettings?.geofence?.maxAccuracyMeters || 150,
+                requireAccurate: companySettings?.geofence?.strictMode === true,
+            })
+        } catch (error) {
+            toast.error(error.message)
+        }
+    }, [captureLocation, checkPermission, companySettings?.geofence])
+
     // Handle check-in
     const handleCheckIn = useCallback(async () => {
         if (attendanceLoading) return // Prevent double submission
@@ -581,52 +635,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         try {
             const token = localStorage.getItem('token')
 
-            // Get user's location
-            let latitude = null
-            let longitude = null
-            let accuracy = null
-            let locationSource = 'gps'
-
-            if (navigator.geolocation) {
-                try {
-                    const position = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, {
-                            enableHighAccuracy: true,
-                            timeout: 10000,
-                            maximumAge: 0
-                        })
-                    })
-
-                    latitude = position.coords.latitude
-                    longitude = position.coords.longitude
-                    accuracy = position.coords.accuracy
-
-                    console.log(`📍 Location captured: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`)
-                } catch (geoError) {
-                    console.warn('Geolocation error:', geoError)
-                }
-            }
-
-            // IP-based location fallback if GPS failed
-            if (latitude === null || longitude === null) {
-                try {
-                    console.log('📍 GPS unavailable, attempting IP-based location fallback...')
-                    const ipRes = await fetch('/api/attendance/ip-location', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
-                    const ipData = await ipRes.json()
-                    if (ipData.success && ipData.latitude && ipData.longitude) {
-                        latitude = ipData.latitude
-                        longitude = ipData.longitude
-                        accuracy = null // IP location has no meaningful accuracy in meters
-                        locationSource = 'ip'
-                        console.log(`📍 IP-based location captured: ${latitude}, ${longitude} (${ipData.city}, ${ipData.region})`)
-                        toast.info('Using approximate location (IP-based). Enable GPS for precise location.')
-                    }
-                } catch (ipError) {
-                    console.warn('IP location fallback failed:', ipError)
-                }
-            }
+            const { latitude, longitude, accuracy, locationSource } = await getAttendanceLocation(token)
 
             // Send coordinates to backend - it will handle geocoding with Google Maps
             const response = await fetch('/api/attendance', {
@@ -665,11 +674,11 @@ export default function UnifiedDashboard({ user: userProp }) {
             // Rollback optimistic update
             attendanceVersionRef.current++
             setTodayAttendance(previousAttendance)
-            toast.error('Failed to check in')
+            toast.error(error.name === 'LocationError' ? error.message : 'Failed to check in')
         } finally {
             setAttendanceLoading(false)
         }
-    }, [employeeIdStr, attendanceLoading, todayAttendance])
+    }, [employeeIdStr, attendanceLoading, todayAttendance, getAttendanceLocation])
 
     // Handle check-out
     const handleCheckOut = useCallback(async () => {
@@ -693,52 +702,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         try {
             const token = localStorage.getItem('token')
 
-            // Get user's location
-            let latitude = null
-            let longitude = null
-            let accuracy = null
-            let locationSource = 'gps'
-
-            if (navigator.geolocation) {
-                try {
-                    const position = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, {
-                            enableHighAccuracy: true,
-                            timeout: 10000,
-                            maximumAge: 0
-                        })
-                    })
-
-                    latitude = position.coords.latitude
-                    longitude = position.coords.longitude
-                    accuracy = position.coords.accuracy
-
-                    console.log(`📍 Location captured: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`)
-                } catch (geoError) {
-                    console.warn('Geolocation error:', geoError)
-                }
-            }
-
-            // IP-based location fallback if GPS failed
-            if (latitude === null || longitude === null) {
-                try {
-                    console.log('📍 GPS unavailable, attempting IP-based location fallback...')
-                    const ipRes = await fetch('/api/attendance/ip-location', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
-                    const ipData = await ipRes.json()
-                    if (ipData.success && ipData.latitude && ipData.longitude) {
-                        latitude = ipData.latitude
-                        longitude = ipData.longitude
-                        accuracy = null
-                        locationSource = 'ip'
-                        console.log(`📍 IP-based location captured: ${latitude}, ${longitude} (${ipData.city}, ${ipData.region})`)
-                        toast.info('Using approximate location (IP-based). Enable GPS for precise location.')
-                    }
-                } catch (ipError) {
-                    console.warn('IP location fallback failed:', ipError)
-                }
-            }
+            const { latitude, longitude, accuracy, locationSource } = await getAttendanceLocation(token)
 
             // Send coordinates to backend - it will handle geocoding with Google Maps
             const response = await fetch('/api/attendance', {
@@ -777,11 +741,11 @@ export default function UnifiedDashboard({ user: userProp }) {
             // Rollback optimistic update
             attendanceVersionRef.current++
             setTodayAttendance(previousAttendance)
-            toast.error('Failed to check out')
+            toast.error(error.name === 'LocationError' ? error.message : 'Failed to check out')
         } finally {
             setAttendanceLoading(false)
         }
-    }, [employeeIdStr, attendanceLoading, todayAttendance])
+    }, [employeeIdStr, attendanceLoading, todayAttendance, getAttendanceLocation])
 
     // Build widget components object based on role permissions
     // CustomizableDashboard expects an object mapping widget IDs to rendered components
@@ -800,6 +764,12 @@ export default function UnifiedDashboard({ user: userProp }) {
                     attendanceLoading={attendanceLoading}
                     onClockIn={handleCheckIn}
                     onClockOut={handleCheckOut}
+                    geofence={companySettings?.geofence}
+                    permissionStatus={permissionStatus}
+                    capturedLocation={capturedLocation}
+                    locationError={locationError}
+                    locationLoading={locationLoading}
+                    onRetryLocation={refreshAttendanceLocation}
                 />
             )
         }
@@ -1082,6 +1052,11 @@ export default function UnifiedDashboard({ user: userProp }) {
         router,
         handleCheckIn,
         handleCheckOut,
+        capturedLocation,
+        permissionStatus,
+        locationError,
+        locationLoading,
+        refreshAttendanceLocation,
         formatCountdown,
         unifiedWidgetData,
         isFeatureEnabled

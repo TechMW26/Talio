@@ -10,6 +10,7 @@ import { Card, CardBody, CardHeader, CardFooter, Button, Chip, Skeleton, Modal, 
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
+import LocationAccessStatus from '@/components/attendance/LocationAccessStatus'
 
 export default function AttendancePage() {
   const [mounted, setMounted] = useState(false)
@@ -21,7 +22,7 @@ export default function AttendancePage() {
   const { socket, isConnected } = useSocket()
 
   // Location capture hook
-  const { captureLocation, loading: locationLoading, error: locationError, permissionStatus, checkPermission } = useLocationCapture()
+  const { location, captureLocation, loading: locationLoading, error: locationError, permissionStatus, checkPermission } = useLocationCapture()
 
   // Overtime check hook
   const { hasPendingRequest, pendingRequest, refresh: refreshOvertime } = useOvertimeCheck()
@@ -106,6 +107,19 @@ export default function AttendancePage() {
   // Company settings (independent)
   const { data: companySettingsRes } = useAuthedSWR('/api/company/settings')
   const workingDays = companySettingsRes?.data?.workingHours?.workingDays || [1, 2, 3, 4, 5]
+  const geofenceSettings = companySettingsRes?.data?.geofence || null
+
+  const refreshLocation = useCallback(async () => {
+    try {
+      await checkPermission()
+      await captureLocation({
+        maxAccuracyMeters: geofenceSettings?.maxAccuracyMeters || 150,
+        requireAccurate: geofenceSettings?.strictMode === true,
+      })
+    } catch (captureError) {
+      toast.error(captureError.message)
+    }
+  }, [captureLocation, checkPermission, geofenceSettings])
 
   // Employee details (depends on user)
   const { data: employeeDetailsRes } = useAuthedSWR(employeeId ? `/api/employees/${employeeId}` : null)
@@ -595,11 +609,18 @@ export default function AttendancePage() {
       let locationData = null
 
       try {
-        locationData = await captureLocation()
-      } catch (locationError) {
-        console.warn('Location capture failed:', locationError.message)
-        // Show warning but continue with check-in
-        toast.warning('Location could not be captured. Check-in will proceed without location.')
+        locationData = await captureLocation({
+          maxAccuracyMeters: geofenceSettings?.maxAccuracyMeters || 150,
+          requireAccurate: geofenceSettings?.strictMode === true,
+        })
+      } catch (captureError) {
+        console.warn('Location capture failed:', captureError.message)
+        if (geofenceSettings?.enabled && geofenceSettings?.strictMode) {
+          mutateTodayAttendance(previousData, false)
+          toast.error(captureError.message)
+          return
+        }
+        toast.warning('Location could not be captured. Attendance will include a location warning.')
       }
 
       const token = localStorage.getItem('token')
@@ -615,6 +636,7 @@ export default function AttendancePage() {
           latitude: locationData?.latitude || null,
           longitude: locationData?.longitude || null,
           accuracy: locationData?.accuracy || null,
+          locationSource: locationData ? 'gps' : null,
           // Address will be resolved server-side for accuracy
         }),
       })
@@ -631,7 +653,7 @@ export default function AttendancePage() {
         // Rollback optimistic update
         mutateTodayAttendance(previousData, false)
         if (data.requiresLocation) {
-          toast.error('Location is required for attendance. Please enable location services.')
+          toast.error(data.message || 'Precise location is required for attendance.')
         } else {
           toast.error(data.message || 'Failed to clock in')
         }
@@ -671,11 +693,18 @@ export default function AttendancePage() {
       let locationData = null
 
       try {
-        locationData = await captureLocation()
-      } catch (locationError) {
-        console.warn('Location capture failed:', locationError.message)
-        // Show warning but continue with check-out
-        toast.warning('Location could not be captured. Check-out will proceed without location.')
+        locationData = await captureLocation({
+          maxAccuracyMeters: geofenceSettings?.maxAccuracyMeters || 150,
+          requireAccurate: geofenceSettings?.strictMode === true,
+        })
+      } catch (captureError) {
+        console.warn('Location capture failed:', captureError.message)
+        if (geofenceSettings?.enabled && geofenceSettings?.strictMode) {
+          mutateTodayAttendance(previousData, false)
+          toast.error(captureError.message)
+          return
+        }
+        toast.warning('Location could not be captured. Attendance will include a location warning.')
       }
 
       const token = localStorage.getItem('token')
@@ -691,6 +720,7 @@ export default function AttendancePage() {
           latitude: locationData?.latitude || null,
           longitude: locationData?.longitude || null,
           accuracy: locationData?.accuracy || null,
+          locationSource: locationData ? 'gps' : null,
           // Address will be resolved server-side for accuracy
         }),
       })
@@ -707,7 +737,7 @@ export default function AttendancePage() {
         // Rollback optimistic update
         mutateTodayAttendance(previousData, false)
         if (data.requiresLocation) {
-          toast.error('Location is required for attendance. Please enable location services.')
+          toast.error(data.message || 'Precise location is required for attendance.')
         } else {
           toast.error(data.message || 'Failed to clock out')
         }
@@ -950,6 +980,16 @@ export default function AttendancePage() {
       {/* Clock In/Out Card */}
       <Card className="mb-4 sm:mb-6 shadow-md">
         <CardBody>
+          <div className="mb-4">
+            <LocationAccessStatus
+              geofence={geofenceSettings}
+              permissionStatus={permissionStatus}
+              location={location}
+              error={locationError}
+              loading={locationLoading}
+              onRetry={refreshLocation}
+            />
+          </div>
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div className="w-full lg:w-auto">
               <h2 className="text-lg sm:text-xl font-semibold text-default-800 mb-3">Today&apos;s Attendance</h2>
@@ -1793,4 +1833,3 @@ export default function AttendancePage() {
     </div>
   )
 }
-

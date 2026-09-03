@@ -3,6 +3,7 @@
 import { FaUser, FaSignInAlt, FaSignOutAlt, FaCheckCircle, FaTimesCircle, FaEnvelope, FaPhone, FaCalendarAlt, FaBriefcase, FaUserTie } from 'react-icons/fa'
 import { Card, CardBody, Button, Avatar, Chip } from '@heroui/react'
 import { formatDesignation } from '@/lib/formatters'
+import LocationAccessStatus from '@/components/attendance/LocationAccessStatus'
 
 export default function CheckInOutWidget({
   user,
@@ -11,6 +12,12 @@ export default function CheckInOutWidget({
   attendanceLoading,
   onClockIn,
   onClockOut,
+  geofence,
+  permissionStatus,
+  capturedLocation,
+  locationError,
+  locationLoading,
+  onRetryLocation,
 }) {
 
   const getStatus = () => {
@@ -184,15 +191,27 @@ export default function CheckInOutWidget({
           )}
         </div>
 
+        <div className="mt-4">
+          <LocationAccessStatus
+            compact
+            geofence={geofence}
+            permissionStatus={permissionStatus}
+            location={capturedLocation}
+            error={locationError}
+            loading={locationLoading}
+            onRetry={onRetryLocation}
+          />
+        </div>
+
         {/* Action Buttons */}
         <div className="flex gap-3 mt-5">
           <Button
             onPress={() => onClockIn()}
-            isDisabled={attendanceLoading || (todayAttendance && todayAttendance.checkIn)}
-            isLoading={attendanceLoading}
+            isDisabled={attendanceLoading || locationLoading || (todayAttendance && todayAttendance.checkIn)}
+            isLoading={attendanceLoading || locationLoading}
             size="lg"
             radius="full"
-            startContent={!attendanceLoading && <FaSignInAlt className="w-4 h-4" />}
+            startContent={!attendanceLoading && !locationLoading && <FaSignInAlt className="w-4 h-4" />}
             className={`flex-1 font-bold backdrop-blur-sm transition-all shadow-lg border-2 ${
               attendanceLoading || (todayAttendance && todayAttendance.checkIn)
                 ? 'bg-gray-400/30 text-white/50 border-white/20 cursor-not-allowed'
@@ -204,11 +223,11 @@ export default function CheckInOutWidget({
           </Button>
           <Button
             onPress={() => onClockOut()}
-            isDisabled={attendanceLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
-            isLoading={attendanceLoading}
+            isDisabled={attendanceLoading || locationLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
+            isLoading={attendanceLoading || locationLoading}
             size="lg"
             radius="full"
-            startContent={!attendanceLoading && <FaSignOutAlt className="w-4 h-4" />}
+            startContent={!attendanceLoading && !locationLoading && <FaSignOutAlt className="w-4 h-4" />}
             className={`flex-1 font-bold transition-all shadow-lg ${
               attendanceLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut
                 ? 'bg-gray-300 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'

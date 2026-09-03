@@ -92,6 +92,12 @@ const CompanySettingsSchema = new mongoose.Schema({
       type: Boolean,
       default: true, // Always use GeofenceLocation collection for multiple locations
     },
+    maxAccuracyMeters: {
+      type: Number,
+      default: 150,
+      min: 10,
+      max: 5000,
+    },
   },
 
   // Break Timings (when geofencing is paused)

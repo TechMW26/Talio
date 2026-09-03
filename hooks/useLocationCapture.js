@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
 /**
  * Custom hook for capturing high-accuracy GPS location
@@ -18,6 +18,8 @@ export default function useLocationCapture() {
     const [error, setError] = useState(null)
     const [permissionStatus, setPermissionStatus] = useState(null)
     const watchIdRef = useRef(null)
+    const permissionRef = useRef(null)
+    const permissionListenerRef = useRef(null)
 
     /**
      * Check if geolocation is supported
@@ -39,10 +41,15 @@ export default function useLocationCapture() {
                 const result = await navigator.permissions.query({ name: 'geolocation' })
                 setPermissionStatus(result.state)
 
-                // Listen for permission changes
-                result.addEventListener('change', () => {
-                    setPermissionStatus(result.state)
-                })
+                if (permissionRef.current !== result) {
+                    if (permissionRef.current && permissionListenerRef.current) {
+                        permissionRef.current.removeEventListener?.('change', permissionListenerRef.current)
+                    }
+                    const listener = () => setPermissionStatus(result.state)
+                    result.addEventListener('change', listener)
+                    permissionRef.current = result
+                    permissionListenerRef.current = listener
+                }
 
                 return result.state
             }
@@ -61,11 +68,13 @@ export default function useLocationCapture() {
      * Capture current location with high accuracy
      * Returns location data or throws error
      */
-    const captureLocation = useCallback(async () => {
+    const captureLocation = useCallback(async ({ maxAccuracyMeters = null, requireAccurate = false } = {}) => {
         if (!isSupported) {
             const errorMsg = 'Geolocation is not supported by this browser/device'
             setError(errorMsg)
-            throw new Error(errorMsg)
+            const unsupportedError = new Error(errorMsg)
+            unsupportedError.name = 'LocationError'
+            throw unsupportedError
         }
 
         setLoading(true)
@@ -90,6 +99,18 @@ export default function useLocationCapture() {
                         speed: position.coords.speed,
                         timestamp: position.timestamp,
                         capturedAt: new Date().toISOString()
+                    }
+
+                    if (requireAccurate && Number.isFinite(Number(maxAccuracyMeters)) &&
+                        Number.isFinite(Number(locationData.accuracy)) &&
+                        Number(locationData.accuracy) > Number(maxAccuracyMeters)) {
+                        const errorMessage = `Location accuracy is ${Math.round(locationData.accuracy)}m. Required accuracy is ${maxAccuracyMeters}m or better.`
+                        setLoading(false)
+                        setError(errorMessage)
+                        const accuracyError = new Error(errorMessage)
+                        accuracyError.name = 'LocationError'
+                        reject(accuracyError)
+                        return
                     }
 
                     setLocation(locationData)
@@ -125,7 +146,9 @@ export default function useLocationCapture() {
                     setError(errorMessage)
                     console.error(`❌ Location capture failed: ${errorMessage}`)
 
-                    reject(new Error(errorMessage))
+                    const captureError = new Error(errorMessage)
+                    captureError.name = 'LocationError'
+                    reject(captureError)
                 },
                 options
             )
@@ -141,7 +164,7 @@ export default function useLocationCapture() {
             return
         }
 
-        if (watchIdRef.current) {
+        if (watchIdRef.current !== null) {
             navigator.geolocation.clearWatch(watchIdRef.current)
         }
 
@@ -177,7 +200,7 @@ export default function useLocationCapture() {
      * Stop watching location
      */
     const stopWatching = useCallback(() => {
-        if (watchIdRef.current) {
+        if (watchIdRef.current !== null) {
             navigator.geolocation.clearWatch(watchIdRef.current)
             watchIdRef.current = null
         }
@@ -206,6 +229,18 @@ export default function useLocationCapture() {
         // On web, just log guidance
         console.log('Please enable location in your browser settings')
     }, [])
+
+    useEffect(() => {
+        checkPermission()
+        return () => {
+            if (watchIdRef.current !== null && isSupported) {
+                navigator.geolocation.clearWatch(watchIdRef.current)
+            }
+            if (permissionRef.current && permissionListenerRef.current) {
+                permissionRef.current.removeEventListener?.('change', permissionListenerRef.current)
+            }
+        }
+    }, [checkPermission, isSupported])
 
     return {
         // State

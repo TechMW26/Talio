@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { uploadImage, deleteImage } from '@/lib/gridfs'
+import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 
 // GET - Get single company
 export async function GET(request, { params }) {
@@ -11,7 +12,7 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { Company } = models
 
     const company = await Company.findById(id)
@@ -51,7 +52,7 @@ export async function PUT(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Company } = models
 
     // Check role - only admin or hr can update companies
@@ -149,6 +150,12 @@ export async function PUT(request, { params }) {
       updateData,
       { new: true }
     )
+
+    const tenantId = tenant?.databaseName
+    await Promise.all([
+      clearCachePattern(buildCachePattern({ tenantId, namespace: 'company-settings', userId: '*' })),
+      clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:unified', userId: '*' })),
+    ])
 
     return NextResponse.json({
       success: true,

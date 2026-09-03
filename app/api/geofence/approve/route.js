@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { getIO } from '@/lib/socket'
+import mongoose from 'mongoose'
 
 // POST - Approve or reject out-of-premises request
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User']);
+    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User', 'Notification']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
@@ -16,7 +17,7 @@ export async function POST(request) {
 
     const { logId, action, comments } = await request.json();
 
-    if (!logId || !action) {
+    if (!logId || !mongoose.Types.ObjectId.isValid(logId) || !action) {
       return NextResponse.json(
         { success: false, message: 'Log ID and action are required' },
         { status: 400 }
@@ -39,7 +40,7 @@ export async function POST(request) {
       );
     }
 
-    const reviewer = await Employee.findById(userRecord.employeeId);
+    const reviewer = await Employee.findById(userRecord.employeeId).select('firstName lastName department');
 
     // Get the geofence log
     const log = await GeofenceLog.findById(logId)
@@ -53,11 +54,19 @@ export async function POST(request) {
       )
     }
 
+    if (log.outOfPremisesRequest?.status !== 'pending') {
+      return NextResponse.json(
+        { success: false, message: 'This request has already been reviewed' },
+        { status: 409 }
+      )
+    }
+
     // Check if user has permission to approve/reject
     // Only managers, department heads, admin, and HR can approve
     const canApprove = 
       user.role === 'admin' ||
       user.role === 'hr' ||
+      (user.role === 'department_head' && reviewer.department?.toString() === log.department?.toString()) ||
       (user.role === 'manager' && log.reportingManager?.toString() === reviewer._id.toString())
 
     if (!canApprove) {
@@ -88,13 +97,14 @@ export async function POST(request) {
           },
           {
             eventType: 'geofenceApproval',
-            clickAction: '/dashboard/geofence',
+            clickAction: '/dashboard/team/geofencing',
             icon: '/icon-192x192.png',
             data: {
               type: 'geofence_approval',
               logId: log._id.toString(),
               action,
             },
+            models: { User: models.User, Notification: models.Notification }
           }
         )
 
@@ -114,8 +124,7 @@ export async function POST(request) {
                 },
                 reviewedAt: log.outOfPremisesRequest.reviewedAt,
                 reviewerComments: log.outOfPremisesRequest.reviewerComments
-              },
-              notification: notificationData
+              }
             })
             console.log(`[Socket.IO] Sent geofence-approval event to user:${employeeUser._id}`)
           }
