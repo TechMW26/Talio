@@ -553,6 +553,9 @@ export async function PATCH(request) {
         console.log(`   Calculated Status: ${calculatedStatus}`)
         console.log(`   Reason: ${statusReason}\n`)
 
+      } else if (attendance.checkIn && !attendance.checkOut) {
+        calculatedStatus = correction.requestedStatus || 'in-progress'
+        statusReason = 'Check-in recorded; checkout is still pending'
       } else if (correction.requestedStatus && !attendance.checkIn && !attendance.checkOut) {
         // Only use requestedStatus when there's NO check-in/check-out at all
         calculatedStatus = correction.requestedStatus
@@ -564,29 +567,41 @@ export async function PATCH(request) {
       // This is the CRITICAL update - all fields must be set here
       // =====================================================
 
-      // Core status fields
-      attendance.status = calculatedStatus
-      attendance.statusReason = `Corrected: ${statusReason}`
+      // Update only the fields owned by regularisation. A full document save
+      // also validates unrelated historical fields and used to fail for legacy
+      // autoCheckoutReason descriptions written before enum codes were adopted.
+      const attendanceUpdate = {
+        checkIn: attendance.checkIn,
+        checkOut: attendance.checkOut,
+        status: calculatedStatus,
+        statusReason: `Corrected: ${statusReason}`,
+        workHours: calculatedWorkHours,
+        totalLoggedHours: attendance.totalLoggedHours || 0,
+        breakMinutes: attendance.breakMinutes || 0,
+        shrinkagePercentage: attendance.shrinkagePercentage || 0,
+        isManualEntry: true,
+        source: 'correction',
+        remarks: `Corrected on ${new Date().toLocaleDateString('en-IN')} - ${correction.reason}`,
+        createdBySystem: false,
+        lastModifiedBy: user._id,
+        approvedBy: reviewerEmployeeId || null,
+        checkOutStatus: 'on-time',
+        // Once a human approves the corrected record it is no longer an
+        // auto-checkout result. Clearing these values also repairs legacy rows.
+        autoCheckedOut: false,
+        autoCheckoutReason: null,
+        autoCheckoutAt: null,
+      }
 
-      // Audit/tracking fields
-      attendance.isManualEntry = true
-      attendance.source = 'correction'
-      attendance.remarks = `Corrected on ${new Date().toLocaleDateString('en-IN')} - ${correction.reason}`
+      const savedAttendance = await Attendance.findByIdAndUpdate(
+        attendance._id,
+        { $set: attendanceUpdate },
+        { new: true, runValidators: true }
+      ).lean()
 
-      // Clear system-generated flags (important for auto-absent records)
-      attendance.createdBySystem = false
-
-      // Set correction audit fields
-      attendance.lastModifiedBy = user._id
-      attendance.approvedBy = reviewerEmployeeId
-
-      // Save the attendance record
-      await attendance.save()
-
-      // =====================================================
-      // STEP 7: Reload to confirm saved values
-      // =====================================================
-      const savedAttendance = await Attendance.findById(attendance._id).lean()
+      if (!savedAttendance) {
+        return NextResponse.json({ success: false, message: 'Attendance record not found' }, { status: 404 })
+      }
 
       // =====================================================
       // STEP 8: Update correction record with ACTUAL saved values

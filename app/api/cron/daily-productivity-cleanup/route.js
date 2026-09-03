@@ -71,7 +71,8 @@ async function autoCheckoutOpenAttendance({ models, dateString, timezone, now })
       $set: {
         checkOut: now,
         checkOutStatus: 'auto-checkout',
-        autoCheckoutReason: `Midnight auto-checkout (${timezone})`,
+        autoCheckedOut: true,
+        autoCheckoutReason: 'midnight_cutoff',
         autoCheckoutAt: now,
       },
     },
