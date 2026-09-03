@@ -104,15 +104,19 @@ export function PageTransitionProvider({ children }) {
         const path = parsed.pathname
         if (path === pathnameRef.current) return
         if (!path.startsWith('/dashboard')) return
-        setTargetPath(path)
-        setIsNavigating(true)
+        queueMicrotask(() => {
+          setTargetPath(path)
+          setIsNavigating(true)
+        })
       } catch {
         // Fallback for simple path strings
         const path = urlStr.split('?')[0].split('#')[0]
         if (path === pathnameRef.current) return
         if (!path.startsWith('/dashboard')) return
-        setTargetPath(path)
-        setIsNavigating(true)
+        queueMicrotask(() => {
+          setTargetPath(path)
+          setIsNavigating(true)
+        })
       }
     }
 
@@ -130,8 +134,10 @@ export function PageTransitionProvider({ children }) {
     const handlePopState = () => {
       const path = window.location.pathname
       if (path !== pathnameRef.current && path.startsWith('/dashboard')) {
-        setTargetPath(path)
-        setIsNavigating(true)
+        queueMicrotask(() => {
+          setTargetPath(path)
+          setIsNavigating(true)
+        })
       }
     }
 
