@@ -27,6 +27,16 @@ describe('managed meeting implementation', () => {
     expect(source).toContain('reliable: true')
   })
 
+  test('alerts users to deduplicated unread in-meeting messages', () => {
+    expect(source).toContain('seenChatMessageIdsRef.current.has(messageId)')
+    expect(source).toContain('showChatRef.current')
+    expect(source).toContain("showChat && displayMode === 'full'")
+    expect(source).toContain('setUnreadChatCount((current) => current + 1)')
+    expect(source).toContain('data-meeting-chat-notification')
+    expect(source).toContain('onClick={openChatPanel}')
+    expect(source).toContain("unreadChatCount > 99 ? '99+' : unreadChatCount")
+  })
+
   test('shares hand state and never uploads transcription while muted', () => {
     expect(source).toContain("publishData('talio-hand'")
     expect(source).toContain("topic === 'talio-hand'")

@@ -6,6 +6,7 @@ import queryCache from '@/lib/queryCache'
 import { isFeatureEnabled } from '@/lib/planFeatures'
 import { applyLifecycleAction, getLifecycleProgress, hydrateEmployeeLifecycle, reconcileOnboardingChecklist } from '@/lib/hrms/employeeLifecycle.server'
 import { getOnboardingCompletionSignals } from '@/lib/hrms/onboardingProgress.server'
+import { loadOffboardingAssetClearance } from '@/lib/hrms/offboardingAssets.server'
 import { createWorkflow } from '@/lib/hrms/workflowService.server'
 
 export const dynamic = 'force-dynamic'
@@ -50,8 +51,18 @@ async function getLifecycle(request, { params }) {
     ? await getOnboardingCompletionSignals({ models: auth.models, employee })
     : {}
   const reconciliation = reconcileOnboardingChecklist(hydratedLifecycle, signals)
-  const lifecycle = reconciliation.lifecycle
-  if (reconciliation.changed) {
+  let lifecycle = reconciliation.lifecycle
+  let lifecycleChanged = reconciliation.changed
+  if (lifecycle.offboarding?.status && lifecycle.offboarding.status !== 'not_started') {
+    const clearance = await loadOffboardingAssetClearance({
+      Asset: auth.models.Asset,
+      employeeId: employee._id,
+      offboarding: lifecycle.offboarding,
+    })
+    lifecycle = { ...lifecycle, offboarding: clearance.offboarding }
+    lifecycleChanged ||= clearance.changed
+  }
+  if (lifecycleChanged) {
     await auth.models.Employee.updateOne({ _id: employee._id }, { $set: { lifecycle } })
   }
   const workflows = await auth.models.HrmsWorkflow.find({ subjectEmployee: employee._id })
@@ -116,10 +127,26 @@ async function patchLifecycle(request, { params }) {
   const signals = onboardingEnabled
     ? await getOnboardingCompletionSignals({ models: auth.models, employee })
     : {}
-  const reconciledLifecycle = reconcileOnboardingChecklist(currentLifecycle, signals).lifecycle
+  let reconciledLifecycle = reconcileOnboardingChecklist(currentLifecycle, signals).lifecycle
+  if (reconciledLifecycle.offboarding?.status && reconciledLifecycle.offboarding.status !== 'not_started') {
+    const clearance = await loadOffboardingAssetClearance({
+      Asset: auth.models.Asset,
+      employeeId: employee._id,
+      offboarding: reconciledLifecycle.offboarding,
+    })
+    reconciledLifecycle = { ...reconciledLifecycle, offboarding: clearance.offboarding }
+  }
   let result
   try {
     result = applyLifecycleAction(reconciledLifecycle, action, body, { actorId: actorId(auth.user) })
+    if (action === 'start_offboarding') {
+      const clearance = await loadOffboardingAssetClearance({
+        Asset: auth.models.Asset,
+        employeeId: employee._id,
+        offboarding: result.lifecycle.offboarding,
+      })
+      result.lifecycle.offboarding = clearance.offboarding
+    }
   } catch (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 400 })
   }

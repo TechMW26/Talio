@@ -140,6 +140,9 @@ export default function ManagedMeetingRoomSession({
   const recorderStopPromiseRef = useRef(Promise.resolve())
   const lastTranscriptUploadRef = useRef(Promise.resolve())
   const reactionTimers = useRef(new Map())
+  const chatNotificationTimerRef = useRef(null)
+  const seenChatMessageIdsRef = useRef(new Set())
+  const showChatRef = useRef(false)
   const [meeting, setMeeting] = useState(meetingData)
   const [room, setRoom] = useState(null)
   const [participants, setParticipants] = useState([])
@@ -156,6 +159,8 @@ export default function ManagedMeetingRoomSession({
   const [showAddParticipants, setShowAddParticipants] = useState(false)
   const [messages, setMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
+  const [unreadChatCount, setUnreadChatCount] = useState(0)
+  const [chatNotification, setChatNotification] = useState(null)
   const [reactions, setReactions] = useState({})
   const [raisedHands, setRaisedHands] = useState({})
   const [handRaised, setHandRaised] = useState(false)
@@ -195,6 +200,15 @@ export default function ManagedMeetingRoomSession({
     ))
   }, [transcriptResponse])
 
+  useEffect(() => {
+    const chatPanelIsVisible = showChat && displayMode === 'full'
+    showChatRef.current = chatPanelIsVisible
+    if (!chatPanelIsVisible) return
+    clearTimeout(chatNotificationTimerRef.current)
+    setChatNotification(null)
+    setUnreadChatCount(0)
+  }, [displayMode, showChat])
+
   const refreshParticipants = useCallback((activeRoom = roomRef.current) => {
     if (!activeRoom) return
     const remote = [...activeRoom.remoteParticipants.values()].map(participantSnapshot)
@@ -221,7 +235,31 @@ export default function ManagedMeetingRoomSession({
       const data = JSON.parse(decoder.decode(payload))
       const sender = participant?.identity || data.senderId
       if (topic === 'talio-chat' && data.message) {
-        setMessages((current) => current.some((item) => item.id === data.id) ? current : [...current, { ...data, senderId: sender }])
+        const messageId = data.id || `${sender || 'participant'}:${data.createdAt || Date.now()}:${data.message}`
+        if (seenChatMessageIdsRef.current.has(messageId)) return
+        seenChatMessageIdsRef.current.add(messageId)
+        if (seenChatMessageIdsRef.current.size > 1000) {
+          const oldestMessageId = seenChatMessageIdsRef.current.values().next().value
+          seenChatMessageIdsRef.current.delete(oldestMessageId)
+        }
+
+        const incomingMessage = {
+          ...data,
+          id: messageId,
+          senderId: sender,
+          senderName: data.senderName || participant?.name || 'Participant',
+        }
+        setMessages((current) => [...current, incomingMessage])
+
+        const isRemoteMessage = sender !== roomRef.current?.localParticipant.identity
+        if (isRemoteMessage && !showChatRef.current) {
+          setUnreadChatCount((current) => current + 1)
+          setChatNotification(incomingMessage)
+          clearTimeout(chatNotificationTimerRef.current)
+          chatNotificationTimerRef.current = setTimeout(() => {
+            setChatNotification((current) => current?.id === messageId ? null : current)
+          }, 5000)
+        }
       }
       if (topic === 'talio-reaction' && data.reaction) showReaction(sender, data.reaction)
       if (topic === 'talio-hand') {
@@ -305,6 +343,7 @@ export default function ManagedMeetingRoomSession({
 
   useEffect(() => () => {
     for (const timer of reactionTimers.current.values()) clearTimeout(timer)
+    clearTimeout(chatNotificationTimerRef.current)
     roomRef.current?.disconnect()
   }, [])
 
@@ -441,6 +480,7 @@ export default function ManagedMeetingRoomSession({
     const message = chatInput.trim()
     if (!message || !room) return
     const data = { id: crypto.randomUUID(), message, senderName: room.localParticipant.name || guestName || 'You', createdAt: new Date().toISOString(), senderId: room.localParticipant.identity }
+    seenChatMessageIdsRef.current.add(data.id)
     setMessages((current) => [...current, data])
     setChatInput('')
     await publishData('talio-chat', data)
@@ -557,6 +597,28 @@ export default function ManagedMeetingRoomSession({
   const isCompact = displayMode === 'compact'
   const isBubble = displayMode === 'bubble'
   const isPip = displayMode !== 'full'
+  const clearChatAlerts = () => {
+    clearTimeout(chatNotificationTimerRef.current)
+    setChatNotification(null)
+    setUnreadChatCount(0)
+  }
+  const openChatPanel = () => {
+    clearChatAlerts()
+    showChatRef.current = !isPip
+    setShowChat(true)
+    setShowParticipants(false)
+    setShowNotetaker(false)
+    setShowReactions(false)
+    if (isPip) onRestoreMeeting?.()
+  }
+  const toggleChatPanel = () => {
+    if (showChat) {
+      showChatRef.current = false
+      setShowChat(false)
+      return
+    }
+    openChatPanel()
+  }
   const participantLabel = `${participants.length} participant${participants.length === 1 ? '' : 's'}`
   const transcriptLabel = !guestToken && transcriptStatus !== 'off'
     ? (transcriptStatus === 'listening' ? 'Mira listening' : transcriptStatus)
@@ -568,6 +630,34 @@ export default function ManagedMeetingRoomSession({
         <h2 className="mt-4 text-lg font-semibold">Ending meeting...</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{endingMeetingStatus}</p>
       </div>
+    </div>
+  ) : null
+  const chatNotificationBanner = chatNotification && !(showChat && !isPip) ? (
+    <div
+      className="fixed right-3 top-[calc(4rem+env(safe-area-inset-top))] z-[150] w-[min(22rem,calc(100vw-1.5rem))]"
+      role="status"
+      aria-live="polite"
+      data-meeting-chat-notification
+    >
+      <button
+        type="button"
+        onClick={openChatPanel}
+        className="flex w-full items-start gap-3 rounded-2xl border border-slate-200/90 bg-white/95 p-3 text-left text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-white/15 dark:bg-slate-900/95 dark:text-white dark:ring-white/10 dark:hover:border-indigo-400/60"
+        aria-label={`Open message from ${chatNotification.senderName || 'participant'}`}
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">
+          <HiOutlineChatBubbleLeftRight className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{chatNotification.senderName || 'Participant'}</span>
+          <span className="mt-0.5 block truncate text-sm text-slate-600 dark:text-slate-300">{chatNotification.message}</span>
+        </span>
+        {unreadChatCount > 0 && (
+          <span className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold text-white" aria-label={`${unreadChatCount} unread message${unreadChatCount === 1 ? '' : 's'}`}>
+            {unreadChatCount > 99 ? '99+' : unreadChatCount}
+          </span>
+        )}
+      </button>
     </div>
   ) : null
 
@@ -592,6 +682,7 @@ export default function ManagedMeetingRoomSession({
   if (isPip && isBubble) {
     return (
       <>
+        {chatNotificationBanner}
         {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
           <RemoteAudio key={`audio-${participant.identity}`} participant={participant.participant} />
         ))}
@@ -605,6 +696,11 @@ export default function ManagedMeetingRoomSession({
         >
           <HiOutlineVideoCamera className="h-6 w-6" />
           <span className={`absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white ${muted ? 'bg-red-500' : 'bg-emerald-400'}`} aria-hidden="true" />
+          {unreadChatCount > 0 && (
+            <span className="absolute -left-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-950" aria-label={`${unreadChatCount} unread message${unreadChatCount === 1 ? '' : 's'}`}>
+              {unreadChatCount > 99 ? '99+' : unreadChatCount}
+            </span>
+          )}
         </button>
       </>
     )
@@ -614,6 +710,7 @@ export default function ManagedMeetingRoomSession({
     return (
       <>
         {endingMeetingOverlay}
+        {chatNotificationBanner}
         <section
           className="fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex min-h-[5.25rem] w-[min(94vw,22rem)] items-center gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 px-3 py-2.5 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950/95 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0"
           aria-label="Talio Meet compact picture in picture"
@@ -636,12 +733,17 @@ export default function ManagedMeetingRoomSession({
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            onClick={onRestoreMeeting}
-            aria-label="Restore meeting"
-            title="Restore meeting"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-700 transition hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+            onClick={unreadChatCount > 0 ? openChatPanel : onRestoreMeeting}
+            aria-label={unreadChatCount > 0 ? `Open ${unreadChatCount} unread meeting message${unreadChatCount === 1 ? '' : 's'}` : 'Restore meeting'}
+            title={unreadChatCount > 0 ? 'Open unread messages' : 'Restore meeting'}
+            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-700 transition hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
           >
             <HiOutlineArrowsPointingOut className="h-5 w-5" />
+            {unreadChatCount > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-950" aria-hidden="true">
+                {unreadChatCount > 99 ? '99+' : unreadChatCount}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -685,6 +787,7 @@ export default function ManagedMeetingRoomSession({
       data-meeting-pip={isPip ? 'expanded' : undefined}
     >
       {endingMeetingOverlay}
+      {chatNotificationBanner}
       <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 dark:border-white/10 dark:bg-slate-900/90">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{meeting?.title || 'Talio Meet'}</p>
@@ -742,7 +845,7 @@ export default function ManagedMeetingRoomSession({
           <button onClick={toggleVideo} aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'} className={`flex h-11 w-11 items-center justify-center rounded-full ${videoOff ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={videoOff}><HiOutlineVideoCamera className="h-5 w-5" /></CutLineIcon></button>
           <button onClick={toggleScreen} aria-label={screenSharing ? 'Stop presenting' : 'Present screen'} className={`flex h-11 w-11 items-center justify-center rounded-full ${screenSharing ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineComputerDesktop className="h-5 w-5" /></button>
           {!guestToken && <button onClick={toggleNotetaker} aria-label={showNotetaker ? 'Close meeting notes' : 'Open meeting notes'} title="Meeting notes" className={`flex h-11 w-11 items-center justify-center rounded-full ${showNotetaker ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineDocumentText className="h-5 w-5" /></button>}
-          <button onClick={() => { setShowChat(!showChat); setShowParticipants(false); setShowNotetaker(false) }} aria-label="Open chat" className={`flex h-11 w-11 items-center justify-center rounded-full ${showChat ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineChatBubbleLeftRight className="h-5 w-5" /></button>
+          <button onClick={toggleChatPanel} aria-label={showChat ? 'Close chat' : 'Open chat'} className={`relative flex h-11 w-11 items-center justify-center rounded-full ${showChat ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineChatBubbleLeftRight className="h-5 w-5" />{unreadChatCount > 0 && !showChat && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900" aria-label={`${unreadChatCount} unread message${unreadChatCount === 1 ? '' : 's'}`}>{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>}</button>
           <button onClick={() => { setShowParticipants(!showParticipants); setShowChat(false); setShowNotetaker(false) }} aria-label="Open participants" className={`flex h-11 w-11 items-center justify-center rounded-full ${showParticipants ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineUserGroup className="h-5 w-5" /></button>
           <button onClick={toggleHand} aria-label={handRaised ? 'Lower hand' : 'Raise hand'} className={`flex h-11 w-11 items-center justify-center rounded-full ${handRaised ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineHandRaised className="h-5 w-5" /></button>
           <div className="relative">

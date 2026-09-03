@@ -8,6 +8,7 @@ import {
   toIstDateKey,
 } from '@/lib/hrms/employeeLifecycle.server'
 import { getOnboardingCompletionSignals } from '@/lib/hrms/onboardingProgress.server'
+import { reconcileOffboardingAssetChecklist } from '@/lib/hrms/offboardingAssets.server'
 import Employee from '@/models/Employee'
 import { formatEmployeeAddress, normalizeEmployeeAddress } from '@/lib/employeeAddress'
 import fs from 'node:fs'
@@ -160,6 +161,60 @@ describe('employee lifecycle', () => {
     expect(result.employeeUpdates.status).toBe('resigned')
   })
 
+  test('connects offboarding clearance to actual employee asset assignments', () => {
+    const employeeId = 'employee-1'
+    const assigned = reconcileOffboardingAssetChecklist({}, [{
+      _id: 'asset-1',
+      name: 'MacBook Pro',
+      assetCode: 'TAL-101',
+      category: 'laptop',
+      assignedTo: employeeId,
+    }], { employeeId, now: '2026-09-03T10:00:00.000Z' })
+
+    expect(assigned.summary).toEqual({ total: 1, cleared: 0, pending: 1, complete: false })
+    expect(assigned.checklist[0]).toMatchObject({ asset: 'asset-1', assetCode: 'TAL-101', status: 'pending' })
+
+    const returned = reconcileOffboardingAssetChecklist(assigned.offboarding, [{
+      _id: 'asset-1',
+      name: 'MacBook Pro',
+      assetCode: 'TAL-101',
+      category: 'laptop',
+      assignedTo: null,
+      condition: 'good',
+      returnDate: '2026-09-03T11:00:00.000Z',
+    }], { employeeId, now: '2026-09-03T11:00:00.000Z' })
+
+    expect(returned.summary.complete).toBe(true)
+    expect(returned.checklist[0]).toMatchObject({ status: 'returned', returnCondition: 'good', recordMissing: false })
+    expect(returned.offboarding.assetsReturned).toBe(true)
+  })
+
+  test('reopens asset clearance when a cleared asset is reassigned and does not silently clear deleted records', () => {
+    const employeeId = 'employee-1'
+    const clearedOffboarding = {
+      assetsReturned: true,
+      assetChecklist: [{ asset: 'asset-1', name: 'Laptop', status: 'returned', clearedAt: '2026-09-03T10:00:00.000Z' }],
+    }
+    const reassigned = reconcileOffboardingAssetChecklist(clearedOffboarding, [{
+      _id: 'asset-1', name: 'Laptop', assetCode: 'TAL-101', assignedTo: employeeId,
+    }], { employeeId })
+    expect(reassigned.checklist[0]).toMatchObject({ status: 'pending', clearedAt: null })
+    expect(reassigned.summary.complete).toBe(false)
+
+    const missing = reconcileOffboardingAssetChecklist({
+      assetChecklist: [{ asset: 'asset-2', name: 'Access card', status: 'pending' }],
+    }, [], { employeeId })
+    expect(missing.checklist[0]).toMatchObject({ status: 'pending', recordMissing: true })
+    expect(missing.summary.complete).toBe(false)
+  })
+
+  test('requires the connected checklist instead of manually toggling asset clearance', () => {
+    const lifecycle = buildEmployeeLifecycle({ dateOfJoining: '2026-01-01' })
+    expect(() => applyLifecycleAction(lifecycle, 'update_offboarding', {
+      field: 'assetsReturned', value: true,
+    })).toThrow('connected asset clearance checklist')
+  })
+
   test('candidate conversion uses the canonical employee lifecycle path', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'app/api/recruitment/candidates/convert/route.js'), 'utf8')
     expect(source).toContain('dateOfJoining:')
@@ -175,6 +230,20 @@ describe('employee lifecycle', () => {
     expect(route).toContain("message: 'Invalid JSON request body'")
     expect(panel).toContain('const responseText = await response.text()')
     expect(panel).toContain('The lifecycle service returned an invalid response')
+  })
+
+  test('offboarding UI and API use the tenant asset register for clearance', () => {
+    const route = fs.readFileSync(path.join(process.cwd(), 'app/api/employees/[id]/offboarding-assets/route.js'), 'utf8')
+    const panel = fs.readFileSync(path.join(process.cwd(), 'components/employees/EmployeeLifecyclePanel.js'), 'utf8')
+    const modal = fs.readFileSync(path.join(process.cwd(), 'components/employees/OffboardingAssetChecklistModal.js'), 'utf8')
+
+    expect(route).toContain("{ _id: assetId, assignedTo: id }")
+    expect(route).toContain("$unset: { assignedTo: 1, assignedAt: 1, assignedDate: 1 }")
+    expect(route).toContain("'lifecycle.offboarding.assetsReturned': clearance.summary.complete")
+    expect(panel).toContain('<OffboardingAssetChecklistModal')
+    expect(panel).not.toContain("runAction('update_offboarding', { field: 'assetsReturned'")
+    expect(modal).toContain('Assigned asset clearance')
+    expect(modal).toContain('Mark returned')
   })
 
   test('persists lifecycle changes without saving and revalidating unrelated legacy fields', () => {

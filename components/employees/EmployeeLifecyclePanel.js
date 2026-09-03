@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
+import OffboardingAssetChecklistModal from '@/components/employees/OffboardingAssetChecklistModal'
 import toast from '@/utils/toast'
 import { Button, Chip, Progress, Skeleton } from '@heroui/react'
 import { FaCheck, FaClock, FaFlagCheckered, FaHourglassHalf, FaRoute, FaSyncAlt, FaUserCheck } from 'react-icons/fa'
@@ -25,6 +26,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
   const [processing, setProcessing] = useState('')
   const [showExtension, setShowExtension] = useState(false)
   const [showOffboarding, setShowOffboarding] = useState(false)
+  const [showAssetClearance, setShowAssetClearance] = useState(false)
   const [extension, setExtension] = useState({ months: 1, reason: '' })
   const [offboarding, setOffboarding] = useState({ separationType: 'resignation', resignationDate: '', lastWorkingDate: '', reason: '' })
 
@@ -66,6 +68,8 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
 
   const probation = lifecycle.probation || {}
   const exit = lifecycle.offboarding || {}
+  const assetChecklist = exit.assetChecklist || []
+  const clearedAssets = assetChecklist.filter((item) => ['returned', 'waived'].includes(item.status)).length
   const canManage = details.permissions?.canManage
   const canOffboard = details.permissions?.canOffboard
 
@@ -183,13 +187,21 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
               <p className="mb-3 text-xs text-slate-500">Last working date: {formatIstDate(exit.lastWorkingDate)}</p>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                  ['exitInterviewCompleted', 'Exit interview', Boolean(exit.exitInterviewCompleted)],
-                  ['assetsReturned', 'Assets returned', Boolean(exit.assetsReturned)],
-                  ['accessRevoked', 'Access revoked', Boolean(exit.accessRevoked)],
-                  ['fullAndFinalStatus', 'Full and final', exit.fullAndFinalStatus === 'completed'],
-                ].map(([field, label, completed]) => (
-                  <button key={field} type="button" onClick={() => runAction('update_offboarding', { field, value: field === 'fullAndFinalStatus' ? (completed ? 'pending' : 'completed') : !completed })} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-zinc-800">
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-full ${completed ? 'bg-success text-white' : 'border border-slate-300 dark:border-zinc-600'}`}>{completed && <FaCheck className="h-2.5 w-2.5" />}</span>{label}
+                  { field: 'exitInterviewCompleted', label: 'Exit interview', completed: Boolean(exit.exitInterviewCompleted) },
+                  { field: 'assetsReturned', label: assetChecklist.length ? `Assets (${clearedAssets}/${assetChecklist.length})` : 'Asset clearance', completed: Boolean(exit.assetsReturned), connected: true },
+                  { field: 'accessRevoked', label: 'Access revoked', completed: Boolean(exit.accessRevoked) },
+                  { field: 'fullAndFinalStatus', label: 'Full and final', completed: exit.fullAndFinalStatus === 'completed' },
+                ].map(({ field, label, completed, connected }) => (
+                  <button
+                    key={field}
+                    type="button"
+                    onClick={() => connected
+                      ? setShowAssetClearance(true)
+                      : runAction('update_offboarding', { field, value: field === 'fullAndFinalStatus' ? (completed ? 'pending' : 'completed') : !completed })}
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3 text-left text-sm transition hover:border-primary-300 dark:border-zinc-800 dark:hover:border-primary-700"
+                  >
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${completed ? 'bg-success text-white' : 'border border-slate-300 dark:border-zinc-600'}`}>{completed && <FaCheck className="h-2.5 w-2.5" />}</span>
+                    <span>{label}{connected && <span className="ml-1 text-xs text-primary">View checklist</span>}</span>
                   </button>
                 ))}
               </div>
@@ -198,6 +210,15 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
           )}
         </div>
       )}
+      <OffboardingAssetChecklistModal
+        isOpen={showAssetClearance}
+        employeeId={employeeId}
+        onClose={() => setShowAssetClearance(false)}
+        onUpdated={async () => {
+          await mutate()
+          onEmployeeRefresh?.()
+        }}
+      />
     </section>
   )
 }
