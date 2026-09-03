@@ -83,6 +83,7 @@ export async function POST(request) {
       prompt += `Context: "${errorContext.message}"\n`;
       if (errorContext.page) prompt += `Page: ${errorContext.page}\n`;
       if (errorContext.action) prompt += `Action they were trying: ${errorContext.action}\n`;
+      if (errorContext.popupTitle) prompt += `Open popup: ${String(errorContext.popupTitle).slice(0, 120)}\n`;
       if (errorContext.timestamp) prompt += `Time: ${errorContext.timestamp}\n`;
       prompt += '\n';
     }

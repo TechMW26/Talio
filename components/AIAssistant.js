@@ -28,6 +28,7 @@ const CATEGORY_META = {
   navigation: { label: 'Navigation', color: 'default', icon: '🔍' },
   server: { label: 'Service Status', color: 'warning', icon: '🖥️' },
   account: { label: 'Account Help', color: 'primary', icon: '👤' },
+  workflow: { label: 'Action Help', color: 'primary', icon: '✨' },
 }
 
 // Render formatted AI response with bold, numbered lists, etc.
@@ -179,6 +180,11 @@ export default function AIAssistant() {
                       <p className="text-sm text-primary-600/80 dark:text-primary-200/80 mt-1">
                         {errorContext.message}
                       </p>
+                      {errorContext.popupTitle && (
+                        <p className="mt-1 text-xs text-primary-500/80 dark:text-primary-300/70">
+                          While using: {errorContext.popupTitle}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

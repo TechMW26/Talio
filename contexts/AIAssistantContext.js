@@ -22,6 +22,12 @@ const ERROR_PATTERNS = [
   { pattern: /timeout|timed out/i, category: 'network', severity: 'medium' },
   { pattern: /already (checked|clocked) (in|out)/i, category: 'attendance', severity: 'low' },
   { pattern: /service.*unavailable|503/i, category: 'server', severity: 'medium' },
+  {
+    pattern: /\b(?:failed|unable|could not|can't|cannot)\b(?:\s+to)?\s+(?:load|fetch|save|update|create|delete|submit|approve|reject|assign|upload|download|process|complete|verify|clear|send|generate|start|revoke|connect|join|share|schedule)\b/i,
+    category: 'workflow',
+    severity: 'medium',
+  },
+  { pattern: /\b(?:action|operation|request|import|verification)\s+failed\b/i, category: 'workflow', severity: 'medium' },
 ]
 
 // Quick tips for immediate display (before AI responds)
@@ -81,9 +87,14 @@ const QUICK_TIPS = {
     'Your account status may need to be reviewed',
     'This usually requires admin assistance to resolve',
   ],
+  workflow: [
+    'Keep the popup open so your entered information is not lost',
+    'Review the required fields, then try the action once more',
+    'If it still does not complete, use Helpdesk and include the popup name',
+  ],
 }
 
-function classifyError(message) {
+export function classifyError(message) {
   if (!message || typeof message !== 'string') return null
   for (const { pattern, category, severity } of ERROR_PATTERNS) {
     if (pattern.test(message)) {
@@ -103,38 +114,6 @@ export function AIAssistantProvider({ children }) {
   const [isSolutionProvided, setIsSolutionProvided] = useState(false)
   const [errorLog, setErrorLog] = useState([])
   const cooldownRef = useRef(false)
-
-  // Intercept an error and potentially trigger the assistant
-  const interceptError = useCallback((message, meta = {}) => {
-    if (!message || typeof message !== 'string') return
-    if (cooldownRef.current) return
-
-    // Log it
-    const entry = {
-      message,
-      page: typeof window !== 'undefined' ? window.location.pathname : '',
-      timestamp: new Date().toISOString(),
-      ...meta,
-    }
-    setErrorLog(prev => [...prev.slice(-19), entry])
-
-    const result = classifyError(message)
-    if (result && result.severity !== 'low') {
-      // Cooldown to avoid spamming
-      cooldownRef.current = true
-      setTimeout(() => { cooldownRef.current = false }, 5000)
-
-      setClassification(result)
-      setErrorContext(entry)
-      setAiResponse('')
-      setConversationHistory([])
-      setIsSolutionProvided(false)
-      setIsOpen(true)
-
-      // Auto-fetch AI guidance
-      fetchAIHelp(entry, [])
-    }
-  }, [])
 
   // Fetch AI response
   const fetchAIHelp = useCallback(async (ctx, history, question) => {
@@ -177,6 +156,38 @@ export function AIAssistantProvider({ children }) {
       setIsAiLoading(false)
     }
   }, [])
+
+  // Intercept an error and potentially trigger the assistant
+  const interceptError = useCallback((message, meta = {}) => {
+    if (!message || typeof message !== 'string') return
+    if (cooldownRef.current) return
+
+    // Log it
+    const entry = {
+      message,
+      page: typeof window !== 'undefined' ? window.location.pathname : '',
+      timestamp: new Date().toISOString(),
+      ...meta,
+    }
+    setErrorLog(prev => [...prev.slice(-19), entry])
+
+    const result = classifyError(message)
+    if (result && result.severity !== 'low') {
+      // Cooldown to avoid spamming
+      cooldownRef.current = true
+      setTimeout(() => { cooldownRef.current = false }, 5000)
+
+      setClassification(result)
+      setErrorContext(entry)
+      setAiResponse('')
+      setConversationHistory([])
+      setIsSolutionProvided(false)
+      setIsOpen(true)
+
+      // Auto-fetch AI guidance
+      fetchAIHelp(entry, [])
+    }
+  }, [fetchAIHelp])
 
   // User asks a follow-up question
   const askQuestion = useCallback((question) => {
