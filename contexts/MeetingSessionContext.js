@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
@@ -8,6 +8,9 @@ import { usesManagedMeetingTransport } from '@/lib/meetings/transport'
 
 const MeetingSessionContext = createContext(null)
 const ROOM_PATH_PATTERN = /^\/dashboard\/meetings\/room\/([^/]+)/
+const ACTIVE_MEETING_STORAGE_KEY = 'talio:active-meeting-session:v1'
+const ACTIVE_MEETING_MAX_AGE_MS = 24 * 60 * 60 * 1000
+const PIP_SIZES = new Set(['expanded', 'compact', 'bubble'])
 const useManagedMeetings = usesManagedMeetingTransport()
 const MeetingRoomSession = dynamic(
   () => useManagedMeetings
@@ -23,6 +26,57 @@ const MeetingRoomSession = dynamic(
     ),
   }
 )
+
+function getStoredUserId() {
+  if (typeof window === 'undefined') return null
+  try {
+    const user = JSON.parse(window.localStorage.getItem('user') || 'null')
+    return String(user?._id || user?.id || '') || null
+  } catch {
+    return null
+  }
+}
+
+function clearPersistedMeetingSession() {
+  if (typeof window === 'undefined') return
+  window.sessionStorage.removeItem(ACTIVE_MEETING_STORAGE_KEY)
+}
+
+function readPersistedMeetingSession() {
+  if (typeof window === 'undefined') return null
+  try {
+    const session = JSON.parse(window.sessionStorage.getItem(ACTIVE_MEETING_STORAGE_KEY) || 'null')
+    const roomId = typeof session?.roomId === 'string' ? session.roomId.trim() : ''
+    const isExpired = !Number.isFinite(session?.savedAt)
+      || Date.now() - session.savedAt > ACTIVE_MEETING_MAX_AGE_MS
+    const currentUserId = getStoredUserId()
+    const belongsToAnotherUser = Boolean(session?.userId && currentUserId && session.userId !== currentUserId)
+
+    if (!roomId || session?.joined !== true || isExpired || belongsToAnotherUser) {
+      clearPersistedMeetingSession()
+      return null
+    }
+
+    return {
+      roomId,
+      pipSize: PIP_SIZES.has(session.pipSize) ? session.pipSize : 'expanded',
+    }
+  } catch {
+    clearPersistedMeetingSession()
+    return null
+  }
+}
+
+function persistMeetingSession(roomId, pipSize) {
+  if (typeof window === 'undefined' || !roomId) return
+  window.sessionStorage.setItem(ACTIVE_MEETING_STORAGE_KEY, JSON.stringify({
+    roomId,
+    joined: true,
+    pipSize: PIP_SIZES.has(pipSize) ? pipSize : 'expanded',
+    savedAt: Date.now(),
+    userId: getStoredUserId(),
+  }))
+}
 
 function MeetingRoomErrorFallback({ retry, onBack }) {
   return (
@@ -65,9 +119,35 @@ export function MeetingSessionProvider({ children }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeRoomId = pathname?.match(ROOM_PATH_PATTERN)?.[1] || null
+  const initialRouteRoomId = useRef(routeRoomId).current
   const [activeRoomId, setActiveRoomId] = useState(routeRoomId)
   const [isJoined, setIsJoined] = useState(false)
   const [pipSize, setPipSize] = useState('expanded')
+  const [autoJoinRoomId, setAutoJoinRoomId] = useState(null)
+  const [didRestoreSession, setDidRestoreSession] = useState(false)
+
+  useEffect(() => {
+    const persistedSession = readPersistedMeetingSession()
+
+    if (!persistedSession) {
+      setDidRestoreSession(true)
+      return
+    }
+
+    // Opening a different room is an intentional room switch, so a stale
+    // session must never pull the user back into the previous meeting.
+    if (initialRouteRoomId && initialRouteRoomId !== persistedSession.roomId) {
+      clearPersistedMeetingSession()
+      setDidRestoreSession(true)
+      return
+    }
+
+    setActiveRoomId(persistedSession.roomId)
+    setIsJoined(true)
+    setPipSize(persistedSession.pipSize)
+    setAutoJoinRoomId(persistedSession.roomId)
+    setDidRestoreSession(true)
+  }, [initialRouteRoomId]) // Restore once per browser document; route changes are handled below.
 
   useEffect(() => {
     if (routeRoomId && routeRoomId !== activeRoomId) {
@@ -88,6 +168,15 @@ export function MeetingSessionProvider({ children }) {
     }
   }, [activeRoomId, router])
 
+  useEffect(() => {
+    if (!didRestoreSession) return
+    if (activeRoomId && isJoined) {
+      persistMeetingSession(activeRoomId, pipSize)
+    } else if (!activeRoomId) {
+      clearPersistedMeetingSession()
+    }
+  }, [activeRoomId, didRestoreSession, isJoined, pipSize])
+
   const minimizeToPip = useCallback(() => {
     setPipSize('expanded')
     router.replace('/dashboard')
@@ -100,9 +189,16 @@ export function MeetingSessionProvider({ children }) {
   }, [activeRoomId, router])
 
   const endSession = useCallback(() => {
+    clearPersistedMeetingSession()
     setActiveRoomId(null)
     setIsJoined(false)
     setPipSize('expanded')
+    setAutoJoinRoomId(null)
+  }, [])
+
+  const handleJoinedChange = useCallback((joined) => {
+    setIsJoined(joined)
+    if (joined) setAutoJoinRoomId(null)
   }, [])
 
   const value = useMemo(() => ({
@@ -135,7 +231,8 @@ export function MeetingSessionProvider({ children }) {
           <MeetingRoomSession
             roomId={activeRoomId}
             displayMode={isFullRoom ? 'full' : pipSize}
-            onJoinedChange={setIsJoined}
+            autoJoin={autoJoinRoomId === activeRoomId}
+            onJoinedChange={handleJoinedChange}
             onMinimizeToPip={minimizeToPip}
             onRestoreMeeting={restoreMeeting}
             onSetPipSize={setPipSize}

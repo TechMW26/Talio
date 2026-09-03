@@ -66,6 +66,7 @@ const CONNECTION_QUALITY_META = {
 export default function MeetingRoomSession({
   roomId,
   displayMode = 'full',
+  autoJoin = false,
   onJoinedChange,
   onMinimizeToPip,
   onRestoreMeeting,
@@ -125,6 +126,7 @@ export default function MeetingRoomSession({
   const [hasScreenStream, setHasScreenStream] = useState(false) // Track screen stream
   const [previewReady, setPreviewReady] = useState(false) // Track preview camera state
   const [previewError, setPreviewError] = useState(null) // Track preview errors
+  const [autoJoinFailed, setAutoJoinFailed] = useState(false)
   const [showNotetaker, setShowNotetaker] = useState(false)
   const [liveTranscript, setLiveTranscript] = useState([])
   const [transcriptLanguages, setTranscriptLanguages] = useState([])
@@ -159,6 +161,7 @@ export default function MeetingRoomSession({
   const meetingStartedRef = useRef(false)
   const meetingSocketJoinedRef = useRef(false)
   const isLeavingRef = useRef(false)
+  const autoJoinAttemptedRef = useRef(false)
   const meetingSessionStartedAtRef = useRef(null)
   const transcriptionRecorderRef = useRef(null)
   const lastTranscriptionPromiseRef = useRef(Promise.resolve())
@@ -590,6 +593,7 @@ export default function MeetingRoomSession({
 
   // Initialize WebRTC and Socket connection
   const joinMeeting = useCallback(async () => {
+    setAutoJoinFailed(false)
     try {
       // Use existing preview stream or get new one
       if (!localStreamRef.current) {
@@ -829,6 +833,7 @@ export default function MeetingRoomSession({
       onJoinedChange?.(true)
       toast.success('Joined meeting')
     } catch (error) {
+      setAutoJoinFailed(true)
       console.error('Error joining meeting:', error)
       socketRef.current?.disconnect()
       socketRef.current = null
@@ -842,6 +847,12 @@ export default function MeetingRoomSession({
       }
     }
   }, [onJoinedChange, roomId, user, upsertParticipant])
+
+  useEffect(() => {
+    if (!autoJoin || isJoined || autoJoinAttemptedRef.current) return
+    autoJoinAttemptedRef.current = true
+    void joinMeeting()
+  }, [autoJoin, isJoined, joinMeeting])
 
   useEffect(() => {
     if (!isJoined || !meeting?._id || !meeting.isOrganizer || meetingStartedRef.current) {
@@ -1457,6 +1468,7 @@ export default function MeetingRoomSession({
   }
 
   if (!isJoined) {
+    const isRestoring = autoJoin && !autoJoinFailed
     return (
       <div className="fixed inset-0 z-[110] flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-slate-100 p-4 dark:bg-slate-950">
         <div className="max-w-lg w-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xl dark:border-white/10 dark:bg-slate-900">
@@ -1467,7 +1479,7 @@ export default function MeetingRoomSession({
             {meeting?.title || 'Meeting Room'}
           </h1>
           <p className="mb-4 text-slate-500 dark:text-slate-300">
-            Ready to join the meeting?
+            {isRestoring ? 'Restoring your meeting connection…' : 'Ready to join the meeting?'}
           </p>
 
           {/* Camera Preview */}
@@ -1558,13 +1570,13 @@ export default function MeetingRoomSession({
 
           <button
             onClick={joinMeeting}
-            disabled={!previewReady && !previewError}
+            disabled={isRestoring || (!previewReady && !previewError)}
             className={`w-full py-3 font-medium rounded-xl transition-colors ${previewReady || previewError
               ? 'bg-indigo-600 text-white hover:bg-indigo-700'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
           >
-            {previewReady || previewError ? 'Join Meeting' : 'Preparing...'}
+            {isRestoring ? 'Reconnecting…' : previewReady || previewError ? 'Join Meeting' : 'Preparing...'}
           </button>
 
           <button

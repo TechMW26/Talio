@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FaComments, FaTimes, FaUsers, FaUserPlus, FaSearch } from 'react-icons/fa'
+import { FaCheck, FaComments, FaTimes, FaUsers, FaUserPlus, FaSearch } from 'react-icons/fa'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import Loader from '@/components/ui/Loader'
+import toast from '@/utils/toast'
 
 export default function FloatingChatWidget() {
   const { 
@@ -29,6 +30,11 @@ export default function FloatingChatWidget() {
   const [loadingEmployees, setLoadingEmployees] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showNewChat, setShowNewChat] = useState(false)
+  const [showNewGroup, setShowNewGroup] = useState(false)
+  const [selectedEmployees, setSelectedEmployees] = useState([])
+  const [groupName, setGroupName] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [composeError, setComposeError] = useState('')
   const [currentUserId, setCurrentUserId] = useState(null)
   const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
   const [isDesktop, setIsDesktop] = useState(false)
@@ -118,6 +124,7 @@ export default function FloatingChatWidget() {
 
   const startNewChat = async (employeeId) => {
     try {
+      setComposeError('')
       const token = localStorage.getItem('token')
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -130,15 +137,82 @@ export default function FloatingChatWidget() {
           isGroup: false
         })
       })
-      const data = await response.json()
-      if (data.success) {
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.success) {
         openChat(data.data)
         setShowNewChat(false)
         setSearchQuery('')
         fetchChats()
+      } else {
+        setComposeError(data?.message || 'Unable to start this conversation')
       }
     } catch (error) {
       console.error('Error creating chat:', error)
+      setComposeError('Unable to start this conversation')
+    }
+  }
+
+  const openComposer = (mode) => {
+    setShowNewChat(mode === 'direct')
+    setShowNewGroup(mode === 'group')
+    setSearchQuery('')
+    setComposeError('')
+    if (mode === 'group') {
+      setSelectedEmployees([])
+      setGroupName('')
+    }
+    fetchEmployees()
+  }
+
+  const closeComposer = () => {
+    setShowNewChat(false)
+    setShowNewGroup(false)
+    setSelectedEmployees([])
+    setGroupName('')
+    setSearchQuery('')
+    setComposeError('')
+  }
+
+  const toggleGroupMember = (employeeId) => {
+    setSelectedEmployees((current) => current.includes(employeeId)
+      ? current.filter((id) => id !== employeeId)
+      : [...current, employeeId])
+  }
+
+  const createGroup = async () => {
+    const name = groupName.trim()
+    if (!name || selectedEmployees.length === 0 || creatingGroup) return
+
+    try {
+      setCreatingGroup(true)
+      setComposeError('')
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          isGroup: true,
+          participants: selectedEmployees,
+          name,
+        })
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || 'Unable to create the group')
+      }
+
+      openChat(data.data)
+      closeComposer()
+      await fetchChats()
+      toast.success('Group created')
+    } catch (error) {
+      console.error('Error creating group:', error)
+      setComposeError(error.message || 'Unable to create the group')
+    } finally {
+      setCreatingGroup(false)
     }
   }
 
@@ -278,8 +352,15 @@ export default function FloatingChatWidget() {
 
   // Filter employees by search
   const filteredEmployees = employees.filter(emp => {
-    const name = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase()
-    return name.includes(searchQuery.toLowerCase())
+    const searchableText = [
+      emp.firstName,
+      emp.lastName,
+      emp.email,
+      emp.employeeCode,
+      emp.designation?.title,
+      emp.department?.name,
+    ].filter(Boolean).join(' ').toLowerCase()
+    return searchableText.includes(searchQuery.trim().toLowerCase())
   })
 
   // Don't render on mobile
@@ -375,17 +456,22 @@ export default function FloatingChatWidget() {
             </div>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => {
-                  setShowNewChat(true)
-                  fetchEmployees()
-                }}
+                onClick={() => openComposer('direct')}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-600 rounded-lg transition-colors"
                 style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
                 title="New Chat"
+                aria-label="New chat"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" className="w-4 h-4" fill={primaryDark}>
-                  <path d="M96 128a128 128 0 1 1 256 0A128 128 0 1 1 96 128zM0 482.3C0 383.8 79.8 304 178.3 304h91.4C368.2 304 448 383.8 448 482.3c0 16.4-13.3 29.7-29.7 29.7H29.7C13.3 512 0 498.7 0 482.3zM504 312V248H440c-13.3 0-24-10.7-24-24s10.7-24 24-24h64V136c0-13.3 10.7-24 24-24s24 10.7 24 24v64h64c13.3 0 24 10.7 24 24s-10.7 24-24 24H552v64c0 13.3-10.7 24-24 24s-24-10.7-24-24z"/>
-                </svg>
+                <FaUserPlus className="h-4 w-4" style={{ color: primaryDark }} />
+              </button>
+              <button
+                onClick={() => openComposer('group')}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-600 rounded-lg transition-colors"
+                style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
+                title="New Group"
+                aria-label="New group"
+              >
+                <FaUsers className="h-4 w-4" style={{ color: primaryDark }} />
               </button>
               <button
                 onClick={closeWidget}
@@ -408,7 +494,7 @@ export default function FloatingChatWidget() {
                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder={showNewChat ? "Search people..." : "Search conversations..."}
+                  placeholder={showNewChat || showNewGroup ? "Search people..." : "Search conversations..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="input input-search text-sm"
@@ -418,21 +504,48 @@ export default function FloatingChatWidget() {
 
             {/* Chat List or New Chat */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ background: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 0.5)' }}>
-              {showNewChat ? (
+              {showNewChat || showNewGroup ? (
                 <>
                   <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: isDarkMode ? 'rgba(24, 24, 27, 0.6)' : 'rgba(255, 255, 255, 0.6)' }}>
-                    <span className="text-sm font-medium" style={{ color: isDarkMode ? '#e4e4e7' : '#374151' }}>Start a conversation</span>
+                    <span className="text-sm font-medium" style={{ color: isDarkMode ? '#e4e4e7' : '#374151' }}>
+                      {showNewGroup ? 'Create a group' : 'Start a conversation'}
+                    </span>
                     <button
-                      onClick={() => {
-                        setShowNewChat(false)
-                        setSearchQuery('')
-                      }}
+                      onClick={closeComposer}
                       className="text-xs font-medium px-2 py-1 rounded-md hover:bg-gray-100/50 transition-colors"
                       style={{ color: primaryColor }}
                     >
                       Back
                     </button>
                   </div>
+                  {showNewGroup && (
+                    <div className="space-y-2 border-b px-3 py-3" style={{ borderColor: isDarkMode ? 'rgba(51, 65, 85, 0.45)' : 'rgba(203, 213, 225, 0.7)' }}>
+                      <label htmlFor="floating-chat-group-name" className="sr-only">Group name</label>
+                      <input
+                        id="floating-chat-group-name"
+                        type="text"
+                        value={groupName}
+                        onChange={(event) => setGroupName(event.target.value)}
+                        placeholder="Group name"
+                        maxLength={80}
+                        className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-2"
+                        style={{
+                          color: isDarkMode ? '#f4f4f5' : '#111827',
+                          background: isDarkMode ? '#18181b' : '#ffffff',
+                          borderColor: isDarkMode ? '#3f3f46' : '#d1d5db',
+                          '--tw-ring-color': primaryColor,
+                        }}
+                      />
+                      <p className="text-xs" style={{ color: isDarkMode ? '#a1a1aa' : '#6b7280' }}>
+                        {selectedEmployees.length} member{selectedEmployees.length === 1 ? '' : 's'} selected
+                      </p>
+                    </div>
+                  )}
+                  {composeError && (
+                    <div className="mx-3 mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200" role="alert">
+                      {composeError}
+                    </div>
+                  )}
                   <div>
                     {loadingEmployees ? (
                       <div className="p-8 flex flex-col items-center justify-center">
@@ -443,9 +556,10 @@ export default function FloatingChatWidget() {
                       filteredEmployees.map(emp => (
                         <button
                           key={emp._id}
-                          onClick={() => startNewChat(emp._id)}
+                          onClick={() => showNewGroup ? toggleGroupMember(emp._id) : startNewChat(emp._id)}
                           className="w-full px-4 py-3 transition-colors border-b"
                           style={{ display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '100%', overflow: 'hidden', borderColor: isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(255, 255, 255, 0.3)' }}
+                          aria-pressed={showNewGroup ? selectedEmployees.includes(emp._id) : undefined}
                         >
                           <div 
                             className="rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm overflow-hidden"
@@ -471,6 +585,19 @@ export default function FloatingChatWidget() {
                               {emp.designation?.title || emp.department?.name || emp.email}
                             </p>
                           </div>
+                          {showNewGroup && (
+                            <span
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border"
+                              style={{
+                                color: selectedEmployees.includes(emp._id) ? 'white' : 'transparent',
+                                backgroundColor: selectedEmployees.includes(emp._id) ? primaryColor : 'transparent',
+                                borderColor: selectedEmployees.includes(emp._id) ? primaryColor : (isDarkMode ? '#52525b' : '#cbd5e1'),
+                              }}
+                              aria-hidden="true"
+                            >
+                              <FaCheck className="h-3 w-3" />
+                            </span>
+                          )}
                         </button>
                       ))
                     ) : (
@@ -479,6 +606,20 @@ export default function FloatingChatWidget() {
                       </div>
                     )}
                   </div>
+                  {showNewGroup && (
+                    <div className="sticky bottom-0 border-t p-3 backdrop-blur-xl" style={{ background: isDarkMode ? 'rgba(24, 24, 27, 0.96)' : 'rgba(255, 255, 255, 0.96)', borderColor: isDarkMode ? '#3f3f46' : '#e5e7eb' }}>
+                      <button
+                        type="button"
+                        onClick={createGroup}
+                        disabled={!groupName.trim() || selectedEmployees.length === 0 || creatingGroup}
+                        className="relative flex min-h-10 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        <span className={creatingGroup ? 'invisible' : ''}>Create group</span>
+                        {creatingGroup && <span className="absolute h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : loading ? (
                 <div className="p-8 text-center h-full flex items-center justify-center">
@@ -589,10 +730,7 @@ export default function FloatingChatWidget() {
                   <p className="font-medium" style={{ color: isDarkMode ? '#e4e4e7' : '#4B5563' }}>No conversations yet</p>
                   <p className="text-sm mt-1" style={{ color: isDarkMode ? '#71717a' : '#9CA3AF' }}>Start chatting with your team!</p>
                   <button
-                    onClick={() => {
-                      setShowNewChat(true)
-                      fetchEmployees()
-                    }}
+                    onClick={() => openComposer('direct')}
                     className="mt-4 px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity shadow-sm"
                     style={{ backgroundColor: primaryColor }}
                   >

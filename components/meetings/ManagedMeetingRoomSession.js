@@ -121,6 +121,7 @@ function ParticipantTile({ item, local = false, reaction, handRaised = false, fe
 export default function ManagedMeetingRoomSession({
   roomId,
   displayMode = 'full',
+  autoJoin = false,
   guestToken = null,
   guestName = null,
   meetingData = null,
@@ -135,6 +136,7 @@ export default function ManagedMeetingRoomSession({
   const recorderRef = useRef(null)
   const mutedRef = useRef(false)
   const joiningRef = useRef(false)
+  const autoJoinAttemptedRef = useRef(false)
   const leavingRef = useRef(false)
   const meetingSessionStartedAtRef = useRef(null)
   const recorderStopPromiseRef = useRef(Promise.resolve())
@@ -340,6 +342,12 @@ export default function ManagedMeetingRoomSession({
       setJoining(false)
     }
   }, [guestToken, handleData, joined, muted, onJoinedChange, refreshParticipants, roomId, videoOff])
+
+  useEffect(() => {
+    if (!autoJoin || joined || joiningRef.current || autoJoinAttemptedRef.current) return
+    autoJoinAttemptedRef.current = true
+    void join()
+  }, [autoJoin, join, joined])
 
   useEffect(() => () => {
     for (const timer of reactionTimers.current.values()) clearTimeout(timer)
@@ -662,18 +670,21 @@ export default function ManagedMeetingRoomSession({
   ) : null
 
   if (!joined) {
+    const isRestoring = autoJoin && !joinError
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-100 p-4 text-slate-900 dark:bg-slate-950 dark:text-white">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xl dark:border-white/10 dark:bg-slate-900">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"><HiOutlineVideoCamera className="h-8 w-8" /></div>
           <h1 className="mt-4 text-xl font-semibold">{meeting?.title || 'Talio Meet'}</h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Managed, adaptive video with automatic low-network optimisation.</p>
-          <div className="mt-5 flex justify-center gap-3">
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            {isRestoring ? 'Restoring your secure meeting connection…' : 'Managed, adaptive video with automatic low-network optimisation.'}
+          </p>
+          <div className={`mt-5 justify-center gap-3 ${isRestoring ? 'hidden' : 'flex'}`}>
             <button onClick={() => setMuted(!muted)} aria-label={muted ? 'Turn microphone on' : 'Mute microphone'} className={`flex h-12 w-12 items-center justify-center rounded-full ${muted ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={muted}><HiOutlineMicrophone className="h-6 w-6" /></CutLineIcon></button>
             <button onClick={() => setVideoOff(!videoOff)} aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'} className={`flex h-12 w-12 items-center justify-center rounded-full ${videoOff ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={videoOff}><HiOutlineVideoCamera className="h-6 w-6" /></CutLineIcon></button>
           </div>
           {joinError && <p className="mt-5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200" role="alert">{joinError}</p>}
-          <button onClick={join} disabled={joining} className="relative mt-6 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"><span className={joining ? 'invisible' : ''}>{joinError ? 'Try again' : 'Join meeting'}</span>{joining && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
+          <button onClick={join} disabled={joining || isRestoring} className="relative mt-6 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"><span className={joining || isRestoring ? 'invisible' : ''}>{joinError ? 'Try again' : 'Join meeting'}</span>{(joining || isRestoring) && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
         </div>
       </div>
     )
