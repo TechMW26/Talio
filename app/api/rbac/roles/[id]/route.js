@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels, hasRole } from '@/lib/auth'
-import { validatePermissionsShape, invalidatePermissionsCache } from '@/lib/permissions'
+import {
+    validatePermissionsShape,
+    invalidatePermissionsCache,
+    normalizePermissionsShape,
+} from '@/lib/permissions'
 import { SYSTEM_ROLE_DEFINITIONS } from '@/lib/systemRoles'
 import { logRBACEvent, extractRequestMeta } from '@/lib/rbacAudit'
 import { refreshAffectedUsers } from '@/lib/rbacSessionRefresh'
@@ -30,7 +34,17 @@ export async function GET(request, { params }) {
             )
         }
 
-        return NextResponse.json({ success: true, data: role })
+        const fallbackPermissions = role.isSystemRole
+            ? SYSTEM_ROLE_DEFINITIONS[role.name]?.buildPermissions?.()
+            : null
+
+        return NextResponse.json({
+            success: true,
+            data: {
+                ...role,
+                permissions: normalizePermissionsShape(role.permissions, fallbackPermissions),
+            },
+        })
     } catch (error) {
         console.error('[RBAC] Get role error:', error)
         return NextResponse.json(
@@ -85,14 +99,21 @@ export async function PUT(request, { params }) {
 
         // Update permissions
         if (data.permissions) {
-            const validation = validatePermissionsShape(data.permissions)
+            const fallbackPermissions = role.isSystemRole
+                ? SYSTEM_ROLE_DEFINITIONS[role.name]?.buildPermissions?.()
+                : null
+            const normalizedPermissions = normalizePermissionsShape(
+                data.permissions,
+                fallbackPermissions
+            )
+            const validation = validatePermissionsShape(normalizedPermissions)
             if (!validation.valid) {
                 return NextResponse.json(
                     { success: false, message: 'Invalid permissions shape', errors: validation.errors },
                     { status: 400 }
                 )
             }
-            role.permissions = data.permissions
+            role.permissions = normalizedPermissions
         }
 
         await role.save()

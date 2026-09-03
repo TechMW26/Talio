@@ -56,9 +56,14 @@ const { getAuthAndModels } = require('@/lib/auth')
 const { logRBACEvent } = require('@/lib/rbacAudit')
 const { refreshAffectedUsers } = require('@/lib/rbacSessionRefresh')
 const { PUT: assignRole } = require('@/app/api/rbac/roles/[id]/assign/route')
+const { PUT: updateRole } = require('@/app/api/rbac/roles/[id]/route')
 const { GET: validateAuth } = require('@/app/api/auth/validate/route')
 const { POST: createTeam } = require('@/app/api/teams/route')
-const { buildEmptyPermissions } = require('@/lib/permissions.shared')
+const {
+    buildEmptyPermissions,
+    normalizePermissionsShape,
+    validatePermissionsShape,
+} = require('@/lib/permissions.shared')
 const { filterMenuByPermissions } = require('@/utils/permissionFilters')
 const { getMenuItemsForRole } = require('@/utils/roleBasedMenus')
 const { getMenuTemplateRole } = require('@/utils/rbacMenu')
@@ -315,5 +320,79 @@ describe('RBAC integration coverage', () => {
             success: true,
             data: { modifiedCount: 1 },
         })
+    })
+
+    test('legacy roles are hydrated to the current permission schema before update', async () => {
+        const legacyPermissions = {
+            dashboard: { canView: true },
+        }
+        const roleDoc = {
+            _id: 'role-legacy',
+            name: 'legacy_role',
+            displayLabel: 'Legacy Role',
+            description: 'Created before newer permission pages existed',
+            permissions: legacyPermissions,
+            isSystemRole: false,
+            save: jest.fn().mockResolvedValue(undefined),
+            toObject: jest.fn(function toObject() {
+                return {
+                    _id: this._id,
+                    name: this.name,
+                    displayLabel: this.displayLabel,
+                    description: this.description,
+                    permissions: this.permissions,
+                }
+            }),
+        }
+        const models = {
+            Role: {
+                findById: jest.fn().mockResolvedValue(roleDoc),
+            },
+            User: {
+                find: jest.fn(() => ({
+                    lean: jest.fn().mockResolvedValue([]),
+                })),
+            },
+            ForceRefresh: { insertMany: jest.fn() },
+        }
+
+        getAuthAndModels.mockResolvedValue({
+            success: true,
+            user: { _id: 'admin-1', email: 'admin@talio.in', role: 'admin' },
+            tenant: { databaseName: 'talio_company_test' },
+            models,
+        })
+
+        const request = new Request('http://localhost:3000/api/rbac/roles/role-legacy', {
+            method: 'PUT',
+            body: JSON.stringify({
+                displayLabel: 'Legacy Role Updated',
+                permissions: legacyPermissions,
+            }),
+            headers: { 'content-type': 'application/json' },
+        })
+
+        const response = await updateRole(request, {
+            params: Promise.resolve({ id: 'role-legacy' }),
+        })
+        const body = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(roleDoc.save).toHaveBeenCalledTimes(1)
+        expect(roleDoc.permissions.dashboard.canView).toBe(true)
+        expect(roleDoc.permissions.employees).toBeDefined()
+        expect(validatePermissionsShape(roleDoc.permissions)).toEqual({ valid: true, errors: [] })
+        expect(body).toMatchObject({ success: true, message: 'Role updated successfully' })
+    })
+
+    test('permission normalization fills missing entries without hiding malformed values', () => {
+        const normalized = normalizePermissionsShape({
+            dashboard: { canView: true },
+            employees: { canView: 'yes' },
+        })
+
+        expect(normalized.dashboard.canView).toBe(true)
+        expect(normalized.chat).toBeDefined()
+        expect(validatePermissionsShape(normalized)).toEqual(expect.objectContaining({ valid: false }))
     })
 })

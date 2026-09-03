@@ -26,6 +26,49 @@ const isValidObjectId = (id) => {
     (new mongoose.Types.ObjectId(id)).toString() === id
 }
 
+const EMPLOYEE_REFERENCE_FIELDS = {
+  company: 'company',
+  department: 'department',
+  designation: 'designation',
+  reportingManager: 'reporting manager',
+  assignedManager: 'assigned manager',
+  assignedTeamLead: 'assigned team lead',
+  reportsTo: 'reports-to employee',
+}
+
+function normalizeEmployeeReferences(payload) {
+  for (const [field, label] of Object.entries(EMPLOYEE_REFERENCE_FIELDS)) {
+    if (!Object.prototype.hasOwnProperty.call(payload, field)) continue
+
+    const value = payload[field]
+    if (value == null || (typeof value === 'string' && !value.trim())) {
+      payload[field] = null
+      continue
+    }
+
+    const normalizedValue = String(value).trim()
+    if (!isValidObjectId(normalizedValue)) {
+      return `Invalid ${label}`
+    }
+    payload[field] = normalizedValue
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'departments')) {
+    if (!Array.isArray(payload.departments)) return 'Departments must be an array'
+
+    const normalizedDepartments = [...new Set(
+      payload.departments
+        .filter((value) => value != null && String(value).trim())
+        .map((value) => String(value).trim())
+    )]
+    const invalidDepartment = normalizedDepartments.find((value) => !isValidObjectId(value))
+    if (invalidDepartment) return 'Invalid department selection'
+    payload.departments = normalizedDepartments
+  }
+
+  return null
+}
+
 function makeDesignationCode(title) {
   return (title || '')
     .toString()
@@ -412,35 +455,25 @@ export async function PUT(request, { params }) {
       }
     }
 
-    // Handle multiple departments
-    console.log('Received departments:', data.departments)
-    console.log('Received department (legacy):', data.department)
-
-    // Sanitize ObjectId fields - convert empty strings to null/undefined
-    const objectIdFields = ['company', 'department', 'designation', 'reportingManager', 'assignedManager', 'assignedTeamLead'];
-    objectIdFields.forEach(field => {
-      if (data[field] === '') {
-        data[field] = undefined; // Remove from object so Mongoose doesn't try to cast it
-      }
-    });
+    const referenceValidationError = normalizeEmployeeReferences(data)
+    if (referenceValidationError) {
+      return NextResponse.json(
+        { success: false, message: referenceValidationError },
+        { status: 400 }
+      )
+    }
 
     await resolveDesignationRef(Designation, data)
 
     if (data.departments && Array.isArray(data.departments) && data.departments.length > 0) {
-      // Filter out empty strings
-      data.departments = data.departments.filter(d => d && d !== '')
-      console.log('After filtering departments:', data.departments)
       // Set primary department as the first one if not explicitly set
-      if (!data.department || data.department === '') {
+      if (!data.department) {
         data.department = data.departments[0]
       }
-    } else if (data.department && data.department !== '') {
+    } else if (data.department) {
       // If only single department is provided, also add it to departments array
       data.departments = [data.department]
     }
-
-    console.log('Final departments to save:', data.departments)
-    console.log('Final department (primary) to save:', data.department)
 
     // Handle designation level
     if (data.designationLevel) {
@@ -679,8 +712,14 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('Update employee error:', error)
     if (error?.name === 'CastError') {
+      const fieldLabel = EMPLOYEE_REFERENCE_FIELDS[error.path] || error.path
       return NextResponse.json(
-        { success: false, message: 'Invalid employee ID' },
+        {
+          success: false,
+          message: fieldLabel
+            ? `Invalid ${fieldLabel}`
+            : 'Invalid employee reference',
+        },
         { status: 400 }
       )
     }

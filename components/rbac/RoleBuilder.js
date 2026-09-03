@@ -12,6 +12,7 @@ import {
     ACTIONS,
     actionToKey,
     buildEmptyPermissions,
+    normalizePermissionsShape,
 } from '@/lib/permissions.shared'
 
 const CATEGORY_ORDER = [
@@ -58,7 +59,7 @@ export default function RoleBuilder({ role, onClose }) {
     const [displayLabel, setDisplayLabel] = useState(role?.displayLabel || '')
     const [description, setDescription] = useState(role?.description || '')
     const [permissions, setPermissions] = useState(() => {
-        if (role?.permissions) return structuredClone(role.permissions)
+        if (role?.permissions) return normalizePermissionsShape(role.permissions)
         return buildEmptyPermissions()
     })
     const [expandedCategories, setExpandedCategories] = useState(() => {

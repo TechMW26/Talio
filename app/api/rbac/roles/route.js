@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels, hasRole } from '@/lib/auth'
 import {
     validatePermissionsShape,
+    normalizePermissionsShape,
     PERMISSIONS_SCHEMA,
     PAGE_SLUGS,
 } from '@/lib/permissions'
@@ -38,10 +39,17 @@ export async function GET(request) {
             countMap[r._id.toString()] = r.count
         }
 
-        const rolesWithCounts = roles.map((role) => ({
-            ...role,
-            userCount: countMap[role._id.toString()] || 0,
-        }))
+        const rolesWithCounts = roles.map((role) => {
+            const fallbackPermissions = role.isSystemRole
+                ? SYSTEM_ROLE_DEFINITIONS[role.name]?.buildPermissions?.()
+                : null
+
+            return {
+                ...role,
+                permissions: normalizePermissionsShape(role.permissions, fallbackPermissions),
+                userCount: countMap[role._id.toString()] || 0,
+            }
+        })
 
         return NextResponse.json({ success: true, data: rolesWithCounts })
     } catch (error) {
@@ -110,7 +118,8 @@ export async function POST(request) {
                 { status: 400 }
             )
         }
-        const validation = validatePermissionsShape(permissions)
+        const normalizedPermissions = normalizePermissionsShape(permissions)
+        const validation = validatePermissionsShape(normalizedPermissions)
         if (!validation.valid) {
             return NextResponse.json(
                 { success: false, message: 'Invalid permissions shape', errors: validation.errors },
@@ -132,7 +141,7 @@ export async function POST(request) {
             displayLabel: displayLabel.trim(),
             description: description?.trim() || '',
             company: company._id,
-            permissions,
+            permissions: normalizedPermissions,
             isSystemRole: false,
             createdBy: user._id,
         })
