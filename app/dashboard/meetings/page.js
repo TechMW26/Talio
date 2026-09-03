@@ -26,9 +26,11 @@ import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import CreateMeetingModal from './components/CreateMeetingModal'
 import MeetingCard from './components/MeetingCard'
+import EditMeetingModal from './components/EditMeetingModal'
 
 export default function MeetingsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingMeeting, setEditingMeeting] = useState(null)
   const [filter, setFilter] = useState({
     type: 'all',
     status: '',
@@ -284,6 +286,7 @@ export default function MeetingsPage() {
                 key={meeting._id}
                 meeting={meeting}
                 onRespond={handleRespondToInvite}
+                onEdit={setEditingMeeting}
                 showResponseActions
               />
             ))}
@@ -304,6 +307,7 @@ export default function MeetingsPage() {
                 key={meeting._id}
                 meeting={meeting}
                 onRespond={handleRespondToInvite}
+                onEdit={setEditingMeeting}
               />
             ))}
           </div>
@@ -350,6 +354,7 @@ export default function MeetingsPage() {
                 key={meeting._id}
                 meeting={meeting}
                 onRespond={handleRespondToInvite}
+                onEdit={setEditingMeeting}
               />
             ))}
           </div>
@@ -385,6 +390,14 @@ export default function MeetingsPage() {
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onSuccess={handleMeetingCreated}
+        />
+      )}
+      {editingMeeting && (
+        <EditMeetingModal
+          isOpen
+          meeting={editingMeeting}
+          onClose={() => setEditingMeeting(null)}
+          onSuccess={() => refreshMeetings()}
         />
       )}
     </div>

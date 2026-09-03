@@ -21,7 +21,8 @@ import {
   HiOutlineClipboardDocumentList,
   HiOutlineClipboard,
   HiOutlineGlobeAlt,
-  HiOutlineExclamationTriangle
+  HiOutlineExclamationTriangle,
+  HiOutlinePencilSquare
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea, Skeleton } from '@heroui/react'
@@ -31,6 +32,8 @@ import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import { copyTextToClipboard } from '@/utils/clipboard'
+import MeetingJoinLink from '../components/MeetingJoinLink'
+import EditMeetingModal from '../components/EditMeetingModal'
 
 function getInsightItemClassName(tone = 'slate') {
   switch (tone) {
@@ -71,6 +74,7 @@ export default function MeetingDetailPage({ params }) {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const currentUser = useMemo(() => {
     if (typeof window === 'undefined') return null
     const rawUser = localStorage.getItem('user')
@@ -372,6 +376,15 @@ export default function MeetingDetailPage({ params }) {
 
           {meeting.isOrganizer && (
             <div className="flex flex-wrap gap-2">
+              {['scheduled', 'rescheduled'].includes(meeting.status) && (
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-sm font-medium text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200"
+                >
+                  <HiOutlinePencilSquare className="h-4 w-4" />
+                  Edit meeting
+                </button>
+              )}
               {meeting.status === 'scheduled' && (
                 <button
                   onClick={handleCancelMeeting}
@@ -437,13 +450,13 @@ export default function MeetingDetailPage({ params }) {
                 <div className="flex flex-wrap items-center gap-2 xl:max-w-[460px] xl:justify-end">
                 {/* Join button for online meetings */}
                 {meeting.type === 'online' && (isNow || isUpcoming) && (meeting.isOrganizer || meeting.myInviteStatus === 'accepted') && (
-                  <Link
-                    href={`/dashboard/meetings/room/${meeting.roomId}`}
+                  <MeetingJoinLink
+                    roomId={meeting.roomId}
                     className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
                   >
                     <HiOutlinePlayCircle className="w-4 h-4" />
                     {isNow ? 'Join Now' : 'Join Meeting'}
-                  </Link>
+                  </MeetingJoinLink>
                 )}
 
                 {/* Response buttons for pending invites */}
@@ -526,13 +539,13 @@ export default function MeetingDetailPage({ params }) {
                       <HiOutlineVideoCamera className="w-6 h-6 text-gray-400" />
                       <div className="flex-1">
                         <p className="text-sm text-gray-500">Meeting Room</p>
-                        <Link
-                          href={`/dashboard/meetings/room/${meeting.roomId}`}
+                        <MeetingJoinLink
+                          roomId={meeting.roomId}
                           className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                         >
                           <HiOutlinePlayCircle className="w-4 h-4" />
                           Join Meeting Room
-                        </Link>
+                        </MeetingJoinLink>
                       </div>
                     </div>
                   )}
@@ -981,6 +994,13 @@ export default function MeetingDetailPage({ params }) {
       </div>
 
       {/* Delete Confirmation Modal */}
+      <EditMeetingModal
+        isOpen={showEditModal}
+        meeting={meeting}
+        onClose={() => setShowEditModal(false)}
+        onSuccess={() => refreshMeeting()}
+      />
+
       <Modal isOpen={showDeleteModal} onOpenChange={setShowDeleteModal} size="md">
         <ModalContent>
           {(onClose) => (

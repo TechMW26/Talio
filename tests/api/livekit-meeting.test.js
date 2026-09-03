@@ -1,5 +1,6 @@
 import {
   createLiveKitParticipantToken,
+  findParticipantActiveMeeting,
   getLiveKitConfig,
   toLiveKitRoomName,
 } from '@/lib/meetings/livekit.server'
@@ -48,6 +49,56 @@ describe('managed meeting token service', () => {
     })
     expect(result.token.split('.')).toHaveLength(3)
     expect(JSON.stringify(result)).not.toContain(process.env.LIVEKIT_API_SECRET)
+  })
+
+  test('finds the same participant in another active tenant room', async () => {
+    process.env.LIVEKIT_URL = 'wss://example.livekit.cloud'
+    process.env.LIVEKIT_API_KEY = 'testkey'
+    process.env.LIVEKIT_API_SECRET = 'a'.repeat(32)
+    const roomServiceClient = {
+      listRooms: jest.fn().mockResolvedValue([
+        { name: 'talio_talio_acme_current', numParticipants: 1 },
+        { name: 'talio_talio_acme_other', numParticipants: 2 },
+        { name: 'talio_another_tenant_private', numParticipants: 1 },
+      ]),
+      listParticipants: jest.fn().mockResolvedValue([
+        { identity: 'user_1' },
+        { identity: 'user_2' },
+      ]),
+    }
+
+    await expect(findParticipantActiveMeeting({
+      databaseName: 'talio_acme',
+      identity: 'user_1',
+      excludeRoomId: 'current',
+      roomServiceClient,
+    })).resolves.toEqual({
+      roomName: 'talio_talio_acme_other',
+      roomId: 'other',
+    })
+    expect(roomServiceClient.listParticipants).toHaveBeenCalledTimes(1)
+    expect(roomServiceClient.listParticipants).toHaveBeenCalledWith('talio_talio_acme_other')
+  })
+
+  test('allows rejoining the same room and ignores empty rooms', async () => {
+    process.env.LIVEKIT_URL = 'wss://example.livekit.cloud'
+    process.env.LIVEKIT_API_KEY = 'testkey'
+    process.env.LIVEKIT_API_SECRET = 'a'.repeat(32)
+    const roomServiceClient = {
+      listRooms: jest.fn().mockResolvedValue([
+        { name: 'talio_talio_acme_current', numParticipants: 1 },
+        { name: 'talio_talio_acme_empty', numParticipants: 0 },
+      ]),
+      listParticipants: jest.fn(),
+    }
+
+    await expect(findParticipantActiveMeeting({
+      databaseName: 'talio_acme',
+      identity: 'user_1',
+      excludeRoomId: 'current',
+      roomServiceClient,
+    })).resolves.toBeNull()
+    expect(roomServiceClient.listParticipants).not.toHaveBeenCalled()
   })
 })
 

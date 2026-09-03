@@ -151,6 +151,10 @@ export function MeetingSessionProvider({ children }) {
 
   useEffect(() => {
     if (routeRoomId && routeRoomId !== activeRoomId) {
+      if (activeRoomId && isJoined) {
+        router.replace(`/dashboard/meetings/room/${activeRoomId}`)
+        return
+      }
       setActiveRoomId(routeRoomId)
       setIsJoined(false)
       setPipSize('expanded')
@@ -160,7 +164,7 @@ export function MeetingSessionProvider({ children }) {
     if (!routeRoomId && activeRoomId && !isJoined) {
       setActiveRoomId(null)
     }
-  }, [activeRoomId, isJoined, routeRoomId])
+  }, [activeRoomId, isJoined, routeRoomId, router])
 
   useEffect(() => {
     if (activeRoomId) {

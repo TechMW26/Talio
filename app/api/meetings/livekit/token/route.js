@@ -3,13 +3,53 @@ import { jwtVerify } from 'jose'
 import { getAuthAndModels } from '@/lib/auth'
 import { getTenantModel } from '@/lib/tenantModels'
 import { checkTenantFeatureAccess } from '@/lib/companyFeatures.server'
-import { createLiveKitParticipantToken, getLiveKitConfig } from '@/lib/meetings/livekit.server'
+import {
+  createLiveKitParticipantToken,
+  findParticipantActiveMeeting,
+  getLiveKitConfig,
+} from '@/lib/meetings/livekit.server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function error(message, status, code) {
-  return NextResponse.json({ success: false, message, code }, { status })
+function error(message, status, code, data) {
+  return NextResponse.json({ success: false, message, code, ...(data ? { data } : {}) }, { status })
+}
+
+async function checkActiveMeeting({ Meeting, databaseName, identity, roomId }) {
+  let activeRoom
+  try {
+    activeRoom = await findParticipantActiveMeeting({
+      databaseName,
+      identity,
+      excludeRoomId: roomId,
+    })
+  } catch (cause) {
+    console.error('[LiveKit token] Active meeting safety check failed:', cause)
+    return error(
+      'Your active meeting status could not be verified. Please try again.',
+      503,
+      'MEETING_SAFETY_CHECK_UNAVAILABLE',
+    )
+  }
+
+  if (!activeRoom) return null
+
+  const activeMeeting = await Meeting.findOne({ roomId: activeRoom.roomId })
+    .select('_id roomId title')
+    .lean()
+  return error(
+    `You are already in ${activeMeeting?.title || 'another meeting'}. Leave it before joining a different meeting.`,
+    409,
+    'ACTIVE_MEETING_CONFLICT',
+    {
+      activeMeeting: {
+        id: activeMeeting?._id ? String(activeMeeting._id) : null,
+        roomId: activeRoom.roomId,
+        title: activeMeeting?.title || 'Current meeting',
+      },
+    },
+  )
 }
 
 async function readGuestSession(request) {
@@ -39,6 +79,14 @@ async function issueGuestToken(request, body, guest) {
   if (new Date(meeting.scheduledEnd) < new Date() && meeting.status !== 'in-progress') {
     return error('This meeting has ended', 410, 'MEETING_ENDED')
   }
+  const activeMeetingResponse = await checkActiveMeeting({
+    Meeting,
+    databaseName: guest.tenantDatabaseName,
+    identity: guest.guestId,
+    roomId: meeting.roomId,
+  })
+  if (activeMeetingResponse) return activeMeetingResponse
+
   const credentials = await createLiveKitParticipantToken({
     databaseName: guest.tenantDatabaseName,
     roomId: meeting.roomId,
@@ -81,6 +129,15 @@ export async function POST(request) {
       return error('You are not invited to this meeting', 403, 'NOT_INVITED')
     }
 
+    const identity = `user_${auth.user.id || auth.user._id}`
+    const activeMeetingResponse = await checkActiveMeeting({
+      Meeting: auth.models.Meeting,
+      databaseName: auth.tenant.databaseName,
+      identity,
+      roomId: meeting.roomId,
+    })
+    if (activeMeetingResponse) return activeMeetingResponse
+
     const employee = auth.user.employeeId
       ? await auth.models.Employee.findById(auth.user.employeeId).select('firstName lastName').lean()
       : null
@@ -88,7 +145,7 @@ export async function POST(request) {
     const credentials = await createLiveKitParticipantToken({
       databaseName: auth.tenant.databaseName,
       roomId: meeting.roomId,
-      identity: `user_${auth.user.id || auth.user._id}`,
+      identity,
       name: displayName,
       metadata: { type: 'employee', userId: String(auth.user.id || auth.user._id), employeeId },
     })

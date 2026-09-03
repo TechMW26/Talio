@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
-import { SWRConfig } from 'swr'
+import { SWRConfig, useSWRConfig } from 'swr'
 import { HeroUIProvider } from '@heroui/react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AILoadingProvider } from '@/contexts/AILoadingContext'
@@ -36,19 +36,25 @@ function isElectronApp() {
     return false
 }
 
-export function Providers({ children }) {
+function ClientDataSyncBridge() {
+    const { mutate } = useSWRConfig()
+
     useEffect(() => {
         const restoreFetch = patchBrowserFetchForFreshness()
         const unsubscribe = subscribeToClientDataChanges(() => {
-            revalidateAllApiQueries()
+            revalidateAllApiQueries(mutate)
         })
 
         return () => {
             unsubscribe()
             restoreFetch()
         }
-    }, [])
+    }, [mutate])
 
+    return null
+}
+
+export function Providers({ children }) {
     // Defer non-critical initialization (audio only)
     const initializeNonCritical = useCallback(async () => {
         // CRITICAL: Skip audio initialization for desktop apps
@@ -124,6 +130,7 @@ export function Providers({ children }) {
                             provider: () => new Map(),
                         }}
                     >
+                        <ClientDataSyncBridge />
                         <MiraTransitionOverlay />
                         <GlobalAILoadingOverlay />
                         <ScrollToTop />

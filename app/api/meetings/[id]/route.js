@@ -4,6 +4,11 @@ import { sendPushToUser } from '@/lib/pushNotification'
 import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import { sortMeetingTranscript } from '@/lib/meetingLanguage'
 import { parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
+import { emitMeetingUpdate } from '@/lib/realtimeEvents'
+import {
+  buildMeetingDetailsUpdate,
+  MeetingUpdateValidationError,
+} from '@/lib/meetings/meetingUpdate'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -113,23 +118,18 @@ export async function PUT(request, { params }) {
       }, { status: 403 })
     }
 
-    // Fields that can be updated
-    const updateableFields = [
-      'title', 'description', 'scheduledStart', 'scheduledEnd', 
-      'location', 'priority', 'agenda', 'tags', 'notes', 'status', 'actualStart', 'actualEnd'
-    ]
+    const meetingDetailsUpdate = buildMeetingDetailsUpdate(data, meeting)
+    Object.assign(meeting, meetingDetailsUpdate)
 
-    for (const field of updateableFields) {
+    // Operational meeting fields are also written here by the room and note-maker flows.
+    const operationalFields = ['agenda', 'tags', 'notes', 'status', 'actualStart', 'actualEnd']
+    for (const field of operationalFields) {
       if (data[field] !== undefined) {
-        const isMeetingDate = ['scheduledStart', 'scheduledEnd'].includes(field)
+        const isMeetingDate = ['actualStart', 'actualEnd'].includes(field)
         meeting[field] = isMeetingDate
           ? parseDateTimeInTimezone(data[field], IST_TIMEZONE)
           : data[field]
       }
-    }
-
-    if ((data.scheduledStart && !meeting.scheduledStart) || (data.scheduledEnd && !meeting.scheduledEnd)) {
-      return NextResponse.json({ success: false, message: 'Invalid meeting date or time' }, { status: 400 })
     }
 
     // Handle adding new invitees
@@ -179,20 +179,36 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // Recalculate duration if times changed
-    if (data.scheduledStart || data.scheduledEnd) {
-      const startTime = new Date(meeting.scheduledStart)
-      const endTime = new Date(meeting.scheduledEnd)
-      meeting.duration = Math.round((endTime - startTime) / (1000 * 60))
-    }
-
     await meeting.save()
 
     await meeting.populate([
-      { path: 'organizer', select: 'firstName lastName email profilePicture' },
-      { path: 'invitees.employee', select: 'firstName lastName email profilePicture' },
+      { path: 'organizer', select: 'firstName lastName email profilePicture userId' },
+      { path: 'invitees.employee', select: 'firstName lastName email profilePicture userId' },
       { path: 'invitedDepartments', select: 'name code' }
     ])
+
+    const targetUserIds = [
+      meeting.organizer?.userId,
+      ...(meeting.invitees || []).map((invitee) => invitee.employee?.userId),
+    ].filter(Boolean).map(String)
+    emitMeetingUpdate(meeting.toObject(), targetUserIds, { action: 'update' })
+
+    const attendeeVisibleDetailsChanged = [
+      'title', 'description', 'scheduledStart', 'scheduledEnd', 'location', 'priority',
+    ].some((field) => data[field] !== undefined)
+    if (attendeeVisibleDetailsChanged) {
+      for (const userId of targetUserIds) {
+        if (String(userId) === String(meeting.organizer?.userId || '')) continue
+        sendPushToUser(userId, {
+          title: '📅 Meeting updated',
+          body: `${meeting.title} is now scheduled for ${new Date(meeting.scheduledStart).toLocaleString('en-IN', { timeZone: IST_TIMEZONE })}.`,
+        }, {
+          eventType: 'meeting-updated',
+          clickAction: `/dashboard/meetings/${meeting._id}`,
+          data: { meetingId: String(meeting._id) },
+        }).catch(console.error)
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -201,7 +217,8 @@ export async function PUT(request, { params }) {
     })
   } catch (error) {
     console.error('Update meeting error:', error)
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 })
+    const status = error instanceof MeetingUpdateValidationError || error instanceof SyntaxError ? 400 : 500
+    return NextResponse.json({ success: false, message: error.message }, { status })
   }
 }
 

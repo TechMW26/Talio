@@ -104,4 +104,25 @@ describe('MeetingSessionProvider', () => {
       expect(screen.getByTestId('meeting-auto-join')).toHaveTextContent('yes')
     })
   })
+
+  it('keeps the active room when navigation targets a second meeting', async () => {
+    const view = render(
+      <MeetingSessionProvider>
+        <div>Dashboard content</div>
+      </MeetingSessionProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join test meeting' }))
+    mockPathname = '/dashboard/meetings/room/room-456'
+    view.rerender(
+      <MeetingSessionProvider>
+        <div>Dashboard content</div>
+      </MeetingSessionProvider>
+    )
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/dashboard/meetings/room/room-123')
+    })
+    expect(screen.getByTestId('meeting-display-mode')).toHaveTextContent('expanded')
+  })
 })

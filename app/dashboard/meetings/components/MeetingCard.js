@@ -13,12 +13,14 @@ import {
   HiOutlineCalendarDays,
   HiOutlineEllipsisVertical,
   HiOutlinePlayCircle,
-  HiOutlineDocumentText
+  HiOutlineDocumentText,
+  HiOutlinePencilSquare
 } from 'react-icons/hi2'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@heroui/react'
 import { IST_TIMEZONE } from '@/lib/timezone'
+import MeetingJoinLink from './MeetingJoinLink'
 
-export default function MeetingCard({ meeting, onRespond, showResponseActions = false }) {
+export default function MeetingCard({ meeting, onRespond, onEdit, showResponseActions = false }) {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [responding, setResponding] = useState(false)
@@ -245,15 +247,26 @@ export default function MeetingCard({ meeting, onRespond, showResponseActions = 
             </div>
           ) : (
             <div className="flex items-center gap-2">
+              {meeting.isOrganizer && ['scheduled', 'rescheduled'].includes(meeting.status) && onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(meeting)}
+                  aria-label={`Edit ${meeting.title}`}
+                  title="Edit meeting"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 transition-colors hover:bg-indigo-100"
+                >
+                  <HiOutlinePencilSquare className="h-4 w-4" />
+                </button>
+              )}
               {/* Join meeting button for online meetings */}
-              {meeting.type === 'online' && (isNow || (isUpcoming && meeting.status === 'scheduled')) && (meeting.isOrganizer || meeting.myInviteStatus === 'accepted') && (
-                <Link
-                  href={`/dashboard/meetings/room/${meeting.roomId}`}
+              {meeting.type === 'online' && (isNow || (isUpcoming && ['scheduled', 'rescheduled'].includes(meeting.status))) && (meeting.isOrganizer || meeting.myInviteStatus === 'accepted') && (
+                <MeetingJoinLink
+                  roomId={meeting.roomId}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                 >
                   <HiOutlinePlayCircle className="w-4 h-4" />
                   {isNow ? 'Join Now' : 'Join Meeting'}
-                </Link>
+                </MeetingJoinLink>
               )}
 
               {/* View details */}

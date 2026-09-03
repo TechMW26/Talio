@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { createRealtimeClient } from '@/lib/client/realtimeSocketAdapter'
 import toast from '@/utils/toast'
 import { clearAllSessionCaches, validateAuthBackground } from '@/utils/sessionCache'
+import { markClientDataChanged } from '@/lib/clientDataSync'
 
 // Real-time event names (mirrored from lib/realtimeEvents.js for client-side)
 export const REALTIME_EVENTS = {
@@ -46,6 +47,12 @@ export const REALTIME_EVENTS = {
   MEETING_CANCELLED: 'meeting-cancelled',
   DAILY_GOAL_UPDATED: 'daily-goal-updated',
   RECRUITMENT_UPDATE: 'recruitment-update',
+  RECRUITMENT_JOB_CREATED: 'recruitment-job-created',
+  RECRUITMENT_JOB_UPDATED: 'recruitment-job-updated',
+  RECRUITMENT_CANDIDATE_UPDATED: 'recruitment-candidate-updated',
+  RECRUITMENT_CANDIDATE_STAGE_CHANGED: 'recruitment-candidate-stage-changed',
+  RECRUITMENT_INTERVIEW_SCHEDULED: 'recruitment-interview-scheduled',
+  RECRUITMENT_INTERVIEW_UPDATED: 'recruitment-interview-updated',
   HOLIDAY_UPDATE: 'holiday-update',
   POLICY_UPDATE: 'policy-update',
 }
@@ -385,6 +392,16 @@ export function SocketProvider({ children }) {
     // Uses shared handler that works for both Socket.IO and polling
     socketInstance.on('force-refresh', handleForceRefresh)
 
+    // One shared bridge keeps every mounted SWR-backed dashboard view current.
+    // API mutations already trigger the same path locally; this covers changes
+    // made by other users, background jobs, attendance devices, and meetings.
+    const realtimeDataHandlers = new Map()
+    for (const eventName of new Set(Object.values(REALTIME_EVENTS))) {
+      const handler = () => markClientDataChanged(`realtime:${eventName}`)
+      realtimeDataHandlers.set(eventName, handler)
+      socketInstance.on(eventName, handler)
+    }
+
     setSocket(socketInstance)
 
     // Expose socket globally for MIRA to use
@@ -395,6 +412,9 @@ export function SocketProvider({ children }) {
       stopRefreshPolling()
       stopHeartbeat()
       if (socketInstance) {
+        for (const [eventName, handler] of realtimeDataHandlers) {
+          socketInstance.off(eventName, handler)
+        }
         socketInstance.disconnect()
       }
       // Clean up global reference
