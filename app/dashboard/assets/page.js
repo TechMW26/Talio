@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox, FaFileUpload } from 'react-icons/fa'
+import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox, FaFileUpload, FaSearch, FaEye, FaPen } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -11,8 +11,45 @@ import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import ModalPortal from '@/components/ui/ModalPortal'
-import { Select, SelectItem, Input, Textarea, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Skeleton } from '@heroui/react'
+import { Autocomplete, AutocompleteItem, Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/react'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import { getAssetAssigneeLabel, matchesAssetAssignee } from '@/utils/assetAssigneeSearch'
+import { formatAssetStatus, getAssetDisplayDetails, normalizeAssetInput, normalizeAssetStatus } from '@/utils/assetData'
+
+const EMPTY_ASSET_FORM = {
+  name: '',
+  assetCode: '',
+  uin: '',
+  category: 'laptop',
+  description: '',
+  specs: '',
+  assignedTo: '',
+  status: 'available',
+  purchaseDate: '',
+  purchasePrice: '',
+}
+
+const toDateInputValue = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10)
+}
+
+const assetToFormData = (asset = {}) => {
+  const details = getAssetDisplayDetails(asset)
+  return {
+    name: details.name === 'Unnamed asset' ? '' : details.name,
+    assetCode: details.code === 'Not provided' ? '' : details.code,
+    uin: asset.uin || '',
+    category: details.category,
+    description: asset.description || '',
+    specs: asset.specs || '',
+    assignedTo: String(asset.assignedTo?._id || asset.assignedTo || ''),
+    status: details.status,
+    purchaseDate: toDateInputValue(asset.purchaseDate),
+    purchasePrice: asset.purchasePrice ?? '',
+  }
+}
 
 export default function AssetsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -22,19 +59,11 @@ export default function AssetsPage() {
   const [bulkImporting, setBulkImporting] = useState(false)
   const [bulkPreviewing, setBulkPreviewing] = useState(false)
   const [generatingDescription, setGeneratingDescription] = useState(false)
+  const [selectedAsset, setSelectedAsset] = useState(null)
+  const [isEditingAsset, setIsEditingAsset] = useState(false)
+  const [editFormData, setEditFormData] = useState(EMPTY_ASSET_FORM)
   const { startAILoading, stopAILoading } = useAILoading()
-  const [formData, setFormData] = useState({
-    name: '',
-    assetCode: '',
-    uin: '',
-    category: 'laptop',
-    description: '',
-    specs: '',
-    assignedTo: '',
-    status: 'available',
-    purchaseDate: '',
-    purchasePrice: ''
-  })
+  const [formData, setFormData] = useState(EMPTY_ASSET_FORM)
 
   // User from localStorage
   const currentUser = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
@@ -92,23 +121,57 @@ export default function AssetsPage() {
 
   const closeModal = () => {
     setIsModalOpen(false)
-    setFormData({
-      name: '',
-      assetCode: '',
-      uin: '',
-      category: 'laptop',
-      description: '',
-      specs: '',
-      assignedTo: '',
-      status: 'available',
-      purchaseDate: '',
-      purchasePrice: ''
-    })
+    setFormData(EMPTY_ASSET_FORM)
+  }
+
+  const updateMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [assetsUrl],
+    onSuccess: (response) => {
+      toast.success('Asset updated successfully')
+      setSelectedAsset(response.data)
+      setEditFormData(assetToFormData(response.data))
+      setIsEditingAsset(false)
+    },
+    onError: (msg) => toast.error(msg || 'Failed to update asset'),
+  })
+
+  const openAsset = (asset) => {
+    setSelectedAsset(asset)
+    setEditFormData(assetToFormData(asset))
+    setIsEditingAsset(false)
+  }
+
+  const closeAsset = () => {
+    setSelectedAsset(null)
+    setIsEditingAsset(false)
+    updateMutation.reset()
+  }
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target
+    setEditFormData((previous) => ({ ...previous, [name]: value }))
+  }
+
+  const handleAssetUpdate = async (event) => {
+    event.preventDefault()
+    if (!selectedAsset?._id) return
+    const { data, errors } = normalizeAssetInput(editFormData, { partial: true })
+    if (errors.length > 0) {
+      toast.error(errors[0])
+      return
+    }
+    await updateMutation.execute(`/api/assets/${selectedAsset._id}`, data)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    submitMutation.execute('/api/assets', formData)
+    const { data, errors } = normalizeAssetInput(formData)
+    if (errors.length > 0) {
+      toast.error(errors[0])
+      return
+    }
+    await submitMutation.execute('/api/assets', data)
   }
 
   const handleBulkPreview = async () => {
@@ -179,7 +242,7 @@ export default function AssetsPage() {
             {isAdmin ? 'Manage company assets and equipment' : 'View assets assigned to you'}
           </p>
         </div>
-        {['admin', 'hr'].includes(userRole) && (
+        {['admin', 'hr', 'super_admin'].includes(userRole) && (
           <div className="flex gap-2">
             <Button
               onPress={() => setIsBulkImportOpen(true)}
@@ -236,7 +299,7 @@ export default function AssetsPage() {
               <FaTools className="text-orange-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">
-              {assets.filter(a => a.status === 'maintenance').length}
+              {assets.filter(a => normalizeAssetStatus(a.status) === 'under-maintenance').length}
             </div>
           </div>
         </div>
@@ -256,7 +319,7 @@ export default function AssetsPage() {
               <FaTools className="text-orange-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">
-              {assets.filter(a => a.status === 'maintenance').length}
+              {assets.filter(a => normalizeAssetStatus(a.status) === 'under-maintenance').length}
             </div>
           </div>
         </div>
@@ -315,22 +378,40 @@ export default function AssetsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
+                  {isAdmin && (
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {assets.map((asset) => (
-                  <tr key={asset._id} className="hover:bg-gray-50">
+                {assets.map((asset) => {
+                  const details = getAssetDisplayDetails(asset)
+                  return (
+                  <tr
+                    key={asset._id}
+                    className="hover:bg-gray-50 cursor-pointer focus-within:bg-gray-50"
+                    onClick={() => openAsset(asset)}
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        openAsset(asset)
+                      }
+                    }}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {asset.assetName}
+                        {details.name}
                       </div>
-                      <div className="text-sm text-gray-500">{asset.brand}</div>
+                      {details.manufacturer && <div className="text-sm text-gray-500">{details.manufacturer}</div>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {asset.assetId}
+                      {details.code}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {asset.assetType}
+                      <span className="capitalize">{details.category}</span>
                     </td>
                     {isAdmin && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -349,21 +430,171 @@ export default function AssetsPage() {
                         : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.status === 'assigned' ? 'bg-green-100 text-green-800' :
-                          asset.status === 'available' ? 'bg-blue-100 text-blue-800' :
-                            asset.status === 'maintenance' ? 'bg-orange-100 text-orange-800' :
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${details.status === 'assigned' ? 'bg-green-100 text-green-800' :
+                          details.status === 'available' ? 'bg-blue-100 text-blue-800' :
+                            details.status === 'under-maintenance' ? 'bg-orange-100 text-orange-800' :
                               'bg-red-100 text-red-800'
                         }`}>
-                        {asset.status}
+                        {formatAssetStatus(details.status)}
                       </span>
                     </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); openAsset(asset) }}
+                          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          aria-label={`Open ${details.name}`}
+                        >
+                          <FaEye aria-hidden="true" /> View
+                        </button>
+                      </td>
+                    )}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Asset details and edit modal */}
+      <ModalPortal isOpen={Boolean(selectedAsset)}>
+        <div className="modal-overlay" onMouseDown={(event) => event.target === event.currentTarget && closeAsset()}>
+          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="asset-details-title">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h2 id="asset-details-title" className="text-xl font-bold text-gray-900">
+                  {isEditingAsset ? 'Edit Asset' : getAssetDisplayDetails(selectedAsset || {}).name}
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  {isEditingAsset ? 'Update details, status, or employee assignment.' : getAssetDisplayDetails(selectedAsset || {}).code}
+                </p>
+              </div>
+              <button type="button" onClick={closeAsset} className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700" aria-label="Close asset details">
+                <FaTimes />
+              </button>
+            </div>
+
+            {isEditingAsset ? (
+              <form onSubmit={handleAssetUpdate} className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Asset Name" name="name" value={editFormData.name} onChange={handleEditChange} isRequired />
+                  <Input label="Asset Code" name="assetCode" value={editFormData.assetCode} onChange={handleEditChange} isRequired />
+                  <Input label="UIN" name="uin" value={editFormData.uin} onChange={handleEditChange} />
+                  <Select
+                    label="Category"
+                    selectedKeys={[editFormData.category]}
+                    onSelectionChange={(keys) => handleEditChange({ target: { name: 'category', value: Array.from(keys)[0] || 'other' } })}
+                    isRequired
+                  >
+                    <SelectItem key="laptop">Laptop</SelectItem>
+                    <SelectItem key="desktop">Desktop</SelectItem>
+                    <SelectItem key="mobile">Mobile</SelectItem>
+                    <SelectItem key="tablet">Tablet</SelectItem>
+                    <SelectItem key="monitor">Monitor</SelectItem>
+                    <SelectItem key="keyboard">Keyboard</SelectItem>
+                    <SelectItem key="mouse">Mouse</SelectItem>
+                    <SelectItem key="furniture">Furniture</SelectItem>
+                    <SelectItem key="vehicle">Vehicle</SelectItem>
+                    <SelectItem key="other">Other</SelectItem>
+                  </Select>
+                  <Autocomplete
+                    label="Assigned To"
+                    placeholder="Search by name or employee code"
+                    selectedKey={editFormData.assignedTo || 'unassigned'}
+                    onSelectionChange={(key) => {
+                      const assignedTo = key && key !== 'unassigned' ? String(key) : ''
+                      setEditFormData((previous) => ({
+                        ...previous,
+                        assignedTo,
+                        status: assignedTo ? 'assigned' : (previous.status === 'assigned' ? 'available' : previous.status),
+                      }))
+                    }}
+                    defaultFilter={matchesAssetAssignee}
+                    startContent={<FaSearch className="shrink-0 text-gray-400" aria-hidden="true" />}
+                    allowsCustomValue={false}
+                    maxListboxHeight={320}
+                    listboxProps={{ emptyContent: 'No employees match your search' }}
+                    popoverProps={{ classNames: { content: 'rounded-2xl' } }}
+                  >
+                    <AutocompleteItem key="unassigned" textValue="Unassigned">Unassigned</AutocompleteItem>
+                    {employees.map((employee) => (
+                      <AutocompleteItem key={String(employee._id)} textValue={getAssetAssigneeLabel(employee)}>
+                        {getAssetAssigneeLabel(employee)}
+                      </AutocompleteItem>
+                    ))}
+                  </Autocomplete>
+                  <Select
+                    label="Status"
+                    selectedKeys={[editFormData.status]}
+                    onSelectionChange={(keys) => handleEditChange({ target: { name: 'status', value: Array.from(keys)[0] || 'available' } })}
+                    isDisabled={Boolean(editFormData.assignedTo)}
+                    disabledKeys={['assigned']}
+                    description={editFormData.assignedTo ? 'Assigned automatically when an employee is selected' : undefined}
+                  >
+                    <SelectItem key="available">Available</SelectItem>
+                    <SelectItem key="assigned">Assigned</SelectItem>
+                    <SelectItem key="under-maintenance">Under Maintenance</SelectItem>
+                    <SelectItem key="damaged">Damaged</SelectItem>
+                    <SelectItem key="disposed">Disposed</SelectItem>
+                  </Select>
+                  <Input label="Purchase Date" type="date" name="purchaseDate" value={editFormData.purchaseDate} onChange={handleEditChange} />
+                  <Input label="Purchase Price" type="number" min="0" name="purchasePrice" value={String(editFormData.purchasePrice)} onChange={handleEditChange} />
+                  <Textarea className="md:col-span-2" label="Description" name="description" value={editFormData.description} onChange={handleEditChange} />
+                  <Textarea className="md:col-span-2" label="Specifications" name="specs" value={editFormData.specs} onChange={handleEditChange} />
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="flat" onPress={() => setIsEditingAsset(false)}>Cancel</Button>
+                  <LoadingButton type="submit" isLoading={updateMutation.isLoading} color="primary">
+                    Save Changes
+                  </LoadingButton>
+                </div>
+              </form>
+            ) : selectedAsset ? (() => {
+              const details = getAssetDisplayDetails(selectedAsset)
+              const assignedName = selectedAsset.assignedTo
+                ? `${selectedAsset.assignedTo.firstName || ''} ${selectedAsset.assignedTo.lastName || ''}`.trim() || selectedAsset.assignedTo.employeeCode || 'Assigned employee'
+                : 'Unassigned'
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      ['Asset code', details.code],
+                      ['Category', details.category],
+                      ['Status', formatAssetStatus(details.status)],
+                      ['Assigned to', assignedName],
+                      ['Purchase date', selectedAsset.purchaseDate ? new Date(selectedAsset.purchaseDate).toLocaleDateString() : 'Not provided'],
+                      ['Purchase price', selectedAsset.purchasePrice !== undefined && selectedAsset.purchasePrice !== null ? `₹${Number(selectedAsset.purchasePrice).toLocaleString('en-IN')}` : 'Not provided'],
+                      ['UIN', selectedAsset.uin || 'Not provided'],
+                      ['Manufacturer', details.manufacturer || 'Not provided'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+                        <p className="mt-1 break-words text-sm font-semibold text-gray-900 capitalize">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {(selectedAsset.description || selectedAsset.specs) && (
+                    <div className="mt-4 space-y-3">
+                      {selectedAsset.description && <div><p className="text-xs font-medium uppercase tracking-wide text-gray-500">Description</p><p className="mt-1 text-sm text-gray-700">{selectedAsset.description}</p></div>}
+                      {selectedAsset.specs && <div><p className="text-xs font-medium uppercase tracking-wide text-gray-500">Specifications</p><p className="mt-1 text-sm text-gray-700">{selectedAsset.specs}</p></div>}
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <div className="mt-6 flex justify-end">
+                      <Button color="primary" startContent={<FaPen />} onPress={() => setIsEditingAsset(true)}>
+                        Edit or Reassign
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )
+            })() : null}
+          </div>
+        </div>
+      </ModalPortal>
 
       {/* Add Asset Modal */}
       <ModalPortal isOpen={isModalOpen}>
@@ -481,24 +712,43 @@ export default function AssetsPage() {
                   ></textarea>
                 </div>
                 <div>
-                  <Select
+                  <Autocomplete
                     label="Assigned To"
-                    selectedKeys={formData.assignedTo ? [formData.assignedTo] : []}
-                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'assignedTo', value: Array.from(keys)[0] || '' } })}
-                    placeholder="Unassigned"
+                    placeholder="Search by name or employee code"
+                    selectedKey={formData.assignedTo || 'unassigned'}
+                    onSelectionChange={(key) => {
+                      const assignedTo = key && key !== 'unassigned' ? String(key) : ''
+                      setFormData((previous) => ({
+                        ...previous,
+                        assignedTo,
+                        status: assignedTo ? 'assigned' : (previous.status === 'assigned' ? 'available' : previous.status),
+                      }))
+                    }}
+                    defaultFilter={matchesAssetAssignee}
+                    startContent={<FaSearch className="shrink-0 text-gray-400" aria-hidden="true" />}
+                    allowsCustomValue={false}
+                    maxListboxHeight={320}
+                    listboxProps={{ emptyContent: 'No employees match your search' }}
+                    popoverProps={{ classNames: { content: 'rounded-2xl' } }}
                   >
-                    {employees.map(emp => (
-                      <SelectItem key={emp._id}>
-                        {emp.firstName} {emp.lastName} ({emp.employeeCode})
-                      </SelectItem>
+                    <AutocompleteItem key="unassigned" textValue="Unassigned">
+                      Unassigned
+                    </AutocompleteItem>
+                    {employees.map((emp) => (
+                      <AutocompleteItem key={String(emp._id)} textValue={getAssetAssigneeLabel(emp)}>
+                        {getAssetAssigneeLabel(emp)}
+                      </AutocompleteItem>
                     ))}
-                  </Select>
+                  </Autocomplete>
                 </div>
                 <div>
                   <Select
                     label="Status"
                     selectedKeys={[formData.status]}
                     onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'available' } })}
+                    isDisabled={Boolean(formData.assignedTo)}
+                    disabledKeys={['assigned']}
+                    description={formData.assignedTo ? 'Assigned automatically when an employee is selected' : undefined}
                   >
                     <SelectItem key="available">Available</SelectItem>
                     <SelectItem key="assigned">Assigned</SelectItem>

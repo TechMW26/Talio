@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { FaTimes, FaCheck, FaExclamationTriangle } from 'react-icons/fa'
+import { FaTimes, FaExclamationTriangle, FaHourglassHalf } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
@@ -39,14 +39,15 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
   }, [])
 
   // Handle dismiss with animation
-  const handleDismiss = useCallback(() => {
+  const handleDismiss = useCallback((force = false, persistDismissal = true) => {
+    if (notification.displaySettings?.dismissible === false && !force) return
     setIsVisible(false)
     setTimeout(() => {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && persistDismissal) {
         onDismiss?.()
       }
     }, 300)
-  }, [onDismiss])
+  }, [notification.displaySettings?.dismissible, onDismiss])
 
   // Handle action click
   const handleActionClick = useCallback(async (action) => {
@@ -75,7 +76,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
     }
 
     // Check if action requires reason
-    if (action.requiresReason && !reason && !showReasonInput) {
+    if (action.requiresReason && !reason.trim()) {
       setSelectedAction(action)
       setShowReasonInput(true)
       return
@@ -134,7 +135,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
         // Endpoint succeeded - mark notification as actioned (skip server-side proxy)
         await onAction?.(action.id, reason || null, true)
         toast.success(endpointResult?.message || 'Action completed successfully')
-        handleDismiss()
+        handleDismiss(true, false)
       } else {
         // No endpoint - just mark as actioned via the backend
         const result = await onAction?.(action.id, reason || null, false)
@@ -142,7 +143,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
         if (result?.success) {
           toast.success(result.message || 'Action completed successfully')
           if (result.url) router.push(result.url)
-          handleDismiss()
+          handleDismiss(true, false)
         } else {
           toast.error(result?.message || 'Action failed')
         }
@@ -158,7 +159,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
         setSelectedAction(null)
       }
     }
-  }, [notification, router, handleDismiss, onAction, reason, showConfirmation, showReasonInput])
+  }, [notification, router, handleDismiss, onAction, reason, showConfirmation])
 
   // Submit reason and execute action
   const handleReasonSubmit = useCallback((e) => {
@@ -178,6 +179,9 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
 
   // Get icon for notification type
   const getTypeIcon = () => {
+    if (notification.type === 'probation_approval' || notification.icon === 'probation') {
+      return <FaHourglassHalf className="h-5 w-5 text-amber-500" aria-hidden="true" />
+    }
     const icons = {
       project_invitation: '📊',
       task_assignment: '✅',
@@ -229,25 +233,25 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
   return (
     <div
       className={`
-        w-full max-w-md bg-white rounded-xl shadow-2xl 
+        w-full max-w-md bg-white dark:bg-zinc-950 rounded-xl shadow-2xl border border-transparent dark:border-zinc-800
         overflow-hidden
         transition-all duration-300 transform
         ${isVisible ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'}
       `}
     >
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+      <div className="px-4 py-3 bg-gray-50 dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <span className="text-2xl flex-shrink-0">{getTypeIcon()}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-gray-900 text-sm">
+                <h3 className="font-semibold text-gray-900 dark:text-zinc-100 text-sm">
                   {notification.title}
                 </h3>
                 {getPriorityBadge()}
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
                 {notification.createdBy?.firstName 
                   ? `From ${notification.createdBy.firstName} ${notification.createdBy.lastName || ''}`
                   : formatTimeAgo(notification.createdAt)
@@ -255,19 +259,21 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleDismiss}
-            className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
-            aria-label="Dismiss notification"
-          >
-            <FaTimes className="w-4 h-4 text-gray-500" />
-          </button>
+          {notification.displaySettings?.dismissible !== false && (
+            <button
+              onClick={() => handleDismiss()}
+              className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
+              aria-label="Dismiss notification"
+            >
+              <FaTimes className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Body */}
       <div className="px-4 py-3">
-        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+        <p className="text-sm text-gray-700 dark:text-zinc-200 whitespace-pre-wrap">
           {notification.message}
         </p>
       </div>
@@ -276,7 +282,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
       {showReasonInput && selectedAction && (
         <div className="px-4 pb-3">
           <form onSubmit={handleReasonSubmit}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-200 mb-1">
               {selectedAction.reasonPrompt || 'Please provide a reason'}
             </label>
             <textarea
@@ -284,22 +290,24 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
               onChange={(e) => setReason(e.target.value)}
               placeholder="Enter reason..."
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg 
-                       bg-white text-gray-900
+                       bg-white text-gray-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100
                        focus:ring-2 focus:ring-blue-500 focus:border-transparent
                        resize-none"
               rows={2}
+              required
               autoFocus
             />
             <div className="flex justify-end gap-2 mt-2">
               <button
                 type="button"
                 onClick={handleCancelReason}
-                className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"
+                className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200"
               >
                 Cancel
               </button>
               <button
                 type="submit"
+                disabled={!reason.trim() || loadingAction !== null}
                 className={`px-3 py-1.5 text-sm rounded-lg ${getButtonStyle(selectedAction.variant)}`}
               >
                 {loadingAction === selectedAction.id ? (
@@ -346,7 +354,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
 
       {/* Actions */}
       {!showReasonInput && !showConfirmation && notification.actions && notification.actions.length > 0 && (
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
+        <div className="px-4 py-3 bg-gray-50 dark:bg-zinc-900 border-t border-gray-100 dark:border-zinc-800">
           <div className="flex flex-wrap gap-2 justify-end">
             {notification.actions.map((action) => (
               <button

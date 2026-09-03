@@ -51,6 +51,7 @@ const ActionableNotificationSchema = new mongoose.Schema({
       'attendance_correction', // Approve/Reject correction
       'helpdesk_assignment',   // Acknowledge ticket assignment
       'announcement',          // Acknowledge/View announcement
+      'probation_approval',     // Approve/Reject probation confirmation or extension
       'generic'                // Custom actions
     ],
     required: true,
@@ -83,7 +84,7 @@ const ActionableNotificationSchema = new mongoose.Schema({
   reference: {
     model: {
       type: String,
-      enum: ['Project', 'Task', 'Meeting', 'Leave', 'Expense', 'Travel', 'Document', 'Attendance', 'Helpdesk', 'Announcement']
+      enum: ['Project', 'Task', 'Meeting', 'Leave', 'Expense', 'Travel', 'Document', 'Attendance', 'Helpdesk', 'Announcement', 'ProbationApproval']
     },
     id: {
       type: mongoose.Schema.Types.ObjectId
@@ -161,6 +162,10 @@ const ActionableNotificationSchema = new mongoose.Schema({
       default: true  // Show in notification bell
     },
     playSound: {
+      type: Boolean,
+      default: true
+    },
+    dismissible: {
       type: Boolean,
       default: true
     }

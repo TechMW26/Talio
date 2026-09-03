@@ -4,6 +4,7 @@ import { FaLaptop, FaBarcode } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { getEmployeeId } from '@/utils/userHelper'
 import { Card, CardBody, Chip, Skeleton, ScrollShadow } from '@heroui/react'
+import { formatAssetStatus, getAssetDisplayDetails } from '@/utils/assetData'
 
 export default function MyAssetsWidget({ user, initialData }) {
   const router = useRouter()
@@ -40,8 +41,8 @@ export default function MyAssetsWidget({ user, initialData }) {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'active': return 'success'
-      case 'maintenance': return 'warning'
+      case 'assigned': return 'success'
+      case 'under-maintenance': return 'warning'
       default: return 'default'
     }
   }
@@ -84,21 +85,24 @@ export default function MyAssetsWidget({ user, initialData }) {
             <p className="text-sm text-default-500">No assets assigned</p>
           </div>
         ) : (
-          assets.map(asset => (
+          assets.map(asset => {
+            const details = getAssetDisplayDetails(asset)
+            return (
             <Card key={asset._id} className="border border-default-100">
               <CardBody className="p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-default-900 truncate">{asset.name}</p>
-                    <p className="text-xs text-default-500">{asset.assetId || asset.uin}</p>
+                    <p className="text-sm font-semibold text-default-900 truncate">{details.name}</p>
+                    <p className="text-xs text-default-500 truncate">{details.code} · <span className="capitalize">{details.category}</span></p>
                   </div>
-                  <Chip size="sm" color={getStatusColor(asset.status)} variant="flat" className="capitalize">
-                    {asset.status}
+                  <Chip size="sm" color={getStatusColor(details.status)} variant="flat">
+                    {formatAssetStatus(details.status)}
                   </Chip>
                 </div>
               </CardBody>
             </Card>
-          ))
+            )
+          })
         )}
       </ScrollShadow>
     </div>

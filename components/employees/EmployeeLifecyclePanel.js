@@ -5,7 +5,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import OffboardingAssetChecklistModal from '@/components/employees/OffboardingAssetChecklistModal'
 import toast from '@/utils/toast'
 import { Button, Chip, Progress, Skeleton } from '@heroui/react'
-import { FaCheck, FaClock, FaFlagCheckered, FaHourglassHalf, FaRoute, FaSyncAlt, FaUserCheck } from 'react-icons/fa'
+import { FaCheck, FaClock, FaCommentDots, FaFlagCheckered, FaHourglassHalf, FaPaperPlane, FaRoute, FaSyncAlt } from 'react-icons/fa'
 
 const STAGE_LABELS = {
   preboarding: 'Pre-boarding', onboarding: 'Onboarding', probation: 'Probation', confirmed: 'Confirmed',
@@ -20,7 +20,10 @@ function formatIstDate(value) {
 }
 
 export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }) {
-  const { data, isLoading, mutate } = useAuthedSWR(employeeId ? `/api/employees/${employeeId}/lifecycle` : null)
+  const { data, isLoading, mutate } = useAuthedSWR(employeeId ? `/api/employees/${employeeId}/lifecycle` : null, {
+    revalidateOnFocus: true,
+    refreshInterval: 30000,
+  })
   const details = data?.data
   const lifecycle = details?.lifecycle
   const [processing, setProcessing] = useState('')
@@ -54,10 +57,37 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
       toast.success(result.message || 'Lifecycle updated')
       await mutate()
       onEmployeeRefresh?.()
-      if (action === 'extend_probation') setShowExtension(false)
       if (action === 'start_offboarding') setShowOffboarding(false)
     } catch (error) {
       toast.error(error.message)
+    } finally {
+      setProcessing('')
+    }
+  }
+
+  const requestProbationApproval = async (requestType, payload = {}) => {
+    try {
+      setProcessing(`request_probation_${requestType}`)
+      const response = await fetch(`/api/employees/${employeeId}/probation-approval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ requestType, ...payload }),
+      })
+      const responseText = await response.text()
+      let result
+      try {
+        result = responseText ? JSON.parse(responseText) : null
+      } catch {
+        result = null
+      }
+      if (!result) throw new Error(response.ok ? 'The approval service returned an invalid response' : `Approval request failed (${response.status})`)
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to request probation approval')
+      toast.success(result.message || 'Probation approval requested')
+      setShowExtension(false)
+      await mutate()
+    } catch (error) {
+      toast.error(error.message)
+      await mutate()
     } finally {
       setProcessing('')
     }
@@ -67,6 +97,11 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
   if (!lifecycle) return null
 
   const probation = lifecycle.probation || {}
+  const probationApproval = details.probationApproval
+  const approvalPending = ['pending', 'processing'].includes(probationApproval?.status)
+  const approverName = probationApproval?.approver
+    ? `${probationApproval.approver.firstName || ''} ${probationApproval.approver.lastName || ''}`.trim()
+    : ''
   const exit = lifecycle.offboarding || {}
   const assetChecklist = exit.assetChecklist || []
   const clearedAssets = assetChecklist.filter((item) => ['returned', 'waived'].includes(item.status)).length
@@ -141,20 +176,71 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
               <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">{probation.durationMonths} months · review due {formatIstDate(probation.reviewDate)}</p>
               <p className="mt-1 text-xs capitalize text-slate-500">Status: {String(probation.status || '').replaceAll('_', ' ')}</p>
             </div>
-            {canManage && !['confirmed', 'waived'].includes(probation.status) && (
+            {canManage && !approvalPending && !['confirmed', 'waived'].includes(probation.status) && (
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="flat" onPress={() => setShowExtension((value) => !value)}>Extend</Button>
-                <Button size="sm" color="success" className="text-white" isLoading={processing === 'confirm_probation'} startContent={!processing && <FaUserCheck />} onPress={() => runAction('confirm_probation')}>Confirm employee</Button>
+                <Button
+                  size="sm"
+                  color="success"
+                  className="text-white"
+                  isLoading={processing === 'request_probation_confirmation'}
+                  startContent={!processing && <FaPaperPlane />}
+                  onPress={() => requestProbationApproval('confirmation')}
+                >
+                  Request confirmation
+                </Button>
               </div>
             )}
           </div>
-          {showExtension && (
+          {probationApproval && (
+            <div className={`mt-4 rounded-xl border p-4 ${
+              approvalPending
+                ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20'
+                : probationApproval.status === 'approved'
+                  ? 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20'
+                  : 'border-rose-200 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-950/20'
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-zinc-100">
+                  <FaCommentDots className="text-primary" />
+                  {probationApproval.requestType === 'extension' ? 'Extension approval' : 'Confirmation approval'}
+                </p>
+                <Chip
+                  size="sm"
+                  variant="flat"
+                  color={approvalPending ? 'warning' : probationApproval.status === 'approved' ? 'success' : 'danger'}
+                >
+                  {approvalPending ? 'Awaiting approval' : probationApproval.status}
+                </Chip>
+              </div>
+              <p className="mt-2 text-xs text-slate-600 dark:text-zinc-300">
+                {approvalPending
+                  ? `Pending with ${approverName || 'the assigned reporting approver'}`
+                  : `${approverName || 'The assigned approver'} responded ${formatIstDate(probationApproval.decidedAt)}`}
+                {probationApproval.extensionMonths ? ` · ${probationApproval.extensionMonths} month extension` : ''}
+              </p>
+              {probationApproval.requestRemarks && (
+                <p className="mt-2 text-xs text-slate-600 dark:text-zinc-400"><span className="font-semibold">Request note:</span> {probationApproval.requestRemarks}</p>
+              )}
+              {probationApproval.decisionRemarks && (
+                <p className="mt-1 text-xs text-slate-600 dark:text-zinc-400"><span className="font-semibold">Manager remarks:</span> {probationApproval.decisionRemarks}</p>
+              )}
+            </div>
+          )}
+          {showExtension && !approvalPending && (
             <div className="mt-4 grid gap-3 rounded-xl bg-slate-50 p-4 dark:bg-zinc-900 sm:grid-cols-[140px_1fr_auto]">
               <select value={extension.months} onChange={(event) => setExtension((value) => ({ ...value, months: Number(event.target.value) }))} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950">
                 <option value={1}>1 month</option><option value={2}>2 months</option><option value={3}>3 months</option><option value={6}>6 months</option>
               </select>
               <input value={extension.reason} onChange={(event) => setExtension((value) => ({ ...value, reason: event.target.value }))} placeholder="Required reason for extension" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950" />
-              <Button color="primary" isLoading={processing === 'extend_probation'} onPress={() => runAction('extend_probation', extension)}>Save extension</Button>
+              <Button
+                color="primary"
+                isDisabled={!extension.reason.trim()}
+                isLoading={processing === 'request_probation_extension'}
+                onPress={() => requestProbationApproval('extension', { months: extension.months, remarks: extension.reason })}
+              >
+                Request approval
+              </Button>
             </div>
           )}
         </div>

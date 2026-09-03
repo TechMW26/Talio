@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
+import { normalizeAssetInput } from '@/utils/assetData'
+import { emitAssetUpdate } from '@/lib/realtimeEvents'
 
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
@@ -20,13 +22,29 @@ export async function PUT(request, { params }) {
     const { Asset, Employee, User, Notification } = models
 
     // Role check
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'hr', 'super_admin'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can update assets' }, { status: 403 })
     }
 
-    const data = await request.json()
+    const input = await request.json()
+    const { data, errors } = normalizeAssetInput(input, { partial: true })
+    const { id } = await params
 
-    if (!isValidObjectId(params.id)) {
+    if (errors.length > 0) {
+      return NextResponse.json(
+        { success: false, message: errors[0], errors },
+        { status: 400 }
+      )
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'No valid asset fields were provided' },
+        { status: 400 }
+      )
+    }
+
+    if (!isValidObjectId(id)) {
       return NextResponse.json(
         { success: false, message: 'Invalid asset ID' },
         { status: 400 }
@@ -40,8 +58,19 @@ export async function PUT(request, { params }) {
       )
     }
 
+
+    if (data.assignedTo && !(await Employee.exists({ _id: data.assignedTo }))) {
+      return NextResponse.json(
+        { success: false, message: 'Assigned employee was not found' },
+        { status: 404 }
+      )
+    }
+
+    if (data.assignedTo) data.assignedDate = new Date()
+    else if (Object.hasOwn(data, 'assignedTo')) data.assignedDate = null
+
     const asset = await Asset.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true, runValidators: true }
     ).populate('assignedTo', 'firstName lastName employeeCode')
@@ -103,6 +132,8 @@ export async function PUT(request, { params }) {
       console.error('Failed to send asset socket notification:', socketError)
     }
 
+    emitAssetUpdate(asset, [], { action: 'update', broadcast: true })
+
     return NextResponse.json({
       success: true,
       message: 'Asset updated successfully',
@@ -110,6 +141,13 @@ export async function PUT(request, { params }) {
     })
   } catch (error) {
     console.error('Update asset error:', error)
+    if (error?.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || 'asset code'
+      return NextResponse.json(
+        { success: false, message: `An asset with this ${duplicateField} already exists` },
+        { status: 409 }
+      )
+    }
     return NextResponse.json(
       { success: false, message: error.message || 'Failed to update asset' },
       { status: 500 }
@@ -129,18 +167,20 @@ export async function DELETE(request, { params }) {
     const { Asset } = models
 
     // Role check
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'hr', 'super_admin'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can delete assets' }, { status: 403 })
     }
 
-    if (!isValidObjectId(params.id)) {
+    const { id } = await params
+
+    if (!isValidObjectId(id)) {
       return NextResponse.json(
         { success: false, message: 'Invalid asset ID' },
         { status: 400 }
       )
     }
 
-    const asset = await Asset.findByIdAndDelete(params.id)
+    const asset = await Asset.findByIdAndDelete(id)
 
     if (!asset) {
       return NextResponse.json(
@@ -148,6 +188,8 @@ export async function DELETE(request, { params }) {
         { status: 404 }
       )
     }
+
+    emitAssetUpdate(asset, [], { action: 'delete', broadcast: true })
 
     return NextResponse.json({
       success: true,

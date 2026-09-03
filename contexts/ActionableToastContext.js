@@ -208,6 +208,13 @@ export function ActionableToastProvider({ children }) {
         return result
       }
 
+      // Some domain endpoints action the durable notification as part of the
+      // same decision. Treat that idempotent follow-up as success locally.
+      if (response.status === 400 && result.message?.includes('already been actioned')) {
+        setNotifications(prev => prev.filter(n => n._id !== notificationId))
+        return { success: true, message: 'Action completed successfully' }
+      }
+
       return { success: false, message: result.message || 'Action failed' }
     } catch (error) {
       console.error('[ActionableToast] Error executing action:', error)

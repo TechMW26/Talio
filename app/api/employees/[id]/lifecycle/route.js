@@ -24,11 +24,29 @@ function actorId(user) {
   return user?.id || user?._id
 }
 
+function serializeProbationApproval(approval) {
+  if (!approval) return null
+  return {
+    _id: approval._id,
+    requestType: approval.requestType,
+    extensionMonths: approval.extensionMonths,
+    requestRemarks: approval.requestRemarks,
+    status: approval.status,
+    approverSource: approval.approverSource,
+    approver: approval.approverEmployee,
+    requester: approval.requestedByEmployee,
+    decisionRemarks: approval.decisionRemarks,
+    decidedAt: approval.decidedAt,
+    createdAt: approval.createdAt,
+    updatedAt: approval.updatedAt,
+  }
+}
+
 async function authorize(request, id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return { response: NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 }) }
   }
-  const auth = await getAuthAndModels(request, ['Employee', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'Document', 'Asset', 'Payroll', 'Policy'])
+  const auth = await getAuthAndModels(request, ['Employee', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'Document', 'Asset', 'Payroll', 'Policy', 'ProbationApproval'])
   if (!auth.success) {
     return { response: NextResponse.json({ success: false, message: auth.message || 'Unauthorized' }, { status: 401 }) }
   }
@@ -70,6 +88,11 @@ async function getLifecycle(request, { params }) {
     .sort({ createdAt: -1 })
     .limit(50)
     .lean()
+  const probationApproval = await auth.models.ProbationApproval.findOne({ employee: employee._id })
+    .sort({ createdAt: -1 })
+    .populate('approverEmployee', 'firstName lastName employeeCode')
+    .populate('requestedByEmployee', 'firstName lastName employeeCode')
+    .lean()
 
   return NextResponse.json({
     success: true,
@@ -78,6 +101,7 @@ async function getLifecycle(request, { params }) {
       progress: getLifecycleProgress(lifecycle),
       automation: { enabled: true, signals },
       workflows,
+      probationApproval: serializeProbationApproval(probationApproval),
       permissions: {
         canManage: MANAGER_ROLES.has(auth.user?.role),
         canOffboard: HR_ROLES.has(auth.user?.role),
@@ -103,14 +127,20 @@ async function patchLifecycle(request, { params }) {
     return NextResponse.json({ success: false, message: 'Invalid JSON request body' }, { status: 400 })
   }
   const action = String(body.action || '')
-  const module = moduleForAction(action)
+  if (['confirm_probation', 'extend_probation'].includes(action)) {
+    return NextResponse.json({
+      success: false,
+      message: 'Probation confirmation and extensions require the assigned manager approval workflow',
+    }, { status: 409 })
+  }
+  const moduleName = moduleForAction(action)
   if (!MANAGER_ROLES.has(auth.user?.role)) {
     return NextResponse.json({ success: false, message: 'HR or manager access is required' }, { status: 403 })
   }
-  if (module === 'exitManagement' && !HR_ROLES.has(auth.user?.role)) {
+  if (moduleName === 'exitManagement' && !HR_ROLES.has(auth.user?.role)) {
     return NextResponse.json({ success: false, message: 'Only HR can manage offboarding' }, { status: 403 })
   }
-  if (!isFeatureEnabled(auth.companyFeatures, module)) {
+  if (!isFeatureEnabled(auth.companyFeatures, moduleName)) {
     return NextResponse.json({ success: false, message: 'This lifecycle feature is disabled for the tenant' }, { status: 403 })
   }
 
@@ -172,16 +202,16 @@ async function patchLifecycle(request, { params }) {
 
   let workflowWarning = null
   try {
-    let workflow = await auth.models.HrmsWorkflow.findOne({ subjectEmployee: persistedEmployee._id, module }).sort({ createdAt: -1 })
+    let workflow = await auth.models.HrmsWorkflow.findOne({ subjectEmployee: persistedEmployee._id, module: moduleName }).sort({ createdAt: -1 })
     if (!workflow) {
-      const moduleData = module === 'exitManagement'
+      const moduleData = moduleName === 'exitManagement'
         ? result.lifecycle.offboarding
-        : module === 'probation'
+        : moduleName === 'probation'
           ? result.lifecycle.probation
           : result.lifecycle.onboarding
-      const dueAt = module === 'exitManagement'
+      const dueAt = moduleName === 'exitManagement'
         ? result.lifecycle.offboarding.lastWorkingDate
-        : module === 'probation'
+        : moduleName === 'probation'
           ? result.lifecycle.probation.reviewDate
           : result.lifecycle.onboarding.targetDate
       const created = await createWorkflow({
@@ -191,13 +221,13 @@ async function patchLifecycle(request, { params }) {
         bypassPermission: true,
         allowIncompleteData: true,
         payload: {
-          module,
-          title: `${module === 'exitManagement' ? 'Offboarding' : module === 'probation' ? 'Probation' : 'Onboarding'}: ${persistedEmployee.firstName} ${persistedEmployee.lastName}`,
+          module: moduleName,
+          title: `${moduleName === 'exitManagement' ? 'Offboarding' : moduleName === 'probation' ? 'Probation' : 'Onboarding'}: ${persistedEmployee.firstName} ${persistedEmployee.lastName}`,
           subjectEmployee: persistedEmployee._id,
           dueAt,
           data: moduleData,
           source: { entityType: 'Employee', entityId: persistedEmployee._id },
-          idempotencyKey: `employee:${persistedEmployee._id}:${module}`,
+          idempotencyKey: `employee:${persistedEmployee._id}:${moduleName}`,
         },
       })
       if (!created.success || !created.workflow) {
@@ -212,15 +242,15 @@ async function patchLifecycle(request, { params }) {
         || (action === 'complete_onboarding_item' && getLifecycleProgress(result.lifecycle).percentage === 100)
       const previousStatus = workflow.status
       workflow.status = completed ? 'completed' : 'in_progress'
-      workflow.data = module === 'exitManagement' ? result.lifecycle.offboarding : module === 'probation' ? result.lifecycle.probation : result.lifecycle.onboarding
-      workflow.dueAt = module === 'exitManagement' ? result.lifecycle.offboarding.lastWorkingDate : module === 'probation' ? result.lifecycle.probation.reviewDate : result.lifecycle.onboarding.targetDate
+      workflow.data = moduleName === 'exitManagement' ? result.lifecycle.offboarding : moduleName === 'probation' ? result.lifecycle.probation : result.lifecycle.onboarding
+      workflow.dueAt = moduleName === 'exitManagement' ? result.lifecycle.offboarding.lastWorkingDate : moduleName === 'probation' ? result.lifecycle.probation.reviewDate : result.lifecycle.onboarding.targetDate
       workflow.completedAt = completed ? (workflow.completedAt || new Date()) : null
       workflow.updatedBy = actorId(auth.user)
       workflow.version = Number.isFinite(Number(workflow.version)) ? Number(workflow.version) + 1 : 1
       await workflow.save()
       await auth.models.HrmsWorkflowEvent.create({
         workflow: workflow._id,
-        module,
+        module: moduleName,
         type: action,
         fromStatus: previousStatus,
         toStatus: workflow.status,

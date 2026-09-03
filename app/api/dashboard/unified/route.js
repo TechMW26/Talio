@@ -215,7 +215,7 @@ export async function GET(request) {
     if (employeeId && (!companyFeatures || companyFeatures.assets !== false) && (includeAll || includeWidgets.includes('assets'))) {
       fetchPromises.push(
         Asset.find({ assignedTo: employeeId })
-          .select('name type serialNumber status')
+          .select('name assetCode category uin serialNumber manufacturer model status')
           .lean()
           .then(assets => {
             dashboardData.myAssets = assets
