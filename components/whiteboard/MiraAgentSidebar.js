@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MiraSphere from '@/components/ui/MiraSphere';
+import { requestWhiteboardAI } from '@/lib/whiteboardAIClient';
 
 // Quirky loading messages for different phases
 const LOADING_PHASES = {
@@ -556,33 +557,13 @@ export default function MiraAgentSidebar({
     }, 200);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'prepare',
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'prepare',
+        payload: {
           message: userInput,
           templateType: selectedTemplate,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to prepare content';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          if (response.status === 504) errorMsg = 'Request timed out. Try a shorter or simpler topic.';
-          else errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       clearInterval(progressInterval);
       setLoadingProgress(100);
@@ -609,37 +590,18 @@ export default function MiraAgentSidebar({
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
       const section = preparedContent.sections[sectionIndex];
 
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'expand-section',
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'expand-section',
+        payload: {
           sectionIndex,
           sectionTitle: section.title,
           currentContent: section,
           fullContext: preparedContent,
           templateType: selectedTemplate,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to expand section';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       // Update the section with expanded content
       const updatedContent = { ...preparedContent };
@@ -662,37 +624,18 @@ export default function MiraAgentSidebar({
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
       const section = preparedContent.sections[sectionIndex];
 
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'regenerate-section',
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'regenerate-section',
+        payload: {
           sectionIndex,
           sectionTitle: section.title,
           originalPrompt: userInput,
           fullContext: preparedContent,
           templateType: selectedTemplate,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to regenerate section';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       // Update the section with new content
       const updatedContent = { ...preparedContent };
@@ -727,34 +670,14 @@ export default function MiraAgentSidebar({
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
-
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'edit-content',
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'edit-content',
+        payload: {
           editInstruction: chatInput,
           currentContent: preparedContent,
           templateType: selectedTemplate,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to edit content';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       setPreparedContent(data.updatedContent);
       onContentUpdate?.(data.updatedContent);
@@ -781,7 +704,7 @@ export default function MiraAgentSidebar({
   };
 
   // Start plotting on canvas
-  const handleStartPlotting = () => {
+  const handleStartPlotting = async () => {
     if (preparedContent) {
       // Include the userPrompt for history tracking
       const contentWithPrompt = {
@@ -789,15 +712,23 @@ export default function MiraAgentSidebar({
         userPrompt: userInput,
         templateType: selectedTemplate
       };
-      onStartPlotting(contentWithPrompt, selectedTemplate);
-      // Reset modification tracking after plotting
-      setPlottedContentHash(getContentHash(preparedContent));
-      setContentModifiedAfterPlot(false);
+      setIsLoading(true);
+      setError(null);
+      try {
+        await onStartPlotting(contentWithPrompt, selectedTemplate);
+        // Reset modification tracking only after plotting succeeds.
+        setPlottedContentHash(getContentHash(preparedContent));
+        setContentModifiedAfterPlot(false);
+      } catch (err) {
+        setError(err.message || 'Failed to plot content. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
   
   // Update existing plot with modified content
-  const handleUpdatePlotting = () => {
+  const handleUpdatePlotting = async () => {
     if (preparedContent) {
       const contentWithPrompt = {
         ...preparedContent,
@@ -805,10 +736,17 @@ export default function MiraAgentSidebar({
         templateType: selectedTemplate,
         isUpdate: true // Flag to indicate this is an update
       };
-      onStartPlotting(contentWithPrompt, selectedTemplate);
-      // Reset modification tracking
-      setPlottedContentHash(getContentHash(preparedContent));
-      setContentModifiedAfterPlot(false);
+      setIsLoading(true);
+      setError(null);
+      try {
+        await onStartPlotting(contentWithPrompt, selectedTemplate);
+        setPlottedContentHash(getContentHash(preparedContent));
+        setContentModifiedAfterPlot(false);
+      } catch (err) {
+        setError(err.message || 'Failed to update the plotted content. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
   

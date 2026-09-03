@@ -4,6 +4,7 @@ import { generateContent, generateVisionContent } from '@/lib/gemini';
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 import { generateSmartContent } from '@/lib/promptEngine';
 import { compressScreenshot } from '@/lib/imageCompression';
+import { normalizePreparedWhiteboardContent } from '@/lib/whiteboardAIContent';
 
 export const maxDuration = 120;
 
@@ -1020,7 +1021,11 @@ Return ONLY valid JSON:
       }
     } else if (action === 'restructure') {
       // Restructure/cleanup existing canvas - straighten lines, align elements, fix spacing
-      const existingObjects = whiteboard.pages[0]?.objects || [];
+      const requestedPageIndex = Number(body.targetPageIndex);
+      const pageIndex = Number.isInteger(requestedPageIndex)
+        ? Math.max(0, Math.min(requestedPageIndex, whiteboard.pages.length - 1))
+        : 0;
+      const existingObjects = whiteboard.pages[pageIndex]?.objects || [];
 
       if (existingObjects.length === 0) {
         return NextResponse.json({
@@ -1029,7 +1034,7 @@ Return ONLY valid JSON:
       }
 
       const layout = analyzeLayout(existingObjects);
-      const existingCanvasDescription = describeCanvasObjects(whiteboard.pages);
+      const existingCanvasDescription = describeCanvasObjects([whiteboard.pages[pageIndex]]);
 
       const restructurePrompt = `You are MIRA, an expert at cleaning up and professionalizing whiteboard diagrams.
 
@@ -1108,8 +1113,8 @@ Return ONLY valid JSON array. No explanations.`;
         }).filter(obj => obj && obj.type);
 
         // Replace all objects with restructured version
-        whiteboard.pages[0] = {
-          ...whiteboard.pages[0],
+        whiteboard.pages[pageIndex] = {
+          ...whiteboard.pages[pageIndex],
           objects: validObjects
         };
 
@@ -1604,7 +1609,10 @@ Return ONLY this JSON structure (no markdown, no explanation):
             throw new Error('Empty response from AI');
           }
 
-          preparedContent = parseAIResponse(aiResponse);
+          preparedContent = normalizePreparedWhiteboardContent(parseAIResponse(aiResponse), {
+            templateType,
+            prompt: message,
+          });
 
           // Validate the parsed content
           if (!preparedContent.sections || !Array.isArray(preparedContent.sections)) {
@@ -1615,9 +1623,10 @@ Return ONLY this JSON structure (no markdown, no explanation):
             throw new Error('Invalid content structure - empty sections');
           }
 
-          // ═══════════════════════════════════════════════════════════════
-          // VALIDATE ITEM COUNTS - Reject if too few items per section
-          // ═══════════════════════════════════════════════════════════════
+          // Content density is a quality signal, not a fatal condition. A
+          // smaller valid result is still useful and can be expanded from the
+          // sidebar; rejecting it made deterministic model formatting issues
+          // disable Agent Mode completely.
           const MIN_ITEMS_PER_SECTION = 8;
           const sectionsWithTooFewItems = preparedContent.sections.filter(
             s => (s.items?.length || 0) < MIN_ITEMS_PER_SECTION
@@ -1627,14 +1636,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
             const itemCounts = preparedContent.sections.map(s => s.items?.length || 0);
             const avgItems = itemCounts.reduce((a, b) => a + b, 0) / itemCounts.length;
 
-            // If average is below 7, reject and retry
-            if (avgItems < 7) {
-              console.warn(`[MIRA] Insufficient item density: avg ${avgItems.toFixed(1)} items/section. Sections: ${itemCounts.join(', ')}`);
-              throw new Error(`Insufficient content depth - only ${avgItems.toFixed(1)} items per section on average. Need at least 8.`);
-            } else {
-              // Log warning but accept if average is reasonable
-              console.warn(`[MIRA] Some sections have fewer than ${MIN_ITEMS_PER_SECTION} items: ${sectionsWithTooFewItems.map(s => `${s.title}: ${s.items?.length || 0}`).join(', ')}`);
-            }
+            console.warn(`[MIRA] Accepting concise content (avg ${avgItems.toFixed(1)} items/section): ${itemCounts.join(', ')}`);
           }
 
           const totalItems = preparedContent.sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);

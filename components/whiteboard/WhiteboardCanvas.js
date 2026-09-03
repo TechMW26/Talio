@@ -6,6 +6,7 @@ import MiraSphere from '@/components/ui/MiraSphere';
 import Loader from '@/components/ui/Loader';
 import { useAILoading } from '@/contexts/AILoadingContext';
 import MiraAgentSidebar from './MiraAgentSidebar';
+import { requestWhiteboardAI } from '@/lib/whiteboardAIClient';
 
 // Utility functions
 const generateId = () => `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -2814,17 +2815,18 @@ const WhiteboardCanvas = forwardRef(({
     if (!canvas) return null;
 
     try {
-      // Create a higher quality screenshot for AI vision (800x600 for good detail)
+      // Keep enough detail for vision analysis without sending a multi-megabyte
+      // PNG through the serverless request boundary.
       const screenshotCanvas = document.createElement('canvas');
-      const screenshotWidth = 1024;
-      const screenshotHeight = 768;
+      const screenshotWidth = 960;
+      const screenshotHeight = 720;
       screenshotCanvas.width = screenshotWidth;
       screenshotCanvas.height = screenshotHeight;
 
       const ctx = screenshotCanvas.getContext('2d');
       ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, screenshotWidth, screenshotHeight);
 
-      return screenshotCanvas.toDataURL('image/png', 0.9);
+      return screenshotCanvas.toDataURL('image/jpeg', 0.82);
     } catch (err) {
       console.log('Error capturing canvas screenshot:', err);
       return null;
@@ -2918,31 +2920,12 @@ const WhiteboardCanvas = forwardRef(({
     const canvasScreenshot = captureCanvasScreenshot();
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          action: 'analyze',
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'analyze',
+        payload: {
           canvasScreenshot
-        })
+        },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to analyze canvas';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       setAiAnalysis(data.aiAnalysis);
       setIsDirty(true);
@@ -3099,30 +3082,11 @@ const WhiteboardCanvas = forwardRef(({
     setAiInput('');
 
     try {
-      const token = localStorage.getItem('token');
-
       // Regular chat mode - send screenshot for visual context
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ action: 'chat', message, canvasScreenshot })
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'chat',
+        payload: { message, canvasScreenshot },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to send message';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       setAiAnalysis(data.aiAnalysis);
       setIsDirty(true);
@@ -3135,8 +3099,9 @@ const WhiteboardCanvas = forwardRef(({
       }));
     } finally {
       setAiLoading(false);
+      stopAILoading();
     }
-  }, [boardId, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startScanAnimation, captureCanvasScreenshot]);
+  }, [boardId, startScanAnimation, captureCanvasScreenshot, startAILoading, stopAILoading]);
 
   // Legacy: Send AI message with a template type - now redirects to sidebar
   // Kept for backward compatibility but templates now use sidebar
@@ -3165,33 +3130,14 @@ const WhiteboardCanvas = forwardRef(({
     startScanAnimation();
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          action: 'plot-from-content',
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'plot-from-content',
+        payload: {
           preparedContent,
           templateType,
           targetPageIndex: currentPageIndex // Plot on the currently active page
-        })
+        },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to plot content';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       // Update canvas with generated objects
       if (data.pages) {
@@ -3249,6 +3195,7 @@ const WhiteboardCanvas = forwardRef(({
     } catch (error) {
       console.error('Plotting error:', error);
       setAiError(error.message);
+      throw error;
     } finally {
       setAiLoading(false);
       stopAILoading();
@@ -3270,31 +3217,12 @@ const WhiteboardCanvas = forwardRef(({
     startAILoading('MIRA is continuing generation...');
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-          action: 'continue',
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'continue',
+        payload: {
           targetPageIndex: currentPageIndex // Continue on the currently active page
-        })
+        },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to continue generation';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       // Update canvas with new objects
       if (data.pages) {
@@ -3340,28 +3268,10 @@ const WhiteboardCanvas = forwardRef(({
     startAILoading('MIRA is restructuring your canvas...');
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ action: 'restructure' })
+      const data = await requestWhiteboardAI(boardId, {
+        action: 'restructure',
+        payload: { targetPageIndex: currentPageIndex },
       });
-
-      if (!response.ok) {
-        let errorMsg = 'Failed to restructure canvas';
-        try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          errorMsg = `Server error (${response.status}). Please try again.`;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
 
       // Replace all objects with restructured version
       if (data.pages && data.pages[0]) {
@@ -3378,20 +3288,13 @@ const WhiteboardCanvas = forwardRef(({
       setAiLoading(false);
       stopAILoading();
     }
-  }, [boardId, objects.length, saveHistory, setPages, startAILoading, stopAILoading]);
+  }, [boardId, currentPageIndex, objects.length, saveHistory, setPages, startAILoading, stopAILoading]);
 
   const clearAIHistory = useCallback(async () => {
     setAiLoading(true);
+    setAiError(null);
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`/api/whiteboard/${boardId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ action: 'clear' })
-      });
+      await requestWhiteboardAI(boardId, { action: 'clear' });
 
       setAiAnalysis({ summary: '', messages: [], notes: [], keyPoints: [] });
       setIsDirty(true);
@@ -3407,16 +3310,9 @@ const WhiteboardCanvas = forwardRef(({
     if (boardId && !aiAnalysis.summary && aiAnalysis.messages.length === 0) {
       const loadAIAnalysis = async () => {
         try {
-          const token = localStorage.getItem('token');
-          const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.aiAnalysis) {
-              setAiAnalysis(data.aiAnalysis);
-            }
+          const data = await requestWhiteboardAI(boardId);
+          if (data.aiAnalysis) {
+            setAiAnalysis(data.aiAnalysis);
           }
         } catch (error) {
           console.error('Failed to load AI analysis:', error);

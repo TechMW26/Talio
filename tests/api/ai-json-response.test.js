@@ -112,4 +112,39 @@ describe('AI JSON response parser', () => {
         expect(parsed.title).toBe('Use **bold** in markdown');
         expect(parsed.note).toBe('keep ** as-is');
     });
+
+    test('repairs unescaped quotes inside AI-generated item text', () => {
+        const { parseAIJsonResponse } = require('@/lib/aiJsonResponse');
+
+        const response = '{"title":"Hiring Plan","sections":[{"title":"Interview","items":["Use the "structured scorecard" method","Record evidence"]}],"conclusion":"Ready"}';
+
+        const parsed = parseAIJsonResponse(response, { expectedRoot: 'object' });
+
+        expect(parsed.sections[0].items).toEqual([
+            'Use the "structured scorecard" method',
+            'Record evidence'
+        ]);
+    });
+
+    test('repairs several malformed structures in one whiteboard response', () => {
+        const { parseAIJsonResponse } = require('@/lib/aiJsonResponse');
+
+        const response = `\`\`\`json
+{
+  "title": "Launch Plan"
+  "sections": [
+    {"title":"Discover","items":["Interview users" "Map the "current state" journey"]}
+    {"title":"Deliver","items":["Ship pilot","Measure adoption",]}
+  ],
+  "conclusion":"Review weekly",
+}
+\`\`\``;
+
+        const parsed = parseAIJsonResponse(response, { expectedRoot: 'object' });
+
+        expect(parsed.title).toBe('Launch Plan');
+        expect(parsed.sections).toHaveLength(2);
+        expect(parsed.sections[0].items[1]).toBe('Map the "current state" journey');
+        expect(parsed.sections[1].items).toEqual(['Ship pilot', 'Measure adoption']);
+    });
 });
