@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox, FaFileUpload, FaSearch, FaEye, FaPen } from 'react-icons/fa'
+import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox, FaFileUpload, FaEye, FaPen } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -11,9 +11,10 @@ import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import ModalPortal from '@/components/ui/ModalPortal'
-import { Autocomplete, AutocompleteItem, Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/react'
+import SearchableSelect from '@/components/ui/heroui/SearchableSelect'
+import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/react'
 import { useAILoading } from '@/contexts/AILoadingContext'
-import { getAssetAssigneeLabel, matchesAssetAssignee } from '@/utils/assetAssigneeSearch'
+import { getAssetAssigneeLabel } from '@/utils/assetAssigneeSearch'
 import { formatAssetStatus, getAssetDisplayDetails, normalizeAssetInput, normalizeAssetStatus } from '@/utils/assetData'
 
 const EMPTY_ASSET_FORM = {
@@ -83,7 +84,11 @@ export default function AssetsPage() {
 
   // SWR: Employees (admin only, for assignment dropdown)
   const { data: employeesRes } = useAuthedSWR(isAdmin ? '/api/employees?limit=1000' : null)
-  const employees = employeesRes?.data?.employees || employeesRes?.data || []
+  const employees = useMemo(() => employeesRes?.data?.employees || employeesRes?.data || [], [employeesRes])
+  const assigneeOptions = useMemo(() => [
+    { _id: 'unassigned', displayLabel: 'Unassigned' },
+    ...employees.map((employee) => ({ ...employee, displayLabel: getAssetAssigneeLabel(employee) })),
+  ], [employees])
 
   // Real-time updates
   const { socket, isConnected, subscribe } = useSocket()
@@ -500,11 +505,12 @@ export default function AssetsPage() {
                     <SelectItem key="vehicle">Vehicle</SelectItem>
                     <SelectItem key="other">Other</SelectItem>
                   </Select>
-                  <Autocomplete
+                  <SearchableSelect
                     label="Assigned To"
                     placeholder="Search by name or employee code"
-                    selectedKey={editFormData.assignedTo || 'unassigned'}
-                    onSelectionChange={(key) => {
+                    options={assigneeOptions}
+                    value={editFormData.assignedTo || 'unassigned'}
+                    onValueChange={(key) => {
                       const assignedTo = key && key !== 'unassigned' ? String(key) : ''
                       setEditFormData((previous) => ({
                         ...previous,
@@ -512,20 +518,11 @@ export default function AssetsPage() {
                         status: assignedTo ? 'assigned' : (previous.status === 'assigned' ? 'available' : previous.status),
                       }))
                     }}
-                    defaultFilter={matchesAssetAssignee}
-                    startContent={<FaSearch className="shrink-0 text-gray-400" aria-hidden="true" />}
-                    allowsCustomValue={false}
-                    maxListboxHeight={320}
-                    listboxProps={{ emptyContent: 'No employees match your search' }}
-                    popoverProps={{ classNames: { content: 'rounded-2xl' } }}
-                  >
-                    <AutocompleteItem key="unassigned" textValue="Unassigned">Unassigned</AutocompleteItem>
-                    {employees.map((employee) => (
-                      <AutocompleteItem key={String(employee._id)} textValue={getAssetAssigneeLabel(employee)}>
-                        {getAssetAssigneeLabel(employee)}
-                      </AutocompleteItem>
-                    ))}
-                  </Autocomplete>
+                    getOptionKey={(employee) => employee._id}
+                    getOptionLabel={(employee) => employee.displayLabel}
+                    getOptionSearchText={(employee) => `${employee.displayLabel} ${employee.email || ''} ${employee.designation?.name || employee.designation?.title || ''}`}
+                    emptyContent="No employees match your search"
+                  />
                   <Select
                     label="Status"
                     selectedKeys={[editFormData.status]}
@@ -712,11 +709,12 @@ export default function AssetsPage() {
                   ></textarea>
                 </div>
                 <div>
-                  <Autocomplete
+                  <SearchableSelect
                     label="Assigned To"
                     placeholder="Search by name or employee code"
-                    selectedKey={formData.assignedTo || 'unassigned'}
-                    onSelectionChange={(key) => {
+                    options={assigneeOptions}
+                    value={formData.assignedTo || 'unassigned'}
+                    onValueChange={(key) => {
                       const assignedTo = key && key !== 'unassigned' ? String(key) : ''
                       setFormData((previous) => ({
                         ...previous,
@@ -724,22 +722,11 @@ export default function AssetsPage() {
                         status: assignedTo ? 'assigned' : (previous.status === 'assigned' ? 'available' : previous.status),
                       }))
                     }}
-                    defaultFilter={matchesAssetAssignee}
-                    startContent={<FaSearch className="shrink-0 text-gray-400" aria-hidden="true" />}
-                    allowsCustomValue={false}
-                    maxListboxHeight={320}
-                    listboxProps={{ emptyContent: 'No employees match your search' }}
-                    popoverProps={{ classNames: { content: 'rounded-2xl' } }}
-                  >
-                    <AutocompleteItem key="unassigned" textValue="Unassigned">
-                      Unassigned
-                    </AutocompleteItem>
-                    {employees.map((emp) => (
-                      <AutocompleteItem key={String(emp._id)} textValue={getAssetAssigneeLabel(emp)}>
-                        {getAssetAssigneeLabel(emp)}
-                      </AutocompleteItem>
-                    ))}
-                  </Autocomplete>
+                    getOptionKey={(employee) => employee._id}
+                    getOptionLabel={(employee) => employee.displayLabel}
+                    getOptionSearchText={(employee) => `${employee.displayLabel} ${employee.email || ''} ${employee.designation?.name || employee.designation?.title || ''}`}
+                    emptyContent="No employees match your search"
+                  />
                 </div>
                 <div>
                   <Select

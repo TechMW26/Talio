@@ -59,6 +59,57 @@ html.dark button[data-slot="trigger"].border-default-200 {
   border: 1px solid #3f3f46 !important;
 }
 
+/*
+ * Keep selected values readable in every HeroUI Select. Some page-level color
+ * utilities can otherwise override the value slot while leaving the label and
+ * chevron visible, which makes a valid selection look empty.
+ */
+[data-slot="base"][data-has-value="true"] button[data-slot="trigger"] [data-slot="value"] {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #18181b;
+  opacity: 1 !important;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-text-fill-color: #18181b;
+}
+
+html.dark [data-slot="base"][data-has-value="true"] button[data-slot="trigger"] [data-slot="value"] {
+  color: #f4f4f5;
+  -webkit-text-fill-color: #f4f4f5;
+}
+
+button[data-slot="trigger"] [data-slot="innerWrapper"] {
+  min-width: 0;
+}
+
+/* Canonical search-in-dropdown treatment used by SearchableSelect. */
+.talio-searchable-select [data-slot="input-wrapper"] {
+  min-height: 3rem;
+  border-radius: 0.75rem !important;
+  box-shadow: none;
+}
+
+.talio-searchable-select [data-slot="input-wrapper"][data-focus="true"],
+.talio-searchable-select [data-slot="input-wrapper"][data-focus-visible="true"] {
+  border-color: hsl(var(--heroui-primary)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--heroui-primary) / 0.18);
+}
+
+.talio-searchable-select [data-slot="helper-wrapper"] {
+  padding-inline: 0.25rem;
+}
+
+[data-slot="listboxWrapper"] {
+  padding: 0.25rem;
+}
+
+[data-slot="listbox"] [role="option"] {
+  border-radius: 0.75rem;
+}
+
 /* HeroUI inner input elements should NOT have their own border (wrapper handles it) */
 [data-slot="input-wrapper"] input,
 [data-slot="input-wrapper"] textarea {

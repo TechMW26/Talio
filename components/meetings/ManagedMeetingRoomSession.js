@@ -23,8 +23,8 @@ import {
   HiOutlineVideoCamera,
   HiOutlineXMark,
 } from 'react-icons/hi2'
-import { BsEmojiSmile } from 'react-icons/bs'
-import { CutLineIcon, MEETING_REACTIONS, MeetingReactionIcon } from '@/components/meetings/MeetingVisualIcons'
+import { CutLineIcon, MeetingReactionIcon } from '@/components/meetings/MeetingVisualIcons'
+import MeetingReactionPicker from '@/components/meetings/MeetingReactionPicker'
 import AddMeetingParticipantsModal from '@/app/dashboard/meetings/components/AddMeetingParticipantsModal'
 import MeetingNotetakerPanel from '@/app/dashboard/meetings/components/MeetingNotetakerPanel'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -110,7 +110,7 @@ function ParticipantTile({ item, local = false, reaction, handRaised = false, fe
       {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
       {handRaised && <span className="absolute right-3 top-3 rounded-full bg-amber-500 p-2 text-white" aria-label={`${item.name} raised their hand`}><HiOutlineHandRaised className="h-5 w-5" /></span>}
       {reaction && (
-        <span className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce rounded-full bg-white/95 p-3 text-indigo-700 shadow-xl">
+        <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 animate-bounce rounded-full bg-white/95 p-3 text-indigo-700 shadow-xl ring-1 ring-black/5">
           <MeetingReactionIcon value={reaction} className="h-7 w-7" />
         </span>
       )}
@@ -859,10 +859,13 @@ export default function ManagedMeetingRoomSession({
           <button onClick={toggleChatPanel} aria-label={showChat ? 'Close chat' : 'Open chat'} className={`relative flex h-11 w-11 items-center justify-center rounded-full ${showChat ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineChatBubbleLeftRight className="h-5 w-5" />{unreadChatCount > 0 && !showChat && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900" aria-label={`${unreadChatCount} unread message${unreadChatCount === 1 ? '' : 's'}`}>{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>}</button>
           <button onClick={() => { setShowParticipants(!showParticipants); setShowChat(false); setShowNotetaker(false) }} aria-label="Open participants" className={`flex h-11 w-11 items-center justify-center rounded-full ${showParticipants ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineUserGroup className="h-5 w-5" /></button>
           <button onClick={toggleHand} aria-label={handRaised ? 'Lower hand' : 'Raise hand'} className={`flex h-11 w-11 items-center justify-center rounded-full ${handRaised ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><HiOutlineHandRaised className="h-5 w-5" /></button>
-          <div className="relative">
-            <button onClick={() => setShowReactions(!showReactions)} aria-label="Open reactions" className={`flex h-11 w-11 items-center justify-center rounded-full ${showReactions ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><BsEmojiSmile className="h-5 w-5" /></button>
-            {showReactions && <div className="absolute bottom-14 left-1/2 z-40 flex -translate-x-1/2 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-slate-800">{MEETING_REACTIONS.map((reaction) => <button key={reaction.value} onClick={() => sendReaction(reaction.value)} aria-label={`React with ${reaction.label}`} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/10"><MeetingReactionIcon value={reaction.value} className="h-5 w-5" /></button>)}</div>}
-          </div>
+          <MeetingReactionPicker
+            isOpen={showReactions}
+            onOpenChange={setShowReactions}
+            onSelect={sendReaction}
+            buttonClassName={`flex h-11 w-11 items-center justify-center rounded-full ${showReactions ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}
+            iconClassName="h-5 w-5"
+          />
         </>}
         <button onClick={leave} disabled={isEndingMeeting} aria-label="Leave meeting" className="flex h-11 w-11 items-center justify-center rounded-full bg-red-600 text-white disabled:cursor-wait disabled:opacity-60"><HiOutlinePhoneXMark className="h-5 w-5" /></button>
       </footer>

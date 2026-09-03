@@ -25,13 +25,13 @@ import {
   FaNetworkWired,
   FaPlus,
   FaPowerOff,
-  FaSearch,
   FaServer,
   FaSyncAlt,
 } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
+import SearchableSelect from '@/components/ui/heroui/SearchableSelect'
 import { useTheme } from '@/contexts/ThemeContext'
 import { toast } from '@/utils/toast'
 
@@ -82,28 +82,15 @@ export default function AttendanceMachinesSettings() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingMachine, setEditingMachine] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [providerQuery, setProviderQuery] = useState('')
-  const [providerListOpen, setProviderListOpen] = useState(false)
   const [setup, setSetup] = useState(null)
   const [busyMachineId, setBusyMachineId] = useState(null)
 
   const payload = data?.data || {}
-  const machines = payload.machines || []
+  const machines = useMemo(() => payload.machines || [], [payload.machines])
   const providers = payload.providers || []
   const connectionModes = payload.connectionModes || {}
   const companies = companiesResponse?.data || []
   const selectedProvider = providers.find((provider) => provider.key === form.providerKey) || null
-
-  const filteredProviders = useMemo(() => {
-    const query = providerQuery.trim().toLowerCase()
-    if (!query) return providers
-    return providers.filter((provider) => [
-      provider.name,
-      provider.key,
-      ...(provider.models || []),
-      ...(provider.keywords || []),
-    ].some((value) => String(value).toLowerCase().includes(query)))
-  }, [providerQuery, providers])
 
   const visibleMachines = useMemo(() => machines.filter((machine) => {
     if (machine.scope !== scopeFilter) return false
@@ -128,7 +115,6 @@ export default function AttendanceMachinesSettings() {
   function openCreate(scope = scopeFilter) {
     setEditingMachine(null)
     setForm({ ...EMPTY_FORM, credentials: { ...EMPTY_FORM.credentials }, scope })
-    setProviderQuery('')
     setIsModalOpen(true)
   }
 
@@ -153,7 +139,6 @@ export default function AttendanceMachinesSettings() {
       employeeCodeField: machine.employeeCodeField || 'employeeCode',
       credentials: { username: '', password: '', apiKey: '' },
     })
-    setProviderQuery(machine.providerName || '')
     setIsModalOpen(true)
   }
 
@@ -288,8 +273,8 @@ export default function AttendanceMachinesSettings() {
           onSelectionChange={(keys) => setCompanyFilter(Array.from(keys)[0] || 'all')}
           isLoading={companiesLoading}
         >
-          <SelectItem key="all">All companies</SelectItem>
-          {companies.map((company) => <SelectItem key={company._id}>{company.name} ({company.code})</SelectItem>)}
+          <SelectItem key="all" textValue="All companies">All companies</SelectItem>
+          {companies.map((company) => <SelectItem key={String(company._id)} textValue={`${company.name} (${company.code})`}>{company.name} ({company.code})</SelectItem>)}
         </Select>
       )}
 
@@ -374,45 +359,33 @@ export default function AttendanceMachinesSettings() {
               </Select>
               {form.scope === 'company' && (
                 <Select label="Company" selectedKeys={form.companyId ? [form.companyId] : []} onSelectionChange={(keys) => updateForm('companyId', Array.from(keys)[0] || '')} isRequired>
-                  {companies.map((company) => <SelectItem key={company._id}>{company.name} ({company.code})</SelectItem>)}
+                  {companies.map((company) => <SelectItem key={String(company._id)} textValue={`${company.name} (${company.code})`}>{company.name} ({company.code})</SelectItem>)}
                 </Select>
               )}
             </div>
 
-            <div className="relative">
-              <Input
-                label="Search and select provider"
-                value={providerQuery}
-                onFocus={() => setProviderListOpen(true)}
-                onValueChange={(value) => { setProviderQuery(value); setProviderListOpen(true) }}
-                startContent={<FaSearch className="text-default-400" />}
-                placeholder="Search ZKTeco, eSSL, Hikvision, Matrix..."
-                description={selectedProvider ? `${selectedProvider.name} selected` : 'Search by provider, protocol, or model family'}
-                isRequired
-              />
-              {providerListOpen && (
-                <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-default-200 bg-content1 p-1 shadow-xl">
-                  {filteredProviders.length === 0 ? (
-                    <div className="p-4 text-sm text-default-500">No matching provider. Choose Other / Custom device.</div>
-                  ) : filteredProviders.map((provider) => (
-                    <button
-                      type="button"
-                      key={provider.key}
-                      onClick={() => {
-                        updateForm('providerKey', provider.key)
-                        updateForm('connectionMode', provider.modes[0])
-                        setProviderQuery(provider.name)
-                        setProviderListOpen(false)
-                      }}
-                      className={`w-full rounded-lg p-3 text-left hover:bg-default-100 ${form.providerKey === provider.key ? 'bg-primary-50 text-primary-700' : ''}`}
-                    >
-                      <span className="font-medium">{provider.name}</span>
-                      <span className="mt-1 block truncate text-xs text-default-500">{provider.models.slice(0, 4).join(' · ')}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SearchableSelect
+              label="Attendance machine provider"
+              placeholder="Search providers, protocols, or models"
+              options={providers}
+              value={form.providerKey}
+              onValueChange={(providerKey, provider) => {
+                updateForm('providerKey', providerKey)
+                if (provider?.modes?.[0]) updateForm('connectionMode', provider.modes[0])
+              }}
+              getOptionKey={(provider) => provider.key}
+              getOptionLabel={(provider) => provider.name}
+              getOptionDescription={(provider) => (provider.models || []).slice(0, 4).join(' · ')}
+              getOptionSearchText={(provider) => [
+                provider.name,
+                provider.key,
+                ...(provider.models || []),
+                ...(provider.keywords || []),
+              ].join(' ')}
+              description={selectedProvider ? `${selectedProvider.name} selected` : 'Search by provider, protocol, or model family'}
+              emptyContent="No matching provider. Search for Other or Custom device."
+              isRequired
+            />
 
             <div className="grid gap-4 md:grid-cols-2">
               <Input

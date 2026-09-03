@@ -44,6 +44,8 @@ export {
   SearchInput,
 } from './Input'
 
+export { default as SearchableSelect } from './SearchableSelect'
+
 // Tables
 export {
   HRMSTable,

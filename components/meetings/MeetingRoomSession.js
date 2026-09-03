@@ -49,12 +49,12 @@ import {
   optimizeMeetingPeerConnections,
   prepareMeetingMediaStream,
 } from '@/lib/meetingMediaQuality'
-import { BsPin, BsPinFill, BsEmojiSmile } from 'react-icons/bs'
+import { BsPin, BsPinFill } from 'react-icons/bs'
 import {
   CutLineIcon,
-  MEETING_REACTIONS,
   MeetingReactionIcon,
 } from '@/components/meetings/MeetingVisualIcons'
+import MeetingReactionPicker from '@/components/meetings/MeetingReactionPicker'
 import toast from '@/utils/toast'
 
 const CONNECTION_QUALITY_META = {
@@ -1732,7 +1732,7 @@ export default function MeetingRoomSession({
           </>
         )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-10 z-20 flex flex-col items-center gap-1" aria-live="polite">
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 z-30 flex flex-col items-center gap-1" aria-live="polite">
           {floatingReactions
             .filter(reaction => reaction.participantId === tileId)
             .map(reaction => (
@@ -2313,33 +2313,13 @@ export default function MeetingRoomSession({
         </button>
 
         {/* Reactions */}
-        <div className="relative flex-shrink-0">
-          <button
-            onClick={() => setShowReactions(!showReactions)}
-            className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${showReactions ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'
-              }`}
-            title="Reactions"
-          >
-            <BsEmojiSmile className={`h-5 w-5 sm:h-6 sm:w-6 ${showReactions ? 'text-white' : 'text-slate-700 dark:text-white'}`} />
-          </button>
-
-          {/* Reactions Popup */}
-          {showReactions && (
-            <div className="absolute bottom-full left-1/2 z-50 mb-2 flex -translate-x-1/2 gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-800">
-              {MEETING_REACTIONS.map(({ value, label, Icon }) => (
-                <button
-                  key={value}
-                  onClick={() => sendReaction(value)}
-                  className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-white/10"
-                  title={label}
-                  aria-label={label}
-                >
-                  <Icon className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <MeetingReactionPicker
+          isOpen={showReactions}
+          onOpenChange={setShowReactions}
+          onSelect={sendReaction}
+          buttonClassName={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors sm:h-14 sm:w-14 ${showReactions ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600'}`}
+          iconClassName="h-5 w-5 sm:h-6 sm:w-6"
+        />
 
         {/* Mira */}
         <button
