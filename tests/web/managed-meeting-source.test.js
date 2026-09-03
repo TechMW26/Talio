@@ -74,7 +74,22 @@ describe('managed meeting implementation', () => {
   test('keeps join failures recoverable without leaving a partial room connected', () => {
     expect(source).toContain('pendingRoom?.disconnect()')
     expect(source).toContain("role=\"alert\"")
-    expect(source).toContain("joinError ? 'Try again' : 'Join meeting'")
+    expect(source).toContain("joinError ? 'Try again' : previewStatus === 'loading' ? 'Preparing camera…' : 'Join meeting'")
+  })
+
+  test('shows a resilient camera preview and publishes those same tracks on join', () => {
+    expect(source).toContain('data-meeting-camera-preview')
+    expect(source).toContain('aria-label="Camera preview"')
+    expect(source).toContain('createLocalTracks({')
+    expect(source).toContain('createLocalVideoTrack({')
+    expect(source).toContain('createLocalAudioTrack({')
+    expect(source).toContain('liveRoom.localParticipant.publishTrack(track)')
+    expect(source).toContain("previewStatus === 'unavailable'")
+    expect(source).toContain('Try camera again')
+    expect(source).toContain("previewStatus === 'loading'")
+    expect(source).toContain("previewStatus === 'audio-only'")
+    expect(source).toContain('previewAttemptRef.current += 1')
+    expect(source).toContain('stopPreviewTracks()')
   })
 
   test('keeps compact and expanded picture-in-picture layouts collision free', () => {

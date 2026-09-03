@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  createLocalAudioTrack,
+  createLocalTracks,
+  createLocalVideoTrack,
   Room,
   RoomEvent,
   Track,
@@ -35,6 +38,19 @@ import toast from '@/utils/toast'
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
+
+function getPreviewFailureMessage(error) {
+  if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+    return 'Camera and microphone access is blocked. Allow access in your browser settings, then try again.'
+  }
+  if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
+    return 'No camera or microphone was found. You can still join in listen-only mode.'
+  }
+  if (error?.name === 'NotReadableError' || error?.name === 'TrackStartError') {
+    return 'Your camera is being used by another app. Close it there, then try again.'
+  }
+  return 'The camera preview could not start. You can retry or join with your camera off.'
+}
 
 function participantSnapshot(participant) {
   const microphone = participant.getTrackPublication(Track.Source.Microphone)
@@ -133,6 +149,11 @@ export default function ManagedMeetingRoomSession({
 }) {
   const router = useRouter()
   const roomRef = useRef(null)
+  const previewAudioTrackRef = useRef(null)
+  const previewVideoTrackRef = useRef(null)
+  const previewVideoElementRef = useRef(null)
+  const previewAttemptRef = useRef(0)
+  const previewStartedRef = useRef(false)
   const recorderRef = useRef(null)
   const mutedRef = useRef(false)
   const joiningRef = useRef(false)
@@ -154,6 +175,9 @@ export default function ManagedMeetingRoomSession({
   const [joinConflict, setJoinConflict] = useState(null)
   const [muted, setMuted] = useState(false)
   const [videoOff, setVideoOff] = useState(false)
+  const [previewStatus, setPreviewStatus] = useState(autoJoin ? 'skipped' : 'loading')
+  const [previewMessage, setPreviewMessage] = useState('')
+  const [previewDevices, setPreviewDevices] = useState({ audio: false, video: false })
   const [screenSharing, setScreenSharing] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showParticipants, setShowParticipants] = useState(false)
@@ -173,6 +197,18 @@ export default function ManagedMeetingRoomSession({
   const [isEndingMeeting, setIsEndingMeeting] = useState(false)
   const [endingMeetingStatus, setEndingMeetingStatus] = useState('Saving your latest meeting notes...')
   const [connectionLabel, setConnectionLabel] = useState('Connecting')
+  const previewDisplayName = useMemo(() => {
+    if (guestName) return guestName
+    if (typeof window === 'undefined') return 'You'
+    try {
+      const currentUser = JSON.parse(window.localStorage.getItem('user') || 'null')
+      return [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ')
+        || currentUser?.name
+        || 'You'
+    } catch {
+      return 'You'
+    }
+  }, [guestName])
 
   const { data: meetingResponse } = useAuthedSWR(
     guestToken || meetingData ? null : `/api/meetings?roomId=${encodeURIComponent(roomId)}`,
@@ -181,6 +217,135 @@ export default function ManagedMeetingRoomSession({
   useEffect(() => {
     if (meetingResponse?.success && meetingResponse.data?.[0]) setMeeting(meetingResponse.data[0])
   }, [meetingResponse])
+
+  const stopPreviewTracks = useCallback(() => {
+    const videoElement = previewVideoElementRef.current
+    const videoTrack = previewVideoTrackRef.current
+    if (videoElement && videoTrack) videoTrack.detach(videoElement)
+    previewAudioTrackRef.current?.stop()
+    previewVideoTrackRef.current?.stop()
+    previewAudioTrackRef.current = null
+    previewVideoTrackRef.current = null
+  }, [])
+
+  const attachPreviewVideo = useCallback(() => {
+    const videoElement = previewVideoElementRef.current
+    const videoTrack = previewVideoTrackRef.current
+    if (!videoElement || !videoTrack) return
+    videoTrack.attach(videoElement)
+    videoElement.muted = true
+    void videoElement.play().catch(() => { })
+  }, [])
+
+  const startMediaPreview = useCallback(async () => {
+    if (typeof navigator === 'undefined') return
+    const attempt = previewAttemptRef.current + 1
+    previewAttemptRef.current = attempt
+    stopPreviewTracks()
+    setPreviewStatus('loading')
+    setPreviewMessage('')
+    setPreviewDevices({ audio: false, video: false })
+    setMuted(false)
+    setVideoOff(false)
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMuted(true)
+      setVideoOff(true)
+      setPreviewStatus('unavailable')
+      setPreviewMessage('Camera preview is not supported by this browser. You can still join in listen-only mode.')
+      return
+    }
+
+    let tracks = []
+    let initialError = null
+    try {
+      tracks = await createLocalTracks({
+        audio: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+        video: {
+          facingMode: 'user',
+          resolution: VideoPresets.h720.resolution,
+        },
+      })
+    } catch (error) {
+      initialError = error
+      const videoResult = await Promise.allSettled([
+        createLocalVideoTrack({
+          facingMode: 'user',
+          resolution: VideoPresets.h720.resolution,
+        }),
+      ])
+      if (videoResult[0].status === 'fulfilled') tracks.push(videoResult[0].value)
+
+      if (!tracks.length) {
+        const audioResult = await Promise.allSettled([
+          createLocalAudioTrack({
+            autoGainControl: true,
+            echoCancellation: true,
+            noiseSuppression: true,
+          }),
+        ])
+        if (audioResult[0].status === 'fulfilled') tracks.push(audioResult[0].value)
+      }
+    }
+
+    if (previewAttemptRef.current !== attempt) {
+      tracks.forEach((track) => track.stop())
+      return
+    }
+
+    const audioTrack = tracks.find((track) => track.kind === Track.Kind.Audio) || null
+    const videoTrack = tracks.find((track) => track.kind === Track.Kind.Video) || null
+    previewAudioTrackRef.current = audioTrack
+    previewVideoTrackRef.current = videoTrack
+    setPreviewDevices({ audio: Boolean(audioTrack), video: Boolean(videoTrack) })
+
+    if (!audioTrack) setMuted(true)
+    if (!videoTrack) setVideoOff(true)
+
+    if (videoTrack) {
+      setPreviewStatus('ready')
+      if (!audioTrack) setPreviewMessage('Camera ready. No microphone is available, so you will join muted.')
+      requestAnimationFrame(attachPreviewVideo)
+      return
+    }
+
+    setPreviewStatus(audioTrack ? 'audio-only' : 'unavailable')
+    setPreviewMessage(audioTrack
+      ? 'Microphone ready. Camera is unavailable, so you will join with video off.'
+      : getPreviewFailureMessage(initialError))
+  }, [attachPreviewVideo, stopPreviewTracks])
+
+  const skipMediaPreview = useCallback(() => {
+    previewAttemptRef.current += 1
+    stopPreviewTracks()
+    setMuted(true)
+    setVideoOff(true)
+    setPreviewDevices({ audio: false, video: false })
+    setPreviewStatus('unavailable')
+    setPreviewMessage('Camera preview skipped. You can join in listen-only mode or try the camera again.')
+  }, [stopPreviewTracks])
+
+  useEffect(() => {
+    if (!autoJoin && !previewStartedRef.current) {
+      previewStartedRef.current = true
+      void startMediaPreview()
+    }
+  }, [autoJoin, startMediaPreview])
+
+  useEffect(() => {
+    if (autoJoin && joinError && !joinConflict && previewStatus === 'skipped') {
+      previewStartedRef.current = true
+      void startMediaPreview()
+    }
+  }, [autoJoin, joinConflict, joinError, previewStatus, startMediaPreview])
+
+  useEffect(() => {
+    if (previewStatus === 'ready' && !videoOff) attachPreviewVideo()
+  }, [attachPreviewVideo, previewStatus, videoOff])
 
   const {
     data: transcriptResponse,
@@ -323,10 +488,32 @@ export default function ManagedMeetingRoomSession({
         .on(RoomEvent.Disconnected, () => setConnectionLabel('Disconnected'))
 
       await liveRoom.connect(payload.data.serverUrl, payload.data.token, { autoSubscribe: true })
+      const previewTracks = [
+        previewAudioTrackRef.current,
+        previewVideoTrackRef.current,
+      ].filter((track) => track?.mediaStreamTrack?.readyState === 'live')
+      const publishedKinds = new Set()
+
+      if (previewTracks.length) {
+        const publishResults = await Promise.allSettled(previewTracks.map((track) => (
+          liveRoom.localParticipant.publishTrack(track)
+        )))
+        publishResults.forEach((result, index) => {
+          if (result.status === 'fulfilled') publishedKinds.add(previewTracks[index].kind)
+        })
+      }
+
       await Promise.allSettled([
-        liveRoom.localParticipant.setMicrophoneEnabled(!muted),
-        liveRoom.localParticipant.setCameraEnabled(!videoOff),
+        !publishedKinds.has(Track.Kind.Audio)
+          ? liveRoom.localParticipant.setMicrophoneEnabled(!muted)
+          : (muted ? previewAudioTrackRef.current?.mute() : previewAudioTrackRef.current?.unmute()),
+        !publishedKinds.has(Track.Kind.Video)
+          ? liveRoom.localParticipant.setCameraEnabled(!videoOff)
+          : (videoOff ? previewVideoTrackRef.current?.mute() : previewVideoTrackRef.current?.unmute()),
       ])
+      if (previewVideoElementRef.current && previewVideoTrackRef.current) {
+        previewVideoTrackRef.current.detach(previewVideoElementRef.current)
+      }
       setRoom(liveRoom)
       setJoined(true)
       meetingSessionStartedAtRef.current = new Date().toISOString()
@@ -356,10 +543,12 @@ export default function ManagedMeetingRoomSession({
   }, [autoJoin, join, joined])
 
   useEffect(() => () => {
+    previewAttemptRef.current += 1
     for (const timer of reactionTimers.current.values()) clearTimeout(timer)
     clearTimeout(chatNotificationTimerRef.current)
     roomRef.current?.disconnect()
-  }, [])
+    stopPreviewTracks()
+  }, [stopPreviewTracks])
 
   useEffect(() => {
     mutedRef.current = muted
@@ -467,6 +656,18 @@ export default function ManagedMeetingRoomSession({
     await room?.localParticipant.setMicrophoneEnabled(!next)
     setMuted(next)
     refreshParticipants(room)
+  }
+  const togglePreviewMute = async () => {
+    const next = !muted
+    const track = previewAudioTrackRef.current
+    if (track) await (next ? track.mute() : track.unmute())
+    setMuted(next)
+  }
+  const togglePreviewVideo = async () => {
+    const next = !videoOff
+    const track = previewVideoTrackRef.current
+    if (track) await (next ? track.mute() : track.unmute())
+    setVideoOff(next)
   }
   const toggleVideo = async () => {
     const next = !videoOff
@@ -677,18 +878,65 @@ export default function ManagedMeetingRoomSession({
 
   if (!joined) {
     const isRestoring = autoJoin && !joinError
+    const previewInitials = previewDisplayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'YO'
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-100 p-4 text-slate-900 dark:bg-slate-950 dark:text-white">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xl dark:border-white/10 dark:bg-slate-900">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"><HiOutlineVideoCamera className="h-8 w-8" /></div>
-          <h1 className="mt-4 text-xl font-semibold">{meeting?.title || 'Talio Meet'}</h1>
+        <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-2xl dark:border-white/10 dark:bg-slate-900 sm:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"><HiOutlineVideoCamera className="h-7 w-7" /></div>
+          <h1 className="mt-3 text-xl font-semibold">{meeting?.title || 'Talio Meet'}</h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             {isRestoring ? 'Restoring your secure meeting connection…' : 'Managed, adaptive video with automatic low-network optimisation.'}
           </p>
-          <div className={`mt-5 justify-center gap-3 ${isRestoring ? 'hidden' : 'flex'}`}>
-            <button onClick={() => setMuted(!muted)} aria-label={muted ? 'Turn microphone on' : 'Mute microphone'} className={`flex h-12 w-12 items-center justify-center rounded-full ${muted ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={muted}><HiOutlineMicrophone className="h-6 w-6" /></CutLineIcon></button>
-            <button onClick={() => setVideoOff(!videoOff)} aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'} className={`flex h-12 w-12 items-center justify-center rounded-full ${videoOff ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={videoOff}><HiOutlineVideoCamera className="h-6 w-6" /></CutLineIcon></button>
+          <div className={`relative mt-5 aspect-video overflow-hidden rounded-2xl bg-slate-950 ring-1 ring-black/10 dark:ring-white/10 ${isRestoring ? 'hidden' : 'block'}`} data-meeting-camera-preview>
+            <video
+              ref={previewVideoElementRef}
+              autoPlay
+              playsInline
+              muted
+              aria-label="Camera preview"
+              className={`absolute inset-0 h-full w-full -scale-x-100 object-cover transition-opacity duration-200 ${previewStatus === 'ready' && !videoOff ? 'opacity-100' : 'opacity-0'}`}
+            />
+
+            {previewStatus === 'loading' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300" role="status">
+                <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-white" />
+                <span className="mt-3 text-sm">Starting camera preview…</span>
+                <button type="button" onClick={skipMediaPreview} className="mt-3 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">Continue without camera</button>
+              </div>
+            )}
+
+            {(videoOff || previewStatus === 'audio-only') && previewStatus !== 'loading' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-indigo-950 text-white">
+                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600 text-2xl font-semibold ring-4 ring-white/10">{previewInitials}</span>
+                <span className="mt-3 text-sm text-slate-300">Camera off</span>
+              </div>
+            )}
+
+            {previewStatus === 'unavailable' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-slate-300">
+                <HiOutlineVideoCamera className="h-10 w-10 text-slate-400" />
+                <span className="mt-3 max-w-sm text-sm leading-5">{previewMessage}</span>
+                <button type="button" onClick={startMediaPreview} className="mt-3 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15">Try camera again</button>
+              </div>
+            )}
+
+            {previewStatus !== 'loading' && previewStatus !== 'unavailable' && (
+              <>
+                <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">Preview</span>
+                <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
+                  <button type="button" onClick={togglePreviewMute} disabled={!previewDevices.audio} aria-pressed={muted} aria-label={muted ? 'Turn microphone on' : 'Mute microphone'} className={`flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition ${muted ? 'bg-red-600 text-white' : 'bg-black/65 text-white hover:bg-black/80'} disabled:cursor-not-allowed disabled:opacity-50`}><CutLineIcon isOff={muted}><HiOutlineMicrophone className="h-5 w-5" /></CutLineIcon></button>
+                  <button type="button" onClick={togglePreviewVideo} disabled={!previewDevices.video} aria-pressed={videoOff} aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'} className={`flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition ${videoOff ? 'bg-red-600 text-white' : 'bg-black/65 text-white hover:bg-black/80'} disabled:cursor-not-allowed disabled:opacity-50`}><CutLineIcon isOff={videoOff}><HiOutlineVideoCamera className="h-5 w-5" /></CutLineIcon></button>
+                </div>
+              </>
+            )}
           </div>
+          {!isRestoring && previewMessage && previewStatus !== 'unavailable' && <p className="mt-3 text-xs text-amber-600 dark:text-amber-300" role="status">{previewMessage}</p>}
           {joinError && <p className="mt-5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200" role="alert">{joinError}</p>}
           {joinConflict?.roomId ? (
             <button
@@ -699,7 +947,7 @@ export default function ManagedMeetingRoomSession({
               Return to {joinConflict.title || 'current meeting'}
             </button>
           ) : (
-            <button onClick={join} disabled={joining || isRestoring} className="relative mt-6 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"><span className={joining || isRestoring ? 'invisible' : ''}>{joinError ? 'Try again' : 'Join meeting'}</span>{(joining || isRestoring) && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
+            <button onClick={join} disabled={joining || isRestoring || previewStatus === 'loading'} className="relative mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"><span className={joining || isRestoring ? 'invisible' : ''}>{joinError ? 'Try again' : previewStatus === 'loading' ? 'Preparing camera…' : 'Join meeting'}</span>{(joining || isRestoring) && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
           )}
         </div>
       </div>
