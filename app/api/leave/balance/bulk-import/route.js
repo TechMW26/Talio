@@ -7,6 +7,7 @@ import {
   normalizeLeaveBalance,
   normalizeLeaveTypes,
 } from '@/lib/leaveData'
+import { EMPLOYED_STATUSES } from '@/lib/leaveAllocation.server'
 
 // POST - Bulk import leave balances from CSV/text data using AI parsing
 export async function POST(request) {
@@ -48,7 +49,7 @@ export async function POST(request) {
 
     // Get all employees and leave types for matching
     const [employees, rawLeaveTypes] = await Promise.all([
-      Employee.find({ status: 'active' }).select('firstName lastName employeeCode email department').lean(),
+      Employee.find({ status: { $in: EMPLOYED_STATUSES } }).select('firstName lastName employeeCode email department').lean(),
       LeaveType.find({ isActive: true }).select('name code maxDaysPerYear daysPerYear').lean(),
     ])
     const leaveTypes = normalizeLeaveTypes(rawLeaveTypes)

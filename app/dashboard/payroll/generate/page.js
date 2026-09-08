@@ -119,7 +119,7 @@ export default function GeneratePayrollPage() {
 
       // Fetch employees, departments, and company settings in parallel
       const [employeesRes, departmentsRes, settingsRes] = await Promise.all([
-        fetch('/api/employees?limit=1000&status=active', {
+        fetch('/api/employees?limit=1000&status=active,probation', {
           headers: { 'Authorization': 'Bearer ' + token },
         }),
         fetch('/api/departments', {

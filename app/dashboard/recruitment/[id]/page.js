@@ -15,6 +15,7 @@ import { CANDIDATE_SOURCE_OPTIONS } from '@/lib/recruitmentConstants';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile';
 import {
   FaArrowLeft, FaEdit, FaTrash, FaBriefcase, FaMapMarkerAlt, FaClock,
   FaDollarSign, FaUsers, FaUserPlus, FaGraduationCap, FaCalendarAlt,
@@ -48,6 +49,7 @@ export default function JobDetailPage() {
     source: 'website', totalExperience: '', currentCompany: '',
     expectedSalary: '', skills: '',
   });
+  const [resumeFile, setResumeFile] = useState(null);
 
   const { socket, isConnected, subscribe } = useSocket();
 
@@ -95,6 +97,7 @@ export default function JobDetailPage() {
       toast.success('Candidate added successfully');
       onAddClose();
       setCandidateForm({ firstName: '', lastName: '', email: '', phone: '', source: 'website', totalExperience: '', currentCompany: '', expectedSalary: '', skills: '' });
+      setResumeFile(null);
     },
     onError: (msg) => toast.error(msg || 'Failed to add candidate'),
   });
@@ -104,8 +107,22 @@ export default function JobDetailPage() {
       toast.error('First name, last name, and email are required');
       return;
     }
+    let resume;
+    if (resumeFile) {
+      try {
+        const upload = await uploadAuthenticatedFile(resumeFile, {
+          category: 'documents',
+          token: localStorage.getItem('token'),
+        });
+        resume = { name: resumeFile.name, url: upload.data.fileUrl, uploadedAt: new Date().toISOString() };
+      } catch (error) {
+        toast.error(error.message || 'Unable to upload CV');
+        return;
+      }
+    }
     const payload = {
       ...candidateForm,
+      ...(resume ? { resume } : {}),
       jobPosting: params.id,
       totalExperience: candidateForm.totalExperience ? parseFloat(candidateForm.totalExperience) : undefined,
       expectedSalary: candidateForm.expectedSalary ? parseFloat(candidateForm.expectedSalary) : undefined,
@@ -488,6 +505,17 @@ export default function JobDetailPage() {
                 <Input label="Expected Salary" type="number" size="sm" value={candidateForm.expectedSalary} onValueChange={(v) => setCandidateForm((p) => ({ ...p, expectedSalary: v }))} />
                 <div className="sm:col-span-2">
                   <Input label="Skills (comma-separated)" size="sm" value={candidateForm.skills} onValueChange={(v) => setCandidateForm((p) => ({ ...p, skills: v }))} placeholder="React, Node.js, MongoDB..." />
+                </div>
+                <div className="sm:col-span-2 rounded-xl border border-default-200 p-3">
+                  <label className="block text-sm font-medium text-default-700" htmlFor="candidate-resume">Candidate CV / resume</label>
+                  <input
+                    id="candidate-resume"
+                    type="file"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
+                    className="mt-2 block w-full text-sm text-default-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-primary"
+                  />
+                  <p className="mt-1 text-xs text-default-400">PDF or Word document. Stored in the tenant's protected document storage.</p>
                 </div>
               </div>
             </ModalBody>

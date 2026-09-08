@@ -10,12 +10,12 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'LeaveBalance', 'LeaveType', 'Payroll', 'Employee', 'Designation', 'Department', 'User', 'Performance']);
+    const auth = await getAuthAndModels(request, ['Attendance', 'LeaveBalance', 'LeaveType', 'Payroll', 'Employee', 'Designation', 'Department', 'User', 'Performance', 'Task', 'TaskAssignee']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models, tenant } = auth;
-    const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance } = models;
+    const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance, Task, TaskAssignee } = models;
 
     // Find the user first to get the employeeId
     const userWithEmployee = await User.findById(user._id || user.userId).populate({
@@ -133,6 +133,17 @@ export async function GET(request) {
       employee: employee._id
     }).sort({ createdAt: -1 })
 
+    const assignedTaskRows = await TaskAssignee.find({
+      user: employee._id,
+      assignmentStatus: { $in: ['pending', 'accepted'] },
+    }).select('task').lean()
+    const pendingTaskCount = assignedTaskRows.length
+      ? await Task.countDocuments({
+          _id: { $in: assignedTaskRows.map((assignment) => assignment.task) },
+          status: { $in: ['todo', 'in-progress', 'review', 'blocked'] },
+        })
+      : 0
+
     // Get last 7 days attendance for chart (single query)
     const startOfDay = (date) => {
       const d = new Date(date)
@@ -202,19 +213,19 @@ export async function GET(request) {
           (currentSalary.netSalary >= lastMonthSalary.netSalary ? 'up' : 'down') : 'neutral'
       },
       pendingTasks: {
-        value: Math.floor(Math.random() * 10), // Placeholder - implement task system
-        change: -2,
-        trend: 'down'
+        value: pendingTaskCount,
+        change: 0,
+        trend: 'neutral'
       },
       completedCourses: {
-        value: Math.floor(Math.random() * 5), // Placeholder - implement learning system
-        change: 1,
-        trend: 'up'
+        value: 0,
+        change: 0,
+        trend: 'neutral'
       },
       performanceScore: {
-        value: latestPerformance ? latestPerformance.overallRating * 20 : 92, // Convert 5-point to percentage
-        change: 5,
-        trend: 'up'
+        value: latestPerformance ? latestPerformance.overallRating * 20 : 0,
+        change: 0,
+        trend: 'neutral'
       }
     }
 

@@ -22,6 +22,7 @@ import {
 import { buildEmployeeLifecycle, createInitialLifecycleWorkflows } from '@/lib/hrms/employeeLifecycle.server'
 import { normalizeEmployeeAddress } from '@/lib/employeeAddress'
 import { clampEmployeeListLimit } from '@/lib/employeeListQuery'
+import { ensureEmployeeLeaveBalances } from '@/lib/leaveAllocation.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -219,7 +220,8 @@ export async function GET(request) {
     }
 
     if (status) {
-      query.status = status
+      const requestedStatuses = status.split(',').map((value) => value.trim()).filter(Boolean)
+      query.status = requestedStatuses.length > 1 ? { $in: requestedStatuses } : requestedStatuses[0]
     }
 
     if (team && TenantTeam && mongoose.Types.ObjectId.isValid(team)) {
@@ -333,7 +335,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get auth and tenant-aware models
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'OnboardingEmail', 'CompanySettings', 'Role', 'HrmsWorkflow', 'HrmsWorkflowEvent']);
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'OnboardingEmail', 'CompanySettings', 'Role', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'LeaveType', 'LeaveBalance']);
     if (!auth.success) {
       return NextResponse.json(
         { success: false, message: auth.message || 'Unauthorized' },
@@ -496,6 +498,12 @@ export async function POST(request) {
       employee,
       features: auth.companyFeatures,
     }).catch((error) => console.error('[Employee Create] Lifecycle workflow initialization failed:', error))
+
+    await ensureEmployeeLeaveBalances({
+      models: auth.models,
+      employeeId: employee._id,
+      year: new Date(employee.dateOfJoining || Date.now()).getFullYear(),
+    }).catch((error) => console.error('[Employee Create] Leave allocation failed:', error))
 
     // Create user account for the employee
     const password = data.password || 'employee123' // Default password if not provided

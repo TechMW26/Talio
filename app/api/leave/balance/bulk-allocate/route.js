@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 import { buildLeaveBalanceFields, normalizeLeaveType } from '@/lib/leaveData'
+import { EMPLOYED_STATUSES } from '@/lib/leaveAllocation.server'
 // POST - Bulk allocate leave for all employees
 export async function POST(request) {
   try {
@@ -26,7 +27,7 @@ export async function POST(request) {
     }
 
     // Get all active employees
-    const employees = await Employee.find({ status: 'active' })
+    const employees = await Employee.find({ status: { $in: EMPLOYED_STATUSES } })
     
     // Get all active leave types
     const leaveTypes = await LeaveType.find({ isActive: true })

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
+import { emitHolidayUpdate } from '@/lib/realtimeEvents'
+import { sanitizeHolidayPayload } from '@/lib/holidayPolicy'
 // GET - Get single holiday
 export async function GET(request, { params }) {
   try {
@@ -41,10 +43,24 @@ export async function PUT(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models, tenant } = auth
+    const { user, models, tenant } = auth
     const { Holiday } = models
 
-    const data = await request.json()
+    if (!['admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
+      return NextResponse.json({ success: false, message: 'Only Admin and HR can manage holidays' }, { status: 403 })
+    }
+
+    const existingHoliday = await Holiday.findById(params.id).lean()
+    if (!existingHoliday) {
+      return NextResponse.json({ success: false, message: 'Holiday not found' }, { status: 404 })
+    }
+
+    let data
+    try {
+      data = sanitizeHolidayPayload(await request.json(), existingHoliday)
+    } catch (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+    }
 
     const holiday = await Holiday.findByIdAndUpdate(
       params.id,
@@ -65,6 +81,8 @@ export async function PUT(request, { params }) {
     } catch (cacheErr) {
       console.error('Failed to clear holiday cache:', cacheErr)
     }
+
+    emitHolidayUpdate(holiday.toObject ? holiday.toObject() : holiday, { action: 'update', broadcast: true })
 
     return NextResponse.json({
       success: true,
@@ -87,8 +105,12 @@ export async function DELETE(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models, tenant } = auth
+    const { user, models, tenant } = auth
     const { Holiday } = models
+
+    if (!['admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
+      return NextResponse.json({ success: false, message: 'Only Admin and HR can manage holidays' }, { status: 403 })
+    }
 
     const holiday = await Holiday.findByIdAndDelete(params.id)
 
@@ -105,6 +127,8 @@ export async function DELETE(request, { params }) {
     } catch (cacheErr) {
       console.error('Failed to clear holiday cache:', cacheErr)
     }
+
+    emitHolidayUpdate(holiday.toObject ? holiday.toObject() : holiday, { action: 'delete', broadcast: true })
 
     return NextResponse.json({
       success: true,

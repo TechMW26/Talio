@@ -15,6 +15,8 @@ import { getCandidateSourceLabel } from '@/lib/recruitmentConstants';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile';
+import { createOfferLetterFile } from '@/lib/client/offerLetter';
 import {
   FaArrowLeft, FaEdit, FaTrash, FaUser, FaEnvelope, FaPhone,
   FaBriefcase, FaStar, FaCalendarAlt, FaDollarSign, FaClock,
@@ -49,13 +51,16 @@ export default function CandidateDetailPage() {
   // Rating modal
   const { isOpen: isRatingOpen, onOpen: onRatingOpen, onClose: onRatingClose } = useDisclosure();
   const [ratingValue, setRatingValue] = useState('');
+  const { isOpen: isOfferOpen, onOpen: onOfferOpen, onClose: onOfferClose } = useDisclosure();
+  const [offerData, setOfferData] = useState({ designation: '', joiningDate: '', salary: '', notes: '' });
+  const [generatingOffer, setGeneratingOffer] = useState(false);
 
   // Convert modal
   const { isOpen: isConvertOpen, onOpen: onConvertOpen, onClose: onConvertClose } = useDisclosure();
   const [convertData, setConvertData] = useState({
     employeeCode: '', joiningDate: '', onboardingTemplate: 'standard',
     probationApplicable: true, probationDurationMonths: 3, noticePeriodDays: 30,
-    backgroundVerificationRequired: true, assetProvisioningRequired: true,
+    backgroundVerificationRequired: true, assetProvisioningRequired: true, reportingManager: '',
   });
 
   const { socket, isConnected, subscribe } = useSocket();
@@ -66,6 +71,8 @@ export default function CandidateDetailPage() {
 
   const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/recruitment/candidates/${params.id}` : null);
   const candidate = res?.data || null;
+  const { data: managersResponse } = useAuthedSWR(isConvertOpen ? '/api/employees?status=active,probation&limit=500&sortBy=firstName&sortOrder=asc' : null);
+  const managerOptions = managersResponse?.data || [];
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -120,8 +127,8 @@ export default function CandidateDetailPage() {
   });
 
   const handleConvert = async () => {
-    if (!convertData.employeeCode || !convertData.joiningDate) {
-      toast.error('Employee code and joining date are required');
+    if (!convertData.employeeCode || !convertData.joiningDate || !convertData.reportingManager) {
+      toast.error('Employee code, joining date, and reporting manager are required');
       return;
     }
     await convertMutation.execute('/api/recruitment/candidates/convert', { candidateId: params.id, ...convertData });
@@ -136,6 +143,50 @@ export default function CandidateDetailPage() {
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this candidate?')) return;
     await deleteMutation.execute(`/api/recruitment/candidates/${params.id}`);
+  };
+
+  const handleGenerateOffer = async () => {
+    if (!offerData.joiningDate || !Number(offerData.salary)) {
+      toast.error('Joining date and annual salary are required');
+      return;
+    }
+    setGeneratingOffer(true);
+    try {
+      const file = await createOfferLetterFile({
+        candidate,
+        jobTitle: candidate.jobPosting?.jobTitle,
+        ...offerData,
+      });
+      const uploaded = await uploadAuthenticatedFile(file, {
+        category: 'documents',
+        token: localStorage.getItem('token'),
+      });
+      const response = await fetch(`/api/recruitment/candidates/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({
+          stage: 'offer',
+          offer: {
+            offeredDate: new Date().toISOString(),
+            joiningDate: offerData.joiningDate,
+            salary: Number(offerData.salary),
+            designation: offerData.designation || candidate.jobPosting?.jobTitle,
+            status: 'pending',
+            offerLetterUrl: uploaded.data.fileUrl,
+            notes: offerData.notes,
+          },
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to save offer letter');
+      toast.success('Offer letter generated and attached');
+      onOfferClose();
+      await refresh();
+    } catch (error) {
+      toast.error(error.message || 'Unable to generate offer letter');
+    } finally {
+      setGeneratingOffer(false);
+    }
   };
 
   if (isLoading) {
@@ -229,6 +280,12 @@ export default function CandidateDetailPage() {
                 Change Stage
               </Button>
               <Button size="sm" variant="flat" onPress={onRatingOpen}>Rate</Button>
+              {!candidate.convertedEmployeeId && (
+                <Button size="sm" color="secondary" variant="flat" onPress={() => {
+                  setOfferData((value) => ({ ...value, designation: value.designation || candidate.jobPosting?.jobTitle || '' }));
+                  onOfferOpen();
+                }}>Generate Offer</Button>
+              )}
               {candidate.stage === 'hired' && !candidate.convertedEmployeeId && (
                 <Button size="sm" color="success" variant="flat" onPress={onConvertOpen} startContent={<FaUserCheck className="w-3 h-3" />}>
                   Convert to Employee
@@ -488,6 +545,11 @@ export default function CandidateDetailPage() {
                       <p className="font-medium text-default-800">{new Date(candidate.offer.joiningDate).toLocaleDateString()}</p>
                     </div>
                   )}
+                  {candidate.offer.offerLetterUrl && (
+                    <a href={candidate.offer.offerLetterUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-medium text-primary hover:underline">
+                      <FaFileAlt className="h-4 w-4" /> View offer letter
+                    </a>
+                  )}
                 </CardBody>
               </Card>
             )}
@@ -509,6 +571,24 @@ export default function CandidateDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Stage Change Modal */}
+        <Modal isOpen={isOfferOpen} onClose={onOfferClose} size="lg">
+          <ModalContent>
+            <ModalHeader>Generate Offer Letter</ModalHeader>
+            <ModalBody>
+              <Input label="Designation" value={offerData.designation} onValueChange={(value) => setOfferData((current) => ({ ...current, designation: value }))} />
+              <Input label="Joining Date" type="date" isRequired value={offerData.joiningDate} onValueChange={(value) => setOfferData((current) => ({ ...current, joiningDate: value }))} />
+              <Input label="Annual Salary (INR)" type="number" min={1} isRequired value={offerData.salary} onValueChange={(value) => setOfferData((current) => ({ ...current, salary: value }))} />
+              <Textarea label="Additional terms (optional)" value={offerData.notes} onValueChange={(value) => setOfferData((current) => ({ ...current, notes: value }))} />
+              <p className="text-xs text-default-500">The PDF is generated, stored securely, attached to the candidate, and moves the candidate to Offer stage.</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={onOfferClose}>Cancel</Button>
+              <Button color="primary" isLoading={generatingOffer} onPress={handleGenerateOffer}>Generate & attach</Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
 
         {/* Stage Change Modal */}
         <Modal isOpen={isStageOpen} onClose={onStageClose}>
@@ -602,6 +682,19 @@ export default function CandidateDetailPage() {
                 onValueChange={(v) => setConvertData((prev) => ({ ...prev, joiningDate: v }))}
                 className="mt-3"
               />
+              <Select
+                label="Reporting Manager"
+                isRequired
+                className="mt-3"
+                placeholder="Search or select reporting manager"
+                selectedKeys={convertData.reportingManager ? new Set([convertData.reportingManager]) : new Set()}
+                onSelectionChange={(keys) => setConvertData((previous) => ({ ...previous, reportingManager: String(Array.from(keys)[0] || '') }))}
+              >
+                {managerOptions.map((employee) => {
+                  const label = `${employee.firstName || ''} ${employee.lastName || ''}`.trim()
+                  return <SelectItem key={String(employee._id)} textValue={`${label} ${employee.employeeCode || ''}`}>{label} ({employee.employeeCode || 'EMP'})</SelectItem>
+                })}
+              </Select>
               <div className="mt-4 rounded-xl border border-default-200 p-4">
                 <p className="text-sm font-semibold text-default-800">Employment lifecycle</p>
                 <p className="mb-3 mt-1 text-xs text-default-500">Onboarding and probation will start automatically after conversion.</p>

@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import { isWithinOfficeHours } from '@/lib/officeHours';
 import { processImage, ImagePipelineError } from '@/lib/imagePipeline';
 import { getDateKeyInTimezone } from '@/lib/timezone';
+import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -42,12 +43,12 @@ export async function POST(request) {
     const userId = user._id || user.userId;
     const userRole = user.role;
 
-    // Skip for admin roles
-    if (['admin'].includes(userRole)) {
+    // Admin and HR screens contain privileged employee data and must never be captured.
+    if (isScreenCaptureProtectedRole(userRole)) {
       return NextResponse.json({
         success: false,
-        error: 'Screenshot capture not enabled for admin roles'
-      }, { status: 400 });
+        error: 'Screenshot capture is disabled for protected roles'
+      }, { status: 403 });
     }
 
     // Get form data

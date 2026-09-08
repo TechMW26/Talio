@@ -34,6 +34,12 @@ export default function LoginPage() {
   const [checking, setChecking] = useState(true)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [loginError, setLoginError] = useState(null) // { errorType, message }
+  const [rememberMe, setRememberMe] = useState(true)
+
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem('talio_remembered_email')
+    if (rememberedEmail) setFormData((previous) => ({ ...previous, email: rememberedEmail }))
+  }, [])
 
   // Check if running in Electron/desktop app
   const isDesktopApp = () => {
@@ -215,7 +221,11 @@ export default function LoginPage() {
         sessionStorage.setItem('playLoginSound', 'true')
 
         toast.success('Login successful!')
-        // Store in localStorage
+        if (rememberMe) localStorage.setItem('talio_remembered_email', formData.email.trim())
+        else localStorage.removeItem('talio_remembered_email')
+
+        // Authentication remains persistent for the configured token lifetime;
+        // Remember me controls whether the login identifier is retained.
         localStorage.setItem('token', data.token)
         localStorage.setItem('user', JSON.stringify(data.user))
         const resolvedUserId = data.user?.id || data.user?._id || data.user?.userId
@@ -430,8 +440,10 @@ export default function LoginPage() {
 
                 {/* Remember & Forgot */}
                 <div className="flex items-center justify-between">
-                  <Checkbox 
+                  <Checkbox
                     size="sm"
+                    isSelected={rememberMe}
+                    onValueChange={setRememberMe}
                     classNames={{
                       label: "text-default-600 text-sm",
                     }}

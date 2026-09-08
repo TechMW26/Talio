@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildDirectReportsFilter } from '@/lib/teamScope'
+import { EMPLOYED_STATUSES } from '@/lib/leaveAllocation.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,7 +85,7 @@ export async function GET(request) {
       // Get all team members from filtered departments
       teamMembers = await Employee.find({
         department: { $in: filteredDepartmentIds },
-        status: 'active'
+        status: { $in: EMPLOYED_STATUSES }
       })
         .populate('designation', 'title level levelName')
         .populate('department', 'name code')
@@ -190,7 +191,7 @@ export async function GET(request) {
         // Get all team members from ALL departments user heads
         teamMembers = await Employee.find({
           department: { $in: departmentIds },
-          status: 'active'
+          status: { $in: EMPLOYED_STATUSES }
         })
           .populate('designation', 'title level levelName')
           .populate('department', 'name code')
@@ -280,7 +281,7 @@ export async function GET(request) {
 
             teamMembers = await Employee.find({
               department: dept._id,
-              status: 'active'
+              status: { $in: EMPLOYED_STATUSES }
             })
               .populate('designation', 'title level levelName')
               .populate('department', 'name code')
@@ -319,7 +320,7 @@ export async function GET(request) {
     } else if (userRole === 'manager') {
       // User is manager - get direct reports (all relationship fields)
       teamMembers = await Employee.find(
-        buildDirectReportsFilter(userRecord.employeeId, { status: 'active' })
+        buildDirectReportsFilter(userRecord.employeeId, { status: { $in: EMPLOYED_STATUSES } })
       )
         .populate('designation', 'title level levelName')
         .populate('department', 'name')
@@ -366,7 +367,7 @@ export async function GET(request) {
 
         // Populate designation and department for each member
         const memberIds = [...memberMap.keys()]
-        teamMembers = await Employee.find({ _id: { $in: memberIds }, status: 'active' })
+        teamMembers = await Employee.find({ _id: { $in: memberIds }, status: { $in: EMPLOYED_STATUSES } })
           .populate('designation', 'title level levelName')
           .populate('department', 'name code')
           .populate('reportingManager', 'firstName lastName employeeCode')

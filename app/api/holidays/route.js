@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { emitHolidayUpdate } from '@/lib/realtimeEvents'
 import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
+import { HOLIDAY_TYPES, sanitizeHolidayPayload } from '@/lib/holidayPolicy'
 
 // GET - List holidays
 export async function GET(request) {
@@ -38,7 +39,7 @@ export async function GET(request) {
     const query = {}
 
     // Filter by holiday type (e.g. 'public', 'optional', 'restricted')
-    if (type) {
+    if (type && HOLIDAY_TYPES.includes(type)) {
       query.type = type
     }
 
@@ -89,10 +90,19 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models, tenant } = auth
+    const { user, models, tenant } = auth
     const { Holiday } = models
 
-    const data = await request.json()
+    if (!['admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
+      return NextResponse.json({ success: false, message: 'Only Admin and HR can manage holidays' }, { status: 403 })
+    }
+
+    let data
+    try {
+      data = sanitizeHolidayPayload(await request.json())
+    } catch (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+    }
 
     const holiday = await Holiday.create(data)
 

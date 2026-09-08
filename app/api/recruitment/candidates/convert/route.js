@@ -6,11 +6,12 @@ import { emitRecruitmentUpdate, emitEmployeeUpdate } from '@/lib/realtimeEvents'
 import { buildEmployeeLifecycle, createInitialLifecycleWorkflows } from '@/lib/hrms/employeeLifecycle.server'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { checkUserLimit, getTenantCompanyByDbName, registerUserTenantMapping } from '@/lib/tenantContext'
+import { ensureEmployeeLeaveBalances } from '@/lib/leaveAllocation.server'
 
 // POST - Convert hired candidate to employee
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Candidate', 'JobPosting', 'Employee', 'Department', 'Designation', 'User', 'Role', 'OnboardingEmail', 'CompanySettings', 'HrmsWorkflow', 'HrmsWorkflowEvent'])
+    const auth = await getAuthAndModels(request, ['Candidate', 'JobPosting', 'Employee', 'Department', 'Designation', 'User', 'Role', 'OnboardingEmail', 'CompanySettings', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'LeaveType', 'LeaveBalance'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -22,10 +23,13 @@ export async function POST(request) {
     }
 
     const data = await request.json()
-    const { candidateId, employeeCode, joiningDate, designation, department } = data
+    const { candidateId, employeeCode, joiningDate, designation, department, reportingManager } = data
 
     if (!candidateId) {
       return NextResponse.json({ success: false, message: 'Candidate ID is required' }, { status: 400 })
+    }
+    if (!reportingManager) {
+      return NextResponse.json({ success: false, message: 'Reporting manager is required before onboarding' }, { status: 400 })
     }
 
     const candidate = await Candidate.findById(candidateId)
@@ -49,9 +53,10 @@ export async function POST(request) {
     }
 
     const effectiveEmployeeCode = employeeCode || `EMP-${Date.now().toString(36).toUpperCase()}`
-    const [existingEmployee, existingUser, limitCheck] = await Promise.all([
+    const [existingEmployee, existingUser, managerRecord, limitCheck] = await Promise.all([
       Employee.findOne({ $or: [{ email: candidate.email }, { employeeCode: effectiveEmployeeCode }] }).select('_id').lean(),
       User.findOne({ email: candidate.email }).select('_id').lean(),
+      Employee.findOne({ _id: reportingManager, status: { $in: ['active', 'probation'] } }).select('_id').lean(),
       tenant?.databaseName ? checkUserLimit(tenant.databaseName) : Promise.resolve({ allowed: true }),
     ])
     if (existingEmployee || existingUser) {
@@ -59,6 +64,9 @@ export async function POST(request) {
     }
     if (!limitCheck.allowed) {
       return NextResponse.json({ success: false, message: limitCheck.message || 'User limit reached' }, { status: 403 })
+    }
+    if (!managerRecord) {
+      return NextResponse.json({ success: false, message: 'Selected reporting manager is unavailable' }, { status: 400 })
     }
 
     // Create employee record
@@ -70,6 +78,8 @@ export async function POST(request) {
       employeeCode: effectiveEmployeeCode,
       department: department || candidate.jobPosting?.department,
       designation: designation || candidate.jobPosting?.designation,
+      reportingManager: managerRecord._id,
+      assignedManager: managerRecord._id,
       dateOfJoining: joiningDate || candidate.offer?.joiningDate || new Date(),
       skills: candidate.skills,
       salary: (candidate.offer?.salary || candidate.expectedSalary)
@@ -109,6 +119,11 @@ export async function POST(request) {
       employee,
       features: auth.companyFeatures,
     }).catch((error) => console.error('[Candidate Convert] Lifecycle workflow initialization failed:', error))
+    await ensureEmployeeLeaveBalances({
+      models,
+      employeeId: employee._id,
+      year: new Date(employee.dateOfJoining || Date.now()).getFullYear(),
+    }).catch((error) => console.error('[Candidate Convert] Leave allocation failed:', error))
 
     const tenantCompany = tenant?.databaseName ? await getTenantCompanyByDbName(tenant.databaseName) : null
     if (tenantCompany) {

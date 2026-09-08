@@ -131,7 +131,6 @@ export default function DocumentsPage() {
           fileType: uploadData.data.fileType || selectedFile.type,
           fileSize: uploadData.data.fileSize || selectedFile.size,
           employee: employeeId,
-          uploadedBy: employeeId,
         }),
       })
 

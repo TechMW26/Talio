@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildDirectReportsFilter } from '@/lib/teamScope'
+import { EMPLOYED_STATUSES } from '@/lib/leaveAllocation.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,7 +63,7 @@ export async function GET(request) {
     // Get employees based on role
     let employees
     if (isAdmin) {
-      employees = await Employee.find({ status: 'active' })
+      employees = await Employee.find({ status: { $in: EMPLOYED_STATUSES } })
         .select('firstName lastName profilePicture department')
         .lean()
     } else {
@@ -95,7 +96,7 @@ export async function GET(request) {
       if (departmentIds.length > 0) {
         // User is department head - get employees from ALL departments they head
         employees = await Employee.find({
-          status: 'active',
+          status: { $in: EMPLOYED_STATUSES },
           department: { $in: departmentIds }
         })
           .select('firstName lastName profilePicture department')
@@ -115,7 +116,7 @@ export async function GET(request) {
           }
           employees = await Employee.find({
             _id: { $in: [...teamEmployeeIds] },
-            status: 'active'
+            status: { $in: EMPLOYED_STATUSES }
           })
             .select('firstName lastName profilePicture department')
             .lean()
@@ -127,7 +128,7 @@ export async function GET(request) {
         const orClauses = [{ department: requestingEmployee.department }]
         if (directReportsClause) orClauses.unshift(...directReportsClause.$or)
         employees = await Employee.find({
-          status: 'active',
+          status: { $in: EMPLOYED_STATUSES },
           $or: orClauses,
         })
           .select('firstName lastName profilePicture department')

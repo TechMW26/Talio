@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import mongoose from 'mongoose';
+import { SCREEN_CAPTURE_PROTECTED_ROLES, isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
 
 // Roles that can initiate manual captures (in addition to department heads)
 const ALLOWED_INITIATOR_ROLES = ['admin', 'hr'];
 
 // Roles that cannot be captured (even manually)
-const PROTECTED_ROLES = ['admin'];
+const PROTECTED_ROLES = SCREEN_CAPTURE_PROTECTED_ROLES;
 
 /**
  * Check if a user is a department head
@@ -87,7 +88,7 @@ export async function POST(request) {
     }
 
     // CRITICAL: Admin cannot capture their own screen
-    if (targetUserId === initiatorId && PROTECTED_ROLES.includes(initiatorRole)) {
+    if (targetUserId === initiatorId && isScreenCaptureProtectedRole(initiatorRole)) {
       console.log(`[ManualCapture] BLOCKED - Admin cannot capture their own screen`);
       return NextResponse.json(
         { success: false, error: 'Admin cannot capture their own screen' },
@@ -106,10 +107,10 @@ export async function POST(request) {
     }
 
     // Check if target user is an admin (protected from capture)
-    if (PROTECTED_ROLES.includes(targetUser.role)) {
+    if (isScreenCaptureProtectedRole(targetUser.role)) {
       console.log(`[ManualCapture] BLOCKED - Cannot capture admin user`);
       return NextResponse.json(
-        { success: false, error: 'Admin screens cannot be captured' },
+        { success: false, error: 'Admin and HR screens cannot be captured' },
         { status: 403 }
       );
     }
@@ -219,7 +220,7 @@ export async function GET(request) {
     // Determine permissions based on role OR department head status
     const hasRolePermission = ALLOWED_INITIATOR_ROLES.includes(userRole);
     const canInitiateCapture = hasRolePermission || isDepartmentHead;
-    const isProtectedFromCapture = PROTECTED_ROLES.includes(userRole);
+    const isProtectedFromCapture = isScreenCaptureProtectedRole(userRole);
 
     let captureScope = 'none';
     let targetableUsers = [];

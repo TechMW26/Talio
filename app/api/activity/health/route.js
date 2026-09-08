@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { mkdir, access, constants } from 'fs/promises';
 import path from 'path';
+import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
 
 /**
  * Ensure user activity folder exists
@@ -62,7 +63,7 @@ export async function GET(request) {
       timestamp: new Date().toISOString(),
       userId,
       role: userRole,
-      captureEnabled: !['admin'].includes(userRole),
+      captureEnabled: !isScreenCaptureProtectedRole(userRole),
       database: 'connected',
       activityFolder: folderResult,
       server: {

@@ -68,7 +68,8 @@ export async function GET(request) {
               type: 'image',
               fileType: 'image',
               employee: employee,
-              uploadedBy: employee,
+              uploadedBy: null,
+              uploadedByLabel: 'Employee self-service',
               createdAt: aadhaarFront.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
               updatedAt: aadhaarFront.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
               isAadhaarDocument: true,
@@ -89,7 +90,8 @@ export async function GET(request) {
               type: 'image',
               fileType: 'image',
               employee: employee,
-              uploadedBy: employee,
+              uploadedBy: null,
+              uploadedByLabel: 'Employee self-service',
               createdAt: aadhaarBack.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
               updatedAt: aadhaarBack.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
               isAadhaarDocument: true,
@@ -123,12 +125,12 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Document'])
+    const auth = await getAuthAndModels(request, ['Document', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { Document } = models
+    const { Document, User, Employee } = models
 
     let data = await request.json()
 
@@ -145,6 +147,15 @@ export async function POST(request) {
         { status: 400 }
       )
     }
+
+    const actorUser = await User.findById(auth.user._id || auth.user.userId).select('employeeId').lean()
+    const actorEmployee = actorUser?.employeeId
+      ? await Employee.findById(actorUser.employeeId).select('_id').lean()
+      : await Employee.findOne({ userId: auth.user._id || auth.user.userId }).select('_id').lean()
+    if (!actorEmployee?._id) {
+      return NextResponse.json({ success: false, message: 'Uploader employee profile not found' }, { status: 400 })
+    }
+    data.uploadedBy = actorEmployee._id
 
     const document = await Document.create(data)
 

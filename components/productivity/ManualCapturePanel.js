@@ -325,7 +325,7 @@ export default function ManualCapturePanel() {
               <p className="font-medium mb-1">Important Notes:</p>
               <ul className="list-disc list-inside space-y-0.5 text-amber-600">
                 <li>Manual captures require the target user's desktop app to be running</li>
-                <li>Admin screens cannot be captured under any circumstances</li>
+                <li>Admin and HR screens cannot be captured under any circumstances</li>
                 <li>All capture requests are logged for audit purposes</li>
               </ul>
             </div>
