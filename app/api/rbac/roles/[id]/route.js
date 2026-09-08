@@ -134,7 +134,7 @@ export async function PUT(request, { params }) {
                 email: user.email,
                 role: user.role,
             },
-            message: `Permissions for ${role.displayLabel} were updated. Talio will refresh to apply the latest access.`,
+            message: `Permissions for ${role.displayLabel} were updated. Talio is applying the latest access in the background.`,
         })
 
         // Audit log
@@ -221,7 +221,7 @@ export async function DELETE(request, { params }) {
                     email: user.email,
                     role: user.role,
                 },
-                message: `Your custom role ${role.displayLabel} was removed. Talio will refresh to apply the default access.`,
+                message: `Your custom role ${role.displayLabel} was removed. Talio is applying the default access in the background.`,
             })
         }
 

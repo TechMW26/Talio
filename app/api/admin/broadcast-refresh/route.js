@@ -4,8 +4,8 @@ import mongoose from 'mongoose';
 
 /**
  * POST /api/admin/broadcast-refresh
- * Send a force-refresh event to users via Socket.IO (or DB fallback)
- * ADMIN ONLY - HR and Department Heads can view but not refresh
+ * Send a background data-sync event to users via Socket.IO (or DB fallback).
+ * ADMIN ONLY - HR and Department Heads can view but not trigger a sync.
  * 
  * Body:
  * - target: 'all' | 'department' | 'user'
@@ -119,22 +119,23 @@ export async function POST(request) {
 
     if (targetUserIds.length === 0) {
       return NextResponse.json(
-        { success: false, message: 'No users found to send refresh to.' },
+        { success: false, message: 'No users found to sync.' },
         { status: 404 }
       );
     }
 
-    // Emit force-refresh event to each user's room
+    // Keep the legacy event name for compatibility; clients handle it as a
+    // non-disruptive session/data sync.
     const refreshPayload = {
       type: 'force-refresh',
-      message: message || 'The administrator has requested a page refresh. Your page will reload shortly.',
+      message: message || 'The administrator requested a background data sync. Your open work will stay in place.',
       initiatedBy: {
         userId: user._id?.toString() || user.userId,
         email: user.email,
         role: user.role,
       },
       timestamp: new Date().toISOString(),
-      hard: true, // Indicates a hard refresh (clear cache)
+      hard: false,
     };
 
     let sentCount = 0;
@@ -145,7 +146,7 @@ export async function POST(request) {
         global.io.to(`user:${uid}`).emit('force-refresh', refreshPayload);
         sentCount++;
       }
-      console.log(`[Broadcast Refresh] ${user.email} sent refresh via Socket.IO to ${sentCount} users (${targetDescription})`);
+      console.log(`[Broadcast Sync] ${user.email} sent a data sync via Socket.IO to ${sentCount} users (${targetDescription})`);
     } else {
       // Fallback path: Store in DB for polling clients
       const docs = targetUserIds.map(uid => ({
@@ -157,12 +158,12 @@ export async function POST(request) {
       }));
       await ForceRefresh.insertMany(docs);
       sentCount = docs.length;
-      console.log(`[Broadcast Refresh] ${user.email} stored refresh in DB for ${sentCount} users (${targetDescription}) - Socket.IO unavailable`);
+      console.log(`[Broadcast Sync] ${user.email} stored a data sync in DB for ${sentCount} users (${targetDescription}) - Socket.IO unavailable`);
     }
 
     return NextResponse.json({
       success: true,
-      message: `Refresh request sent to ${sentCount} users (${targetDescription}).`,
+      message: `Data sync request sent to ${sentCount} users (${targetDescription}).`,
       data: {
         targetCount: sentCount,
         targetDescription,
@@ -170,9 +171,9 @@ export async function POST(request) {
       }
     });
   } catch (error) {
-    console.error('[Broadcast Refresh API] Error:', error);
+    console.error('[Broadcast Sync API] Error:', error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Failed to broadcast refresh' },
+      { success: false, message: error.message || 'Failed to broadcast data sync' },
       { status: 500 }
     );
   }

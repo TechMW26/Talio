@@ -10,7 +10,6 @@ import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
 import MiraTransitionOverlay from '@/components/ui/MiraTransitionOverlay'
 import AIAssistant from '@/components/AIAssistant'
 import AIAssistantBridge from '@/components/AIAssistantBridge'
-import AutoRefresh from '@/components/AutoRefresh'
 import WebNetworkRecovery from '@/components/WebNetworkRecovery'
 import ScrollToTop from '@/components/ScrollToTop'
 import { FocusTimerProvider } from '@/contexts/FocusTimerContext'
@@ -18,7 +17,7 @@ import { MiraChatProvider } from '@/contexts/MiraChatContext'
 import { MeetingSessionProvider } from '@/contexts/MeetingSessionContext'
 import {
     patchBrowserFetchForFreshness,
-    revalidateAllApiQueries,
+    revalidateApiQueries,
     subscribeToClientDataChanges
 } from '@/lib/clientDataSync'
 
@@ -41,8 +40,8 @@ function ClientDataSyncBridge() {
 
     useEffect(() => {
         const restoreFetch = patchBrowserFetchForFreshness()
-        const unsubscribe = subscribeToClientDataChanges(() => {
-            revalidateAllApiQueries(mutate)
+        const unsubscribe = subscribeToClientDataChanges((change) => {
+            revalidateApiQueries(mutate, change?.scopes)
         })
 
         return () => {
@@ -135,7 +134,6 @@ export function Providers({ children }) {
                         <GlobalAILoadingOverlay />
                         <ScrollToTop />
                         <WebNetworkRecovery />
-                        <AutoRefresh />
                         <AIAssistant />
                         <AIAssistantBridge />
                         <MeetingSessionProvider>

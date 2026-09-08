@@ -54,7 +54,7 @@ export async function PUT(request, { params }) {
                 email: user.email,
                 role: user.role,
             },
-            message: `Your access role was updated to ${role.displayLabel}. Talio will refresh to apply the new permissions.`,
+            message: `Your access role was updated to ${role.displayLabel}. Talio is applying the new permissions in the background.`,
         })
 
         // Audit log

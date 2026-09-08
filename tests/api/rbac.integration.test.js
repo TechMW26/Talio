@@ -314,7 +314,7 @@ describe('RBAC integration coverage', () => {
             databaseName: 'talio_company_mushroom_world_group',
             userIds: ['user-2'],
             forceRefreshModel: models.ForceRefresh,
-            message: 'Your access role was updated to Senior MIS Executive. Talio will refresh to apply the new permissions.',
+            message: 'Your access role was updated to Senior MIS Executive. Talio is applying the new permissions in the background.',
         }))
         expect(body).toMatchObject({
             success: true,

@@ -62,10 +62,10 @@ export default function LiveUsersPage() {
   const broadcastMutation = useApiMutation({
     method: 'POST',
     onSuccess: (data) => {
-      toast.success(data?.message || 'Refresh request sent successfully')
+      toast.success(data?.message || 'Data sync request sent successfully')
       setSelectedUsers([])
     },
-    onError: (msg) => toast.error(msg || 'Failed to send refresh request'),
+    onError: (msg) => toast.error(msg || 'Failed to send data sync request'),
   })
 
   const handleRefresh = () => {
@@ -74,7 +74,7 @@ export default function LiveUsersPage() {
 
   const handleBroadcastRefresh = async (target, targetId = null) => {
     if (!permissions.canRefresh) {
-      toast.error('You do not have permission to send refresh requests')
+      toast.error('You do not have permission to send data sync requests')
       return
     }
 
@@ -270,7 +270,7 @@ export default function LiveUsersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Live Users</h1>
-          <p className="text-gray-600 mt-1">Monitor active users and send refresh requests</p>
+          <p className="text-gray-600 mt-1">Monitor active users and sync data without interrupting their work</p>
         </div>
         <div className="flex items-center gap-3">
           {/* Connection Status */}
@@ -296,7 +296,7 @@ export default function LiveUsersPage() {
               color="primary"
               startContent={<HiOutlineSignal className="h-5 w-5" />}
             >
-              <span className="hidden sm:inline">Refresh All Users</span>
+              <span className="hidden sm:inline">Sync All Users</span>
             </Button>
           )}
         </div>

@@ -199,14 +199,15 @@ export function SocketProvider({ children }) {
       }
     }
 
-    // Shared force-refresh handler (used by both Socket.IO and polling)
-    const handleForceRefresh = (data) => {
+    // Session/permission changes are synchronized without reloading the route.
+    // Keeping the current React tree mounted prevents in-progress forms from
+    // losing their local values.
+    const handleForceRefresh = async (data) => {
       try {
-        console.log('🔄 [Socket.IO Client] Force refresh request received:', data)
+        console.log('🔄 [Socket.IO Client] Session sync request received:', data)
 
-        const message = data?.message || 'The administrator has requested a page refresh.'
+        const message = data?.message || 'Your access settings changed. Talio is syncing them in the background.'
 
-        // Show toast notification before refresh
         toast.custom((t) => (
           <div
             className={`${t.visible ? 'animate-enter' : 'animate-leave'
@@ -223,13 +224,13 @@ export function SocketProvider({ children }) {
                 </div>
                 <div className="ml-3 flex-1">
                   <p className="text-sm font-medium text-amber-900">
-                    Page Refresh Required
+                    Account settings updated
                   </p>
                   <p className="mt-1 text-sm text-amber-700">
                     {message}
                   </p>
                   <p className="mt-2 text-xs text-amber-600">
-                    Refreshing in 3 seconds...
+                    Your open work will stay in place.
                   </p>
                 </div>
               </div>
@@ -240,37 +241,16 @@ export function SocketProvider({ children }) {
           position: 'top-center',
         })
 
-        // Delay the refresh to let user see the message
-        setTimeout(async () => {
-          try {
-            const token = localStorage.getItem('token')
-            if (token) {
-              clearAllSessionCaches()
-              await validateAuthBackground(token, null, { force: true })
-            }
-          } catch (error) {
-            console.error('❌ [Socket.IO Client] Failed to sync session before refresh:', error)
-          }
+        const token = localStorage.getItem('token')
+        if (token) {
+          clearAllSessionCaches()
+          await validateAuthBackground(token, null, { force: true })
+        }
 
-          // Hard refresh: clear cache and reload
-          if (data?.hard) {
-            const keysToRemove = []
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i)
-              if (key && (key.startsWith('cache_') || key.startsWith('query_'))) {
-                keysToRemove.push(key)
-              }
-            }
-            keysToRemove.forEach(key => localStorage.removeItem(key))
-            sessionStorage.clear()
-            window.location.reload(true)
-          } else {
-            window.location.reload()
-          }
-        }, 3000)
+        markClientDataChanged('session-permissions-updated')
+        window.dispatchEvent(new CustomEvent('talio:session-updated', { detail: data }))
       } catch (error) {
-        console.error('❌ [Socket.IO Client] Error handling force-refresh:', error)
-        setTimeout(() => window.location.reload(), 2000)
+        console.error('❌ [Socket.IO Client] Error syncing session:', error)
       }
     }
 

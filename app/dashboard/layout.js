@@ -35,6 +35,7 @@ import {
 } from '@/utils/sessionCache'
 import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebAccessRestriction'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
+import { markClientDataChanged } from '@/lib/clientDataSync'
 
 // Keep non-critical dashboard features out of the initial route bundle. They
 // load as independent chunks after the persistent shell becomes interactive.
@@ -167,9 +168,9 @@ export default function DashboardLayout({ children }) {
         }
 
         if (validationResult.userChanged) {
-          console.log('[Dashboard] Session user data changed, reloading to apply updated permissions...')
-          window.location.reload()
-          return
+          console.log('[Dashboard] Session user data changed, syncing without reloading...')
+          markClientDataChanged('session-permissions-updated')
+          window.dispatchEvent(new CustomEvent('talio:session-updated'))
         }
 
         // Check profile completion status (with caching)

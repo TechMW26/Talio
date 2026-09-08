@@ -46,7 +46,7 @@ describe('refreshAffectedUsers()', () => {
             databaseName: 'talio_company_mushroom_world_group',
             userIds: ['online-user', 'offline-user'],
             initiatedBy: { userId: 'admin-1', email: 'taliohrms@gmail.com', role: 'admin' },
-            message: 'Your access role was updated to Senior MIS Executive. Talio will refresh to apply the latest access.',
+            message: 'Your access role was updated to Senior MIS Executive. Talio is applying the latest access in the background.',
             forceRefreshModel,
         })
 
@@ -54,8 +54,8 @@ describe('refreshAffectedUsers()', () => {
 
         expect(payload).toMatchObject({
             type: 'force-refresh',
-            hard: true,
-            message: 'Your access role was updated to Senior MIS Executive. Talio will refresh to apply the latest access.',
+            hard: false,
+            message: 'Your access role was updated to Senior MIS Executive. Talio is applying the latest access in the background.',
             initiatedBy: { userId: 'admin-1', email: 'taliohrms@gmail.com', role: 'admin' },
         })
         expect(result).toEqual({
@@ -66,7 +66,7 @@ describe('refreshAffectedUsers()', () => {
             expect.objectContaining({
                 userId: 'offline-user',
                 consumed: false,
-                hard: true,
+                hard: false,
             }),
         ])
         expect(clearCachePattern).toHaveBeenCalledTimes(8)

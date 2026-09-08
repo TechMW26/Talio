@@ -18,8 +18,15 @@ describe('dashboard realtime cache bridge', () => {
     expect(providers).toContain('function ClientDataSyncBridge()')
     expect(providers).toContain('const { mutate } = useSWRConfig()')
     expect(providers.indexOf('<SWRConfig')).toBeLessThan(providers.indexOf('<ClientDataSyncBridge />'))
-    expect(providers).toContain('revalidateAllApiQueries(mutate)')
+    expect(providers).toContain('revalidateApiQueries(mutate, change?.scopes)')
     expect(dataSync).toContain('pendingRevalidateMutators.add(mutateFunction)')
+  })
+
+  test('does not mount a route-level inactivity refresh cycle', () => {
+    const providers = fs.readFileSync(path.join(process.cwd(), 'components/Providers.js'), 'utf8')
+
+    expect(providers).not.toContain("import AutoRefresh from '@/components/AutoRefresh'")
+    expect(providers).not.toContain('<AutoRefresh />')
   })
 
   test('covers the recruitment events emitted by the server', () => {
