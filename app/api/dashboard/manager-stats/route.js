@@ -41,12 +41,6 @@ export async function GET(request) {
       })
     }
 
-    // Find the manager's employee record
-    const manager = await Employee.findById(user.employeeId._id || user.employeeId)
-    if (!manager) {
-      return NextResponse.json({ success: false, message: 'Manager not found' }, { status: 404 })
-    }
-
     const todayKey = new Date().toISOString().slice(0, 10)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
@@ -61,15 +55,20 @@ export async function GET(request) {
       return NextResponse.json(cached)
     }
 
+    const [manager, userRecord] = await Promise.all([
+      Employee.findById(user.employeeId._id || user.employeeId).lean(),
+      User.findById(user._id || user.userId)
+        .select('isDepartmentHead headOfDepartments')
+        .lean(),
+    ])
+    if (!manager) {
+      return NextResponse.json({ success: false, message: 'Manager not found' }, { status: 404 })
+    }
+
     // Get team members - support multi-department heads
     let teamMembers = []
     let teamMemberIds = []
     let departmentIds = []
-
-    // Get user record to check headOfDepartments
-    const userRecord = await User.findById(user._id || user.userId)
-      .select('isDepartmentHead headOfDepartments')
-      .lean()
 
     // First check User.headOfDepartments (supports multiple departments)
     if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
@@ -110,74 +109,92 @@ export async function GET(request) {
     todayStart.setHours(0, 0, 0, 0)
     const todayEnd = new Date(today)
     todayEnd.setHours(23, 59, 59, 999)
+    const weeklyStart = new Date(todayStart)
+    weeklyStart.setDate(weeklyStart.getDate() - 6)
+    const performanceStart = new Date(today.getFullYear(), today.getMonth() - 5, 1)
+    const performanceEnd = new Date(todayEnd)
 
     // 1. Team Strength
     const teamStrength = teamMembers.length
 
-    // 2. Who is absent/on leave today
-    let onLeaveToday = await Leave.find({
-      employee: { $in: teamMemberIds },
-      status: 'approved',
-      startDate: { $lte: today },
-      endDate: { $gte: today }
-    }).select('employee status startDate endDate leaveType createdAt').lean()
-
-    let absentToday = await Attendance.find({
-      employee: { $in: teamMemberIds },
-      date: { $gte: todayStart, $lte: todayEnd },
-      status: 'absent'
-    }).select('employee status date checkIn').lean()
-
-    // 3. Who came late today
-    let lateToday = await Attendance.find({
-      employee: { $in: teamMemberIds },
-      date: { $gte: todayStart, $lte: todayEnd },
-      status: 'late'
-    }).select('employee status date checkIn').lean()
-
-    // 3.5 Who is present today (fully completed check-in/check-out)
-    let presentToday = await Attendance.find({
-      employee: { $in: teamMemberIds },
-      date: { $gte: todayStart, $lte: todayEnd },
-      status: { $in: ['present', 'half-day'] }, // Completed attendance (checked in AND checked out)
-      checkIn: { $exists: true, $ne: null }
-    }).select('employee status date checkIn').lean()
-
-    // 3.6 Who is in progress today (checked in but not checked out yet)
-    let inProgressToday = await Attendance.find({
-      employee: { $in: teamMemberIds },
-      date: { $gte: todayStart, $lte: todayEnd },
-      status: 'in-progress', // Checked in but not checked out yet
-      checkIn: { $exists: true, $ne: null }
-    }).select('employee status date checkIn').lean()
-
-    // 4. Underperforming employees
-    let underperforming = await Performance.find({
-      employee: { $in: teamMemberIds },
-      overallRating: { $lt: 3 }, // Rating below 3 out of 5
-      isActive: true
-    }).select('employee overallRating createdAt').lean()
-
-    // 5. Pending approvals for manager
-    let pendingLeaveApprovals = await Leave.find({
-      employee: { $in: teamMemberIds },
-      status: 'pending'
-    }).select('employee status startDate endDate leaveType createdAt').lean()
-
-    // 6. Team attendance summary
-    const teamAttendanceToday = await Attendance.aggregate([
-      {
-        $match: {
-          employee: { $in: teamMemberIds },
-          date: { $gte: todayStart, $lte: todayEnd }
+    const recentActivityStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    let [
+      onLeaveToday,
+      absentToday,
+      lateToday,
+      presentToday,
+      inProgressToday,
+      underperforming,
+      pendingLeaveApprovals,
+      teamAttendanceToday,
+      teamPerformance,
+      recentLeaves,
+      recentReviews,
+      weeklyAttendanceAgg,
+      performanceAgg,
+    ] = await Promise.all([
+      Leave.find({
+        employee: { $in: teamMemberIds }, status: 'approved',
+        startDate: { $lte: today }, endDate: { $gte: today }
+      }).select('employee status startDate endDate leaveType createdAt').lean(),
+      Attendance.find({
+        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd }, status: 'absent'
+      }).select('employee status date checkIn').lean(),
+      Attendance.find({
+        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd }, status: 'late'
+      }).select('employee status date checkIn').lean(),
+      Attendance.find({
+        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd },
+        status: { $in: ['present', 'half-day'] }, checkIn: { $exists: true, $ne: null }
+      }).select('employee status date checkIn').lean(),
+      Attendance.find({
+        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd },
+        status: 'in-progress', checkIn: { $exists: true, $ne: null }
+      }).select('employee status date checkIn').lean(),
+      Performance.find({
+        employee: { $in: teamMemberIds }, overallRating: { $lt: 3 }, isActive: true
+      }).select('employee overallRating createdAt').lean(),
+      Leave.find({
+        employee: { $in: teamMemberIds }, status: 'pending'
+      }).select('employee status startDate endDate leaveType createdAt').lean(),
+      Attendance.aggregate([
+        { $match: { employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+      Performance.aggregate([
+        { $match: { employee: { $in: teamMemberIds }, isActive: true } },
+        {
+          $group: {
+            _id: null,
+            averageRating: { $avg: '$overallRating' },
+            totalReviews: { $sum: 1 },
+            excellentPerformers: { $sum: { $cond: [{ $gte: ['$overallRating', 4] }, 1, 0] } },
+            underPerformers: { $sum: { $cond: [{ $lt: ['$overallRating', 3] }, 1, 0] } }
+          }
         }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
+      ]),
+      Leave.find({
+        employee: { $in: teamMemberIds }, createdAt: { $gte: recentActivityStart }
+      }).select('employee status startDate endDate leaveType createdAt').sort({ createdAt: -1 }).limit(5).lean(),
+      Performance.find({
+        employee: { $in: teamMemberIds }, createdAt: { $gte: recentActivityStart }
+      }).select('employee overallRating createdAt').sort({ createdAt: -1 }).limit(3).lean(),
+      Attendance.aggregate([
+        { $match: { employee: { $in: teamMemberIds }, date: { $gte: weeklyStart, $lte: todayEnd } } },
+        { $project: { status: 1, day: { $dateToString: { format: '%Y-%m-%d', date: '$date' } } } },
+        { $group: { _id: { day: '$day', status: '$status' }, count: { $sum: 1 } } }
+      ]),
+      Performance.aggregate([
+        {
+          $match: {
+            employee: { $in: teamMemberIds },
+            createdAt: { $gte: performanceStart, $lte: performanceEnd },
+            isActive: true
+          }
+        },
+        { $project: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' }, overallRating: 1 } },
+        { $group: { _id: { year: '$year', month: '$month' }, averageRating: { $avg: '$overallRating' } } }
+      ]),
     ])
 
     const attendanceSummary = {
@@ -194,29 +211,6 @@ export async function GET(request) {
       else if (item._id === 'half-day') attendanceSummary.halfDay = item.count
     })
 
-    // 7. Team performance overview
-    const teamPerformance = await Performance.aggregate([
-      {
-        $match: {
-          employee: { $in: teamMemberIds },
-          isActive: true
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          averageRating: { $avg: '$overallRating' },
-          totalReviews: { $sum: 1 },
-          excellentPerformers: {
-            $sum: { $cond: [{ $gte: ['$overallRating', 4] }, 1, 0] }
-          },
-          underPerformers: {
-            $sum: { $cond: [{ $lt: ['$overallRating', 3] }, 1, 0] }
-          }
-        }
-      }
-    ])
-
     const performanceStats = teamPerformance[0] || {
       averageRating: 0,
       totalReviews: 0,
@@ -226,15 +220,6 @@ export async function GET(request) {
 
     // 8. Recent team activities
     const recentActivities = []
-
-    // Add recent leave applications
-    let recentLeaves = await Leave.find({
-      employee: { $in: teamMemberIds },
-      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-    }).select('employee status startDate endDate leaveType createdAt')
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean()
 
     const attachEmployee = (doc) => {
       const employeeId = doc?.employee?.toString ? doc.employee.toString() : doc?.employee
@@ -282,15 +267,6 @@ export async function GET(request) {
       })
     })
 
-    // Add recent performance reviews
-    let recentReviews = await Performance.find({
-      employee: { $in: teamMemberIds },
-      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-    }).select('employee overallRating createdAt')
-      .sort({ createdAt: -1 })
-      .limit(3)
-      .lean()
-
     recentReviews.forEach(review => {
       recentActivities.push({
         type: 'performance',
@@ -306,33 +282,6 @@ export async function GET(request) {
     // 9. Weekly attendance data for chart (last 7 days)
     const weeklyAttendanceData = []
     const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
-    const weeklyStart = new Date()
-    weeklyStart.setHours(0, 0, 0, 0)
-    weeklyStart.setDate(weeklyStart.getDate() - 6)
-    const weeklyEnd = new Date()
-    weeklyEnd.setHours(23, 59, 59, 999)
-
-    const weeklyAttendanceAgg = await Attendance.aggregate([
-      {
-        $match: {
-          employee: { $in: teamMemberIds },
-          date: { $gte: weeklyStart, $lte: weeklyEnd }
-        }
-      },
-      {
-        $project: {
-          status: 1,
-          day: { $dateToString: { format: '%Y-%m-%d', date: '$date' } }
-        }
-      },
-      {
-        $group: {
-          _id: { day: '$day', status: '$status' },
-          count: { $sum: 1 }
-        }
-      }
-    ])
 
     const attendanceByDay = {}
     weeklyAttendanceAgg.forEach(item => {
@@ -360,37 +309,6 @@ export async function GET(request) {
     // 10. Performance trend data (last 6 months)
     const performanceTrendData = []
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-    const performanceStart = new Date()
-    performanceStart.setDate(1)
-    performanceStart.setHours(0, 0, 0, 0)
-    performanceStart.setMonth(performanceStart.getMonth() - 5)
-
-    const performanceEnd = new Date()
-    performanceEnd.setHours(23, 59, 59, 999)
-
-    const performanceAgg = await Performance.aggregate([
-      {
-        $match: {
-          employee: { $in: teamMemberIds },
-          createdAt: { $gte: performanceStart, $lte: performanceEnd },
-          isActive: true
-        }
-      },
-      {
-        $project: {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' },
-          overallRating: 1
-        }
-      },
-      {
-        $group: {
-          _id: { year: '$year', month: '$month' },
-          averageRating: { $avg: '$overallRating' }
-        }
-      }
-    ])
 
     const performanceByMonth = new Map(
       performanceAgg.map(item => [`${item._id.year}-${String(item._id.month).padStart(2, '0')}`, item.averageRating])
@@ -434,7 +352,7 @@ export async function GET(request) {
       data: stats
     }
 
-    await setCache(cacheKey, response, 5 * 60) // 5 min TTL
+    void setCache(cacheKey, response, 5 * 60).catch(() => {})
 
     return NextResponse.json(response)
 

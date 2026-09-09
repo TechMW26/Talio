@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -23,6 +23,43 @@ import { FaPlus, FaUndo, FaCog, FaTh, FaThLarge } from 'react-icons/fa'
 
 // Layout storage key
 const LAYOUT_STORAGE_KEY = 'dashboard_layout_columns'
+
+function DeferredWidgetContent({ children, eager = false }) {
+  const containerRef = useRef(null)
+  const [shouldRender, setShouldRender] = useState(eager)
+
+  useEffect(() => {
+    if (eager) setShouldRender(true)
+  }, [eager])
+
+  useEffect(() => {
+    if (shouldRender || typeof IntersectionObserver === 'undefined') {
+      if (!shouldRender) setShouldRender(true)
+      return undefined
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setShouldRender(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '600px 0px' })
+
+    if (containerRef.current) observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [shouldRender])
+
+  return (
+    <div ref={containerRef} className="h-full min-h-[280px]" aria-busy={!shouldRender}>
+      {shouldRender ? children : (
+        <div className="h-full min-h-[280px] animate-pulse p-5" role="status" aria-label="Loading dashboard widget">
+          <div className="mb-5 h-5 w-2/5 rounded-lg bg-default-200" />
+          <div className="h-[190px] rounded-2xl bg-default-100" />
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function CustomizableDashboard({
   userId,
@@ -273,7 +310,9 @@ export default function CustomizableDashboard({
                       removable={isEditMode}
                       className="rounded-[22px] overflow-hidden"
                     >
-                      {WidgetContent}
+                      <DeferredWidgetContent eager>
+                        {WidgetContent}
+                      </DeferredWidgetContent>
                     </DraggableWidget>
                   )
                 })}
@@ -282,7 +321,9 @@ export default function CustomizableDashboard({
 
             {/* Actionable Insights - AI-powered dashboard section */}
             <div className="mt-5">
-              <ActionableInsights />
+              <DeferredWidgetContent eager={isEditMode}>
+                <ActionableInsights />
+              </DeferredWidgetContent>
             </div>
 
             {/* Remaining Widgets */}
@@ -300,7 +341,9 @@ export default function CustomizableDashboard({
                       removable={isEditMode}
                       className="rounded-[22px] overflow-hidden"
                     >
-                      {WidgetContent}
+                      <DeferredWidgetContent eager={isEditMode}>
+                        {WidgetContent}
+                      </DeferredWidgetContent>
                     </DraggableWidget>
                   )
                 })}

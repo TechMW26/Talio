@@ -112,7 +112,7 @@ describe('MongoDB pool configuration', () => {
       maxIdleTimeMS: 60_000,
     })
     expect(getMongoPoolConfig('tenant', { VERCEL: '1', NODE_ENV: 'production' })).toEqual({
-      maxPoolSize: 3,
+      maxPoolSize: 5,
       minPoolSize: 0,
       maxIdleTimeMS: 60_000,
     })

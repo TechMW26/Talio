@@ -148,7 +148,8 @@ export function useAuthedSWRRealtime(key, options = {}) {
   return useSWR(key, authedFetcher, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    refreshInterval: options.refreshInterval || 30000, // 30 seconds default
+    // Respect an explicit 0 so socket-driven screens can disable polling.
+    refreshInterval: options.refreshInterval ?? 30000,
     dedupingInterval: 1000,
     shouldRetryOnError: true,
     keepPreviousData: true,

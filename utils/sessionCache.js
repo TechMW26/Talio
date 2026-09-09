@@ -227,7 +227,6 @@ export async function validateAuthBackground(token, onInvalid, options = {}) {
     const queryParams = new URLSearchParams()
     if (force) {
       queryParams.set('ts', Date.now().toString())
-      queryParams.set('skipWarmCache', '1')
     }
     const validateUrl = queryParams.size > 0 ? `/api/auth/validate?${queryParams.toString()}` : '/api/auth/validate'
 

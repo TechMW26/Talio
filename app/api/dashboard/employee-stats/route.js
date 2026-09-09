@@ -17,7 +17,21 @@ export async function GET(request) {
     const { user, models, tenant } = auth;
     const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance, Task, TaskAssignee } = models;
 
-    // Find the user first to get the employeeId
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: user._id || user.userId,
+      namespace: 'dashboard:employee-stats',
+      params: { date: todayKey }
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
+
+    // Only hydrate the profile on a cache miss.
     const userWithEmployee = await User.findById(user._id || user.userId).populate({
       path: 'employeeId',
       populate: [
@@ -31,20 +45,6 @@ export async function GET(request) {
 
     if (!userWithEmployee.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee profile not found' }, { status: 404 });
-    }
-
-    const todayKey = new Date().toISOString().slice(0, 10)
-    const cacheKey = buildCacheKey({
-      tenantId: tenant?.databaseName,
-      role: user.role,
-      userId: user._id || user.userId,
-      namespace: 'dashboard:employee-stats',
-      params: { date: todayKey }
-    })
-
-    const cached = await getCache(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
     }
 
     const employee = userWithEmployee.employeeId;
@@ -246,7 +246,7 @@ export async function GET(request) {
       }
     }
 
-    await setCache(cacheKey, response, 5 * 60) // 5 min TTL
+    void setCache(cacheKey, response, 5 * 60).catch(() => {})
 
     return NextResponse.json(response)
 

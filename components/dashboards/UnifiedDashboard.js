@@ -261,8 +261,6 @@ export default function UnifiedDashboard({ user: userProp }) {
     const [dashboardStats, setDashboardStats] = useState(null)
     const [departments, setDepartments] = useState([])
     const [leaveRequests, setLeaveRequests] = useState([])
-    const [attendanceData, setAttendanceData] = useState([])
-
     // Unified widget data (fetched in single API call for performance)
     const [unifiedWidgetData, setUnifiedWidgetData] = useState(null)
 
@@ -292,6 +290,9 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Incremented on every direct setTodayAttendance call; fetchUnifiedWidgetData
     // captures it before fetching and skips the update if it changed during the request.
     const attendanceVersionRef = useRef(0)
+    const dashboardStatsRequestRef = useRef(null)
+    const unifiedWidgetsRequestRef = useRef(null)
+    const realtimeRefreshTimerRef = useRef(null)
 
     // Get employee ID and role
     const employeeIdStr = getEmployeeId(user)
@@ -321,6 +322,19 @@ export default function UnifiedDashboard({ user: userProp }) {
         recentActivities: permissions.recentActivities && isFeatureEnabled('gpsAttendance'),
     }), [permissions, isFeatureEnabled])
 
+    const unifiedWidgetSelection = useMemo(() => [
+        featurePermissions.holidays && 'holidays',
+        featurePermissions.announcements && 'announcements',
+        featurePermissions.myAssets && 'assets',
+        featurePermissions.myExpenses && 'expenses',
+        featurePermissions.myHelpdesk && 'helpdesk',
+        featurePermissions.policies && 'policies',
+        featurePermissions.checkInOut && 'attendance',
+        featurePermissions.leaveBalance && 'leaveBalance',
+        featurePermissions.leaveRequests && 'leaveRequests',
+        featurePermissions.departmentChart && 'departments',
+    ].filter(Boolean).join(','), [featurePermissions])
+
     // Format countdown time - using useCallback for stable reference
     const formatCountdown = useCallback((seconds) => {
         const hours = Math.floor(seconds / 3600)
@@ -329,26 +343,15 @@ export default function UnifiedDashboard({ user: userProp }) {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
     }, [])
 
-    // Fetch company settings
-    const fetchCompanySettings = useCallback(async () => {
-        try {
-            const token = localStorage.getItem('token')
-            const response = await fetch('/api/settings/company', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const data = await response.json()
-            if (data.success) {
-                setCompanySettings(data.data)
-            }
-        } catch (error) {
-            console.error('Fetch company settings error:', error)
-        }
-    }, [])
-
     // Fetch dashboard stats based on role - ONLY fetches KPI stats
     // Other data (departments, leave requests, attendance) comes from the unified endpoint
-    const fetchDashboardData = useCallback(async () => {
-        try {
+    const fetchDashboardData = useCallback(() => {
+        if (dashboardStatsRequestRef.current) {
+            return dashboardStatsRequestRef.current
+        }
+
+        const requestPromise = (async () => {
+          try {
             const token = localStorage.getItem('token')
             const role = user?.role || 'employee'
 
@@ -369,9 +372,17 @@ export default function UnifiedDashboard({ user: userProp }) {
             if (statsData.success) {
                 setDashboardStats(statsData.data)
             }
-        } catch (error) {
+          } catch (error) {
             console.error('Fetch dashboard stats error:', error)
-        }
+          }
+        })()
+
+        dashboardStatsRequestRef.current = requestPromise
+        requestPromise.then(
+            () => { dashboardStatsRequestRef.current = null },
+            () => { dashboardStatsRequestRef.current = null }
+        )
+        return requestPromise
     }, [user?.role])
 
     // Fetch today's attendance - used for real-time updates only (initial load uses unified endpoint)
@@ -401,11 +412,16 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Fetch unified widget data - single API call for holidays, announcements, assets, expenses, helpdesk, policies
     // ALSO populates: departments, leave requests, attendance summary, employee data, and today's attendance
     // This eliminates 5+ separate API calls that were causing browser connection queue stalling
-    const fetchUnifiedWidgetData = useCallback(async () => {
+    const fetchUnifiedWidgetData = useCallback(() => {
+        if (unifiedWidgetsRequestRef.current) {
+            return unifiedWidgetsRequestRef.current
+        }
+
         const versionBeforeFetch = attendanceVersionRef.current
-        try {
+        const requestPromise = (async () => {
+          try {
             const token = localStorage.getItem('token')
-            const response = await fetch('/api/dashboard/unified', {
+            const response = await fetch(`/api/dashboard/unified?widgets=${encodeURIComponent(unifiedWidgetSelection)}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             const data = await response.json()
@@ -420,11 +436,6 @@ export default function UnifiedDashboard({ user: userProp }) {
                 // Populate leave requests from unified response (eliminates /api/leave?status=pending call)
                 if (data.pendingLeaveRequests) {
                     setLeaveRequests(data.pendingLeaveRequests)
-                }
-
-                // Populate attendance summary from unified response (eliminates /api/attendance/summary call)
-                if (data.attendanceSummary) {
-                    setAttendanceData(data.attendanceSummary)
                 }
 
                 // Populate employee data from unified response (eliminates /api/employees/:id call)
@@ -444,17 +455,35 @@ export default function UnifiedDashboard({ user: userProp }) {
                     setCompanySettings(data.companySettings)
                 }
             }
-        } catch (error) {
+          } catch (error) {
             console.error('Error fetching unified widget data:', error)
+          }
+        })()
+
+        unifiedWidgetsRequestRef.current = requestPromise
+        requestPromise.then(
+            () => { unifiedWidgetsRequestRef.current = null },
+            () => { unifiedWidgetsRequestRef.current = null }
+        )
+        return requestPromise
+    }, [unifiedWidgetSelection])
+
+    const scheduleDashboardRefresh = useCallback(() => {
+        if (realtimeRefreshTimerRef.current) {
+            clearTimeout(realtimeRefreshTimerRef.current)
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+        realtimeRefreshTimerRef.current = setTimeout(() => {
+            realtimeRefreshTimerRef.current = null
+            fetchDashboardData()
+            fetchUnifiedWidgetData()
+        }, 200)
+    }, [fetchDashboardData, fetchUnifiedWidgetData])
 
     // Real-time update handlers - MUST come after fetch functions
-    const handleRealtimeUpdate = useCallback((data) => {
+    const handleRealtimeUpdate = useCallback(() => {
         console.log('🔄 [Unified Dashboard] Real-time update received')
-        fetchDashboardData()
-        fetchUnifiedWidgetData()
-    }, [fetchDashboardData, fetchUnifiedWidgetData])
+        scheduleDashboardRefresh()
+    }, [scheduleDashboardRefresh])
 
     const handleAttendanceUpdate = useCallback((data) => {
         console.log('🔄 [Unified Dashboard] Attendance update received', data)
@@ -482,6 +511,12 @@ export default function UnifiedDashboard({ user: userProp }) {
         onHolidayUpdate: handleRealtimeUpdate,
         onDashboardRefresh: handleRealtimeUpdate
     })
+
+    useEffect(() => () => {
+        if (realtimeRefreshTimerRef.current) {
+            clearTimeout(realtimeRefreshTimerRef.current)
+        }
+    }, [])
 
     // Cross-tab sync via BroadcastChannel — updates all open tabs when attendance changes
     const broadcastChannelRef = useRef(null)
@@ -557,7 +592,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     // Timer interval
     useEffect(() => {
-        if (!isCountingDown || remainingTime <= 0) return
+        if (!isCountingDown) return
 
         const interval = setInterval(() => {
             setRemainingTime((prev) => {
@@ -570,7 +605,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         }, 1000)
 
         return () => clearInterval(interval)
-    }, [isCountingDown, remainingTime])
+    }, [isCountingDown])
 
     const getAttendanceLocation = useCallback(async (token) => {
         const geofence = companySettings?.geofence
@@ -1045,7 +1080,6 @@ export default function UnifiedDashboard({ user: userProp }) {
         dashboardStats,
         departments,
         leaveRequests,
-        attendanceData,
         remainingTime,
         isCountingDown,
         companySettings,

@@ -31,10 +31,6 @@ jest.mock('@/lib/tenantModels', () => ({
     getTenantModel: jest.fn(),
 }))
 
-jest.mock('@/lib/cacheWarming', () => ({
-    warmDashboardCaches: jest.fn().mockResolvedValue(undefined),
-}))
-
 jest.mock('@/lib/auth', () => ({
     getAuthAndModels: jest.fn(),
     hasRole: jest.fn((user, roles) => roles.includes(user?.role)),
@@ -51,7 +47,6 @@ jest.mock('@/lib/rbacSessionRefresh', () => ({
 
 const { jwtVerify } = require('jose')
 const { getTenantModel } = require('@/lib/tenantModels')
-const { warmDashboardCaches } = require('@/lib/cacheWarming')
 const { getAuthAndModels } = require('@/lib/auth')
 const { logRBACEvent } = require('@/lib/rbacAudit')
 const { refreshAffectedUsers } = require('@/lib/rbacSessionRefresh')
@@ -140,7 +135,7 @@ describe('RBAC integration coverage', () => {
         })
 
         const request = {
-            url: 'http://localhost:3000/api/auth/validate?skipWarmCache=1',
+            url: 'http://localhost:3000/api/auth/validate',
             headers: new Headers({ Authorization: 'Bearer test-token' }),
             cookies: {
                 get: jest.fn(() => undefined),
@@ -157,7 +152,6 @@ describe('RBAC integration coverage', () => {
         expect(body.user.permissions).toEqual(permissions)
         expect(body.user.permissionsCache).toEqual(permissions)
         expect(response.cookies.set).toHaveBeenCalledWith('token', 'test-token', expect.objectContaining({ path: '/' }))
-        expect(warmDashboardCaches).not.toHaveBeenCalled()
     })
 
     test('custom-role menu uses the admin template and filters down to granted pages', () => {

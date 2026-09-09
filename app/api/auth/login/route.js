@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
 import { sendLoginAlertEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
-import { warmDashboardCaches } from '@/lib/cacheWarming'
 import { resolveUserPermissions } from '@/lib/permissions'
 import { compareStoredPassword, needsPasswordHashUpgrade } from '@/lib/passwordAuth'
 import crypto from 'crypto'
@@ -669,15 +668,6 @@ export async function POST(request) {
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 // 7 days
-    })
-
-    // 🔥 Pre-warm Redis caches for dashboard APIs in the background
-    // This ensures the first dashboard load after login hits warm caches
-    warmDashboardCaches({
-      token,
-      role: user.role,
-      employeeId: user.employeeId?.toString() || '',
-      userId: user._id.toString(),
     })
 
     return response

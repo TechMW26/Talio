@@ -14,23 +14,18 @@ export async function GET(request) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models, tenant } = auth
-    const { Employee, Leave, Attendance, Recruitment, Performance, Payroll, User, Department } = models
+    const { Employee, Leave, Attendance, Recruitment, Performance, Payroll, User } = models
 
     // Check role authorization
     if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
 
-    // Get user record to check department head status
-    const userRecord = await User.findById(user._id || user.userId)
-      .select('employeeId isDepartmentHead headOfDepartments')
-      .lean()
-
     const todayKey = new Date().toISOString().slice(0, 10)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: user.role,
-      userId: userRecord?.isDepartmentHead ? user._id : 'all',
+      userId: user.role === 'admin' ? 'all' : user._id,
       namespace: 'dashboard:hr-stats',
       params: { date: todayKey }
     })
@@ -40,114 +35,90 @@ export async function GET(request) {
       return NextResponse.json(cached)
     }
 
+    // Department-head scope is only needed after a cache miss. Admins never
+    // need this additional profile query.
+    const userRecord = user.role === 'hr'
+      ? await User.findById(user._id || user.userId)
+        .select('employeeId isDepartmentHead headOfDepartments')
+        .lean()
+      : null
+
     // Date calculations
     const today = new Date()
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-    const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0)
 
-    // 1. Total Employees
-    const totalEmployees = await Employee.countDocuments({ status: 'active' })
-    const lastMonthEmployees = await Employee.countDocuments({
-      status: 'active',
-      createdAt: { $lt: startOfMonth }
-    })
-
-    // 2. Gender Ratio
-    const genderStats = await Employee.aggregate([
-      { $match: { status: 'active' } },
-      { $group: { _id: '$gender', count: { $sum: 1 } } }
-    ])
-
-    const maleCount = genderStats.find(g => g._id === 'male')?.count || 0
-    const femaleCount = genderStats.find(g => g._id === 'female')?.count || 0
-
-    // 3. Active Employees (present today)
     const todayStart = new Date(today)
     todayStart.setHours(0, 0, 0, 0)
     const todayEnd = new Date(today)
     todayEnd.setHours(23, 59, 59, 999)
 
-    const activeToday = await Attendance.countDocuments({
-      date: { $gte: todayStart, $lte: todayEnd },
-      status: { $in: ['present', 'late', 'half-day', 'in-progress'] }
-    })
-
-    // 4. Employees on Leave Today
-    const onLeaveToday = await Leave.countDocuments({
-      status: 'approved',
-      startDate: { $lte: today },
-      endDate: { $gte: today }
-    })
-
-    // 5. Department-wise Employee Count
-    const departmentStats = await Employee.aggregate([
-      { $match: { status: 'active' } },
-      { $group: { _id: '$department', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ])
-
-    // 6. Attrition Rate (employees who left this month vs total)
-    const leftThisMonth = await Employee.countDocuments({
-      status: 'inactive',
-      updatedAt: { $gte: startOfMonth }
-    })
-    const attritionRate = totalEmployees > 0 ? ((leftThisMonth / totalEmployees) * 100).toFixed(1) : 0
-
-    // 7. Late Coming Summary Today
-    const lateToday = await Attendance.countDocuments({
-      date: { $gte: todayStart, $lte: todayEnd },
-      status: 'late'
-    })
-
-    // 8. PIP Cases Active
-    const pipCases = await Performance.countDocuments({
-      status: 'pip',
-      isActive: true
-    })
-
-    // 9. Pending Leave Approvals
     // HR users who are NOT department heads should NOT see pending approvals
     // Only admin sees all pending leaves, HR dept heads see only their department's
-    let pendingLeaves = 0
-    if (user.role === 'admin') {
-      pendingLeaves = await Leave.countDocuments({ status: 'pending' })
-    } else if (user.role === 'hr' && userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
-      // HR who is dept head - only count their department's leaves
-      const deptEmployees = await Employee.find({
+    const pendingLeavesPromise = (async () => {
+      if (user.role === 'admin') {
+        return Leave.countDocuments({ status: 'pending' })
+      }
+      if (user.role !== 'hr' || !userRecord?.isDepartmentHead || !userRecord?.headOfDepartments?.length) {
+        return 0
+      }
+
+      const deptEmployeeIds = await Employee.find({
         department: { $in: userRecord.headOfDepartments },
         _id: { $ne: userRecord.employeeId }
-      }).select('_id').lean()
-      const deptEmployeeIds = deptEmployees.map(e => e._id)
-      pendingLeaves = await Leave.countDocuments({
+      }).distinct('_id')
+      return Leave.countDocuments({
         status: 'pending',
         employee: { $in: deptEmployeeIds }
       })
-    }
-    // Regular HR (not dept head) - pendingLeaves stays 0
+    })()
 
-    // 10. Open Positions
-    const openPositions = await Recruitment.countDocuments({
-      status: 'open'
-    })
+    const [
+      totalEmployees,
+      lastMonthEmployees,
+      genderStats,
+      activeToday,
+      onLeaveToday,
+      departmentStats,
+      leftThisMonth,
+      lateToday,
+      pipCases,
+      pendingLeaves,
+      openPositions,
+      newHires,
+      currentMonthPayroll,
+      reviewsCompleted,
+      totalAttendanceRecords,
+    ] = await Promise.all([
+      Employee.countDocuments({ status: 'active' }),
+      Employee.countDocuments({ status: 'active', createdAt: { $lt: startOfMonth } }),
+      Employee.aggregate([
+        { $match: { status: 'active' } },
+        { $group: { _id: '$gender', count: { $sum: 1 } } }
+      ]),
+      Attendance.countDocuments({
+        date: { $gte: todayStart, $lte: todayEnd },
+        status: { $in: ['present', 'late', 'half-day', 'in-progress'] }
+      }),
+      Leave.countDocuments({ status: 'approved', startDate: { $lte: today }, endDate: { $gte: today } }),
+      Employee.aggregate([
+        { $match: { status: 'active' } },
+        { $group: { _id: '$department', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]),
+      Employee.countDocuments({ status: 'inactive', updatedAt: { $gte: startOfMonth } }),
+      Attendance.countDocuments({ date: { $gte: todayStart, $lte: todayEnd }, status: 'late' }),
+      Performance.countDocuments({ status: 'pip', isActive: true }),
+      pendingLeavesPromise,
+      Recruitment.countDocuments({ status: 'open' }),
+      Employee.countDocuments({ status: 'active', createdAt: { $gte: startOfMonth } }),
+      Payroll.findOne({ month: today.getMonth() + 1, year: today.getFullYear() }).select('_id').lean(),
+      Performance.countDocuments({ createdAt: { $gte: startOfMonth }, status: { $ne: 'draft' } }),
+      Attendance.countDocuments({ date: { $gte: todayStart, $lte: todayEnd } }),
+    ])
 
-    // 11. New Hires This Month
-    const newHires = await Employee.countDocuments({
-      status: 'active',
-      createdAt: { $gte: startOfMonth }
-    })
-
-    // 12. Payroll Status
-    const currentMonthPayroll = await Payroll.findOne({
-      month: today.getMonth() + 1,
-      year: today.getFullYear()
-    })
-
-    // 13. Performance Reviews Completed This Month
-    const reviewsCompleted = await Performance.countDocuments({
-      createdAt: { $gte: startOfMonth },
-      status: { $ne: 'draft' }
-    })
+    const maleCount = genderStats.find(g => g._id === 'male')?.count || 0
+    const femaleCount = genderStats.find(g => g._id === 'female')?.count || 0
+    const attritionRate = totalEmployees > 0 ? ((leftThisMonth / totalEmployees) * 100).toFixed(1) : 0
 
     // Calculate trends
     const employeeGrowth = totalEmployees - lastMonthEmployees
@@ -155,9 +126,6 @@ export async function GET(request) {
       ((employeeGrowth / lastMonthEmployees) * 100).toFixed(1) : 0
 
     // Attendance rate calculation
-    const totalAttendanceRecords = await Attendance.countDocuments({
-      date: { $gte: todayStart, $lte: todayEnd }
-    })
     const attendanceRate = totalAttendanceRecords > 0 ?
       ((activeToday / totalAttendanceRecords) * 100).toFixed(1) : 0
 
@@ -224,7 +192,7 @@ export async function GET(request) {
       data: stats
     }
 
-    await setCache(cacheKey, response, 5 * 60) // 5 min TTL
+    void setCache(cacheKey, response, 5 * 60).catch(() => {})
 
     return NextResponse.json(response)
 

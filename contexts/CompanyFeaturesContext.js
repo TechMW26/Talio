@@ -1,10 +1,11 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSocket } from '@/contexts/SocketContext'
 import { isFeatureEnabled as checkFeatureEnabled, mergeCompanyFeatures } from '@/lib/planFeatures'
 
 const CompanyFeaturesContext = createContext(null)
+const FEATURE_CACHE_TTL_MS = 5 * 60 * 1000
 
 function getStorageKey(databaseName) {
   return `talio_company_features_${databaseName}`
@@ -26,7 +27,10 @@ function writeCachedPayload(databaseName, payload) {
   if (typeof window === 'undefined' || !databaseName || !payload) return
 
   try {
-    localStorage.setItem(getStorageKey(databaseName), JSON.stringify(payload))
+    localStorage.setItem(getStorageKey(databaseName), JSON.stringify({
+      ...payload,
+      cachedAt: Date.now(),
+    }))
   } catch {
     // Ignore storage write failures
   }
@@ -34,6 +38,7 @@ function writeCachedPayload(databaseName, payload) {
 
 export function CompanyFeaturesProvider({ children }) {
   const { subscribe } = useSocket()
+  const inFlightRefreshRef = useRef(null)
   const [state, setState] = useState({
     databaseName: null,
     plan: 'custom',
@@ -66,38 +71,49 @@ export function CompanyFeaturesProvider({ children }) {
       return null
     }
 
-    setState((prev) => ({ ...prev, databaseName, loading: true }))
-
-    try {
-      const response = await fetch('/api/company/features', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch company features (${response.status})`)
-      }
-
-      const data = await response.json()
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to fetch company features')
-      }
-
-      const nextPayload = {
-        databaseName,
-        plan: data.plan || 'custom',
-        features: mergeCompanyFeatures(data.features, data.plan || 'custom'),
-        miraTokens: data.miraTokens || { perUserAllocation: 0 },
-        updatedAt: data.updatedAt || new Date().toISOString(),
-      }
-
-      writeCachedPayload(databaseName, nextPayload)
-      setState({ ...nextPayload, loading: false })
-      return nextPayload
-    } catch (error) {
-      console.error('[CompanyFeaturesContext] Failed to refresh company features:', error)
-      setState((prev) => ({ ...prev, loading: false }))
-      return null
+    if (inFlightRefreshRef.current?.databaseName === databaseName) {
+      return inFlightRefreshRef.current.promise
     }
+
+    const refreshPromise = (async () => {
+      try {
+        const response = await fetch('/api/company/features', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch company features (${response.status})`)
+        }
+
+        const data = await response.json()
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to fetch company features')
+        }
+
+        const nextPayload = {
+          databaseName,
+          plan: data.plan || 'custom',
+          features: mergeCompanyFeatures(data.features, data.plan || 'custom'),
+          miraTokens: data.miraTokens || { perUserAllocation: 0 },
+          updatedAt: data.updatedAt || new Date().toISOString(),
+        }
+
+        writeCachedPayload(databaseName, nextPayload)
+        setState({ ...nextPayload, loading: false })
+        return nextPayload
+      } catch (error) {
+        console.error('[CompanyFeaturesContext] Failed to refresh company features:', error)
+        setState((prev) => ({ ...prev, loading: false }))
+        return null
+      } finally {
+        if (inFlightRefreshRef.current?.promise === refreshPromise) {
+          inFlightRefreshRef.current = null
+        }
+      }
+    })()
+
+    inFlightRefreshRef.current = { databaseName, promise: refreshPromise }
+    return refreshPromise
   }, [])
 
   useEffect(() => {
@@ -118,6 +134,9 @@ export function CompanyFeaturesProvider({ children }) {
       const cachedPayload = readCachedPayload(databaseName)
       if (cachedPayload?.features) {
         setState({ ...cachedPayload, databaseName, loading: false })
+        if (Date.now() - Number(cachedPayload.cachedAt || 0) < FEATURE_CACHE_TTL_MS) {
+          return
+        }
       } else {
         setState((prev) => ({ ...prev, databaseName, loading: true }))
       }
@@ -155,7 +174,10 @@ export function CompanyFeaturesProvider({ children }) {
     if (!state.databaseName) return undefined
 
     const handleFocus = () => {
-      refreshFeatures(state.databaseName)
+      const cachedPayload = readCachedPayload(state.databaseName)
+      if (Date.now() - Number(cachedPayload?.cachedAt || 0) >= FEATURE_CACHE_TTL_MS) {
+        refreshFeatures(state.databaseName)
+      }
     }
 
     window.addEventListener('focus', handleFocus)

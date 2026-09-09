@@ -339,7 +339,7 @@ function setupFetchMock(overrides = {}) {
             return Promise.resolve(makeFetchResponse(attendanceBody))
         }
         // Unified dashboard
-        if (url === '/api/dashboard/unified') {
+        if (typeof url === 'string' && url.startsWith('/api/dashboard/unified?')) {
             return Promise.resolve(makeFetchResponse(unifiedBody))
         }
         // Stats

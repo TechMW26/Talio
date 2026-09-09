@@ -173,9 +173,12 @@ export default function ManagedMeetingRoomSession({
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
   const [joinConflict, setJoinConflict] = useState(null)
-  const [muted, setMuted] = useState(false)
-  const [videoOff, setVideoOff] = useState(false)
-  const [previewStatus, setPreviewStatus] = useState(autoJoin ? 'skipped' : 'loading')
+  // Privacy boundary: joining or restoring a room never implies permission to
+  // capture. Media starts disabled and can only be acquired through the
+  // explicit preview action in this browser document.
+  const [muted, setMuted] = useState(true)
+  const [videoOff, setVideoOff] = useState(true)
+  const [previewStatus, setPreviewStatus] = useState('idle')
   const [previewMessage, setPreviewMessage] = useState('')
   const [previewDevices, setPreviewDevices] = useState({ audio: false, video: false })
   const [screenSharing, setScreenSharing] = useState(false)
@@ -328,20 +331,6 @@ export default function ManagedMeetingRoomSession({
     setPreviewStatus('unavailable')
     setPreviewMessage('Camera preview skipped. You can join in listen-only mode or try the camera again.')
   }, [stopPreviewTracks])
-
-  useEffect(() => {
-    if (!autoJoin && !previewStartedRef.current) {
-      previewStartedRef.current = true
-      void startMediaPreview()
-    }
-  }, [autoJoin, startMediaPreview])
-
-  useEffect(() => {
-    if (autoJoin && joinError && !joinConflict && previewStatus === 'skipped') {
-      previewStartedRef.current = true
-      void startMediaPreview()
-    }
-  }, [autoJoin, joinConflict, joinError, previewStatus, startMediaPreview])
 
   useEffect(() => {
     if (previewStatus === 'ready' && !videoOff) attachPreviewVideo()
@@ -503,13 +492,16 @@ export default function ManagedMeetingRoomSession({
         })
       }
 
+      // Never call set*Enabled(true) for a missing preview track: LiveKit would
+      // acquire a device as a side effect. Only tracks obtained after the
+      // person's explicit preview action may be published.
       await Promise.allSettled([
-        !publishedKinds.has(Track.Kind.Audio)
-          ? liveRoom.localParticipant.setMicrophoneEnabled(!muted)
-          : (muted ? previewAudioTrackRef.current?.mute() : previewAudioTrackRef.current?.unmute()),
-        !publishedKinds.has(Track.Kind.Video)
-          ? liveRoom.localParticipant.setCameraEnabled(!videoOff)
-          : (videoOff ? previewVideoTrackRef.current?.mute() : previewVideoTrackRef.current?.unmute()),
+        publishedKinds.has(Track.Kind.Audio)
+          ? (muted ? previewAudioTrackRef.current?.mute() : previewAudioTrackRef.current?.unmute())
+          : Promise.resolve(),
+        publishedKinds.has(Track.Kind.Video)
+          ? (videoOff ? previewVideoTrackRef.current?.mute() : previewVideoTrackRef.current?.unmute())
+          : Promise.resolve(),
       ])
       if (previewVideoElementRef.current && previewVideoTrackRef.current) {
         previewVideoTrackRef.current.detach(previewVideoElementRef.current)
@@ -914,7 +906,19 @@ export default function ManagedMeetingRoomSession({
             {(videoOff || previewStatus === 'audio-only') && previewStatus !== 'loading' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-indigo-950 text-white">
                 <span className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600 text-2xl font-semibold ring-4 ring-white/10">{previewInitials}</span>
-                <span className="mt-3 text-sm text-slate-300">Camera off</span>
+                <span className="mt-3 text-sm text-slate-300">Camera and microphone off</span>
+                {previewStatus === 'idle' && !isRestoring && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      previewStartedRef.current = true
+                      void startMediaPreview()
+                    }}
+                    className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  >
+                    Preview camera &amp; microphone
+                  </button>
+                )}
               </div>
             )}
 
@@ -926,7 +930,7 @@ export default function ManagedMeetingRoomSession({
               </div>
             )}
 
-            {previewStatus !== 'loading' && previewStatus !== 'unavailable' && (
+            {previewStatus !== 'idle' && previewStatus !== 'loading' && previewStatus !== 'unavailable' && (
               <>
                 <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">Preview</span>
                 <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
@@ -947,7 +951,7 @@ export default function ManagedMeetingRoomSession({
               Return to {joinConflict.title || 'current meeting'}
             </button>
           ) : (
-            <button onClick={join} disabled={joining || isRestoring || previewStatus === 'loading'} className="relative mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"><span className={joining || isRestoring ? 'invisible' : ''}>{joinError ? 'Try again' : previewStatus === 'loading' ? 'Preparing camera…' : 'Join meeting'}</span>{(joining || isRestoring) && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
+            <button onClick={join} disabled={joining || isRestoring || previewStatus === 'loading'} className="relative mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"><span className={joining || isRestoring ? 'invisible' : ''}>{joinError ? 'Try again' : previewStatus === 'loading' ? 'Preparing camera…' : previewStatus === 'idle' ? 'Join with camera & mic off' : 'Join meeting'}</span>{(joining || isRestoring) && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
           )}
         </div>
       </div>

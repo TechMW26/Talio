@@ -105,8 +105,8 @@ export default function MeetingRoomSession({
   // State
   const [meeting, setMeeting] = useState(null)
   const [isJoined, setIsJoined] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
-  const [isVideoOff, setIsVideoOff] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
+  const [isVideoOff, setIsVideoOff] = useState(true)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [showChat, setShowChat] = useState(false)
@@ -157,7 +157,6 @@ export default function MeetingRoomSession({
   const peerConnectionsRef = useRef({})
   const pendingIceCandidatesRef = useRef({})
   const remoteStreamsRef = useRef({})
-  const cameraPreviewStartedRef = useRef(false)
   const meetingStartedRef = useRef(false)
   const meetingSocketJoinedRef = useRef(false)
   const isLeavingRef = useRef(false)
@@ -420,11 +419,6 @@ export default function MeetingRoomSession({
 
       setMeeting(meetingData)
 
-      // Start camera preview only once
-      if (!cameraPreviewStartedRef.current) {
-        cameraPreviewStartedRef.current = true
-        startCameraPreview()
-      }
     } else {
       toast.error('Meeting not found')
       router.push('/dashboard/meetings')
@@ -435,12 +429,16 @@ export default function MeetingRoomSession({
   // Start camera preview before joining
   const startCameraPreview = async () => {
     try {
+      setPreviewError(null)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: MEETING_CAMERA_CONSTRAINTS,
         audio: MEETING_AUDIO_CONSTRAINTS,
       })
 
       localStreamRef.current = prepareMeetingMediaStream(stream)
+      isMutedRef.current = false
+      setIsMuted(false)
+      setIsVideoOff(false)
       setHasLocalStream(true)
       setPreviewReady(true)
 
@@ -595,21 +593,13 @@ export default function MeetingRoomSession({
   const joinMeeting = useCallback(async () => {
     setAutoJoinFailed(false)
     try {
-      // Use existing preview stream or get new one
+      // Only an explicitly-created preview stream may publish devices. Joining
+      // without one is always listen-only, including session restoration.
       if (!localStreamRef.current) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: MEETING_CAMERA_CONSTRAINTS,
-            audio: MEETING_AUDIO_CONSTRAINTS,
-          })
-          localStreamRef.current = prepareMeetingMediaStream(stream)
-        } catch {
-          localStreamRef.current = new MediaStream()
-          isMutedRef.current = true
-          setIsMuted(true)
-          setIsVideoOff(true)
-          toast('Joining in listen-only mode')
-        }
+        localStreamRef.current = new MediaStream()
+        isMutedRef.current = true
+        setIsMuted(true)
+        setIsVideoOff(true)
         setHasLocalStream(true)
       }
 
@@ -1513,9 +1503,20 @@ export default function MeetingRoomSession({
                 <p className="text-gray-400 text-sm">Camera off</p>
               </div>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
-                <svg className="animate-spin w-8 h-8 text-gray-400 mb-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                <p className="text-gray-400 text-sm">Starting camera...</p>
+              <div className="absolute inset-0 z-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-indigo-950 px-4">
+                <div className="mb-2 flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600">
+                  <span className="text-3xl font-bold text-white">{user?.firstName?.[0]?.toUpperCase() || 'Y'}</span>
+                </div>
+                <p className="text-sm text-gray-300">Camera and microphone off</p>
+                {!isRestoring && (
+                  <button
+                    type="button"
+                    onClick={startCameraPreview}
+                    className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  >
+                    Preview camera &amp; microphone
+                  </button>
+                )}
               </div>
             )}
 
@@ -1570,13 +1571,10 @@ export default function MeetingRoomSession({
 
           <button
             onClick={joinMeeting}
-            disabled={isRestoring || (!previewReady && !previewError)}
-            className={`w-full py-3 font-medium rounded-xl transition-colors ${previewReady || previewError
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
+            disabled={isRestoring}
+            className="w-full rounded-xl bg-indigo-600 py-3 font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isRestoring ? 'Reconnecting…' : previewReady || previewError ? 'Join Meeting' : 'Preparing...'}
+            {isRestoring ? 'Reconnecting safely with camera & mic off…' : previewReady || previewError ? 'Join Meeting' : 'Join with camera & mic off'}
           </button>
 
           <button

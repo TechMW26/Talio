@@ -74,7 +74,7 @@ describe('managed meeting implementation', () => {
   test('keeps join failures recoverable without leaving a partial room connected', () => {
     expect(source).toContain('pendingRoom?.disconnect()')
     expect(source).toContain("role=\"alert\"")
-    expect(source).toContain("joinError ? 'Try again' : previewStatus === 'loading' ? 'Preparing camera…' : 'Join meeting'")
+    expect(source).toContain("joinError ? 'Try again' : previewStatus === 'loading' ? 'Preparing camera…'")
   })
 
   test('shows a resilient camera preview and publishes those same tracks on join', () => {
@@ -90,6 +90,21 @@ describe('managed meeting implementation', () => {
     expect(source).toContain("previewStatus === 'audio-only'")
     expect(source).toContain('previewAttemptRef.current += 1')
     expect(source).toContain('stopPreviewTracks()')
+  })
+
+  test('requires explicit media consent and restores meetings listen-only', () => {
+    expect(source).toContain("const [muted, setMuted] = useState(true)")
+    expect(source).toContain("const [videoOff, setVideoOff] = useState(true)")
+    expect(source).toContain("const [previewStatus, setPreviewStatus] = useState('idle')")
+    expect(source).toContain('Preview camera &amp; microphone')
+    expect(source).toContain('Join with camera & mic off')
+    expect(source).not.toContain('!publishedKinds.has(Track.Kind.Audio)')
+    expect(source).not.toContain('!publishedKinds.has(Track.Kind.Video)')
+
+    expect(legacySource).toContain("const [isMuted, setIsMuted] = useState(true)")
+    expect(legacySource).toContain("const [isVideoOff, setIsVideoOff] = useState(true)")
+    expect(legacySource).toContain('Only an explicitly-created preview stream may publish devices')
+    expect(legacySource).not.toContain('cameraPreviewStartedRef')
   })
 
   test('keeps compact and expanded picture-in-picture layouts collision free', () => {

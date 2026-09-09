@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { SWRConfig, useSWRConfig } from 'swr'
 import { HeroUIProvider } from '@heroui/react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
@@ -54,8 +54,13 @@ function ClientDataSyncBridge() {
 }
 
 export function Providers({ children }) {
+    const nonCriticalInitializedRef = useRef(false)
+
     // Defer non-critical initialization (audio only)
     const initializeNonCritical = useCallback(async () => {
+        if (nonCriticalInitializedRef.current) return
+        nonCriticalInitializedRef.current = true
+
         // CRITICAL: Skip audio initialization for desktop apps
         // AudioContext can crash the Electron renderer process
         if (isElectronApp()) {
