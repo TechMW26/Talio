@@ -10,7 +10,7 @@ export async function GET(request) {
         }
         const { user, models } = auth
 
-        if (!hasRole(user, ['admin'])) {
+        if (!hasRole(user, ['admin', 'super_admin'])) {
             return NextResponse.json(
                 { success: false, message: 'Only admins can view audit logs' },
                 { status: 403 }

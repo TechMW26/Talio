@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Fragment, useState, useMemo } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
@@ -26,9 +26,21 @@ export default function AttendanceReportPage() {
     employeeDetails: true
   })
   const [searchTerm, setSearchTerm] = useState('')
+  const [expandedEmployeeRows, setExpandedEmployeeRows] = useState({})
 
   const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
-  const isAuthorized = user && ['admin', 'hr'].includes(user.role)
+  const isAuthorized = user && ['admin', 'super_admin', 'hr'].includes(user.role)
+
+  const formatPunchTime = (value) => value
+    ? new Date(value).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    : '—'
+
+  const attendanceTypeLabel = (record = {}) => {
+    if (record.source === 'biometric') return 'Biometric'
+    if (record.source === 'correction' || record.isManualEntry) return 'Regularised'
+    if (record.workLocation === 'home' || ['wfh', 'work-from-home'].includes(record.status)) return 'Work from home'
+    return record.source ? String(record.source).replace(/[-_]/g, ' ') : 'Talio check-in'
+  }
 
   // Compute date range params (auto-updates SWR keys when filters change)
   const dateParams = useMemo(() => {
@@ -77,7 +89,7 @@ export default function AttendanceReportPage() {
     isAuthorized && dateParams ? `/api/attendance?startDate=${dateParams.startDate}&endDate=${dateParams.endDate}${deptParam}&populate=true` : null
   )
   const { data: employeesRes, error: empError, isLoading: empLoading, isValidating: empValidating } = useAuthedSWR(
-    isAuthorized && dateParams ? `/api/employees?limit=1000&status=active&populate=true${deptParam}` : null
+    isAuthorized && dateParams ? `/api/employees?limit=1000&status=active,probation&populate=true${deptParam}` : null
   )
   const { data: companyRes, isLoading: compLoading } = useAuthedSWR(
     isAuthorized ? '/api/settings/company' : null
@@ -93,7 +105,7 @@ export default function AttendanceReportPage() {
   // Helper function to count working days between two dates
   const countWorkingDays = (startDate, endDate, workingDays, holidays) => {
     const dayNameMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const holidayDates = new Set(holidays.map(h => getDateKeyInTimezone(h.date)))
+    const holidaysByDate = new Map(holidays.map(h => [getDateKeyInTimezone(h.date), h]))
 
     let count = 0
     const current = new Date(startDate)
@@ -103,8 +115,10 @@ export default function AttendanceReportPage() {
       const dayName = dayNameMap[current.getUTCDay()]
       const dateStr = getDateKeyInTimezone(current)
 
-      if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
-        count++
+      if (workingDays.includes(dayName)) {
+        const holiday = holidaysByDate.get(dateStr)
+        if (!holiday) count++
+        else if (holiday.dayPortion && holiday.dayPortion !== 'full_day') count += 0.5
       }
       current.setUTCDate(current.getUTCDate() + 1)
     }
@@ -437,10 +451,23 @@ export default function AttendanceReportPage() {
         emp.totalHours,
         emp.avgHours,
         emp.attendanceRate + '%'
-      ])
+      ]),
+      [],
+      ['DAILY PUNCH DETAILS'],
+      ['Employee', 'Code', 'Date', 'Attendance Type', 'Punch In', 'Punch Out', 'Status', 'Work Hours'],
+      ...reportData.employees.flatMap(emp => emp.records.map(record => [
+        emp.name,
+        emp.employeeCode || '',
+        getDateKeyInTimezone(record.date || record.checkIn || record.createdAt),
+        attendanceTypeLabel(record),
+        formatPunchTime(record.checkIn),
+        formatPunchTime(record.checkOut),
+        record.status || '',
+        Number(record.workHours || 0).toFixed(2),
+      ]))
     ]
 
-    const csv = csvData.map(row => row.join(',')).join('\n')
+    const csv = csvData.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -551,6 +578,25 @@ export default function AttendanceReportPage() {
     ]
     sheets.push({ name: 'Employee Details', rows: employeeData })
 
+    const dailyPunchData = [
+      ['DAILY PUNCH DETAILS'],
+      ['Period', `${reportData.period.startDate} to ${reportData.period.endDate}`],
+      [],
+      ['Employee', 'Code', 'Department', 'Date', 'Attendance Type', 'Punch In', 'Punch Out', 'Status', 'Work Hours'],
+      ...reportData.employees.flatMap(emp => emp.records.map(record => [
+        emp.name,
+        emp.employeeCode || '',
+        emp.department,
+        getDateKeyInTimezone(record.date || record.checkIn || record.createdAt),
+        attendanceTypeLabel(record),
+        formatPunchTime(record.checkIn),
+        formatPunchTime(record.checkOut),
+        record.status || '',
+        Number(record.workHours || 0).toFixed(2),
+      ])),
+    ]
+    sheets.push({ name: 'Daily Punches', rows: dailyPunchData })
+
     try {
       await downloadExcelWorkbook(`attendance-report-${reportData.period.startDate}-to-${reportData.period.endDate}.xlsx`, sheets)
       toast.success('Excel Report exported successfully')
@@ -560,11 +606,11 @@ export default function AttendanceReportPage() {
   }
 
   const filteredEmployees = reportData?.employees.filter(emp => {
-    const searchLower = searchTerm.toLowerCase()
+    const searchLower = searchTerm.trim().toLowerCase()
     return (
-      emp.name.toLowerCase().includes(searchLower) ||
-      emp.employeeCode.toLowerCase().includes(searchLower) ||
-      emp.department.toLowerCase().includes(searchLower)
+      String(emp.name || '').toLowerCase().includes(searchLower) ||
+      String(emp.employeeCode || '').toLowerCase().includes(searchLower) ||
+      String(emp.department || '').toLowerCase().includes(searchLower)
     )
   }) || []
 
@@ -586,7 +632,7 @@ export default function AttendanceReportPage() {
     )
   }
 
-  if (!user || !['admin', 'hr'].includes(user.role)) {
+  if (!user || !['admin', 'super_admin', 'hr'].includes(user.role)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -944,6 +990,7 @@ export default function AttendanceReportPage() {
                     <table className="w-full">
                       <thead className="bg-default-50 border-b border-divider">
                         <tr>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-default-500 uppercase">Punches</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Employee</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Code</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Department</th>
@@ -958,7 +1005,19 @@ export default function AttendanceReportPage() {
                       </thead>
                       <tbody className="divide-y divide-divider">
                         {filteredEmployees.map((emp) => (
-                          <tr key={emp.id} className="hover:bg-default-50">
+                          <Fragment key={emp.id}>
+                          <tr className="hover:bg-default-50">
+                            <td className="px-3 py-4">
+                              <button
+                                type="button"
+                                aria-label={`${expandedEmployeeRows[emp.id] ? 'Hide' : 'Show'} daily punches for ${emp.name}`}
+                                aria-expanded={Boolean(expandedEmployeeRows[emp.id])}
+                                onClick={() => setExpandedEmployeeRows(prev => ({ ...prev, [emp.id]: !prev[emp.id] }))}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary hover:bg-primary-50"
+                              >
+                                {expandedEmployeeRows[emp.id] ? <FaChevronUp /> : <FaChevronDown />}
+                              </button>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center space-x-3">
                                 {emp.avatar ? (
@@ -994,6 +1053,45 @@ export default function AttendanceReportPage() {
                               </Chip>
                             </td>
                           </tr>
+                          {expandedEmployeeRows[emp.id] && (
+                            <tr className="bg-default-50/60">
+                              <td colSpan={11} className="px-4 py-4">
+                                {emp.records.length === 0 ? (
+                                  <p className="text-sm text-default-500">No punch records exist for this employee in the selected period.</p>
+                                ) : (
+                                  <div className="overflow-x-auto rounded-xl border border-divider bg-content1">
+                                    <table className="w-full min-w-[720px] text-sm">
+                                      <thead className="bg-default-100/70 text-default-500">
+                                        <tr>
+                                          <th className="px-4 py-2 text-left">Date</th>
+                                          <th className="px-4 py-2 text-left">Attendance type</th>
+                                          <th className="px-4 py-2 text-left">Punch in</th>
+                                          <th className="px-4 py-2 text-left">Punch out</th>
+                                          <th className="px-4 py-2 text-left">Status</th>
+                                          <th className="px-4 py-2 text-right">Hours</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-divider">
+                                        {[...emp.records]
+                                          .sort((a, b) => new Date(b.date || b.checkIn || 0) - new Date(a.date || a.checkIn || 0))
+                                          .map((record, index) => (
+                                            <tr key={record._id || `${emp.id}-${index}`}>
+                                              <td className="px-4 py-2">{getDateKeyInTimezone(record.date || record.checkIn || record.createdAt)}</td>
+                                              <td className="px-4 py-2 capitalize">{attendanceTypeLabel(record)}</td>
+                                              <td className="px-4 py-2">{formatPunchTime(record.checkIn)}</td>
+                                              <td className="px-4 py-2">{formatPunchTime(record.checkOut)}</td>
+                                              <td className="px-4 py-2 capitalize">{String(record.status || 'unknown').replace(/-/g, ' ')}</td>
+                                              <td className="px-4 py-2 text-right font-medium">{Number(record.workHours || 0).toFixed(2)}h</td>
+                                            </tr>
+                                          ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>
@@ -1005,7 +1103,7 @@ export default function AttendanceReportPage() {
         </>
       )}
 
-      {!reportData && !loading && (
+      {!reportData && !isLoading && (
         <div className="text-center py-12 text-default-500">
           <FaCalendarAlt className="w-12 h-12 mx-auto mb-4 text-default-300" />
           <p>Select filters above to generate the attendance report</p>

@@ -14,7 +14,7 @@ export async function PUT(request, { params }) {
         }
         const { user, models, tenant } = auth
 
-        if (!hasRole(user, ['admin'])) {
+        if (!hasRole(user, ['admin', 'super_admin'])) {
             return NextResponse.json(
                 { success: false, message: 'Only admins can assign roles' },
                 { status: 403 }

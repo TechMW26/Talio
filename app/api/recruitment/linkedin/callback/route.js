@@ -10,7 +10,7 @@ import {
 } from '@/lib/linkedinIntegration';
 import { getTenantModels } from '@/lib/tenantModels';
 
-const ALLOWED_ROLES = ['admin', 'hr'];
+const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 function buildRedirectResponse(request, returnTo, params = {}) {
     const response = NextResponse.redirect(buildLinkedInAppRedirect(request, returnTo, params));

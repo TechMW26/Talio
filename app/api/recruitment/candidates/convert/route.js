@@ -18,7 +18,7 @@ export async function POST(request) {
     const { user, models, tenant } = auth
     const { Candidate, Employee, User, Role, OnboardingEmail, CompanySettings } = models
 
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
     }
 

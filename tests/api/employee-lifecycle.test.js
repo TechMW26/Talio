@@ -108,7 +108,7 @@ describe('employee lifecycle', () => {
     expect(() => applyLifecycleAction(lifecycle, 'complete_onboarding_item', {
       itemKey: 'documents',
       verification: { details: {}, documents: [] },
-    }, { actorId: 'u1', employee: {} })).toThrow('Identity proof must be uploaded')
+    }, { actorId: 'u1', employee: {} })).toThrow('Aadhaar card must be uploaded')
   })
 
   test('updates canonical bank details but masks the account number in lifecycle evidence', () => {
@@ -200,7 +200,10 @@ describe('employee lifecycle', () => {
         documents: [
           { name: 'Aadhaar identity proof', url: '/identity.pdf' },
           { name: 'PAN tax document', url: '/tax.pdf' },
-          { name: 'Signed employment contract', url: '/employment.pdf' },
+          { name: 'Class 10 marksheet', url: '/class-10.pdf' },
+          { name: 'Class 12 marksheet', url: '/class-12.pdf' },
+          { name: 'Graduation degree certificate', url: '/graduation.pdf' },
+          { name: 'Police verification report', url: '/police.pdf' },
           { name: 'Background verification report', url: '/background.pdf' },
           { name: 'Cancelled cheque bank proof', url: '/bank.pdf' },
         ],

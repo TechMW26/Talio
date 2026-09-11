@@ -54,21 +54,9 @@ async function canApproveCorrections(userId, targetEmployeeId, models) {
 
   const role = user.role
 
-  // God admin and admin can approve all corrections
-  if (role === 'admin') {
+  // Tenant administrators and HR review attendance across the organisation.
+  if (['admin', 'super_admin', 'hr'].includes(role)) {
     return { canApprove: true, role }
-  }
-
-  // HR users can ONLY approve if they're a department head (limited to their department)
-  if (role === 'hr') {
-    if (user.isDepartmentHead && user.headOfDepartments?.length > 0 && targetEmployeeId) {
-      // Check if target employee is in HR's department
-      const targetEmployee = await Employee.findById(targetEmployeeId).lean()
-      if (targetEmployee && user.headOfDepartments.some(d => d.toString() === targetEmployee.department?.toString())) {
-        return { canApprove: true, role: 'hr_department_head' }
-      }
-    }
-    return { canApprove: false, reason: 'HR users can only approve within their department if they are the department head' }
   }
 
   // Department heads can approve for their department members
@@ -157,8 +145,8 @@ export async function GET(request) {
         .select('employeeId isDepartmentHead headOfDepartments')
         .lean()
 
-      if (user?.role === 'admin') {
-        // Admin can see all corrections
+      if (['admin', 'super_admin', 'hr'].includes(user?.role)) {
+        // Tenant administrators and HR can see all corrections.
         if (type === 'pending') {
           query.status = 'pending'
         }
@@ -168,24 +156,6 @@ export async function GET(request) {
           const deptEmployees = await Employee.find({ department: departmentFilter }).select('_id').lean()
           const empIds = deptEmployees.map(e => e._id)
           query.employee = { $in: empIds }
-        }
-      } else if (user?.role === 'hr') {
-        // HR users should ONLY see corrections if they're a department head
-        // Regular HR employees should NOT see pending corrections - their dept head handles them
-        if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
-          // HR who is dept head - only see their department's corrections
-          const deptEmployees = await Employee.find({
-            department: { $in: userRecord.headOfDepartments },
-            _id: { $ne: userRecord.employeeId }
-          }).select('_id').lean()
-          const empIds = deptEmployees.map(e => e._id)
-          query.employee = { $in: empIds }
-          if (type === 'pending') {
-            query.status = 'pending'
-          }
-        } else {
-          // Regular HR (not dept head) - only show their own corrections
-          query.employee = userEmployeeId
         }
       } else if (user?.employeeId) {
         // Department head / team leader - get corrections for their department/team

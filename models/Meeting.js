@@ -265,6 +265,7 @@ const MeetingSchema = new mongoose.Schema({
       type: String,
       enum: ['15min', '30min', '1hour', '1day'],
     },
+    time: Date,
     sent: {
       type: Boolean,
       default: false

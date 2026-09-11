@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { logActivity } from '@/lib/activityLogger'
 import { emitLeaveUpdate } from '@/lib/realtimeEvents'
-import { buildDirectReportsFilter } from '@/lib/teamScope'
+import { buildDirectReportsFilter, buildUnassignedApprovalFilter } from '@/lib/teamScope'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 import { emitEvent, EVENTS } from '@/lib/eventBus'
 import {
@@ -58,7 +58,7 @@ export async function GET(request) {
     // When fetching pending leaves without a specific employeeId, scope based on role
     if (status === 'pending' && !employeeId) {
       // Admin sees all pending leaves
-      if (userRole === 'admin') {
+      if (['admin', 'super_admin'].includes(userRole)) {
         // No additional filter - admin sees everything
       }
       // HR users should ONLY see approvals if they're a department head (for their department)
@@ -73,13 +73,14 @@ export async function GET(request) {
           const deptEmployeeIds = deptEmployees.map(e => e._id)
           query.employee = { $in: deptEmployeeIds }
         } else {
-          // Regular HR (not dept head) - should not see pending approvals
-          // Return empty - they can only see their own leaves via employeeId filter
-          return NextResponse.json({
-            success: true,
-            data: [],
-            message: 'Only your department head can approve leave requests'
-          })
+          // HR is the explicit fallback for new joiners whose reporting chain
+          // has not been assigned yet. Once hierarchy is configured, the
+          // request is routed to that manager/department workflow instead.
+          const unassignedEmployees = await Employee.find({
+            ...buildUnassignedApprovalFilter(),
+            _id: { $ne: userEmployeeId },
+          }).select('_id').lean()
+          query.employee = { $in: unassignedEmployees.map((employee) => employee._id) }
         }
       }
       // Department heads see their department's leaves
@@ -349,7 +350,7 @@ export async function POST(request) {
     // Emit real-time leave update to admins/HR/managers
     try {
       const adminUsers = await User.find({
-        role: { $in: ['admin', 'hr', 'manager', 'department_head'] },
+        role: { $in: ['admin', 'super_admin', 'hr', 'manager', 'department_head'] },
         isActive: true,
       }).select('_id').lean()
       const targetUserIds = [...new Set([

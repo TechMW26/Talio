@@ -71,6 +71,14 @@ describe('managed meeting implementation', () => {
     expect(source).toContain('compact />')
   })
 
+  test('allows only one active screen presenter and resolves simultaneous-share races', () => {
+    expect(source).toContain('const remotePresenter = participants.find')
+    expect(source).toContain('is already presenting. Ask them to stop')
+    expect(source).toContain('presenters.length > 1')
+    expect(source).toContain('screenConflictResolutionRef.current')
+    expect(source).toContain('setScreenShareEnabled(false)')
+  })
+
   test('keeps join failures recoverable without leaving a partial room connected', () => {
     expect(source).toContain('pendingRoom?.disconnect()')
     expect(source).toContain("role=\"alert\"")

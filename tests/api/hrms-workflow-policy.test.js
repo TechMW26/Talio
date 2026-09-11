@@ -1,4 +1,4 @@
-import { HOLIDAY_TYPES, normalizeHolidayType, sanitizeHolidayPayload } from '@/lib/holidayPolicy'
+import { HOLIDAY_DAY_PORTIONS, HOLIDAY_TYPES, normalizeHolidayType, sanitizeHolidayPayload } from '@/lib/holidayPolicy'
 import { EMPLOYED_STATUSES, isLeaveEligibleEmployee } from '@/lib/leaveAllocation.server'
 import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy'
 
@@ -25,5 +25,13 @@ describe('HRMS workflow policies', () => {
 
     const payload = sanitizeHolidayPayload({ name: 'Foundation Day', date: '2026-09-10', type: 'Company Holiday' })
     expect(payload).toMatchObject({ name: 'Foundation Day', type: 'company', category: 'company_specific', isOptional: false })
+  })
+
+  test('supports management-approved full and half-day holidays', () => {
+    expect(HOLIDAY_DAY_PORTIONS).toEqual(['full_day', 'first_half', 'second_half'])
+    expect(sanitizeHolidayPayload({ name: 'Foundation Morning', date: '2026-09-10', type: 'company', dayPortion: 'first_half' }))
+      .toMatchObject({ dayPortion: 'first_half' })
+    expect(() => sanitizeHolidayPayload({ name: 'Invalid', date: '2026-09-10', type: 'company', dayPortion: 'quarter_day' }))
+      .toThrow('Holiday duration')
   })
 })

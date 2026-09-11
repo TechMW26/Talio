@@ -7,7 +7,7 @@ import {
   REALTIME_EVENTS,
 } from '@/lib/realtimeEvents'
 import { emitEvent, EVENTS } from '@/lib/eventBus'
-import { isDirectReport } from '@/lib/teamScope'
+import { hasReportingChain, isDirectReport } from '@/lib/teamScope'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 import {
   buildLeaveBalanceFields,
@@ -54,27 +54,21 @@ export async function PUT(request, { params }) {
     const userEmployeeId = userRecord?.employeeId
 
     // Admin can approve all leaves
-    if (userRole !== 'admin') {
+    if (!['admin', 'super_admin'].includes(userRole)) {
       // Get the employee who requested leave
       const leaveEmployee = await Employee.findById(leave.employee)
-        .select('department reportingManager manager assignedManager supervisor')
+        .select('department reportsTo reportingManager assignedManager assignedTeamLead')
         .lean()
 
       if (userRole === 'hr') {
-        // HR users can ONLY approve if they're a department head of the employee's department
-        if (!userRecord?.isDepartmentHead || !userRecord?.headOfDepartments?.length) {
-          return NextResponse.json(
-            { success: false, message: 'Only your department head can approve leave requests' },
-            { status: 403 }
+        const isDepartmentFallback = userRecord?.isDepartmentHead
+          && userRecord?.headOfDepartments?.some((department) =>
+            department.toString() === leaveEmployee?.department?.toString()
           )
-        }
-        // Check if employee is in HR's department
-        const isInHRDept = userRecord.headOfDepartments.some(d =>
-          d.toString() === leaveEmployee?.department?.toString()
-        )
-        if (!isInHRDept) {
+        const isHierarchyFallback = !hasReportingChain(leaveEmployee)
+        if (!isDepartmentFallback && !isHierarchyFallback) {
           return NextResponse.json(
-            { success: false, message: 'You can only approve leaves for your own department' },
+            { success: false, message: 'This request is routed to the employee\'s assigned manager or department head' },
             { status: 403 }
           )
         }
@@ -275,7 +269,7 @@ export async function PUT(request, { params }) {
 
     // Emit real-time update to all admin/HR dashboards for live refresh
     try {
-      const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
+      const adminUsers = await User.find({ role: { $in: ['admin', 'super_admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
       const targetUserIds = adminUsers.map(u => u._id.toString())
 
       emitLeaveUpdate(
@@ -352,7 +346,7 @@ export async function DELETE(request, { params }) {
     const userEmployeeId = userRecord?.employeeId || user.employeeId
     const isOwner = userEmployeeId && String(userEmployeeId) === String(leave.employee)
 
-    if (!isOwner && !['admin', 'hr'].includes(userRole)) {
+    if (!isOwner && !['admin', 'super_admin', 'hr'].includes(userRole)) {
       return NextResponse.json(
         { success: false, message: 'You can only cancel your own leave request' },
         { status: 403 }

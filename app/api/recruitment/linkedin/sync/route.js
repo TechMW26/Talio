@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { syncLinkedInApplicants } from '@/lib/linkedinSync';
 
-const ALLOWED_ROLES = ['admin', 'hr'];
+const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 export async function POST(request) {
     try {

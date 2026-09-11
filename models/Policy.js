@@ -65,6 +65,8 @@ const PolicySchema = new mongoose.Schema({
   }],
   attachments: [{
     name: String,
+    fileName: String,
+    fileId: String,
     url: String,
   }],
   createdBy: {

@@ -37,7 +37,7 @@ export default function TeamAttendancePage() {
   const [employeesLoading, setEmployeesLoading] = useState(true)
 
   const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
-  const isAdmin = user && ['admin', 'hr'].includes(user.role)
+  const isAdmin = user && ['admin', 'super_admin', 'hr'].includes(user.role)
 
   // SWR: Check if user is a department head
   const { data: headCheckRes, isLoading: headCheckLoading, error: headCheckError } = useAuthedSWR(
@@ -45,7 +45,7 @@ export default function TeamAttendancePage() {
   )
   const isDepartmentHead = headCheckRes?.success && headCheckRes?.isDepartmentHead
   const isTeamLeader = headCheckRes?.success && headCheckRes?.isTeamLeader
-  const headedDepartments = headCheckRes?.departments || []
+  const headedDepartments = useMemo(() => headCheckRes?.departments || [], [headCheckRes?.departments])
   const departmentInfo = useMemo(() => {
     if (!isDepartmentHead || headedDepartments.length === 0) return null
     return {
@@ -56,7 +56,7 @@ export default function TeamAttendancePage() {
 
   // SWR: Departments list (admin filter dropdown)
   const { data: deptsRes } = useAuthedSWR(isAdmin ? '/api/departments' : null)
-  const departments = deptsRes?.data || []
+  const departments = useMemo(() => deptsRes?.data || [], [deptsRes?.data])
 
   // SWR: Fetch teams for selected department
   const teamsFetchKey = (() => {
@@ -65,7 +65,7 @@ export default function TeamAttendancePage() {
     return null
   })()
   const { data: teamsRes } = useAuthedSWR(teamsFetchKey)
-  const availableTeams = teamsRes?.data || []
+  const availableTeams = useMemo(() => teamsRes?.data || [], [teamsRes?.data])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -92,7 +92,7 @@ export default function TeamAttendancePage() {
       try {
         if (isAdmin || (isDepartmentHead && headedDepartments.length > 0)) {
           const query = new URLSearchParams({
-            status: 'active',
+            status: 'active,probation,on_leave',
             limit: '48',
             page: String(employeePage),
             sortBy: 'firstName',
@@ -165,7 +165,7 @@ export default function TeamAttendancePage() {
   const { data: attendanceRes, isLoading: attLoading, isValidating: attValidating } = useAuthedSWR(
     attendanceKey, { keepPreviousData: false }
   )
-  const attendance = attendanceRes?.data || []
+  const attendance = useMemo(() => attendanceRes?.data || [], [attendanceRes?.data])
 
   const handleEmployeeClick = (employee) => {
     setSelectedEmployee(employee)
@@ -376,7 +376,7 @@ export default function TeamAttendancePage() {
                 ? <>{`View attendance for all ${employeePagination.total} employees${isDepartmentHead ? ' (your department shown first)' : ''}`} <BackgroundRefreshIndicator isValidating={attValidating} /></>
                 : 'Select an employee to view their attendance calendar'
               )}
-              {view === 'calendar' && <>'View attendance calendar and work hours' <BackgroundRefreshIndicator isValidating={attValidating} /></>}
+              {view === 'calendar' && <>View attendance calendar and work hours <BackgroundRefreshIndicator isValidating={attValidating} /></>}
             </p>
           </div>
         </div>

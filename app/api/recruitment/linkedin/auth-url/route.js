@@ -11,7 +11,7 @@ import {
 } from '@/lib/linkedinIntegration';
 import { getAuthAndModels } from '@/lib/auth';
 
-const ALLOWED_ROLES = ['admin', 'hr'];
+const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 export async function GET(request) {
     try {

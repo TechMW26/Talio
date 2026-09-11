@@ -5,6 +5,7 @@ import { sendPushToUsers } from '@/lib/pushNotification'
 // PUT - Update policy
 export async function PUT(request, { params }) {
   try {
+    const { id } = await params
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Policy', 'User', 'Employee', 'Company', 'Department'])
     if (!auth.success) {
@@ -14,14 +15,14 @@ export async function PUT(request, { params }) {
     const { Policy, User, Employee, Company, Department } = models
 
     // Only admin and HR can update policies
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Only admin and HR can update policies' }, { status: 403 })
     }
 
     const data = await request.json()
 
     const policy = await Policy.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true, runValidators: true }
     ).populate('createdBy', 'firstName lastName')
@@ -119,6 +120,7 @@ export async function PUT(request, { params }) {
 // DELETE - Delete policy
 export async function DELETE(request, { params }) {
   try {
+    const { id } = await params
     const auth = await getAuthAndModels(request, ['Policy'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
@@ -127,11 +129,11 @@ export async function DELETE(request, { params }) {
     const { Policy } = models
 
     // Only admin and HR can delete policies
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Only admin and HR can delete policies' }, { status: 403 })
     }
 
-    const policy = await Policy.findByIdAndDelete(params.id)
+    const policy = await Policy.findByIdAndDelete(id)
 
     if (!policy) {
       return NextResponse.json(

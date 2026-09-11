@@ -3,7 +3,7 @@ import { buildCachePattern, clearCachePattern } from '@/lib/cache';
 import { getAuthAndModels } from '@/lib/auth';
 import { buildLinkedInStatusPayload } from '@/lib/linkedinIntegration';
 
-const ALLOWED_ROLES = ['admin', 'hr'];
+const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 export async function DELETE(request) {
     try {

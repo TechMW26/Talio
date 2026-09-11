@@ -166,6 +166,7 @@ export default function ManagedMeetingRoomSession({
   const chatNotificationTimerRef = useRef(null)
   const seenChatMessageIdsRef = useRef(new Set())
   const showChatRef = useRef(false)
+  const screenConflictResolutionRef = useRef(false)
   const [meeting, setMeeting] = useState(meetingData)
   const [room, setRoom] = useState(null)
   const [participants, setParticipants] = useState([])
@@ -370,9 +371,32 @@ export default function ManagedMeetingRoomSession({
     if (!activeRoom) return
     const remote = [...activeRoom.remoteParticipants.values()].map(participantSnapshot)
     const local = participantSnapshot(activeRoom.localParticipant)
-    setParticipants([local, ...remote])
-    const presenter = [local, ...remote].find((participant) => participant.isScreenSharing)
+    const nextParticipants = [local, ...remote]
+    setParticipants(nextParticipants)
+    const presenters = nextParticipants
+      .filter((participant) => participant.isScreenSharing)
+      .sort((a, b) => a.identity.localeCompare(b.identity))
+    const presenter = presenters[0]
     if (presenter) setScreenSharing(local.identity === presenter.identity)
+    else setScreenSharing(false)
+
+    // A race can occur when two people start sharing at almost the same time.
+    // Every client deterministically keeps the same presenter; a losing local
+    // publication is stopped so shared screens can never overlap.
+    if (
+      presenters.length > 1
+      && local.isScreenSharing
+      && presenter.identity !== local.identity
+      && !screenConflictResolutionRef.current
+    ) {
+      screenConflictResolutionRef.current = true
+      void activeRoom.localParticipant.setScreenShareEnabled(false)
+        .then(() => toast.info(`${presenter.name} is already presenting. Your screen share was stopped.`))
+        .finally(() => {
+          screenConflictResolutionRef.current = false
+          refreshParticipants(activeRoom)
+        })
+    }
   }, [])
 
   const showReaction = useCallback((identity, reaction) => {
@@ -669,6 +693,13 @@ export default function ManagedMeetingRoomSession({
   }
   const toggleScreen = async () => {
     try {
+      const remotePresenter = participants.find((participant) => (
+        participant.isScreenSharing && participant.identity !== room?.localParticipant.identity
+      ))
+      if (!screenSharing && remotePresenter) {
+        toast.info(`${remotePresenter.name} is already presenting. Ask them to stop before sharing your screen.`)
+        return
+      }
       await room?.localParticipant.setScreenShareEnabled(!screenSharing, { audio: true })
       setScreenSharing(!screenSharing)
       refreshParticipants(room)

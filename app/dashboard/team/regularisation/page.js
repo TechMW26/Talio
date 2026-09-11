@@ -24,7 +24,7 @@ export default function TeamRegularisationPage() {
     try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
-  const isAdminOrHR = ['admin', 'hr'].includes(user?.role)
+  const isAdminOrHR = ['admin', 'super_admin', 'hr'].includes(user?.role)
 
   // Check department head access for non-admin/HR users
   const { data: accessRes, isLoading: accessLoading } = useAuthedSWR(

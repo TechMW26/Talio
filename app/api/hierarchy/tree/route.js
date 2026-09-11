@@ -38,7 +38,7 @@ export async function GET(request) {
     const { Employee, User, Team } = auth.models
     const viewerUserId = String(auth.user?._id || auth.user?.userId || '')
 
-    const employees = await Employee.find({ status: { $ne: 'terminated' } })
+    const employees = await Employee.find({ status: { $in: ['active', 'probation', 'on_leave'] } })
       .populate('designation', 'title level levelName')
       .populate('department', 'name')
       .select('firstName lastName profilePicture bio designation designationLevel designationLevelName reportingManager assignedManager assignedTeamLead reportsTo department status dateOfJoining dateOfBirth')

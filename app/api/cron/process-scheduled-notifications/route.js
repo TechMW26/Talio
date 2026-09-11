@@ -3,6 +3,7 @@ import { connectSuperadminDB } from '@/lib/superadminDb'
 import getTenantCompanyModel from '@/models/TenantCompany'
 import { getTenantModels } from '@/lib/tenantModels'
 import { sendPushToUsers } from '@/lib/pushNotification'
+import { buildMeetingReminders } from '@/lib/meetings/meetingUpdate'
 import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 
 export const dynamic = 'force-dynamic'
@@ -16,15 +17,16 @@ async function processNotificationsForTenant(tenant, now) {
     tenantName: tenant.name,
     tenantSlug: tenant.slug,
     scheduled: { total: 0, processed: 0, failed: 0 },
-    recurring: { total: 0, processed: 0, failed: 0 }
+    recurring: { total: 0, processed: 0, failed: 0 },
+    meetingReminders: { total: 0, processed: 0, failed: 0 }
   }
 
   try {
     // Get tenant-specific models
     const models = await getTenantModels(tenant.databaseName, [
-      'ScheduledNotification', 'RecurringNotification', 'Notification', 'User', 'Employee', 'Department'
+      'ScheduledNotification', 'RecurringNotification', 'Notification', 'User', 'Employee', 'Department', 'Meeting'
     ])
-    const { ScheduledNotification, RecurringNotification, Notification, User, Employee } = models
+    const { ScheduledNotification, RecurringNotification, Notification, User, Employee, Meeting } = models
 
     // ========== PROCESS SCHEDULED NOTIFICATIONS ==========
     const dueNotifications = await ScheduledNotification.find({
@@ -300,6 +302,94 @@ async function processNotificationsForTenant(tenant, now) {
       }
     }
 
+    // ========== PROCESS MEETING REMINDERS ==========
+    // Backfill meetings created before reminder timestamps were persisted.
+    // Limiting this to the next 24 hours keeps each cron run bounded while
+    // ensuring every upcoming legacy meeting enters the normal due queue.
+    const legacyReminderMeetings = await Meeting.find({
+      status: 'scheduled',
+      scheduledStart: { $gte: now, $lte: new Date(now.getTime() + 24 * 60 * 60 * 1000) },
+      $or: [
+        { 'reminders.0': { $exists: false } },
+        { 'reminders.time': { $exists: false } },
+      ],
+    }).select('_id scheduledStart reminders').lean()
+    for (const meeting of legacyReminderMeetings) {
+      await Meeting.updateOne({ _id: meeting._id }, {
+        $set: { reminders: buildMeetingReminders(meeting.reminders, new Date(meeting.scheduledStart)) },
+      })
+    }
+
+    // Claim each embedded reminder atomically before delivering it. This makes
+    // overlapping Vercel cron invocations idempotent.
+    const dueMeetings = await Meeting.find({
+      status: 'scheduled',
+      reminders: { $elemMatch: { time: { $lte: now }, sent: { $ne: true } } },
+      scheduledEnd: { $gte: now },
+    }).select('_id title scheduledStart organizer invitees reminders').lean()
+
+    for (const meeting of dueMeetings) {
+      const dueIndexes = (meeting.reminders || [])
+        .map((reminder, index) => ({ reminder, index }))
+        .filter(({ reminder }) => reminder?.time && new Date(reminder.time) <= now && reminder.sent !== true)
+      results.meetingReminders.total += dueIndexes.length
+
+      for (const { reminder, index } of dueIndexes) {
+        const claim = await Meeting.updateOne({
+          _id: meeting._id,
+          status: 'scheduled',
+          [`reminders.${index}.sent`]: { $ne: true },
+          [`reminders.${index}.time`]: { $lte: now },
+        }, {
+          $set: {
+            [`reminders.${index}.sent`]: true,
+            [`reminders.${index}.sentAt`]: now,
+          },
+        })
+        if (!claim.modifiedCount) continue
+
+        try {
+          const employeeIds = [
+            meeting.organizer,
+            ...(meeting.invitees || []).map((invitee) => invitee.employee),
+          ].filter(Boolean)
+          const users = await User.find({ employeeId: { $in: employeeIds }, isActive: { $ne: false } }).select('_id').lean()
+          const userIds = [...new Set(users.map((user) => String(user._id)))]
+          if (!userIds.length) throw new Error('No active meeting participants found')
+
+          const startLabel = new Date(meeting.scheduledStart).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+          const title = 'Meeting starting soon'
+          const message = `${meeting.title} starts at ${startLabel}`
+          const url = `/dashboard/meetings/${meeting._id}`
+          await Notification.insertMany(userIds.map((userId) => ({
+            user: userId,
+            title,
+            message,
+            type: 'scheduled',
+            link: url,
+            url,
+            metadata: { meetingId: String(meeting._id), reminderType: reminder.type || '15min' },
+            data: { meetingId: String(meeting._id), reminderType: reminder.type || '15min' },
+          })))
+          await sendPushToUsers(userIds, { title, body: message }, {
+            type: 'meeting-reminder',
+            url,
+            data: { meetingId: String(meeting._id), reminderType: reminder.type || '15min' },
+          }).catch(() => ({ success: false }))
+          results.meetingReminders.processed++
+        } catch (error) {
+          await Meeting.updateOne({ _id: meeting._id }, {
+            $set: {
+              [`reminders.${index}.sent`]: false,
+              [`reminders.${index}.sentAt`]: null,
+            },
+          }).catch(() => {})
+          results.meetingReminders.failed++
+          console.error(`[Cron] Meeting reminder failed for tenant ${tenant.slug}:`, error)
+        }
+      }
+    }
+
     return results
 
   } catch (error) {
@@ -337,6 +427,7 @@ export async function GET(request) {
       tenantsProcessed: activeTenants.length,
       totalScheduled: { processed: 0, failed: 0 },
       totalRecurring: { processed: 0, failed: 0 },
+      totalMeetingReminders: { processed: 0, failed: 0 },
       tenantResults: []
     }
 
@@ -350,13 +441,15 @@ export async function GET(request) {
       allResults.totalScheduled.failed += tenantResult.scheduled.failed
       allResults.totalRecurring.processed += tenantResult.recurring.processed
       allResults.totalRecurring.failed += tenantResult.recurring.failed
+      allResults.totalMeetingReminders.processed += tenantResult.meetingReminders.processed
+      allResults.totalMeetingReminders.failed += tenantResult.meetingReminders.failed
     }
 
-    console.log(`[Cron] Completed. Scheduled: ${allResults.totalScheduled.processed} processed, ${allResults.totalScheduled.failed} failed. Recurring: ${allResults.totalRecurring.processed} processed, ${allResults.totalRecurring.failed} failed.`)
+    console.log(`[Cron] Completed. Scheduled: ${allResults.totalScheduled.processed} processed, ${allResults.totalScheduled.failed} failed. Recurring: ${allResults.totalRecurring.processed} processed, ${allResults.totalRecurring.failed} failed. Meeting reminders: ${allResults.totalMeetingReminders.processed} processed, ${allResults.totalMeetingReminders.failed} failed.`)
 
     return NextResponse.json({
       success: true,
-      message: `Processed ${allResults.totalScheduled.processed} scheduled, ${allResults.totalRecurring.processed} recurring. Failed: ${allResults.totalScheduled.failed} scheduled, ${allResults.totalRecurring.failed} recurring`,
+      message: `Processed ${allResults.totalScheduled.processed} scheduled, ${allResults.totalRecurring.processed} recurring, ${allResults.totalMeetingReminders.processed} meeting reminders. Failed: ${allResults.totalScheduled.failed} scheduled, ${allResults.totalRecurring.failed} recurring, ${allResults.totalMeetingReminders.failed} meeting reminders`,
       data: allResults
     })
   } catch (error) {

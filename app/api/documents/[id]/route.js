@@ -3,18 +3,31 @@ import mongoose from 'mongoose'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
+const DOCUMENT_MANAGER_ROLES = ['admin', 'super_admin', 'hr']
+
+async function canAccessDocument(user, User, document) {
+  if (DOCUMENT_MANAGER_ROLES.includes(user.role)) return true
+  const actor = await User.findById(user._id || user.userId).select('employeeId').lean()
+  return Boolean(actor?.employeeId && document?.employee && String(actor.employeeId) === String(document.employee?._id || document.employee))
+}
+
 // GET - Get single document
 export async function GET(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Document'])
+    const auth = await getAuthAndModels(request, ['Document', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Document } = models
+    const { Document, User } = models
+    const { id } = await params
 
-    const document = await Document.findById(params.id)
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ success: false, message: 'Invalid document id' }, { status: 400 })
+    }
+
+    const document = await Document.findById(id)
       .populate('employee', 'firstName lastName employeeCode')
       .populate('uploadedBy', 'firstName lastName')
 
@@ -23,6 +36,10 @@ export async function GET(request, { params }) {
         { success: false, message: 'Document not found' },
         { status: 404 }
       )
+    }
+
+    if (!(await canAccessDocument(user, User, document))) {
+      return NextResponse.json({ success: false, message: 'You do not have access to this document' }, { status: 403 })
     }
 
     return NextResponse.json({
@@ -42,17 +59,30 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Document', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Document', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
-    const { Document, Employee } = models
+    const { user, models } = auth
+    const { Document, Employee, User } = models
+    const { id } = await params
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ success: false, message: 'Invalid document id' }, { status: 400 })
+    }
+
+    const existingDocument = await Document.findById(id).select('employee').lean()
+    if (!existingDocument) {
+      return NextResponse.json({ success: false, message: 'Document not found' }, { status: 404 })
+    }
+    if (!(await canAccessDocument(user, User, existingDocument))) {
+      return NextResponse.json({ success: false, message: 'You do not have access to this document' }, { status: 403 })
+    }
 
     const data = await request.json()
 
     const document = await Document.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true, runValidators: true }
     )
@@ -131,21 +161,30 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Document'])
+    const auth = await getAuthAndModels(request, ['Document', 'User'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { Document } = auth.models
+    const { Document, User } = auth.models
+    const { id } = await params
 
     // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, message: 'Invalid document id' },
         { status: 400 }
       )
     }
 
-    const document = await Document.findByIdAndDelete(params.id)
+    const existingDocument = await Document.findById(id).select('employee').lean()
+    if (!existingDocument) {
+      return NextResponse.json({ success: false, message: 'Document not found' }, { status: 404 })
+    }
+    if (!(await canAccessDocument(auth.user, User, existingDocument))) {
+      return NextResponse.json({ success: false, message: 'You do not have access to this document' }, { status: 403 })
+    }
+
+    const document = await Document.findByIdAndDelete(id)
 
     if (!document) {
       return NextResponse.json(

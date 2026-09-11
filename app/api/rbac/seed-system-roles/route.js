@@ -12,7 +12,7 @@ export async function POST(request) {
         }
         const { user, models, tenant } = auth
 
-        if (!hasRole(user, ['admin'])) {
+        if (!hasRole(user, ['admin', 'super_admin'])) {
             return NextResponse.json(
                 { success: false, message: 'Only admins can seed system roles' },
                 { status: 403 }

@@ -66,7 +66,7 @@ export default function JobDetailPage() {
     return () => { if (unsub) unsub(); };
   }, [socket, isConnected, refresh, subscribe]);
 
-  const canManage = user && ['admin', 'hr', 'manager'].includes(user.role);
+  const canManage = user && ['admin', 'super_admin', 'hr', 'manager'].includes(user.role);
 
   const deleteMutation = useApiMutation({
     method: 'DELETE',
@@ -515,7 +515,7 @@ export default function JobDetailPage() {
                     onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
                     className="mt-2 block w-full text-sm text-default-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-primary"
                   />
-                  <p className="mt-1 text-xs text-default-400">PDF or Word document. Stored in the tenant's protected document storage.</p>
+                  <p className="mt-1 text-xs text-default-400">PDF or Word document. Stored in the tenant&apos;s protected document storage.</p>
                 </div>
               </div>
             </ModalBody>

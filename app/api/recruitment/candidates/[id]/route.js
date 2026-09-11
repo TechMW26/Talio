@@ -3,7 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { logActivity } from '@/lib/activityLogger'
 import { emitCandidateStageChanged, emitRecruitmentUpdate } from '@/lib/realtimeEvents'
 
-const ALLOWED_ROLES = ['admin', 'hr', 'manager']
+const ALLOWED_ROLES = ['admin', 'super_admin', 'hr', 'manager']
 
 // GET - Get single candidate with full history
 export async function GET(request, { params }) {
@@ -162,7 +162,7 @@ export async function DELETE(request, { params }) {
     const { user, models } = auth
     const { Candidate, Interview } = models
 
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
     }
 

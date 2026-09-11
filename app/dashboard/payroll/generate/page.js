@@ -135,7 +135,7 @@ export default function GeneratePayrollPage() {
       const settingsData = await settingsRes.json()
 
       if (employeesData.success) {
-        setEmployees(employeesData.data.filter(emp => emp.status === 'active'))
+        setEmployees(employeesData.data.filter(emp => ['active', 'probation'].includes(emp.status)))
       }
 
       if (departmentsData.success) {

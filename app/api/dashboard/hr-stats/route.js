@@ -89,10 +89,10 @@ export async function GET(request) {
       reviewsCompleted,
       totalAttendanceRecords,
     ] = await Promise.all([
-      Employee.countDocuments({ status: 'active' }),
-      Employee.countDocuments({ status: 'active', createdAt: { $lt: startOfMonth } }),
+      Employee.countDocuments({ status: { $in: ['active', 'probation', 'on_leave'] } }),
+      Employee.countDocuments({ status: { $in: ['active', 'probation', 'on_leave'] }, createdAt: { $lt: startOfMonth } }),
       Employee.aggregate([
-        { $match: { status: 'active' } },
+        { $match: { status: { $in: ['active', 'probation', 'on_leave'] } } },
         { $group: { _id: '$gender', count: { $sum: 1 } } }
       ]),
       Attendance.countDocuments({
@@ -101,16 +101,16 @@ export async function GET(request) {
       }),
       Leave.countDocuments({ status: 'approved', startDate: { $lte: today }, endDate: { $gte: today } }),
       Employee.aggregate([
-        { $match: { status: 'active' } },
+        { $match: { status: { $in: ['active', 'probation', 'on_leave'] } } },
         { $group: { _id: '$department', count: { $sum: 1 } } },
         { $sort: { count: -1 } }
       ]),
-      Employee.countDocuments({ status: 'inactive', updatedAt: { $gte: startOfMonth } }),
+      Employee.countDocuments({ status: { $in: ['inactive', 'resigned', 'terminated'] }, updatedAt: { $gte: startOfMonth } }),
       Attendance.countDocuments({ date: { $gte: todayStart, $lte: todayEnd }, status: 'late' }),
       Performance.countDocuments({ status: 'pip', isActive: true }),
       pendingLeavesPromise,
       Recruitment.countDocuments({ status: 'open' }),
-      Employee.countDocuments({ status: 'active', createdAt: { $gte: startOfMonth } }),
+      Employee.countDocuments({ status: { $in: ['active', 'probation', 'on_leave'] }, createdAt: { $gte: startOfMonth } }),
       Payroll.findOne({ month: today.getMonth() + 1, year: today.getFullYear() }).select('_id').lean(),
       Performance.countDocuments({ createdAt: { $gte: startOfMonth }, status: { $ne: 'draft' } }),
       Attendance.countDocuments({ date: { $gte: todayStart, $lte: todayEnd } }),

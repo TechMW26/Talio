@@ -31,6 +31,7 @@ export default function HolidaysPage() {
     name: '',
     date: '',
     type: 'public',
+    dayPortion: 'full_day',
     description: '',
     locations: [],
     applicableTo: 'all'
@@ -103,6 +104,7 @@ export default function HolidaysPage() {
       name: holiday.name,
       date: new Date(holiday.date).toISOString().split('T')[0],
       type: holiday.type || 'public',
+      dayPortion: holiday.dayPortion || 'full_day',
       description: holiday.description || '',
       locations: holiday.locations || [],
       applicableTo: holiday.applicableTo || 'all'
@@ -122,6 +124,7 @@ export default function HolidaysPage() {
       name: '',
       date: '',
       type: 'public',
+      dayPortion: 'full_day',
       description: '',
       locations: [],
       applicableTo: 'all'
@@ -229,7 +232,7 @@ export default function HolidaysPage() {
                         {holiday.name}
                       </div>
                       <div className="text-[9px] sm:text-[10px] opacity-75 capitalize">
-                        {holiday.type}
+                        {holiday.type} · {String(holiday.dayPortion || 'full_day').replace('_', ' ')}
                       </div>
                     </div>
                   )}
@@ -384,6 +387,9 @@ export default function HolidaysPage() {
                                     }`}>
                                     {holiday.type}
                                   </span>
+                                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800 capitalize">
+                                    {String(holiday.dayPortion || 'full_day').replace('_', ' ')}
+                                  </span>
                                   {holiday.locations && holiday.locations.length > 0 && (
                                     <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
                                       {holiday.locations.join(', ')}
@@ -453,6 +459,17 @@ export default function HolidaysPage() {
                   >
                     <SelectItem key="public">Public Holiday</SelectItem>
                     <SelectItem key="company">Company Holiday</SelectItem>
+                  </Select>
+
+                  <Select
+                    label="Holiday Duration"
+                    isRequired
+                    selectedKeys={formData.dayPortion ? [formData.dayPortion] : ['full_day']}
+                    onSelectionChange={(keys) => setFormData({ ...formData, dayPortion: Array.from(keys)[0] || 'full_day' })}
+                  >
+                    <SelectItem key="full_day">Full Day</SelectItem>
+                    <SelectItem key="first_half">First Half</SelectItem>
+                    <SelectItem key="second_half">Second Half</SelectItem>
                   </Select>
 
                   <Select

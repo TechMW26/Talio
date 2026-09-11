@@ -631,7 +631,7 @@ export async function POST(request) {
         isActive: true
       });
 
-      if (holiday) {
+      if (holiday && (!holiday.dayPortion || holiday.dayPortion === 'full_day')) {
         return NextResponse.json(
           { success: false, message: `Check-in is not allowed today (Holiday: ${holiday.name}).` },
           { status: 403 }

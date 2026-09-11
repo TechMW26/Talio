@@ -11,6 +11,7 @@ import { getRoleDisplayLabel } from '@/hooks/useRoles'
 const rolePermissions = {
   // Admin has access to everything
   admin: ['*'],
+  super_admin: ['*'],
 
   // HR has access to HR-related functions
   hr: [
@@ -20,6 +21,7 @@ const rolePermissions = {
     '/dashboard/employees/add',
     '/dashboard/departments',
     '/dashboard/designations',
+    '/dashboard/hierarchy',
     '/dashboard/attendance',
     '/dashboard/attendance/report',
     '/dashboard/attendance/checkins',
@@ -44,6 +46,7 @@ const rolePermissions = {
     '/dashboard/productivity',
     '/dashboard/employees', // View team members
     '/dashboard/departments', // View departments
+    '/dashboard/hierarchy',
     '/dashboard/attendance',
     '/dashboard/attendance/report',
     '/dashboard/leave/apply',
@@ -72,6 +75,7 @@ const rolePermissions = {
     '/dashboard/attendance/team',
     '/dashboard/team/members',
     '/dashboard/team/my-teams',
+    '/dashboard/hierarchy',
     '/dashboard/team/regularisation',
     '/dashboard/leave/apply',
     '/dashboard/leave/requests',
@@ -96,6 +100,7 @@ const rolePermissions = {
     '/dashboard',
     '/dashboard/productivity',
     '/dashboard/profile',
+    '/dashboard/hierarchy',
     '/dashboard/attendance',
     '/dashboard/attendance/report', // Own attendance only
     '/dashboard/leave/apply',

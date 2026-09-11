@@ -132,7 +132,7 @@ export async function DELETE(request, { params }) {
     const { user, models } = auth
     const { Interview } = models
 
-    if (!['admin', 'hr', 'manager'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr', 'manager'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
     }
 

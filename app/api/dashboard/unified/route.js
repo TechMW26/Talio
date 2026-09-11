@@ -373,7 +373,7 @@ export async function GET(request) {
 
         fetchPromises.push(
           Promise.all([
-            Employee.countDocuments({ status: 'active' }),
+            Employee.countDocuments({ status: { $in: ['active', 'probation', 'on_leave'] } }),
             Attendance.countDocuments({ date: { $gte: today, $lt: tomorrow } }),
             Attendance.countDocuments({
               date: { $gte: today, $lt: tomorrow },

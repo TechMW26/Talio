@@ -7,6 +7,7 @@ import { createMeetingInvitationNotification } from '@/lib/actionableNotificatio
 import { getEndOfDayInTimezone, getStartOfDayInTimezone, parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
 import crypto from 'crypto'
 import { generateRecurringStarts } from '@/lib/meetingRecurrence'
+import { buildMeetingReminders } from '@/lib/meetings/meetingUpdate'
 
 export const dynamic = 'force-dynamic'
 
@@ -299,7 +300,7 @@ export async function POST(request) {
       tags: data.tags || [],
       isRecurring: data.isRecurring || false,
       recurrence: data.recurrence && typeof data.recurrence === 'object' ? data.recurrence : undefined,
-      reminders: data.reminders || [{ time: new Date(startTime.getTime() - 15 * 60 * 1000), sent: false }]
+      reminders: buildMeetingReminders(data.reminders, startTime)
     })
 
     await meeting.save()
@@ -339,7 +340,7 @@ export async function POST(request) {
             seriesId,
             occurrenceIndex: index + 1,
           },
-          reminders: [{ time: new Date(occurrenceStart.getTime() - 15 * 60 * 1000), sent: false }],
+          reminders: buildMeetingReminders(data.reminders, occurrenceStart),
         })
         seriesMeetings.push(occurrence)
       }

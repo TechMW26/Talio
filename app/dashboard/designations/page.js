@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Skeleton } from '@heroui/react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
@@ -27,12 +27,12 @@ export default function DesignationsPage() {
   // Real-time updates
   const { socket, isConnected, subscribe } = useSocket()
 
-  useState(() => {
+  useEffect(() => {
     if (!socket || !isConnected) return
     const handleDesignationUpdate = () => refreshDesignations()
     const unsub = subscribe?.('designation-updated', handleDesignationUpdate)
     return () => unsub?.()
-  })
+  }, [socket, isConnected, subscribe, refreshDesignations])
 
   // --- Submit mutation (create/edit) ---
   const submitMutation = useApiMutation({

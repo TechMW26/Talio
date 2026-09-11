@@ -93,7 +93,7 @@ export async function POST(request) {
     const { user, models, tenant } = auth
     const { Holiday } = models
 
-    if (!['admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
+    if (!['admin', 'super_admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
       return NextResponse.json({ success: false, message: 'Only Admin and HR can manage holidays' }, { status: 403 })
     }
 

@@ -89,7 +89,7 @@ export async function POST(request) {
     const { Recruitment } = models;
 
     // Role check
-    if (!['admin', 'hr', 'manager'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr', 'manager'].includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'Not authorized to create job postings' },
         { status: 403 }

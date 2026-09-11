@@ -109,7 +109,7 @@ export default function InterviewsPage() {
     return () => unsub?.();
   }, [socket, isConnected]);
 
-  const canManage = user && ['admin', 'hr', 'manager'].includes(user.role);
+  const canManage = user && ['admin', 'super_admin', 'hr', 'manager'].includes(user.role);
 
   const updateFilter = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: key === 'page' ? value : 1 }));

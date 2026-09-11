@@ -80,7 +80,7 @@ export default function CandidateDetailPage() {
     return () => unsub?.();
   }, [socket, isConnected, refresh, subscribe]);
 
-  const canManage = user && ['admin', 'hr', 'manager'].includes(user.role);
+  const canManage = user && ['admin', 'super_admin', 'hr', 'manager'].includes(user.role);
 
   const stageMutation = useApiMutation({
     method: 'PUT',

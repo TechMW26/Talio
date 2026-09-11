@@ -110,24 +110,17 @@ export async function GET(request) {
     counts.tasks = taskCount
     counts.notifications = notificationCount
 
-    // For managers, department heads, HR, and admins - count pending approvals
-    // NOTE: HR users should ONLY see approvals if they're a department head (for their own department)
-    // This prevents regular HR employees from seeing all company-wide approvals - only their dept head handles their approvals
+    // For managers, department heads, HR, and admins - count pending approvals.
     const isDeptHead = userRecord?.isDepartmentHead === true
 
-    // Only admin sees company-wide counts
-    // HR users need to be department heads to see their department's counts
-    // Managers and department_head role users see their department's counts
-    const canApprove = userRole === 'admin' ||
+    const organisationReviewer = ['admin', 'super_admin', 'hr'].includes(userRole)
+    const canApprove = organisationReviewer ||
       isDeptHead ||
       (userRole === 'manager') ||
       (userRole === 'department_head')
 
     if (canApprove) {
-      // Determine if this user should have department-scoped view
-      // Only admin sees company-wide counts
-      // Everyone else (including HR who is dept head) sees only their department's counts
-      const hasDeptScopedView = userRole !== 'admin'
+      const hasDeptScopedView = !organisationReviewer
 
       // For users with department-scoped view, find departments they manage
       let departmentEmployeeIds = []
@@ -205,7 +198,7 @@ export async function GET(request) {
             console.error('Error counting expenses:', err.message)
             return 0
           }),
-        ['admin', 'hr'].includes(userRole) && companyFeatures?.helpdesk !== false
+        ['admin', 'super_admin', 'hr'].includes(userRole) && companyFeatures?.helpdesk !== false
           ? Helpdesk.countDocuments({ status: { $in: ['open', 'in-progress'] } }).catch((err) => {
             console.error('Error counting helpdesk tickets:', err.message)
             return 0

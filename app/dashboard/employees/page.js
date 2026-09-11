@@ -19,6 +19,8 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 
 // Status options with Hero UI colors
 const STATUS_OPTIONS = [
+  { value: 'current', label: 'Current Workforce', color: 'primary' },
+  { value: 'all', label: 'All Statuses', color: 'default' },
   { value: 'active', label: 'Active', color: 'success' },
   { value: 'inactive', label: 'Inactive', color: 'default' },
   { value: 'probation', label: 'Probation', color: 'primary' },
@@ -30,15 +32,14 @@ const STATUS_OPTIONS = [
 // Level options
 const LEVEL_OPTIONS = [
   { value: 1, label: 'Level 1 - Entry' },
-  { value: 2, label: 'Level 2 - Junior' },
-  { value: 3, label: 'Level 3 - Mid' },
-  { value: 4, label: 'Level 4 - Senior' },
-  { value: 5, label: 'Level 5 - Lead' },
+  { value: 2, label: 'Level 2 - Mid' },
+  { value: 3, label: 'Level 3 - Senior' },
+  { value: 4, label: 'Level 4 - Team Lead' },
+  { value: 5, label: 'Level 5 - Assistant Manager' },
   { value: 6, label: 'Level 6 - Manager' },
-  { value: 7, label: 'Level 7 - Director' },
-  { value: 8, label: 'Level 8 - VP' },
-  { value: 9, label: 'Level 9 - C-Level' },
-  { value: 10, label: 'Level 10 - Executive' },
+  { value: 7, label: 'Level 7 - C-Suite' },
+  { value: 8, label: 'Level 8 - Assistant Director' },
+  { value: 9, label: 'Level 9 - Director' },
 ]
 
 export default function EmployeesPage() {
@@ -56,7 +57,7 @@ export default function EmployeesPage() {
   const [selectedDepartment, setSelectedDepartment] = useState('')
   const [selectedDesignation, setSelectedDesignation] = useState('')
   const [selectedLevel, setSelectedLevel] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState('current')
 
   // Bulk selection states
   const [selectedEmployees, setSelectedEmployees] = useState([])
@@ -72,7 +73,7 @@ export default function EmployeesPage() {
 
   // Auth
   const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
-  const accessDenied = user ? !['admin', 'hr'].includes(user.role) : false
+  const accessDenied = user ? !['admin', 'super_admin', 'hr'].includes(user.role) : false
 
   // Real-time updates
   const { socket, isConnected, onEmployeeCreated, onEmployeeUpdated, subscribe } = useSocket()
@@ -94,7 +95,8 @@ export default function EmployeesPage() {
     if (selectedDepartment) params.set('department', selectedDepartment)
     if (selectedDesignation) params.set('designation', selectedDesignation)
     if (selectedLevel) params.set('level', selectedLevel)
-    if (selectedStatus) params.set('status', selectedStatus)
+    if (selectedStatus === 'current') params.set('status', 'active,probation,on_leave')
+    else if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus)
     return params.toString()
   }, [page, debouncedSearch, sortBy, sortOrder, selectedDepartment, selectedDesignation, selectedLevel, selectedStatus])
 
@@ -196,11 +198,11 @@ export default function EmployeesPage() {
   }
 
   const canManageEmployees = () => {
-    return user && ['admin', 'hr'].includes(user.role)
+    return user && ['admin', 'super_admin', 'hr'].includes(user.role)
   }
 
   const canViewEmployeeDetails = () => {
-    return user && ['admin', 'hr', 'manager'].includes(user.role)
+    return user && ['admin', 'super_admin', 'hr', 'manager'].includes(user.role)
   }
 
   const handleSearch = (e) => {
@@ -213,12 +215,12 @@ export default function EmployeesPage() {
     setSelectedDepartment('')
     setSelectedDesignation('')
     setSelectedLevel('')
-    setSelectedStatus('')
+    setSelectedStatus('current')
     setSearch('')
     setPage(1)
   }
 
-  const hasActiveFilters = selectedDepartment || selectedDesignation || selectedLevel || selectedStatus
+  const hasActiveFilters = selectedDepartment || selectedDesignation || selectedLevel || !['', 'current'].includes(selectedStatus)
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -316,7 +318,7 @@ export default function EmployeesPage() {
           </div>
           <h1 className="text-2xl font-bold text-default-800 mb-2">Access Denied</h1>
           <p className="text-default-500 text-center max-w-md mb-6">
-            You don't have permission to access the Employees section.
+            You don&apos;t have permission to access the Employees section.
             This page is restricted to Admin and HR users only.
           </p>
           <Button

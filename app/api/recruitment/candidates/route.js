@@ -4,7 +4,7 @@ import { logActivity } from '@/lib/activityLogger'
 import { upsertCandidate } from '@/lib/recruitmentHelpers'
 import { emitRecruitmentUpdate, emitCandidateStageChanged } from '@/lib/realtimeEvents'
 
-const ALLOWED_ROLES = ['admin', 'hr', 'manager']
+const ALLOWED_ROLES = ['admin', 'super_admin', 'hr', 'manager']
 const VALID_STAGES = ['applied', 'screening', 'shortlisted', 'interview', 'assessment', 'offer', 'hired', 'rejected', 'withdrawn']
 
 // GET - List candidates with filters & pagination

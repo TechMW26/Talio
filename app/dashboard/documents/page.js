@@ -22,8 +22,10 @@ export default function DocumentsPage() {
     } catch { return { user: null, employeeId: null } }
   }, [])
 
+  const canManageDocuments = Boolean(user && ['admin', 'super_admin', 'hr'].includes(user.role))
+
   // SWR data fetching
-  const swrKey = employeeId ? `/api/documents?employeeId=${employeeId}` : null
+  const swrKey = canManageDocuments ? '/api/documents' : employeeId ? `/api/documents?employeeId=${employeeId}` : null
   const { data: docsRes, error, isLoading, isValidating, mutate: refreshDocuments } = useAuthedSWR(swrKey)
   const documents = docsRes?.data || []
 
@@ -32,9 +34,16 @@ export default function DocumentsPage() {
   const [uploadForm, setUploadForm] = useState({
     fileName: '',
     category: '',
+    employee: '',
   })
   const [selectedFile, setSelectedFile] = useState(null)
   const fileInputRef = useRef(null)
+  const { data: employeeOptionsRes } = useAuthedSWR(
+    canManageDocuments && showModal
+      ? '/api/employees?status=active,probation,on_leave&limit=1000&sortBy=firstName&sortOrder=asc'
+      : null
+  )
+  const employeeOptions = employeeOptionsRes?.data || []
 
   // Preview modal state
   const [previewDoc, setPreviewDoc] = useState(null)
@@ -81,7 +90,7 @@ export default function DocumentsPage() {
   }
 
   const resetUploadForm = () => {
-    setUploadForm({ fileName: '', category: '' })
+    setUploadForm({ fileName: '', category: '', employee: '' })
     setSelectedFile(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -130,7 +139,7 @@ export default function DocumentsPage() {
           fileId: uploadData.data.fileId,
           fileType: uploadData.data.fileType || selectedFile.type,
           fileSize: uploadData.data.fileSize || selectedFile.size,
-          employee: employeeId,
+          employee: canManageDocuments ? uploadForm.employee || undefined : employeeId,
         }),
       })
 
@@ -182,7 +191,7 @@ export default function DocumentsPage() {
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Documents</h1>
-          <p className="text-gray-600 mt-1">Manage your documents and files <BackgroundRefreshIndicator isValidating={isValidating} /></p>
+          <p className="text-gray-600 mt-1">{canManageDocuments ? 'Manage employee and company documents' : 'Manage your documents and files'} <BackgroundRefreshIndicator isValidating={isValidating} /></p>
         </div>
         <Button
           onPress={() => setShowModal(true)}
@@ -240,6 +249,11 @@ export default function DocumentsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Category
                   </th>
+                  {canManageDocuments && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Employee
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Size
                   </th>
@@ -254,7 +268,7 @@ export default function DocumentsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {documents.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={canManageDocuments ? 6 : 5} className="px-6 py-4 text-center text-gray-500">
                       No documents found
                     </td>
                   </tr>
@@ -283,6 +297,13 @@ export default function DocumentsPage() {
                           {doc.category}
                         </span>
                       </td>
+                      {canManageDocuments && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {doc.employee
+                            ? `${doc.employee.firstName || ''} ${doc.employee.lastName || ''}`.trim() || doc.employee.employeeCode
+                            : 'Company-wide'}
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {doc.isAadhaarDocument ? '-' : formatFileSize(doc.fileSize || 0)}
                       </td>
@@ -360,6 +381,23 @@ export default function DocumentsPage() {
                     <SelectItem key="tax">Tax</SelectItem>
                     <SelectItem key="other">Other</SelectItem>
                   </Select>
+
+                  {canManageDocuments && (
+                    <Select
+                      label="Employee (optional)"
+                      description="Leave blank for a company-wide HR document"
+                      selectedKeys={uploadForm.employee ? [uploadForm.employee] : []}
+                      onSelectionChange={(keys) => setUploadForm((prev) => ({ ...prev, employee: Array.from(keys)[0] || '' }))}
+                      isDisabled={uploading}
+                      placeholder="Company-wide document"
+                    >
+                      {employeeOptions.map((employee) => (
+                        <SelectItem key={employee._id} textValue={`${employee.firstName} ${employee.lastName} ${employee.employeeCode || ''}`}>
+                          {employee.firstName} {employee.lastName}{employee.employeeCode ? ` (${employee.employeeCode})` : ''}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  )}
 
                   <div>
                     <label className="text-sm font-medium text-default-700 mb-2 block">File *</label>

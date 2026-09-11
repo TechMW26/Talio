@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { buildLinkedInStatusPayload } from '@/lib/linkedinIntegration';
 
-const ALLOWED_ROLES = ['admin', 'hr'];
+const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 export async function GET(request) {
     try {

@@ -3,7 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { logActivity } from '@/lib/activityLogger'
 import { emitInterviewUpdate } from '@/lib/realtimeEvents'
 
-const ALLOWED_ROLES = ['admin', 'hr', 'manager']
+const ALLOWED_ROLES = ['admin', 'super_admin', 'hr', 'manager']
 
 // GET - List interviews with filters & pagination
 export async function GET(request) {

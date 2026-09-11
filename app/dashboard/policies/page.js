@@ -3,13 +3,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle, FaBuilding, FaSitemap } from 'react-icons/fa'
+import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle, FaBuilding, FaSitemap, FaPaperclip, FaTimes } from 'react-icons/fa'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Textarea, Checkbox, Skeleton, Chip } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 // --- Skeleton Loader for Policies page ---
 function PoliciesSkeleton() {
@@ -60,6 +61,7 @@ export default function PoliciesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingPolicy, setEditingPolicy] = useState(null)
   const [showAckModal, setShowAckModal] = useState(false)
+  const [uploadingAttachments, setUploadingAttachments] = useState(false)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -72,10 +74,11 @@ export default function PoliciesPage() {
     applicableTo: 'all',
     companies: [],
     departments: [],
+    attachments: [],
   })
 
   const resetForm = () => {
-    setFormData({ title: '', code: '', category: '', content: '', description: '', effectiveDate: '', requiresAcknowledgment: true, applicableTo: 'all', companies: [], departments: [] })
+    setFormData({ title: '', code: '', category: '', content: '', description: '', effectiveDate: '', requiresAcknowledgment: true, applicableTo: 'all', companies: [], departments: [], attachments: [] })
   }
 
   // Real-time updates
@@ -89,7 +92,7 @@ export default function PoliciesPage() {
   const policies = policiesRes?.data || []
 
   // Fetch companies and departments for targeting
-  const isAdminOrHR = ['admin', 'hr'].includes(currentUser?.role)
+  const isAdminOrHR = ['admin', 'super_admin', 'hr'].includes(currentUser?.role)
   const { data: companiesRes } = useAuthedSWR(isAdminOrHR ? '/api/companies' : null)
   const { data: deptsRes } = useAuthedSWR(isAdminOrHR ? '/api/departments' : null)
   const companies = companiesRes?.data || companiesRes?.companies || []
@@ -165,6 +168,30 @@ export default function PoliciesPage() {
     await submitMutation.execute(url, dataToSend, { method })
   }
 
+  const handleAttachmentUpload = async (event) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!files.length) return
+    setUploadingAttachments(true)
+    try {
+      const uploaded = []
+      for (const file of files) {
+        const result = await uploadAuthenticatedFile(file, { category: 'policies' })
+        uploaded.push({
+          url: result.fileUrl || result.url,
+          fileId: result.data?.fileId || '',
+          fileName: result.data?.fileName || file.name,
+        })
+      }
+      setFormData(previous => ({ ...previous, attachments: [...previous.attachments, ...uploaded] }))
+      toast.success(`${uploaded.length} policy attachment${uploaded.length === 1 ? '' : 's'} uploaded`)
+    } catch (error) {
+      toast.error(error?.message || 'Could not upload policy attachment')
+    } finally {
+      setUploadingAttachments(false)
+    }
+  }
+
   const handleEdit = (policy) => {
     setEditingPolicy(policy)
     setFormData({
@@ -180,6 +207,11 @@ export default function PoliciesPage() {
       applicableTo: policy.applicableTo || 'all',
       companies: (policy.companies || []).map(c => c._id || c),
       departments: (policy.departments || []).map(d => d._id || d),
+      attachments: (policy.attachments || []).map(attachment => ({
+        url: attachment.url,
+        fileId: attachment.fileId || '',
+        fileName: attachment.fileName || attachment.name || 'Policy attachment',
+      })),
     })
     setShowModal(true)
   }
@@ -277,6 +309,23 @@ export default function PoliciesPage() {
                     {policy.content.substring(0, 200)}...
                   </p>
 
+                  {policy.attachments?.length > 0 && (
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      {policy.attachments.map((attachment, index) => (
+                        <a
+                          key={attachment.fileId || attachment.url || index}
+                          href={attachment.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1.5 text-sm text-primary hover:bg-primary-100"
+                        >
+                          <FaPaperclip aria-hidden="true" />
+                          {attachment.fileName || attachment.name || `Attachment ${index + 1}`}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="flex items-center flex-wrap gap-2 text-sm text-gray-500">
                     {policy.effectiveDate && (
                       <span>
@@ -302,7 +351,7 @@ export default function PoliciesPage() {
                 </div>
 
                 <div className="flex space-x-2 ml-4">
-                  {['admin', 'hr'].includes(currentUser?.role) && (
+                  {['admin', 'super_admin', 'hr'].includes(currentUser?.role) && (
                     <>
                       <button
                         onClick={() => handleEdit(policy)}
@@ -394,6 +443,48 @@ export default function PoliciesPage() {
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     placeholder="Full policy content..."
                   />
+
+                  <div className="rounded-xl border border-default-200 bg-default-50 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-default-800">Policy attachments</p>
+                        <p className="text-xs text-default-500">Upload PDFs, Word files, or supporting images (25 MB each).</p>
+                      </div>
+                      <label className="cursor-pointer rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+                        {uploadingAttachments ? 'Uploading…' : 'Upload files'}
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,.doc,.docx,image/*"
+                          className="sr-only"
+                          disabled={uploadingAttachments}
+                          onChange={handleAttachmentUpload}
+                        />
+                      </label>
+                    </div>
+                    {formData.attachments.length === 0 ? (
+                      <p className="text-sm text-default-400">No attachments added.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {formData.attachments.map((attachment, index) => (
+                          <li key={attachment.fileId || attachment.url || index} className="flex items-center justify-between gap-3 rounded-lg bg-content1 px-3 py-2">
+                            <span className="min-w-0 truncate text-sm text-default-700">{attachment.fileName}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${attachment.fileName}`}
+                              onClick={() => setFormData(previous => ({
+                                ...previous,
+                                attachments: previous.attachments.filter((_, itemIndex) => itemIndex !== index),
+                              }))}
+                              className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-full text-danger hover:bg-danger-50"
+                            >
+                              <FaTimes aria-hidden="true" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
 
                   <Checkbox
                     isSelected={formData.requiresAcknowledgment}
@@ -493,6 +584,7 @@ export default function PoliciesPage() {
                     color="primary"
                     type="submit"
                     isLoading={submitMutation.isLoading}
+                    isDisabled={uploadingAttachments}
                     loadingText={editingPolicy ? 'Updating...' : 'Creating...'}
                   >
                     {editingPolicy ? 'Update' : 'Create'}

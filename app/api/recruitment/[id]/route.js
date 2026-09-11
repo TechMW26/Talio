@@ -72,7 +72,7 @@ export async function PUT(request, { params }) {
     const { Recruitment } = models;
 
     // Role check
-    if (!['admin', 'hr', 'manager'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr', 'manager'].includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'Not authorized to update job postings' },
         { status: 403 }
@@ -135,7 +135,7 @@ export async function DELETE(request, { params }) {
     const { Recruitment, Candidate, Interview } = models;
 
     // Role check
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'Not authorized to delete job postings' },
         { status: 403 }

@@ -19,8 +19,20 @@ export async function GET(request) {
     const category = searchParams.get('category')
 
     const query = {}
+    const managerRoles = ['admin', 'super_admin', 'hr']
+    const canManageDocuments = managerRoles.includes(user.role)
+    const actorUser = await User.findById(user._id || user.userId).select('employeeId').lean()
+    const actorEmployeeId = actorUser?.employeeId || user.employeeId
 
-    if (employeeId) {
+    if (!canManageDocuments) {
+      if (!actorEmployeeId) {
+        return NextResponse.json({ success: true, data: [] })
+      }
+      query.employee = actorEmployeeId
+    } else if (employeeId) {
+      if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+        return NextResponse.json({ success: false, message: 'Invalid employee id' }, { status: 400 })
+      }
       query.employee = employeeId
     }
 
@@ -129,7 +141,7 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Document, User, Employee } = models
 
     let data = await request.json()
@@ -148,14 +160,27 @@ export async function POST(request) {
       )
     }
 
+    const managerRoles = ['admin', 'super_admin', 'hr']
+    const canManageDocuments = managerRoles.includes(user.role)
     const actorUser = await User.findById(auth.user._id || auth.user.userId).select('employeeId').lean()
     const actorEmployee = actorUser?.employeeId
       ? await Employee.findById(actorUser.employeeId).select('_id').lean()
       : await Employee.findOne({ userId: auth.user._id || auth.user.userId }).select('_id').lean()
-    if (!actorEmployee?._id) {
+    if (!actorEmployee?._id && !canManageDocuments) {
       return NextResponse.json({ success: false, message: 'Uploader employee profile not found' }, { status: 400 })
     }
-    data.uploadedBy = actorEmployee._id
+
+    if (!canManageDocuments) {
+      data.employee = actorEmployee._id
+    }
+    if (data.employee && !mongoose.Types.ObjectId.isValid(String(data.employee))) {
+      return NextResponse.json({ success: false, message: 'Invalid employee id' }, { status: 400 })
+    }
+    if (data.employee && !(await Employee.exists({ _id: data.employee }))) {
+      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    }
+    data.uploadedBy = actorEmployee?._id
+    data.isCompanyDocument = canManageDocuments && !data.employee
 
     const document = await Document.create(data)
 

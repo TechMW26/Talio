@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
         }
         const { user, models } = auth
 
-        if (!hasRole(user, ['admin'])) {
+        if (!hasRole(user, ['admin', 'super_admin'])) {
             return NextResponse.json(
                 { success: false, message: 'Only admins can view role details' },
                 { status: 403 }
@@ -64,7 +64,7 @@ export async function PUT(request, { params }) {
         }
         const { user, models, tenant } = auth
 
-        if (!hasRole(user, ['admin'])) {
+        if (!hasRole(user, ['admin', 'super_admin'])) {
             return NextResponse.json(
                 { success: false, message: 'Only admins can update roles' },
                 { status: 403 }
@@ -177,7 +177,7 @@ export async function DELETE(request, { params }) {
         }
         const { user, models, tenant } = auth
 
-        if (!hasRole(user, ['admin'])) {
+        if (!hasRole(user, ['admin', 'super_admin'])) {
             return NextResponse.json(
                 { success: false, message: 'Only admins can delete roles' },
                 { status: 403 }

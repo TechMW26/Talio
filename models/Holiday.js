@@ -14,6 +14,11 @@ const HolidaySchema = new mongoose.Schema({
     enum: ['public', 'company'],
     default: 'public',
   },
+  dayPortion: {
+    type: String,
+    enum: ['full_day', 'first_half', 'second_half'],
+    default: 'full_day',
+  },
   description: {
     type: String,
   },

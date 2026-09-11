@@ -6,6 +6,7 @@ import { sanitizeHolidayPayload } from '@/lib/holidayPolicy'
 // GET - Get single holiday
 export async function GET(request, { params }) {
   try {
+    const { id } = await params
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Holiday'])
     if (!auth.success) {
@@ -14,7 +15,7 @@ export async function GET(request, { params }) {
     const { user, models } = auth
     const { Holiday } = models
 
-    const holiday = await Holiday.findById(params.id)
+    const holiday = await Holiday.findById(id)
 
     if (!holiday) {
       return NextResponse.json(
@@ -39,6 +40,7 @@ export async function GET(request, { params }) {
 // PUT - Update holiday
 export async function PUT(request, { params }) {
   try {
+    const { id } = await params
     const auth = await getAuthAndModels(request, ['Holiday'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
@@ -46,11 +48,11 @@ export async function PUT(request, { params }) {
     const { user, models, tenant } = auth
     const { Holiday } = models
 
-    if (!['admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
+    if (!['admin', 'super_admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
       return NextResponse.json({ success: false, message: 'Only Admin and HR can manage holidays' }, { status: 403 })
     }
 
-    const existingHoliday = await Holiday.findById(params.id).lean()
+    const existingHoliday = await Holiday.findById(id).lean()
     if (!existingHoliday) {
       return NextResponse.json({ success: false, message: 'Holiday not found' }, { status: 404 })
     }
@@ -63,7 +65,7 @@ export async function PUT(request, { params }) {
     }
 
     const holiday = await Holiday.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true, runValidators: true }
     )
@@ -101,6 +103,7 @@ export async function PUT(request, { params }) {
 // DELETE - Delete holiday
 export async function DELETE(request, { params }) {
   try {
+    const { id } = await params
     const auth = await getAuthAndModels(request, ['Holiday'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
@@ -108,11 +111,11 @@ export async function DELETE(request, { params }) {
     const { user, models, tenant } = auth
     const { Holiday } = models
 
-    if (!['admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
+    if (!['admin', 'super_admin', 'hr'].includes(String(user.role || '').toLowerCase())) {
       return NextResponse.json({ success: false, message: 'Only Admin and HR can manage holidays' }, { status: 403 })
     }
 
-    const holiday = await Holiday.findByIdAndDelete(params.id)
+    const holiday = await Holiday.findByIdAndDelete(id)
 
     if (!holiday) {
       return NextResponse.json(

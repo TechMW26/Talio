@@ -30,7 +30,7 @@ export async function GET(request) {
       .sort({ createdAt: -1 })
 
     // For non-admin/hr users, filter to only show applicable policies
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
       const employee = await Employee.findById(user.employeeId || user._id).select('company department departments')
       if (employee) {
         const empCompany = employee.company?.toString()

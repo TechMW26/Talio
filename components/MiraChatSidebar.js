@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaChevronLeft, FaRegTrashAlt, FaCopy, FaCheck, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb } from 'react-icons/fa'
+import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaChevronLeft, FaRegTrashAlt, FaCopy, FaCheck, FaDownload, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { useMiraChat } from '@/contexts/MiraChatContext'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -28,6 +28,39 @@ function CopyButton({ text, className = '' }) {
       } ${className}`}
     >
       {copied ? <><FaCheck className="w-2.5 h-2.5" /> Copied</> : <><FaCopy className="w-2.5 h-2.5" /> Copy</>}
+    </button>
+  )
+}
+
+function ExportButton({ message, className = '' }) {
+  const handleExport = useCallback(() => {
+    const report = [
+      '# MIRA report',
+      '',
+      message.message || '',
+      ...(message.cards?.length
+        ? ['', '## Report data', '', '```json', JSON.stringify(message.cards, null, 2), '```']
+        : []),
+      '',
+      `Exported from Talio on ${new Date().toLocaleString()}`,
+    ].join('\n')
+    const blobUrl = URL.createObjectURL(new Blob([report], { type: 'text/markdown;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = `mira-report-${new Date().toISOString().slice(0, 10)}.md`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(blobUrl)
+  }, [message])
+
+  return (
+    <button
+      onClick={handleExport}
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-default-200/80 text-default-500 hover:bg-default-300 dark:bg-white/10 dark:hover:bg-white/15 dark:text-default-400 transition-all ${className}`}
+      title="Export this MIRA report"
+    >
+      <FaDownload className="w-2.5 h-2.5" /> Export
     </button>
   )
 }
@@ -342,9 +375,10 @@ function MessageBubble({ message, onSuggestionClick }) {
               {data.message}
             </ReactMarkdown>
           </div>
-          {/* Copy message button */}
+          {/* Report actions */}
           {showCopy && (
-            <div className="absolute -bottom-2 right-2">
+            <div className="absolute -bottom-2 right-2 flex items-center gap-1">
+              <ExportButton message={data} className="shadow-sm" />
               <CopyButton text={data.message} className="shadow-sm" />
             </div>
           )}
