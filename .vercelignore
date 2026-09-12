@@ -1,6 +1,7 @@
 .git
 .next
 .next-dev
+.next-dev-next
 node_modules
 coverage
 desktop-app

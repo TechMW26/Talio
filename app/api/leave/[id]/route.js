@@ -208,7 +208,8 @@ export async function PUT(request, { params }) {
             leaveType: leaveTypeName,
             startDate,
             endDate,
-            approvedBy: approvedBy
+            approvedBy: approvedBy,
+            models,
           })
         } else if (status === 'rejected') {
           await sendLeaveRejectedNotification({
@@ -218,7 +219,8 @@ export async function PUT(request, { params }) {
             startDate,
             endDate,
             rejectedBy: approvedBy,
-            reason: rejectionReason
+            reason: rejectionReason,
+            models,
           })
         }
 

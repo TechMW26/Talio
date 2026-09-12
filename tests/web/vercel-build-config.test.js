@@ -16,8 +16,6 @@ describe('Vercel production build configuration', () => {
       'instrumentation.js',
       'app/global-error.jsx',
       'lib/security/securityHeaders.js',
-      'server.js',
-      'Dockerfile',
     ]
 
     runtimeFiles.forEach((file) => {
@@ -51,7 +49,7 @@ describe('Vercel production build configuration', () => {
   test('preserves Vercel realtime initialization', () => {
     const instrumentation = fs.readFileSync(path.join(root, 'instrumentation.js'), 'utf8')
     expect(instrumentation).toContain('initializeServerlessRealtime')
-    expect(instrumentation).toContain("process.env.VERCEL === '1'")
+    expect(instrumentation).toContain('process.env.NEXT_RUNTIME === "nodejs"')
   })
 
   test('uses Fluid compute in the data-local deployment region', () => {

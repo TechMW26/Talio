@@ -115,18 +115,14 @@ export async function GET(request) {
       const tenantResult = await checkProfileDeadlinesForTenant(tenant, now)
       allResults.tenantResults.push(tenantResult)
       allResults.totalOverdue += tenantResult.overdue
+      if (tenantResult.overdue > 0) {
+        global.io?.to(`tenant:${tenant.databaseName}`).emit('users:profile-overdue', {
+          count: tenantResult.overdue, reason: 'profile_incomplete', timestamp: now,
+        })
+      }
     }
 
     console.log(`[Profile Deadline Check] Completed. Total overdue (NOT deactivated): ${allResults.totalOverdue}`)
-
-    // Emit Socket.IO event if available (for dashboard awareness, not deactivation)
-    if (global.io && allResults.totalOverdue > 0) {
-      global.io.emit('users:profile-overdue', {
-        count: allResults.totalOverdue,
-        reason: 'profile_incomplete',
-        timestamp: now
-      })
-    }
 
     return NextResponse.json({
       success: true,

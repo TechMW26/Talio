@@ -6,11 +6,11 @@
     "node": ">=20 <23"
   },
   "scripts": {
-    "dev": "cross-env TZ=Asia/Kolkata NODE_ENV=development NODE_OPTIONS=--max-old-space-size=6144 NEXT_DISABLE_REACT_DEV_OVERLAY=1 NEXT_DIST_DIR=.next-dev NEXT_ASSET_PREFIX=/__talio_dev_assets node server.js",
+    "dev": "cross-env TZ=Asia/Kolkata NODE_ENV=development NEXT_DIST_DIR=.next-dev-next next dev",
     "dev:next": "cross-env TZ=Asia/Kolkata NODE_ENV=development NEXT_DIST_DIR=.next-dev-next next dev",
     "build": "cross-env TZ=Asia/Kolkata NODE_OPTIONS=--max-old-space-size=6144 SKIP_ENV_VALIDATION=true next build",
     "vercel-build": "cross-env TZ=Asia/Kolkata NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=6144 NEXT_BUILD_CPUS=4 SKIP_ENV_VALIDATION=true next build",
-    "start": "cross-env TZ=Asia/Kolkata node server.js",
+    "start": "cross-env TZ=Asia/Kolkata next start",
     "start:next": "cross-env TZ=Asia/Kolkata next start",
     "lint": "next lint",
     "seed": "node scripts/seed.js",
@@ -58,7 +58,6 @@
     "mongodb": "^7.0.0",
     "mongoose": "^8.9.3",
     "next": "~15.5.12",
-    "node-schedule": "^2.1.1",
     "nodemailer": "^9.0.6",
     "pusher": "^5.3.2",
     "pusher-js": "^8.4.0",
@@ -70,8 +69,6 @@
     "recharts": "^2.14.1",
     "redis": "^4.6.13",
     "sharp": "^0.35.4",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
     "swr": "^2.3.8",
     "web-push": "^3.6.7"
   },
@@ -90,7 +87,9 @@
     "mongodb-memory-server": "^11.0.1",
     "postcss": "^8.5.23",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
   },
   "overrides": {
     "postcss": "$postcss",

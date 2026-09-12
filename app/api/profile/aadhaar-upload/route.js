@@ -128,17 +128,8 @@ export async function POST(request) {
       console.error('[Aadhaar Upload] ❌ GridFS upload failed:', gridfsError.message)
     }
 
-    // Fallback: Local file storage
     if (!fileUrl) {
-      const firstName = (employee?.firstName || '').replace(/[^a-zA-Z0-9]/g, '')
-      const lastName = (employee?.lastName || '').replace(/[^a-zA-Z0-9]/g, '')
-      const employeeFolderName = `${firstName}${lastName}-${employeeCode}`
-      const uploadDir = path.join(process.cwd(), 'uploads', 'aadhaar', employeeFolderName)
-      await fs.mkdir(uploadDir, { recursive: true })
-
-      const filePath = path.join(uploadDir, filename)
-      await fs.writeFile(filePath, imageBuffer)
-      fileUrl = `/uploads/aadhaar/${employeeFolderName}/${filename}`
+      return NextResponse.json({ success: false, message: 'Document storage is unavailable. Please retry.' }, { status: 503 })
     }
 
     // Update user's Aadhaar document status

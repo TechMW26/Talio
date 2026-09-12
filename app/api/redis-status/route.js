@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
+import { verifySuperAdmin } from '@/lib/superadminAuth'
 import {
     getCache,
     setCache,
@@ -16,6 +18,9 @@ export const dynamic = 'force-dynamic'
  * Only accessible by admin users (or via internal token).
  */
 export async function GET(request) {
+    const auth = await getAuthAndModels(request, [])
+    if (!auth.success) return NextResponse.json({ ok: false, message: auth.message }, { status: 401 })
+    if (!['admin', 'hr'].includes(auth.user.role)) return NextResponse.json({ ok: false, message: 'Forbidden' }, { status: 403 })
     try {
         // Run a live round-trip test
         const testKey = `redis:health:test:${Date.now()}`
@@ -76,6 +81,9 @@ export async function GET(request) {
  * Body: { action: 'reset' } - resets the Redis connection state and forces a reconnect.
  */
 export async function POST(request) {
+    // Maintenance affects the shared Redis service, not just one organisation.
+    const auth = await verifySuperAdmin(request)
+    if (!auth.success) return NextResponse.json({ ok: false, message: auth.message }, { status: 401 })
     try {
         const body = await request.json().catch(() => ({}))
 

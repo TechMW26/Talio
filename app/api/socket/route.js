@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
+import { isPusherRealtimeConfigured } from '@/lib/platform/realtimeChannels'
 
 export const dynamic = 'force-dynamic'
 
-// This is a placeholder route for Socket.IO
-// The actual Socket.IO server is initialized in server.js
 export async function GET() {
+  const configured = isPusherRealtimeConfigured()
   return NextResponse.json({
-    message: 'Socket.IO endpoint - connect via client',
-    path: '/api/socketio'
-  })
+    provider: 'pusher',
+    configured,
+    authorizationEndpoint: '/api/realtime/auth',
+  }, { status: configured ? 200 : 503 })
 }
 

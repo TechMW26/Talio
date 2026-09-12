@@ -7,12 +7,12 @@ describe('managed meeting implementation', () => {
   const source = fs.readFileSync(path.join(process.cwd(), 'components/meetings/ManagedMeetingRoomSession.js'), 'utf8')
   const signedInSelector = fs.readFileSync(path.join(process.cwd(), 'contexts/MeetingSessionContext.js'), 'utf8')
   const guestSelector = fs.readFileSync(path.join(process.cwd(), 'app/join/[guestLink]/room/page.js'), 'utf8')
-  const legacySource = fs.readFileSync(path.join(process.cwd(), 'components/meetings/MeetingRoomSession.js'), 'utf8')
   const reactionPickerSource = fs.readFileSync(path.join(process.cwd(), 'components/meetings/MeetingReactionPicker.js'), 'utf8')
 
   test('uses the Vercel-compatible managed transport by default for employees and guests', () => {
     for (const selector of [signedInSelector, guestSelector]) {
-      expect(selector).toContain('usesManagedMeetingTransport()')
+      expect(selector).toContain('ManagedMeetingRoomSession')
+      expect(selector).not.toContain("import('@/components/meetings/MeetingRoomSession')")
       expect(selector).not.toContain("NEXT_PUBLIC_MEETING_TRANSPORT === 'livekit'")
     }
   })
@@ -109,10 +109,6 @@ describe('managed meeting implementation', () => {
     expect(source).not.toContain('!publishedKinds.has(Track.Kind.Audio)')
     expect(source).not.toContain('!publishedKinds.has(Track.Kind.Video)')
 
-    expect(legacySource).toContain("const [isMuted, setIsMuted] = useState(true)")
-    expect(legacySource).toContain("const [isVideoOff, setIsVideoOff] = useState(true)")
-    expect(legacySource).toContain('Only an explicitly-created preview stream may publish devices')
-    expect(legacySource).not.toContain('cameraPreviewStartedRef')
   })
 
   test('keeps compact and expanded picture-in-picture layouts collision free', () => {
@@ -128,14 +124,11 @@ describe('managed meeting implementation', () => {
 
   test('renders the reaction picker above every meeting and PiP stacking context', () => {
     expect(source).toContain("import MeetingReactionPicker")
-    expect(legacySource).toContain("import MeetingReactionPicker")
     expect(source).toContain('<MeetingReactionPicker')
-    expect(legacySource).toContain('<MeetingReactionPicker')
     expect(reactionPickerSource).toContain('Popover')
     expect(reactionPickerSource).toContain("base: 'z-[220]'")
     expect(reactionPickerSource).toContain('data-meeting-reaction-picker')
     expect(source).toContain('bottom-10 left-1/2 z-30')
-    expect(legacySource).toContain('bottom-10 z-30')
     expect(source).not.toContain('absolute bottom-14 left-1/2 z-40')
   })
 })

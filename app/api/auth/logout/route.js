@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
-import { enqueueAnalysis, getQueueStatus } from '@/lib/productivityQueue';
+import { enqueueAnalysis } from '@/lib/productivityQueue';
 
 /**
  * POST /api/auth/logout
@@ -42,7 +42,7 @@ export async function POST(request) {
 
                 console.log(`[Logout] User ${userId} has ${sessionIds.length} un-analyzed sessions. Enqueuing for background analysis...`);
 
-                const result = enqueueAnalysis({
+                const result = await enqueueAnalysis({
                     databaseName,
                     userId,
                     sessionIds,

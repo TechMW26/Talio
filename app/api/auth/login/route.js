@@ -55,7 +55,7 @@ export async function POST(request) {
   //    accounts also throttles).
   if (securityChecksAvailable) {
     try {
-      const ipRl = rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, {
+      const ipRl = await rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, {
         ip: ipAddress,
         path: '/api/auth/login',
         method: 'POST',
@@ -90,7 +90,7 @@ export async function POST(request) {
     // Per-(IP+email) rate limit: tighter quota on a single account.
     if (securityChecksAvailable) {
       try {
-        const pairRl = rateLimit('AUTH_LOGIN', `pair:${ipAddress}:${email}`, {
+        const pairRl = await rateLimit('AUTH_LOGIN', `pair:${ipAddress}:${email}`, {
           ip: ipAddress,
           path: '/api/auth/login',
           method: 'POST',
@@ -292,7 +292,7 @@ export async function POST(request) {
         // Heuristic: if the IP-scoped rate-limit bucket is heavy too, block IP.
         // Use rateLimit to inspect (don't double-record).
         try {
-          const ipPressure = rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, { record: false, ip: ipAddress })
+          const ipPressure = await rateLimit('AUTH_LOGIN', `ip:${ipAddress}`, { record: false, ip: ipAddress })
           if (ipPressure.hits >= IP_AUTOBLOCK_AFTER_LOCKOUTS * MAX_FAILED_ATTEMPTS) {
             blockIp(ipAddress, {
               reason: 'Repeated brute-force lockouts',

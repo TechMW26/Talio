@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
+import { saveMeetingAudio, readMeetingAudio, deleteMeetingAudio, validateAudioSegment } from '@/lib/platform/meetingAudio.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,17 +14,18 @@ export async function POST(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Meeting, Employee, User } = models
 
     const formData = await request.formData();
     const audioFile = formData.get('audio');
     const duration = parseFloat(formData.get('duration') || '0');
 
-    if (!audioFile) {
+    const audioError = validateAudioSegment(audioFile, duration)
+    if (audioError) {
       return NextResponse.json({ 
         success: false, 
-        message: 'No audio file provided' 
+        message: audioError
       }, { status: 400 });
     }
 
@@ -73,19 +73,10 @@ export async function POST(request, { params }) {
       }, { status: 403 })
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'meetings', id.toString())
-    await mkdir(uploadsDir, { recursive: true })
-
-    // Save audio file
-    const timestamp = Date.now()
-    const fileName = `audio-${employee._id}-${timestamp}.webm`
-    const filePath = path.join(uploadsDir, fileName)
-    
-    const buffer = Buffer.from(await audioFile.arrayBuffer())
-    await writeFile(filePath, buffer)
-
-    const audioUrl = `/uploads/meetings/${id}/${fileName}`
+    const fileId = await saveMeetingAudio({
+      databaseName: tenant.databaseName, meetingId: id, employeeId: employee._id, file: audioFile,
+    })
+    const audioUrl = `/api/meetings/${id}/audio?segment=${fileId}`
 
     // Add to offline audio segments
     if (!meeting.offlineAudio) {
@@ -99,7 +90,12 @@ export async function POST(request, { params }) {
       uploadedAt: new Date()
     })
 
-    await meeting.save()
+    try {
+      await meeting.save()
+    } catch (error) {
+      await deleteMeetingAudio(tenant.databaseName, fileId).catch(() => {})
+      throw error
+    }
 
     return NextResponse.json({
       success: true,
@@ -179,5 +175,37 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('Update audio consent error:', error)
     return NextResponse.json({ success: false, message: error.message }, { status: 500 })
+  }
+}
+
+
+// Private delivery requires membership in this meeting as well as the tenant.
+export async function GET(request, { params }) {
+  const auth = await getAuthAndModels(request, ['Meeting', 'User', 'Employee'])
+  if (!auth.success) return new NextResponse('Unauthorized', { status: 401 })
+  const { id } = await params
+  const segment = new URL(request.url).searchParams.get('segment')
+  try {
+    const userId = auth.user._id || auth.user.userId
+    const user = await auth.models.User.findById(userId).select('employeeId').lean()
+    const employee = user?.employeeId
+      ? { _id: user.employeeId }
+      : await auth.models.Employee.findOne({ userId }).select('_id').lean()
+    const meeting = await auth.models.Meeting.findById(id).select('organizer invitees offlineAudio').lean()
+    if (!meeting || !employee) return new NextResponse('Not found', { status: 404 })
+    const member = String(meeting.organizer) === String(employee._id)
+      || (meeting.invitees || []).some(invitee => String(invitee.employee) === String(employee._id))
+    if (!member) return new NextResponse('Forbidden', { status: 403 })
+    const result = await readMeetingAudio(auth.tenant.databaseName, id, segment)
+    if (!result) return new NextResponse('Not found', { status: 404 })
+    return new NextResponse(result.stream, { headers: {
+      'Content-Type': result.file.metadata.contentType,
+      'Content-Length': String(result.file.length),
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    } })
+  } catch (error) {
+    console.error('[MeetingAudio] Read failed:', error.message)
+    return new NextResponse('Audio unavailable', { status: 500 })
   }
 }

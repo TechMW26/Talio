@@ -158,7 +158,8 @@ export async function POST(request) {
           policyId: policy._id.toString(),
           title: policy.title,
           targetUserIds,
-          createdBy: creatorUserId
+          createdBy: creatorUserId,
+          models,
         })
 
         console.log(`Firebase policy notification sent to ${targetUserIds.length} user(s)`)

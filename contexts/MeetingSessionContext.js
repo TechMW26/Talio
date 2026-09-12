@@ -4,18 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
-import { usesManagedMeetingTransport } from '@/lib/meetings/transport'
 
 const MeetingSessionContext = createContext(null)
 const ROOM_PATH_PATTERN = /^\/dashboard\/meetings\/room\/([^/]+)/
 const ACTIVE_MEETING_STORAGE_KEY = 'talio:active-meeting-session:v1'
 const ACTIVE_MEETING_MAX_AGE_MS = 24 * 60 * 60 * 1000
 const PIP_SIZES = new Set(['expanded', 'compact', 'bubble'])
-const useManagedMeetings = usesManagedMeetingTransport()
 const MeetingRoomSession = dynamic(
-  () => useManagedMeetings
-    ? import('@/components/meetings/ManagedMeetingRoomSession')
-    : import('@/components/meetings/MeetingRoomSession'),
+  () => import('@/components/meetings/ManagedMeetingRoomSession'),
   {
     ssr: false,
     loading: () => (

@@ -5,7 +5,6 @@ import { uploadImage, deleteImage } from '@/lib/gridfs'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import path from 'path'
 import fs from 'fs/promises'
-import { existsSync } from 'fs'
 
 export const dynamic = 'force-dynamic'
 
@@ -158,19 +157,8 @@ export async function POST(request) {
             console.error('[Profile Picture] ❌ GridFS upload failed:', gridfsError.message)
         }
 
-        // Fallback: Local file storage
         if (!fileUrl) {
-            const firstName = (employee?.firstName || '').replace(/[^a-zA-Z0-9]/g, '')
-            const lastName = (employee?.lastName || '').replace(/[^a-zA-Z0-9]/g, '')
-            const employeeFolderName = `${firstName}${lastName}-${employeeCode}`
-            const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'profiles', employeeFolderName)
-            if (!existsSync(uploadDir)) {
-                await fs.mkdir(uploadDir, { recursive: true })
-            }
-
-            const filePath = path.join(uploadDir, filename)
-            await fs.writeFile(filePath, optimizedBuffer)
-            fileUrl = `/uploads/profiles/${employeeFolderName}/${filename}`
+            return NextResponse.json({ success: false, message: 'Image storage is unavailable. Please retry.' }, { status: 503 })
         }
 
         // Get old profile picture info for cleanup

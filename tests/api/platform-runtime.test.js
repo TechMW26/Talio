@@ -60,6 +60,9 @@ describe('Vercel readiness', () => {
     expect(getVercelReadiness({ ...complete, NEXT_PUBLIC_MEETING_TRANSPORT: 'socket' }).invalid)
       .toContainEqual(expect.objectContaining({ capability: 'managed meetings' }))
   })
+  test('accepts existing GridFS storage without an unused Blob credential', () => {
+    expect(getVercelReadiness({ ...complete, BLOB_READ_WRITE_TOKEN: '' }).ready).toBe(true)
+  })
 })
 
 describe('tenant Blob path construction', () => {

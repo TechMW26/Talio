@@ -7,7 +7,7 @@ describe('dashboard performance boundaries', () => {
   const layoutSource = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/layout.js'), 'utf8')
   const transitionCss = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')
   const transitionContext = fs.readFileSync(path.join(process.cwd(), 'contexts/PageTransitionContext.js'), 'utf8')
-  const serverSource = fs.readFileSync(path.join(process.cwd(), 'server.js'), 'utf8')
+  const packageJson = require('../../package.json')
   const draggableWidgetSource = fs.readFileSync(path.join(process.cwd(), 'components/dashboard/DraggableWidget.js'), 'utf8')
   const customizableDashboardSource = fs.readFileSync(path.join(process.cwd(), 'components/dashboard/CustomizableDashboard.js'), 'utf8')
   const unifiedDashboardSource = fs.readFileSync(path.join(process.cwd(), 'components/dashboards/UnifiedDashboard.js'), 'utf8')
@@ -55,10 +55,11 @@ describe('dashboard performance boundaries', () => {
     expect(transitionContext).toContain('e.ctrlKey')
   })
 
-  test('keeps production schedulers out of the default development process', () => {
-    expect(serverSource).toContain("process.env.ENABLE_BACKGROUND_JOBS === 'true'")
-    expect(serverSource).toContain("!dev && process.env.ENABLE_BACKGROUND_JOBS !== 'false'")
-    expect(serverSource).toContain('if (backgroundJobsEnabled)')
+  test('uses the same Next.js runtime in development and production', () => {
+    expect(packageJson.scripts.dev).toContain('next dev')
+    expect(packageJson.scripts.start).toContain('next start')
+    expect(packageJson.dependencies['node-schedule']).toBeUndefined()
+    expect(packageJson.dependencies['socket.io']).toBeUndefined()
   })
 
   test('does not schedule React rerenders for widget entrance or hover effects', () => {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { checkAndTriggerNotifications } from '@/lib/attendanceNotificationScheduler'
+import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,23 +10,8 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request) {
   try {
-    // Verify internal call or admin token
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = request.headers.get('x-cron-secret')
-    
-    // Allow internal calls from server.js or calls with valid CRON_SECRET
-    const isInternalCall = cronSecret === 'internal'
-    const isValidCronSecret = process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET
-    
-    if (!isInternalCall && !isValidCronSecret) {
-      // For external calls, verify admin token
-      if (!authHeader) {
-        return NextResponse.json(
-          { success: false, message: 'Unauthorized' },
-          { status: 401 }
-        )
-      }
-    }
+    const authError = getCronAuthErrorResponse(request)
+    if (authError) return authError
 
     const result = await checkAndTriggerNotifications()
 

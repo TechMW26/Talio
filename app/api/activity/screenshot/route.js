@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import mongoose from 'mongoose';
@@ -11,18 +10,6 @@ import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-
-/**
- * Ensure directory exists
- */
-async function ensureDirectory(dirPath) {
-  try {
-    await access(dirPath, constants.W_OK);
-  } catch {
-    await mkdir(dirPath, { recursive: true, mode: 0o755 });
-    console.log(`[Screenshot] Created directory: ${dirPath}`);
-  }
-}
 
 /**
  * POST /api/activity/screenshot
@@ -186,12 +173,7 @@ export async function POST(request) {
       });
     }
 
-    // Generate employee folder name for filesystem fallback
-    const firstName = (employee?.firstName || '').replace(/[^a-zA-Z0-9]/g, '');
-    const lastName = (employee?.lastName || '').replace(/[^a-zA-Z0-9]/g, '');
-    const employeeFolderName = `${firstName}${lastName}-${employeeCode}`;
-
-    let publicPath = '';
+    const publicPath = '';
     let gridfsResult = null;
 
     // === GRIDFS STORAGE (primary - for long-term storage & AI analysis) ===
@@ -213,16 +195,8 @@ export async function POST(request) {
       console.error('[Screenshot] ❌ GridFS upload failed:', gridfsError.message);
     }
 
-    // === FALLBACK: FILESYSTEM STORAGE (for dashboard display) ===
     if (!gridfsResult) {
-      const activityDir = path.join(process.cwd(), 'public', 'activity', employeeFolderName, dateString);
-      await ensureDirectory(activityDir);
-
-      const filePath = path.join(activityDir, filename);
-      await writeFile(filePath, buffer);
-
-      publicPath = `/activity/${employeeFolderName}/${dateString}/${filename}`;
-      console.log(`[Screenshot] Saved to filesystem: ${publicPath}`);
+      return NextResponse.json({ success: false, message: 'Screenshot storage is unavailable. Please retry.' }, { status: 503 });
     }
 
     // === DATABASE RECORD ===

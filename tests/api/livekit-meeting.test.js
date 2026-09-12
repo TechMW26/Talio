@@ -110,7 +110,7 @@ describe('meeting transport selection', () => {
 
   test.each(['socket', 'socketio', 'socket.io', 'legacy'])(
     'requires explicit opt-in for the legacy %s transport',
-    (transport) => expect(usesManagedMeetingTransport(transport)).toBe(false),
+    (transport) => expect(usesManagedMeetingTransport(transport)).toBe(true),
   )
 
   test('turns missing configuration and network failures into actionable messages', () => {

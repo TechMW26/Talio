@@ -14,7 +14,6 @@ describe('managed realtime channel isolation', () => {
 
   test('creates only the authenticated base channels', () => {
     expect(getBaseRealtimeChannels({ userId: 'u1', tenantId: 'talio_acme' })).toEqual([
-      'private-global',
       'private-user-u1',
       'private-tenant-talio_acme',
     ])

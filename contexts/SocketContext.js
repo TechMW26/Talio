@@ -97,26 +97,12 @@ export function SocketProvider({ children }) {
       }
     }
 
-    // Initialize Socket.IO connection
-    // Use window.location.origin to connect to the same server
+    // Managed Pusher connection; no local WebSocket endpoint is required
     const socketInstance = createRealtimeClient({
-      origin: window.location.origin,
       token,
       userId,
       employeeId,
       tenantId: tenantDatabaseName,
-      socketOptions: {
-        path: '/api/socketio',
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionDelay: 2000,
-        reconnectionDelayMax: 10000,
-        reconnectionAttempts: 3,
-        timeout: 10000,
-        autoConnect: true,
-        forceNew: false,
-        auth: token ? { token } : undefined,
-      },
     })
 
     // =============================================

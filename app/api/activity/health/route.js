@@ -1,34 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
-import { mkdir, access, constants } from 'fs/promises';
-import path from 'path';
 import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
-
-/**
- * Ensure user activity folder exists
- */
-async function ensureUserActivityFolder(userId) {
-  const activityDir = path.join(process.cwd(), 'public', 'activity', userId);
-  
-  try {
-    await access(activityDir, constants.W_OK);
-    return { exists: true, path: activityDir };
-  } catch {
-    try {
-      await mkdir(activityDir, { recursive: true, mode: 0o755 });
-      console.log(`[Health] Created activity folder for user ${userId}`);
-      return { exists: true, path: activityDir, created: true };
-    } catch (error) {
-      console.error(`[Health] Failed to create folder for ${userId}:`, error.message);
-      return { exists: false, error: error.message };
-    }
-  }
-}
 
 /**
  * GET /api/activity/health
  * Health check endpoint for desktop app
- * Also ensures user activity folder exists
+ * Validates tenant authentication without touching the deployment filesystem
  */
 export async function GET(request) {
   try {
@@ -54,8 +31,6 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    // Ensure user's activity folder exists
-    const folderResult = await ensureUserActivityFolder(userId.toString());
 
     return NextResponse.json({
       success: true,
@@ -65,7 +40,7 @@ export async function GET(request) {
       role: userRole,
       captureEnabled: !isScreenCaptureProtectedRole(userRole),
       database: 'connected',
-      activityFolder: folderResult,
+      storage: { provider: 'mongodb-gridfs', persistentFilesystemRequired: false },
       server: {
         uptime: process.uptime(),
         memory: process.memoryUsage().heapUsed,
