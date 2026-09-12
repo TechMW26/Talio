@@ -127,58 +127,54 @@ export async function GET(request) {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    // Get departments (filtered for department heads)
-    let departmentQuery = {};
+    // Fetch the independent population, attendance and presence datasets in
+    // parallel. This route used to serialize four full database round-trips.
+    const departmentQuery = {};
     if (allowedDepartmentIds && allowedDepartmentIds.length > 0) {
       // Convert to ObjectId strings for comparison
       departmentQuery._id = { $in: allowedDepartmentIds.map(id => id.toString()) };
     }
-    const departments = await Department.find(departmentQuery).select('_id name').lean();
-    const departmentMap = new Map(departments.map(d => [d._id.toString(), d.name]));
-    
+
+    const presenceByUserId = global.presenceByUserId || new Map();
+    const hasSocketPresence = presenceByUserId.size > 0;
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+
+    const [departments, users, todayAttendance, activePresences] = await Promise.all([
+      Department.find(departmentQuery).select('_id name').lean(),
+      User.find({ isActive: true })
+        .select('_id email role lastLogin employeeId isActive')
+        .populate({
+          path: 'employeeId',
+          select: 'firstName lastName profilePicture department designation status',
+          populate: [
+            { path: 'department', select: 'name' },
+            { path: 'designation', select: 'title' }
+          ]
+        })
+        .lean(),
+      Attendance.find({
+        date: { $gte: todayStart, $lt: todayEnd },
+        checkIn: { $exists: true, $ne: null }
+      }).select('employee checkIn checkOut status').lean(),
+      hasSocketPresence
+        ? Promise.resolve([])
+        : UserPresence.find(
+            { lastHeartbeat: { $gte: twoMinutesAgo } },
+            { userId: 1 }
+          ).lean(),
+    ]);
+
     // Create a Set of allowed department IDs for faster lookup
     const allowedDeptSet = allowedDepartmentIds ? new Set(allowedDepartmentIds.map(id => id.toString())) : null;
 
-    // Get all active users with their employee info
-    const users = await User.find({ isActive: true })
-      .select('_id email role lastLogin employeeId isActive')
-      .populate({
-        path: 'employeeId',
-        select: 'firstName lastName profilePicture department designation status',
-        populate: [
-          { path: 'department', select: 'name' },
-          { path: 'designation', select: 'title' }
-        ]
-      })
-      .lean();
-
-    // Get today's attendance records
-    // Note: Attendance model uses 'employee' field, not 'employeeId'
-    const todayAttendance = await Attendance.find({
-      date: { $gte: todayStart, $lt: todayEnd },
-      checkIn: { $exists: true, $ne: null }
-    }).select('employee checkIn checkOut status').lean();
-
-    const checkedInEmployeeIds = new Set(
-      todayAttendance.map(a => a.employee?.toString()).filter(Boolean)
+    const attendanceByEmployeeId = new Map(
+      todayAttendance
+        .filter(attendance => attendance.employee)
+        .map(attendance => [attendance.employee.toString(), attendance])
     );
 
-    // Get active users from socket presence (real-time connection tracking)
-    // In serverless mode, global.presenceByUserId is always empty,
-    // so fall back to DB-backed heartbeat presence (UserPresence collection).
-    const presenceByUserId = global.presenceByUserId || new Map();
-    const hasSocketPresence = presenceByUserId.size > 0;
-
     // DB-backed presence: users with a heartbeat in the last 2 minutes are "active"
-    let dbActiveUserIds = new Set();
-    if (!hasSocketPresence) {
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-      const activePresences = await UserPresence.find(
-        { lastHeartbeat: { $gte: twoMinutesAgo } },
-        { userId: 1 }
-      ).lean();
-      dbActiveUserIds = new Set(activePresences.map(p => p.userId));
-    }
+    const dbActiveUserIds = new Set(activePresences.map(p => p.userId));
 
     // Helper function to check if a user is currently active
     const isUserActiveNow = (userId) => {
@@ -225,14 +221,14 @@ export async function GET(request) {
         departmentName: employee.department?.name || 'No Department',
         designation: employee.designation?.title || 'No Designation',
         status: employee.status || 'unknown',
-        isCheckedIn: checkedInEmployeeIds.has(employeeId),
+        isCheckedIn: attendanceByEmployeeId.has(employeeId),
         checkInTime: null,
         checkOutTime: null,
         attendanceStatus: null,
       };
 
       // Add attendance info if checked in
-      const attendance = todayAttendance.find(a => a.employee?.toString() === employeeId);
+      const attendance = attendanceByEmployeeId.get(employeeId);
       if (attendance) {
         userData.checkInTime = attendance.checkIn;
         userData.checkOutTime = attendance.checkOut;
@@ -258,32 +254,38 @@ export async function GET(request) {
       }
     }
 
-    // Group by department
+    // Group in one pass. The previous repeated Array#filter calls were O(D*N)
+    // and became visible once organisations exceeded 100 employees.
     const byDepartment = {};
     for (const dept of departments) {
       byDepartment[dept._id.toString()] = {
         id: dept._id.toString(),
         name: dept.name,
-        users: allUsers.filter(u => u.departmentId === dept._id.toString()),
-        loggedInCount: loggedInToday.filter(u => u.departmentId === dept._id.toString()).length,
-        checkedInCount: checkedInToday.filter(u => u.departmentId === dept._id.toString()).length,
-        activeCount: activeNow.filter(u => u.departmentId === dept._id.toString()).length,
+        users: [],
+        loggedInCount: 0,
+        checkedInCount: 0,
+        activeCount: 0,
       };
     }
 
-    // Add "No Department" group (only for admin/HR who see all)
-    if (!allowedDepartmentIds) {
-      const noDeptUsers = allUsers.filter(u => !u.departmentId);
-      if (noDeptUsers.length > 0) {
-        byDepartment['none'] = {
+    for (const liveUser of allUsers) {
+      const groupKey = liveUser.departmentId || 'none';
+      if (!byDepartment[groupKey] && groupKey === 'none' && !allowedDepartmentIds) {
+        byDepartment.none = {
           id: 'none',
           name: 'No Department',
-          users: noDeptUsers,
-          loggedInCount: loggedInToday.filter(u => !u.departmentId).length,
-          checkedInCount: checkedInToday.filter(u => !u.departmentId).length,
-          activeCount: activeNow.filter(u => !u.departmentId).length,
+          users: [],
+          loggedInCount: 0,
+          checkedInCount: 0,
+          activeCount: 0,
         };
       }
+      const group = byDepartment[groupKey];
+      if (!group) continue;
+      group.users.push(liveUser);
+      if (liveUser.lastLogin && new Date(liveUser.lastLogin) >= todayStart) group.loggedInCount++;
+      if (liveUser.isCheckedIn) group.checkedInCount++;
+      if (liveUser.isActiveNow) group.activeCount++;
     }
 
     return NextResponse.json({

@@ -70,8 +70,8 @@ export default function ProjectsPage() {
   // --- SWR Data Fetching (replaces manual fetch + setInterval) ---
   const swrKey = `/api/projects?status=${statusFilter}`
   const { data: projectsRes, error, isLoading, isValidating, mutate: refreshProjects } = useAuthedSWR(swrKey, {
-    refreshInterval: 30000, // Refresh every 30s instead of 10s (reduces load)
-    revalidateOnFocus: true,
+    refreshInterval: 0,
+    revalidateOnFocus: false,
   })
   const projects = projectsRes?.data || []
 

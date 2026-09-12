@@ -7,7 +7,7 @@ import { Skeleton } from '@heroui/react'
 export default function AttendanceSummaryWidget({ employeeId }) {
   const { data, error, isLoading } = useAuthedSWR(
     employeeId ? `/api/attendance/summary?employeeId=${employeeId}` : null,
-    { refreshInterval: 120_000 }
+    { refreshInterval: 0 }
   )
 
   const summary = data?.data

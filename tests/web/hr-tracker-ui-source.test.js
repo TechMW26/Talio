@@ -52,4 +52,13 @@ describe('HR tracker UI regressions', () => {
     expect(source).toContain('mira-report-')
     expect(source).toContain('Export this MIRA report')
   })
+
+  test('organogram keeps a visible viewport and never degrades to a blank canvas', () => {
+    const source = read('app/dashboard/hierarchy/page.js')
+    expect(source).toContain('className="hierarchy-viewport"')
+    expect(source).toContain('height: calc(100dvh - 108px)')
+    expect(source).toContain('Unable to load the organogram')
+    expect(source).toContain('No employees to display yet')
+    expect(source).toContain('onClick={() => mutate()}')
+  })
 })

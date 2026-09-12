@@ -76,8 +76,8 @@ export default function ApprovalsPage() {
   const approvalKey = `/api/projects/approvals?${approvalParams.toString()}`
 
   const { data: approvalsRes, isLoading: loading } = useAuthedSWR(approvalKey, {
-    refreshInterval: 10000, // auto-refresh every 10s
-    revalidateOnFocus: true,
+    refreshInterval: 0,
+    revalidateOnFocus: false,
     keepPreviousData: true,
   })
   const requests = approvalsRes?.data || []

@@ -59,7 +59,7 @@ export default function GeofencingPage() {
   })()
   const { data: logsRes, error, isLoading, isValidating, mutate: refreshLogs } = useAuthedSWR(
     `/api/geofence/log${params}`,
-    { refreshInterval: 30000 }
+    { refreshInterval: 0 }
   )
   const logs = logsRes?.data || []
   const pendingRequests = useMemo(() =>

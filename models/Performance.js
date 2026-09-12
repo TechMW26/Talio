@@ -86,5 +86,8 @@ const PerformanceSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+PerformanceSchema.index({ employee: 1, createdAt: -1 });
+PerformanceSchema.index({ employee: 1, isActive: 1, createdAt: -1 });
+
 export default mongoose.models.Performance || mongoose.model('Performance', PerformanceSchema);
 

@@ -120,13 +120,9 @@ export async function GET(request) {
     const recentActivityStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     let [
       onLeaveToday,
-      absentToday,
-      lateToday,
-      presentToday,
-      inProgressToday,
+      todayAttendanceRows,
       underperforming,
       pendingLeaveApprovals,
-      teamAttendanceToday,
       teamPerformance,
       recentLeaves,
       recentReviews,
@@ -138,18 +134,7 @@ export async function GET(request) {
         startDate: { $lte: today }, endDate: { $gte: today }
       }).select('employee status startDate endDate leaveType createdAt').lean(),
       Attendance.find({
-        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd }, status: 'absent'
-      }).select('employee status date checkIn').lean(),
-      Attendance.find({
-        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd }, status: 'late'
-      }).select('employee status date checkIn').lean(),
-      Attendance.find({
-        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd },
-        status: { $in: ['present', 'half-day'] }, checkIn: { $exists: true, $ne: null }
-      }).select('employee status date checkIn').lean(),
-      Attendance.find({
-        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd },
-        status: 'in-progress', checkIn: { $exists: true, $ne: null }
+        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd }
       }).select('employee status date checkIn').lean(),
       Performance.find({
         employee: { $in: teamMemberIds }, overallRating: { $lt: 3 }, isActive: true
@@ -157,10 +142,6 @@ export async function GET(request) {
       Leave.find({
         employee: { $in: teamMemberIds }, status: 'pending'
       }).select('employee status startDate endDate leaveType createdAt').lean(),
-      Attendance.aggregate([
-        { $match: { employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd } } },
-        { $group: { _id: '$status', count: { $sum: 1 } } }
-      ]),
       Performance.aggregate([
         { $match: { employee: { $in: teamMemberIds }, isActive: true } },
         {
@@ -197,19 +178,28 @@ export async function GET(request) {
       ]),
     ])
 
-    const attendanceSummary = {
-      present: 0,
-      absent: 0,
-      late: 0,
-      halfDay: 0
-    }
+    // One indexed attendance read powers every today card and list. Previously
+    // this endpoint scanned the same team/day range six times.
+    let absentToday = todayAttendanceRows.filter(item => item.status === 'absent')
+    let lateToday = todayAttendanceRows.filter(item => item.status === 'late')
+    let presentToday = todayAttendanceRows.filter(item =>
+      ['present', 'half-day'].includes(item.status) && item.checkIn
+    )
+    let inProgressToday = todayAttendanceRows.filter(item =>
+      item.status === 'in-progress' && item.checkIn
+    )
 
-    teamAttendanceToday.forEach(item => {
-      if (item._id === 'present') attendanceSummary.present = item.count
-      else if (item._id === 'absent') attendanceSummary.absent = item.count
-      else if (item._id === 'late') attendanceSummary.late = item.count
-      else if (item._id === 'half-day') attendanceSummary.halfDay = item.count
-    })
+    const attendanceCountByStatus = todayAttendanceRows.reduce((counts, item) => {
+      counts[item.status] = (counts[item.status] || 0) + 1
+      return counts
+    }, {})
+
+    const attendanceSummary = {
+      present: attendanceCountByStatus.present || 0,
+      absent: attendanceCountByStatus.absent || 0,
+      late: attendanceCountByStatus.late || 0,
+      halfDay: attendanceCountByStatus['half-day'] || 0
+    }
 
     const performanceStats = teamPerformance[0] || {
       averageRating: 0,

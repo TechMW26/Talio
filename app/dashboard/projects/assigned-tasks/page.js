@@ -169,7 +169,7 @@ export default function AssignedTasksPage() {
 
   const { data: tasksData, error: tasksError, isLoading: loading, mutate: mutateTasks } = useAuthedSWR(
     `/api/projects/assigned-tasks?${tasksQueryString}`,
-    { refreshInterval: 10000 }
+    { refreshInterval: 0 }
   )
 
   const tasks = tasksData?.data || []

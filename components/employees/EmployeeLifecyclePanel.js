@@ -22,8 +22,8 @@ function formatIstDate(value) {
 
 export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }) {
   const { data, isLoading, mutate } = useAuthedSWR(employeeId ? `/api/employees/${employeeId}/lifecycle` : null, {
-    revalidateOnFocus: true,
-    refreshInterval: 30000,
+    revalidateOnFocus: false,
+    refreshInterval: 0,
   })
   const details = data?.data
   const lifecycle = details?.lifecycle

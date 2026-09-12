@@ -50,8 +50,8 @@ export async function GET(request) {
     // Get authenticated user and tenant-specific models
     // Only load models that are actually queried in this route
     const auth = await getAuthAndModels(request, [
-      'Attendance', 'LeaveBalance', 'LeaveType', 'Leave',
-      'Employee', 'Department', 'User',
+      'Attendance', 'LeaveBalance', 'Leave',
+      'Employee', 'Department',
       'Holiday', 'Announcement', 'Asset', 'Expense', 'Ticket', 'Policy',
       'CompanySettings', 'Company'
     ])
@@ -62,8 +62,8 @@ export async function GET(request) {
 
     const { user, models, tenant } = auth
     const {
-      Attendance, LeaveBalance, LeaveType, Leave,
-      Employee, Department, User,
+      Attendance, LeaveBalance, Leave,
+      Employee, Department,
       Holiday, Announcement, Asset, Expense, Ticket, Policy,
       CompanySettings, Company
     } = models
@@ -88,7 +88,8 @@ export async function GET(request) {
       return NextResponse.json(cached)
     }
 
-    const [featurePayload, userWithEmployee] = await Promise.all([
+    const authEmployeeId = user.employeeId?._id || user.employeeId
+    const [featurePayload, employee] = await Promise.all([
       getTenantCompanyFeaturePayload({
         companySlug: tenant?.companySlug,
         databaseName: tenant?.databaseName,
@@ -96,21 +97,19 @@ export async function GET(request) {
         console.error('[Dashboard Unified API] Failed to resolve company features:', featureError)
         return null
       }),
-      User.findById(user._id || user.userId)
-        .populate({
-          path: 'employeeId',
-          select: 'firstName lastName employeeCode designation department company profilePicture status email phone dateOfJoining employmentType reportingManager _id',
-          populate: [
+      authEmployeeId
+        ? Employee.findById(authEmployeeId)
+          .select('firstName lastName employeeCode designation department company profilePicture status email phone dateOfJoining employmentType reportingManager _id')
+          .populate([
             { path: 'designation', select: 'title' },
             { path: 'department', select: 'name' },
             { path: 'reportingManager', select: 'firstName lastName' }
-          ]
-        })
-        .lean(),
+          ])
+          .lean()
+        : Promise.resolve(null),
     ])
 
     const companyFeatures = featurePayload?.features || null
-    const employee = userWithEmployee?.employeeId
     const employeeId = employee?._id
 
     // Initialize response object

@@ -89,3 +89,6 @@ uploads/aadhaar/
 
 # Local pitch documents
 /Pitch Docs/
+.vercel
+.env*
+.next-dev-next/

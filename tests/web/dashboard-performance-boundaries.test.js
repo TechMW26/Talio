@@ -17,6 +17,12 @@ describe('dashboard performance boundaries', () => {
   const authedSwrSource = fs.readFileSync(path.join(process.cwd(), 'hooks/useAuthedSWR.js'), 'utf8')
   const authSource = fs.readFileSync(path.join(process.cwd(), 'lib/auth.js'), 'utf8')
   const companyFeatureServerSource = fs.readFileSync(path.join(process.cwd(), 'lib/companyFeatures.server.js'), 'utf8')
+  const clientDataSyncSource = fs.readFileSync(path.join(process.cwd(), 'lib/clientDataSync.js'), 'utf8')
+  const socketContextSource = fs.readFileSync(path.join(process.cwd(), 'contexts/SocketContext.js'), 'utf8')
+  const employeeStatsSource = fs.readFileSync(path.join(process.cwd(), 'app/api/dashboard/employee-stats/route.js'), 'utf8')
+  const liveUsersSource = fs.readFileSync(path.join(process.cwd(), 'app/api/admin/live-users/route.js'), 'utf8')
+  const managerStatsSource = fs.readFileSync(path.join(process.cwd(), 'app/api/dashboard/manager-stats/route.js'), 'utf8')
+  const cacheSource = fs.readFileSync(path.join(process.cwd(), 'lib/cache.js'), 'utf8')
 
   test('does not bundle route skeletons into the persistent dashboard shell', () => {
     expect(layoutSource).not.toContain("@/components/ui/PageSkeletons")
@@ -74,6 +80,8 @@ describe('dashboard performance boundaries', () => {
     expect(companyFeatureServerSource).toContain('void setCache(cacheKey, response, 300)')
     expect(authSource).not.toContain('await setCache(authCacheKey')
     expect(companyFeatureServerSource).not.toContain('await setCache(cacheKey, response, 300)')
+    expect(cacheSource).toContain('waitUntil(remoteWrite)')
+    expect(cacheSource).toContain("process.env.VERCEL === '1'")
   })
 
   test('defers offscreen widget work until it approaches the viewport', () => {
@@ -92,6 +100,43 @@ describe('dashboard performance boundaries', () => {
   test('deduplicates feature refreshes and respects socket-only realtime data', () => {
     expect(companyFeaturesSource).toContain('FEATURE_CACHE_TTL_MS')
     expect(companyFeaturesSource).toContain('inFlightRefreshRef.current')
-    expect(authedSwrSource).toContain('options.refreshInterval ?? 30000')
+    expect(authedSwrSource).toContain('options.refreshInterval ?? 0')
+    expect(authedSwrSource).toContain('dedupingInterval: 5000')
+    expect(clientDataSyncSource).toContain('REVALIDATION_DEBOUNCE_MS = 250')
+    expect(clientDataSyncSource).not.toContain('scheduleApiRevalidation(mutate, scopes)')
+    expect(socketContextSource).toContain('}, 60000) // Rare fallback only')
+  })
+
+  test('keeps editable dashboard views free of interval polling', () => {
+    const eventDrivenViews = [
+      'app/dashboard/admin/live-users/page.js',
+      'app/dashboard/projects/page.js',
+      'app/dashboard/projects/approvals/page.js',
+      'app/dashboard/projects/my-tasks/page.js',
+      'app/dashboard/projects/assigned-tasks/page.js',
+      'app/dashboard/projects/[projectId]/page.js',
+      'app/dashboard/team/geofencing/page.js',
+      'components/employees/EmployeeLifecyclePanel.js',
+      'components/widgets/AttendanceSummaryWidget.js',
+      'components/widgets/EmployeeDirectoryWidget.js',
+      'components/widgets/LeaveBalanceWidget.js',
+    ]
+
+    for (const file of eventDrivenViews) {
+      const source = fs.readFileSync(path.join(process.cwd(), file), 'utf8')
+      expect(source).not.toMatch(/refreshInterval:\s*(?!0\b)\d+/)
+    }
+  })
+
+  test('batches high-frequency dashboard database work', () => {
+    expect((employeeStatsSource.match(/Attendance\.find\(/g) || []).length).toBe(1)
+    expect(employeeStatsSource).toContain('attendanceWindow')
+    expect(employeeStatsSource).toContain('] = await Promise.all([')
+    expect(liveUsersSource).toContain('attendanceByEmployeeId')
+    expect(liveUsersSource).not.toContain('todayAttendance.find(')
+    expect(liveUsersSource).not.toContain('allUsers.filter(')
+    expect((managerStatsSource.match(/Attendance\.find\(/g) || []).length).toBe(1)
+    expect(managerStatsSource).toContain('todayAttendanceRows')
+    expect(managerStatsSource).toContain('attendanceCountByStatus')
   })
 })

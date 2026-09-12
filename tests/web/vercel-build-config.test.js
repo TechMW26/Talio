@@ -4,6 +4,7 @@ import path from 'path'
 const root = process.cwd()
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const nextConfig = require(path.join(root, 'next.config.js'))
+const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'))
 
 describe('Vercel production build configuration', () => {
   test('keeps Sentry out of runtime and build dependencies', () => {
@@ -51,5 +52,17 @@ describe('Vercel production build configuration', () => {
     const instrumentation = fs.readFileSync(path.join(root, 'instrumentation.js'), 'utf8')
     expect(instrumentation).toContain('initializeServerlessRealtime')
     expect(instrumentation).toContain("process.env.VERCEL === '1'")
+  })
+
+  test('uses Fluid compute in the data-local deployment region', () => {
+    expect(vercelConfig.fluid).toBe(true)
+    expect(vercelConfig.regions).toEqual(['bom1'])
+  })
+
+  test('documents encrypted, fail-fast Redis settings', () => {
+    const envExample = fs.readFileSync(path.join(root, '.env.example'), 'utf8')
+    expect(envExample).toContain('REDIS_URL=rediss://')
+    expect(envExample).toContain('REDIS_OPERATION_TIMEOUT_MS=200')
+    expect(envExample).toContain('REDIS_CONNECT_TIMEOUT_MS=3000')
   })
 })

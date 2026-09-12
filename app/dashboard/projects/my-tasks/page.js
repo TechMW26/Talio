@@ -178,7 +178,7 @@ export default function MyTasksPage() {
 
   const { data: tasksData, error: tasksError, isLoading: loading, mutate: mutateTasks } = useAuthedSWR(
     `/api/projects/my-tasks?${tasksQueryString}`,
-    { refreshInterval: 10000 }
+    { refreshInterval: 0 }
   )
 
   // Sync SWR data to local state (for TaskCard optimistic updates)

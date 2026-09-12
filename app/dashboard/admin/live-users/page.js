@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Button, Skeleton } from '@heroui/react'
 import { useSocket } from '@/contexts/SocketContext'
 import toast from '@/utils/toast'
@@ -24,18 +24,34 @@ import {
 } from 'react-icons/hi2'
 
 export default function LiveUsersPage() {
-  const { isConnected } = useSocket()
+  const { isConnected, onPresenceUpdate } = useSocket()
   const [activeTab, setActiveTab] = useState('checkedIn')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('')
   const [expandedDepartments, setExpandedDepartments] = useState({})
   const [selectedUsers, setSelectedUsers] = useState([])
 
-  // SWR: fetch live users data (auto-refresh every 30s)
+  // SWR: event-driven live users data. Realtime presence events replace the
+  // old 30-second polling loop that refetched the full employee population.
   const { data: result, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(
     '/api/admin/live-users',
-    { refreshInterval: 30000 }
+    { refreshInterval: 0 }
   )
+  const presenceRefreshTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (!isConnected || !onPresenceUpdate) return undefined
+
+    const unsubscribe = onPresenceUpdate(() => {
+      if (presenceRefreshTimerRef.current) clearTimeout(presenceRefreshTimerRef.current)
+      presenceRefreshTimerRef.current = setTimeout(() => refresh(), 500)
+    })
+
+    return () => {
+      unsubscribe?.()
+      if (presenceRefreshTimerRef.current) clearTimeout(presenceRefreshTimerRef.current)
+    }
+  }, [isConnected, onPresenceUpdate, refresh])
 
   // Derive data from SWR response
   const data = useMemo(() => {

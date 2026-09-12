@@ -10,7 +10,7 @@ export default function EmployeeDirectoryWidget() {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const { data, error, isLoading } = useAuthedSWR('/api/employees?limit=20&status=active', {
-    refreshInterval: 300_000,
+    refreshInterval: 0,
   })
 
   const employees = data?.data || []

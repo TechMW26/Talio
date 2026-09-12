@@ -109,8 +109,9 @@ export default function useAuthedSWR(key, options = {}) {
     // Stale-while-revalidate: show cached data immediately
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
-    // Keep deduping short so post-mutation revalidation happens immediately.
-    dedupingInterval: 2000,
+    // Coalesce duplicate mounts and realtime bursts. Explicit mutate calls are
+    // still immediate, so this does not delay post-mutation updates.
+    dedupingInterval: 5000,
     // Don't retry on error by default (we have retry in fetcher)
     shouldRetryOnError: false,
     // Keep previous data while loading new data (prevents flashing)
@@ -146,11 +147,12 @@ export function useAuthedSWRStatic(key, options = {}) {
  */
 export function useAuthedSWRRealtime(key, options = {}) {
   return useSWR(key, authedFetcher, {
-    revalidateOnFocus: true,
+    revalidateOnFocus: false,
     revalidateOnReconnect: true,
-    // Respect an explicit 0 so socket-driven screens can disable polling.
-    refreshInterval: options.refreshInterval ?? 30000,
-    dedupingInterval: 1000,
+    // Realtime screens are event-driven. Callers may opt into polling only for
+    // protocols that require a liveness check (for example meeting sessions).
+    refreshInterval: options.refreshInterval ?? 0,
+    dedupingInterval: 5000,
     shouldRetryOnError: true,
     keepPreviousData: true,
     ...options,

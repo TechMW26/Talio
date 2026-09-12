@@ -118,8 +118,8 @@ export function Providers({ children }) {
                             // Stale-while-revalidate: show cached data immediately
                             revalidateOnFocus: false,
                             revalidateOnReconnect: true,
-                            // Keep deduping short so mutation-triggered revalidations are not delayed.
-                            dedupingInterval: 2000,
+                            // Collapse duplicate mounts and realtime event bursts.
+                            dedupingInterval: 5000,
                             // Retry on error with backoff
                             shouldRetryOnError: true,
                             errorRetryInterval: 5000,

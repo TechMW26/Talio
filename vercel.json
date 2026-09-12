@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
+  "fluid": true,
   "regions": ["bom1"],
   "functions": {
     "app/api/queues/webhooks/route.js": {

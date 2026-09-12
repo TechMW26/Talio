@@ -478,7 +478,7 @@ function OrgCard({
 export default function HierarchyPage() {
   const router = useRouter();
   const { isDarkMode } = useTheme();
-  const { data, mutate } = useAuthedSWR('/api/hierarchy/tree');
+  const { data, error, isLoading, mutate } = useAuthedSWR('/api/hierarchy/tree');
   const { onEmployeeUpdated, onEmployeeCreated } = useSocket();
 
   useEffect(() => {
@@ -730,20 +730,34 @@ export default function HierarchyPage() {
     return `M ${fx} ${fy} C ${fx} ${mid}, ${tx2} ${mid}, ${tx2} ${ty2}`;
   }
 
-  const loading = !data;
+  const loading = isLoading && !data;
+  const isEmpty = !loading && !error && totalEmployees === 0;
 
   return (
     <>
       <style>{`
         @keyframes pulseRing { 0%,100%{opacity:0.5;transform:scale(1)} 50%{opacity:0.9;transform:scale(1.03)} }
         @keyframes spin { to { transform: rotate(360deg) } }
+
+        .hierarchy-viewport {
+          height: calc(100dvh - 108px);
+          min-height: 480px;
+        }
+
+        @media (max-width: 639px) {
+          .hierarchy-viewport {
+            height: calc(100dvh - 132px);
+            min-height: 360px;
+          }
+        }
       `}</style>
 
       <div
         ref={vpRef}
+        className="hierarchy-viewport"
         style={{
-          position: 'absolute',
-          inset: 0,
+          position: 'relative',
+          width: '100%',
           overflow: 'hidden',
           background: isDarkMode ? '#000000' : '#ffffff',
           userSelect: 'none',
@@ -757,6 +771,84 @@ export default function HierarchyPage() {
         {loading && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
             <div style={{ width: 38, height: 38, border: '3px solid #10b981', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        )}
+
+        {!loading && error && (
+          <div
+            role="alert"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 50,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+            }}
+          >
+            <div
+              style={{
+                width: 'min(440px, 100%)',
+                padding: 24,
+                borderRadius: 18,
+                textAlign: 'center',
+                background: isDarkMode ? 'rgba(15,23,42,0.94)' : 'rgba(255,255,255,0.96)',
+                border: `1px solid ${isDarkMode ? 'rgba(248,113,113,0.38)' : 'rgba(220,38,38,0.2)'}`,
+                boxShadow: '0 18px 48px rgba(0,0,0,0.22)',
+              }}
+            >
+              <div style={{ color: isDarkMode ? '#f8fafc' : '#0f172a', fontSize: 18, fontWeight: 800 }}>
+                Unable to load the organogram
+              </div>
+              <div style={{ marginTop: 8, color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 13, lineHeight: 1.5 }}>
+                {error.message || 'The hierarchy data could not be loaded. Please try again.'}
+              </div>
+              <button
+                type="button"
+                onClick={() => mutate()}
+                style={{
+                  marginTop: 18,
+                  height: 38,
+                  padding: '0 18px',
+                  border: 0,
+                  borderRadius: 11,
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isEmpty && (
+          <div
+            role="status"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 30,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              textAlign: 'center',
+            }}
+          >
+            <div>
+              <div style={{ color: isDarkMode ? '#f8fafc' : '#0f172a', fontSize: 18, fontWeight: 800 }}>
+                No employees to display yet
+              </div>
+              <div style={{ marginTop: 8, fontSize: 13 }}>
+                Add an active employee or complete their hierarchy assignment to build the organogram.
+              </div>
+            </div>
           </div>
         )}
 

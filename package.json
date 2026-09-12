@@ -16,6 +16,7 @@
     "seed": "node scripts/seed.js",
     "migrate:designation-levels": "node scripts/migrate-designation-levels.js",
     "migrate:hrms-workflows": "node scripts/migrate-hrms-workflow-kernel.js",
+    "migrate:performance-indexes": "node scripts/migrate-performance-indexes.js",
     "attendance:bridge": "node scripts/talio-attendance-bridge.mjs",
     "test": "jest",
     "test:watch": "jest --watch",

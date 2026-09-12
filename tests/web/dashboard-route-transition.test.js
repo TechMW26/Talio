@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import DashboardRouteTransition from '@/components/ui/DashboardRouteTransition'
 
+const fs = require('fs')
+const path = require('path')
+
 let mockIsNavigating = false
 let mockPathname = '/dashboard'
 
@@ -46,5 +49,12 @@ describe('DashboardRouteTransition', () => {
     expect(container.querySelector('.dashboard-route-scan')).toBeInTheDocument()
     expect(screen.getByText('Current route remains visible')).toBeInTheDocument()
   })
-})
 
+  test('releases the 3D compositor layer after the route-entry animation', () => {
+    const css = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')
+    const routeAnimation = css.match(/@keyframes dashboard-route-enter[\s\S]*?(?=@keyframes dashboard-route-scan)/)?.[0]
+
+    expect(routeAnimation).toContain('100% {')
+    expect(routeAnimation).toContain('transform: none;')
+  })
+})

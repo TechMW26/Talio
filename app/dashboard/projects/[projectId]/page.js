@@ -107,13 +107,13 @@ export default function ProjectDetailPage() {
   // SWR hooks for data fetching (replaces manual fetch + auto-refresh)
   const { data: projectData, error: projectError, isLoading: loading, mutate: mutateProject } = useAuthedSWR(
     projectId ? `/api/projects/${projectId}` : null,
-    { refreshInterval: 10000 }
+    { refreshInterval: 0 }
   )
   const project = projectData?.data || null
 
   const { data: tasksData, mutate: mutateTasks } = useAuthedSWR(
     projectId ? `/api/projects/${projectId}/tasks?month=${taskMonth}&year=${taskYear}` : null,
-    { refreshInterval: 10000 }
+    { refreshInterval: 0 }
   )
 
   const [tasks, setTasks] = useState([])
@@ -121,20 +121,20 @@ export default function ProjectDetailPage() {
 
   const { data: timelineData, error: timelineErrorSWR, isLoading: timelineLoading, mutate: mutateTimeline } = useAuthedSWR(
     activeTab === 'timeline' ? `/api/projects/${projectId}/timeline` : null,
-    { refreshInterval: 10000 }
+    { refreshInterval: 0 }
   )
   const timeline = timelineData?.data || []
   const timelineError = timelineErrorSWR ? 'Failed to load activity. Please try again.' : null
 
   const { data: notesData, mutate: mutateNotes } = useAuthedSWR(
     activeTab === 'notes' ? `/api/projects/${projectId}/notes` : null,
-    { refreshInterval: 10000 }
+    { refreshInterval: 0 }
   )
   const notes = notesData?.data || []
 
   const { data: completionData, mutate: mutateCompletionStatus } = useAuthedSWR(
     projectId ? `/api/projects/${projectId}/complete` : null,
-    { refreshInterval: 10000 }
+    { refreshInterval: 0 }
   )
   const completionStatus = completionData?.data || {
     canComplete: false,

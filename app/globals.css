@@ -172,7 +172,10 @@ html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-20
   100% {
     opacity: 1;
     filter: blur(0) saturate(1);
-    transform: perspective(1100px) translate3d(0, 0, 0) scale(1);
+    /* Release the temporary 3D compositing layer after the transition. A
+       persistent perspective transform prevents nested canvases such as the
+       organogram from being painted by some Chromium/GPU combinations. */
+    transform: none;
   }
 }
 

@@ -134,6 +134,7 @@ export function SocketProvider({ children }) {
 
       console.log('🔄 [Socket.IO Client] Socket.IO unavailable - starting refresh polling fallback')
       refreshPollTimer = setInterval(async () => {
+        if (document.hidden || !navigator.onLine) return
         try {
           const res = await fetch('/api/user/check-refresh', {
             headers: { 'Authorization': `Bearer ${token}` },
@@ -148,7 +149,7 @@ export function SocketProvider({ children }) {
         } catch {
           // Silently ignore polling errors
         }
-      }, 15000) // Poll every 15 seconds
+      }, 60000) // Rare fallback only; normal updates use managed realtime
     }
 
     const stopRefreshPolling = () => {
