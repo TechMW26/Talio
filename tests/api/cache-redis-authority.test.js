@@ -61,4 +61,14 @@ describe('distributed cache authority', () => {
 
     await expect(cache.getCache('shared-key')).resolves.toBeNull()
   })
+
+  test('allows an internal health probe to ignore caller cache-bypass headers', async () => {
+    const { headers } = await import('next/headers')
+    headers.mockResolvedValueOnce(new Headers({ 'cache-control': 'no-store' }))
+    mockRedisClient.get.mockResolvedValueOnce(JSON.stringify({ ok: true }))
+
+    await expect(
+      cache.getCache('redis-health-probe', { respectRequestBypass: false })
+    ).resolves.toEqual({ ok: true })
+  })
 })

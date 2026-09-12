@@ -32,11 +32,13 @@ export async function GET(request) {
             await setCache(testKey, testValue, 10) // TTL = 10 s
             writeOk = true
 
-            const got = await getCache(testKey)
+            // A caller may explicitly bypass response caches while checking
+            // health. The diagnostic read itself must still exercise Redis.
+            const got = await getCache(testKey, { respectRequestBypass: false })
             readOk = got?.ping === 'pong'
 
             await deleteCache(testKey)
-            const gone = await getCache(testKey)
+            const gone = await getCache(testKey, { respectRequestBypass: false })
             deleteOk = gone === null
 
             roundTripMs = Date.now() - t0
