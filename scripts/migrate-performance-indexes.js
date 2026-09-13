@@ -12,6 +12,10 @@ const dryRun = process.env.DRY_RUN !== 'false'
 const mongoUri = process.env.MONGODB_URI
 
 const INDEXES = Object.freeze({
+  employees: [
+    { key: { createdAt: -1, _id: -1 }, name: 'createdAt_-1__id_-1' },
+    { key: { status: 1, createdAt: -1, _id: -1 }, name: 'status_1_createdAt_-1__id_-1' },
+  ],
   attendances: [
     { key: { date: 1, status: 1 }, name: 'date_1_status_1' },
     { key: { employee: 1, date: -1 }, name: 'employee_1_date_-1' },
@@ -26,13 +30,13 @@ async function ensureTenantIndexes(connection) {
   let created = 0
   for (const [collectionName, definitions] of Object.entries(INDEXES)) {
     const collection = connection.collection(collectionName)
-    const existing = new Set(
-      (await collection.listIndexes().toArray().catch(() => []))
-        .map(index => index.name)
-    )
+    const existing = await collection.listIndexes().toArray().catch(error => {
+      if (error.code === 26) return [] // Namespace not created yet.
+      throw error // Never mask an authorization/network failure as missing indexes.
+    })
 
     for (const definition of definitions) {
-      if (existing.has(definition.name)) continue
+      if (existing.some(index => sameIndex(index, definition))) continue
       if (!dryRun) {
         await collection.createIndex(definition.key, { name: definition.name, background: true })
       }
@@ -40,6 +44,11 @@ async function ensureTenantIndexes(connection) {
     }
   }
   return created
+}
+
+function sameIndex(existing, requested) {
+  return !existing.partialFilterExpression && !existing.sparse && !existing.collation &&
+    JSON.stringify(existing.key) === JSON.stringify(requested.key)
 }
 
 async function main() {
@@ -74,7 +83,9 @@ async function main() {
   if (summary.errors.length) process.exitCode = 1
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   console.error('[Performance indexes] Fatal:', error.message)
   process.exitCode = 1
 })
+
+module.exports = { INDEXES, sameIndex }

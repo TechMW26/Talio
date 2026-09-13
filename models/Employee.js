@@ -380,6 +380,8 @@ EmployeeSchema.index({ department: 1, status: 1 }); // Common filter combination
 EmployeeSchema.index({ departments: 1 }); // Multiple departments queries
 EmployeeSchema.index({ status: 1, createdAt: -1 }); // List queries with sorting
 EmployeeSchema.index({ reportingManager: 1 }); // Manager queries
+EmployeeSchema.index({ createdAt: -1, _id: -1 });
+EmployeeSchema.index({ status: 1, createdAt: -1, _id: -1 });
 EmployeeSchema.index({ assignedManager: 1 }); // Explicit manager assignment queries
 EmployeeSchema.index({ assignedTeamLead: 1 }); // Explicit team lead assignment queries
 EmployeeSchema.index({ reportsTo: 1 }); // Executive reporting chain queries

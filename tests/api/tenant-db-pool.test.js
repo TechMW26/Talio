@@ -66,4 +66,21 @@ describe('shared tenant database pool', () => {
     expect(mockRootConnection.removeDb).toHaveBeenCalledWith('talio_company_one')
     expect(mockRootConnection.close).not.toHaveBeenCalled()
   })
+
+  test('concurrent tenants share a pool even during a transient disconnect', async () => {
+    const disconnected = mockRootConnection.on.mock.calls.find(([event]) => event === 'disconnected')[1]
+    mockRootConnection.readyState = 0
+    disconnected()
+    await Promise.all(Array.from({ length: 100 }, (_, index) =>
+      tenantDb.getTenantConnection(`talio_company_concurrent_${index % 5}`)))
+    expect(mockCreateConnection).toHaveBeenCalledTimes(1)
+    mockRootConnection.readyState = 1
+  })
+
+  test('explicit shutdown also closes a temporarily disconnected driver', async () => {
+    mockRootConnection.readyState = 0
+    await tenantDb.closeAllTenantConnections()
+    expect(mockRootConnection.close).toHaveBeenCalledTimes(1)
+    expect(tenantDb.getActiveTenantConnections()).toEqual([])
+  })
 })

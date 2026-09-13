@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import queryCache from '@/lib/queryCache'
 import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 import bcrypt from 'bcryptjs'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
@@ -161,27 +160,6 @@ export async function GET(request) {
       return NextResponse.json(redisCached)
     }
 
-    // Fallback: in-memory queryCache
-    const cacheKey = queryCache.generateKey(
-      auth.tenant.databaseName,
-      'employees',
-      page,
-      limit,
-      search,
-      department,
-      departmentsParam,
-      designation,
-      level,
-      status,
-      team,
-      sortBy,
-      sortOrder
-    )
-    const cached = queryCache.get(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
-    }
-
     // Build query
     const query = {}
 
@@ -238,6 +216,7 @@ export async function GET(request) {
     // Build sort object
     const sortObj = {}
     sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1
+    sortObj._id = sortObj[sortBy] // Stable pagination when employees share the same sort value.
 
     // Optimized: Use select() to fetch only needed fields and lean() for plain objects
     // Include salary and statutory fields for payroll calculations
@@ -316,9 +295,8 @@ export async function GET(request) {
       },
     }
 
-    // Store in Redis cache (30s TTL, tenant-isolated) AND in-memory fallback
+    // One authoritative cache path; getCache already handles bounded outage fallback.
     void setCache(redisCacheKey, response, 30).catch(() => {})
-    queryCache.set(cacheKey, response, 30000)
 
     return NextResponse.json(response)
   } catch (error) {
@@ -598,7 +576,6 @@ export async function POST(request) {
     // Clear both Redis and in-memory employee list caches
     const bustPattern = buildCachePattern({ tenantId: auth.tenant?.databaseName, namespace: 'employees:list' })
     await clearCachePattern(bustPattern).catch(() => { })
-    queryCache.clearPattern('employees')
 
     // Send onboarding email and log to database (async, don't block response)
     const actualPassword = data.password || 'employee123'
