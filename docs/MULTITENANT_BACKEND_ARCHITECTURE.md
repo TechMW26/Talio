@@ -62,7 +62,9 @@ Files: `lib/tenantDb.js`, `lib/superadminDb.js`, `lib/tenantModels.js`,
   set are not a credible scalability benchmark.
 - Four additive indexes were applied across the two current tenant databases:
   `{createdAt:-1,_id:-1}` and `{status:1,createdAt:-1,_id:-1}` per tenant.
-- Regression suite: 600 passing tests, 18 skipped at this checkpoint. Skipped
+- Detailed health uses a direct Redis PING, not a cache read that can be bypassed
+  by the caller or satisfied by in-process memory. Provider failure is degraded.
+- Regression suite: 605 passing tests, 18 skipped at this checkpoint. Skipped
   tests do not establish coverage of live provider behavior.
 
 ## Next migrations (not yet implemented)

@@ -6,6 +6,7 @@ const mockRedisClient = {
   }),
   get: jest.fn(),
   set: jest.fn().mockResolvedValue('OK'),
+  ping: jest.fn().mockResolvedValue('PONG'),
 }
 
 jest.mock('redis', () => ({
@@ -70,5 +71,17 @@ describe('distributed cache authority', () => {
     await expect(
       cache.getCache('redis-health-probe', { respectRequestBypass: false })
     ).resolves.toEqual({ ok: true })
+  })
+
+  test('health probes reach Redis regardless of request cache policy', async () => {
+    const { headers } = await import('next/headers')
+    headers.mockResolvedValue(new Headers({ 'cache-control': 'no-store' }))
+    await expect(cache.probeRedis()).resolves.toBe(true)
+    expect(mockRedisClient.ping).toHaveBeenCalledTimes(1)
+  })
+
+  test('health probes cannot mask an unavailable Redis behind warm memory', async () => {
+    mockRedisClient.ping.mockRejectedValueOnce(new Error('connection lost'))
+    await expect(cache.probeRedis()).resolves.toBe(false)
   })
 })

@@ -3,7 +3,7 @@ import mongoose from 'mongoose'
 import { getRuntimeCapabilities, getVercelReadiness } from '@/lib/platform/runtime'
 import connectDB from '@/lib/mongodb'
 
-// Health check endpoint for Docker and monitoring
+// Lightweight liveness endpoint; detailed checks verify managed services.
 export async function HEAD() {
   return new Response(null, { status: 200 })
 }
@@ -21,7 +21,7 @@ export async function GET(request) {
     instanceUptimeSeconds: Math.round(process.uptime()),
   }
 
-  // Quick health check for Docker (no detailed checks)
+  // Quick health check (no detailed checks)
   if (!detailed) {
     return NextResponse.json(health)
   }
@@ -39,13 +39,10 @@ export async function GET(request) {
 
     // Check Redis if available
     try {
-      const { getCache, setCache, getRedisInfo } = await import('@/lib/cache')
-      const testKey = `health:${Date.now()}`
-      await setCache(testKey, 'ok', 5)
-      const result = await getCache(testKey)
-      const info = await getRedisInfo()
+      const { probeRedis, getRedisInfo } = await import('@/lib/cache')
+      const [available, info] = await Promise.all([probeRedis(), getRedisInfo()])
       health.cache = {
-        available: result === 'ok',
+        available,
         type: info.connected ? 'redis' : 'memory',
         connected: info.connected,
         host: info.host,
@@ -53,8 +50,10 @@ export async function GET(request) {
         lastError: info.lastError,
         ...(info.serverInfo ? { serverInfo: info.serverInfo } : {}),
       }
+      if (runtime.distributedCache && !available) health.status = 'degraded'
     } catch {
       health.cache = { available: false, type: 'none' }
+      if (runtime.distributedCache) health.status = 'degraded'
     }
 
     // Memory usage
