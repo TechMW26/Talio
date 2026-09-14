@@ -2,6 +2,16 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 
+export function getAttendanceLocationOptions(geofence) {
+    const strict = geofence?.enabled === true && geofence?.strictMode === true
+    return {
+        maxAccuracyMeters: geofence?.maxAccuracyMeters || 150,
+        requireAccurate: strict,
+        maximumAge: strict ? 0 : 10000,
+        timeout: strict ? 15000 : 5000,
+    }
+}
+
 /**
  * Custom hook for capturing high-accuracy GPS location
  * Used for attendance check-in/check-out
@@ -68,7 +78,7 @@ export default function useLocationCapture() {
      * Capture current location with high accuracy
      * Returns location data or throws error
      */
-    const captureLocation = useCallback(async ({ maxAccuracyMeters = null, requireAccurate = false } = {}) => {
+    const captureLocation = useCallback(async ({ maxAccuracyMeters = null, requireAccurate = false, maximumAge = 0, timeout = 15000 } = {}) => {
         if (!isSupported) {
             const errorMsg = 'Geolocation is not supported by this browser/device'
             setError(errorMsg)
@@ -83,8 +93,8 @@ export default function useLocationCapture() {
         return new Promise((resolve, reject) => {
             const options = {
                 enableHighAccuracy: true,  // Use GPS for high accuracy
-                timeout: 15000,            // 15 second timeout
-                maximumAge: 0              // Don't use cached position
+                timeout,
+                maximumAge
             }
 
             navigator.geolocation.getCurrentPosition(

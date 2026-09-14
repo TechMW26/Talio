@@ -541,6 +541,21 @@ describe('Group 1 — API Call & Response Handling', () => {
 // ════════════════════════════════════════════════════════════════
 
 describe('Group 2 — State Update After Successful API Response', () => {
+    test('slow desktop capture startup does not delay the saved check-in confirmation', async () => {
+        window.talioDesktop = { attendanceClockIn: jest.fn(() => new Promise(() => {})) }
+        try {
+            await renderDashboard()
+            await act(async () => {
+                fireEvent.click(getCheckInButton())
+                await new Promise(resolve => setTimeout(resolve, 50))
+            })
+            expect(window.talioDesktop.attendanceClockIn).toHaveBeenCalledTimes(1)
+            expect(mockToast.success).toHaveBeenCalledWith('Checked in successfully!')
+            expect(screen.getByTestId('widget-quick-glance').textContent).toContain('In Progress')
+        } finally {
+            delete window.talioDesktop
+        }
+    })
     test('attendance state is updated immediately after a successful check-in response', async () => {
         await renderDashboard()
         const btn = getCheckInButton()
@@ -635,7 +650,7 @@ describe('Group 2 — State Update After Successful API Response', () => {
 // ════════════════════════════════════════════════════════════════
 
 describe('Group 3 — Optimistic UI Update & Rollback', () => {
-    test('the UI state is updated immediately before the API call completes (optimistic)', async () => {
+    test('the UI is busy immediately but does not confirm a punch before persistence', async () => {
         let resolveAttendance
         const pendingPromise = new Promise((res) => { resolveAttendance = res })
 
@@ -650,9 +665,10 @@ describe('Group 3 — Optimistic UI Update & Rollback', () => {
             fireEvent.click(btn)
         })
 
-        // The widget should already show In Progress (optimistic) while API is pending
+        // A pending request must not look like a saved attendance record.
         const widget = screen.getByTestId('widget-quick-glance')
-        expect(widget.textContent).toContain('In Progress')
+        expect(widget.textContent).not.toContain('In Progress')
+        expect(getCheckInButton()).toBeDisabled()
 
         // Now resolve the API
         await act(async () => {
@@ -1457,8 +1473,11 @@ describe('Source Validation — Structural guarantees', () => {
         'utf8'
     )
 
-    test('UnifiedDashboard contains optimistic update pattern for check-in', () => {
-        expect(dashboardSource).toContain('setTodayAttendance(optimisticAttendance)')
+    test('UnifiedDashboard shows loading immediately but only confirms a persisted punch', () => {
+        expect(dashboardSource).not.toContain('setTodayAttendance(optimisticAttendance)')
+        expect(dashboardSource).toContain('setTodayAttendance(data.data)')
+        expect(dashboardSource).toContain('attendanceSubmissionRef.current = true')
+        expect(dashboardSource).not.toContain('await syncDesktopAttendanceCapture(')
     })
 
     test('UnifiedDashboard contains rollback pattern on error for check-in', () => {
@@ -1485,8 +1504,8 @@ describe('Source Validation — Structural guarantees', () => {
         expect(dashboardSource).toContain('setTodayAttendance(data.attendance)')
     })
 
-    test('UnifiedDashboard guards against double submission with attendanceLoading check', () => {
-        expect(dashboardSource).toContain('if (attendanceLoading) return')
+    test('UnifiedDashboard guards against double submission before the next render', () => {
+        expect(dashboardSource).toContain('if (attendanceSubmissionRef.current) return')
     })
 
     test('attendanceLoading is always cleared in finally blocks', () => {

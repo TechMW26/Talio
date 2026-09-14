@@ -11,7 +11,7 @@ import { CustomizableDashboard } from '@/components/dashboard'
 import CallAlertButton from '@/components/CallAlertButton'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import { getTodayDateString } from '@/lib/timezone'
-import useLocationCapture from '@/hooks/useLocationCapture'
+import useLocationCapture, { getAttendanceLocationOptions } from '@/hooks/useLocationCapture'
 import {
     FaUsers, FaCalendarAlt, FaUserPlus,
     FaBriefcase, FaFileAlt, FaUserClock, FaUserTimes,
@@ -290,6 +290,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Incremented on every direct setTodayAttendance call; fetchUnifiedWidgetData
     // captures it before fetching and skips the update if it changed during the request.
     const attendanceVersionRef = useRef(0)
+    const attendanceSubmissionRef = useRef(false)
     const dashboardStatsRequestRef = useRef(null)
     const unifiedWidgetsRequestRef = useRef(null)
     const realtimeRefreshTimerRef = useRef(null)
@@ -405,7 +406,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         } catch (error) {
             console.error('Fetch today attendance error:', error)
         } finally {
-            setAttendanceLoading(false)
+            if (!attendanceSubmissionRef.current) setAttendanceLoading(false)
         }
     }, [employeeIdStr])
 
@@ -610,10 +611,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     const getAttendanceLocation = useCallback(async (token) => {
         const geofence = companySettings?.geofence
         try {
-            const preciseLocation = await captureLocation({
-                maxAccuracyMeters: geofence?.maxAccuracyMeters || 150,
-                requireAccurate: geofence?.enabled === true && geofence?.strictMode === true,
-            })
+            const preciseLocation = await captureLocation(getAttendanceLocationOptions(geofence))
             return { ...preciseLocation, locationSource: 'gps' }
         } catch (geoError) {
             if (geofence?.enabled && geofence?.strictMode) throw geoError
@@ -621,7 +619,8 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         try {
             const ipRes = await fetch('/api/attendance/ip-location', {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${token}` },
+                signal: AbortSignal.timeout(2500),
             })
             const ipData = await ipRes.json()
             if (ipData.success && Number.isFinite(Number(ipData.latitude)) && Number.isFinite(Number(ipData.longitude))) {
@@ -654,17 +653,11 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     // Handle check-in
     const handleCheckIn = useCallback(async () => {
-        if (attendanceLoading) return // Prevent double submission
+        if (attendanceSubmissionRef.current) return // Synchronous double-click guard
         const previousAttendance = todayAttendance
 
-        // Optimistic UI: show checked-in state immediately
-        const optimisticAttendance = {
-            ...previousAttendance,
-            checkIn: new Date().toISOString(),
-            status: 'in-progress',
-        }
+        attendanceSubmissionRef.current = true
         attendanceVersionRef.current++
-        setTodayAttendance(optimisticAttendance)
         setAttendanceLoading(true)
 
         try {
@@ -691,47 +684,38 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             const data = await response.json()
             if (data.success) {
-                await syncDesktopAttendanceCapture('clock-in')
+                void syncDesktopAttendanceCapture('clock-in')
                 toast.success('Checked in successfully!')
-                // Replace optimistic data with real server data
+                // Display only the confirmed server record
                 attendanceVersionRef.current++
                 setTodayAttendance(data.data)
                 // Notify other tabs via BroadcastChannel
                 broadcastChannelRef.current?.postMessage({ type: 'check-in', attendance: data.data })
             } else {
-                // Rollback optimistic update
+                // Preserve the last confirmed attendance
                 attendanceVersionRef.current++
                 setTodayAttendance(previousAttendance)
                 toast.error(data.message || 'Failed to check in')
             }
         } catch (error) {
             console.error('Check in error:', error)
-            // Rollback optimistic update
+            // Preserve the last confirmed attendance
             attendanceVersionRef.current++
             setTodayAttendance(previousAttendance)
             toast.error(error.name === 'LocationError' ? error.message : 'Failed to check in')
         } finally {
+            attendanceSubmissionRef.current = false
             setAttendanceLoading(false)
         }
     }, [employeeIdStr, attendanceLoading, todayAttendance, getAttendanceLocation])
 
     // Handle check-out
     const handleCheckOut = useCallback(async () => {
-        if (attendanceLoading) return // Prevent double submission
+        if (attendanceSubmissionRef.current) return // Synchronous double-click guard
         const previousAttendance = todayAttendance
 
-        // Optimistic UI: show checked-out state immediately
-        const now = new Date()
-        const checkInTime = previousAttendance?.checkIn ? new Date(previousAttendance.checkIn) : now
-        const workHours = Math.round(((now - checkInTime) / (1000 * 60 * 60)) * 100) / 100
-        const optimisticAttendance = {
-            ...previousAttendance,
-            checkOut: now.toISOString(),
-            status: 'present',
-            workHours,
-        }
+        attendanceSubmissionRef.current = true
         attendanceVersionRef.current++
-        setTodayAttendance(optimisticAttendance)
         setAttendanceLoading(true)
 
         try {
@@ -758,26 +742,27 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             const data = await response.json()
             if (data.success) {
-                await syncDesktopAttendanceCapture('clock-out')
+                void syncDesktopAttendanceCapture('clock-out')
                 toast.success('Checked out successfully!')
-                // Replace optimistic data with real server data
+                // Display only the confirmed server record
                 attendanceVersionRef.current++
                 setTodayAttendance(data.data)
                 // Notify other tabs via BroadcastChannel
                 broadcastChannelRef.current?.postMessage({ type: 'check-out', attendance: data.data })
             } else {
-                // Rollback optimistic update
+                // Preserve the last confirmed attendance
                 attendanceVersionRef.current++
                 setTodayAttendance(previousAttendance)
                 toast.error(data.message || 'Failed to check out')
             }
         } catch (error) {
             console.error('Check out error:', error)
-            // Rollback optimistic update
+            // Preserve the last confirmed attendance
             attendanceVersionRef.current++
             setTodayAttendance(previousAttendance)
             toast.error(error.name === 'LocationError' ? error.message : 'Failed to check out')
         } finally {
+            attendanceSubmissionRef.current = false
             setAttendanceLoading(false)
         }
     }, [employeeIdStr, attendanceLoading, todayAttendance, getAttendanceLocation])

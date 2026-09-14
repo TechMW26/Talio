@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import toast from '@/utils/toast'
 import { FaClock, FaSignInAlt, FaSignOutAlt, FaCalendarAlt, FaEdit, FaCheck, FaTimes, FaExclamationCircle, FaPlus, FaChevronLeft, FaChevronRight, FaList, FaTh, FaMapMarkerAlt } from 'react-icons/fa'
 import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
-import useLocationCapture from '@/hooks/useLocationCapture'
+import useLocationCapture, { getAttendanceLocationOptions } from '@/hooks/useLocationCapture'
 import { useSocket } from '@/contexts/SocketContext'
 import { Card, CardBody, CardHeader, CardFooter, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Select, SelectItem } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -588,31 +588,21 @@ export default function AttendancePage() {
     }
   }
 
+  const punchInFlightRef = useRef(false)
+
   const handleClockIn = async () => {
-    if (!user || loading) return
+    if (!user || punchInFlightRef.current) return
+    punchInFlightRef.current = true
     setLoading(true)
 
-    // Optimistic update: immediately show checked-in state in SWR cache
     const previousData = todayAttendanceRes
-    const optimisticRecord = {
-      ...(todayAttendance || {}),
-      checkIn: new Date().toISOString(),
-      status: 'in-progress',
-    }
-    mutateTodayAttendance(
-      { ...todayAttendanceRes, data: [optimisticRecord] },
-      false // don't revalidate yet
-    )
 
     try {
       // Capture location with high accuracy - preferred but not blocking
       let locationData = null
 
       try {
-        locationData = await captureLocation({
-          maxAccuracyMeters: geofenceSettings?.maxAccuracyMeters || 150,
-          requireAccurate: geofenceSettings?.strictMode === true,
-        })
+        locationData = await captureLocation(getAttendanceLocationOptions(geofenceSettings))
       } catch (captureError) {
         console.warn('Location capture failed:', captureError.message)
         if (geofenceSettings?.enabled && geofenceSettings?.strictMode) {
@@ -633,9 +623,9 @@ export default function AttendancePage() {
         body: JSON.stringify({
           employeeId: getEmployeeId(user),
           type: 'clock-in',
-          latitude: locationData?.latitude || null,
-          longitude: locationData?.longitude || null,
-          accuracy: locationData?.accuracy || null,
+          latitude: locationData?.latitude ?? null,
+          longitude: locationData?.longitude ?? null,
+          accuracy: locationData?.accuracy ?? null,
           locationSource: locationData ? 'gps' : null,
           // Address will be resolved server-side for accuracy
         }),
@@ -646,11 +636,11 @@ export default function AttendancePage() {
       if (data.success) {
         const address = data.data?.location?.checkIn?.address || 'Location captured'
         toast.success(`Clocked in successfully\n📍 ${address}`, { duration: 4000 })
-        // Replace optimistic data with real server data, then revalidate
-        mutateTodayAttendance({ ...todayAttendanceRes, data: [data.data] }, true)
+        // Publish the saved record immediately; refresh the history separately.
+        mutateTodayAttendance({ ...todayAttendanceRes, data: [data.data] }, false)
         mutateAttendance()
       } else {
-        // Rollback optimistic update
+        // Preserve the last confirmed attendance on error
         mutateTodayAttendance(previousData, false)
         if (data.requiresLocation) {
           toast.error(data.message || 'Precise location is required for attendance.')
@@ -660,43 +650,28 @@ export default function AttendancePage() {
       }
     } catch (error) {
       console.error('Clock in error:', error)
-      // Rollback optimistic update
+      // Preserve the last confirmed attendance on error
       mutateTodayAttendance(previousData, false)
       toast.error('An error occurred while clocking in')
     } finally {
+      punchInFlightRef.current = false
       setLoading(false)
     }
   }
 
   const handleClockOut = async () => {
-    if (!user || loading) return
+    if (!user || punchInFlightRef.current) return
+    punchInFlightRef.current = true
     setLoading(true)
 
-    // Optimistic update: immediately show checked-out state in SWR cache
     const previousData = todayAttendanceRes
-    const now = new Date()
-    const checkInTime = todayAttendance?.checkIn ? new Date(todayAttendance.checkIn) : now
-    const workHours = Math.round(((now - checkInTime) / (1000 * 60 * 60)) * 100) / 100
-    const optimisticRecord = {
-      ...(todayAttendance || {}),
-      checkOut: now.toISOString(),
-      status: 'present',
-      workHours,
-    }
-    mutateTodayAttendance(
-      { ...todayAttendanceRes, data: [optimisticRecord] },
-      false // don't revalidate yet
-    )
 
     try {
       // Capture location with high accuracy - preferred but not blocking
       let locationData = null
 
       try {
-        locationData = await captureLocation({
-          maxAccuracyMeters: geofenceSettings?.maxAccuracyMeters || 150,
-          requireAccurate: geofenceSettings?.strictMode === true,
-        })
+        locationData = await captureLocation(getAttendanceLocationOptions(geofenceSettings))
       } catch (captureError) {
         console.warn('Location capture failed:', captureError.message)
         if (geofenceSettings?.enabled && geofenceSettings?.strictMode) {
@@ -717,9 +692,9 @@ export default function AttendancePage() {
         body: JSON.stringify({
           employeeId: getEmployeeId(user),
           type: 'clock-out',
-          latitude: locationData?.latitude || null,
-          longitude: locationData?.longitude || null,
-          accuracy: locationData?.accuracy || null,
+          latitude: locationData?.latitude ?? null,
+          longitude: locationData?.longitude ?? null,
+          accuracy: locationData?.accuracy ?? null,
           locationSource: locationData ? 'gps' : null,
           // Address will be resolved server-side for accuracy
         }),
@@ -730,11 +705,11 @@ export default function AttendancePage() {
       if (data.success) {
         const address = data.data?.location?.checkOut?.address || 'Location captured'
         toast.success(`Clocked out successfully\n📍 ${address}`, { duration: 4000 })
-        // Replace optimistic data with real server data, then revalidate
-        mutateTodayAttendance({ ...todayAttendanceRes, data: [data.data] }, true)
+        // Publish the saved record immediately; refresh the history separately.
+        mutateTodayAttendance({ ...todayAttendanceRes, data: [data.data] }, false)
         mutateAttendance()
       } else {
-        // Rollback optimistic update
+        // Preserve the last confirmed attendance on error
         mutateTodayAttendance(previousData, false)
         if (data.requiresLocation) {
           toast.error(data.message || 'Precise location is required for attendance.')
@@ -744,10 +719,11 @@ export default function AttendancePage() {
       }
     } catch (error) {
       console.error('Clock out error:', error)
-      // Rollback optimistic update
+      // Preserve the last confirmed attendance on error
       mutateTodayAttendance(previousData, false)
       toast.error('An error occurred while clocking out')
     } finally {
+      punchInFlightRef.current = false
       setLoading(false)
     }
   }

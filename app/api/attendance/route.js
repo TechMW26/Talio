@@ -7,7 +7,7 @@ import { logActivity } from '@/lib/activityLogger'
 import { sendEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
-import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
+import { validateLocationData } from '@/lib/geocoding'
 import { emitAttendanceUpdate, emitDashboardRefresh, emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 import { getAuthAndModels } from '@/lib/auth'
 import { getTenantModels } from '@/lib/tenantModels'
@@ -15,6 +15,7 @@ import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
 import { createDailyMosaicOnCheckout } from '@/lib/productivityMosaic'
 import { evaluateEmployeeGeofence, toGeofenceResponse } from '@/lib/geofencing'
 import mongoose from 'mongoose'
+import { afterAttendanceResponse, enrichAttendanceAddress } from '@/lib/attendancePostResponse'
 import {
   getTimezone,
   compareTimeToOfficeHours,
@@ -328,6 +329,7 @@ export async function GET(request) {
 
 // POST - Mark attendance (Clock in/out)
 export async function POST(request) {
+  const startedAt = performance.now()
   try {
     // Get auth and tenant-aware models
     const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'Leave', 'Company', 'CompanySettings', 'Holiday', 'User', 'GeofenceLocation', 'GeofenceLog', 'OvertimeRequest', 'Notification']);
@@ -504,26 +506,27 @@ export async function POST(request) {
     }
 
     // Check for approved leave or work from home for today
-    const todayLeave = await TenantLeave.findOne({
-      employee: employeeId,
-      status: 'approved',
-      requestType: { $ne: 'early_leave' },
-      startDate: { $lte: new Date() },
-      endDate: { $gte: today }
-    })
-    const todayEarlyLeave = await TenantLeave.findOne({
-      employee: employeeId,
-      status: 'approved',
-      requestType: 'early_leave',
-      startDate: { $lte: new Date() },
-      endDate: { $gte: today },
-    }).lean()
-
-    // Check if attendance already exists for today
-    let attendance = await TenantAttendance.findOne({
-      employee: employeeId,
-      date: { $gte: today, $lt: tomorrow },
-    })
+    const [todayLeave, todayEarlyLeave, existingAttendance] = await Promise.all([
+      TenantLeave.findOne({
+        employee: employeeId,
+        status: 'approved',
+        requestType: { $ne: 'early_leave' },
+        startDate: { $lte: new Date() },
+        endDate: { $gte: today }
+      }),
+      TenantLeave.findOne({
+        employee: employeeId,
+        status: 'approved',
+        requestType: 'early_leave',
+        startDate: { $lte: new Date() },
+        endDate: { $gte: today },
+      }).lean(),
+      TenantAttendance.findOne({
+        employee: employeeId,
+        date: { $gte: today, $lt: tomorrow },
+      }),
+    ])
+    let attendance = existingAttendance
 
     // If no attendance record exists but there's an approved leave/WFH, create one
     if (!attendance && todayLeave) {
@@ -695,24 +698,7 @@ export async function POST(request) {
         if (isIPBasedLocation) {
           locationWarning = 'Approximate location from IP - GPS was unavailable'
         }
-        try {
-          const geocodeResult = await reverseGeocode(latitude, longitude)
-          if (geocodeResult.success) {
-            resolvedAddress = geocodeResult.address
-            if (isIPBasedLocation) {
-              resolvedAddress = `${resolvedAddress} (approx.)`
-            }
-            addressDetails = geocodeResult.details
-            console.log(`📍 Check-in location resolved: ${resolvedAddress}`)
-          } else {
-            console.warn(`⚠️ Geocoding failed for check-in: ${geocodeResult.error}`)
-            // Fallback to coordinates if geocoding fails
-            resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-          }
-        } catch (geocodeError) {
-          console.error('Geocoding error during check-in:', geocodeError)
-          resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-        }
+        resolvedAddress = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}${isIPBasedLocation ? ' (approx.)' : ''}`
       } else {
         // Location not captured - set warning
         locationWarning = 'Location not captured - GPS was unavailable or denied'
@@ -774,6 +760,10 @@ export async function POST(request) {
       }
 
       await writeGeofenceAudit('attendance_check_in', geofenceCheck, checkInTime)
+      if (hasValidLocation) afterAttendanceResponse(() => enrichAttendanceAddress({
+        Attendance: TenantAttendance, attendanceId: attendance._id, field: 'checkIn',
+        capturedAt: checkInTime, latitude, longitude, approximate: isIPBasedLocation,
+      }))
 
       // Clear cached attendance queries for this employee to prevent stale UI
       try {
@@ -792,146 +782,151 @@ export async function POST(request) {
         relatedId: attendance._id
       })
 
-      // Best-effort: send clock-in email if enabled in settings
-      try {
-        const emailNotificationsEnabled =
-          settings?.notifications?.emailNotifications !== false
+      afterAttendanceResponse(async () => {
+        // Best-effort: send clock-in email if enabled in settings
+        try {
+          const emailNotificationsEnabled =
+            settings?.notifications?.emailNotifications !== false
 
-        const emailEvents = settings?.notifications?.emailEvents || {}
-        const clockInEmailEnabled = emailEvents.attendanceClockIn !== false
+          const emailEvents = settings?.notifications?.emailEvents || {}
+          const clockInEmailEnabled = emailEvents.attendanceClockIn !== false
 
-        if (emailNotificationsEnabled && clockInEmailEnabled && employee?.email) {
-          const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
-          const greetingName = employeeName ? ` ${employeeName}` : ''
-          const timeString = checkInTime.toLocaleString('en-IN', {
-            timeZone: settings?.timezone || 'Asia/Kolkata',
-          })
+          if (emailNotificationsEnabled && clockInEmailEnabled && employee?.email) {
+            const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
+            const greetingName = employeeName ? ` ${employeeName}` : ''
+            const timeString = checkInTime.toLocaleString('en-IN', {
+              timeZone: settings?.timezone || 'Asia/Kolkata',
+            })
 
-          const textLines = [
-            `Hi${greetingName},`,
-            '',
-            `Your clock-in has been recorded on ${timeString}.`,
-            `Status: ${checkInStatus}.`,
-            '',
-            'If this was not you, please contact your HR/administrator.',
-            '',
-            'Thanks,',
-            'Talio',
-          ]
+            const textLines = [
+              `Hi${greetingName},`,
+              '',
+              `Your clock-in has been recorded on ${timeString}.`,
+              `Status: ${checkInStatus}.`,
+              '',
+              'If this was not you, please contact your HR/administrator.',
+              '',
+              'Thanks,',
+              'Talio',
+            ]
 
-          await sendEmail({
-            to: employee.email,
-            subject: 'Clock-in recorded',
-            text: textLines.join('\n'),
-          })
-        }
-      } catch (emailError) {
-        console.error('Failed to send clock-in email:', emailError)
-      }
-
-      // Best-effort: send clock-in push notification if enabled in settings
-      try {
-        const pushNotificationsEnabled =
-          settings?.notifications?.pushNotifications !== false
-
-        const pushEvents = settings?.notifications?.pushEvents || {}
-        const clockInPushEnabled = pushEvents.attendanceClockIn !== false
-
-        if (pushNotificationsEnabled && clockInPushEnabled && employee?.user) {
-          const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
-          const timeString = checkInTime.toLocaleTimeString('en-IN', {
-            timeZone: settings?.timezone || 'Asia/Kolkata',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-
-          let statusEmoji = '✅'
-          let statusText = checkInStatus
-          if (checkInStatus === 'on-time') {
-            statusEmoji = '✅'
-            statusText = 'On Time'
-          } else if (checkInStatus === 'late') {
-            statusEmoji = '⏰'
-            statusText = 'Late'
-          } else if (checkInStatus === 'early') {
-            statusEmoji = '🌅'
-            statusText = 'Early'
+            await sendEmail({
+              to: employee.email,
+              subject: 'Clock-in recorded',
+              text: textLines.join('\n'),
+            })
           }
-
-          await sendPushToUser(
-            employee.user,
-            {
-              title: `${statusEmoji} Clock-In Recorded`,
-              body: `Hi ${employeeName}! You clocked in at ${timeString}. Status: ${statusText}`,
-            },
-            {
-              eventType: 'attendanceClockIn',
-              clickAction: '/dashboard/attendance',
-              icon: '/icons/icon-192x192.png',
-              data: {
-                attendanceId: attendance._id.toString(),
-                checkInTime: checkInTime.toISOString(),
-                status: checkInStatus,
-                type: 'clock-in',
-              },
-              models: { User: models.User, Notification: models.Notification }
-            }
-          )
+        } catch (emailError) {
+          console.error('Failed to send clock-in email:', emailError)
         }
-      } catch (pushError) {
-        console.error('Failed to send clock-in push notification:', pushError)
-      }
 
-      // Best-effort: send latest role news push (Android-targeted) on check-in
-      try {
-        const pushNotificationsEnabled =
-          settings?.notifications?.pushNotifications !== false
+        // Best-effort: send clock-in push notification if enabled in settings
+        try {
+          const pushNotificationsEnabled =
+            settings?.notifications?.pushNotifications !== false
 
-        if (pushNotificationsEnabled && employee?.user) {
-          const designationTitle = employee.designation?.title || employee.designationLevelName || ''
-          const departmentName = employee.department?.name || ''
-          const role = user?.role || 'employee'
+          const pushEvents = settings?.notifications?.pushEvents || {}
+          const clockInPushEnabled = pushEvents.attendanceClockIn !== false
 
-          const searchQuery = buildSearchQuery(designationTitle, departmentName, role)
-          const latestNews = await fetchRoleNews(searchQuery, 1, {
-            freshnessMinutes: 60,
-            maxAgeMinutes: 60,
-          })
+          if (pushNotificationsEnabled && clockInPushEnabled && employee?.user) {
+            const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
+            const timeString = checkInTime.toLocaleTimeString('en-IN', {
+              timeZone: settings?.timezone || 'Asia/Kolkata',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
 
-          if (latestNews.length > 0) {
-            const topNews = latestNews[0]
+            let statusEmoji = '✅'
+            let statusText = checkInStatus
+            if (checkInStatus === 'on-time') {
+              statusEmoji = '✅'
+              statusText = 'On Time'
+            } else if (checkInStatus === 'late') {
+              statusEmoji = '⏰'
+              statusText = 'Late'
+            } else if (checkInStatus === 'early') {
+              statusEmoji = '🌅'
+              statusText = 'Early'
+            }
 
             await sendPushToUser(
               employee.user,
               {
-                title: '📰 Latest News for You',
-                body: topNews.title,
+                title: `${statusEmoji} Clock-In Recorded`,
+                body: `Hi ${employeeName}! You clocked in at ${timeString}. Status: ${statusText}`,
               },
               {
-                eventType: 'roleNews',
-                clickAction: topNews.link || '/dashboard',
+                eventType: 'attendanceClockIn',
+                clickAction: '/dashboard/attendance',
                 icon: '/icons/icon-192x192.png',
                 data: {
-                  type: 'role-news',
-                  targetPlatform: 'android',
-                  newsTitle: topNews.title,
-                  newsLink: topNews.link,
-                  publishedAt: topNews.publishedAt,
+                  attendanceId: attendance._id.toString(),
+                  checkInTime: checkInTime.toISOString(),
+                  status: checkInStatus,
+                  type: 'clock-in',
                 },
                 models: { User: models.User, Notification: models.Notification }
               }
             )
           }
+        } catch (pushError) {
+          console.error('Failed to send clock-in push notification:', pushError)
         }
-      } catch (newsPushError) {
-        console.error('Failed to send latest news push notification:', newsPushError)
-      }
+
+        // Best-effort: send latest role news push (Android-targeted) on check-in
+        try {
+          const pushNotificationsEnabled =
+            settings?.notifications?.pushNotifications !== false
+
+          if (pushNotificationsEnabled && employee?.user) {
+            const designationTitle = employee.designation?.title || employee.designationLevelName || ''
+            const departmentName = employee.department?.name || ''
+            const role = user?.role || 'employee'
+
+            const searchQuery = buildSearchQuery(designationTitle, departmentName, role)
+            const latestNews = await fetchRoleNews(searchQuery, 1, {
+              freshnessMinutes: 60,
+              maxAgeMinutes: 60,
+            })
+
+            if (latestNews.length > 0) {
+              const topNews = latestNews[0]
+
+              await sendPushToUser(
+                employee.user,
+                {
+                  title: '📰 Latest News for You',
+                  body: topNews.title,
+                },
+                {
+                  eventType: 'roleNews',
+                  clickAction: topNews.link || '/dashboard',
+                  icon: '/icons/icon-192x192.png',
+                  data: {
+                    type: 'role-news',
+                    targetPlatform: 'android',
+                    newsTitle: topNews.title,
+                    newsLink: topNews.link,
+                    publishedAt: topNews.publishedAt,
+                  },
+                  models: { User: models.User, Notification: models.Notification }
+                }
+              )
+            }
+          }
+        } catch (newsPushError) {
+          console.error('Failed to send latest news push notification:', newsPushError)
+        }
+
+      })
 
       const tenantId = tenant?.databaseName
-      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' }))
-      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
-      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
-      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
+      await Promise.allSettled([
+        clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' })),
+        clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId })),
+      ])
 
       // Emit real-time Socket.IO events for cross-tab/cross-window/desktop sync
       try {
@@ -968,7 +963,10 @@ export async function POST(request) {
         responseData.locationCaptured = true
       }
 
-      return NextResponse.json(responseData)
+      return NextResponse.json(responseData, { headers: {
+        'Cache-Control': 'no-store',
+        'Server-Timing': `attendance;dur=${(performance.now() - startedAt).toFixed(1)}`,
+      } })
     } else if (type === 'clock-out') {
       if (!attendance || !attendance.checkIn) {
         return NextResponse.json(
@@ -1011,23 +1009,7 @@ export async function POST(request) {
         if (isIPBasedLocation) {
           checkOutLocationWarning = 'Approximate location from IP - GPS was unavailable'
         }
-        try {
-          const geocodeResult = await reverseGeocode(latitude, longitude)
-          if (geocodeResult.success) {
-            resolvedAddress = geocodeResult.address
-            if (isIPBasedLocation) {
-              resolvedAddress = `${resolvedAddress} (approx.)`
-            }
-            addressDetails = geocodeResult.details
-            console.log(`📍 Check-out location resolved: ${resolvedAddress}`)
-          } else {
-            console.warn(`⚠️ Geocoding failed for check-out: ${geocodeResult.error}`)
-            resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-          }
-        } catch (geocodeError) {
-          console.error('Geocoding error during check-out:', geocodeError)
-          resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-        }
+        resolvedAddress = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}${isIPBasedLocation ? ' (approx.)' : ''}`
       } else {
         // Location not captured - set warning
         checkOutLocationWarning = 'Location not captured - GPS was unavailable or denied'
@@ -1165,6 +1147,10 @@ export async function POST(request) {
 
       await attendance.save()
       await writeGeofenceAudit('attendance_check_out', geofenceCheck, checkOutTime)
+      if (hasValidLocation) afterAttendanceResponse(() => enrichAttendanceAddress({
+        Attendance: TenantAttendance, attendanceId: attendance._id, field: 'checkOut',
+        capturedAt: checkOutTime, latitude, longitude, approximate: isIPBasedLocation,
+      }))
 
       // Clear cached attendance queries for this employee to prevent stale UI
       try {
@@ -1183,114 +1169,120 @@ export async function POST(request) {
         relatedId: attendance._id
       })
 
-      // Best-effort: send clock-out email if enabled in settings
-      try {
-        const emailNotificationsEnabled =
-          settings?.notifications?.emailNotifications !== false
+      afterAttendanceResponse(async () => {
+        // Best-effort: send clock-out email if enabled in settings
+        try {
+          const emailNotificationsEnabled =
+            settings?.notifications?.emailNotifications !== false
 
-        const emailEvents = settings?.notifications?.emailEvents || {}
+          const emailEvents = settings?.notifications?.emailEvents || {}
 
-        let statusToggleKey = null
-        if (attendance.status === 'present') statusToggleKey = 'attendanceStatusPresent'
-        else if (attendance.status === 'half-day') statusToggleKey = 'attendanceStatusHalfDay'
-        else if (attendance.status === 'absent') statusToggleKey = 'attendanceStatusAbsent'
+          let statusToggleKey = null
+          if (attendance.status === 'present') statusToggleKey = 'attendanceStatusPresent'
+          else if (attendance.status === 'half-day') statusToggleKey = 'attendanceStatusHalfDay'
+          else if (attendance.status === 'absent') statusToggleKey = 'attendanceStatusAbsent'
 
-        const statusEmailEnabled =
-          statusToggleKey && emailEvents[statusToggleKey] !== false
+          const statusEmailEnabled =
+            statusToggleKey && emailEvents[statusToggleKey] !== false
 
-        if (emailNotificationsEnabled && statusEmailEnabled && employee?.email) {
-          const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
-          const greetingName = employeeName ? ` ${employeeName}` : ''
-          const timeString = checkOutTime.toLocaleString('en-IN', {
-            timeZone: settings?.timezone || 'Asia/Kolkata',
-          })
+          if (emailNotificationsEnabled && statusEmailEnabled && employee?.email) {
+            const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
+            const greetingName = employeeName ? ` ${employeeName}` : ''
+            const timeString = checkOutTime.toLocaleString('en-IN', {
+              timeZone: settings?.timezone || 'Asia/Kolkata',
+            })
 
-          let statusLabel = attendance.status
-          if (attendance.status === 'present') statusLabel = 'Present'
-          else if (attendance.status === 'half-day') statusLabel = 'Half day'
-          else if (attendance.status === 'absent') statusLabel = 'Absent'
+            let statusLabel = attendance.status
+            if (attendance.status === 'present') statusLabel = 'Present'
+            else if (attendance.status === 'half-day') statusLabel = 'Half day'
+            else if (attendance.status === 'absent') statusLabel = 'Absent'
 
-          const textLines = [
-            `Hi${greetingName},`,
-            '',
-            `Your clock-out has been recorded on ${timeString}.`,
-            `Todays attendance status: ${statusLabel}.`,
-            `Total hours worked: ${attendance.workHours} hours.`,
-            '',
-            'If this was not you, please contact your HR/administrator.',
-            '',
-            'Thanks,',
-            'Talio',
-          ]
+            const textLines = [
+              `Hi${greetingName},`,
+              '',
+              `Your clock-out has been recorded on ${timeString}.`,
+              `Todays attendance status: ${statusLabel}.`,
+              `Total hours worked: ${attendance.workHours} hours.`,
+              '',
+              'If this was not you, please contact your HR/administrator.',
+              '',
+              'Thanks,',
+              'Talio',
+            ]
 
-          await sendEmail({
-            to: employee.email,
-            subject: 'Clock-out recorded',
-            text: textLines.join('\n'),
-          })
-        }
-      } catch (emailError) {
-        console.error('Failed to send clock-out email:', emailError)
-      }
-
-      // Best-effort: send clock-out push notification if enabled in settings
-      try {
-        const pushNotificationsEnabled =
-          settings?.notifications?.pushNotifications !== false
-
-        const pushEvents = settings?.notifications?.pushEvents || {}
-        const clockOutPushEnabled = pushEvents.attendanceClockOut !== false
-
-        if (pushNotificationsEnabled && clockOutPushEnabled && employee?.user) {
-          const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
-          const timeString = checkOutTime.toLocaleTimeString('en-IN', {
-            timeZone: settings?.timezone || 'Asia/Kolkata',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-
-          let statusLabel = attendance.status
-          let statusEmoji = '✅'
-          if (attendance.status === 'present') {
-            statusLabel = 'Present'
-            statusEmoji = '✅'
-          } else if (attendance.status === 'half-day') {
-            statusLabel = 'Half Day'
-            statusEmoji = '⏱️'
-          } else if (attendance.status === 'absent') {
-            statusLabel = 'Absent'
-            statusEmoji = '❌'
+            await sendEmail({
+              to: employee.email,
+              subject: 'Clock-out recorded',
+              text: textLines.join('\n'),
+            })
           }
-
-          await sendPushToUser(
-            employee.user,
-            {
-              title: `${statusEmoji} Clock-Out Recorded`,
-              body: `Hi ${employeeName}! You clocked out at ${timeString}. Status: ${statusLabel}. Hours worked: ${attendance.workHours}h`,
-            },
-            {
-              eventType: 'attendanceClockOut',
-              clickAction: '/dashboard/attendance',
-              icon: '/icons/icon-192x192.png',
-              data: {
-                attendanceId: attendance._id.toString(),
-                checkOutTime: checkOutTime.toISOString(),
-                status: attendance.status,
-                workHours: attendance.workHours,
-                type: 'clock-out',
-              },
-            }
-          )
+        } catch (emailError) {
+          console.error('Failed to send clock-out email:', emailError)
         }
-      } catch (pushError) {
-        console.error('Failed to send clock-out push notification:', pushError)
-      }
+
+        // Best-effort: send clock-out push notification if enabled in settings
+        try {
+          const pushNotificationsEnabled =
+            settings?.notifications?.pushNotifications !== false
+
+          const pushEvents = settings?.notifications?.pushEvents || {}
+          const clockOutPushEnabled = pushEvents.attendanceClockOut !== false
+
+          if (pushNotificationsEnabled && clockOutPushEnabled && employee?.user) {
+            const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
+            const timeString = checkOutTime.toLocaleTimeString('en-IN', {
+              timeZone: settings?.timezone || 'Asia/Kolkata',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+
+            let statusLabel = attendance.status
+            let statusEmoji = '✅'
+            if (attendance.status === 'present') {
+              statusLabel = 'Present'
+              statusEmoji = '✅'
+            } else if (attendance.status === 'half-day') {
+              statusLabel = 'Half Day'
+              statusEmoji = '⏱️'
+            } else if (attendance.status === 'absent') {
+              statusLabel = 'Absent'
+              statusEmoji = '❌'
+            }
+
+            await sendPushToUser(
+              employee.user,
+              {
+                title: `${statusEmoji} Clock-Out Recorded`,
+                body: `Hi ${employeeName}! You clocked out at ${timeString}. Status: ${statusLabel}. Hours worked: ${attendance.workHours}h`,
+              },
+              {
+                eventType: 'attendanceClockOut',
+                clickAction: '/dashboard/attendance',
+                icon: '/icons/icon-192x192.png',
+                data: {
+                  attendanceId: attendance._id.toString(),
+                  checkOutTime: checkOutTime.toISOString(),
+                  status: attendance.status,
+                  workHours: attendance.workHours,
+                  type: 'clock-out',
+                },
+                models: { User: models.User, Notification: models.Notification },
+              }
+            )
+          }
+        } catch (pushError) {
+          console.error('Failed to send clock-out push notification:', pushError)
+        }
+
+      })
 
       const tenantId = tenant?.databaseName
-      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' }))
-      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
-      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
-      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
+      await Promise.allSettled([
+        clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' })),
+        clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' })),
+        clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId })),
+      ])
 
       // Emit real-time Socket.IO events for cross-tab/cross-window/desktop sync
       try {
@@ -1316,7 +1308,7 @@ export async function POST(request) {
         const checkoutUserId = (user._id || user.userId)?.toString()
         if (checkoutUserId && tenant?.databaseName) {
           const checkoutTimezone = getTimezone(settings?.timezone) || DEFAULT_TIMEZONE
-          createDailyMosaicOnCheckout({
+          afterAttendanceResponse(() => createDailyMosaicOnCheckout({
             userId: checkoutUserId,
             employeeId,
             databaseName: tenant.databaseName,
@@ -1331,7 +1323,7 @@ export async function POST(request) {
             }
           }).catch((err) => {
             console.error('[Attendance] Daily mosaic creation failed (non-blocking):', err.message)
-          })
+          }))
         }
       } catch (analysisError) {
         console.error('[Attendance] Failed to create daily mosaic (non-blocking):', analysisError.message)
@@ -1354,7 +1346,10 @@ export async function POST(request) {
         checkOutResponse.locationCaptured = true
       }
 
-      return NextResponse.json(checkOutResponse)
+      return NextResponse.json(checkOutResponse, { headers: {
+        'Cache-Control': 'no-store',
+        'Server-Timing': `attendance;dur=${(performance.now() - startedAt).toFixed(1)}`,
+      } })
     }
 
     return NextResponse.json(
