@@ -102,7 +102,7 @@ const nextConfig = {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: blob: https://ik.imagekit.io https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com",
           "font-src 'self' data: https://fonts.gstatic.com",
-          "connect-src 'self' https://ik.imagekit.io https://maps.googleapis.com https://maps.gstatic.com https://nominatim.openstreetmap.org https://*.pusher.com wss://*.pusher.com wss: ws:",
+          "connect-src 'self' https://ik.imagekit.io https://maps.googleapis.com https://maps.gstatic.com https://nominatim.openstreetmap.org https://*.pusher.com wss://*.pusher.com https://*.livekit.cloud wss: ws:",
           "frame-src 'self' https://www.google.com https://maps.google.com https://www.openstreetmap.org",
           "media-src 'self' data: blob:",
           "worker-src 'self' blob:",

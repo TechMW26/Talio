@@ -5,6 +5,7 @@ const path = require('path')
 
 describe('managed meeting implementation', () => {
   const source = fs.readFileSync(path.join(process.cwd(), 'components/meetings/ManagedMeetingRoomSession.js'), 'utf8')
+  const mediaSource = fs.readFileSync(path.join(process.cwd(), 'components/meetings/MeetingMedia.js'), 'utf8')
   const signedInSelector = fs.readFileSync(path.join(process.cwd(), 'contexts/MeetingSessionContext.js'), 'utf8')
   const guestSelector = fs.readFileSync(path.join(process.cwd(), 'app/join/[guestLink]/room/page.js'), 'utf8')
   const reactionPickerSource = fs.readFileSync(path.join(process.cwd(), 'components/meetings/MeetingReactionPicker.js'), 'utf8')
@@ -63,8 +64,8 @@ describe('managed meeting implementation', () => {
 
   test('renders remote audio and uses an uncropped presentation layout with a thumbnail rail', () => {
     expect(source).toContain('<RemoteAudio')
-    expect(source).toContain('item.isScreenSharing')
-    expect(source).toContain("item.isScreenSharing ? 'bg-black object-contain' : 'object-cover'")
+    expect(mediaSource).toContain('item.isScreenSharing')
+    expect(mediaSource).toContain("item.isScreenSharing ? 'bg-black object-contain' : 'object-cover'")
     expect(source).toContain('data-meeting-layout="presentation"')
     expect(source).toContain('data-meeting-participant-rail')
     expect(source).toContain('railParticipants.map')
@@ -128,7 +129,7 @@ describe('managed meeting implementation', () => {
     expect(reactionPickerSource).toContain('Popover')
     expect(reactionPickerSource).toContain("base: 'z-[220]'")
     expect(reactionPickerSource).toContain('data-meeting-reaction-picker')
-    expect(source).toContain('bottom-10 left-1/2 z-30')
+    expect(mediaSource).toContain('bottom-10 left-1/2 z-30')
     expect(source).not.toContain('absolute bottom-14 left-1/2 z-40')
   })
 })

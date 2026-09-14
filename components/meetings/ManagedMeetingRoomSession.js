@@ -26,7 +26,8 @@ import {
   HiOutlineVideoCamera,
   HiOutlineXMark,
 } from 'react-icons/hi2'
-import { CutLineIcon, MeetingReactionIcon } from '@/components/meetings/MeetingVisualIcons'
+import { CutLineIcon } from '@/components/meetings/MeetingVisualIcons'
+import { ParticipantTile, RemoteAudio } from '@/components/meetings/MeetingMedia'
 import MeetingReactionPicker from '@/components/meetings/MeetingReactionPicker'
 import AddMeetingParticipantsModal from '@/app/dashboard/meetings/components/AddMeetingParticipantsModal'
 import MeetingNotetakerPanel from '@/app/dashboard/meetings/components/MeetingNotetakerPanel'
@@ -66,74 +67,6 @@ function participantSnapshot(participant) {
   }
 }
 
-function RemoteAudio({ participant }) {
-  const ref = useRef(null)
-  const publication = participant.getTrackPublication(Track.Source.Microphone)
-  useEffect(() => {
-    const track = publication?.track
-    const element = ref.current
-    if (!track || !element) return undefined
-    track.attach(element)
-    return () => track.detach(element)
-  }, [publication?.track])
-  return <audio ref={ref} autoPlay />
-}
-
-function ParticipantTile({ item, local = false, reaction, handRaised = false, featured = false, compact = false }) {
-  const videoRef = useRef(null)
-  const screenPublication = item.participant.getTrackPublication(Track.Source.ScreenShare)
-  const cameraPublication = item.participant.getTrackPublication(Track.Source.Camera)
-  const publication = screenPublication && !screenPublication.isMuted ? screenPublication : cameraPublication
-
-  useEffect(() => {
-    const track = publication?.track
-    const element = videoRef.current
-    if (!track || !element) return undefined
-    track.attach(element)
-    return () => track.detach(element)
-  }, [publication?.track])
-
-  const tileSize = featured
-    ? 'h-full min-h-0 w-full'
-    : compact
-      ? 'h-24 w-36 shrink-0 sm:h-28 sm:w-44'
-      : 'min-h-44'
-
-  return (
-    <div
-      className={`relative flex overflow-hidden bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${compact ? 'rounded-xl' : 'rounded-2xl'} ${tileSize}`}
-      data-participant-tile={featured ? 'presenter' : compact ? 'rail' : 'grid'}
-    >
-      {publication?.track && !publication.isMuted ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={local}
-          className={`h-full w-full ${item.isScreenSharing ? 'bg-black object-contain' : 'object-cover'} ${local && !item.isScreenSharing ? '-scale-x-100' : ''}`}
-        />
-      ) : (
-        <div className="flex h-full w-full flex-1 items-center justify-center">
-          <span className={`flex items-center justify-center rounded-full bg-indigo-600 font-semibold text-white ${compact ? 'h-10 w-10 text-sm' : 'h-16 w-16 text-xl'}`}>
-            {item.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
-          </span>
-        </div>
-      )}
-      <div className={`absolute flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-lg bg-black/65 text-xs font-medium text-white backdrop-blur ${compact ? 'bottom-2 left-2 px-2 py-1' : 'bottom-3 left-3 px-2.5 py-1.5'}`}>
-        <span className="truncate">{local ? 'You' : item.name}</span>
-        {item.isMuted && <CutLineIcon isOff><HiOutlineMicrophone className="h-4 w-4" /></CutLineIcon>}
-      </div>
-      {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
-      {handRaised && <span className="absolute right-3 top-3 rounded-full bg-amber-500 p-2 text-white" aria-label={`${item.name} raised their hand`}><HiOutlineHandRaised className="h-5 w-5" /></span>}
-      {reaction && (
-        <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 animate-bounce rounded-full bg-white/95 p-3 text-indigo-700 shadow-xl ring-1 ring-black/5">
-          <MeetingReactionIcon value={reaction} className="h-7 w-7" />
-        </span>
-      )}
-    </div>
-  )
-}
-
 export default function ManagedMeetingRoomSession({
   roomId,
   displayMode = 'full',
@@ -157,6 +90,9 @@ export default function ManagedMeetingRoomSession({
   const recorderRef = useRef(null)
   const mutedRef = useRef(false)
   const joiningRef = useRef(false)
+  const joinAttemptRef = useRef(0)
+  const connectedRef = useRef(false)
+  const mediaToggleRef = useRef(new Set())
   const autoJoinAttemptedRef = useRef(false)
   const leavingRef = useRef(false)
   const meetingSessionStartedAtRef = useRef(null)
@@ -201,6 +137,8 @@ export default function ManagedMeetingRoomSession({
   const [isEndingMeeting, setIsEndingMeeting] = useState(false)
   const [endingMeetingStatus, setEndingMeetingStatus] = useState('Saving your latest meeting notes...')
   const [connectionLabel, setConnectionLabel] = useState('Connecting')
+  const [playbackBlocked, setPlaybackBlocked] = useState(false)
+  const [mediaError, setMediaError] = useState('')
   const previewDisplayName = useMemo(() => {
     if (guestName) return guestName
     if (typeof window === 'undefined') return 'You'
@@ -368,9 +306,11 @@ export default function ManagedMeetingRoomSession({
   }, [displayMode, showChat])
 
   const refreshParticipants = useCallback((activeRoom = roomRef.current) => {
-    if (!activeRoom) return
+    if (!activeRoom || roomRef.current !== activeRoom) return
     const remote = [...activeRoom.remoteParticipants.values()].map(participantSnapshot)
     const local = participantSnapshot(activeRoom.localParticipant)
+    setMuted(local.isMuted)
+    setVideoOff(local.isVideoOff)
     const nextParticipants = [local, ...remote]
     setParticipants(nextParticipants)
     const presenters = nextParticipants
@@ -453,10 +393,12 @@ export default function ManagedMeetingRoomSession({
 
   const join = useCallback(async () => {
     if (joiningRef.current || joined) return
+    const attempt = ++joinAttemptRef.current
     joiningRef.current = true
     setJoining(true)
     setJoinError('')
     setJoinConflict(null)
+    setMediaError('')
     let pendingRoom = null
     try {
       const authorization = guestToken ? `Guest ${guestToken}` : `Bearer ${localStorage.getItem('token')}`
@@ -466,6 +408,7 @@ export default function ManagedMeetingRoomSession({
         body: JSON.stringify({ roomId }),
       })
       const payload = await response.json().catch(() => null)
+      if (attempt !== joinAttemptRef.current) return
       if (!response.ok) {
         const requestError = new Error(payload?.message || 'Unable to join managed meeting')
         requestError.code = payload?.code || 'TOKEN_REQUEST_FAILED'
@@ -491,16 +434,50 @@ export default function ManagedMeetingRoomSession({
         .on(RoomEvent.ParticipantDisconnected, () => refreshParticipants(liveRoom))
         .on(RoomEvent.TrackSubscribed, () => refreshParticipants(liveRoom))
         .on(RoomEvent.TrackUnsubscribed, () => refreshParticipants(liveRoom))
+        .on(RoomEvent.TrackPublished, () => refreshParticipants(liveRoom))
+        .on(RoomEvent.TrackUnpublished, () => refreshParticipants(liveRoom))
+        .on(RoomEvent.TrackSubscriptionFailed, () => {
+          setMediaError('A participant’s media could not be received. Rejoin if it does not recover.')
+        })
         .on(RoomEvent.TrackMuted, () => refreshParticipants(liveRoom))
         .on(RoomEvent.TrackUnmuted, () => refreshParticipants(liveRoom))
         .on(RoomEvent.LocalTrackPublished, () => refreshParticipants(liveRoom))
         .on(RoomEvent.LocalTrackUnpublished, () => refreshParticipants(liveRoom))
         .on(RoomEvent.DataReceived, handleData)
         .on(RoomEvent.Reconnecting, () => setConnectionLabel('Reconnecting'))
-        .on(RoomEvent.Reconnected, () => setConnectionLabel('Connected'))
-        .on(RoomEvent.Disconnected, () => setConnectionLabel('Disconnected'))
+        .on(RoomEvent.Reconnected, () => {
+          setConnectionLabel('Connected')
+          refreshParticipants(liveRoom)
+        })
+        .on(RoomEvent.AudioPlaybackStatusChanged, () => setPlaybackBlocked(!liveRoom.canPlaybackAudio || !liveRoom.canPlaybackVideo))
+        .on(RoomEvent.VideoPlaybackStatusChanged, () => setPlaybackBlocked(!liveRoom.canPlaybackAudio || !liveRoom.canPlaybackVideo))
+        .on(RoomEvent.Disconnected, () => {
+          if (roomRef.current !== liveRoom || !connectedRef.current || leavingRef.current) return
+          connectedRef.current = false
+          roomRef.current = null
+          setRoom(null)
+          setParticipants([])
+          setJoined(false)
+          stopPreviewTracks()
+          setMuted(true)
+          setVideoOff(true)
+          setPreviewStatus('idle')
+          setPlaybackBlocked(false)
+          setJoinError('You were disconnected. Rejoin with camera and microphone off, or preview them first.')
+          onJoinedChange?.(false)
+          toast.error('Meeting disconnected. Please rejoin from Meetings.')
+        })
 
       await liveRoom.connect(payload.data.serverUrl, payload.data.token, { autoSubscribe: true })
+      if (attempt !== joinAttemptRef.current) {
+        void liveRoom.disconnect()
+        return
+      }
+      // Playback permission is independent of capture permission. This never
+      // turns on a camera or microphone; a gesture banner handles browser blocks.
+      void liveRoom.startAudio().catch(() => {
+        if (roomRef.current === liveRoom) setPlaybackBlocked(true)
+      })
       const previewTracks = [
         previewAudioTrackRef.current,
         previewVideoTrackRef.current,
@@ -513,7 +490,15 @@ export default function ManagedMeetingRoomSession({
         )))
         publishResults.forEach((result, index) => {
           if (result.status === 'fulfilled') publishedKinds.add(previewTracks[index].kind)
+          else {
+            previewTracks[index].stop()
+            setMediaError('Your camera or microphone could not be shared. Use its control to try again.')
+          }
         })
+      }
+      if (attempt !== joinAttemptRef.current) {
+        void liveRoom.disconnect()
+        return
       }
 
       // Never call set*Enabled(true) for a missing preview track: LiveKit would
@@ -527,10 +512,15 @@ export default function ManagedMeetingRoomSession({
           ? (videoOff ? previewVideoTrackRef.current?.mute() : previewVideoTrackRef.current?.unmute())
           : Promise.resolve(),
       ])
+      if (attempt !== joinAttemptRef.current) {
+        void liveRoom.disconnect()
+        return
+      }
       if (previewVideoElementRef.current && previewVideoTrackRef.current) {
         previewVideoTrackRef.current.detach(previewVideoElementRef.current)
       }
       setRoom(liveRoom)
+      connectedRef.current = true
       setJoined(true)
       meetingSessionStartedAtRef.current = new Date().toISOString()
       setConnectionLabel('Connected')
@@ -539,6 +529,7 @@ export default function ManagedMeetingRoomSession({
     } catch (error) {
       console.error('[Managed meeting] Join failed:', error)
       pendingRoom?.disconnect()
+      if (attempt !== joinAttemptRef.current) return
       if (roomRef.current === pendingRoom) roomRef.current = null
       const message = getManagedMeetingJoinError(error)
       setJoinError(message)
@@ -547,10 +538,12 @@ export default function ManagedMeetingRoomSession({
       }
       toast.error(message)
     } finally {
-      joiningRef.current = false
-      setJoining(false)
+      if (attempt === joinAttemptRef.current) {
+        joiningRef.current = false
+        setJoining(false)
+      }
     }
-  }, [guestToken, handleData, joined, muted, onJoinedChange, refreshParticipants, roomId, videoOff])
+  }, [guestToken, handleData, joined, muted, onJoinedChange, refreshParticipants, roomId, stopPreviewTracks, videoOff])
 
   useEffect(() => {
     if (!autoJoin || joined || joiningRef.current || autoJoinAttemptedRef.current) return
@@ -559,10 +552,15 @@ export default function ManagedMeetingRoomSession({
   }, [autoJoin, join, joined])
 
   useEffect(() => () => {
+    joinAttemptRef.current += 1
+    connectedRef.current = false
+    joiningRef.current = false
+    autoJoinAttemptedRef.current = false
     previewAttemptRef.current += 1
     for (const timer of reactionTimers.current.values()) clearTimeout(timer)
     clearTimeout(chatNotificationTimerRef.current)
     roomRef.current?.disconnect()
+    roomRef.current = null
     stopPreviewTracks()
   }, [stopPreviewTracks])
 
@@ -667,12 +665,22 @@ export default function ManagedMeetingRoomSession({
     }
   }, [guestToken, joined, meeting?._id, muted, refreshTranscript, room])
 
-  const toggleMute = async () => {
-    const next = !muted
-    await room?.localParticipant.setMicrophoneEnabled(!next)
-    setMuted(next)
-    refreshParticipants(room)
+  const toggleDevice = async (kind) => {
+    const activeRoom = roomRef.current
+    if (!activeRoom || !connectedRef.current || mediaToggleRef.current.has(kind)) return
+    mediaToggleRef.current.add(kind)
+    try {
+      setMediaError('')
+      if (kind === 'audio') await activeRoom.localParticipant.setMicrophoneEnabled(!activeRoom.localParticipant.isMicrophoneEnabled)
+      else await activeRoom.localParticipant.setCameraEnabled(!activeRoom.localParticipant.isCameraEnabled)
+    } catch (error) {
+      setMediaError(getPreviewFailureMessage(error))
+    } finally {
+      mediaToggleRef.current.delete(kind)
+      if (roomRef.current === activeRoom) refreshParticipants(activeRoom)
+    }
   }
+  const toggleMute = () => toggleDevice('audio')
   const togglePreviewMute = async () => {
     const next = !muted
     const track = previewAudioTrackRef.current
@@ -685,12 +693,7 @@ export default function ManagedMeetingRoomSession({
     if (track) await (next ? track.mute() : track.unmute())
     setVideoOff(next)
   }
-  const toggleVideo = async () => {
-    const next = !videoOff
-    await room?.localParticipant.setCameraEnabled(!next)
-    setVideoOff(next)
-    refreshParticipants(room)
-  }
+  const toggleVideo = () => toggleDevice('video')
   const toggleScreen = async () => {
     try {
       const remotePresenter = participants.find((participant) => (
@@ -858,6 +861,22 @@ export default function ManagedMeetingRoomSession({
     openChatPanel()
   }
   const participantLabel = `${participants.length} participant${participants.length === 1 ? '' : 's'}`
+  const resumePlayback = async () => {
+    const activeRoom = roomRef.current
+    if (!activeRoom) return
+    // Both calls start inside the click gesture; neither acquires local media.
+    await Promise.allSettled([activeRoom.startAudio(), activeRoom.startVideo()])
+    if (roomRef.current === activeRoom) {
+      setPlaybackBlocked(!activeRoom.canPlaybackAudio || !activeRoom.canPlaybackVideo)
+    }
+  }
+  const mediaStatusBanner = joined && (playbackBlocked || mediaError) ? (
+    <div role="status" className="fixed left-1/2 top-16 z-[230] flex max-w-[92vw] -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-amber-400/40 bg-slate-900 px-4 py-3 text-sm text-white shadow-xl">
+      <span>{playbackBlocked ? 'Your browser paused meeting playback.' : mediaError}</span>
+      {playbackBlocked && <button type="button" onClick={resumePlayback} className="rounded-lg bg-indigo-600 px-3 py-2 font-semibold">Enable meeting audio &amp; video</button>}
+      {!playbackBlocked && <button type="button" onClick={() => setMediaError('')} aria-label="Dismiss media warning"><HiOutlineXMark className="h-5 w-5" /></button>}
+    </div>
+  ) : null
   const transcriptLabel = !guestToken && transcriptStatus !== 'off'
     ? (transcriptStatus === 'listening' ? 'Mira listening' : transcriptStatus)
     : null
@@ -992,9 +1011,13 @@ export default function ManagedMeetingRoomSession({
   if (isPip && isBubble) {
     return (
       <>
+        {mediaStatusBanner}
         {chatNotificationBanner}
         {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
-          <RemoteAudio key={`audio-${participant.identity}`} participant={participant.participant} />
+          <span key={`audio-${participant.identity}`}>
+            <RemoteAudio participant={participant.participant} />
+            <RemoteAudio participant={participant.participant} source={Track.Source.ScreenShareAudio} />
+          </span>
         ))}
         <button
           type="button"
@@ -1019,6 +1042,7 @@ export default function ManagedMeetingRoomSession({
   if (isPip && isCompact) {
     return (
       <>
+        {mediaStatusBanner}
         {endingMeetingOverlay}
         {chatNotificationBanner}
         <section
@@ -1027,7 +1051,10 @@ export default function ManagedMeetingRoomSession({
           data-meeting-pip="compact"
         >
         {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
-          <RemoteAudio key={`audio-${participant.identity}`} participant={participant.participant} />
+          <span key={`audio-${participant.identity}`}>
+            <RemoteAudio participant={participant.participant} />
+            <RemoteAudio participant={participant.participant} source={Track.Source.ScreenShareAudio} />
+          </span>
         ))}
 
         <div className="min-w-0 flex-1">
@@ -1096,6 +1123,7 @@ export default function ManagedMeetingRoomSession({
         : 'fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white'}
       data-meeting-pip={isPip ? 'expanded' : undefined}
     >
+      {mediaStatusBanner}
       {endingMeetingOverlay}
       {chatNotificationBanner}
       <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 dark:border-white/10 dark:bg-slate-900/90">
@@ -1146,7 +1174,10 @@ export default function ManagedMeetingRoomSession({
       </main>}
 
       {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
-        <RemoteAudio key={`audio-${participant.identity}`} participant={participant.participant} />
+          <span key={`audio-${participant.identity}`}>
+            <RemoteAudio participant={participant.participant} />
+            <RemoteAudio participant={participant.participant} source={Track.Source.ScreenShareAudio} />
+          </span>
       ))}
 
       <footer className="flex min-h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-slate-200 bg-white/90 px-3 dark:border-white/10 dark:bg-slate-900/90">
