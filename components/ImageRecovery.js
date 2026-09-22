@@ -23,6 +23,12 @@ export default function ImageRecovery() {
     }
 
     document.addEventListener('error', recoverImage, true)
+    // Server-rendered/cached images can fail before this effect attaches.
+    for (const image of document.images) {
+      if (image.complete && image.naturalWidth === 0 && image.getAttribute('src')) {
+        recoverImage({ target: image })
+      }
+    }
     return () => document.removeEventListener('error', recoverImage, true)
   }, [])
 

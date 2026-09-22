@@ -4,6 +4,8 @@ import {
   applyImageFallback,
   getFallbackImageSrc,
 } from '@/lib/imageFallback'
+import { render, act } from '@testing-library/react'
+import ImageRecovery from '@/components/ImageRecovery'
 
 describe('image recovery', () => {
   it('uses an avatar fallback for profile media behind Next image optimization', () => {
@@ -46,5 +48,29 @@ describe('image recovery', () => {
       applyImageFallback(image, 'https://example.com/original.png')
     ).toBe(false)
     expect(image.src).toContain('component-fallback.png')
+  })
+
+  it('does not repeatedly retry a failed fallback', () => {
+    const image = document.createElement('img')
+    image.alt = 'User avatar'
+    image.src = '/missing.jpg'
+    expect(applyImageFallback(image, image.src)).toBe(true)
+    expect(applyImageFallback(image, image.src)).toBe(false)
+  })
+
+  it('recovers images that failed before the listener mounted', () => {
+    jest.useFakeTimers()
+    const image = document.createElement('img')
+    image.alt = 'Employee profile'
+    image.src = '/missing.jpg'
+    Object.defineProperty(image, 'complete', { value: true })
+    Object.defineProperty(image, 'naturalWidth', { value: 0 })
+    document.body.appendChild(image)
+    const { unmount } = render(<ImageRecovery />)
+    act(() => jest.runOnlyPendingTimers())
+    expect(image.getAttribute('src')).toBe(DEFAULT_AVATAR_SRC)
+    unmount()
+    image.remove()
+    jest.useRealTimers()
   })
 })

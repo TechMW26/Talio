@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
+import MemberAvatar from '@/components/chat/MemberAvatar'
 
 // ── Confetti Launchers ──
 
@@ -154,23 +155,14 @@ function PersonCard({ person, type, index }) {
         }}
         transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <div className="w-24 h-24 rounded-full bg-white dark:bg-zinc-800 overflow-hidden ring-2 ring-white/50 dark:ring-zinc-700/50">
-          {person.profilePicture ? (
-            <img
-              src={person.profilePicture}
-              alt={`${person.firstName} ${person.lastName}`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className={`w-full h-full flex items-center justify-center text-2xl font-bold ${
-              isBirthday
-                ? 'bg-gradient-to-br from-pink-100 to-purple-100 text-pink-600 dark:from-pink-900/30 dark:to-purple-900/30 dark:text-pink-300'
-                : 'bg-gradient-to-br from-indigo-100 to-blue-100 text-indigo-600 dark:from-indigo-900/30 dark:to-blue-900/30 dark:text-indigo-300'
-            }`}>
-              {person.firstName?.[0]}{person.lastName?.[0]}
-            </div>
-          )}
-        </div>
+        <MemberAvatar
+          member={person}
+          className="w-24 h-24 ring-2 ring-white/50 dark:ring-zinc-700/50"
+          textClassName="text-2xl"
+          background={isBirthday
+            ? 'linear-gradient(135deg, #9d174d, #7e22ce)'
+            : 'linear-gradient(135deg, #4338ca, #2563eb)'}
+        />
       </motion.div>
 
       <div className="text-center">
