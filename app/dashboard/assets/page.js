@@ -1,5 +1,7 @@
 'use client'
 
+import usePermission from '@/hooks/usePermission'
+
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
@@ -69,7 +71,10 @@ export default function AssetsPage() {
   // User from localStorage
   const currentUser = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
   const userRole = currentUser?.role
-  const isAdmin = ['admin', 'hr', 'super_admin'].includes(userRole)
+  const { can } = usePermission()
+  const canCreateAsset = can('assets', 'create')
+  const canEditAsset = can('assets', 'edit')
+  const isAdmin = canCreateAsset || canEditAsset || can('assets', 'manage')
 
   // SWR: Assets (conditional URL based on role)
   const assetsUrl = useMemo(() => {
@@ -247,7 +252,7 @@ export default function AssetsPage() {
             {isAdmin ? 'Manage company assets and equipment' : 'View assets assigned to you'}
           </p>
         </div>
-        {['admin', 'hr', 'super_admin'].includes(userRole) && (
+        {canCreateAsset && (
           <div className="flex gap-2">
             <Button
               onPress={() => setIsBulkImportOpen(true)}
@@ -579,7 +584,7 @@ export default function AssetsPage() {
                       {selectedAsset.specs && <div><p className="text-xs font-medium uppercase tracking-wide text-gray-500">Specifications</p><p className="mt-1 text-sm text-gray-700">{selectedAsset.specs}</p></div>}
                     </div>
                   )}
-                  {isAdmin && (
+                  {canEditAsset && (
                     <div className="mt-6 flex justify-end">
                       <Button color="primary" startContent={<FaPen />} onPress={() => setIsEditingAsset(true)}>
                         Edit or Reassign

@@ -11,7 +11,6 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
-import { getTodayDateString } from '@/lib/timezone'
 import {
   calculateLeaveDays,
   normalizeLeaveBalances,
@@ -19,7 +18,6 @@ import {
 
 export default function ApplyLeavePage() {
   const router = useRouter()
-  const today = useMemo(() => getTodayDateString(), [])
 
   // Derive user/employeeId from localStorage
   const user = useMemo(() => getCurrentUser(), [])
@@ -169,10 +167,6 @@ export default function ApplyLeavePage() {
       return
     }
 
-    if (formData.startDate < today) {
-      toast.error('Start date cannot be in the past')
-      return
-    }
 
     await submitLeave.execute('/api/leave', {
       ...formData,
@@ -315,7 +309,6 @@ export default function ApplyLeavePage() {
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleChange}
-                      min={today}
                       isRequired
                     />
                     <Input
@@ -324,7 +317,7 @@ export default function ApplyLeavePage() {
                       name="endDate"
                       value={formData.endDate}
                       onChange={handleChange}
-                      min={formData.startDate || today}
+                      min={formData.startDate || undefined}
                       isDisabled={formData.isHalfDay}
                       isRequired
                     />

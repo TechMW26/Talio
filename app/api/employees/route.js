@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { syncReportingManager } from '@/lib/employeeReporting'
 import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 import bcrypt from 'bcryptjs'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
@@ -461,11 +462,7 @@ export async function POST(request) {
     }
 
     // If no explicit reporting manager is provided, derive from hierarchy assignments.
-    if (!employeeData.reportingManager) {
-      if (employeeData.assignedTeamLead) employeeData.reportingManager = employeeData.assignedTeamLead
-      else if (employeeData.assignedManager) employeeData.reportingManager = employeeData.assignedManager
-      else if (employeeData.reportsTo) employeeData.reportingManager = employeeData.reportsTo
-    }
+    syncReportingManager(employeeData)
 
     // Create employee first
     const employee = await TenantEmployee.create(employeeData)

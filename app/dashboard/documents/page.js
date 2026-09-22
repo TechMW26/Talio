@@ -12,6 +12,7 @@ import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
+import { fetchDocumentFile, downloadDocumentFile } from '@/lib/client/documentFile'
 
 export default function DocumentsPage() {
   const { user, employeeId } = useMemo(() => {
@@ -48,6 +49,28 @@ export default function DocumentsPage() {
   // Preview modal state
   const [previewDoc, setPreviewDoc] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [previewFile, setPreviewFile] = useState(null)
+  const [previewError, setPreviewError] = useState('')
+  const [previewAttempt, setPreviewAttempt] = useState(0)
+  useEffect(() => {
+    setPreviewFile(null)
+    setPreviewError('')
+    if (!showPreview || !previewDoc) return
+    const controller = new AbortController()
+    let objectUrl
+    fetchDocumentFile(previewDoc.fileUrl || previewDoc.url, { signal: controller.signal })
+      .then(blob => {
+        if (controller.signal.aborted) return
+        objectUrl = URL.createObjectURL(blob)
+        setPreviewFile({ url: objectUrl, type: blob.type })
+      })
+      .catch(error => { if (!controller.signal.aborted) setPreviewError(error.message) })
+    return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [showPreview, previewDoc, previewAttempt])
+  const downloadDocument = async (document) => {
+    try { await downloadDocumentFile(document) }
+    catch (error) { toast.error(error.message) }
+  }
 
   // Real-time updates
   const { socket, isConnected, subscribe, onDocumentUpdate } = useSocket()
@@ -322,14 +345,13 @@ export default function DocumentsPage() {
                           >
                             <FaEye />
                           </button>
-                          <a
-                            href={doc.fileUrl || doc.url}
-                            download={doc.fileName || doc.name}
+                          <button
+                            onClick={() => downloadDocument(doc)}
                             className="text-green-600 hover:text-green-900"
                             title="Download"
                           >
                             <FaDownload />
-                          </a>
+                          </button>
                           {!doc.isAadhaarDocument && (
                             <button
                               onClick={() => handleDelete(doc._id)}
@@ -378,6 +400,7 @@ export default function DocumentsPage() {
                   >
                     <SelectItem key="personal">Personal</SelectItem>
                     <SelectItem key="employment">Employment</SelectItem>
+                    <SelectItem key="experience">Experience letter</SelectItem>
                     <SelectItem key="tax">Tax</SelectItem>
                     <SelectItem key="other">Other</SelectItem>
                   </Select>
@@ -472,15 +495,23 @@ export default function DocumentsPage() {
               <ModalBody className="p-0">
                 {previewDoc && (
                   <div className="flex items-center justify-center bg-gray-100 min-h-[400px] max-h-[70vh]">
-                    {(previewDoc.fileType?.startsWith('image') || previewDoc.type?.startsWith('image') || previewDoc.isAadhaarDocument) ? (
+                    {previewError ? (
+                      <div role="alert" className="p-6 text-center text-default-700">
+                        <p>{previewError}</p>
+                        <Button className="mt-4" onPress={() => setPreviewAttempt(value => value + 1)}>Retry preview</Button>
+                      </div>
+                    ) : !previewFile ? (
+                      <p role="status" className="p-6 text-default-600">Loading document…</p>
+                    ) : (previewFile.type?.startsWith('image') || previewDoc.fileType?.startsWith('image') || previewDoc.type?.startsWith('image') || previewDoc.isAadhaarDocument) ? (
                       <img
-                        src={previewDoc.fileUrl || previewDoc.url}
+                        src={previewFile.url}
+                        onError={() => setPreviewError('This image could not be displayed. You can download the original file below.')}
                         alt={previewDoc.fileName || previewDoc.name}
                         className="max-w-full max-h-[70vh] object-contain"
                       />
-                    ) : previewDoc.fileType === 'application/pdf' || previewDoc.type === 'application/pdf' ? (
+                    ) : previewFile.type === 'application/pdf' || previewDoc.fileType === 'application/pdf' || previewDoc.type === 'application/pdf' ? (
                       <iframe
-                        src={previewDoc.fileUrl || previewDoc.url}
+                        src={previewFile.url}
                         className="w-full h-[70vh]"
                         title={previewDoc.fileName || previewDoc.name}
                       />
@@ -488,14 +519,7 @@ export default function DocumentsPage() {
                       <div className="text-center p-8">
                         <FaFile className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-600 mb-4">Preview not available for this file type</p>
-                        <a
-                          href={previewDoc.fileUrl || previewDoc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:text-primary-700 underline"
-                        >
-                          Open in new tab
-                        </a>
+                        <Button onPress={() => downloadDocument(previewDoc)}>Download original file</Button>
                       </div>
                     )}
                   </div>
@@ -505,14 +529,9 @@ export default function DocumentsPage() {
                 <Button variant="light" onPress={onClose}>
                   Close
                 </Button>
-                <a
-                  href={previewDoc?.fileUrl || previewDoc?.url}
-                  download={previewDoc?.fileName || previewDoc?.name}
-                >
-                  <Button color="primary" startContent={<FaDownload />}>
+                  <Button color="primary" startContent={<FaDownload />} onPress={() => previewDoc && downloadDocument(previewDoc)}>
                     Download
                   </Button>
-                </a>
               </ModalFooter>
             </>
           )}

@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useEffect, useState } from 'react'
 import { checkPermission, getPageSlugForPath } from '@/lib/permissions.shared'
+import { getPermissionsForLegacyRole } from '@/lib/systemRoles'
 
 /**
  * usePermission — client-side permission checking hook.
@@ -15,29 +16,23 @@ import { checkPermission, getPageSlugForPath } from '@/lib/permissions.shared'
  *   if (canView('payroll')) { ... }
  */
 export default function usePermission() {
-    // Read permissions from localStorage user object
-    const permissions = useMemo(() => {
-        if (typeof window === 'undefined') return null
-        try {
-            const userData = localStorage.getItem('user')
-            if (!userData) return null
-            const user = JSON.parse(userData)
-            return user.permissions || user.permissionsCache || null
-        } catch {
-            return null
+    const [user, setUser] = useState(null)
+    useEffect(() => {
+        const refresh = () => {
+            try { setUser(JSON.parse(localStorage.getItem('user') || 'null')) }
+            catch { setUser(null) }
+        }
+        refresh()
+        window.addEventListener('storage', refresh)
+        window.addEventListener('talio:session-updated', refresh)
+        return () => {
+            window.removeEventListener('storage', refresh)
+            window.removeEventListener('talio:session-updated', refresh)
         }
     }, [])
-
-    const userRole = useMemo(() => {
-        if (typeof window === 'undefined') return null
-        try {
-            const userData = localStorage.getItem('user')
-            if (!userData) return null
-            return JSON.parse(userData).role
-        } catch {
-            return null
-        }
-    }, [])
+    const permissions = useMemo(() => user?.permissions || user?.permissionsCache
+        || (user && !user.roleId ? getPermissionsForLegacyRole(user.role) : null), [user])
+    const userRole = user?.role
 
     /**
      * Check if the current user has a specific permission.

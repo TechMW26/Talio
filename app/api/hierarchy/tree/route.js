@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { LEVEL_NAMES, inferLevelFromTitle } from '@/lib/designationLevels'
+import { getReportingParent } from '@/lib/employeeReporting'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,12 +31,12 @@ function isHrText(value) {
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Team'])
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
 
-    const { Employee, User, Team } = auth.models
+    const { Employee, User } = auth.models
     const viewerUserId = String(auth.user?._id || auth.user?.userId || '')
 
     const employees = await Employee.find({ status: { $in: ['active', 'probation', 'on_leave'] } })
@@ -51,11 +52,6 @@ export async function GET(request) {
     const users = await User.find({ employeeId: { $in: employees.map((e) => e._id) } })
       .select('_id employeeId isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf teamLeaderOf teamMemberOf')
       .lean()
-
-    const teams = await Team.find({ isActive: { $ne: false } })
-      .select('_id name department teamLeaders members')
-      .lean()
-      .catch(() => [])
 
     const employeesById = new Map(employees.map((e) => [String(e._id), e]))
     const userByEmployeeId = new Map(users.map((u) => [String(u.employeeId), u]))
@@ -76,16 +72,6 @@ export async function GET(request) {
       if (!deptToMembers.has(dId)) deptToMembers.set(dId, [])
       deptToMembers.get(dId).push(String(emp._id))
       if (emp.department?.name) deptName.set(dId, emp.department.name)
-    }
-
-    // Team index
-    const teamMap = new Map()
-    for (const t of teams) {
-      teamMap.set(String(t._id), {
-        department: t.department ? String(t.department) : null,
-        leaders: (t.teamLeaders || []).map(String),
-        members: (t.members || []).map(String),
-      })
     }
 
     // Compute & cache level per employee
@@ -112,45 +98,13 @@ export async function GET(request) {
       if (head) deptToHead.set(dId, head)
     }
 
-    // Parent resolution strictly uses, in order:
-    //   1. assignedManager
-    //   2. assignedTeamLead
-    //   3. reportsTo (executive reporting chain)
-    //   4. department head -> department members (only when emp is not the head)
-    // No inferred reporting chains, no team-leader inference, no "closest superior" fallback.
+    // Match the relationship used by employee records and workflow routing.
+    // Never invent a reporting line from a department or designation alone.
     const parentOf = new Map()
     for (const emp of employees) {
       const empId = String(emp._id)
-      const dId = emp.department ? String(emp.department._id || emp.department) : null
-      let parent = null
-
-      const assignedManagerId = emp.assignedManager ? String(emp.assignedManager) : null
-      if (assignedManagerId && assignedManagerId !== empId && employeesById.has(assignedManagerId)) {
-        parent = assignedManagerId
-      }
-
-      if (!parent) {
-        const assignedLeadId = emp.assignedTeamLead ? String(emp.assignedTeamLead) : null
-        if (assignedLeadId && assignedLeadId !== empId && employeesById.has(assignedLeadId)) {
-          parent = assignedLeadId
-        }
-      }
-
-      if (!parent) {
-        const reportsToId = emp.reportsTo ? String(emp.reportsTo) : null
-        if (reportsToId && reportsToId !== empId && employeesById.has(reportsToId)) {
-          parent = reportsToId
-        }
-      }
-
-      if (!parent && dId) {
-        const headId = deptToHead.get(dId)
-        if (headId && headId !== empId && employeesById.has(headId)) {
-          parent = headId
-        }
-      }
-
-      parentOf.set(empId, parent)
+      const parent = getReportingParent(emp)
+      parentOf.set(empId, parent !== empId && employeesById.has(parent) ? parent : null)
     }
 
     // Cycle protection

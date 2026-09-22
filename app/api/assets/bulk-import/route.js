@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { NextResponse, after } from 'next/server'
+import { requirePermission } from '@/lib/permissions'
+import { notifyAssetAssignment } from '@/lib/assetNotifications.server'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
 import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
 import { generateContent } from '@/lib/gemini'
@@ -182,16 +183,11 @@ JSON only:`
 // POST - Bulk import assets
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Asset', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
+    const auth = await requirePermission('assets', 'create')(request, ['Asset', 'Employee', 'Notification'])
+    if (auth.denied) return auth.denied
+    const { models } = auth
     const { Asset, Employee } = models
 
-    if (!['admin', 'hr'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Only admin and HR can bulk import assets' }, { status: 403 })
-    }
 
     const formData = await request.formData()
     const file = formData.get('file')
@@ -251,6 +247,7 @@ export async function POST(request) {
 
     // Import mode — create assets
     const results = { created: 0, skipped: 0, errors: [] }
+    const assignedAssets = []
 
     // Build employee lookup for assignment
     let employeeByEmail = {}
@@ -348,7 +345,8 @@ export async function POST(request) {
           assetData.status = 'assigned'
         }
 
-        await Asset.create(assetData)
+        const asset = await Asset.create(assetData)
+        if (asset.assignedTo) assignedAssets.push(asset)
         existingCodes.add(assetCode.toLowerCase())
         results.created++
       } catch (rowErr) {
@@ -361,6 +359,12 @@ export async function POST(request) {
     if (results.created > 0) {
       emitAssetUpdate({ action: 'bulk-import', count: results.created }, [], { broadcast: true })
     }
+    if (assignedAssets.length) after(async () => {
+      for (const asset of assignedAssets) {
+        try { await notifyAssetAssignment({ models, asset }) }
+        catch (error) { console.error('[Asset import] Notification failed:', error) }
+      }
+    })
 
     return NextResponse.json({
       success: true,

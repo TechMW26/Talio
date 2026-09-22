@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { NextResponse, after } from 'next/server'
+import { requirePermission } from '@/lib/permissions'
+import { notifyAssetAssignment } from '@/lib/assetNotifications.server'
 import mongoose from 'mongoose'
 import { normalizeAssetInput } from '@/utils/assetData'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
@@ -14,17 +15,11 @@ const isValidObjectId = (id) => {
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Asset', 'Employee', 'User', 'Notification'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Asset, Employee, User, Notification } = models
+    const auth = await requirePermission('assets', 'edit')(request, ['Asset', 'Employee', 'Notification'])
+    if (auth.denied) return auth.denied
+    const { models } = auth
+    const { Asset, Employee } = models
 
-    // Role check
-    if (!['admin', 'hr', 'super_admin'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can update assets' }, { status: 403 })
-    }
 
     const input = await request.json()
     const { data, errors } = normalizeAssetInput(input, { partial: true })
@@ -66,6 +61,8 @@ export async function PUT(request, { params }) {
       )
     }
 
+    const previous = await Asset.findById(id).select('assignedTo').lean()
+    if (!previous) return NextResponse.json({ success: false, message: 'Asset not found' }, { status: 404 })
     if (data.assignedTo) data.assignedDate = new Date()
     else if (Object.hasOwn(data, 'assignedTo')) data.assignedDate = null
 
@@ -82,55 +79,7 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // Emit Socket.IO event for asset assignments/updates
-    try {
-      const io = global.io
-      if (io && data.assignedTo) {
-        const employeeDoc = await Employee.findById(data.assignedTo).select('userId')
-        const employeeUserId = employeeDoc?.userId
-
-        if (employeeUserId) {
-          const action = data.status === 'returned' ? 'returned' : 'assigned'
-          const icon = action === 'returned' ? '↩️' : '🔧'
-
-          // Socket.IO event
-          io.to(`user:${employeeUserId}`).emit('asset-update', {
-            asset,
-            action,
-            message: `Asset "${asset.name}" (${asset.assetCode}) has been ${action}`,
-            timestamp: new Date()
-          })
-          console.log(`✅ [Socket.IO] Asset update sent to user:${employeeUserId}`)
-
-          // FCM push notification
-          try {
-            const { sendPushToUser } = require('@/lib/pushNotification')
-            await sendPushToUser(
-              employeeUserId,
-              {
-                title: `${icon} Asset ${action === 'assigned' ? 'Assigned' : 'Returned'}`,
-                body: `Asset "${asset.name}" (${asset.assetCode}) has been ${action}`,
-              },
-              {
-                clickAction: '/dashboard/assets',
-                eventType: 'asset_update',
-                data: {
-                  assetId: asset._id.toString(),
-                  action,
-                  type: 'asset_update'
-                },
-                models: { User, Notification }
-              }
-            )
-            console.log(`📲 [FCM] Asset notification sent to user:${employeeUserId}`)
-          } catch (fcmError) {
-            console.error('Failed to send asset FCM notification:', fcmError)
-          }
-        }
-      }
-    } catch (socketError) {
-      console.error('Failed to send asset socket notification:', socketError)
-    }
+    after(() => notifyAssetAssignment({ models, asset, previousAssignee: previous.assignedTo }).catch(error => console.error('[Asset] Notification failed:', error)))
 
     emitAssetUpdate(asset, [], { action: 'update', broadcast: true })
 
@@ -159,17 +108,11 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Asset'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
+    const auth = await requirePermission('assets', 'delete')(request, ['Asset'])
+    if (auth.denied) return auth.denied
+    const { models } = auth
     const { Asset } = models
 
-    // Role check
-    if (!['admin', 'hr', 'super_admin'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can delete assets' }, { status: 403 })
-    }
 
     const { id } = await params
 

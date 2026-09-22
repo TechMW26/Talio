@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { syncReportingManager } from '@/lib/employeeReporting'
 import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
 import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
@@ -506,11 +507,7 @@ export async function PUT(request, { params }) {
       }
     }
 
-    if (!data.reportingManager) {
-      if (data.assignedTeamLead) data.reportingManager = data.assignedTeamLead
-      else if (data.assignedManager) data.reportingManager = data.assignedManager
-      else if (data.reportsTo) data.reportingManager = data.reportsTo
-    }
+    syncReportingManager(data, employee)
 
     // System role belongs to the linked User document, not the Employee document.
     delete data.systemRole

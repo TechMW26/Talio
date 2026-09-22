@@ -774,7 +774,7 @@ export default function EditEmployeePage() {
 
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-2">
-                    Assigned Team Lead
+                    Assigned Team Lead (optional)
                   </label>
                   <Select
                     name="assignedTeamLead"
@@ -786,6 +786,7 @@ export default function EditEmployeePage() {
                     }}
                     isDisabled={!allowTeamLeadAssignment}
                     aria-label="Assigned Team Lead"
+                    description="Leave empty when the employee reports directly to their assigned manager."
                     placeholder={allowTeamLeadAssignment ? 'Select Team Lead' : 'Not required for selected role level'}
                     classNames={{ trigger: "bg-white" }}
                   >
@@ -797,7 +798,7 @@ export default function EditEmployeePage() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-default-700 mb-2">
-                    Reports To
+                    Executive escalation
                   </label>
                   <Select
                     name="reportsTo"
@@ -809,6 +810,7 @@ export default function EditEmployeePage() {
                     }}
                     isDisabled={!canAssignReportsTo}
                     aria-label="Reports To"
+                    description="Optional when a manager or team lead is assigned. This is not the direct manager field."
                     placeholder={canAssignReportsTo ? (selectedLevel === 8 ? 'Select Director' : selectedLevel === 7 ? 'Select Assistant Director or Director' : 'Select Director, Assistant Director, or C-Suite') : 'Directors do not report to anyone'}
                     classNames={{ trigger: "bg-white" }}
                   >

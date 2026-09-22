@@ -763,7 +763,7 @@ export default function AddEmployeePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-default-700 mb-2">
-                      Assigned Team Lead
+                      Assigned Team Lead (optional)
                     </label>
                     <Select
                       name="assignedTeamLead"
@@ -775,6 +775,7 @@ export default function AddEmployeePage() {
                       }}
                       isDisabled={!allowTeamLeadAssignment}
                       aria-label="Assigned Team Lead"
+                      description="Leave empty when the employee reports directly to their assigned manager."
                       placeholder={allowTeamLeadAssignment ? 'Select Team Lead' : 'Not required for selected role level'}
                       classNames={{
                         trigger: "bg-white border border-default-300 text-default-700 data-[hover=true]:border-default-400",
@@ -791,7 +792,7 @@ export default function AddEmployeePage() {
 
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-default-700 mb-2">
-                      Reports To {requireReportsTo && <span className="text-danger">*</span>}
+                      Executive escalation {requireReportsTo && !formData.assignedManager && !formData.assignedTeamLead && <span className="text-danger">*</span>}
                     </label>
                     <Select
                       name="reportsTo"
@@ -802,7 +803,8 @@ export default function AddEmployeePage() {
                         setFormData((prev) => ({ ...prev, reportsTo: String(value) }))
                       }}
                       isDisabled={!requireReportsTo}
-                      isRequired={requireReportsTo}
+                      isRequired={requireReportsTo && !formData.assignedManager && !formData.assignedTeamLead}
+                      description="Optional when a manager or team lead is assigned. This is not the direct manager field."
                       aria-label="Reports To"
                       placeholder={requireReportsTo ? (selectedLevel === 8 ? 'Select Director' : selectedLevel === 7 ? 'Select Assistant Director or Director' : 'Select Director, Assistant Director, or C-Suite') : 'Directors do not report to anyone'}
                       classNames={{

@@ -575,7 +575,7 @@ export default function EmployeesPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Designation</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Level</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
+                      <th className="sticky right-0 z-10 bg-content1 px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-content1 divide-y divide-default-200">
@@ -635,7 +635,7 @@ export default function EmployeesPage() {
                             </Chip>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="sticky right-0 z-10 bg-content1 px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
                             {canViewEmployeeDetails() && (
                               <Button isIconOnly variant="light" color="primary" size="sm" onPress={() => router.push(`/dashboard/employees/${employee._id}`)} title="View Details">

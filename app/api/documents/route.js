@@ -24,6 +24,12 @@ export async function GET(request) {
     const actorUser = await User.findById(user._id || user.userId).select('employeeId').lean()
     const actorEmployeeId = actorUser?.employeeId || user.employeeId
 
+    if (employeeId && !mongoose.Types.ObjectId.isValid(employeeId)) {
+      return NextResponse.json({ success: false, message: 'Invalid employee id' }, { status: 400 })
+    }
+    if (!canManageDocuments && employeeId && String(actorEmployeeId || '') !== employeeId) {
+      return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
+    }
     if (!canManageDocuments) {
       if (!actorEmployeeId) {
         return NextResponse.json({ success: true, data: [] })
@@ -48,75 +54,41 @@ export async function GET(request) {
     // Convert to plain objects
     let allDocuments = documents.map(doc => doc.toObject ? doc.toObject() : doc)
 
-    // If fetching for a specific employee, also include Aadhaar documents from User's profileCompletion
-    if (employeeId && (!category || category === 'identity')) {
-      try {
-        // Convert employeeId to ObjectId if valid
-        const employeeObjectId = mongoose.Types.ObjectId.isValid(employeeId) 
-          ? new mongoose.Types.ObjectId(employeeId) 
-          : employeeId
-
-        // Find the user with this employeeId
-        const userWithAadhaar = await User.findOne({ employeeId: employeeObjectId })
-          .select('profileCompletion')
-          .lean()
-
-        if (userWithAadhaar?.profileCompletion) {
-          const { aadhaarFront, aadhaarBack } = userWithAadhaar.profileCompletion
-          
-          // Get employee details for the document
-          const employee = await Employee.findById(employeeId).select('firstName lastName employeeCode').lean()
-
-          // Add Aadhaar Front if it exists
-          if (aadhaarFront?.url) {
-            allDocuments.push({
-              _id: `aadhaar-front-${employeeId}`,
-              name: 'Aadhaar Card (Front)',
-              fileName: 'Aadhaar Card (Front)',
-              category: 'identity',
-              url: aadhaarFront.url,
-              fileUrl: aadhaarFront.url,
-              fileId: aadhaarFront.fileId,
-              type: 'image',
-              fileType: 'image',
-              employee: employee,
-              uploadedBy: null,
-              uploadedByLabel: 'Employee self-service',
-              createdAt: aadhaarFront.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
-              updatedAt: aadhaarFront.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
-              isAadhaarDocument: true,
-              isSystemGenerated: true,
-            })
-          }
-
-          // Add Aadhaar Back if it exists
-          if (aadhaarBack?.url) {
-            allDocuments.push({
-              _id: `aadhaar-back-${employeeId}`,
-              name: 'Aadhaar Card (Back)',
-              fileName: 'Aadhaar Card (Back)',
-              category: 'identity',
-              url: aadhaarBack.url,
-              fileUrl: aadhaarBack.url,
-              fileId: aadhaarBack.fileId,
-              type: 'image',
-              fileType: 'image',
-              employee: employee,
-              uploadedBy: null,
-              uploadedByLabel: 'Employee self-service',
-              createdAt: aadhaarBack.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
-              updatedAt: aadhaarBack.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
-              isAadhaarDocument: true,
-              isSystemGenerated: true,
-            })
-          }
-        }
-      } catch (aadhaarError) {
-        // Log but don't fail the whole request if Aadhaar fetch fails
-        console.error('Error fetching Aadhaar documents:', aadhaarError)
+    // Use the authorized employee scope for both document stores.
+    if (!category || category === 'identity') {
+      const profileQuery = {
+        ...(query.employee ? { employeeId: query.employee } : { employeeId: { $ne: null } }),
+        $or: [
+          { 'profileCompletion.aadhaarFront.url': { $exists: true, $ne: '' } },
+          { 'profileCompletion.aadhaarBack.url': { $exists: true, $ne: '' } },
+        ],
       }
-
-      // Sort all documents by createdAt (newest first)
+      const profiles = await User.find(profileQuery)
+        .select('employeeId profileCompletion.aadhaarFront profileCompletion.aadhaarBack profileCompletion.firstLoginAt')
+        .lean()
+      const employees = profiles.length
+        ? await Employee.find({ _id: { $in: profiles.map(profile => profile.employeeId) } })
+          .select('firstName lastName employeeCode').lean()
+        : []
+      const employeeMap = new Map(employees.map(employee => [String(employee._id), employee]))
+      for (const profile of profiles) {
+        const employee = employeeMap.get(String(profile.employeeId))
+        if (!employee) continue
+        for (const side of ['Front', 'Back']) {
+          const file = profile.profileCompletion?.[`aadhaar${side}`]
+          if (!file?.url) continue
+          allDocuments.push({
+            _id: `aadhaar-${side.toLowerCase()}-${profile.employeeId}`,
+            name: `Aadhaar Card (${side})`, fileName: `Aadhaar Card (${side})`,
+            category: 'identity', url: file.url, fileUrl: file.url, fileId: file.fileId,
+            type: 'image', fileType: 'image', employee,
+            uploadedBy: null, uploadedByLabel: 'Employee self-service',
+            createdAt: file.uploadedAt || profile.profileCompletion.firstLoginAt,
+            updatedAt: file.uploadedAt || profile.profileCompletion.firstLoginAt,
+            isAadhaarDocument: true, isSystemGenerated: true,
+          })
+        }
+      }
       allDocuments.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
     }
 

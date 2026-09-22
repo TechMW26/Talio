@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import mongoose from 'mongoose'
+import { EMPLOYED_STATUSES, ensureEmployeeLeaveBalances } from '@/lib/leaveAllocation.server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, buildCachePattern, clearCachePattern, getCache, setCache } from '@/lib/cache'
 import {
@@ -7,120 +9,55 @@ import {
   normalizeLeaveBalances,
 } from '@/lib/leaveData'
 
-// GET - Get leave balances
+// GET - Get balances only within the actor's authorized employee scope.
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['LeaveBalance', 'Employee', 'LeaveType'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     const { user, models, tenant } = auth
-    const { LeaveBalance, Employee, LeaveType } = models
-
+    const { LeaveBalance, Employee } = models
     const { searchParams } = new URL(request.url)
-    const employeeId = searchParams.get('employeeId')
-    const year = parseInt(searchParams.get('year')) || new Date().getFullYear()
-
-    // If employeeId is provided, get balance for specific employee
-    if (employeeId) {
-      const cacheKey = buildCacheKey({
-        tenantId: tenant?.databaseName,
-        role: user.role,
-        userId: user._id || user.userId,
-        namespace: 'leave-balance',
-        params: { employeeId, year, formatVersion: 2 }
-      })
-
-      const cached = await getCache(cacheKey)
-      if (cached) {
-        return NextResponse.json(cached)
-      }
-
-      const leaveBalances = await LeaveBalance.find({
-        employee: employeeId,
-        year: year
-      }).populate('leaveType', 'name color code').lean()
-
-      const response = {
-        success: true,
-        data: normalizeLeaveBalances(leaveBalances),
-      }
-
-      await setCache(cacheKey, response, 5 * 60)
-
-      return NextResponse.json(response)
+    const requestedEmployee = searchParams.get('employeeId')
+    const rawYear = searchParams.get('year')
+    const year = rawYear === null ? new Date().getFullYear() : Number(rawYear)
+    if (!Number.isInteger(year) || year < 1900 || year > 9998
+      || (requestedEmployee && !mongoose.Types.ObjectId.isValid(requestedEmployee))) {
+      return NextResponse.json({ success: false, message: 'Invalid employee or leave year' }, { status: 400 })
     }
-
-    // If no employeeId and user is admin/hr, get all balances
-    if (['admin', 'hr'].includes(user.role)) {
-      const cacheKey = buildCacheKey({
-        tenantId: tenant?.databaseName,
-        role: user.role,
-        userId: 'all',
-        namespace: 'leave-balance',
-        params: { year, scope: 'all', formatVersion: 2 }
-      })
-
-      const cached = await getCache(cacheKey)
-      if (cached) {
-        return NextResponse.json(cached)
-      }
-
-      const leaveBalances = await LeaveBalance.find({ year: year })
-        .populate('employee', 'employeeCode firstName lastName email department')
-        .populate('leaveType', 'name color code')
-        .sort({ 'employee.employeeCode': 1 })
-        .lean()
-
-      const response = {
-        success: true,
-        data: normalizeLeaveBalances(leaveBalances),
-      }
-
-      await setCache(cacheKey, response, 5 * 60)
-
-      return NextResponse.json(response)
+    const canViewAll = ['admin', 'super_admin', 'hr'].includes(user.role)
+    let ownId = String(user.employeeId?._id || user.employeeId || '')
+    if (!canViewAll && !ownId) {
+      const ownEmployee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
+      ownId = String(ownEmployee?._id || '')
     }
-
-    // For regular employees, get their own balance
-    const employee = await Employee.findOne({ _id: user._id || user.userId })
-    if (!employee) {
-      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    if (!canViewAll && requestedEmployee && requestedEmployee !== ownId) {
+      return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
     }
-
+    const employeeId = requestedEmployee || (!canViewAll ? ownId : null)
+    if (!canViewAll && !employeeId) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     const cacheKey = buildCacheKey({
-      tenantId: tenant?.databaseName,
-      role: user.role,
-      userId: user._id || user.userId,
-      namespace: 'leave-balance',
-      params: { employeeId: employee._id.toString(), year, formatVersion: 2 }
+      tenantId: tenant.databaseName, role: user.role, userId: user._id || user.userId,
+      namespace: 'leave-balance', params: { employeeId, year, formatVersion: 3 },
     })
-
     const cached = await getCache(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
+    if (cached) return NextResponse.json(cached)
+    let employeeFilter
+    if (employeeId) {
+      await ensureEmployeeLeaveBalances({ models, employeeId, year })
+      employeeFilter = employeeId
+    } else {
+      const eligible = await Employee.find({ status: { $in: EMPLOYED_STATUSES } }).select('_id').lean()
+      employeeFilter = { $in: eligible.map(employee => employee._id) }
     }
-
-    const leaveBalances = await LeaveBalance.find({
-      employee: employee._id,
-      year: year
-    }).populate('leaveType', 'name color code').lean()
-
-    const response = {
-      success: true,
-      data: normalizeLeaveBalances(leaveBalances),
-    }
-
-    await setCache(cacheKey, response, 5 * 60)
-
+    const balances = await LeaveBalance.find({ employee: employeeFilter, year })
+      .populate('employee', 'employeeCode firstName lastName email department')
+      .populate('leaveType', 'name color code').lean()
+    const response = { success: true, data: normalizeLeaveBalances(balances) }
+    await setCache(cacheKey, response, 60)
     return NextResponse.json(response)
   } catch (error) {
     console.error('Get leave balance error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch leave balance' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, message: 'Failed to fetch leave balance' }, { status: 500 })
   }
 }
 
@@ -136,7 +73,7 @@ export async function POST(request) {
     const { LeaveBalance, Employee, LeaveType } = models
 
     // Only admin/hr can create/update leave balances
-    if (!['admin', 'hr'].includes(user.role)) {
+    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 

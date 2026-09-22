@@ -65,9 +65,7 @@ export default function HelpdeskManagePage() {
   const handleUpdateTicket = () => {
     if (!selectedTicket) return
     const updateData = { status: newStatus }
-    if (newStatus === 'resolved' && selectedTicket.status !== 'resolved') updateData.resolvedDate = new Date()
-    if (newStatus === 'closed' && selectedTicket.status !== 'closed') updateData.closedDate = new Date()
-    if (assignTo) { updateData.assignedTo = assignTo; if (!selectedTicket.assignedTo) updateData.assignedDate = new Date() }
+    if (assignTo !== (selectedTicket.assignedTo?._id || '')) updateData.assignedTo = assignTo || null
     updateMutation.execute(`/api/helpdesk/${selectedTicket._id}`, updateData, { method: 'PATCH' })
   }
 

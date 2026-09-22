@@ -94,7 +94,7 @@ export default function SpecialRequestPage({ requestType, title, description }) 
               <Input
                 type="date"
                 label={isEarlyLeave ? 'Request Date' : 'Start Date'}
-                min={today}
+                min={requestType === 'early_leave' ? today : undefined}
                 value={form.startDate}
                 onValueChange={startDate => setForm(current => ({
                   ...current,
@@ -107,7 +107,7 @@ export default function SpecialRequestPage({ requestType, title, description }) 
                 <Input
                   type="date"
                   label="End Date"
-                  min={form.startDate || today}
+                  min={form.startDate || undefined}
                   value={form.endDate}
                   onValueChange={endDate => setForm(current => ({ ...current, endDate }))}
                   isRequired

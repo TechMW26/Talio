@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { NextResponse, after } from 'next/server'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
+import { requirePermission, checkPermission } from '@/lib/permissions'
+import { notifyAssetAssignment } from '@/lib/assetNotifications.server'
 import mongoose from 'mongoose'
 import { normalizeAssetInput, normalizeAssetStatus } from '@/utils/assetData'
 
@@ -14,10 +15,8 @@ const isValidObjectId = (id) => {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Asset'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
+    const auth = await requirePermission('assets', 'view')(request, ['Asset'])
+    if (auth.denied) return auth.denied
     const { user, models } = auth
     const { Asset } = models
 
@@ -26,6 +25,13 @@ export async function GET(request) {
     const status = searchParams.get('status')
 
     const query = {}
+    const managesInventory = ['create', 'edit', 'manage', 'assign'].some(action => checkPermission(user.permissions, 'assets', action))
+    if (!managesInventory) {
+      const ownId = String(user.employeeId?._id || user.employeeId || '')
+      if (!isValidObjectId(ownId)) return NextResponse.json({ success: true, data: [] })
+      if (employeeId && employeeId !== ownId) return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
+      query.assignedTo = ownId
+    }
 
     if (employeeId) {
       if (!isValidObjectId(employeeId)) {
@@ -65,17 +71,11 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Asset', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
+    const auth = await requirePermission('assets', 'create')(request, ['Asset', 'Employee', 'Notification'])
+    if (auth.denied) return auth.denied
     const { user, models } = auth
     const { Asset, Employee } = models
 
-    // Check if user has permission
-    if (!['admin', 'hr', 'super_admin'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can add assets' }, { status: 403 })
-    }
 
     const input = await request.json()
     const { data, errors } = normalizeAssetInput(input)
@@ -107,6 +107,8 @@ export async function POST(request) {
 
     const populatedAsset = await Asset.findById(asset._id)
       .populate('assignedTo', 'firstName lastName employeeCode')
+
+    after(() => notifyAssetAssignment({ models, asset: populatedAsset }).catch(error => console.error('[Asset] Notification failed:', error)))
 
     // Emit real-time event
     emitAssetUpdate(populatedAsset, [], { action: 'create', broadcast: true })

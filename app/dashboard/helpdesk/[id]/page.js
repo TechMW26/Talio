@@ -10,10 +10,12 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import usePermission from '@/hooks/usePermission'
 
 export default function TicketDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { can } = usePermission()
   const [newComment, setNewComment] = useState('')
   const commentsEndRef = useRef(null)
 
@@ -58,7 +60,7 @@ export default function TicketDetailPage() {
     })
   }
 
-  const canManageTicket = user && ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
+  const canManageTicket = can('helpdesk_manage', 'edit')
 
   if (isLoading) {
     return (

@@ -149,6 +149,23 @@ describe('employee update references', () => {
     expect(body).toMatchObject({ success: true, message: 'Employee updated successfully' })
   })
 
+  test('clearing the team lead reroutes saved approvals to the retained manager', async () => {
+    const { models, existingEmployee } = createModels()
+    const managerId = '111111111111111111111111'
+    existingEmployee.designationLevel = 2
+    existingEmployee.assignedManager = managerId
+    existingEmployee.assignedTeamLead = '222222222222222222222222'
+    existingEmployee.reportingManager = existingEmployee.assignedTeamLead
+    getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'admin-1', role: 'admin' }, tenant: { databaseName: 'talio_company_test' }, models })
+    const response = await updateEmployee(new Request(`http://localhost:3000/api/employees/${EMPLOYEE_ID}`, {
+      method: 'PUT', body: JSON.stringify({ assignedTeamLead: '' }),
+    }), { params: Promise.resolve({ id: EMPLOYEE_ID }) })
+    expect(response.status).toBe(200)
+    expect(models.Employee.findByIdAndUpdate).toHaveBeenCalledWith(EMPLOYEE_ID,
+      expect.objectContaining({ assignedTeamLead: null, reportingManager: managerId }),
+      { new: true, runValidators: true })
+  })
+
   test('rejects a malformed relationship with a precise field error', async () => {
     const { models } = createModels()
     getAuthAndModels.mockResolvedValue({
