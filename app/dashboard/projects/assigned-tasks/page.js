@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchCompleteEmployeeResponse } from '@/lib/client/employeePages'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -190,7 +191,7 @@ export default function AssignedTasksPage() {
         }
       } else {
         // For standalone tasks, fetch all employees
-        const response = await fetch(`/api/employees/list?includeAdmins=true`, {
+        const response = await fetchCompleteEmployeeResponse(`/api/employees/list?includeAdmins=true`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         const data = await response.json()

@@ -26,7 +26,8 @@ import {
   HiOutlineVideoCamera,
   HiOutlineXMark,
 } from 'react-icons/hi2'
-import { CutLineIcon } from '@/components/meetings/MeetingVisualIcons'
+import { CutLineIcon, MEETING_REACTIONS } from '@/components/meetings/MeetingVisualIcons'
+import { createMeetingFeedback, unlockMeetingSounds } from '@/lib/meetings/feedback'
 import { ParticipantTile, RemoteAudio } from '@/components/meetings/MeetingMedia'
 import MeetingReactionPicker from '@/components/meetings/MeetingReactionPicker'
 import AddMeetingParticipantsModal from '@/app/dashboard/meetings/components/AddMeetingParticipantsModal'
@@ -99,6 +100,16 @@ export default function ManagedMeetingRoomSession({
   const recorderStopPromiseRef = useRef(Promise.resolve())
   const lastTranscriptUploadRef = useRef(Promise.resolve())
   const reactionTimers = useRef(new Map())
+  const feedbackRef = useRef(null)
+  if (!feedbackRef.current) feedbackRef.current = createMeetingFeedback(MEETING_REACTIONS.map(({ value }) => value))
+  useEffect(() => {
+    document.addEventListener('pointerdown', unlockMeetingSounds)
+    document.addEventListener('keydown', unlockMeetingSounds)
+    return () => {
+      document.removeEventListener('pointerdown', unlockMeetingSounds)
+      document.removeEventListener('keydown', unlockMeetingSounds)
+    }
+  }, [])
   const chatNotificationTimerRef = useRef(null)
   const seenChatMessageIdsRef = useRef(new Set())
   const showChatRef = useRef(false)
@@ -382,9 +393,11 @@ export default function ManagedMeetingRoomSession({
           }, 5000)
         }
       }
-      if (topic === 'talio-reaction' && data.reaction) showReaction(sender, data.reaction)
-      if (topic === 'talio-hand') {
-        setRaisedHands((current) => ({ ...current, [sender]: Boolean(data.raised) }))
+      if (topic === 'talio-reaction' || topic === 'talio-hand') {
+        // Bind feedback to LiveKit's authenticated sender, not a payload identity.
+        if (!feedbackRef.current({ topic, data, sender: participant?.identity, localIdentity: roomRef.current?.localParticipant.identity })) return
+        if (topic === 'talio-reaction') showReaction(participant.identity, data.reaction)
+        else setRaisedHands((current) => ({ ...current, [participant.identity]: data.raised }))
       }
     } catch {
       // Ignore malformed participant data packets.
@@ -727,8 +740,9 @@ export default function ManagedMeetingRoomSession({
     await publishData('talio-chat', data)
   }
   const sendReaction = async (reaction) => {
+    if (!room || !MEETING_REACTIONS.some(({ value }) => value === reaction)) return
     showReaction(room.localParticipant.identity, reaction)
-    await publishData('talio-reaction', { reaction, senderId: room.localParticipant.identity })
+    await publishData('talio-reaction', { id: crypto.randomUUID(), reaction, senderId: room.localParticipant.identity })
     setShowReactions(false)
   }
   const toggleHand = async () => {
@@ -736,7 +750,7 @@ export default function ManagedMeetingRoomSession({
     const next = !handRaised
     setHandRaised(next)
     setRaisedHands((current) => ({ ...current, [room.localParticipant.identity]: next }))
-    await publishData('talio-hand', { raised: next, senderId: room.localParticipant.identity })
+    await publishData('talio-hand', { id: crypto.randomUUID(), raised: next, senderId: room.localParticipant.identity })
   }
   const leave = async () => {
     if (leavingRef.current) return

@@ -14,6 +14,7 @@ import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import ModalPortal from '@/components/ui/ModalPortal'
 import SearchableSelect from '@/components/ui/heroui/SearchableSelect'
+import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
 import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/react'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { getAssetAssigneeLabel } from '@/utils/assetAssigneeSearch'
@@ -88,8 +89,13 @@ export default function AssetsPage() {
   const assets = assetsRes?.data || []
 
   // SWR: Employees (admin only, for assignment dropdown)
-  const { data: employeesRes } = useAuthedSWR(isAdmin ? '/api/employees?limit=1000' : null)
-  const employees = useMemo(() => employeesRes?.data?.employees || employeesRes?.data || [], [employeesRes])
+  const { data: employeesRes } = useAuthedSWR(isAdmin ? '/api/employees?all=true&limit=1000' : null)
+  const [assigneeSearch, setAssigneeSearch] = useState('')
+  const { employees: searchedAssignees, isLoading: searchingAssignees, error: assigneeSearchError } = useEmployeeDirectorySearch({ enabled: isAdmin && Boolean(assigneeSearch.trim()), query: assigneeSearch, includeSelf: true })
+  const employees = useMemo(() => [...new Map([
+    ...(employeesRes?.data?.employees || employeesRes?.data || []),
+    ...searchedAssignees,
+  ].map(employee => [String(employee._id), employee])).values()], [employeesRes, searchedAssignees])
   const assigneeOptions = useMemo(() => [
     { _id: 'unassigned', displayLabel: 'Unassigned' },
     ...employees.map((employee) => ({ ...employee, displayLabel: getAssetAssigneeLabel(employee) })),
@@ -512,6 +518,9 @@ export default function AssetsPage() {
                   </Select>
                   <SearchableSelect
                     label="Assigned To"
+                    onSearchChange={setAssigneeSearch}
+                    isLoading={searchingAssignees}
+                    description={assigneeSearchError ? 'Search failed. Please retry.' : undefined}
                     placeholder="Search by name or employee code"
                     options={assigneeOptions}
                     value={editFormData.assignedTo || 'unassigned'}
@@ -716,6 +725,9 @@ export default function AssetsPage() {
                 <div>
                   <SearchableSelect
                     label="Assigned To"
+                    onSearchChange={setAssigneeSearch}
+                    isLoading={searchingAssignees}
+                    description={assigneeSearchError ? 'Search failed. Please retry.' : undefined}
                     placeholder="Search by name or employee code"
                     options={assigneeOptions}
                     value={formData.assignedTo || 'unassigned'}

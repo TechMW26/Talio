@@ -39,7 +39,7 @@ export default function AddEmployeePage() {
   const { data: compRes } = useAuthedSWR(accessDenied ? null : '/api/companies')
   const companies = compRes?.data || []
 
-  const { data: assignRes } = useAuthedSWR(accessDenied ? null : '/api/employees?status=active&limit=500&sortBy=firstName&sortOrder=asc')
+  const { data: assignRes } = useAuthedSWR(accessDenied ? null : '/api/employees?all=true&status=active&limit=500&sortBy=firstName&sortOrder=asc')
   const assignmentEmployees = assignRes?.data || []
 
   const { roles: availableRoles, loading: rolesLoading } = useRoles()

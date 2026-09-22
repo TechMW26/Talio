@@ -1,19 +1,10 @@
-import {
-  HiOutlineFaceSmile,
-  HiOutlineFire,
-  HiOutlineHandRaised,
-  HiOutlineHandThumbUp,
-  HiOutlineHeart,
-  HiOutlineSparkles,
-} from 'react-icons/hi2'
-
 export const MEETING_REACTIONS = [
-  { value: '👍', label: 'Thumbs up', Icon: HiOutlineHandThumbUp },
-  { value: '👏', label: 'Applause', Icon: HiOutlineHandRaised },
-  { value: '❤️', label: 'Heart', Icon: HiOutlineHeart },
-  { value: '😂', label: 'Laugh', Icon: HiOutlineFaceSmile },
-  { value: '😮', label: 'Surprised', Icon: HiOutlineSparkles },
-  { value: '🎉', label: 'Celebrate', Icon: HiOutlineFire },
+  { value: '👍', label: 'Thumbs up', asset: '1f44d' },
+  { value: '👏', label: 'Applause', asset: '1f44f' },
+  { value: '❤️', label: 'Heart', asset: '2764' },
+  { value: '😂', label: 'Laugh', asset: '1f602' },
+  { value: '😮', label: 'Surprised', asset: '1f62e' },
+  { value: '🎉', label: 'Celebrate', asset: '1f389' },
 ]
 
 export function CutLineIcon({ children, isOff = false, className = '', label }) {
@@ -32,9 +23,8 @@ export function CutLineIcon({ children, isOff = false, className = '', label }) 
   )
 }
 
-export function MeetingReactionIcon({ value, className = 'h-6 w-6' }) {
+export function MeetingReactionIcon({ value, className = 'h-10 w-10' }) {
   const reaction = MEETING_REACTIONS.find(item => item.value === value)
-  const Icon = reaction?.Icon || HiOutlineSparkles
-
-  return <Icon className={className} aria-hidden="true" />
+  if (!reaction) return null
+  return <img src={`/emojis/twemoji/${reaction.asset}.png`} alt={reaction.label} width={72} height={72} draggable={false} className={`${className} object-contain`} />
 }

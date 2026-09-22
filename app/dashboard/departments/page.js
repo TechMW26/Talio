@@ -81,7 +81,7 @@ export default function DepartmentsPage() {
   const { data: deptsRes, error, isLoading, isValidating, mutate: refreshDepartments } = useAuthedSWR('/api/departments')
   const departments = deptsRes?.data || []
 
-  const { data: employeesRes } = useAuthedSWR(isAdmin ? '/api/employees?limit=1000' : null)
+  const { data: employeesRes } = useAuthedSWR(isAdmin ? '/api/employees?all=true&limit=1000' : null)
   const employees = employeesRes?.data || []
 
   const { data: usersRes } = useAuthedSWR(isAdmin ? '/api/users?limit=1000' : null)

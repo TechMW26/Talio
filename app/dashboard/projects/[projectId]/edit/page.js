@@ -37,7 +37,7 @@ export default function EditProjectPage() {
   const { data: deptRes } = useAuthedSWR('/api/departments')
   const departments = deptRes?.data || []
 
-  const { data: empRes } = useAuthedSWR('/api/employees?limit=1000')
+  const { data: empRes } = useAuthedSWR('/api/employees?all=true&limit=1000')
   const employees = empRes?.data || []
 
   // --- Submit mutation ---

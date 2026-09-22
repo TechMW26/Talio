@@ -23,7 +23,7 @@ export async function GET(request) {
       .lean()
 
     // Get all active employees
-    let employeeQuery = { status: 'active' }
+    let employeeQuery = { status: { $in: ['active', 'probation', 'on_leave'] } }
     
     if (search) {
       employeeQuery.$or = [

@@ -18,7 +18,7 @@ describe('meeting visual icons', () => {
     expect(container.querySelector('.-rotate-45')).toBeInTheDocument()
   })
 
-  it('renders every reaction as an icon without visible emoji text', () => {
+  it('renders every reaction as a local PNG with an accessible label', () => {
     const { container } = render(
       <div>
         {MEETING_REACTIONS.map(reaction => (
@@ -27,7 +27,10 @@ describe('meeting visual icons', () => {
       </div>
     )
 
-    expect(container.querySelectorAll('svg')).toHaveLength(MEETING_REACTIONS.length)
+    expect(container.querySelectorAll('img')).toHaveLength(MEETING_REACTIONS.length)
+    for (const reaction of MEETING_REACTIONS) {
+      expect(screen.getByRole('img', { name: reaction.label }).getAttribute('src')).toMatch(/^\/emojis\/twemoji\/[a-f0-9]+\.png$/)
+    }
     expect(container.textContent).toBe('')
   })
 })

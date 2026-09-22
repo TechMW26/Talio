@@ -43,7 +43,7 @@ export default function EditJobPage() {
   // Fetch dropdown data
   const { data: deptRes } = useAuthedSWR('/api/departments');
   const { data: desigRes } = useAuthedSWR('/api/designations');
-  const { data: empRes } = useAuthedSWR('/api/employees');
+  const { data: empRes } = useAuthedSWR('/api/employees?all=true');
   const departments = deptRes?.data || [];
   const designations = desigRes?.data || [];
   const employees = empRes?.data || [];

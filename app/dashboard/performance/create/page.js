@@ -31,7 +31,7 @@ export default function CreatePerformanceReviewPage() {
   })
 
   // Fetch employees
-  const { data: empRes, isLoading: loading } = useAuthedSWR('/api/employees?limit=1000&status=active')
+  const { data: empRes, isLoading: loading } = useAuthedSWR('/api/employees?all=true&limit=1000&status=active')
   const employees = (empRes?.data || []).filter(emp => emp.status === 'active')
 
   const user = useMemo(() => {

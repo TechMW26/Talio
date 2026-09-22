@@ -33,6 +33,7 @@ export default function SearchableSelect({
   className,
   maxListboxHeight = 320,
   onOpenChange,
+  onSearchChange,
   classNames: providedClassNames = {},
   inputProps: providedInputProps = {},
   listboxProps: providedListboxProps = {},
@@ -120,6 +121,7 @@ export default function SearchableSelect({
       inputValue={inputValue}
       onInputChange={(nextValue) => {
         setInputValue(nextValue)
+        onSearchChange?.(nextValue)
         if (!isOpen) handleOpenChange(true)
       }}
       onSelectionChange={handleSelectionChange}

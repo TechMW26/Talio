@@ -24,6 +24,7 @@ export default function useEmployeeDirectorySearch({
       limit: String(limit),
       includeAdmins: String(includeAdmins),
       includeSelf: String(includeSelf),
+      all: 'true',
     })
     if (debouncedQuery) params.set('q', debouncedQuery)
     return `/api/directory?${params.toString()}`

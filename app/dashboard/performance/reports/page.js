@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchCompleteEmployeeResponse } from '@/lib/client/employeePages'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import toast from '@/utils/toast'
 import { downloadExcelWorkbook } from '@/lib/client/spreadsheetExport'
@@ -256,7 +257,7 @@ export default function PerformanceReportsPage() {
         fetch(`/api/projects?limit=1000&populate=true${deptFilter}${teamFilterParam}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`/api/employees?limit=1000&status=active&populate=true${deptFilter}`, {
+        fetchCompleteEmployeeResponse(`/api/employees?limit=1000&status=active&populate=true${deptFilter}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`/api/settings/company`, {

@@ -2,6 +2,7 @@
 
 import useSWR from 'swr'
 import { clearAllSessionCaches } from '@/utils/sessionCache'
+import { collectEmployeePages, isCompleteEmployeeList } from '@/lib/client/employeePages'
 
 // Flag to prevent multiple redirects
 let isRedirecting = false
@@ -75,6 +76,7 @@ const fetchWithRetry = async (url, options, maxRetries = 1, timeout = 15000) => 
 }
 
 const authedFetcher = async (url) => {
+  if (isCompleteEmployeeList(url)) return collectEmployeePages(url, authedFetcher)
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
   const headers = token ? { Authorization: `Bearer ${token}` } : undefined
 

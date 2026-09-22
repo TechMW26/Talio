@@ -42,7 +42,7 @@ export default function CreateJobPage() {
   // Fetch dropdown data
   const { data: deptRes, isLoading: deptLoading } = useAuthedSWR('/api/departments');
   const { data: desigRes, isLoading: desigLoading } = useAuthedSWR('/api/designations');
-  const { data: empRes, isLoading: empLoading } = useAuthedSWR('/api/employees');
+  const { data: empRes, isLoading: empLoading } = useAuthedSWR('/api/employees?all=true');
   const departments = deptRes?.data || [];
   const designations = desigRes?.data || [];
   const employees = empRes?.data || [];

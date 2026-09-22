@@ -3,25 +3,15 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaSearch, FaUser } from 'react-icons/fa'
-import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
 import { Card, CardBody, Button, Input, Avatar, Skeleton, ScrollShadow } from '@heroui/react'
 
 export default function EmployeeDirectoryWidget() {
   const router = useRouter()
   const [search, setSearch] = useState('')
-  const { data, error, isLoading } = useAuthedSWR('/api/employees?limit=20&status=active', {
-    refreshInterval: 0,
-  })
+  const { employees: filteredEmployees, error, isLoading } = useEmployeeDirectorySearch({ query: search, includeSelf: true })
 
-  const employees = data?.data || []
-
-  const filteredEmployees = employees.filter(emp =>
-    `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-    emp.email?.toLowerCase().includes(search.toLowerCase()) ||
-    emp.employeeCode?.toLowerCase().includes(search.toLowerCase())
-  )
-
-  if (isLoading) {
+  if (isLoading && !search) {
     return (
       <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
         <Skeleton className="h-10 w-full rounded-lg mb-4" />
@@ -40,7 +30,7 @@ export default function EmployeeDirectoryWidget() {
     )
   }
 
-  if (error) {
+  if (error && !search) {
     return (
       <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
         <h3 className="text-base sm:text-lg font-bold text-default-900 mb-4">Employee Directory</h3>
@@ -78,16 +68,18 @@ export default function EmployeeDirectoryWidget() {
       />
 
       {/* Employee List */}
+      {isLoading && <p role="status" className="text-sm text-default-500">Searching employees…</p>}
+      {error && <p role="alert" className="text-sm text-danger">Search failed. Please try again.</p>}
       <ScrollShadow className="space-y-2 max-h-[200px]">
         {filteredEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-6">
             <div className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center mb-3">
               <FaUser className="w-7 h-7 text-default-400" />
             </div>
-            <p className="text-sm text-default-500">No employees match your search</p>
+            <p className="text-sm text-default-500">{isLoading ? 'Loading employees…' : 'No employees match your search'}</p>
           </div>
         ) : (
-          filteredEmployees.slice(0, 8).map((emp) => (
+          filteredEmployees.map((emp) => (
             <Card
               key={emp._id}
               isPressable

@@ -41,7 +41,7 @@ export default function DocumentsPage() {
   const fileInputRef = useRef(null)
   const { data: employeeOptionsRes } = useAuthedSWR(
     canManageDocuments && showModal
-      ? '/api/employees?status=active,probation,on_leave&limit=1000&sortBy=firstName&sortOrder=asc'
+      ? '/api/employees?all=true&status=active,probation,on_leave&limit=1000&sortBy=firstName&sortOrder=asc'
       : null
   )
   const employeeOptions = employeeOptionsRes?.data || []

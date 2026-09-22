@@ -30,7 +30,7 @@ export default function EditGoalPage() {
   })
 
   // Fetch employees
-  const { data: empRes } = useAuthedSWR('/api/employees?limit=1000')
+  const { data: empRes } = useAuthedSWR('/api/employees?all=true&limit=1000')
   const employees = empRes?.data || []
 
   // Fetch the goal

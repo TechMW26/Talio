@@ -36,7 +36,7 @@ export default function CreateProjectPage() {
   const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
 
   // --- SWR: Dropdown data ---
-  const { data: empRes } = useAuthedSWR('/api/employees?limit=500&status=active')
+  const { data: empRes } = useAuthedSWR('/api/employees?all=true&limit=500&status=active')
   const employees = empRes?.data || []
 
   const { data: deptRes } = useAuthedSWR('/api/departments')

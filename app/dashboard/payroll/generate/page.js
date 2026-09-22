@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchCompleteEmployeeResponse } from '@/lib/client/employeePages'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -119,7 +120,7 @@ export default function GeneratePayrollPage() {
 
       // Fetch employees, departments, and company settings in parallel
       const [employeesRes, departmentsRes, settingsRes] = await Promise.all([
-        fetch('/api/employees?limit=1000&status=active,probation', {
+        fetchCompleteEmployeeResponse('/api/employees?limit=1000&status=active,probation', {
           headers: { 'Authorization': 'Bearer ' + token },
         }),
         fetch('/api/departments', {

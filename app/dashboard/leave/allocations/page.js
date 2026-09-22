@@ -53,7 +53,7 @@ export default function LeaveAllocationsPage() {
   }, [user])
 
   // SWR data fetching
-  const { data: employeesRes, error: employeesError, isLoading: employeesLoading, isValidating: employeesValidating } = useAuthedSWR('/api/employees?limit=1000')
+  const { data: employeesRes, error: employeesError, isLoading: employeesLoading, isValidating: employeesValidating } = useAuthedSWR('/api/employees?all=true&limit=1000')
   const { data: leaveTypesRes, error: leaveTypesError, isLoading: leaveTypesLoading, isValidating: leaveTypesValidating } = useAuthedSWR('/api/leave/types')
   const { data: balancesRes, error: balancesError, isLoading: balancesLoading, isValidating: balancesValidating, mutate: refreshBalances } = useAuthedSWR(`/api/leave/balance?year=${selectedYear}`)
   const { data: halfDayPolicyRes } = useAuthedSWR(`/api/leave/half-day-balance?year=${selectedYear}&includePolicy=1`)

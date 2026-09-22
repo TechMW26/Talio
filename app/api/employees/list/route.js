@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withTenantApi } from '@/lib/api/route'
-import { listDirectory } from '@/lib/services/directoryService.server'
+import { listDirectory, directoryInternals } from '@/lib/services/directoryService.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,9 +20,10 @@ export const GET = withTenantApi({
     currentUserId: auth.user.id || auth.user._id,
     query: searchParams.get('q') || searchParams.get('search') || '',
     limit: searchParams.get('limit') || 100,
+    page: searchParams.get('page'),
     includeAdmins: searchParams.get('includeAdmins') === 'true',
     includeSelf: searchParams.get('includeSelf') === 'true',
   })
 
-  return NextResponse.json({ success: true, data })
+  return NextResponse.json({ success: true, data, pagination: { hasMore: data.length === directoryInternals.clampLimit(searchParams.get('limit') || 100) } })
 })

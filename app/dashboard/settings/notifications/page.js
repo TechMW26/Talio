@@ -115,7 +115,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
   const departments = deptData?.data || []
   const { roles: availableRoles } = useRoles()
 
-  const { data: empData } = useAuthedSWR('/api/employees?limit=1000')
+  const { data: empData } = useAuthedSWR('/api/employees?all=true&limit=1000')
   const employees = empData?.data || []
 
   const sendMutation = useApiMutation({
@@ -297,7 +297,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
   const departments = deptData?.data || []
   const { roles: availableRoles } = useRoles()
 
-  const { data: empData } = useAuthedSWR('/api/employees?limit=1000')
+  const { data: empData } = useAuthedSWR('/api/employees?all=true&limit=1000')
   const employees = empData?.data || []
 
   const createMutation = useApiMutation({

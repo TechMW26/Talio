@@ -67,8 +67,8 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
       {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
       {handRaised && <span className="absolute right-3 top-3 rounded-full bg-amber-500 p-2 text-white" aria-label={`${item.name} raised their hand`}><HiOutlineHandRaised className="h-5 w-5" /></span>}
       {reaction && (
-        <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 animate-bounce rounded-full bg-white/95 p-3 text-indigo-700 shadow-xl ring-1 ring-black/5">
-          <MeetingReactionIcon value={reaction} className="h-7 w-7" />
+        <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 motion-safe:animate-bounce drop-shadow-lg">
+          <MeetingReactionIcon value={reaction} className={compact ? 'h-12 w-12' : 'h-20 w-20 sm:h-24 sm:w-24'} />
         </span>
       )}
     </div>

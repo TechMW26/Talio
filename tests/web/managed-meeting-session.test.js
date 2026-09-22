@@ -53,9 +53,32 @@ jest.mock('@/app/dashboard/meetings/components/AddMeetingParticipantsModal', () 
 jest.mock('@/app/dashboard/meetings/components/MeetingNotetakerPanel', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/utils/toast', () => ({ __esModule: true, default: { error: jest.fn(), info: jest.fn(), success: jest.fn() } }))
 jest.mock('@/lib/meetingTranscriber', () => ({ isMeetingAudioUploadSupported: () => false, getSupportedAudioMimeType: () => '' }))
+jest.mock('@/lib/notificationSounds', () => ({
+  playNotificationSound: jest.fn(),
+  getNotificationSounds: () => ({ init: jest.fn(), resume: jest.fn() }),
+}))
 
 const ManagedMeetingRoomSession = require('@/components/meetings/ManagedMeetingRoomSession').default
 const { createLocalTracks } = require('livekit-client')
+const { playNotificationSound } = require('@/lib/notificationSounds')
+
+test('remote hand raises chime and reactions render PNGs without enabling devices', async () => {
+  const { room } = await join()
+  const remote = mockParticipant('Colleague')
+  act(() => {
+    room.remoteParticipants.set(remote.identity, remote)
+    room.emit('ParticipantConnected', remote)
+    room.emit('DataReceived', new TextEncoder().encode(JSON.stringify({ id: 'hand-1', raised: true })), remote, null, 'talio-hand')
+  })
+  expect(playNotificationSound).toHaveBeenCalledWith('chime')
+  expect(screen.getByLabelText('Colleague raised their hand')).toBeInTheDocument()
+  act(() => {
+    room.emit('DataReceived', new TextEncoder().encode(JSON.stringify({ id: 'reaction-1', reaction: '👍' })), remote, null, 'talio-reaction')
+  })
+  expect(screen.getByRole('img', { name: 'Thumbs up' })).toHaveAttribute('src', '/emojis/twemoji/1f44d.png')
+  expect(room.localParticipant.setCameraEnabled).not.toHaveBeenCalled()
+  expect(room.localParticipant.setMicrophoneEnabled).not.toHaveBeenCalled()
+})
 
 beforeEach(() => {
   mockRooms.length = 0

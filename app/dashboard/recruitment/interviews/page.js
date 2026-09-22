@@ -74,7 +74,7 @@ export default function InterviewsPage() {
   const jobs = jobsResponse?.data || [];
 
   // --- SWR: Employees (static) ---
-  const { data: employeesResponse } = useAuthedSWR('/api/employees?limit=1000');
+  const { data: employeesResponse } = useAuthedSWR('/api/employees?all=true&limit=1000');
   const employees = employeesResponse?.data || [];
 
   // --- Mutations ---

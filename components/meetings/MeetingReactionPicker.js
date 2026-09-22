@@ -42,9 +42,9 @@ export default function MeetingReactionPicker({
               onClick={() => onSelect?.(reaction.value)}
               aria-label={`React with ${reaction.label}`}
               title={reaction.label}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-indigo-600 transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-indigo-300 dark:hover:bg-white/10"
+              className="flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-xl text-indigo-600 transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-indigo-300 dark:hover:bg-white/10"
             >
-              <MeetingReactionIcon value={reaction.value} className="h-6 w-6" />
+              <MeetingReactionIcon value={reaction.value} className="h-9 w-9 sm:h-11 sm:w-11" />
             </button>
           ))}
         </div>

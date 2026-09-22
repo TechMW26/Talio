@@ -26,7 +26,7 @@ export default function EditEmployeePage() {
   const { data: desigRes } = useAuthedSWR(accessDenied ? null : '/api/designations')
   const designations = desigRes?.data || []
 
-  const { data: assignRes } = useAuthedSWR(accessDenied ? null : '/api/employees?status=active&limit=500&sortBy=firstName&sortOrder=asc')
+  const { data: assignRes } = useAuthedSWR(accessDenied ? null : '/api/employees?all=true&status=active&limit=500&sortBy=firstName&sortOrder=asc')
   const assignmentEmployees = assignRes?.data || []
 
   const { roles: availableRoles, loading: rolesLoading } = useRoles()

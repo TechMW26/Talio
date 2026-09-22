@@ -30,7 +30,7 @@ export default function HelpdeskManagePage() {
   const { data: ticketsRes, error, isLoading, isValidating, mutate: refreshTickets } = useAuthedSWR(hasAccess ? '/api/helpdesk' : null)
   const tickets = ticketsRes?.data || []
 
-  const { data: employeesRes } = useAuthedSWR(hasAccess ? '/api/employees?limit=1000' : null)
+  const { data: employeesRes } = useAuthedSWR(hasAccess ? '/api/employees?all=true&limit=1000' : null)
   const employeesRaw = employeesRes?.data
   const employees = Array.isArray(employeesRaw) ? employeesRaw : (employeesRaw?.employees || [])
 

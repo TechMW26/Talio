@@ -89,7 +89,7 @@ export default function AttendanceReportPage() {
     isAuthorized && dateParams ? `/api/attendance?startDate=${dateParams.startDate}&endDate=${dateParams.endDate}${deptParam}&populate=true` : null
   )
   const { data: employeesRes, error: empError, isLoading: empLoading, isValidating: empValidating } = useAuthedSWR(
-    isAuthorized && dateParams ? `/api/employees?limit=1000&status=active,probation&populate=true${deptParam}` : null
+    isAuthorized && dateParams ? `/api/employees?all=true&limit=1000&status=active,probation&populate=true${deptParam}` : null
   )
   const { data: companyRes, isLoading: compLoading } = useAuthedSWR(
     isAuthorized ? '/api/settings/company' : null

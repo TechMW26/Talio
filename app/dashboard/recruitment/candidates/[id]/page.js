@@ -71,7 +71,7 @@ export default function CandidateDetailPage() {
 
   const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/recruitment/candidates/${params.id}` : null);
   const candidate = res?.data || null;
-  const { data: managersResponse } = useAuthedSWR(isConvertOpen ? '/api/employees?status=active,probation&limit=500&sortBy=firstName&sortOrder=asc' : null);
+  const { data: managersResponse } = useAuthedSWR(isConvertOpen ? '/api/employees?all=true&status=active,probation&limit=500&sortBy=firstName&sortOrder=asc' : null);
   const managerOptions = managersResponse?.data || [];
 
   useEffect(() => {
