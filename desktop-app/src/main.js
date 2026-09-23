@@ -18,6 +18,7 @@ const logger = require('./logger');
 const screenshotService = require('./screenshotService');
 const socketHandler = require('./socketHandler');
 const { inspectRendererHealth, resolveAppNavigationUrl } = require('./rendererHealth');
+const { revealMiraWindow } = require('./miraWakeBridge');
 
 // PERFORMANCE: Optimized GPU and rendering settings
 const forceDisableGPU = process.env.TALIO_DISABLE_GPU === '1';
@@ -1394,6 +1395,10 @@ function setupIPCHandlers() {
   }
 
   ipcHandlersRegistered = true;
+
+  ipcMain.handle('mira-wake', function (event) {
+    return revealMiraWindow(event, mainWindow, APP_ORIGIN);
+  });
 
   // App version
   ipcMain.handle('get-app-version', function () {

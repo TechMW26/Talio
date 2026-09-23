@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useState, useEffect } from 'react'
 import { FaCalendarAlt, FaGift } from 'react-icons/fa'
 
@@ -56,7 +58,7 @@ export default function HolidaysWidget({ limit = 5, initialData }) {
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
@@ -86,9 +88,9 @@ export default function HolidaysWidget({ limit = 5, initialData }) {
     ]
 
     return (
-        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-default-900">Upcoming Holidays</h3>
+                <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Upcoming Holidays</h3>
                 <Button
                     variant="light"
                     color="primary"
@@ -99,7 +101,7 @@ export default function HolidaysWidget({ limit = 5, initialData }) {
                 </Button>
             </div>
 
-            <ScrollShadow className="space-y-2 max-h-[200px]">
+            <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                 {upcomingHolidays.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center py-6">
                         <img
@@ -113,7 +115,7 @@ export default function HolidaysWidget({ limit = 5, initialData }) {
                     upcomingHolidays.map((holiday, index) => {
                         const daysUntil = getDaysUntil(holiday.date)
                         return (
-                            <Card
+                            <Card data-widget-card=""
                                 key={holiday._id || index}
                                 className={`border-0 shadow-none ${itemColors[index % itemColors.length]}`}
                             >

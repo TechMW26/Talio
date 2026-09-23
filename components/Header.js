@@ -1,10 +1,14 @@
 'use client'
+import AIActivityBeam from '@/components/ui/AIActivityBeam'
+import CallAlertButton from '@/components/CallAlertButton'
+import { getCurrentUser } from '@/utils/userHelper'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { FaSearch, FaTimes, FaSyncAlt, FaSun, FaMoon } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
-import MiraSphere from '@/components/ui/MiraSphere'
+import MiraSphere from '@/components/ui/MiraPet'
+import MiraWakeReminder from '@/components/MiraWakeReminder'
 import { handleSessionExpired } from '@/utils/userHelper'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
@@ -19,6 +23,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const { openWidget } = useChatWidget()
 
   const [mounted, setMounted] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [showSearchResults, setShowSearchResults] = useState(false)
@@ -26,7 +31,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [searching, setSearching] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [isMiraHovered, setIsMiraHovered] = useState(false)
-  const { openChat } = useMiraChat()
+  const { openChat, isThinking } = useMiraChat()
   const searchRef = useRef(null)
   const searchTimeoutRef = useRef(null)
 
@@ -53,7 +58,11 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   }, [])
 
   useEffect(() => {
+    const syncUser = () => setCurrentUser(getCurrentUser())
+    syncUser()
     setMounted(true)
+    window.addEventListener('talio:user-updated', syncUser)
+    return () => window.removeEventListener('talio:user-updated', syncUser)
   }, [])
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -79,15 +88,17 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
     if (searchQuery.trim().length < 2) {
       setSearchResults(null)
+      setSearching(false)
       return
     }
 
+    const controller = new AbortController()
     setSearching(true)
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         const token = localStorage.getItem('token')
         const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         })
 
         // Handle 401 - session expired
@@ -97,18 +108,19 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         }
 
         const result = await response.json()
-        if (result.success) {
+        if (result.success && !controller.signal.aborted) {
           setSearchResults(result.data)
           setShowSearchResults(true)
         }
       } catch (error) {
-        console.error('Search error:', error)
+        if (error.name !== 'AbortError') console.error('Search error:', error)
       } finally {
-        setSearching(false)
+        if (!controller.signal.aborted) setSearching(false)
       }
     }, 300)
 
     return () => {
+      controller.abort()
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current)
       }
@@ -151,7 +163,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   if (!mounted) {
     return (
       <header
-        className="h-[60.5px] bg-content1 w-full z-[40] shadow-[0_2px_6px_rgba(15,23,42,0.08)] transition-all duration-300 flex-shrink-0"
+        className="talio-navigation-header h-[60.5px] w-full z-[40] transition-all duration-300 flex-shrink-0"
       >
         <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
           <div className="flex items-center space-x-2 sm:space-x-4">
@@ -176,7 +188,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
   return (
     <header
-      className="h-[60.5px] bg-content1 w-full z-[40] shadow-[0_2px_6px_rgba(15,23,42,0.08)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.3)] transition-all duration-300 flex-shrink-0"
+      className="talio-navigation-header h-[60.5px] w-full z-[40] transition-all duration-300 flex-shrink-0"
     >
       <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
         {/* Left side - Hamburger (mobile/tablet) + Search pill */}
@@ -196,6 +208,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           </Button>
 
           {/* MIRA Cloud Pill Button - Desktop Only */}
+          <div className="relative hidden md:block">
           <div
             className="hidden md:flex items-center cursor-pointer relative group -ml-3"
             data-mira-sphere="true"
@@ -226,14 +239,16 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             />
             {/* White circular background behind globe */}
             <div className="relative z-10 flex items-center justify-center rounded-full bg-white dark:bg-white/90" style={{ width: 34, height: 34 }}>
-              <MiraSphere size={32} isHovered={isMiraHovered} />
+              <MiraSphere size={32} isThinking={isThinking} />
             </div>
-            <span className="text-white text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>
+            <span className="text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5" style={{ color: '#111111' }}>
               Ask Mira
             </span>
           </div>
 
           {/* Separator */}
+          <MiraWakeReminder />
+          </div>
           <div className="hidden md:block w-px h-7 bg-slate-400 dark:bg-zinc-300/40 mx-1" />
 
           {/* Search Pill Button - opens floating search overlay */}
@@ -302,7 +317,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     setShowSearchResults(false)
                   }}
                 />
-                <div className="fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-content1 overflow-hidden z-[101] search-overlay-input" style={{ border: 'none', borderRadius: '1rem', outline: 'none', boxShadow: 'none' }}>
+                <div className="ai-glass-panel fixed left-1/2 -translate-x-1/2 top-20 w-[90%] max-w-xl overflow-hidden z-[101] search-overlay-input">
+                  <AIActivityBeam active={searching} />
                   <Input
                     size="lg"
                     value={searchQuery}
@@ -378,8 +394,9 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           </div>
         </div>
 
-        {/* Right side - MIRA + Focus Timer + Refresh */}
+        {/* Global actions: Call / Alert, focus timer and refresh */}
         <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+          {currentUser && <CallAlertButton user={currentUser} />}
           {/* Focus Timer Pill */}
           <FocusTimerPill />
 
@@ -393,19 +410,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             <FaSyncAlt className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
           </Button>
 
-          {/* Theme Toggle - Sun/Moon pill */}
-          <button
-            onClick={(e) => setDarkModePreference(isDarkMode ? 'light' : 'dark', e)}
-            className={`hidden md:flex items-center w-[52px] h-7 rounded-full p-[3px] transition-colors duration-400 relative cursor-pointer ${isDarkMode ? 'bg-slate-700' : 'bg-amber-100'}`}
-            aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            <span
-              className={`flex items-center justify-center w-[22px] h-[22px] rounded-full shadow-md transition-all duration-400 ${isDarkMode ? 'translate-x-[23px] bg-slate-900' : 'translate-x-0 bg-white'}`}
-            >
-              <FaSun className={`w-3.5 h-3.5 text-amber-400 absolute transition-all duration-400 ${!isDarkMode ? 'rotate-0 scale-100 opacity-100' : 'rotate-90 scale-0 opacity-0'}`} />
-              <FaMoon className={`w-3 h-3 text-blue-300 absolute transition-all duration-400 ${isDarkMode ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-0 opacity-0'}`} />
-            </span>
-          </button>
 
           {/* Mobile/Tablet Search Button */}
           <Button
@@ -421,7 +425,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
       {/* Mobile Search Fullscreen Modal */}
       {showMobileSearch && (
-        <div className="fixed inset-0 bg-content1 z-[100] lg:!hidden">
+        <div className="ai-glass-panel fixed inset-x-3 top-20 bottom-4 z-[100] lg:!hidden overflow-hidden">
+          <AIActivityBeam active={searching} />
           <div className="flex flex-col h-full">
             {/* Search Header - Match header height */}
             <div className="flex items-center gap-3 px-3 h-16 border-b border-divider bg-content1">

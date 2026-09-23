@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useRouter } from 'next/navigation'
 import { Button } from '@heroui/react'
 import { FaUser, FaCalendar, FaDollarSign, FaTasks, FaFileAlt, FaPlane } from 'react-icons/fa'
@@ -19,27 +21,27 @@ export default function QuickActionsWidget() {
     ].filter((action) => !action.featureKey || isFeatureEnabled(action.featureKey))
 
     return (
-        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             <div className="mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-default-900">Quick Actions</h3>
+                <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Quick Actions</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 flex-1">
-                {actions.map((action, index) => {
+            <div className={`${widgetStyles.quickActionsGrid} grid gap-3 flex-1`}>
+                {actions.map((action) => {
                     const Icon = action.icon
                     return (
-                        <Button
-                            key={index}
+                        <Button data-widget-card="" data-widget-tone={action.color}
+                            key={action.path}
                             variant="flat"
                             color={action.color}
                             onPress={() => router.push(action.path)}
-                            className="p-4 h-auto flex flex-col items-center gap-2 text-center border border-default-100"
+                            className="p-4 sm:p-5 h-auto min-h-[88px] w-full min-w-0 flex flex-row justify-start items-center gap-4 text-left whitespace-normal border border-default-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
                             radius="lg"
                         >
-                            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <div aria-hidden="true" className="w-11 h-11 shrink-0 bg-primary-100 rounded-xl flex items-center justify-center">
                                 <Icon className="w-5 h-5 text-primary-600" />
                             </div>
-                            <span className="text-xs font-medium text-default-700">{action.label}</span>
+                            <span className="min-w-0 text-base sm:text-lg leading-snug font-semibold text-default-900">{action.label}</span>
                         </Button>
                     )
                 })}

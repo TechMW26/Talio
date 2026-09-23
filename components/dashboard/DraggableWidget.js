@@ -12,6 +12,7 @@ export default function DraggableWidget({
   className = '',
   colorIndex = 0,
   removable = true,
+  frameless = false,
 }) {
   const {
     attributes,
@@ -29,6 +30,7 @@ export default function DraggableWidget({
     transition: isDragging ? 'none' : (transition || 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)'),
     zIndex: isDragging ? 50 : 'auto',
     '--widget-enter-delay': `${Math.min(colorIndex, 10) * 45}ms`,
+    ...(frameless ? { background: 'transparent', border: 0, boxShadow: 'none' } : {}),
   }
 
   return (
@@ -38,7 +40,7 @@ export default function DraggableWidget({
       className={`
         dashboard-widget-enter relative group bg-white dark:bg-[#18181b] border border-gray-100/50 dark:border-zinc-800/50 h-full rounded-2xl
         ${isDragging ? '' : 'transition-[box-shadow,border-color] duration-300 ease-out'}
-        ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : 'shadow-sm dark:shadow-none hover:shadow-xl dark:hover:shadow-lg dark:hover:shadow-black/20 hover:scale-[1.01]'}
+        ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : 'shadow-sm dark:shadow-none hover:shadow-lg dark:hover:shadow-black/20'}
         ${className}
       `}
     >

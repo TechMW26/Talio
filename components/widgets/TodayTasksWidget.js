@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useState, useEffect } from 'react'
 import { FaTasks, FaExclamationTriangle, FaCheckCircle, FaSpinner } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow, Spinner } from '@heroui/react'
@@ -62,7 +64,7 @@ export default function TodayTasksWidget({ limit = 5 }) {
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
@@ -80,9 +82,9 @@ export default function TodayTasksWidget({ limit = 5 }) {
     }
 
     return (
-        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-default-900">Today's Tasks</h3>
+                <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Today's Tasks</h3>
                 <Button
                     variant="light"
                     color="primary"
@@ -94,7 +96,7 @@ export default function TodayTasksWidget({ limit = 5 }) {
                 </Button>
             </div>
 
-            <ScrollShadow className="space-y-2 max-h-[200px]">
+            <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                 {tasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center py-6">
                         <img
@@ -106,7 +108,7 @@ export default function TodayTasksWidget({ limit = 5 }) {
                     </div>
                 ) : (
                     tasks.map((task, index) => (
-                        <Card
+                        <Card data-widget-card=""
                             key={task._id || index}
                             className="border border-default-100"
                         >

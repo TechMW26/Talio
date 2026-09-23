@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { generateContent, generateVisionContent } from '@/lib/gemini';
+import { generateVisionContent as generateBaseVisionContent } from '@/lib/gemini';
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
-import { generateSmartContent } from '@/lib/promptEngine';
+import { generateSmartContent as generateBaseSmartContent } from '@/lib/promptEngine';
+import { MIRA_LANGUAGE_POLICY } from '@/lib/miraLanguage';
+import { buildWhiteboardPlanPrompt, plotWhiteboardPlan } from '@/lib/whiteboardAIPlan';
 import { compressScreenshot } from '@/lib/imageCompression';
 import { normalizePreparedWhiteboardContent } from '@/lib/whiteboardAIContent';
 
 export const maxDuration = 120;
+
+// One language policy for analysis, chat, planning and every edit/regeneration path.
+const generateSmartContent = (prompt, options = {}) => generateBaseSmartContent(prompt, {
+  ...options, systemInstruction: `${options.systemInstruction || ''}\n${MIRA_LANGUAGE_POLICY}`,
+});
+const generateVisionContent = (prompt, images) => generateBaseVisionContent(`${prompt}\n${MIRA_LANGUAGE_POLICY}`, images);
 
 /**
  * Downscale/compress the client screenshot before sending it to the vision
@@ -1147,441 +1155,12 @@ Return ONLY valid JSON array. No explanations.`;
 
       const templateType = body.templateType || 'mindmap';
 
-      // Enhanced template-specific structure definitions - DYNAMIC with no hardcoded limits
-      const templateStructures = {
-        mindmap: {
-          description: 'comprehensive radial thought map with central topic and extensively branching ideas - unlimited depth and breadth',
-          minSections: 6,
-          maxSections: 15,
-          itemsPerSection: '10-50',
-          dynamicLayout: true,
-          sections: [
-            { type: 'central', title: 'Core Concept & Definition', purpose: 'The fundamental definition, scope, and significance of the topic' },
-            { type: 'branch', title: 'Key Dimensions & Components', purpose: 'All primary aspects, pillars, or dimensions of the topic' },
-            { type: 'context', title: 'Market/Industry Context', purpose: 'Current landscape, trends, statistics, and relevant data points' },
-            { type: 'stakeholders', title: 'Stakeholders & Audience', purpose: 'Who is affected, target demographics, user personas, decision makers' },
-            { type: 'strategies', title: 'Strategies & Approaches', purpose: 'Methodologies, frameworks, best practices, proven techniques' },
-            { type: 'challenges', title: 'Challenges & Solutions', purpose: 'Common obstacles, risks, mitigation strategies, and workarounds' },
-            { type: 'metrics', title: 'Success Metrics & KPIs', purpose: 'How to measure success, benchmarks, industry standards' },
-            { type: 'action', title: 'Implementation Roadmap', purpose: 'Concrete next steps, priorities, quick wins, long-term initiatives' },
-            { type: 'dependencies', title: 'Dependencies & Prerequisites', purpose: 'What needs to be in place, blockers, enablers' },
-            { type: 'alternatives', title: 'Alternatives & Options', purpose: 'Other approaches, plan B scenarios, contingencies' },
-            { type: 'resources', title: 'Resources & Tools', purpose: 'Required tools, platforms, documentation, references' },
-            { type: 'timeline', title: 'Timeline & Milestones', purpose: 'Key dates, phases, checkpoints' },
-          ]
-        },
-        flowchart: {
-          description: 'detailed process flow with comprehensive steps, decision logic, exception handling, and all possible paths',
-          minSections: 5,
-          maxSections: 15,
-          itemsPerSection: '10-50',
-          dynamicLayout: true,
-          sections: [
-            { type: 'prerequisites', title: 'Prerequisites & Inputs', purpose: 'Required resources, data, approvals, or conditions needed before starting' },
-            { type: 'start', title: 'Initiation Phase', purpose: 'Entry points, triggers, and initial setup steps' },
-            { type: 'core_process', title: 'Core Process Steps', purpose: 'Detailed sequential actions with specific instructions' },
-            { type: 'decisions', title: 'Decision Points & Logic', purpose: 'Conditional branches, criteria for each path, edge cases' },
-            { type: 'parallel', title: 'Parallel Workflows', purpose: 'Concurrent activities, dependencies, synchronization points' },
-            { type: 'exceptions', title: 'Exception Handling', purpose: 'Error scenarios, fallback procedures, escalation paths' },
-            { type: 'outputs', title: 'Outputs & Deliverables', purpose: 'Expected results, quality criteria, handoff points' },
-            { type: 'loops', title: 'Iteration & Loops', purpose: 'Repeat conditions, loop exits, retry logic' },
-            { type: 'validation', title: 'Validation & Quality Gates', purpose: 'Checkpoints, verification steps, approval stages' },
-            { type: 'rollback', title: 'Rollback & Recovery', purpose: 'Undo procedures, recovery paths, fallback options' },
-          ]
-        },
-        planning: {
-          description: 'comprehensive project plan with strategic objectives, detailed tasks, resource allocation, and full timeline',
-          minSections: 6,
-          maxSections: 15,
-          itemsPerSection: '10-50',
-          dynamicLayout: true,
-          sections: [
-            { type: 'vision', title: 'Vision & Objectives', purpose: 'Strategic goals, success criteria, alignment with broader initiatives' },
-            { type: 'scope', title: 'Scope Definition', purpose: 'In-scope items, out-of-scope items, boundaries and constraints' },
-            { type: 'phases', title: 'Project Phases', purpose: 'Major phases with durations, phase gates, and deliverables' },
-            { type: 'tasks', title: 'Detailed Task Breakdown', purpose: 'Specific work items, owners, effort estimates, priorities' },
-            { type: 'resources', title: 'Resources & Budget', purpose: 'Team allocation, tools needed, budget considerations' },
-            { type: 'risks', title: 'Risks & Mitigation', purpose: 'Identified risks, probability, impact, mitigation strategies' },
-            { type: 'milestones', title: 'Milestones & Deadlines', purpose: 'Key dates, dependencies, critical path items' },
-            { type: 'governance', title: 'Governance & Review', purpose: 'Review cadence, stakeholder updates, decision authority' },
-            { type: 'communication', title: 'Communication Plan', purpose: 'Stakeholder updates, reporting frequency, channels' },
-            { type: 'quality', title: 'Quality Assurance', purpose: 'Testing approach, acceptance criteria, sign-off process' },
-            { type: 'dependencies', title: 'Dependencies & Blockers', purpose: 'External dependencies, internal blockers, resolution paths' },
-            { type: 'success_criteria', title: 'Success Criteria & KPIs', purpose: 'Measurable outcomes, metrics, benchmarks' },
-          ]
-        },
-        eventcircuit: {
-          description: 'exhaustive decision chain reaction analysis mapping ALL possible permutations, branching outcomes, probability assessments, and convergent conclusions',
-          minSections: 12,
-          maxSections: 20,
-          itemsPerSection: '10-50',
-          dynamicChainDepth: true,
-          sections: [
-            { type: 'root_decision', title: 'Core Decision/Goal', purpose: 'The central decision or goal being analyzed - the single starting point of the entire chain reaction' },
-            { type: 'context_constraints', title: 'Context & Constraints', purpose: 'Environmental factors, limitations, resources available, stakeholders involved, timeline pressures' },
-            { type: 'possible_actions', title: 'Possible Actions/Choices', purpose: 'All distinct action paths that can be taken from the root decision - each becomes a major branch' },
-            { type: 'immediate_outcomes_t0', title: 'Immediate Outcomes (T+0)', purpose: 'Direct first-order effects for EACH action choice - what happens within hours/days of decision' },
-            { type: 'chain_reactions_t1', title: 'Chain Reactions (T+1)', purpose: 'Second-order effects triggered by T+0 outcomes - branching possibilities within weeks' },
-            { type: 'chain_reactions_t2', title: 'Chain Reactions (T+2)', purpose: 'Third-order cascading effects from T+1 - compound consequences within months' },
-            { type: 'chain_reactions_t3', title: 'Chain Reactions (T+3)', purpose: 'Fourth-order deep cascade effects - long-term ramifications within 6-12 months' },
-            { type: 'chain_reactions_t4_plus', title: 'Deep Cascade (T+4+)', purpose: 'Fifth-order and beyond - ultimate long-term consequences, generational effects if applicable' },
-            { type: 'decision_nodes', title: 'Critical Decision Points', purpose: 'Key branching moments where choices must be made - IF/THEN decision diamonds in the flow' },
-            { type: 'probability_matrix', title: 'Probability Matrix', purpose: 'Likelihood percentages for each branch path with confidence levels and key assumptions' },
-            { type: 'risk_cascade', title: 'Risk Cascade Pathways', purpose: 'Failure chains showing how small risks compound into major problems - worst-case scenario mapping' },
-            { type: 'opportunity_cascade', title: 'Opportunity Cascade Pathways', purpose: 'Success amplifier chains showing how wins compound - best-case scenario mapping' },
-            { type: 'convergence_points', title: 'Convergence Points', purpose: 'Where multiple branches merge back together - common outcomes from different paths' },
-            { type: 'terminal_outcomes', title: 'Terminal Outcomes', purpose: 'ALL possible final conclusions/endpoints of the chain reaction - multiple end states' },
-            { type: 'optimal_path', title: 'Optimal Path Analysis', purpose: 'The recommended route with highest probability-weighted success - step by step actions' },
-            { type: 'alternative_paths', title: 'Alternative Viable Paths', purpose: 'Backup routes and pivot strategies if primary path encounters obstacles' },
-            { type: 'early_warning_indicators', title: 'Early Warning Indicators', purpose: 'Signals that indicate which branch path is actualizing - monitoring triggers' },
-            { type: 'action_items', title: 'Immediate Action Items', purpose: 'Concrete next steps to execute with owners, deadlines, and success metrics' },
-          ]
-        },
-        ideas: {
-          description: 'extensive creative brainstorm with categorized concepts, feasibility analysis, prioritization, and actionable next steps - unlimited ideas',
-          minSections: 6,
-          maxSections: 15,
-          itemsPerSection: '10-50',
-          dynamicLayout: true,
-          sections: [
-            { type: 'theme', title: 'Central Theme & Context', purpose: 'Core problem statement, opportunity space, constraints' },
-            { type: 'research', title: 'Research & Insights', purpose: 'Data points, user insights, market research, competitor analysis' },
-            { type: 'categories', title: 'Idea Categories', purpose: 'Grouped concepts by theme, approach, or target segment' },
-            { type: 'innovative', title: 'Innovative Concepts', purpose: 'Bold, disruptive, or unconventional ideas worth exploring' },
-            { type: 'practical', title: 'Practical Solutions', purpose: 'Immediately actionable, low-risk, quick-win ideas' },
-            { type: 'moonshots', title: 'Moonshot Ideas', purpose: 'High-risk high-reward transformational concepts' },
-            { type: 'incremental', title: 'Incremental Improvements', purpose: 'Small optimizations that compound over time' },
-            { type: 'evaluation', title: 'Feasibility Analysis', purpose: 'Pros/cons, resource requirements, implementation complexity' },
-            { type: 'priorities', title: 'Prioritized Recommendations', purpose: 'Top picks with rationale, suggested sequencing' },
-            { type: 'validation', title: 'Validation Methods', purpose: 'How to test each idea, experiments, MVPs' },
-            { type: 'resources', title: 'Required Resources', purpose: 'What is needed to execute - people, tools, budget' },
-            { type: 'next_steps', title: 'Exploration Paths', purpose: 'Questions to answer, experiments to run, validation needed' },
-          ]
-        }
-      };
-
-      const structure = templateStructures[templateType] || templateStructures.mindmap;
-
-      // Template-specific deep research instructions
-      const templateSpecificInstructions = {
-        eventcircuit: `
-=== EVENT CIRCUIT CHAIN REACTION ANALYSIS - COMPREHENSIVE INSTRUCTIONS ===
-
-You are building a COMPLETE DECISION TREE that maps EVERY possible permutation and combination of outcomes. Think like a chess grandmaster calculating 20 moves ahead combined with a probability theorist.
-
-🎯 CORE MANDATE: Generate an EXHAUSTIVE chain reaction analysis until ALL branches reach natural conclusions. Do NOT artificially limit the depth or breadth.
-
-═══════════════════════════════════════════════════════════════════════════════
-CHAIN REACTION RULES - FOLLOW EXACTLY:
-═══════════════════════════════════════════════════════════════════════════════
-
-1. SINGLE ROOT: Start with ONE clear decision/goal as the root node
-
-2. BRANCHING LOGIC:
-   - Every action creates 2-6 possible outcome branches
-   - Every outcome can trigger new decisions (IF this happens, THEN these options...)
-   - Label each branch with: "IF [condition] → THEN [outcome] (X% probability)"
-   - Continue branching until you reach terminal states (conclusions)
-
-3. TEMPORAL CHAIN DEPTH:
-   - T+0: Immediate (hours/days) - What happens RIGHT after the decision?
-   - T+1: Short-term (weeks) - What does T+0 trigger?
-   - T+2: Medium-term (months) - What does T+1 cascade into?
-   - T+3: Long-term (6-12 months) - Compound effects
-   - T+4+: Ultimate outcomes (1+ years) - Final state
-   - KEEP GOING until natural conclusion - do NOT stop artificially
-
-4. DECISION NODE FORMAT:
-   Each decision point must specify:
-   - The decision/choice to be made
-   - All possible options (minimum 2, typically 3-5)
-   - Probability % for each option being chosen/occurring
-   - Key factors that influence which option manifests
-
-5. OUTCOME NODE FORMAT:
-   Each outcome must include:
-   - Clear description of what happens
-   - Probability % of this outcome
-   - Impact rating (1-10 scale)
-   - Time to manifest
-   - What it triggers next (next decision or terminal state)
-
-6. TERMINAL OUTCOMES:
-   - Multiple endpoints are EXPECTED (rarely single conclusion)
-   - Each terminal outcome should have:
-     • Final state description
-     • Cumulative probability to reach this state
-     • Overall impact assessment (positive/negative/neutral)
-     • Path summary (key decisions that led here)
-
-═══════════════════════════════════════════════════════════════════════════════
-CONTENT DENSITY REQUIREMENTS:
-═══════════════════════════════════════════════════════════════════════════════
-
-- MINIMUM 10 items per section (target 10-15 per section, NEVER less than 8)
-- For complex chain reactions, aim for 15-25 items per section
-- Be SPECIFIC with numbers, percentages, timeframes, and metrics
-- Include ACTIONABLE details - who does what, when, how
-- Every probability must be justified with reasoning
-- Map ALL failure modes AND success amplifiers
-- Identify convergence points where different paths lead to same outcome
-- Include probability percentages on EVERY branch (must sum to 100% for siblings)
-
-═══════════════════════════════════════════════════════════════════════════════
-ITEM FORMAT - USE THIS EXACTLY:
-═══════════════════════════════════════════════════════════════════════════════
-
-For decision nodes:
-"[DECISION] {Decision description} | Options: {Option A (X%), Option B (Y%), Option C (Z%)} | Factors: {key influencing factors}"
-
-For outcome nodes:
-"[OUTCOME] {What happens} | Probability: {X%} | Impact: {1-10} | Timeframe: {when} | Triggers: {what happens next}"
-
-For terminal outcomes:
-"[TERMINAL] {Final state} | Cumulative Probability: {X%} | Net Impact: {positive/negative/neutral, 1-10} | Path: {key decisions}"
-
-═══════════════════════════════════════════════════════════════════════════════
-EXAMPLE CHAIN STRUCTURE:
-═══════════════════════════════════════════════════════════════════════════════
-
-ROOT: "Launch new product in competitive market"
-├── [DECISION] Market entry timing | Options: Q1 Launch (40%), Q2 Launch (35%), Delay to Q3 (25%) | Factors: competitor moves, resource readiness
-│   ├── IF Q1 Launch (40%):
-│   │   ├── [OUTCOME] First mover advantage captured | Probability: 60% | Impact: 8 | Timeframe: 2 weeks | Triggers: competitor response decision
-│   │   │   ├── [DECISION] Competitor response | Options: Price war (30%), Feature race (45%), Market segmentation (25%)
-│   │   │   │   ├── IF Price war → [OUTCOME] Margin compression | Probability: 70% | Impact: -6 | Timeframe: 1 month | Triggers: sustainability assessment
-│   │   │   │   │   └── [TERMINAL] Market consolidation - 2 players remain | Cumulative: 8.4% | Net Impact: +3 | Path: Q1→FirstMover→PriceWar→Consolidation
-│   │   │   │   └── [continues branching...]
-│   │   └── [OUTCOME] Market resistance | Probability: 40% | Impact: -4 | Timeframe: 1 month | Triggers: pivot decision
-│   └── [continues for other timing options...]
-
-═══════════════════════════════════════════════════════════════════════════════
-PROBABILITY RULES:
-═══════════════════════════════════════════════════════════════════════════════
-
-- Sibling branches from same decision node must sum to 100%
-- Cumulative path probability = product of all probabilities along path
-- Flag any path with <5% cumulative probability as "Edge Case"
-- Highlight paths with >25% cumulative probability as "Primary Scenario"
-- Mark paths with >40% cumulative probability as "Most Likely Outcome"
-
-OUTPUT ALL SECTIONS FULLY - DO NOT TRUNCATE OR SUMMARIZE. CONTINUE UNTIL NATURAL CONCLUSIONS.
-`,
-        mindmap: `
-=== MINDMAP DEEP DIVE INSTRUCTIONS ===
-Create a comprehensive knowledge map that serves as a single source of truth for this topic.
-
-⚠️ MANDATORY ITEM COUNT - NON-NEGOTIABLE:
-- Each section MUST have 10-15 items (minimum 8, target 12)
-- If you write only 5 items, STOP and add 5-7 more
-- 5 items per section is UNACCEPTABLE and will be rejected
-
-CONTENT REQUIREMENTS:
-- Central concept should capture the ESSENCE in 3-5 words
-- Each branch should represent a DISTINCT dimension (not overlapping)
-- Sub-branches should drill down to SPECIFIC, actionable insights
-- Include real data, benchmarks, and industry standards where applicable
-- Cover ALL angles: who, what, when, where, why, how
-- Include contrarian views and edge cases
-- DO NOT artificially limit content - explore every relevant aspect
-`,
-        flowchart: `
-=== FLOWCHART PROCESS ANALYSIS INSTRUCTIONS ===
-Map the process with PRECISION and COMPLETENESS.
-
-⚠️ MANDATORY ITEM COUNT - NON-NEGOTIABLE:
-- Each section MUST have 10-15 items (minimum 8, target 12)
-- If you write only 5 items, STOP and add 5-7 more
-- 5 items per section is UNACCEPTABLE and will be rejected
-
-CONTENT REQUIREMENTS:
-- Include ALL decision points, not just the happy path
-- Show exception handling and error recovery for EVERY failure mode
-- Add time estimates where relevant
-- Identify bottlenecks and optimization opportunities
-- Include parallel processes that can run simultaneously
-- Map edge cases and rare scenarios
-- Document prerequisites and post-conditions for each step
-`,
-        planning: `
-=== PROJECT PLANNING INSTRUCTIONS ===
-Create a BATTLE-READY, COMPREHENSIVE project plan.
-
-⚠️ MANDATORY ITEM COUNT - NON-NEGOTIABLE:
-- Each section MUST have 10-15 items (minimum 8, target 12)
-- If you write only 5 items, STOP and add 5-7 more
-- 5 items per section is UNACCEPTABLE and will be rejected
-
-CONTENT REQUIREMENTS:
-- Every task should be specific enough to be assigned to someone
-- Include dependencies and blockers for EACH task
-- Estimate effort realistically (include buffer for unknowns)
-- Identify ALL critical path items
-- Plan for risks before they happen
-- Include communication touchpoints
-- Document success criteria and acceptance tests
-`,
-        ideas: `
-=== BRAINSTORMING DEEP DIVE INSTRUCTIONS ===
-Generate ideas that span the FULL spectrum from safe to revolutionary.
-
-⚠️ MANDATORY ITEM COUNT - NON-NEGOTIABLE:
-- Each section MUST have 10-15 items (minimum 8, target 12)
-- If you write only 5 items, STOP and add 5-7 more
-- 5 items per section is UNACCEPTABLE and will be rejected
-
-CONTENT REQUIREMENTS:
-- Include at least 5 "crazy" ideas that challenge assumptions
-- Ground innovative ideas in feasibility assessment
-- Cross-pollinate ideas from adjacent industries
-- Include quick wins AND long-term moonshots
-- Rate each idea on effort/impact
-- Include ideas from different stakeholder perspectives
-`
-      };
-
-      const templateInstructions = templateSpecificInstructions[templateType] || '';
-
-      const preparePrompt = `You are MIRA, an elite strategic consultant and expert researcher with deep expertise in business strategy, market analysis, project management, and creative problem-solving.
-
-USER REQUEST: "${message}"
-TEMPLATE TYPE: ${templateType} - ${structure.description}
-${templateInstructions}
-=== RESEARCH MANDATE ===
-You must conduct EXHAUSTIVE, PROFESSIONAL-LEVEL research and analysis on this topic. Think like a McKinsey consultant, a Harvard Business School professor, and a domain expert combined.
-
-Your analysis should be:
-- COMPREHENSIVE: Cover every significant angle, dimension, and consideration
-- SPECIFIC: Use concrete examples, real data points, actual metrics, industry benchmarks
-- ACTIONABLE: Every item should be implementable, not vague platitudes
-- INSIGHTFUL: Provide non-obvious connections, hidden opportunities, contrarian perspectives
-- STRUCTURED: Logical flow from analysis to recommendations to action
-- PROFESSIONAL: Use appropriate business terminology and frameworks
-
-=== DEEP RESEARCH REQUIREMENTS ===
-For the topic "${message}", you must explore:
-
-1. FOUNDATIONAL UNDERSTANDING
-   - What is the core definition and scope?
-   - What are the historical context and evolution?
-   - What are the fundamental principles at play?
-
-2. CURRENT LANDSCAPE ANALYSIS
-   - What are the latest trends and developments?
-   - Who are the key players, competitors, or stakeholders?
-   - What are the current best practices?
-   - What data/statistics are relevant?
-
-3. STRATEGIC DIMENSIONS
-   - What are all the critical success factors?
-   - What frameworks or methodologies apply?
-   - What are the common pitfalls and how to avoid them?
-   - What differentiates good from great execution?
-
-4. STAKEHOLDER PERSPECTIVES
-   - Who benefits and how?
-   - What are different user/customer segments?
-   - What are the organizational implications?
-
-5. IMPLEMENTATION CONSIDERATIONS
-   - What resources are required?
-   - What is realistic timeline?
-   - What are dependencies and prerequisites?
-   - What are the quick wins vs long-term investments?
-
-6. RISK & OPPORTUNITY ANALYSIS
-   - What could go wrong?
-   - What opportunities are often missed?
-   - How to measure success?
-
-=== EXPECTED OUTPUT STRUCTURE ===
-Generate ${structure.minSections}-${structure.maxSections} comprehensive sections:
-${structure.sections.map((s, i) => `${i + 1}. ${s.title} - ${s.purpose}`).join('\n')}
-
-═══════════════════════════════════════════════════════════════════════════════
-ITEM COUNT GUIDANCE - CRITICAL - MUST FOLLOW
-═══════════════════════════════════════════════════════════════════════════════
-
-⚠️ STRICT REQUIREMENT - YOUR RESPONSE WILL BE REJECTED IF NOT MET:
-
-For EACH section, you MUST provide:
-- A clear, specific title (not generic)
-- MINIMUM 10 items per section (absolute minimum 8, NEVER 5 or fewer)
-- TARGET: 10-15 items per section
-- Each item should be a complete, specific thought (10-25 words)
-- A concise summary
-
-❌ UNACCEPTABLE: Sections with only 4-6 items - this is insufficient depth
-✅ ACCEPTABLE: Sections with 10-15 items showing comprehensive analysis
-
-If you find yourself writing only 5-6 items, STOP and add more by:
-1. Breaking down points into more specific sub-aspects
-2. Adding "what NOT to do" versions of items  
-3. Including stakeholder-specific perspectives
-4. Adding measurement/metrics for abstract items
-5. Including real-world examples or case study references
-6. Adding prerequisites or dependencies
-7. Including common mistakes to avoid
-8. Adding best practice variations
-
-═══════════════════════════════════════════════════════════════════════════════
-
-=== CRITICAL GUIDELINES ===
-- NO generic filler content - every item must be specific to this topic
-- NO emojis anywhere
-- Each item should stand alone as valuable insight
-- Use specific numbers, percentages, or benchmarks where applicable
-- Include contrarian or non-obvious perspectives
-- Make connections between sections explicit
-- The conclusion should synthesize key insights into strategic recommendations
-- Focus on COMPLETENESS - cover all angles, not just the obvious ones
-
-Return ONLY this JSON structure (no markdown, no explanation):
-{
-  "title": "Compelling, specific title for this ${templateType}",
-  "description": "Executive summary of what this analysis covers and its value (2-3 sentences)",
-  "templateType": "${templateType}",
-  "sections": [
-    {
-      "type": "section_type",
-      "title": "Specific Section Title",
-      "items": [
-        "1. First detailed, specific, actionable item with concrete guidance",
-        "2. Second specific item that provides real insight and value",
-        "3. Third item with specific data point or benchmark",
-        "4. Fourth item covering another angle of this topic",
-        "5. Fifth item with actionable recommendation",
-        "6. Sixth item exploring edge cases or exceptions",
-        "7. Seventh item with best practice guidance",
-        "8. Eighth item covering common mistakes to avoid",
-        "9. Ninth item with specific tool or method recommendation",
-        "10. Tenth item with measurement or success criteria (MINIMUM REQUIRED)",
-        "11. Eleventh item with stakeholder consideration",
-        "12. Twelfth item with resource or budget implication",
-        "13. Thirteenth item with timeline or milestone guidance",
-        "14. Fourteenth item with risk or mitigation strategy",
-        "15. Fifteenth item completing comprehensive coverage (TARGET)"
-      ],
-      "summary": "Key insight or takeaway from this section (1-2 sentences)",
-      "color": {
-        "bg": "bg-color-50",
-        "border": "border-color-200",
-        "text": "text-color-700"
-      }
-    }
-  ],
-  "conclusion": "Strategic synthesis: What are the 3-5 most important takeaways and recommended next steps? Be specific and actionable.",
-  "metadata": {
-    "itemCount": "total_items_should_be_120_plus_for_12_sections",
-    "estimatedElements": "approximate_canvas_elements_needed",
-    "researchDepth": "comprehensive"
-  }
-}`;
+      const preparePrompt = buildWhiteboardPlanPrompt(message, templateType, (whiteboard.pages || []).flatMap(page => (page.objects || []).map(object => object.text || '')).join('\n').slice(0, 6000));
 
       // ═══════════════════════════════════════════════════════════════
       // ROBUST CONTENT GENERATION WITH RETRY & FALLBACK
       // ═══════════════════════════════════════════════════════════════
-      const MAX_RETRIES = 3;
+      const MAX_RETRIES = 2;
       const RETRY_DELAY = 1000; // ms
 
       const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -1599,6 +1178,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
           const aiResponse = await generateSmartContent(preparePrompt, {
             userId: user._id || user.userId,
             feature: 'whiteboard-prepare',
+            useCase: 'reasoning',
             skipRefinement: true,
             skipContext: true,
             skipSaveContext: true,
@@ -1716,6 +1296,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
           title: preparedContent.title || 'Untitled',
           description: preparedContent.description || '',
           sections: preparedContent.sections || [],
+          diagram: preparedContent.diagram || null,
           conclusion: preparedContent.conclusion || '',
           userPrompt: message,
           isPlotted: false,
@@ -1905,7 +1486,7 @@ Apply the user's requested changes to the content. You can:
 4. Rephrase or reorganize content
 5. Change the overall structure if requested
 
-IMPORTANT: Maintain the same JSON structure, just update the content as requested.
+IMPORTANT: Maintain the same JSON structure, just update the content as requested. Preserve section IDs where possible. Update diagram.edges when sections change, removing invalid references. Include the diagram layout and a brief user-facing summary of the updated plan; no hidden reasoning.
 
 Return ONLY the updated JSON structure (same format as input, but modified):
 {
@@ -1913,6 +1494,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
   "description": "...",
   "templateType": "${templateType}",
   "sections": [...],
+  "diagram": {"layout":"layered|radial|grid", "summary":"brief updated plan", "edges":[{"from":"section-id", "to":"section-id", "label":"relationship"}]},
   "conclusion": "...",
   "metadata": {...}
 }`;
@@ -1927,7 +1509,9 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           skipGuardrails: true
         });
 
-        const updatedContent = parseAIJsonResponse(aiResponse, { expectedRoot: 'object' });
+        const updatedContent = normalizePreparedWhiteboardContent(parseAIJsonResponse(aiResponse, { expectedRoot: 'object' }), { templateType });
+        updatedContent.id = currentContent.id;
+        updatedContent.isPlotted = currentContent.isPlotted;
 
         // Update stored content
         whiteboard.aiAnalysis.preparedContent = updatedContent;
@@ -1967,18 +1551,17 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       const existingObjects = whiteboard.pages[pageIndex]?.objects || [];
 
       // Check if this is an update (has previous generation ID or replaceExisting flag)
-      const replaceExisting = body.replaceExisting !== false; // Default to true
-      const previousGenerationId = body.previousGenerationId || preparedContent.id?.replace('prep-', 'gen-');
+      const replaceExisting = preparedContent.isUpdate === true || body.replaceExisting === true;
+      const previousGenerationId = body.previousGenerationId || preparedContent.id;
 
       // Filter out previous MIRA-generated elements
       let filteredObjects = existingObjects;
-      if (replaceExisting) {
-        // Remove ALL MIRA-generated elements (any element with id starting with 'mira-' or has generationId)
+      if (replaceExisting && previousGenerationId) {
+        // Update only this generation; preserve other AI work and hand-drawn content.
         const previousCount = existingObjects.length;
         filteredObjects = existingObjects.filter(obj => {
           // Keep if not a MIRA element
-          const isMiraElement = obj.id?.startsWith('mira-') || obj.generationId;
-          return !isMiraElement;
+          return obj.generationId !== previousGenerationId;
         });
         const removedCount = previousCount - filteredObjects.length;
         if (removedCount > 0) {
@@ -4196,9 +3779,15 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       // EXECUTE LAYOUT GENERATOR WITH ERROR HANDLING
       // ═══════════════════════════════════════════════════════════════
       try {
-        // Execute the appropriate layout generator
-        const generator = layoutGenerators[templateType] || layoutGenerators.mindmap;
-        generator();
+        if (preparedContent.diagram) {
+          const plan = plotWhiteboardPlan(normalizePreparedWhiteboardContent(preparedContent), baseX, baseY, generateId);
+          contentElements.push(...plan.objects);
+          Object.assign(sectionMapping, plan.sectionMapping);
+        } else {
+          // Legacy saved generations retain their original layout.
+          const generator = layoutGenerators[templateType] || layoutGenerators.mindmap;
+          generator();
+        }
       } catch (layoutError) {
         console.error('[MIRA] Layout generation failed:', layoutError);
 
@@ -4250,6 +3839,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         title: preparedContent.title || 'Untitled',
         description: preparedContent.description || '',
         sections: preparedContent.sections || [],
+        diagram: preparedContent.diagram || null,
         conclusion: preparedContent.conclusion || '',
         userPrompt: preparedContent.userPrompt || body.userPrompt || '',
         isPlotted: true,
@@ -4284,80 +3874,13 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       whiteboard.markModified('aiAnalysis');
       whiteboard.markModified('pages');
 
-      // Save using chunked approach - save objects in batches to handle large documents
-      const MAX_SAVE_RETRIES = 5;
-      const CHUNK_SIZE = 50; // Save 50 objects at a time
-      let saveSuccess = false;
-      let saveError = null;
-
-      const allObjects = currentPage.objects;
-      const totalObjects = allObjects.length;
-
-      console.log(`[MIRA] Preparing to save ${totalObjects} objects in chunks of ${CHUNK_SIZE}`);
-
-      for (let attempt = 0; attempt < MAX_SAVE_RETRIES && !saveSuccess; attempt++) {
-        try {
-          // Clear the page objects first
-          console.log(`[MIRA] Attempt ${attempt + 1}: Clearing page ${pageIndex}...`);
-          await Whiteboard.updateOne(
-            { _id: whiteboard._id },
-            { $set: { [`pages.${pageIndex}.objects`]: [] } },
-            { maxTimeMS: 30000 }
-          );
-
-          // Save objects in chunks using $push with $each
-          for (let i = 0; i < totalObjects; i += CHUNK_SIZE) {
-            const chunk = allObjects.slice(i, i + CHUNK_SIZE);
-            const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
-            const totalChunks = Math.ceil(totalObjects / CHUNK_SIZE);
-
-            console.log(`[MIRA] Attempt ${attempt + 1}: Saving chunk ${chunkNum}/${totalChunks} (${chunk.length} objects)...`);
-
-            await Whiteboard.updateOne(
-              { _id: whiteboard._id },
-              {
-                $push: {
-                  [`pages.${pageIndex}.objects`]: { $each: chunk }
-                }
-              },
-              { maxTimeMS: 60000 }
-            );
-          }
-
-          // Save aiAnalysis separately (smaller payload)
-          console.log(`[MIRA] Attempt ${attempt + 1}: Saving aiAnalysis...`);
-          await Whiteboard.updateOne(
-            { _id: whiteboard._id },
-            {
-              $set: {
-                aiAnalysis: whiteboard.aiAnalysis,
-                lastModified: new Date()
-              }
-            },
-            { maxTimeMS: 30000 }
-          );
-
-          saveSuccess = true;
-          console.log(`[MIRA] Whiteboard saved successfully (attempt ${attempt + 1}) - ${totalObjects} objects in ${Math.ceil(totalObjects / CHUNK_SIZE)} chunks`);
-        } catch (err) {
-          saveError = err;
-          console.error(`[MIRA] Save attempt ${attempt + 1} failed:`, err.message, err.code);
-          if (attempt < MAX_SAVE_RETRIES - 1) {
-            // Exponential backoff with longer delays
-            const delay = 3000 * Math.pow(2, attempt);
-            console.log(`[MIRA] Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-        }
-      }
-
-      if (!saveSuccess) {
-        console.error('[MIRA] All save attempts failed:', saveError?.message);
-        return NextResponse.json({
-          error: 'Failed to save canvas after multiple attempts. Your content was generated but could not be saved. Please try again.',
-          details: saveError?.message || 'Save error'
-        }, { status: 500 });
-      }
+      // One atomic write: never expose an empty or partially plotted page.
+      const saved = await Whiteboard.updateOne(
+        { _id: whiteboard._id, ...(whiteboard.updatedAt ? { updatedAt: whiteboard.updatedAt } : {}) },
+        { $set: { [`pages.${pageIndex}.objects`]: currentPage.objects, aiAnalysis: whiteboard.aiAnalysis, lastModified: new Date() } },
+        { maxTimeMS: 30000 }
+      );
+      if (saved?.matchedCount === 0) return NextResponse.json({ error: 'This board changed while plotting. Refresh and try again; your collaborators’ changes were preserved.' }, { status: 409 });
 
       return NextResponse.json({
         success: true,

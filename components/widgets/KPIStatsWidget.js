@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useRouter } from 'next/navigation'
 import { Card, CardBody } from '@heroui/react'
 import { FaChartBar } from 'react-icons/fa'
@@ -8,15 +10,15 @@ export default function KPIStatsWidget({ statsData }) {
   const router = useRouter()
 
   return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
       <div className="mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-default-900">Key Statistics</h3>
+        <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Key Statistics</h3>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className={`${widgetStyles.metricsGrid} grid gap-3`}>
         {statsData.map((stat, index) => {
           const Icon = stat.icon
           return (
-            <Card
+            <Card data-widget-card="" data-widget-tone={["primary", "success", "warning", "secondary"][index % 4]}
               key={index}
               isPressable={!!stat.href}
               isHoverable
@@ -30,7 +32,7 @@ export default function KPIStatsWidget({ statsData }) {
                     <p className="text-default-500 text-xs font-medium truncate">{stat.title}</p>
                     <h3 className="text-xl font-bold text-default-900 mt-1">{stat.value}</h3>
                   </div>
-                  <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <div aria-hidden="true" className={widgetStyles.statIcon}>
                     <Icon className="w-5 h-5 text-primary-600" />
                   </div>
                 </div>

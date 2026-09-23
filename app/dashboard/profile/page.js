@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Loader from '@/components/ui/Loader'
+import Loader, { PageLoader } from '@/components/ui/Loader'
 import {
   FaUser,
   FaEnvelope,
@@ -507,11 +507,7 @@ export default function ProfilePage() {
 
   if (loading || !user || !employee) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-slate-50 dark:bg-[#09090b]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader size="lg" />
-        </div>
-      </div>
+      <PageLoader message="Loading profile" />
     )
   }
 

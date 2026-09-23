@@ -2,11 +2,13 @@
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import MiraLoadingOverlay from '@/components/ui/MiraLoadingOverlay';
-import MiraSphere from '@/components/ui/MiraSphere';
+import MiraSphere from '@/components/ui/MiraPet';
 import Loader from '@/components/ui/Loader';
 import { useAILoading } from '@/contexts/AILoadingContext';
 import MiraAgentSidebar from './MiraAgentSidebar';
+import AIActivityBeam from '@/components/ui/AIActivityBeam';
 import { requestWhiteboardAI } from '@/lib/whiteboardAIClient';
+import { moveWhiteboardObject } from '@/lib/whiteboardGeometry';
 
 // Utility functions
 const generateId = () => `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -417,6 +419,8 @@ const WhiteboardCanvas = forwardRef(({
   // AI Analysis state
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(initialData?.aiAnalysis || { summary: '', messages: [], notes: [], keyPoints: [] });
+  const latestSaveState = useRef({ pages, aiAnalysis });
+  latestSaveState.current = { pages, aiAnalysis };
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [aiError, setAiError] = useState(null);
@@ -2234,11 +2238,7 @@ const WhiteboardCanvas = forwardRef(({
       const dy = point.y - currentDragStart.y;
       updateObjects(objects.map(obj => {
         if (!dragIds.includes(obj.id)) return obj;
-        if (obj.points) return { ...obj, points: obj.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
-        // Ensure x and y are numbers before adding
-        const currentX = Number(obj.x) || 0;
-        const currentY = Number(obj.y) || 0;
-        return { ...obj, x: currentX + dx, y: currentY + dy };
+        return moveWhiteboardObject(obj, dx, dy);
       }));
       // Update both ref and state
       dragStartRef.current = point;
@@ -2865,10 +2865,12 @@ const WhiteboardCanvas = forwardRef(({
   useEffect(() => {
     if (!isDirty || !onSave) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
+    saveTimeoutRef.current = setTimeout(async () => {
       const thumbnail = generateThumbnail();
-      onSave({ pages, thumbnail, aiAnalysis });
-      setIsDirty(false);
+      try {
+        await onSave({ pages, thumbnail, aiAnalysis });
+        if (latestSaveState.current.pages === pages && latestSaveState.current.aiAnalysis === aiAnalysis) setIsDirty(false);
+      } catch (error) { setAiError(error.message || 'Save failed. Your changes are still on this canvas.'); }
     }, 2000);
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, [isDirty, pages, onSave, generateThumbnail, aiAnalysis]);
@@ -2888,12 +2890,17 @@ const WhiteboardCanvas = forwardRef(({
   }, [isDirty]);
 
   // Force save function for immediate save
-  const forceSave = useCallback(() => {
+  const forceSave = useCallback(async () => {
     if (!onSave) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     const thumbnail = generateThumbnail();
-    onSave({ pages, thumbnail, aiAnalysis });
-    setIsDirty(false);
+    try {
+      await onSave({ pages, thumbnail, aiAnalysis });
+      if (latestSaveState.current.pages === pages && latestSaveState.current.aiAnalysis === aiAnalysis) setIsDirty(false);
+    } catch (error) {
+      setAiError(error.message || 'Save failed. Please try again.');
+      throw error;
+    }
   }, [onSave, pages, generateThumbnail, aiAnalysis]);
 
   // Expose forceSave and isDirty to parent component
@@ -3149,7 +3156,7 @@ const WhiteboardCanvas = forwardRef(({
         if (data.generatedObjects && data.generatedObjects.length > 0) {
           const newIds = data.generatedObjects.map(o => o.id);
           animateNewObjects(newIds);
-          smoothZoomToFitContent(data.generatedObjects);
+          // Keep the user's viewport; Center remains an explicit action.
           setSelectedIds([]);
         }
       }
@@ -3172,9 +3179,11 @@ const WhiteboardCanvas = forwardRef(({
         );
         if (currentGen) {
           setAgentSidebarContent({
+            id: currentGen.id,
             title: currentGen.title,
             description: currentGen.description,
             sections: currentGen.sections,
+            diagram: currentGen.diagram,
             conclusion: currentGen.conclusion,
             templateType: currentGen.templateType,
             userPrompt: currentGen.userPrompt,
@@ -3234,7 +3243,7 @@ const WhiteboardCanvas = forwardRef(({
         if (data.generatedObjects && data.generatedObjects.length > 0) {
           const newIds = data.generatedObjects.map(o => o.id);
           animateNewObjects(newIds);
-          smoothZoomToFitContent(data.generatedObjects);
+          // Keep the user's viewport during continuation batches too.
           setSelectedIds([]); // Clear selection
         }
       }
@@ -5444,18 +5453,19 @@ const WhiteboardCanvas = forwardRef(({
           onClick={() => setShowAIPanel(prev => !prev)}
           className={`
             group relative flex items-center gap-2 px-4 py-3 rounded-2xl
-            bg-white/20
-            border border-white/30
+            bg-white
+            border border-gray-200
             shadow-[0_4px_24px_rgba(0,0,0,0.08)]
-            hover:bg-white/30 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]
+            hover:bg-gray-50 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]
             transition-all duration-300 ease-out
             hover:scale-[1.02] active:scale-[0.98]
-            ${showAIPanel ? 'ring-2 ring-violet-400/40 bg-white/30' : ''}
+            ${showAIPanel ? 'ring-2 ring-violet-400/40' : ''}
           `}
           title="Mira"
         >
           {/* Text */}
-          <span className="text-sm font-medium text-gray-700">Mira</span>
+          <MiraSphere size={28} isThinking={aiLoading} />
+          <span className="text-sm font-medium text-gray-700">MIRA</span>
 
           {/* Pulse effect when has content */}
           {aiAnalysis.messages.length > 0 && (
@@ -5468,27 +5478,27 @@ const WhiteboardCanvas = forwardRef(({
       {showAIPanel && (
         <div
           ref={aiPanelRef}
-          className="fixed bottom-20 sm:bottom-36 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-96 max-h-[calc(100vh-120px)] sm:max-h-[calc(100vh-180px)] flex flex-col
-            bg-white
-            border border-gray-200
-            rounded-2xl
-            shadow-[0_8px_40px_rgba(0,0,0,0.12)]
+          data-theme="light"
+          role="dialog"
+          aria-label="MIRA canvas chat"
+          className="ai-glass-panel fixed mira-board-panel top-3 bottom-3 right-3 z-50 w-[calc(100vw-24px)] sm:w-[460px] flex flex-col
             overflow-hidden
             animate-in slide-in-from-bottom-4 fade-in duration-300"
         >
           {/* Header */}
-          <div className="relative px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+          <AIActivityBeam active={aiLoading} strength={0.95} theme="light" />
+          <div className="mira-board-toolbar relative shrink-0 px-5 py-3">
             <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="sr-only">
                 <div className="w-10 h-10 flex items-center justify-center">
-                  <MiraSphere size={40} particleCount={100} enableProximity={true} enableRandomPulse={true} proximityRadius={100} />
+                  <MiraSphere size={32} isThinking={aiLoading} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-800">MIRA Canvas Analysis</h3>
-                  <p className="text-xs text-gray-500">AI-powered insights</p>
+                  <h3 className="text-base font-semibold text-gray-800">MIRA</h3>
+                  <p className="text-xs text-gray-500">Canvas chat</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex w-full items-center justify-between gap-1">
                 {aiAnalysis.messages.length > 0 && (
                   <button
                     onClick={clearAIHistory}
@@ -5502,6 +5512,7 @@ const WhiteboardCanvas = forwardRef(({
                 )}
                 <button
                   onClick={() => setShowAIPanel(false)}
+                  aria-label="Close canvas chat"
                   className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -5513,9 +5524,10 @@ const WhiteboardCanvas = forwardRef(({
           </div>
 
           {/* Messages area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[120px] sm:min-h-[180px] bg-white">
+          <div role="log" aria-label="Canvas conversation" aria-live="polite" className="mira-board-messages flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
             {aiAnalysis.messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-6 text-center">
+                <div className="mb-5"><MiraSphere size={64} isThinking={aiLoading} /></div>
                 <h4 className="text-sm font-medium text-gray-700 mb-1">Analyse Your Canvas</h4>
                 <p className="text-xs text-gray-500 max-w-[180px] mb-4">
                   Get AI insights about your whiteboard content
@@ -5539,10 +5551,11 @@ const WhiteboardCanvas = forwardRef(({
                     key={idx}
                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
+                    {msg.role !== 'user' && <span className="shrink-0 mr-2 pt-2"><MiraSphere size={24} /></span>}
                     <div
                       className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === 'user'
-                          ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-br-md'
-                          : 'bg-gray-50 text-gray-800 border border-gray-200 rounded-bl-md'
+                          ? 'mira-board-user rounded-br-md'
+                          : 'mira-board-assistant text-gray-800 rounded-bl-md'
                         }`}
                     >
                       <div className="text-sm whitespace-pre-wrap leading-relaxed">
@@ -5561,7 +5574,7 @@ const WhiteboardCanvas = forwardRef(({
             {/* Loading indicator */}
             {aiLoading && aiAnalysis.messages.length > 0 && (
               <div className="flex justify-start">
-                <div className="bg-white/60 rounded-2xl rounded-bl-md px-4 py-3 border border-white/40">
+                <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 border border-gray-200">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
                       <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -5576,7 +5589,7 @@ const WhiteboardCanvas = forwardRef(({
 
             {/* Error message */}
             {aiError && (
-              <div className="bg-red-50/80 border border-red-200/50 rounded-xl px-4 py-3 text-sm text-red-600">
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">
                 {aiError}
               </div>
             )}
@@ -5584,7 +5597,8 @@ const WhiteboardCanvas = forwardRef(({
 
           {/* Key points section */}
           {aiAnalysis.keyPoints && aiAnalysis.keyPoints.length > 0 && (
-            <div className="px-4 py-3 border-t border-white/20 bg-amber-50/30">
+            <details className="shrink-0 px-4 py-2 border-t border-gray-200 max-h-32 overflow-y-auto">
+              <summary className="text-xs cursor-pointer text-gray-500">Key points</summary>
               <h4 className="text-xs font-semibold text-amber-700 mb-2 flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -5599,11 +5613,11 @@ const WhiteboardCanvas = forwardRef(({
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           )}
 
           {/* Input area */}
-          <div className="p-3 sm:p-4 border-t border-gray-100 bg-gray-50/50">
+          <div className="mira-board-composer shrink-0 p-3 sm:p-4 border-t border-gray-100">
             <div className="flex gap-2">
               <textarea
                 value={aiInput}
@@ -5615,7 +5629,8 @@ const WhiteboardCanvas = forwardRef(({
                     sendAIMessage(aiInput);
                   }
                 }}
-                placeholder="Ask MIRA about your canvas...\n(Ctrl+Enter to send)"
+                aria-label="Message MIRA about your canvas"
+                placeholder="Message MIRA about your canvas…"
                 rows={2}
                 className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl
                   bg-white
@@ -5627,11 +5642,7 @@ const WhiteboardCanvas = forwardRef(({
               <button
                 onClick={() => sendAIMessage(aiInput)}
                 disabled={aiLoading || !aiInput.trim()}
-                className="px-4 py-2.5 rounded-xl self-end
-                  bg-gradient-to-r from-violet-500 to-purple-600
-                  text-white
-                  shadow-md
-                  hover:shadow-lg
+                className="mira-board-send px-4 py-2.5 rounded-xl self-end
                   disabled:opacity-50 disabled:cursor-not-allowed
                   transition-all duration-200"
                 title="Send (Ctrl+Enter)"
@@ -5643,22 +5654,22 @@ const WhiteboardCanvas = forwardRef(({
             </div>
 
             {/* Agent Mode button - Opens MIRA Agent Sidebar directly */}
-            <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="mt-2 flex items-start justify-between gap-2">
               <button
                 onClick={() => {
                   setShowAgentSidebar(true);
+                  setShowAIPanel(false);
                 }}
-                className="w-full flex items-center justify-center gap-2 text-xs px-4 py-2.5 rounded-lg transition-all border bg-gradient-to-r from-violet-500 to-purple-600 text-white border-violet-500 shadow-md hover:shadow-lg"
+                className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-full text-gray-700 hover:bg-gray-100"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                </svg>
-                Open Agent Mode
+                <MiraSphere size={22} />
+                Agent Mode
               </button>
 
               {/* Quick action buttons */}
-              <div className="grid grid-cols-2 gap-2 mt-3">
+              <details className="min-w-0 flex-1 max-w-[230px]">
+                <summary className="cursor-pointer text-xs text-gray-500 text-right py-2">Canvas tools</summary>
+              <div className="grid grid-cols-2 gap-2 mt-2">
                 <button
                   onClick={() => sendAIMessage('Create key points and notes from this canvas')}
                   disabled={aiLoading}
@@ -5707,6 +5718,7 @@ const WhiteboardCanvas = forwardRef(({
                   Restructure
                 </button>
               </div>
+              </details>
             </div>
           </div>
         </div>
@@ -5777,9 +5789,11 @@ const WhiteboardCanvas = forwardRef(({
           const gen = agentGenerations.find(g => g.id === genId);
           if (gen) {
             setAgentSidebarContent({
+              id: gen.id,
               title: gen.title,
               description: gen.description,
               sections: gen.sections,
+              diagram: gen.diagram,
               conclusion: gen.conclusion,
               templateType: gen.templateType,
               userPrompt: gen.userPrompt,

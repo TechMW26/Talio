@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useState, useRef } from 'react'
 import { FaBuilding } from 'react-icons/fa'
 import { Card, CardBody } from '@heroui/react'
@@ -32,9 +34,9 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
 
   if (!departmentStats || departmentStats.length === 0) {
     return (
-      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+      <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
         <div className="mb-4">
-          <h3 className="text-base sm:text-lg font-bold text-default-900">Department Distribution</h3>
+          <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Department Distribution</h3>
         </div>
         <div className="flex flex-col items-center justify-center text-center py-6">
           <img
@@ -62,9 +64,9 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
   const dynamicGap = numBars > 20 ? 2 : numBars > 10 ? 4 : 6
 
   return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full relative">
+    <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full relative`}>
       <div className="mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-default-900">Department Distribution</h3>
+        <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Department Distribution</h3>
       </div>
 
       {/* Centralized Tooltip - always positioned in center of widget */}
@@ -75,7 +77,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
 
         return (
           <div className="absolute left-1/2 top-12 -translate-x-1/2 z-20 pointer-events-none">
-            <Card className="min-w-[140px] shadow-lg">
+            <Card data-widget-card="" className="min-w-[140px] shadow-lg">
               {/* Tooltip Header with department color */}
               <div
                 className="px-3 py-2 border-b border-default-200"

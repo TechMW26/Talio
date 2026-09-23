@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
 import { requirePermission, checkPermission } from '@/lib/permissions'
-import { notifyAssetAssignment } from '@/lib/assetNotifications.server'
+import { notifyAssetAssignment, assetNotificationRecipients } from '@/lib/assetNotifications.server'
 import mongoose from 'mongoose'
 import { normalizeAssetInput, normalizeAssetStatus } from '@/utils/assetData'
 
@@ -71,7 +71,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await requirePermission('assets', 'create')(request, ['Asset', 'Employee', 'Notification'])
+    const auth = await requirePermission('assets', 'create')(request, ['Asset', 'Employee', 'Department', 'Team', 'Notification'])
     if (auth.denied) return auth.denied
     const { user, models } = auth
     const { Asset, Employee } = models
@@ -111,7 +111,8 @@ export async function POST(request) {
     after(() => notifyAssetAssignment({ models, asset: populatedAsset }).catch(error => console.error('[Asset] Notification failed:', error)))
 
     // Emit real-time event
-    emitAssetUpdate(populatedAsset, [], { action: 'create', broadcast: true })
+    const recipients = await assetNotificationRecipients(models, populatedAsset)
+    if (recipients.length) emitAssetUpdate(populatedAsset, recipients.map(user => user.id), { action: 'create', broadcast: false })
 
     return NextResponse.json({
       success: true,

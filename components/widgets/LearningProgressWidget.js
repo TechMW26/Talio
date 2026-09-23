@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useState, useEffect } from 'react'
 import { FaGraduationCap, FaCheckCircle, FaSpinner, FaPlayCircle } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Progress, Skeleton, ScrollShadow } from '@heroui/react'
@@ -80,7 +82,7 @@ export default function LearningProgressWidget({ limit = 4 }) {
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
@@ -95,9 +97,9 @@ export default function LearningProgressWidget({ limit = 4 }) {
     }
 
     return (
-        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-default-900">Learning Progress</h3>
+                <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Learning Progress</h3>
                 <Button
                     variant="light"
                     color="primary"
@@ -109,9 +111,9 @@ export default function LearningProgressWidget({ limit = 4 }) {
                 </Button>
             </div>
 
-            <ScrollShadow className="space-y-3 max-h-48">
+            <ScrollShadow data-widget-list="" className="space-y-3 flex-1 min-h-0 overflow-y-auto">
                 {courses.map((course, index) => (
-                    <Card key={index} className="border border-default-100">
+                    <Card data-widget-card="" key={index} className="border border-default-100">
                         <CardBody className="p-3">
                             <div className="flex items-center justify-start mb-2">
                                 <h4 className="text-sm font-semibold text-default-900 truncate pr-2 flex-1">

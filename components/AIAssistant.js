@@ -9,10 +9,10 @@ import {
   ModalFooter,
   Button,
   Input,
-  Spinner,
   Chip,
 } from '@heroui/react'
-import { FaPaperPlane, FaRobot, FaInfoCircle, FaCheckCircle, FaHeadset } from 'react-icons/fa'
+import { FaPaperPlane, FaInfoCircle, FaCheckCircle, FaHeadset } from 'react-icons/fa'
+import MiraPet from '@/components/ui/MiraPet'
 import { useAIAssistant } from '@/contexts/AIAssistantContext'
 import { useRouter } from 'next/navigation'
 
@@ -28,7 +28,7 @@ const CATEGORY_META = {
   navigation: { label: 'Navigation', color: 'default', icon: '🔍' },
   server: { label: 'Service Status', color: 'warning', icon: '🖥️' },
   account: { label: 'Account Help', color: 'primary', icon: '👤' },
-  workflow: { label: 'Action Help', color: 'primary', icon: '✨' },
+  workflow: { label: 'Action Help', color: 'primary', icon: '→' },
 }
 
 // Render formatted AI response with bold, numbered lists, etc.
@@ -146,8 +146,8 @@ export default function AIAssistant() {
           <>
             <ModalHeader>
               <div className="flex items-center gap-3 w-full">
-                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/40 dark:to-primary-800/40 rounded-xl">
-                  <FaRobot className="text-primary-600 dark:text-primary-400 text-lg" />
+                <div className="flex shrink-0 items-center justify-center w-12 h-12 overflow-visible">
+                  <MiraPet size={36} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">MIRA Assistant</h3>
@@ -228,7 +228,7 @@ export default function AIAssistant() {
                       >
                         {msg.role === 'assistant' && (
                           <div className="flex items-center gap-1.5 mb-2">
-                            <FaRobot className="text-primary-500 dark:text-primary-400 text-xs" />
+                            <MiraPet size={22} />
                             <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">MIRA</span>
                           </div>
                         )}
@@ -244,7 +244,7 @@ export default function AIAssistant() {
                   <div className="flex justify-start">
                     <div className="max-w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 dark:bg-zinc-700/80 text-gray-800 dark:text-gray-100">
                       <div className="flex items-center gap-1.5 mb-2">
-                        <FaRobot className="text-primary-500 dark:text-primary-400 text-xs" />
+                        <MiraPet size={22} />
                         <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">MIRA</span>
                       </div>
                       <FormattedMessage content={aiResponse} />
@@ -257,7 +257,7 @@ export default function AIAssistant() {
                   <div className="flex justify-start">
                     <div className="rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 dark:bg-zinc-700/80">
                       <div className="flex items-center gap-2">
-                        <Spinner size="sm" color="primary" />
+                        <MiraPet size={28} isThinking />
                         <span className="text-sm text-gray-600 dark:text-gray-300">MIRA is looking into this...</span>
                       </div>
                     </div>
@@ -302,7 +302,7 @@ export default function AIAssistant() {
                       inputWrapper: 'bg-gray-50 dark:bg-zinc-700/60 border-gray-300 dark:border-zinc-600',
                       input: 'text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500',
                     }}
-                    startContent={<FaRobot className="text-gray-400 dark:text-gray-500 text-sm" />}
+                    startContent={<MiraPet size={24} />}
                   />
                   <Button
                     color="primary"

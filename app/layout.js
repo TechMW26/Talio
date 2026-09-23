@@ -57,16 +57,14 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" style={{ colorScheme: 'dark' }} suppressHydrationWarning>
       <head>
         {/* Dark mode flash prevention - applies dark class before paint */}
         <script dangerouslySetInnerHTML={{
           __html: `
             (function() {
               try {
-                var pref = localStorage.getItem('app-dark-mode-pref') || 'auto';
-                var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                if (dark) document.documentElement.classList.add('dark');
+                document.documentElement.classList.add('dark');
               } catch(e) {}
             })();
           `

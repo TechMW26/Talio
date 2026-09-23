@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Select, SelectItem } from '@heroui/react';
 import Loader from '@/components/ui/Loader';
 import { getRoleDisplayLabel } from '@/hooks/useRoles';
@@ -28,13 +29,13 @@ import { filterDepartmentGroupEmployees, hasActiveGroupSearch, isDepartmentGroup
 
 // Priority badge colors matching project's theme
 const priorityColors = {
-  low: 'bg-gray-100 text-gray-700',
-  medium: 'bg-blue-100 text-blue-700',
+  low: 'bg-default-100 text-default-700',
+  medium: 'bg-primary/10 text-primary',
   high: 'bg-orange-100 text-orange-700',
   urgent: 'bg-red-100 text-red-700'
 };
 
-export default function CallAlertButton({ user }) {
+export default function CallAlertButton({ user, floating = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(1); // 1: Select recipients, 2: Compose message
   const [loading, setLoading] = useState(false);
@@ -333,20 +334,30 @@ export default function CallAlertButton({ user }) {
   // Total employees count
   const totalEmployeesCount = filteredDeptGroups.reduce((sum, g) => sum + g.employees.length, 0);
 
-  return (
-    <>
-      {/* Call Alert Button */}
+  const trigger = (
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+        aria-label="Call / Alert"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        className={`inline-flex h-10 w-10 sm:w-auto shrink-0 items-center justify-center gap-2 sm:px-4 rounded-full border border-primary/20 bg-primary/10 text-primary text-sm font-semibold hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors duration-200 ${floating ? 'fixed z-40' : ''}`}
         style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+          ...(floating ? {
+            bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+            right: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
+          } : {}),
         }}
         title="Send Call Alert"
       >
         <HiOutlinePhone className="w-5 h-5" />
         <span className="hidden sm:inline">Call / Alert</span>
       </button>
+  );
+
+  return (
+    <>
+      {/* Escape transformed route ancestors so fixed positioning follows the viewport. */}
+      {floating ? (typeof document !== 'undefined' ? createPortal(trigger, document.body) : null) : trigger}
 
       {/* Modal via Portal */}
       <ModalPortal show={isOpen}>
@@ -355,31 +366,29 @@ export default function CallAlertButton({ user }) {
           onClick={handleBackdropClick}
         >
           {/* Modal Content */}
-          <div className="relative bg-white rounded-[30px] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-modal-enter" onClick={e => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-labelledby="call-alert-title" className="relative bg-content1 text-foreground border border-default-200 rounded-[30px] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-modal-enter" onClick={e => e.stopPropagation()}>
             {/* Header with gradient */}
             <div
-              className="px-6 py-5"
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-              }}
+              className="px-6 py-5 bg-primary/10 border-b border-primary/15"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-white rounded-xl">
-                    <HiOutlinePhone className="w-6 h-6 text-blue-900" />
+                  <div className="p-2.5 bg-primary/10 rounded-full">
+                    <HiOutlinePhone className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-white">
+                    <h2 id="call-alert-title" className="text-xl font-semibold text-foreground">
                       {step === 1 ? 'Select Recipients' : 'Compose Alert'}
                     </h2>
-                    <p className="text-sm text-white/80 mt-0.5">
+                    <p className="text-sm text-default-500 mt-0.5">
                       {step === 1 ? 'Choose who will receive this alert' : 'Write your message'}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={handleClose}
-                  className="p-2 rounded-xl hover:bg-white/20 transition-colors"
+                  aria-label="Close call alert"
+                  className="p-2 rounded-full text-default-600 hover:bg-primary/10 transition-colors"
                 >
                   <HiOutlineXMark className="w-6 h-6 text-blue" />
                 </button>
@@ -387,13 +396,13 @@ export default function CallAlertButton({ user }) {
 
               {/* Step Progress Bar */}
               <div className="mt-4 flex items-center gap-2">
-                <div className={`h-1.5 flex-1 rounded-full transition-all ${step >= 1 ? 'bg-white' : 'bg-blue-900'}`} />
-                <div className={`h-1.5 flex-1 rounded-full transition-all ${step >= 2 ? 'bg-white' : 'bg-blue-900'}`} />
+                <div className={`h-1.5 flex-1 rounded-full transition-all ${step >= 1 ? 'bg-primary' : 'bg-primary/20'}`} />
+                <div className={`h-1.5 flex-1 rounded-full transition-all ${step >= 2 ? 'bg-primary' : 'bg-primary/20'}`} />
               </div>
             </div>
 
             {/* Body - White background with black text */}
-            <div className="p-6 max-h-[60vh] overflow-y-auto bg-white">
+            <div className="p-6 max-h-[60vh] overflow-y-auto bg-content1">
               {step === 1 ? (
                 /* Step 1: Select Recipients */
                 <div className="space-y-4">
@@ -416,7 +425,7 @@ export default function CallAlertButton({ user }) {
                         onChange={(e) => setSelectedDepartment(e.target.value)}
                         aria-label="Filter by Department"
                         className="min-w-[180px]"
-                        classNames={{ trigger: "bg-white" }}
+                        classNames={{ trigger: "bg-content1" }}
                       >
                         <SelectItem key="all">All Departments</SelectItem>
                         {departments.map(dept => (
@@ -427,9 +436,9 @@ export default function CallAlertButton({ user }) {
                   </div>
 
                   {/* Selection Summary */}
-                  <div className="flex items-center justify-between py-2 px-3 bg-gray-100 rounded-xl">
-                    <span className="text-sm text-gray-600">
-                      <span className="font-semibold text-black">{selectedRecipients.length}</span> of <span className="font-semibold text-black">{totalEmployeesCount}</span> selected
+                  <div className="flex items-center justify-between py-2 px-3 bg-default-100 rounded-2xl">
+                    <span className="text-sm text-default-500">
+                      <span className="font-semibold text-foreground">{selectedRecipients.length}</span> of <span className="font-semibold text-foreground">{totalEmployeesCount}</span> selected
                     </span>
                     {selectedRecipients.length > 0 && (
                       <button
@@ -442,13 +451,13 @@ export default function CallAlertButton({ user }) {
                   </div>
 
                   {/* Department Groups */}
-                  <div className="border border-gray-300 rounded-xl max-h-72 overflow-y-auto bg-white">
+                  <div className="border border-default-300 rounded-2xl max-h-72 overflow-y-auto bg-content1">
                     {loading ? (
                       <div className="flex items-center justify-center py-12">
                         <Loader size="md" />
                       </div>
                     ) : filteredDeptGroups.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                      <div className="flex flex-col items-center justify-center py-12 text-default-500">
                         <HiOutlineUsers className="w-12 h-12 mb-3" />
                         <p className="font-medium">No recipients found</p>
                       </div>
@@ -466,32 +475,32 @@ export default function CallAlertButton({ user }) {
                         const someSelected = deptEmployeeIds.some(id => selectedRecipients.some(r => r.userId === id));
 
                         return (
-                          <div key={deptId} className="border-b border-gray-200 last:border-b-0">
+                          <div key={deptId} className="border-b border-default-200 last:border-b-0">
                             {/* Department Header */}
-                            <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
+                            <div className="flex items-center gap-3 px-4 py-3 bg-default-50 cursor-pointer hover:bg-default-100 transition-colors">
                               <button
                                 onClick={() => toggleDepartmentExpand(deptId)}
                                 className="p-1"
                               >
-                                <HiOutlineChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                                <HiOutlineChevronDown className={`w-4 h-4 text-default-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                               </button>
 
                               <button
                                 onClick={() => toggleSelectAllDepartment(deptId)}
                                 className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${allSelected
-                                    ? 'border-blue-500 bg-blue-500'
+                                    ? 'border-primary bg-primary'
                                     : someSelected
-                                      ? 'border-blue-500 bg-blue-100'
-                                      : 'border-gray-300'
+                                      ? 'border-primary bg-primary/10'
+                                      : 'border-default-300'
                                   }`}
                               >
-                                {allSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
-                                {someSelected && !allSelected && <div className="w-2 h-0.5 bg-blue-500 rounded" />}
+                                {allSelected && <HiOutlineCheck className="w-3 h-3 text-primary-foreground" />}
+                                {someSelected && !allSelected && <div className="w-2 h-0.5 bg-primary rounded" />}
                               </button>
 
                               <div className="flex-1" onClick={() => toggleDepartmentExpand(deptId)}>
-                                <span className="font-medium text-black">{group.department.name}</span>
-                                <span className="ml-2 text-sm text-gray-500">({group.employees.length})</span>
+                                <span className="font-medium text-foreground">{group.department.name}</span>
+                                <span className="ml-2 text-sm text-default-500">({group.employees.length})</span>
                               </div>
                             </div>
 
@@ -504,27 +513,27 @@ export default function CallAlertButton({ user }) {
                                     <div
                                       key={recipient.userId}
                                       onClick={() => toggleRecipient(recipient)}
-                                      className={`flex items-center gap-3 px-4 py-3 pl-12 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                                      className={`flex items-center gap-3 px-4 py-3 pl-12 cursor-pointer transition-colors ${isSelected ? 'bg-primary/5' : 'hover:bg-default-50'
                                         }`}
                                     >
-                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isSelected ? 'border-primary bg-primary' : 'border-default-300'
                                         }`}>
-                                        {isSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
+                                        {isSelected && <HiOutlineCheck className="w-3 h-3 text-primary-foreground" />}
                                       </div>
 
-                                      <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                                      <div className="w-9 h-9 rounded-full bg-default-200 flex items-center justify-center overflow-hidden">
                                         {recipient.profilePicture ? (
                                           <img src={recipient.profilePicture} alt="" className="w-full h-full object-cover" />
                                         ) : (
-                                          <HiOutlineUser className="w-5 h-5 text-gray-400" />
+                                          <HiOutlineUser className="w-5 h-5 text-default-400" />
                                         )}
                                       </div>
 
                                       <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-black truncate">
+                                        <p className="font-medium text-foreground truncate">
                                           {recipient.name}
                                         </p>
-                                        <p className="text-sm text-gray-500 truncate">
+                                        <p className="text-sm text-default-500 truncate">
                                           {recipient.employeeCode} • {recipient.designation || 'Employee'}
                                         </p>
                                       </div>
@@ -545,7 +554,7 @@ export default function CallAlertButton({ user }) {
                       {selectedRecipients.slice(0, 5).map(r => (
                         <span
                           key={r.userId}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-700"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary"
                         >
                           {r.name}
                           <button
@@ -557,7 +566,7 @@ export default function CallAlertButton({ user }) {
                         </span>
                       ))}
                       {selectedRecipients.length > 5 && (
-                        <span className="px-3 py-1.5 bg-gray-200 text-gray-600 rounded-full text-sm font-medium">
+                        <span className="px-3 py-1.5 bg-default-200 text-default-500 rounded-full text-sm font-medium">
                           +{selectedRecipients.length - 5} more
                         </span>
                       )}
@@ -568,29 +577,29 @@ export default function CallAlertButton({ user }) {
                 /* Step 2: Compose Message */
                 <div className="space-y-5">
                   {/* Recipients Summary */}
-                  <div className="flex items-center gap-3 p-4 bg-gray-100 rounded-xl">
-                    <div className="p-2.5 rounded-xl bg-blue-100">
-                      <HiOutlineUsers className="w-5 h-5 text-blue-600" />
+                  <div className="flex items-center gap-3 p-4 bg-default-100 rounded-2xl">
+                    <div className="p-2.5 rounded-2xl bg-primary/10">
+                      <HiOutlineUsers className="w-5 h-5 text-primary" />
                     </div>
-                    <span className="text-gray-700">
-                      Sending to <strong className="text-black">{selectedRecipients.length}</strong> recipient(s)
+                    <span className="text-default-700">
+                      Sending to <strong className="text-foreground">{selectedRecipients.length}</strong> recipient(s)
                     </span>
                   </div>
 
                   {/* Template Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Quick Templates</label>
+                    <label className="block text-sm font-medium text-default-700 mb-2">Quick Templates</label>
                     <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
                       {templates.slice(0, 6).map(template => (
                         <button
                           key={template.id}
                           onClick={() => handleTemplateSelect(template)}
-                          className={`p-3 text-left border rounded-xl transition-all ${selectedTemplate?.id === template.id
-                              ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                              : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                          className={`p-3 text-left border rounded-2xl transition-all ${selectedTemplate?.id === template.id
+                              ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                              : 'border-default-300 hover:border-gray-400 hover:bg-default-50'
                             }`}
                         >
-                          <p className="font-medium text-black truncate text-sm">{template.title}</p>
+                          <p className="font-medium text-foreground truncate text-sm">{template.title}</p>
                           <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium ${priorityColors[template.priority]}`}>
                             {template.priority}
                           </span>
@@ -601,30 +610,30 @@ export default function CallAlertButton({ user }) {
 
                   {/* Custom Message */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Message <span className="text-gray-400 font-normal">(supports placeholders)</span>
+                    <label className="block text-sm font-medium text-default-700 mb-2">
+                      Message <span className="text-default-400 font-normal">(supports placeholders)</span>
                     </label>
                     <textarea
                       value={customMessage}
                       onChange={(e) => setCustomMessage(e.target.value)}
                       placeholder="Enter your message... Use {senderName}, {receiverName}, {senderRole}, {receiverDepartment} as placeholders"
                       rows={4}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-black placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
+                      className="w-full px-4 py-3 border border-default-300 rounded-2xl bg-content1 text-foreground placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none"
                     />
-                    <p className="mt-2 text-xs text-gray-500">
-                      Available: <code className="px-1 py-0.5 bg-gray-100 rounded text-black">{'{senderName}'}</code>, <code className="px-1 py-0.5 bg-gray-100 rounded text-black">{'{receiverName}'}</code>, <code className="px-1 py-0.5 bg-gray-100 rounded text-black">{'{time}'}</code>, <code className="px-1 py-0.5 bg-gray-100 rounded text-black">{'{date}'}</code>
+                    <p className="mt-2 text-xs text-default-500">
+                      Available: <code className="px-1 py-0.5 bg-default-100 rounded text-foreground">{'{senderName}'}</code>, <code className="px-1 py-0.5 bg-default-100 rounded text-foreground">{'{receiverName}'}</code>, <code className="px-1 py-0.5 bg-default-100 rounded text-foreground">{'{time}'}</code>, <code className="px-1 py-0.5 bg-default-100 rounded text-foreground">{'{date}'}</code>
                     </p>
                   </div>
 
                   {/* Priority & Voice Options */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                      <label className="block text-sm font-medium text-default-700 mb-2">Priority</label>
                       <Select
                         selectedKeys={[priority]}
                         onChange={(e) => setPriority(e.target.value)}
                         aria-label="Priority"
-                        classNames={{ trigger: "bg-white" }}
+                        classNames={{ trigger: "bg-content1" }}
                       >
                         <SelectItem key="low">Low</SelectItem>
                         <SelectItem key="medium">Medium</SelectItem>
@@ -634,12 +643,12 @@ export default function CallAlertButton({ user }) {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Voice Alert (AI)</label>
+                      <label className="block text-sm font-medium text-default-700 mb-2">Voice Alert (AI)</label>
                       <button
                         onClick={() => setGenerateVoice(!generateVoice)}
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl transition-all font-medium ${generateVoice
-                            ? 'border-green-500 bg-green-50 text-green-700'
-                            : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 border rounded-2xl transition-all font-medium ${generateVoice
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-default-300 text-default-500 hover:bg-default-50'
                           }`}
                       >
                         <HiOutlineSpeakerWave className="w-5 h-5" />
@@ -650,11 +659,11 @@ export default function CallAlertButton({ user }) {
 
                   {/* Preview */}
                   {customMessage && (
-                    <div className="p-4 rounded-xl border bg-blue-50 border-blue-200">
-                      <p className="text-sm font-medium mb-2 text-blue-700">
+                    <div className="p-4 rounded-2xl border bg-primary/5 border-primary/20">
+                      <p className="text-sm font-medium mb-2 text-primary">
                         Message Preview:
                       </p>
-                      <p className="text-sm text-blue-600">
+                      <p className="text-sm text-primary">
                         {customMessage
                           .replace('{senderName}', `${user?.firstName || 'You'} ${user?.lastName || ''}`.trim())
                           .replace('{senderRole}', getRoleDisplayLabel(user?.role))
@@ -671,22 +680,22 @@ export default function CallAlertButton({ user }) {
             </div>
 
             {/* Footer - Light gray background */}
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between">
+            <div className="px-6 py-4 border-t border-default-200 bg-default-50 flex justify-between">
               {step === 1 ? (
                 <>
                   <button
                     onClick={handleClose}
-                    className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+                    className="px-5 py-2.5 rounded-full border border-default-300 text-default-700 font-medium hover:bg-default-100 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => setStep(2)}
                     disabled={selectedRecipients.length === 0}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-primary-foreground font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     style={selectedRecipients.length > 0 ? {
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                    } : { backgroundColor: '#9ca3af' }}
+                      background: 'hsl(var(--heroui-primary))'
+                    } : { backgroundColor: 'hsl(var(--heroui-default-300))' }}
                   >
                     Next
                     <HiOutlineArrowRight className="w-4 h-4" />
@@ -696,7 +705,7 @@ export default function CallAlertButton({ user }) {
                 <>
                   <button
                     onClick={() => setStep(1)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-default-300 text-default-700 font-medium hover:bg-default-100 transition-colors"
                   >
                     <HiOutlineArrowLeft className="w-4 h-4" />
                     Back
@@ -704,10 +713,10 @@ export default function CallAlertButton({ user }) {
                   <button
                     onClick={sendAlert}
                     disabled={sending || !customMessage.trim()}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-primary-foreground font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     style={!sending && customMessage.trim() ? {
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                    } : { backgroundColor: '#9ca3af' }}
+                      background: 'hsl(var(--heroui-primary))'
+                    } : { backgroundColor: 'hsl(var(--heroui-default-300))' }}
                   >
                     {sending ? (
                       <>

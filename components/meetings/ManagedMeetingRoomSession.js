@@ -634,7 +634,7 @@ export default function ManagedMeetingRoomSession({
           formData.append('startedAt', new Date(segmentStartedAt).toISOString())
           formData.append('durationMs', String(durationMs))
           formData.append('language', 'auto')
-          formData.append('source', 'live-pollinations')
+          formData.append('source', 'live-elevenlabs')
 
           const response = await fetch(`/api/meetings/${meeting._id}/transcript`, {
             method: 'POST',

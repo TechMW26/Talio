@@ -1,0 +1,44 @@
+import React from 'react'
+import { render, screen, waitFor } from '@testing-library/react'
+import MiraGeneratedImage from '@/components/ui/MiraGeneratedImage'
+
+jest.mock('next/dynamic', () => () => function MockEffect({ children, images, onCycle }) {
+  return <div data-testid="pixel-effect" onClick={() => onCycle({ phase: 'visible' })}>{children}<span>{images.length ? 'Reveal ready' : 'Mosaic loading'}</span></div>
+})
+
+beforeEach(() => {
+  window.matchMedia = jest.fn(() => ({ matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn() }))
+  jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ getExtension: () => ({ loseContext: jest.fn() }) })
+  URL.createObjectURL = jest.fn(() => 'blob:generated-image')
+  URL.revokeObjectURL = jest.fn()
+  global.fetch = jest.fn(async () => ({ ok: true, blob: async () => new Blob(['image'], { type: 'image/png' }) }))
+  localStorage.setItem('token', 'test-token')
+})
+afterEach(() => jest.restoreAllMocks())
+
+test('pending generation shows pixel effect without fetching an image', () => {
+  render(<MiraGeneratedImage image={{ status: 'pending' }} />)
+  expect(screen.getByText('Mosaic loading')).toBeTruthy()
+  expect(fetch).not.toHaveBeenCalled()
+})
+
+test('saved image is fetched privately and offers a download without regeneration', async () => {
+  const { unmount } = render(<MiraGeneratedImage image={{ status: 'ready', id: '1234567890abcdef12345678' }} />)
+  await waitFor(() => expect(screen.getByText('Download image').getAttribute('href')).toBe('blob:generated-image'))
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(fetch).toHaveBeenCalledWith('/api/ai/mira-images/1234567890abcdef12345678', expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } }))
+  unmount()
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:generated-image')
+})
+
+test('reduced motion uses a static placeholder', () => {
+  window.matchMedia.mockReturnValue({ matches: true, addEventListener: jest.fn(), removeEventListener: jest.fn() })
+  render(<MiraGeneratedImage image={{ status: 'pending' }} />)
+  expect(screen.queryByTestId('pixel-effect')).toBeNull()
+})
+
+test('image delivery failure shows an error instead of an endless loader', async () => {
+  fetch.mockResolvedValue({ ok: false })
+  render(<MiraGeneratedImage image={{ status: 'ready', id: '1234567890abcdef12345678' }} />)
+  await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('could not be loaded'))
+})

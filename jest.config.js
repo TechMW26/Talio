@@ -30,6 +30,7 @@ module.exports = {
             testMatch: ['<rootDir>/tests/web/**/*.test.js'],
             setupFilesAfterEnv: ['<rootDir>/tests/setup.web.js'],
             moduleNameMapper: {
+                '^.+\\.module\\.css$': '<rootDir>/tests/styleMock.js',
                 '^@/(.*)$': '<rootDir>/$1',
             },
             transform: {

@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useState, useEffect } from 'react'
 import { FaBullseye, FaCheckCircle, FaHourglassHalf, FaExclamationTriangle } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/react'
@@ -44,7 +46,7 @@ export default function GoalsWidget({ userId }) {
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="grid grid-cols-4 gap-2 mb-4">
                     {[1, 2, 3, 4].map(i => (
@@ -61,9 +63,9 @@ export default function GoalsWidget({ userId }) {
     }
 
     return (
-        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-default-900">My Goals</h3>
+                <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>My Goals</h3>
                 <Button
                     variant="light"
                     color="primary"
@@ -77,25 +79,25 @@ export default function GoalsWidget({ userId }) {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-4 gap-2 mb-4">
-                <Card className="bg-primary-50 border border-primary-100">
+                <Card data-widget-card="" data-widget-tone="primary" className="bg-primary-50 border border-primary-100">
                     <CardBody className="p-2 text-center">
                         <p className="text-lg font-bold text-primary-600">{stats.total}</p>
                         <p className="text-xs text-default-600">Total</p>
                     </CardBody>
                 </Card>
-                <Card className="bg-success-50 border border-success-100">
+                <Card data-widget-card="" data-widget-tone="success" className="bg-success-50 border border-success-100">
                     <CardBody className="p-2 text-center">
                         <p className="text-lg font-bold text-success-600">{stats.completed}</p>
                         <p className="text-xs text-default-600">Done</p>
                     </CardBody>
                 </Card>
-                <Card className="bg-primary-50 border border-primary-100">
+                <Card data-widget-card="" data-widget-tone="primary" className="bg-primary-50 border border-primary-100">
                     <CardBody className="p-2 text-center">
                         <p className="text-lg font-bold text-primary-600">{stats.inProgress}</p>
                         <p className="text-xs text-default-600">Active</p>
                     </CardBody>
                 </Card>
-                <Card className="bg-danger-50 border border-danger-100">
+                <Card data-widget-card="" data-widget-tone="danger" className="bg-danger-50 border border-danger-100">
                     <CardBody className="p-2 text-center">
                         <p className="text-lg font-bold text-danger-600">{stats.overdue}</p>
                         <p className="text-xs text-default-600">Overdue</p>
@@ -113,9 +115,9 @@ export default function GoalsWidget({ userId }) {
                     <p className="text-xs text-default-400 mt-1">Visit Performance section to create goals</p>
                 </div>
             ) : (
-                <ScrollShadow className="space-y-2 max-h-[200px]">
+                <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                     {goals.map((goal) => (
-                        <Card key={goal._id} className="border border-default-100">
+                        <Card data-widget-card="" key={goal._id} className="border border-default-100">
                             <CardBody className="p-3">
                                 <div className="flex items-center justify-between gap-2">
                                     <div className="flex-1 min-w-0">

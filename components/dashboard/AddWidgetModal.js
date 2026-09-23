@@ -10,7 +10,8 @@ export default function AddWidgetModal({
   onClose,
   onAddWidget,
   enabledWidgets = [],
-  userRole = 'employee'
+  userRole = 'employee',
+  availableWidgetIds,
 }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -31,6 +32,7 @@ export default function AddWidgetModal({
     Object.entries(categorizedWidgets).forEach(([category, { widgets: categoryWidgets }]) => {
       if (selectedCategory === 'all' || selectedCategory === category) {
         categoryWidgets.forEach(widget => {
+          if (availableWidgetIds && !availableWidgetIds.includes(widget.id)) return
           if (
             searchQuery === '' ||
             widget.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -43,7 +45,7 @@ export default function AddWidgetModal({
     })
 
     return widgets
-  }, [categorizedWidgets, selectedCategory, searchQuery])
+  }, [categorizedWidgets, selectedCategory, searchQuery, availableWidgetIds])
 
   // Check if widget is already enabled
   const isWidgetEnabled = (widgetId) => {
@@ -64,10 +66,10 @@ export default function AddWidgetModal({
         <div className="modal-backdrop" />
         <div className="modal-container modal-3xl">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-primary-500 to-primary-600">
+          <div className="px-6 py-4 border-b border-default-200 flex items-center justify-between bg-content1">
             <div>
-              <h2 className="text-xl font-bold text-white">Add Widget</h2>
-              <p className="text-primary-100 text-sm mt-0.5">Customize your dashboard with widgets</p>
+              <h2 className="text-xl font-bold text-foreground">Add Widget</h2>
+              <p className="text-default-500 text-sm mt-0.5">Customize your dashboard with widgets</p>
             </div>
             <button
               onClick={onClose}
@@ -178,7 +180,7 @@ export default function AddWidgetModal({
                         {isEnabled ? (
                           <FaCheck className="w-3.5 h-3.5 text-white" />
                         ) : (
-                          <FaPlus className="w-3.5 h-3.5 text-white" />
+                          <FaPlus className="w-3.5 h-3.5 text-primary-foreground" />
                         )}
                       </div>
                     </div>

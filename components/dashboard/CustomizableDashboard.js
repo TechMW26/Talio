@@ -18,13 +18,12 @@ import DraggableWidget from './DraggableWidget'
 import AddWidgetModal from './AddWidgetModal'
 import ActionableInsights from './ActionableInsights'
 import { useDashboardWidgets } from '@/hooks/useDashboardWidgets'
+import { groupDashboardWidgets, isWideDashboardWidget } from '@/lib/dashboardSections'
 import { WIDGET_REGISTRY } from '@/lib/widgetRegistry'
-import { FaPlus, FaUndo, FaCog, FaTh, FaThLarge } from 'react-icons/fa'
+import { FaPlus, FaUndo, FaCog } from 'react-icons/fa'
 
-// Layout storage key
-const LAYOUT_STORAGE_KEY = 'dashboard_layout_columns'
-
-function DeferredWidgetContent({ children, eager = false }) {
+function DeferredWidgetContent({ children, eager = false, scrollableList = false }) {
+  const minimumHeight = scrollableList ? 'min-h-[320px] sm:min-h-[400px]' : 'min-h-[280px]'
   const containerRef = useRef(null)
   const [shouldRender, setShouldRender] = useState(eager)
 
@@ -50,11 +49,11 @@ function DeferredWidgetContent({ children, eager = false }) {
   }, [shouldRender])
 
   return (
-    <div ref={containerRef} className="h-full min-h-[280px]" aria-busy={!shouldRender}>
+    <div ref={containerRef} data-scrollable-widget={scrollableList || undefined} className={`h-full ${minimumHeight} ${scrollableList ? 'grid grid-rows-[minmax(0,1fr)]' : ''}`} aria-busy={!shouldRender}>
       {shouldRender ? children : (
-        <div className="h-full min-h-[280px] animate-pulse p-5" role="status" aria-label="Loading dashboard widget">
+        <div className={`h-full ${minimumHeight} animate-pulse p-5`} role="status" aria-label="Loading dashboard widget">
           <div className="mb-5 h-5 w-2/5 rounded-lg bg-default-200" />
-          <div className="h-[190px] rounded-2xl bg-default-100" />
+          <div className={`${scrollableList ? 'h-[230px] sm:h-[310px]' : 'h-[190px]'} rounded-2xl bg-default-100`} />
         </div>
       )}
     </div>
@@ -65,56 +64,21 @@ export default function CustomizableDashboard({
   userId,
   userRole = 'employee',
   displayName = '',
+  attendanceSummary = null,
   widgetComponents,  // Object mapping widget IDs to their rendered components
   className = 'space-y-5',
 }) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
-  const [columnLayout, setColumnLayout] = useState(3) // Default to 3 columns for desktop
-  const [isDesktop, setIsDesktop] = useState(false) // Track if on desktop for height matching
-
-  // Check if on desktop (md breakpoint = 768px)
-  useEffect(() => {
-    const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= 768)
-    }
-    checkDesktop()
-    window.addEventListener('resize', checkDesktop)
-    return () => window.removeEventListener('resize', checkDesktop)
-  }, [])
-
-  // Load saved column layout
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedLayout = localStorage.getItem(`${LAYOUT_STORAGE_KEY}_${userId}`)
-      if (savedLayout) {
-        const parsed = parseInt(savedLayout, 10)
-        setColumnLayout(parsed === 1 ? 1 : 3) // Only 1 or 3 columns supported
-      }
-    }
-  }, [userId])
-
-  // Save column layout
-  const toggleColumnLayout = (cols) => {
-    setColumnLayout(cols)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`${LAYOUT_STORAGE_KEY}_${userId}`, cols.toString())
-    }
-  }
-
-  // Grid class based on column layout (static classes for Tailwind purging)
-  const gridClass = columnLayout === 1 ? '' : 'grid md:grid-cols-3 gap-5'
-
   const {
     enabledWidgets,
-    widgetOrder,
     isInitialized,
     addWidget,
     removeWidget,
     handleDragEnd,
     resetToDefaults,
     getOrderedWidgets,
-  } = useDashboardWidgets(userId, userRole)
+  } = useDashboardWidgets(userId, userRole, Object.keys(widgetComponents))
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -167,9 +131,8 @@ export default function CustomizableDashboard({
   )
 
   // Separate top widgets (check-in-out, quick-glance, attendance-summary) from the rest
-  const TOP_WIDGET_IDS = new Set(['check-in-out', 'quick-glance', 'attendance-summary'])
-  const topWidgets = orderedWidgets.filter(w => TOP_WIDGET_IDS.has(w.id))
-  const remainingWidgets = orderedWidgets.filter(w => !TOP_WIDGET_IDS.has(w.id))
+  const taskFallback = ['today-tasks', 'project-tasks'].find(id => widgetComponents[id])
+  const sections = groupDashboardWidgets(orderedWidgets, taskFallback ? WIDGET_REGISTRY[taskFallback] : null)
   const greeting = (() => {
     const hour = Number(new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
@@ -184,13 +147,15 @@ export default function CustomizableDashboard({
 
   return (
     <div className="relative">
-      <section className="mb-5 flex flex-col gap-4 rounded-[24px] border border-default-200 bg-content1 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_350px]">
+      <div className="min-w-0" data-dashboard-widget-area>
+      <section className="mb-5 flex flex-col gap-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-600">{roleLabel} workspace</p>
           <h1 className="mt-1 truncate text-2xl font-bold text-foreground sm:text-3xl">
             {greeting}{displayName ? `, ${displayName}` : ''}
           </h1>
-          <p className="mt-1 text-sm text-default-500">Your priorities, people, and actions in one place.</p>
+          <div className="mt-3">{attendanceSummary}</div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -220,7 +185,7 @@ export default function CustomizableDashboard({
       {/* Advanced layout controls appear only while customising. */}
       {isEditMode && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary-200 bg-primary-50/70 p-3 dark:bg-primary-900/10">
-          <p className="text-xs font-medium text-primary-700 dark:text-primary-300">Drag cards to reorder your workspace.</p>
+          <p className="text-xs font-medium text-primary-700 dark:text-primary-300">Drag cards to reorder within their section. Check-in stays first.</p>
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={resetToDefaults}
@@ -230,32 +195,6 @@ export default function CustomizableDashboard({
               <FaUndo className="h-3 w-3" />
               <span>Reset layout</span>
             </button>
-            <div className="hidden items-center overflow-hidden rounded-lg border border-default-200 bg-content1 md:flex">
-            <button
-              onClick={() => columnLayout !== 1 && toggleColumnLayout(1)}
-              className={`flex min-h-9 items-center gap-1.5 px-3 text-xs font-semibold transition-colors ${
-                columnLayout === 1
-                  ? 'bg-primary-500 text-white'
-                  : 'text-default-500 hover:bg-default-100'
-              }`}
-              title="Single column layout"
-            >
-              <FaTh className="w-3 h-3" />
-              <span>Focus</span>
-            </button>
-            <button
-              onClick={() => columnLayout !== 3 && toggleColumnLayout(3)}
-              className={`flex min-h-9 items-center gap-1.5 px-3 text-xs font-semibold transition-colors ${
-                columnLayout === 3
-                  ? 'bg-primary-500 text-white'
-                  : 'text-default-500 hover:bg-default-100'
-              }`}
-              title="Three column layout"
-            >
-              <FaThLarge className="w-3 h-3" />
-              <span>Overview</span>
-            </button>
-          </div>
           </div>
         </div>
       )}
@@ -292,69 +231,50 @@ export default function CustomizableDashboard({
           onDragEnd={handleDragEndWithReset}
         >
           <SortableContext
-            items={orderedWidgets.map(w => w.id)}
+            items={sections.flatMap(section => section.widgets.map(w => w.id))}
             strategy={rectSortingStrategy}
           >
-            {/* Top Widgets (Check-In/Out, Quick Glance) */}
-            {topWidgets.length > 0 && (
-              <div className={`${gridClass || className}`} style={columnLayout >= 2 && isDesktop ? { gridAutoRows: 'minmax(280px, 1fr)' } : {}}>
-                {topWidgets.map((widget, index) => {
-                  const WidgetContent = widgetComponents[widget.id]
-                  return (
-                    <DraggableWidget
-                      key={widget.id}
-                      id={widget.id}
-                      title={widget.name}
-                      colorIndex={index}
-                      onRemove={isEditMode ? handleRemoveWidget : null}
-                      removable={isEditMode}
-                      className="rounded-[22px] overflow-hidden"
-                    >
-                      <DeferredWidgetContent eager>
-                        {WidgetContent}
-                      </DeferredWidgetContent>
-                    </DraggableWidget>
-                  )
-                })}
+              <div className="min-w-0 space-y-7">
+                {sections.map(section => (
+                  <section key={section.id} aria-labelledby={`dashboard-${section.id}`}>
+                    <div className={section.id === 'attendance' ? 'sr-only' : 'mb-4'}>
+                      <h2 id={`dashboard-${section.id}`} className="text-lg font-semibold text-foreground">{section.title}</h2>
+                      <p className="mt-1 text-sm text-default-500">{section.description}</p>
+                    </div>
+                    <div className="grid min-w-0 gap-5 md:grid-cols-2">
+                      {section.widgets.map((widget, index) => (
+                        <DraggableWidget
+                          key={widget.id}
+                          id={widget.id}
+                          title={widget.name}
+                          colorIndex={index}
+                          onRemove={isEditMode && widget.id !== 'check-in-out' ? handleRemoveWidget : null}
+                          removable={isEditMode && widget.id !== 'check-in-out'}
+                          frameless={widget.id === 'check-in-out'}
+                          className={`min-w-0 ${isWideDashboardWidget(widget.id) ? 'md:col-span-2' : ''} ${widget.id === 'check-in-out' ? '' : 'rounded-[18px] overflow-hidden'}`}
+                        >
+                          <DeferredWidgetContent eager={section.id === 'attendance' || isEditMode} scrollableList={WIDGET_REGISTRY[widget.id]?.scrollableList === true}>
+                            {widgetComponents[widget.id]}
+                          </DeferredWidgetContent>
+                        </DraggableWidget>
+                      ))}
+                    </div>
+                  </section>
+                ))}
               </div>
-            )}
-
-            {/* Actionable Insights - AI-powered dashboard section */}
-            <div className="mt-5">
-              <DeferredWidgetContent eager={isEditMode}>
-                <ActionableInsights />
-              </DeferredWidgetContent>
-            </div>
-
-            {/* Remaining Widgets */}
-            {remainingWidgets.length > 0 && (
-              <div className={`mt-5 ${gridClass || className}`} style={columnLayout >= 2 && isDesktop ? { gridAutoRows: 'minmax(280px, 1fr)' } : {}}>
-                {remainingWidgets.map((widget, index) => {
-                  const WidgetContent = widgetComponents[widget.id]
-                  return (
-                    <DraggableWidget
-                      key={widget.id}
-                      id={widget.id}
-                      title={widget.name}
-                      colorIndex={topWidgets.length + index}
-                      onRemove={isEditMode ? handleRemoveWidget : null}
-                      removable={isEditMode}
-                      className="rounded-[22px] overflow-hidden"
-                    >
-                      <DeferredWidgetContent eager={isEditMode}>
-                        {WidgetContent}
-                      </DeferredWidgetContent>
-                    </DraggableWidget>
-                  )
-                })}
-              </div>
-            )}
           </SortableContext>
         </DndContext>
       )}
 
+      </div>
+      <aside aria-label="Quick tools" className="min-w-0 self-start overflow-hidden rounded-2xl border border-default-200 bg-content1 xl:sticky xl:top-6 xl:h-[calc(100vh-7rem)] xl:supports-[height:100dvh]:h-[calc(100dvh-7rem)]">
+        <ActionableInsights vertical />
+      </aside>
+      </div>
+
       {/* Add Widget Modal */}
       <AddWidgetModal
+        availableWidgetIds={Object.keys(widgetComponents)}
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAddWidget={handleAddWidget}

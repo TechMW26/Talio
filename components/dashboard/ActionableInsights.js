@@ -6,7 +6,6 @@ import { useFocusTimer } from '@/contexts/FocusTimerContext'
 import { useTicTacToe } from '@/contexts/TicTacToeContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import {
-  HiOutlineSparkles,
   HiOutlineClock,
   HiOutlineMapPin,
   HiOutlineCalculator,
@@ -610,34 +609,32 @@ function StickyNoteCard() {
 }
 
 // ─── Main Component ───
-export default function ActionableInsights() {
+export default function ActionableInsights({ vertical = false }) {
   return (
-    <div className="space-y-6">
+    <div className={vertical ? 'flex min-h-0 flex-col xl:h-full' : 'space-y-6'}>
       {/* Section Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/25">
-          <HiOutlineSparkles className="w-5 h-5 text-white" />
-        </div>
+      <div className={`flex shrink-0 items-center gap-3 ${vertical ? 'border-b border-default-200 p-4' : ''}`}>
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
             Quick Tools
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Productivity tools at your fingertips
+            {vertical ? 'Scroll for more tools' : 'Productivity tools at your fingertips'}
           </p>
         </div>
       </div>
 
       {/* Tools Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <TicTacToeCard />
+      <div tabIndex={vertical ? 0 : undefined} role={vertical ? 'region' : undefined} aria-label={vertical ? 'Scrollable quick tools' : undefined} className={vertical ? 'min-h-0 space-y-4 p-3 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'}>
         <FocusTimerCard />
         <CalculatorCard />
+        {vertical && <StickyNoteCard />}
         <LocationMapCard />
+        <TicTacToeCard />
       </div>
 
       {/* Sticky Note - full width */}
-      <StickyNoteCard />
+      {!vertical && <StickyNoteCard />}
     </div>
   )
 }
@@ -646,7 +643,6 @@ function InsightsSkeleton() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Skeleton className="w-10 h-10 rounded-2xl" />
         <div>
           <Skeleton className="h-5 w-48 rounded-lg mb-1" />
           <Skeleton className="h-3.5 w-64 rounded-lg" />

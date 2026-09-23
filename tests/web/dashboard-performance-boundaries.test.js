@@ -4,6 +4,13 @@ const fs = require('fs')
 const path = require('path')
 
 describe('dashboard performance boundaries', () => {
+  test('punch cards have equal top, bottom and right outer spacing', () => {
+    const css = fs.readFileSync(path.join(process.cwd(), 'components/widgets/CheckInOutWidget.module.css'), 'utf8')
+    const punches = css.match(/\.punches\s*\{([^}]+)\}/)[1]
+    expect(punches).toContain('padding-block: 16px')
+    expect(punches).toContain('padding-right: 16px')
+    expect(punches).toContain('repeat(2,minmax(0,1fr))')
+  })
   const layoutSource = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/layout.js'), 'utf8')
   const transitionCss = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')
   const transitionContext = fs.readFileSync(path.join(process.cwd(), 'contexts/PageTransitionContext.js'), 'utf8')
@@ -88,7 +95,9 @@ describe('dashboard performance boundaries', () => {
   test('defers offscreen widget work until it approaches the viewport', () => {
     expect(customizableDashboardSource).toContain('function DeferredWidgetContent')
     expect(customizableDashboardSource).toContain("rootMargin: '600px 0px'")
-    expect(customizableDashboardSource).toContain('<DeferredWidgetContent eager={isEditMode}>')
+    expect(customizableDashboardSource).toContain("<DeferredWidgetContent eager={section.id === 'attendance' || isEditMode}")
+    expect(customizableDashboardSource).toContain('scrollableList={WIDGET_REGISTRY[widget.id]?.scrollableList === true}')
+    expect(customizableDashboardSource).toContain("scrollableList ? 'min-h-[320px] sm:min-h-[400px]' : 'min-h-[280px]'")
   })
 
   test('coalesces realtime dashboard bursts and in-flight requests', () => {

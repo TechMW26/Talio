@@ -1,6 +1,6 @@
 import { NextResponse, after } from 'next/server'
 import { requirePermission } from '@/lib/permissions'
-import { notifyAssetAssignment } from '@/lib/assetNotifications.server'
+import { notifyAssetAssignment, assetNotificationRecipients } from '@/lib/assetNotifications.server'
 import mongoose from 'mongoose'
 import { normalizeAssetInput } from '@/utils/assetData'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
@@ -15,7 +15,7 @@ const isValidObjectId = (id) => {
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await requirePermission('assets', 'edit')(request, ['Asset', 'Employee', 'Notification'])
+    const auth = await requirePermission('assets', 'edit')(request, ['Asset', 'Employee', 'Department', 'Team', 'Notification'])
     if (auth.denied) return auth.denied
     const { models } = auth
     const { Asset, Employee } = models
@@ -81,7 +81,8 @@ export async function PUT(request, { params }) {
 
     after(() => notifyAssetAssignment({ models, asset, previousAssignee: previous.assignedTo }).catch(error => console.error('[Asset] Notification failed:', error)))
 
-    emitAssetUpdate(asset, [], { action: 'update', broadcast: true })
+    const recipients = await assetNotificationRecipients(models, asset)
+    if (recipients.length) emitAssetUpdate(asset, recipients.map(user => user.id), { action: 'update', broadcast: false })
 
     return NextResponse.json({
       success: true,
@@ -108,7 +109,7 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await requirePermission('assets', 'delete')(request, ['Asset'])
+    const auth = await requirePermission('assets', 'delete')(request, ['Asset', 'Employee', 'Department', 'Team'])
     if (auth.denied) return auth.denied
     const { models } = auth
     const { Asset } = models
@@ -132,7 +133,8 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    emitAssetUpdate(asset, [], { action: 'delete', broadcast: true })
+    const recipients = await assetNotificationRecipients(models, asset)
+    if (recipients.length) emitAssetUpdate(asset, recipients.map(user => user.id), { action: 'delete', broadcast: false })
 
     return NextResponse.json({
       success: true,

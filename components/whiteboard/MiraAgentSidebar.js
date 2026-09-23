@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import MiraSphere from '@/components/ui/MiraSphere';
+import MiraSphere from '@/components/ui/MiraPet';
+import AIActivityBeam from '@/components/ui/AIActivityBeam';
 import { requestWhiteboardAI } from '@/lib/whiteboardAIClient';
 
 // Quirky loading messages for different phases
@@ -35,6 +36,12 @@ const LOADING_PHASES = {
 
 // Template icons and colors
 const TEMPLATE_CONFIG = {
+  adaptive: {
+    icon: <span className="text-xl" aria-hidden="true">✧</span>,
+    gradient: 'from-slate-500 to-indigo-600', lightGradient: 'from-slate-50 to-indigo-100',
+    border: 'border-gray-200', text: 'text-gray-700', label: 'Let MIRA plan',
+    description: 'A layout and structure tailored to your goal', prompt: 'What would you like to understand, plan or build?',
+  },
   mindmap: {
     icon: (
       <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -297,75 +304,8 @@ const ContentSection = ({
   );
 };
 
-// Progress Bar Component
-const LoadingProgress = ({ phase, progress, message }) => {
-  const [displayMessage, setDisplayMessage] = useState(message);
-  const messageIntervalRef = useRef(null);
-
-  useEffect(() => {
-    const messages = LOADING_PHASES[phase] || LOADING_PHASES.thinking;
-    let idx = 0;
-    
-    setDisplayMessage(messages[0]);
-    
-    messageIntervalRef.current = setInterval(() => {
-      idx = (idx + 1) % messages.length;
-      setDisplayMessage(messages[idx]);
-    }, 2000);
-
-    return () => {
-      if (messageIntervalRef.current) {
-        clearInterval(messageIntervalRef.current);
-      }
-    };
-  }, [phase]);
-
-  return (
-    <div className="space-y-3">
-      {/* Progress bar */}
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-        <motion.div
-          className="h-full bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500"
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.5 }}
-        />
-      </div>
-      
-      {/* Message */}
-      <AnimatePresence mode="wait">
-        <motion.p
-          key={displayMessage}
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -5 }}
-          className="text-sm text-gray-500 text-center"
-        >
-          {displayMessage}
-        </motion.p>
-      </AnimatePresence>
-
-      {/* Animated dots */}
-      <div className="flex justify-center gap-1">
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            className="w-2 h-2 rounded-full bg-violet-400"
-            animate={{
-              scale: [1, 1.3, 1],
-              opacity: [0.5, 1, 0.5],
-            }}
-            transition={{
-              duration: 1,
-              repeat: Infinity,
-              delay: i * 0.2,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-};
+// Indeterminate status reflects real work, not a simulated completion percentage.
+const LoadingProgress = () => <p role="status" className="text-sm text-gray-500 text-center">Planning the sections, relationships and layout for your request…</p>;
 
 // Helper function to get time ago string
 const getTimeAgo = (date) => {
@@ -540,21 +480,6 @@ export default function MiraAgentSidebar({
     setLoadingPhase('thinking');
     setError(null);
 
-    // Simulate progress phases
-    const progressInterval = setInterval(() => {
-      setLoadingProgress(prev => {
-        if (prev < 30) return prev + 2;
-        if (prev < 60) {
-          setLoadingPhase('structuring');
-          return prev + 1.5;
-        }
-        if (prev < 90) {
-          setLoadingPhase('finalizing');
-          return prev + 1;
-        }
-        return prev;
-      });
-    }, 200);
 
     try {
       const data = await requestWhiteboardAI(boardId, {
@@ -565,17 +490,13 @@ export default function MiraAgentSidebar({
         },
       });
 
-      clearInterval(progressInterval);
       setLoadingProgress(100);
 
-      setTimeout(() => {
-        setPreparedContent(data.content);
-        setStep('preview');
-        setIsLoading(false);
-      }, 500);
+      setPreparedContent(data.content);
+      setStep('preview');
+      setIsLoading(false);
 
     } catch (err) {
-      clearInterval(progressInterval);
       setError(err.message);
       setIsLoading(false);
       setStep('input');
@@ -776,19 +697,22 @@ export default function MiraAgentSidebar({
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: -400, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-      className="fixed left-0 top-0 bottom-0 w-[30vw] min-w-[360px] max-w-[480px] 
-        bg-white
-        border-r border-gray-200 shadow-2xl z-50
+      data-theme="light"
+      role="dialog"
+      aria-label="MIRA agent workspace"
+      className="ai-glass-panel fixed mira-board-panel left-3 top-3 bottom-3 w-[calc(100vw-24px)] sm:w-[460px]
+        z-50
         flex flex-col overflow-hidden"
     >
+      <AIActivityBeam active={isLoading || isChatLoading} strength={0.95} theme="light" />
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center gap-3">
+      <div className="mira-board-toolbar shrink-0 flex items-center justify-between p-4">
+        <div className="sr-only">
           <div className="w-12 h-12 flex items-center justify-center">
-            <MiraSphere size={40} particleCount={80} enableProximity={true} enableRandomPulse={true} proximityRadius={80} />
+            <MiraSphere size={32} isThinking={isLoading || isChatLoading} />
           </div>
           <div>
-            <h2 className="font-semibold text-gray-800">MIRA Agent</h2>
+            <h2 className="font-semibold text-gray-800">MIRA · Agent Mode</h2>
             <p className="text-xs text-gray-500">
               {step === 'template' && 'Choose a template'}
               {step === 'input' && 'Describe your content'}
@@ -798,7 +722,7 @@ export default function MiraAgentSidebar({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2">
           {/* History toggle */}
           {generations.length > 0 && step !== 'history' && (
             <button
@@ -837,6 +761,7 @@ export default function MiraAgentSidebar({
           )}
           <button
             onClick={onClose}
+            aria-label="Close Agent Mode"
             className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -847,7 +772,7 @@ export default function MiraAgentSidebar({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto" aria-label="Agent workspace">
         <AnimatePresence mode="wait">
           {/* Step 1: Template Selection */}
           {step === 'template' && (
@@ -859,6 +784,7 @@ export default function MiraAgentSidebar({
               className="p-4 space-y-4"
             >
               <div className="text-center py-4">
+                <div className="flex justify-center mb-5"><MiraSphere size={64} /></div>
                 <h3 className="text-lg font-medium text-gray-800 mb-2">
                   What would you like to create?
                 </h3>
@@ -917,9 +843,11 @@ export default function MiraAgentSidebar({
                           onClick={() => {
                             if (onSelectGeneration) onSelectGeneration(gen.id);
                             setPreparedContent({
+                              id: gen.id,
                               title: gen.title,
                               description: gen.description,
                               sections: gen.sections,
+                              diagram: gen.diagram,
                               conclusion: gen.conclusion,
                               templateType: gen.templateType,
                               userPrompt: gen.userPrompt,
@@ -1025,7 +953,7 @@ export default function MiraAgentSidebar({
                   disabled:opacity-50 disabled:cursor-not-allowed
                   transition-all"
               >
-                {isLoading ? 'Generating...' : '✨ Generate Content'}
+                {isLoading ? 'Generating...' : 'Generate Content'}
               </button>
             </motion.div>
           )}
@@ -1091,6 +1019,7 @@ export default function MiraAgentSidebar({
               </div>
 
               {/* Content sections */}
+              {preparedContent.diagram?.summary && <div className="rounded-xl border border-gray-200 p-3 text-sm text-gray-600"><strong className="block mb-1">Board plan</strong>{preparedContent.diagram.summary}</div>}
               <div className="space-y-3">
                 {preparedContent.sections?.map((section, index) => (
                   <ContentSection
@@ -1125,70 +1054,6 @@ export default function MiraAgentSidebar({
                   <p className="text-sm text-gray-600">{preparedContent.conclusion}</p>
                 </div>
               )}
-
-              {/* Chat edit input */}
-              <div className={`pt-3 border-t border-gray-200 transition-all ${isChatLoading ? 'opacity-75' : ''}`}>
-                <p className="text-xs text-gray-500 mb-2">
-                  {isChatLoading ? (
-                    <span className="flex items-center gap-2">
-                      <motion.span
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="inline-block"
-                      >
-                        ✨
-                      </motion.span>
-                      MIRA is updating content...
-                    </span>
-                  ) : (
-                    'Ask MIRA to make changes:'
-                  )}
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    ref={chatInputRef}
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleChatEdit();
-                      }
-                    }}
-                    placeholder="e.g., Add more details to the first section..."
-                    className={`flex-1 px-3 py-2 rounded-lg bg-white border text-sm text-gray-800 placeholder-gray-400
-                      focus:outline-none focus:ring-2 focus:ring-violet-400/40
-                      transition-all ${isChatLoading ? 'border-violet-300 animate-pulse' : 'border-gray-200'}`}
-                    disabled={isChatLoading}
-                  />
-                  <button
-                    onClick={handleChatEdit}
-                    disabled={!chatInput.trim() || isChatLoading}
-                    className="px-4 py-2 rounded-lg bg-violet-500 text-white 
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      hover:bg-violet-600 transition-colors"
-                  >
-                    {isChatLoading ? (
-                      <motion.svg 
-                        className="w-4 h-4" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-                      </motion.svg>
-                    ) : (
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
 
               {/* Error display */}
               {error && (
@@ -1245,9 +1110,11 @@ export default function MiraAgentSidebar({
                             onSelectGeneration(gen.id);
                           }
                           setPreparedContent({
+                            id: gen.id,
                             title: gen.title,
                             description: gen.description,
                             sections: gen.sections,
+                            diagram: gen.diagram,
                             conclusion: gen.conclusion,
                             templateType: gen.templateType,
                             userPrompt: gen.userPrompt,
@@ -1315,6 +1182,75 @@ export default function MiraAgentSidebar({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Chat edit input stays outside the scrolling preview. */}
+      {step === 'preview' && preparedContent && (
+              <div className={`mira-board-composer shrink-0 p-4 border-t border-gray-200 transition-all ${isChatLoading ? 'opacity-75' : ''}`}>
+                <p className="text-xs text-gray-500 mb-2">
+                  {isChatLoading ? (
+                    <span className="flex items-center gap-2">
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="inline-block"
+                      >
+                        <span aria-hidden="true" className="block h-3 w-3 rounded-full border-2 border-current border-t-transparent" />
+                      </motion.span>
+                      MIRA is updating content...
+                    </span>
+                  ) : (
+                    'Message MIRA to refine this plan'
+                  )}
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    ref={chatInputRef}
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleChatEdit();
+                      }
+                    }}
+                    aria-label="Message MIRA Agent"
+                    placeholder="Describe a change to your plan…"
+                    className={`flex-1 px-3 py-2 rounded-lg bg-white border text-sm text-gray-800 placeholder-gray-400
+                      focus:outline-none focus:ring-2 focus:ring-violet-400/40
+                      transition-all ${isChatLoading ? 'border-violet-300 animate-pulse' : 'border-gray-200'}`}
+                    disabled={isChatLoading}
+                  />
+                  <button
+                    onClick={handleChatEdit}
+                    disabled={!chatInput.trim() || isChatLoading}
+                    aria-label="Send changes to MIRA"
+                    className="mira-board-send px-4 py-2 rounded-xl 
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      hover:bg-violet-600 transition-colors"
+                  >
+                    {isChatLoading ? (
+                      <motion.svg 
+                        className="w-4 h-4" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                      </motion.svg>
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+      )}
 
       {/* Sticky Footer with Action Buttons - Always visible when in preview step */}
       {step === 'preview' && preparedContent && !isPlotted && (

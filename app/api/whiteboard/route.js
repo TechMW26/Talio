@@ -13,8 +13,11 @@ export async function GET(request) {
     const { Whiteboard, User, Employee } = models
 
     // Get employee ID from user
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
-    let employeeId = userRecord?.employeeId
+    let employeeId = user.employeeId?._id || user.employeeId
+    if (!employeeId) {
+      const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
+      employeeId = userRecord?.employeeId
+    }
     
     if (!employeeId) {
       const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
@@ -91,6 +94,7 @@ export async function GET(request) {
 
 // POST /api/whiteboard - Create new whiteboard
 export async function POST(request) {
+  const startedAt = performance.now()
   try {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
@@ -101,8 +105,11 @@ export async function POST(request) {
     const { Whiteboard, User, Employee } = models
 
     // Get employee ID from user
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
-    let employeeId = userRecord?.employeeId
+    let employeeId = user.employeeId?._id || user.employeeId
+    if (!employeeId) {
+      const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
+      employeeId = userRecord?.employeeId
+    }
     
     if (!employeeId) {
       const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
@@ -135,14 +142,9 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      whiteboard: {
-        _id: whiteboard._id,
-        name: whiteboard.name,
-        title: whiteboard.name, // For UI compatibility
-        description: whiteboard.description,
-        createdAt: whiteboard.createdAt
-      }
-    }, { status: 201 });
+      whiteboard: { ...whiteboard.toObject(), title: whiteboard.name },
+      permission: 'owner',
+    }, { status: 201, headers: { 'Server-Timing': `board-create;dur=${(performance.now() - startedAt).toFixed(1)}` } });
   } catch (error) {
     console.error('Error creating whiteboard:', error.message, error.stack);
     return NextResponse.json({ error: 'Failed to create whiteboard', details: error.message }, { status: 500 });

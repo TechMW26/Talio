@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
 import {
@@ -156,6 +156,7 @@ export async function POST(request) {
       }, models)
     }
 
+    const assignmentNotifications = []
     // Assign to users
     for (const assigneeId of assigneeIds) {
       const assigneeIdStr = assigneeId.toString()
@@ -198,6 +199,7 @@ export async function POST(request) {
 
       // Notify non-self assignments
       if (assigneeIdStr !== user.employeeId.toString()) {
+        assignmentNotifications.push(async () => {
         if (project) {
           await notifyTaskAssigned(project, task, assigneeEmployee, creatorEmployee, models)
         }
@@ -220,6 +222,7 @@ export async function POST(request) {
         } catch (actionErr) {
           console.error('[Tasks/Create] Error creating actionable notification:', actionErr)
         }
+        })
       }
     }
 
@@ -237,7 +240,11 @@ export async function POST(request) {
     const taskAssignees = await TaskAssignee.find({ task: task._id })
       .populate('user', 'firstName lastName profilePicture employeeCode')
 
-    if (projectId) {
+    after(async () => {
+      for (const notify of assignmentNotifications) {
+        try { await notify() } catch (error) { console.error('[Tasks/Create] Invitation delivery failed:', error) }
+      }
+      if (projectId) {
       try {
         await queueTaskCreatedEmailNotifications({
           projectId,
@@ -250,6 +257,7 @@ export async function POST(request) {
         console.error('Failed to queue project task creation emails:', emailError)
       }
     }
+    })
 
     return NextResponse.json({
       success: true,

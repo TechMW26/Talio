@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useState, useEffect } from 'react'
 import { FaHistory, FaClock, FaArrowRight, FaArrowLeft, FaCoffee, FaSignOutAlt, FaSignInAlt } from 'react-icons/fa'
 import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
@@ -126,7 +128,7 @@ export default function RecentActivityWidget({ limit = 6 }) {
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3, 4].map(i => (
@@ -144,11 +146,11 @@ export default function RecentActivityWidget({ limit = 6 }) {
     }
 
     return (
-        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <FaHistory className="w-5 h-5 text-primary-500" />
-                    <h3 className="text-base sm:text-lg font-bold text-default-900">Recent Activity</h3>
+                    <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Recent Activity</h3>
                 </div>
                 <Button
                     variant="light"
@@ -161,9 +163,9 @@ export default function RecentActivityWidget({ limit = 6 }) {
                 </Button>
             </div>
 
-            <ScrollShadow className="space-y-2 max-h-48">
+            <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                 {activities.map((activity, index) => (
-                    <Card key={index} className="border border-default-100">
+                    <Card data-widget-card="" key={index} className="border border-default-100">
                         <CardBody className="p-2">
                             <div className="flex items-start gap-3">
                                 <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">

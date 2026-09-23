@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useRouter } from 'next/navigation'
 import { FaCheck, FaTimes, FaCalendarCheck } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Avatar, ScrollShadow } from '@heroui/react'
@@ -21,9 +23,9 @@ export default function LeaveRequestsWidget({
   }
 
   return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-default-900">Leave Requests</h3>
+        <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Leave Requests</h3>
         <Button
           variant="light"
           color="primary"
@@ -34,7 +36,7 @@ export default function LeaveRequestsWidget({
         </Button>
       </div>
 
-      <ScrollShadow className="space-y-2 flex-1 max-h-[200px]">
+      <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
         {leaveRequests.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-6 flex-1">
             <img
@@ -46,7 +48,7 @@ export default function LeaveRequestsWidget({
           </div>
         ) : (
           leaveRequests.slice(0, 5).map((request) => (
-            <Card key={request._id} className="border border-default-100">
+            <Card data-widget-card="" key={request._id} className="border border-default-100">
               <CardBody className="p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0 flex-1">

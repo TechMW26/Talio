@@ -1,0 +1,10 @@
+Vosk small English model: vosk-model-small-en-us-0.15
+Source: https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+Model publisher: Alpha Cephei
+License: Apache License, Version 2.0
+License text: https://www.apache.org/licenses/LICENSE-2.0.txt
+
+The archive is repackaged without model modification for vosk-browser.
+No proprietary wake-word provider or cloud transcription service is used.
+The SHA-256 and original source are in /models/mira-vosk-en-0.15.json.
+See https://alphacephei.com/vosk/models for upstream model information.

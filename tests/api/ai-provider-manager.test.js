@@ -10,13 +10,14 @@ function svgBase64() {
 
 function clearAIKeys(env) {
     delete env.POLLINATIONS_API_KEY
+    delete env.DEEPSEEK_API_KEY
 }
 
 function reqRouter() {
     return require('@/lib/ai/aiProviderManager')
 }
 
-describe('AIProviderManager — Pollinations-only', () => {
+describe('AIProviderManager — DeepSeek text / Pollinations vision', () => {
     let warnSpy
 
     beforeEach(() => {
@@ -34,8 +35,8 @@ describe('AIProviderManager — Pollinations-only', () => {
         jest.restoreAllMocks()
     })
 
-    test('calls Pollinations and returns text content', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+    test('calls DeepSeek and returns text content', async () => {
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -49,12 +50,12 @@ describe('AIProviderManager — Pollinations-only', () => {
 
         expect(result).toBe('pollinations output')
         expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][0]).toContain('gen.pollinations.ai/v1/chat/completions')
+        expect(global.fetch.mock.calls[0][0]).toContain('api.deepseek.com/chat/completions')
         expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer sk_test-pollinations-key')
     })
 
-    test('passes system instruction to Pollinations', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+    test('passes system instruction to DeepSeek', async () => {
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -69,11 +70,11 @@ describe('AIProviderManager — Pollinations-only', () => {
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
         expect(body.messages[0]).toEqual({ role: 'system', content: 'You are helpful.' })
         expect(body.messages[1].content).toBe('hello')
-        expect(body.model).toBe('openai')
+        expect(body.model).toBe('deepseek-flash')
     })
 
     test('routes analysis use case to gpt-5.4 dynamically', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -86,11 +87,11 @@ describe('AIProviderManager — Pollinations-only', () => {
         await generateContent('analyze this', '', { useCase: 'analysis' })
 
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
-        expect(body.model).toBe('gpt-5.4')
+        expect(body.model).toBe('deepseek-v4-pro')
     })
 
     test('routes spellcheck use case to openai dynamically', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -103,11 +104,11 @@ describe('AIProviderManager — Pollinations-only', () => {
         await generateContent('fix these names', '', { useCase: 'spellcheck' })
 
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
-        expect(body.model).toBe('openai')
+        expect(body.model).toBe('deepseek-flash')
     })
 
     test('allows explicit model override', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -117,14 +118,14 @@ describe('AIProviderManager — Pollinations-only', () => {
         })
 
         const { generateContent } = reqRouter()
-        await generateContent('hello', '', { model: 'gpt-5.6-sol' })
+        await generateContent('hello', '', { model: 'deepseek-flash' })
 
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
-        expect(body.model).toBe('gpt-5.6-sol')
+        expect(body.model).toBe('deepseek-flash')
     })
 
     test('retries on rate limit until success', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch
             .mockResolvedValueOnce({
@@ -148,7 +149,7 @@ describe('AIProviderManager — Pollinations-only', () => {
     })
 
     test('throws after exhausting retries', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValue({
             ok: false,
@@ -164,7 +165,7 @@ describe('AIProviderManager — Pollinations-only', () => {
     })
 
     test('vision call sends image_url data URL to Pollinations', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -187,7 +188,7 @@ describe('AIProviderManager — Pollinations-only', () => {
     })
 
     test('stitched vision call sends pre-built buffer', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
         const imgBuffer = Buffer.from('fake-image-bytes')
 
         global.fetch.mockResolvedValueOnce({
@@ -213,12 +214,12 @@ describe('AIProviderManager — Pollinations-only', () => {
     test('throws when Pollinations is not configured', async () => {
         const { generateContent } = reqRouter()
         await expect(generateContent('hi')).rejects.toThrow(
-            'Pollinations is not configured',
+            'DeepSeek is not configured',
         )
     })
 
     test('getAIAvailability reports Pollinations configuration without leaking keys', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_test-pollinations-key'
 
         const { getAIAvailability } = reqRouter()
         const availability = getAIAvailability()
@@ -226,7 +227,7 @@ describe('AIProviderManager — Pollinations-only', () => {
         expect(availability).toMatchObject({
             anyAvailable: true,
             pollinationsConfigured: true,
-            provider: 'pollinations',
+            provider: 'deepseek',
         })
         const serialized = JSON.stringify(availability)
         expect(serialized).not.toContain('sk_test-pollinations-key')

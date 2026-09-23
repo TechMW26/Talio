@@ -1,7 +1,26 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { mutate } from 'swr'
+import { mutate, useSWRConfig } from 'swr'
+import { matchesApiRefreshScope, markClientDataChanged } from '@/lib/clientDataSync'
+
+async function invalidateQueries(mutateCache, keys) {
+  const entries = (Array.isArray(keys) ? keys : [keys]).filter(Boolean)
+  if (!entries.length) return
+  try {
+    await mutateCache(key => entries.some(entry => {
+      if (entry instanceof RegExp) {
+        entry.lastIndex = 0
+        return typeof key === 'string' && entry.test(key)
+      }
+      if (typeof entry !== 'string') return false
+      return entry.includes('?') ? key === entry : matchesApiRefreshScope(key, [entry])
+    }), undefined, { revalidate: true, populateCache: false })
+  } catch (error) {
+    // A saved change must not be reported as failed just because a read failed.
+    console.warn('[useApiMutation] Data revalidation failed:', error)
+  }
+}
 
 /**
  * useApiMutation - Professional mutation hook for POST/PUT/DELETE operations
@@ -25,6 +44,7 @@ import { mutate } from 'swr'
  * @returns {{ execute, isLoading, error, reset }}
  */
 export default function useApiMutation(options = {}) {
+  const { mutate: mutateCache } = useSWRConfig()
   const {
     method = 'POST',
     invalidateKeys = [],
@@ -61,7 +81,7 @@ export default function useApiMutation(options = {}) {
     if (optimisticConfig?.key && optimisticConfig?.updater) {
       try {
         rollbackData = optimisticConfig.rollback
-        await mutate(optimisticConfig.key, optimisticConfig.updater, false)
+        await mutateCache(optimisticConfig.key, optimisticConfig.updater, false)
       } catch (e) {
         console.warn('[useApiMutation] Optimistic update failed:', e)
       }
@@ -103,21 +123,7 @@ export default function useApiMutation(options = {}) {
 
       // Invalidate SWR caches
       const keys = executeOptions.invalidateKeys || invalidateKeys
-      const keysArray = Array.isArray(keys) ? keys : [keys]
-      for (const key of keysArray) {
-        if (key) {
-          // Support regex key matching for invalidating multiple related caches
-          if (key instanceof RegExp) {
-            await mutate(
-              k => typeof k === 'string' && key.test(k),
-              undefined,
-              { revalidate: true }
-            )
-          } else {
-            await mutate(key)
-          }
-        }
-      }
+      await invalidateQueries(mutateCache, keys)
 
       // Call success handler
       const successHandler = executeOptions.onSuccess || onSuccess
@@ -133,7 +139,7 @@ export default function useApiMutation(options = {}) {
       // Rollback optimistic update on error
       if (rollbackData !== null && optimisticConfig?.key) {
         try {
-          await mutate(optimisticConfig.key, rollbackData, false)
+          await mutateCache(optimisticConfig.key, rollbackData, false)
         } catch (rollbackErr) {
           console.error('[useApiMutation] Rollback failed:', rollbackErr)
         }
@@ -153,7 +159,7 @@ export default function useApiMutation(options = {}) {
 
       return null
     }
-  }, [method, invalidateKeys, onSuccess, onError, timeout, optimistic])
+  }, [method, invalidateKeys, onSuccess, onError, timeout, optimistic, mutateCache])
 
   const reset = useCallback(() => {
     setError(null)
@@ -213,10 +219,9 @@ export async function apiMutate(url, options = {}) {
     }
 
     // Invalidate caches
-    const keys = Array.isArray(invalidateKeys) ? invalidateKeys : [invalidateKeys]
-    for (const key of keys) {
-      if (key) await mutate(key)
-    }
+    await invalidateQueries(mutate, invalidateKeys)
+    const scopes = (Array.isArray(invalidateKeys) ? invalidateKeys : [invalidateKeys]).filter(key => typeof key === 'string')
+    if (scopes.length) markClientDataChanged(`${method} ${url}`, scopes)
 
     return data
   } catch (err) {

@@ -30,10 +30,10 @@ describe('DashboardRouteTransition', () => {
     expect(screen.getByText('Dashboard content')).toBeInTheDocument()
     expect(stage).toHaveAttribute('data-navigation-state', 'idle')
     expect(stage).not.toHaveClass('is-navigating')
-    expect(container.querySelector('.dashboard-route-veil')).not.toHaveClass('is-active')
+    expect(container.querySelector('.dashboard-route-veil')).toBeNull()
   })
 
-  test('adds the non-blocking futuristic transition layer while navigating', () => {
+  test('never covers route content while navigating', () => {
     mockIsNavigating = true
 
     const { container } = render(
@@ -43,10 +43,11 @@ describe('DashboardRouteTransition', () => {
     const stage = container.querySelector('.dashboard-route-stage')
     expect(stage).toHaveAttribute('data-navigation-state', 'loading')
     expect(stage).toHaveClass('is-navigating')
-    expect(container.querySelector('.dashboard-route-veil')).toHaveClass('is-active')
-    expect(container.querySelector('.dashboard-route-grid')).toBeInTheDocument()
-    expect(container.querySelector('.dashboard-route-orb')).toBeInTheDocument()
-    expect(container.querySelector('.dashboard-route-scan')).toBeInTheDocument()
+    expect(container.querySelector('.dashboard-route-veil')).toBeNull()
+    const css = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')
+    const navigating = css.match(/\.dashboard-route-stage\.is-navigating \.dashboard-route-page\s*\{([^}]+)/)[1]
+    expect(navigating).toContain('opacity: 1')
+    expect(navigating).toContain('filter: none')
     expect(screen.getByText('Current route remains visible')).toBeInTheDocument()
   })
 

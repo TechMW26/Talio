@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaSearch, FaUser } from 'react-icons/fa'
@@ -13,7 +15,7 @@ export default function EmployeeDirectoryWidget() {
 
   if (isLoading && !search) {
     return (
-      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+      <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
         <Skeleton className="h-10 w-full rounded-lg mb-4" />
         <div className="space-y-3">
           {[1, 2, 3, 4].map(i => (
@@ -32,17 +34,17 @@ export default function EmployeeDirectoryWidget() {
 
   if (error && !search) {
     return (
-      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
-        <h3 className="text-base sm:text-lg font-bold text-default-900 mb-4">Employee Directory</h3>
+      <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
+        <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900 mb-4`}>Employee Directory</h3>
         <p className="text-sm text-default-500">Unable to load employees.</p>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-default-900">Employee Directory</h3>
+        <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Employee Directory</h3>
         <Button
           variant="light"
           color="primary"
@@ -70,7 +72,7 @@ export default function EmployeeDirectoryWidget() {
       {/* Employee List */}
       {isLoading && <p role="status" className="text-sm text-default-500">Searching employees…</p>}
       {error && <p role="alert" className="text-sm text-danger">Search failed. Please try again.</p>}
-      <ScrollShadow className="space-y-2 max-h-[200px]">
+      <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
         {filteredEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-6">
             <div className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center mb-3">
@@ -80,7 +82,7 @@ export default function EmployeeDirectoryWidget() {
           </div>
         ) : (
           filteredEmployees.map((emp) => (
-            <Card
+            <Card data-widget-card=""
               key={emp._id}
               isPressable
               onPress={() => router.push(`/dashboard/employees/${emp._id}`)}

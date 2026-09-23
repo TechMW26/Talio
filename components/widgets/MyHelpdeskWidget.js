@@ -1,4 +1,6 @@
 'use client'
+
+import widgetStyles from './WidgetDesign.module.css'
 import { useState, useEffect } from 'react'
 import { FaHeadset, FaPlus } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
@@ -49,7 +51,7 @@ export default function MyHelpdeskWidget({ user, initialData }) {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+      <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
         <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
@@ -67,9 +69,9 @@ export default function MyHelpdeskWidget({ user, initialData }) {
   }
 
   return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-default-900">Helpdesk</h3>
+        <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Helpdesk</h3>
         <Button
           variant="light"
           color="primary"
@@ -90,9 +92,9 @@ export default function MyHelpdeskWidget({ user, initialData }) {
           <p className="text-sm text-default-500">No open tickets</p>
         </div>
       ) : (
-        <ScrollShadow className="space-y-2 max-h-[200px]">
+        <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
           {tickets.slice(0, 5).map(ticket => (
-            <Card key={ticket._id} className="border border-default-100">
+            <Card data-widget-card="" key={ticket._id} className="border border-default-100">
               <CardBody className="p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1 pr-2">

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendAnnouncementNotification } from '@/lib/notificationService'
 import { emitDashboardRefresh, REALTIME_EVENTS } from '@/lib/realtimeEvents'
@@ -261,7 +261,8 @@ export async function POST(request) {
       .populate('departments', 'name')
       .populate('targetDepartments', 'name')
 
-    // Send push notification to targeted users and emit Socket.IO event
+    after(async () => {
+    // Delivery is best-effort and must not delay the saved announcement.
     try {
       let targetUsers = []
 
@@ -342,6 +343,7 @@ export async function POST(request) {
     } catch (notifError) {
       console.error('Failed to send announcement notification:', notifError)
     }
+    })
 
     return NextResponse.json({
       success: true,

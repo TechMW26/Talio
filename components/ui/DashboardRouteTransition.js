@@ -22,14 +22,7 @@ export default function DashboardRouteTransition({ children }) {
         {children}
       </div>
 
-      <div
-        aria-hidden="true"
-        className={`dashboard-route-veil ${isNavigating ? 'is-active' : ''}`}
-      >
-        <div className="dashboard-route-grid" />
-        <div className="dashboard-route-orb" />
-        <div className="dashboard-route-scan" />
-      </div>
+      {/* RouteProgressBar indicates navigation without covering usable content. */}
     </div>
   )
 }

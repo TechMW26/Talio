@@ -1,7 +1,9 @@
 'use client'
 
-import { FaUser, FaSignInAlt, FaSignOutAlt, FaCheckCircle, FaTimesCircle, FaEnvelope, FaPhone, FaCalendarAlt, FaBriefcase, FaUserTie } from 'react-icons/fa'
-import { Card, CardBody, Button, Avatar, Chip } from '@heroui/react'
+import styles from './CheckInOutWidget.module.css'
+
+import { FaSignInAlt, FaSignOutAlt, FaEnvelope, FaPhone, FaCalendarAlt } from 'react-icons/fa'
+import { Card, CardBody, Button, Avatar } from '@heroui/react'
 import { formatDesignation } from '@/lib/formatters'
 import LocationAccessStatus from '@/components/attendance/LocationAccessStatus'
 
@@ -21,13 +23,15 @@ export default function CheckInOutWidget({
 }) {
 
   const getStatus = () => {
-    if (!todayAttendance?.checkIn) return { text: 'Not Checked In', color: 'warning', icon: FaTimesCircle, pulse: false }
-    if (todayAttendance?.checkOut) return { text: 'Day Complete', color: 'success', icon: FaCheckCircle, pulse: false }
-    return { text: 'Working', color: 'success', icon: FaCheckCircle, pulse: true }
+    if (todayAttendance?.workFromHome && todayAttendance?.checkIn) return { text: 'WFH', color: 'success' }
+    const labels = { 'half-day': 'Half Day', 'on-leave': 'On Leave', absent: 'Absent' }
+    if (labels[todayAttendance?.status]) return { text: labels[todayAttendance.status], color: 'warning' }
+    if (!todayAttendance?.checkIn) return { text: 'Not Checked In', color: 'warning' }
+    if (todayAttendance?.checkOut) return { text: 'Day Complete', color: 'success' }
+    return { text: 'Working', color: 'success' }
   }
 
   const status = getStatus()
-  const StatusIcon = status.icon
 
   const getDepartmentName = () => {
     const dept = employeeData?.department || user?.department
@@ -44,19 +48,6 @@ export default function CheckInOutWidget({
   const departmentName = getDepartmentName()
   const designationText = getDesignationText()
 
-  const getReportingManagerName = () => {
-    const rm = employeeData?.reportingManager
-    if (!rm) return null
-    if (typeof rm === 'object') return `${rm.firstName || ''} ${rm.lastName || ''}`.trim() || null
-    return null
-  }
-
-  const getEmploymentType = () => {
-    const type = employeeData?.employmentType || user?.employmentType
-    if (!type) return null
-    return type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' ')
-  }
-
   const getDateOfJoining = () => {
     const doj = employeeData?.dateOfJoining || user?.dateOfJoining
     if (!doj) return null
@@ -66,8 +57,6 @@ export default function CheckInOutWidget({
   const getEmail = () => employeeData?.email || user?.email || null
   const getPhone = () => employeeData?.phone || user?.phone || null
 
-  const reportingManager = getReportingManagerName()
-  const employmentType = getEmploymentType()
   const dateOfJoining = getDateOfJoining()
   const email = getEmail()
   const phone = getPhone()
@@ -91,107 +80,57 @@ export default function CheckInOutWidget({
       : name[0].toUpperCase()
   }
 
+  const details = [
+    { label: 'Email', value: email, icon: FaEnvelope },
+    { label: 'Phone', value: phone, icon: FaPhone },
+    { label: 'Joined', value: dateOfJoining, icon: FaCalendarAlt },
+  ].filter(detail => detail.value)
+
   return (
-    <Card
-      className="relative shadow-xl overflow-hidden h-full bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-600 dark:from-[#09090b] dark:via-[#09090b] dark:to-[#09090b]"
-      radius="lg"
-    >
-      {/* Decorative elements */}
-      <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 dark:bg-white/[0.03] rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 dark:bg-white/[0.03] rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl" />
-
-      <CardBody className="p-5 sm:p-6 text-white h-full flex flex-col justify-between relative z-10">
-        {/* Profile Row */}
-        <div className="flex items-center gap-4">
-          {/* Profile Image */}
-          <Avatar
-            src={employeeData?.profilePicture}
-            name={getUserName()}
-            fallback={
-              <span className="text-lg font-bold text-white">{getInitials()}</span>
-            }
-            size="lg"
-            isBordered
-            color="default"
-            className="w-20 h-20 sm:w-24 sm:h-24 ring-4 ring-white/30 bg-gradient-to-br from-primary-400 to-primary-600"
-            classNames={{
-              base: "bg-gradient-to-br from-primary-400 to-primary-600",
-              fallback: "bg-transparent",
-            }}
-          />
-
-          {/* User Info */}
-          <div className="flex-1 min-w-0">
-            {/* Status Badge */}
-            <Chip
-              variant="flat"
-              color={status.color}
-              size="sm"
-              startContent={
-                <StatusIcon className={`w-3 h-3 ${status.pulse ? 'animate-pulse' : ''}`} />
-              }
-              className="mb-2 bg-white/90 dark:bg-white/10 backdrop-blur-sm"
-              classNames={{
-                content: "font-semibold text-xs",
-              }}
-            >
-              {status.text}
-            </Chip>
-
-            {/* Name */}
-            <h2 className="text-xl sm:text-2xl font-bold tracking-wide leading-tight truncate drop-shadow-sm">
-              {getUserName()}
-            </h2>
-
-            {/* Employee Code */}
-            <p className="text-xs font-medium text-white/60 mt-1">
-              {employeeData?.employeeCode || user?.employeeCode || user?.employeeNumber || '---'}
-            </p>
-
-            {/* Designation & Department */}
-            {(designationText || departmentName) && (
-              <p className="text-sm text-white/80 mt-1.5 truncate">
-                {designationText}{designationText && departmentName ? ' • ' : ''}{departmentName}
-              </p>
-            )}
+    <section className={styles.layout} aria-label="Check in and out">
+    <Card className={styles.panel} data-status={status.color} radius="lg">
+      <CardBody className={styles.body}>
+        <div className={styles.hero}>
+          <div className={styles.portrait}>
+            <Avatar
+              src={employeeData?.profilePicture}
+              name={getUserName()}
+              fallback={<span>{getInitials()}</span>}
+              className={styles.avatar}
+            />
+          </div>
+          <div className={styles.identity}>
+            <span className={styles.status}><i aria-hidden="true" />{status.text}</span>
+            <h2>{getUserName()}</h2>
+            <p className={styles.code}>{employeeData?.employeeCode || user?.employeeCode || user?.employeeNumber || '---'}</p>
+            {(designationText || departmentName) && <p className={styles.role}>
+              {designationText}{designationText && departmentName ? ' · ' : ''}{departmentName}
+            </p>}
           </div>
         </div>
 
-        {/* Additional Details */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-4 pt-3 border-t border-white/15">
-          {email && (
-            <div className="flex items-center gap-2 min-w-0">
-              <FaEnvelope className="w-3 h-3 text-white/50 flex-shrink-0" />
-              <span className="text-xs text-white/70 truncate">{email}</span>
-            </div>
-          )}
-          {phone && (
-            <div className="flex items-center gap-2 min-w-0">
-              <FaPhone className="w-3 h-3 text-white/50 flex-shrink-0" />
-              <span className="text-xs text-white/70 truncate">{phone}</span>
-            </div>
-          )}
-          {employmentType && (
-            <div className="flex items-center gap-2 min-w-0">
-              <FaBriefcase className="w-3 h-3 text-white/50 flex-shrink-0" />
-              <span className="text-xs text-white/70 truncate">{employmentType}</span>
-            </div>
-          )}
-          {dateOfJoining && (
-            <div className="flex items-center gap-2 min-w-0">
-              <FaCalendarAlt className="w-3 h-3 text-white/50 flex-shrink-0" />
-              <span className="text-xs text-white/70 truncate">Joined {dateOfJoining}</span>
-            </div>
-          )}
-          {reportingManager && (
-            <div className="flex items-center gap-2 min-w-0 col-span-2">
-              <FaUserTie className="w-3 h-3 text-white/50 flex-shrink-0" />
-              <span className="text-xs text-white/70 truncate">Reports to {reportingManager}</span>
-            </div>
-          )}
-        </div>
+        <dl className={styles.details}>
+          {details.map(({ label, value, icon: Icon }) => <div className={styles.detail} key={label}>
+            <span className={styles.detailIcon} aria-hidden="true"><Icon /></span>
+            <div><dt>{label}</dt><dd title={value}>{value}</dd></div>
+          </div>)}
+        </dl>
 
-        <div className="mt-4">
+      </CardBody>
+    </Card>
+    <div className={styles.punches}>
+      <section className={`${styles.punch} ${styles.arrival}`} aria-label="Check in card">
+        <div className={styles.punchHeading}><span><FaSignInAlt aria-hidden="true" /></span><div><h3>Check In</h3><p>Start your workday</p></div></div>
+        <p className={styles.time}>{formatPunchTime(todayAttendance?.checkIn)}</p>
+        <Button onPress={() => onClockIn()} isDisabled={Boolean(attendanceLoading || locationLoading || todayAttendance?.checkIn)} isLoading={attendanceLoading || locationLoading} className={styles.checkIn}>Check In</Button>
+      </section>
+      <section className={`${styles.punch} ${styles.departure}`} aria-label="Check out card">
+        <div className={styles.punchHeading}><span><FaSignOutAlt aria-hidden="true" /></span><div><h3>Check Out</h3><p>End your workday</p></div></div>
+        <p className={styles.time}>{formatPunchTime(todayAttendance?.checkOut)}</p>
+        <Button onPress={() => onClockOut()} isDisabled={Boolean(attendanceLoading || locationLoading || !todayAttendance?.checkIn || todayAttendance?.checkOut)} isLoading={attendanceLoading || locationLoading} className={styles.checkOut}>Check Out</Button>
+      </section>
+    </div>
+        <div className={styles.location}>
           <LocationAccessStatus
             compact
             geofence={geofence}
@@ -203,42 +142,13 @@ export default function CheckInOutWidget({
           />
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 mt-5">
-          <Button
-            onPress={() => onClockIn()}
-            isDisabled={attendanceLoading || locationLoading || (todayAttendance && todayAttendance.checkIn)}
-            isLoading={attendanceLoading || locationLoading}
-            size="lg"
-            radius="full"
-            startContent={!attendanceLoading && !locationLoading && <FaSignInAlt className="w-4 h-4" />}
-            className={`flex-1 font-bold backdrop-blur-sm transition-all shadow-lg border-2 ${
-              attendanceLoading || (todayAttendance && todayAttendance.checkIn)
-                ? 'bg-gray-400/30 text-white/50 border-white/20 cursor-not-allowed'
-                : 'bg-white/20 hover:bg-white/30 text-white border-white/30'
-            }`}
-            variant="flat"
-          >
-            Check In
-          </Button>
-          <Button
-            onPress={() => onClockOut()}
-            isDisabled={attendanceLoading || locationLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
-            isLoading={attendanceLoading || locationLoading}
-            size="lg"
-            radius="full"
-            startContent={!attendanceLoading && !locationLoading && <FaSignOutAlt className="w-4 h-4" />}
-            className={`flex-1 font-bold transition-all shadow-lg ${
-              attendanceLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut
-                ? 'bg-gray-300 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                : 'bg-white dark:bg-white/90 text-primary-600 hover:bg-default-100 dark:hover:bg-white'
-            }`}
-            variant="solid"
-          >
-            Check Out
-          </Button>
-        </div>
-      </CardBody>
-    </Card>
+    </section>
   )
+}
+
+function formatPunchTime(value) {
+  const date = value ? new Date(value) : null
+  return date && Number.isFinite(date.getTime())
+    ? date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+    : '--:--'
 }

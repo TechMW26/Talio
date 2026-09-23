@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
 import { getDefaultWidgetsForRole, WIDGET_REGISTRY } from '@/lib/widgetRegistry'
+import { balanceDashboardWidgets } from '@/lib/dashboardSections'
 
 const STORAGE_KEY = 'dashboard_widgets_config'
 
@@ -10,7 +11,7 @@ const STORAGE_KEY = 'dashboard_widgets_config'
  * Custom hook to manage dashboard widgets
  * Handles adding, removing, reordering widgets with localStorage persistence
  */
-export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
+export function useDashboardWidgets(userId = 'default', userRole = 'employee', availableWidgetIds) {
   const [enabledWidgets, setEnabledWidgets] = useState([])
   const [widgetOrder, setWidgetOrder] = useState([])
   const [isInitialized, setIsInitialized] = useState(false)
@@ -20,6 +21,14 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
 
   // Ensure we have a valid role - default to 'employee'
   const effectiveRole = userRole || 'employee'
+  const availableKey = availableWidgetIds?.slice().sort().join(',')
+  const balancedIds = useCallback((ids) => {
+    const available = availableKey ? new Set(availableKey.split(',')) : null
+    const candidates = Object.values(WIDGET_REGISTRY)
+      .filter(widget => widget.roles.includes(effectiveRole) && (!available || available.has(widget.id)))
+      .sort((a, b) => Number(b.defaultEnabled) - Number(a.defaultEnabled) || a.order - b.order)
+    return balanceDashboardWidgets(ids.filter(id => !available || available.has(id)).map(id => WIDGET_REGISTRY[id]), candidates).map(widget => widget.id)
+  }, [availableKey, effectiveRole])
 
   // Load saved configuration from localStorage on mount
   useEffect(() => {
@@ -29,7 +38,7 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
       const savedConfig = localStorage.getItem(storageKey)
 
       if (savedConfig) {
-        const { enabled, order } = JSON.parse(savedConfig)
+        const { enabled, order, gridVersion } = JSON.parse(savedConfig)
 
         // Validate that saved widgets still exist in registry AND are allowed for this role
         const validEnabled = enabled.filter(id => {
@@ -45,9 +54,8 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
           }
         })
 
-        // IMPORTANT: Check for new default widgets that were added to the registry
-        // and automatically enable them for existing users
-        const defaultWidgets = getDefaultWidgetsForRole(effectiveRole)
+        // Preserve customization; only attendance is a required permanent widget.
+        const defaultWidgets = getDefaultWidgetsForRole(effectiveRole).filter(widget => widget.id === 'check-in-out')
         defaultWidgets.forEach(widget => {
           if (!validEnabled.includes(widget.id)) {
             // This is a new default widget - add it automatically
@@ -56,12 +64,14 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
           }
         })
 
-        setEnabledWidgets(validEnabled)
-        setWidgetOrder(validOrder)
+        const gridOrder = gridVersion === 2 ? validOrder : balancedIds(validOrder)
+        setEnabledWidgets(gridOrder)
+        setWidgetOrder(gridOrder)
+        if (gridVersion !== 2) localStorage.setItem(storageKey, JSON.stringify({ enabled: gridOrder, order: gridOrder, gridVersion: 2 }))
       } else {
         // First time - use default widgets for role
         const defaultWidgets = getDefaultWidgetsForRole(effectiveRole)
-        const defaultIds = defaultWidgets.map(w => w.id)
+        const defaultIds = balancedIds(defaultWidgets.map(w => w.id))
 
         setEnabledWidgets(defaultIds)
         setWidgetOrder(defaultIds)
@@ -70,13 +80,13 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
       console.error('Error loading dashboard widgets config:', error)
       // Fallback to defaults
       const defaultWidgets = getDefaultWidgetsForRole(effectiveRole)
-      const defaultIds = defaultWidgets.map(w => w.id)
+      const defaultIds = balancedIds(defaultWidgets.map(w => w.id))
       setEnabledWidgets(defaultIds)
       setWidgetOrder(defaultIds)
     }
 
     setIsInitialized(true)
-  }, [storageKey, effectiveRole])
+  }, [storageKey, effectiveRole, balancedIds])
 
   // Save configuration to localStorage
   const saveConfig = useCallback((enabled, order) => {
@@ -86,6 +96,7 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
       localStorage.setItem(storageKey, JSON.stringify({
         enabled,
         order,
+        gridVersion: 2,
         lastUpdated: Date.now()
       }))
     } catch (error) {
@@ -144,7 +155,7 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
   // Reset to defaults
   const resetToDefaults = useCallback(() => {
     const defaultWidgets = getDefaultWidgetsForRole(userRole)
-    const defaultIds = defaultWidgets.map(w => w.id)
+    const defaultIds = balancedIds(defaultWidgets.map(w => w.id))
 
     setEnabledWidgets(defaultIds)
     setWidgetOrder(defaultIds)
@@ -152,7 +163,7 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(storageKey)
     }
-  }, [userRole, storageKey])
+  }, [userRole, storageKey, balancedIds])
 
   // Get ordered widgets with their metadata
   const getOrderedWidgets = useCallback(() => {

@@ -1,144 +1,88 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FaUsers, FaCheck, FaTimes, FaClock } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow, Avatar } from '@heroui/react'
+import { FaArrowRight, FaChevronLeft, FaChevronRight, FaSearch, FaTimes } from 'react-icons/fa'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import styles from './TeamAttendanceWidget.module.css'
 
-// Helper to get display label and colors for status
-const getStatusDisplay = (status) => {
-  switch (status) {
-    case 'present':
-      return { label: 'Present', color: 'success' }
-    case 'in-progress':
-      return { label: 'Working', color: 'primary' }
-    case 'half-day':
-      return { label: 'Half Day', color: 'warning' }
-    case 'absent':
-      return { label: 'Absent', color: 'danger' }
-    case 'on-leave':
-      return { label: 'On Leave', color: 'secondary' }
-    case 'not-checked-in':
-      return { label: 'Not Checked In', color: 'warning' }
-    case 'not-started':
-      return { label: 'Not Started', color: 'default' }
-    case 'late':
-      return { label: 'Late', color: 'warning' }
-    default:
-      return { label: status, color: 'default' }
-  }
+const STATUSES = {
+  present: ['Present', 'green'], 'in-progress': ['Working', 'blue'],
+  'half-day': ['Half Day', 'amber'], absent: ['Absent', 'pink'],
+  'on-leave': ['On Leave', 'amber'], 'not-checked-in': ['Not Checked In', 'amber'],
+  'not-started': ['Not Started', 'neutral'], late: ['Late', 'amber'],
+  holiday: ['Holiday', 'neutral'], weekend: ['Weekend', 'neutral'],
+}
+const PAGE_SIZE = 4
+
+function checkInLabel(member) {
+  const date = member.checkIn && new Date(member.checkIn)
+  if (date && !Number.isNaN(date.getTime())) return `Checked in at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+  return member.status === 'on-leave' ? 'On leave today' : 'No check-in today'
 }
 
 export default function TeamAttendanceWidget() {
   const router = useRouter()
-  const [teamAttendance, setTeamAttendance] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(0)
+  const [search, setSearch] = useState('')
+  const { data, error, isLoading, mutate } = useAuthedSWR('/api/attendance/team-today', { refreshInterval: 0 })
+  const members = Array.isArray(data?.data) ? data.data : []
+  const total = members.length
+  const query = search.trim().toLocaleLowerCase().replace(/\s+/g, ' ')
+  const filteredMembers = query ? members.filter(member =>
+    `${member.firstName || ''} ${member.lastName || ''}`.trim().toLocaleLowerCase().replace(/\s+/g, ' ').includes(query)
+  ) : members
+  const resultCount = filteredMembers.length
+  const lastPage = Math.max(0, Math.ceil(resultCount / PAGE_SIZE) - 1)
+  const currentPage = Math.min(page, lastPage)
+  const offset = currentPage * PAGE_SIZE
+  const metrics = [
+    { label: 'Total', value: total, tone: 'blue' },
+    { label: 'Present', value: members.filter(m => ['present', 'in-progress'].includes(m.status)).length, tone: 'green' },
+    { label: 'Absent', value: members.filter(m => m.status === 'absent').length, tone: 'pink' },
+  ]
 
-  useEffect(() => {
-    fetchTeamAttendance()
-  }, [])
-
-  const fetchTeamAttendance = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/attendance/team-today', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setTeamAttendance(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching team attendance:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
-        <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <Skeleton className="h-20 rounded-xl" />
-          <Skeleton className="h-20 rounded-xl" />
-          <Skeleton className="h-20 rounded-xl" />
-        </div>
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="w-8 h-8 rounded-full" />
-              <Skeleton className="h-4 flex-1 rounded-lg" />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const present = teamAttendance.filter(e => e.status === 'present' || e.status === 'in-progress')
-  const absent = teamAttendance.filter(e => e.status === 'absent')
-
-  return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-default-900">Team Attendance</h3>
-        <Button
-          variant="light"
-          color="primary"
-          size="sm"
-          onPress={() => router.push('/dashboard/attendance')}
-        >
-          View All
-        </Button>
-      </div>
-
-      {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <Card className="bg-primary-50 border border-primary-100">
-          <CardBody className="p-3 text-center">
-            <FaUsers className="w-4 h-4 mx-auto text-primary-600 mb-1" />
-            <p className="text-lg font-bold text-primary-600">{teamAttendance.length}</p>
-            <p className="text-xs text-default-600">Total</p>
-          </CardBody>
-        </Card>
-        <Card className="bg-success-50 border border-success-100">
-          <CardBody className="p-3 text-center">
-            <FaCheck className="w-4 h-4 mx-auto text-success-600 mb-1" />
-            <p className="text-lg font-bold text-success-600">{present.length}</p>
-            <p className="text-xs text-default-600">Present</p>
-          </CardBody>
-        </Card>
-        <Card className="bg-danger-50 border border-danger-100">
-          <CardBody className="p-3 text-center">
-            <FaTimes className="w-4 h-4 mx-auto text-danger-600 mb-1" />
-            <p className="text-lg font-bold text-danger-600">{absent.length}</p>
-            <p className="text-xs text-default-600">Absent</p>
-          </CardBody>
-        </Card>
-      </div>
-
-      {/* Team List */}
-      <ScrollShadow className="space-y-2 max-h-48">
-        {teamAttendance.slice(0, 6).map((member, index) => {
-          const statusDisplay = getStatusDisplay(member.status)
-          return (
-            <div key={index} className="flex items-center justify-between gap-2 py-2 border-b border-default-100 last:border-0">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Avatar
-                  name={`${member.firstName?.charAt(0) || ''}${member.lastName?.charAt(0) || ''}`}
-                  size="sm"
-                  className="bg-primary-100 text-primary-600"
-                />
-                <span className="text-sm text-default-700 truncate">{member.firstName} {member.lastName}</span>
-              </div>
-              <Chip size="sm" color={statusDisplay.color} variant="flat">
-                {statusDisplay.label}
-              </Chip>
-            </div>
-          )
-        })}
-      </ScrollShadow>
+  return <section className={styles.panel} aria-label="Team attendance" aria-busy={isLoading}>
+    <div className={styles.header}>
+      <div><h3>Team Attendance</h3><p>Today's overview</p></div>
+      <button className={styles.button} onClick={() => router.push('/dashboard/attendance')}>View All <FaArrowRight aria-hidden="true" /></button>
     </div>
-  )
+    {error && <div role="alert" className={styles.notice}>Unable to update team attendance. <button onClick={() => mutate()}>Retry</button></div>}
+    <div className={styles.metrics}>
+      {metrics.map(({ label, value, tone }, index) => {
+        const percent = total ? Math.round(value / total * 100) : 0
+        const available = !isLoading && (!error || data)
+        return <div key={label} className={styles.metric} data-tone={tone}>
+          <span>{label}</span><strong>{available ? value : '–'}</strong>
+          {index > 0 && available && <><small>{percent}% of total</small><div className={styles.ring} role="img" aria-label={`${label}: ${percent}% of team`}>
+            <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" /><circle cx="20" cy="20" r="16" pathLength="100" strokeDasharray={`${percent} 100`} /></svg><b>{percent}%</b>
+          </div></>}
+          {index === 0 && <small>Team members</small>}
+        </div>
+      })}
+    </div>
+    <div className={styles.subheading}><div><h4>Recent Team Status</h4><p>Today's attendance records</p></div><span>Today</span></div>
+    <div className={styles.search} data-search-container>
+      <FaSearch aria-hidden="true" />
+      <input type="search" aria-label="Search team members" placeholder="Search team members…" value={search}
+        onChange={event => { setSearch(event.target.value); setPage(0) }}
+        onKeyDown={event => { if (event.key === 'Escape') { setSearch(''); setPage(0) } }} />
+      {search && <button type="button" aria-label="Clear team search" onClick={() => { setSearch(''); setPage(0) }}><FaTimes aria-hidden="true" /></button>}
+    </div>
+    {isLoading && !data ? <p role="status" className={styles.notice}>Loading team attendance…</p> : total === 0 && !error ? <p className={styles.notice}>No team members to display.</p> : resultCount === 0 && total > 0 ? <p role="status" className={styles.notice}>No team members match your search.</p> : <ul key={currentPage} className={styles.list} aria-label="Team attendance records">
+      {filteredMembers.slice(offset, offset + PAGE_SIZE).map(member => {
+        const [label, tone] = STATUSES[member.status] || ['Unknown', 'neutral']
+        const name = `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Team member'
+        return <li key={member._id} className={styles.row}>
+          <span className={styles.avatar} aria-hidden="true">{name.charAt(0)}</span>
+          <div className={styles.identity}><strong>{name}</strong><small>{checkInLabel(member)}</small></div>
+          <span className={styles.status} data-tone={tone}><i aria-hidden="true" />{label}</span>
+        </li>
+      })}
+    </ul>}
+    {resultCount > 0 && <div className={styles.footer}><span aria-live="polite">Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, resultCount)} of {resultCount} {query ? 'matching members' : 'members'}</span><div>
+      <button className={styles.button} aria-label="Previous team members" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}><FaChevronLeft /></button>
+      <button className={styles.button} aria-label="Next team members" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}><FaChevronRight /></button>
+    </div></div>}
+  </section>
 }

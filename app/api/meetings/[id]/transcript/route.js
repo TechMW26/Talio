@@ -177,7 +177,7 @@ export async function POST(request, { params }) {
       payload = {
         text: transcription.text,
         language: transcription.languageCode || parsedPayload.language || 'auto',
-        source: parsedPayload.source || 'live-pollinations',
+        source: parsedPayload.source || 'live-elevenlabs',
         segmentId: parsedPayload.segmentId,
         timestamp: parsedPayload.startedAt || parsedPayload.timestamp,
         startOffsetMs: 0,
@@ -204,7 +204,7 @@ export async function POST(request, { params }) {
       data: {
         transcriptCount: meeting.transcript.length,
         languages: meeting.transcriptLanguages || [],
-        provider: usingAudioUpload ? 'pollinations' : 'client',
+        provider: usingAudioUpload ? 'elevenlabs' : 'client',
         segments,
       },
     })

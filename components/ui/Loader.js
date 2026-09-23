@@ -156,7 +156,7 @@ export default function Loader({ size = 'md', className = '', color = TALIO_TEAL
  */
 export function PageLoader({ message = 'Loading...', size = 'lg' }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[200px] w-full">
+    <div role="status" aria-label={message} className="flex w-full flex-col items-center justify-center min-h-[calc(100vh-7rem)] supports-[height:100dvh]:min-h-[calc(100dvh-7rem)]">
       <Loader size={size} />
     </div>
   )

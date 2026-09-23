@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { sendMeetingInviteEmail } from '@/lib/mailer'
@@ -146,6 +146,7 @@ export async function GET(request) {
 
 // POST - Create a new meeting
 export async function POST(request) {
+  const startedAt = performance.now()
   try {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'Department', 'User', 'Notification', 'ActionableNotification'])
@@ -353,6 +354,14 @@ export async function POST(request) {
       { path: 'invitedDepartments', select: 'name code' }
     ])
 
+    // Keep delivery alive on Vercel, but never hold a saved meeting response
+    // behind recipient lookups, email providers or push delivery.
+    after(async () => {
+    try {
+    const recipientIds = meeting.invitees.map(invitee => invitee.employee?._id || invitee.employee)
+    const recipients = await Employee.find({ _id: { $in: recipientIds } })
+      .select('firstName lastName email userId').populate('userId', '_id email').lean()
+    const recipientsById = new Map(recipients.map(employee => [String(employee._id), employee]))
     // Send notifications to invitees
     const notificationPromises = []
     const emailPromises = []
@@ -381,7 +390,7 @@ export async function POST(request) {
     }
 
     for (const invitee of meeting.invitees) {
-      const emp = await Employee.findById(invitee.employee).populate('userId', '_id email').lean()
+      const emp = recipientsById.get(String(invitee.employee?._id || invitee.employee))
       if (emp?.userId?._id) {
         // Push notification
         notificationPromises.push(
@@ -389,6 +398,7 @@ export async function POST(request) {
             title: '📅 Meeting Invitation',
             body: `${organizer.firstName} ${organizer.lastName} invited you to "${meeting.title}" on ${startTime.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at ${startTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
           }, {
+            models,
             eventType: 'meeting-invite',
             clickAction: `/dashboard/meetings/${meeting._id}`,
             icon: '/icons/icon-192x192.png',
@@ -398,7 +408,7 @@ export async function POST(request) {
             }
           }).then(() => {
             // Mark notification as sent
-            Meeting.updateOne(
+            return Meeting.updateOne(
               { _id: meeting._id, 'invitees.employee': invitee.employee },
               { $set: { 'invitees.$.pushSent': true, 'invitees.$.notificationSent': true } }
             ).exec()
@@ -425,7 +435,7 @@ export async function POST(request) {
               respondLink: `${baseUrl}/dashboard/meetings/${occurrence._id}`
             }).then(() => {
               // Mark email as sent
-              Meeting.updateOne(
+              return Meeting.updateOne(
                 { _id: occurrence._id, 'invitees.employee': invitee.employee },
                 { $set: { 'invitees.$.emailSent': true } }
               ).exec()
@@ -438,14 +448,14 @@ export async function POST(request) {
     }
 
     // Don't wait for notifications and emails to complete
-    Promise.all([...notificationPromises, ...emailPromises]).catch(console.error)
+    await Promise.allSettled([...notificationPromises, ...emailPromises])
 
     // Emit socket event for real-time updates
-    if (global.io) {
+    {
       for (const invitee of meeting.invitees) {
-        const emp = await Employee.findById(invitee.employee).populate('userId', '_id').lean()
+        const emp = recipientsById.get(String(invitee.employee?._id || invitee.employee))
         if (emp?.userId?._id) {
-          global.io.to(`user:${emp.userId._id}`).emit('meeting-invite', {
+          global.io?.to(`user:${emp.userId._id}`).emit('meeting-invite', {
             meeting: meeting.toObject(),
             organizer: {
               _id: organizer._id,
@@ -475,7 +485,13 @@ export async function POST(request) {
     }
 
     // Emit standardized real-time event for dashboard updates
-    emitMeetingUpdate(meeting.toObject(), [], { isNew: true, broadcast: true })
+    await emitMeetingUpdate(meeting.toObject(), recipients.map(emp => emp.userId?._id).filter(Boolean), {
+      isNew: true, tenantId: auth.tenant.databaseName,
+    })
+    } catch (error) {
+      console.error('[Meetings] Post-response invitation delivery failed:', error)
+    }
+    })
 
     return NextResponse.json({
       success: true,
@@ -484,7 +500,7 @@ export async function POST(request) {
         : 'Meeting created successfully',
       data: meeting,
       recurrence: data.isRecurring ? { occurrenceCount: seriesMeetings.length } : undefined
-    }, { status: 201 })
+    }, { status: 201, headers: { 'Server-Timing': `meeting-create;dur=${(performance.now() - startedAt).toFixed(1)}` } })
   } catch (error) {
     console.error('Create meeting error:', error)
     return NextResponse.json({ success: false, message: error.message }, { status: 500 })

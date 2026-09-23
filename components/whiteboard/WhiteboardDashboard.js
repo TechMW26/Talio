@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Skeleton } from '@heroui/react';
+import { Button } from '@heroui/react';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import { useSWRConfig } from 'swr';
 import {
   HiOutlineSquares2X2,
   HiOutlinePlus,
@@ -23,10 +25,25 @@ import {
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import { handleSessionExpired } from '@/utils/userHelper';
 
+function openBoard(router, boardId) {
+  // Request during the opening click, before navigation loses user activation.
+  // The editor still fills the viewport if native fullscreen is unavailable.
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    try { document.documentElement.requestFullscreen()?.catch(() => {}); } catch {}
+  }
+  router.push(`/dashboard/talioboard/${boardId}`);
+}
+
 export default function WhiteboardDashboard() {
   const router = useRouter();
-  const [boards, setBoards] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { mutate: updateCache } = useSWRConfig();
+  const { data, error, isLoading, isValidating, mutate } = useAuthedSWR('/api/whiteboard');
+  const boards = data?.boards || [];
+  const loading = isLoading && !data;
+  const setBoards = (update) => mutate(current => ({
+    ...current,
+    boards: update(current?.boards || []),
+  }), { revalidate: false });
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid');
   const [filterView, setFilterView] = useState('all');
@@ -34,7 +51,6 @@ export default function WhiteboardDashboard() {
   const [newBoardName, setNewBoardName] = useState('');
   const [creating, setCreating] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
-  const [error, setError] = useState(null);
 
   // Rename modal state
   const [showRenameModal, setShowRenameModal] = useState(false);
@@ -46,39 +62,6 @@ export default function WhiteboardDashboard() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareBoard, setShareBoard] = useState(null);
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    fetchBoards();
-  }, []);
-
-  const fetchBoards = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/whiteboard', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.status === 401) {
-        handleSessionExpired();
-        return;
-      }
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to fetch boards');
-      }
-
-      const data = await response.json();
-      setBoards(data.boards || []);
-    } catch (err) {
-      console.error('Error fetching boards:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const createBoard = async () => {
     if (!newBoardName.trim()) return;
@@ -105,6 +88,10 @@ export default function WhiteboardDashboard() {
       }
 
       const data = await response.json();
+      // Render the saved board immediately; no second blocking GET waterfall.
+      await updateCache(`/api/whiteboard/${data.whiteboard._id}`, {
+        whiteboard: data.whiteboard, permission: data.permission || 'owner',
+      }, { revalidate: false });
       setShowNewBoardModal(false);
       setNewBoardName('');
       router.push(`/dashboard/talioboard/${data.whiteboard._id}`);
@@ -134,7 +121,7 @@ export default function WhiteboardDashboard() {
         throw new Error('Failed to delete board');
       }
 
-      setBoards(boards.filter(b => b._id !== boardId));
+      await setBoards(current => current.filter(b => b._id !== boardId));
       setActiveMenu(null);
     } catch (err) {
       console.error('Error deleting board:', err);
@@ -165,7 +152,7 @@ export default function WhiteboardDashboard() {
         throw new Error('Failed to rename board');
       }
 
-      setBoards(boards.map(b =>
+      await setBoards(current => current.map(b =>
         b._id === renameBoard._id ? { ...b, title: newTitle.trim(), name: newTitle.trim() } : b
       ));
       setShowRenameModal(false);
@@ -258,8 +245,8 @@ export default function WhiteboardDashboard() {
       {/* Error State */}
       {error && !loading && (
         <DataErrorState
-          message={error}
-          onRetry={() => fetchBoards()}
+          message={error.message}
+          onRetry={() => mutate()}
           title="Error loading boards"
           className="mb-6"
         />
@@ -273,7 +260,7 @@ export default function WhiteboardDashboard() {
               <HiOutlineSquares2X2 className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-800">{boards.length}</p>
+              <p className="text-2xl font-bold text-gray-800">{data ? boards.length : '—'}</p>
               <p className="text-sm text-gray-500">Total Boards</p>
             </div>
           </div>
@@ -285,7 +272,7 @@ export default function WhiteboardDashboard() {
               <HiOutlineUser className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-800">{boards.filter(b => b.isOwner).length}</p>
+              <p className="text-2xl font-bold text-gray-800">{data ? boards.filter(b => b.isOwner).length : '—'}</p>
               <p className="text-sm text-gray-500">My Boards</p>
             </div>
           </div>
@@ -297,7 +284,7 @@ export default function WhiteboardDashboard() {
               <HiOutlineUserGroup className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-800">{boards.filter(b => !b.isOwner).length}</p>
+              <p className="text-2xl font-bold text-gray-800">{data ? boards.filter(b => !b.isOwner).length : '—'}</p>
               <p className="text-sm text-gray-500">Shared</p>
             </div>
           </div>
@@ -309,7 +296,7 @@ export default function WhiteboardDashboard() {
               <HiOutlineClock className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-800">{recentBoards.length}</p>
+              <p className="text-2xl font-bold text-gray-800">{data ? recentBoards.length : '—'}</p>
               <p className="text-sm text-gray-500">Recent</p>
             </div>
           </div>
@@ -363,19 +350,10 @@ export default function WhiteboardDashboard() {
       </div>
 
       {/* Content */}
+      {data && isValidating && <p role="status" className="mb-3 text-sm text-gray-500">Updating boards…</p>}
       {loading ? (
-        <div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <Skeleton className="w-full aspect-[4/3] rounded-none" />
-                <div className="p-4 space-y-2">
-                  <Skeleton className="h-4 w-3/4 rounded" />
-                  <Skeleton className="h-3 w-1/2 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
+        <div role="status" className="py-6 text-sm text-gray-500">
+          Loading boards… You can still search or create a board.
         </div>
       ) : !error && filteredBoards.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-100">
@@ -396,7 +374,7 @@ export default function WhiteboardDashboard() {
             </Button>
           )}
         </div>
-      ) : !error && (
+      ) : (data || !error) && (
         <div className="space-y-8">
           {/* My Boards Section */}
           {ownedBoards.length > 0 && (
@@ -583,7 +561,7 @@ function BoardGrid({ boards, viewMode, activeMenu, setActiveMenu, deleteBoard, f
           <div
             key={board._id}
             className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors cursor-pointer group"
-            onClick={() => router.push(`/dashboard/talioboard/${board._id}`)}
+            onClick={() => openBoard(router, board._id)}
           >
             {board.thumbnail ? (
               <div className="w-16 h-12 rounded-lg overflow-hidden shadow-sm flex-shrink-0 border border-gray-100">
@@ -646,7 +624,7 @@ function BoardGrid({ boards, viewMode, activeMenu, setActiveMenu, deleteBoard, f
         <div
           key={board._id}
           className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group"
-          onClick={() => router.push(`/dashboard/talioboard/${board._id}`)}
+          onClick={() => openBoard(router, board._id)}
         >
           {/* Preview */}
           <div className="aspect-[4/3] relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">

@@ -224,7 +224,7 @@ export async function POST(request) {
     let voiceGenerationResults = [];
     if (generateVoice) {
       console.log(`[CallAlert] Voice generation ENABLED, starting generation for ${processedMessages.length} messages...`);
-      console.log(`[CallAlert] Pollinations API Key present:`, !!process.env.POLLINATIONS_API_KEY);
+      console.log(`[CallAlert] ElevenLabs API Key present:`, !!process.env.ELEVENLABS_API_KEY);
       
       callAlert.voiceGeneration.status = 'generating';
       await callAlert.save();

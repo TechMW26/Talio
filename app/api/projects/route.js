@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import {
   createProject,
@@ -329,7 +329,8 @@ export async function POST(request) {
       models // Pass tenant-specific models
     )
 
-    // Send notifications to invited project heads (non-blocking)
+    after(async () => {
+    // Invitation delivery must not delay the saved project response.
     // Only send to heads who are not the creator
     for (const headId of headIds) {
       if (headId.toString() !== creatorEmployee._id.toString()) {
@@ -357,6 +358,8 @@ export async function POST(request) {
       }
     }
 
+    })
+
     // Populate and return the project
     const populatedProject = await Project.findById(project._id)
       .populate('projectHead', 'firstName lastName profilePicture')
@@ -367,6 +370,7 @@ export async function POST(request) {
       .populate('assignedTeams', 'teamName teamCode department')
       .populate('chatGroup')
 
+    after(async () => {
     // Emit real-time project creation to all members and admins
     try {
       const memberUserIds = await getProjectMemberUserIds(project._id, null, models)
@@ -399,6 +403,8 @@ export async function POST(request) {
     } catch (emailError) {
       console.error('Failed to queue project creation emails:', emailError)
     }
+
+    })
 
     return NextResponse.json({
       success: true,

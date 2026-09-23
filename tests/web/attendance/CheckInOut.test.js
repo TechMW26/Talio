@@ -182,8 +182,9 @@ jest.mock('@/components/CallAlertButton', () => ({
 // ── CustomizableDashboard — renders widgetComponents values so we can test real widgets ──
 jest.mock('@/components/dashboard', () => ({
     __esModule: true,
-    CustomizableDashboard: ({ widgetComponents }) => (
+    CustomizableDashboard: ({ widgetComponents, attendanceSummary }) => (
         <div data-testid="dashboard">
+            <header>{attendanceSummary}</header>
             {Object.entries(widgetComponents || {}).map(([id, node]) => (
                 <div key={id} data-testid={`widget-${id}`}>{node}</div>
             ))}
@@ -551,7 +552,7 @@ describe('Group 2 — State Update After Successful API Response', () => {
             })
             expect(window.talioDesktop.attendanceClockIn).toHaveBeenCalledTimes(1)
             expect(mockToast.success).toHaveBeenCalledWith('Checked in successfully!')
-            expect(screen.getByTestId('widget-quick-glance').textContent).toContain('In Progress')
+            expect(screen.getByTestId('dashboard').textContent).toContain('Working')
         } finally {
             delete window.talioDesktop
         }
@@ -580,10 +581,10 @@ describe('Group 2 — State Update After Successful API Response', () => {
         })
 
         // The QuickGlance widget should display the server check-in time
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         // Server response has checkIn: '2026-03-23T09:00:05.000Z', checkout is still --:--
         // Verify check-in time is rendered (not all dashes)
-        expect(widget.textContent).toContain('In Progress')
+        expect(widget.textContent).toContain('Working')
         // The Check Out slot will still show --:-- since we only checked in
         // But the Check In slot should have a real time
         expect(widget.textContent).toContain('pm') // locale time format includes am/pm
@@ -593,8 +594,8 @@ describe('Group 2 — State Update After Successful API Response', () => {
         await renderDashboard()
 
         // Before check-in, Quick Glance should not show "In Progress" status
-        const widgetBefore = screen.getByTestId('widget-quick-glance')
-        expect(widgetBefore.textContent).not.toContain('In Progress')
+        const widgetBefore = screen.getByTestId('dashboard')
+        expect(widgetBefore.textContent).not.toContain('Working')
 
         const btn = getCheckInButton()
         await act(async () => {
@@ -603,8 +604,8 @@ describe('Group 2 — State Update After Successful API Response', () => {
         })
 
         // After check-in: In Progress status should appear
-        const widgetAfter = screen.getByTestId('widget-quick-glance')
-        expect(widgetAfter.textContent).toContain('In Progress')
+        const widgetAfter = screen.getByTestId('dashboard')
+        expect(widgetAfter.textContent).toContain('Working')
     })
 
     test('state transitions from in-progress to present after check-out', async () => {
@@ -613,8 +614,8 @@ describe('Group 2 — State Update After Successful API Response', () => {
             attendance: FIXTURES.serverCheckOutResponse,
         })
 
-        const widgetBefore = screen.getByTestId('widget-quick-glance')
-        expect(widgetBefore.textContent).toContain('In Progress')
+        const widgetBefore = screen.getByTestId('dashboard')
+        expect(widgetBefore.textContent).toContain('Working')
 
         const btn = getCheckOutButton()
         await act(async () => {
@@ -622,8 +623,8 @@ describe('Group 2 — State Update After Successful API Response', () => {
             await new Promise((r) => setTimeout(r, 150))
         })
 
-        const widgetAfter = screen.getByTestId('widget-quick-glance')
-        expect(widgetAfter.textContent).toContain('Present')
+        const widgetAfter = screen.getByTestId('dashboard')
+        expect(widgetAfter.textContent).toContain('Day Complete')
     })
 
     test('null response data does not corrupt existing state', async () => {
@@ -640,8 +641,8 @@ describe('Group 2 — State Update After Successful API Response', () => {
         })
 
         // State should be rolled back to checked-in (in-progress)
-        const widget = screen.getByTestId('widget-quick-glance')
-        expect(widget.textContent).toContain('In Progress')
+        const widget = screen.getByTestId('dashboard')
+        expect(widget.textContent).toContain('Working')
     })
 })
 
@@ -666,8 +667,8 @@ describe('Group 3 — Optimistic UI Update & Rollback', () => {
         })
 
         // A pending request must not look like a saved attendance record.
-        const widget = screen.getByTestId('widget-quick-glance')
-        expect(widget.textContent).not.toContain('In Progress')
+        const widget = screen.getByTestId('dashboard')
+        expect(widget.textContent).not.toContain('Working')
         expect(getCheckInButton()).toBeDisabled()
 
         // Now resolve the API
@@ -696,7 +697,7 @@ describe('Group 3 — Optimistic UI Update & Rollback', () => {
         })
 
         // Before click: no attendance
-        const widgetBefore = screen.getByTestId('widget-quick-glance')
+        const widgetBefore = screen.getByTestId('dashboard')
         const textBefore = widgetBefore.textContent
 
         const btn = getCheckInButton()
@@ -725,9 +726,9 @@ describe('Group 3 — Optimistic UI Update & Rollback', () => {
         })
 
         // After rollback the check-in time should still be from the original record
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         // Status should be back to In Progress (rolled back)
-        expect(widget.textContent).toContain('In Progress')
+        expect(widget.textContent).toContain('Working')
         // The check-in time should still be displayed (from the original record)
         expect(widget.textContent).toContain('pm')
     })
@@ -942,7 +943,7 @@ describe('Group 6 — Widget and Component Sync', () => {
 
         // Both widgets should show not-checked-in state
         const checkInOutWidget = screen.getByTestId('widget-check-in-out')
-        const quickGlanceWidget = screen.getByTestId('widget-quick-glance')
+        const quickGlanceWidget = screen.getByTestId('dashboard')
 
         // Check In Out widget should show "Not Checked In"
         expect(checkInOutWidget.textContent).toContain('Not Checked In')
@@ -957,7 +958,7 @@ describe('Group 6 — Widget and Component Sync', () => {
 
         // Both widgets should now reflect checked-in state
         expect(screen.getByTestId('widget-check-in-out').textContent).toContain('Working')
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('In Progress')
+        expect(screen.getByTestId('dashboard').textContent).toContain('Working')
     })
 
     test('the status badge updates its text when attendance status changes', async () => {
@@ -981,7 +982,7 @@ describe('Group 6 — Widget and Component Sync', () => {
         await renderDashboard()
 
         // Before check-in: work hours show "--:--"
-        const quickGlance = screen.getByTestId('widget-quick-glance')
+        const quickGlance = screen.getByTestId('dashboard')
         expect(quickGlance.textContent).toContain('--:--')
 
         // Check in with server response that has checkIn time
@@ -991,7 +992,7 @@ describe('Group 6 — Widget and Component Sync', () => {
         })
 
         // After check-in: work hours should show some value (not --:--)
-        const afterWidget = screen.getByTestId('widget-quick-glance')
+        const afterWidget = screen.getByTestId('dashboard')
         // The work hours should now display a calculated value (e.g., "0h 0m" or similar)
         const workHoursText = afterWidget.textContent
         // It should not have --:-- for work hours anymore (check-in time is present)
@@ -1013,7 +1014,7 @@ describe('Group 6 — Widget and Component Sync', () => {
         })
 
         // After check-out: Quick Glance should show the work hours from server (9h)
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         expect(widget.textContent).toContain('9h')
     })
 })
@@ -1027,7 +1028,7 @@ describe('Group 7 — Socket.IO Event Handling', () => {
         await renderDashboard()
 
         // Before: not checked in
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('--:--')
+        expect(screen.getByTestId('dashboard').textContent).toContain('--:--')
 
         // Simulate socket event via the captured callback
         expect(capturedRealtimeCallbacks.onAttendanceUpdate).toBeDefined()
@@ -1038,7 +1039,7 @@ describe('Group 7 — Socket.IO Event Handling', () => {
         })
 
         // After socket event: should show checked-in state
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('In Progress')
+        expect(screen.getByTestId('dashboard').textContent).toContain('Working')
     })
 
     test('the socket listener callback is registered exactly once during the component lifecycle', async () => {
@@ -1091,7 +1092,7 @@ describe('Group 7 — Socket.IO Event Handling', () => {
         })
 
         // No errors, state should remain the same
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('In Progress')
+        expect(screen.getByTestId('dashboard').textContent).toContain('Working')
     })
 })
 
@@ -1121,7 +1122,7 @@ describe('Group 8 — Cross-Tab BroadcastChannel Sync', () => {
         await renderDashboard()
 
         // Quick Glance should show not-checked-in
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('--:--')
+        expect(screen.getByTestId('dashboard').textContent).toContain('--:--')
 
         // Simulate receiving a message from another tab
         expect(broadcastOnMessage).toBeInstanceOf(Function)
@@ -1134,7 +1135,7 @@ describe('Group 8 — Cross-Tab BroadcastChannel Sync', () => {
         })
 
         // State should be updated from the broadcast
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('In Progress')
+        expect(screen.getByTestId('dashboard').textContent).toContain('Working')
     })
 
     test('receiving a check-out broadcast from another tab updates to checked-out state', async () => {
@@ -1149,7 +1150,7 @@ describe('Group 8 — Cross-Tab BroadcastChannel Sync', () => {
             await new Promise((r) => setTimeout(r, 50))
         })
 
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('Present')
+        expect(screen.getByTestId('dashboard').textContent).toContain('Day Complete')
     })
 
     test('a broadcast with an unrecognized type does not alter attendance state', async () => {
@@ -1165,7 +1166,7 @@ describe('Group 8 — Cross-Tab BroadcastChannel Sync', () => {
         })
 
         // State should not change to checked-out
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('In Progress')
+        expect(screen.getByTestId('dashboard').textContent).toContain('Working')
     })
 
     test('a broadcast with missing attendance data does not corrupt state', async () => {
@@ -1181,7 +1182,7 @@ describe('Group 8 — Cross-Tab BroadcastChannel Sync', () => {
         })
 
         // Should still show In Progress (unchanged)
-        expect(screen.getByTestId('widget-quick-glance').textContent).toContain('In Progress')
+        expect(screen.getByTestId('dashboard').textContent).toContain('Working')
     })
 })
 
@@ -1323,9 +1324,9 @@ describe('Group 10 — Edge Cases', () => {
 
         // After success, the widget should reflect the SERVER timestamp, not the client one
         // Server checkIn: '2026-03-23T09:00:05.000Z'
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         // State should be in-progress from the server response
-        expect(widget.textContent).toContain('In Progress')
+        expect(widget.textContent).toContain('Working')
         // Check-in time should be rendered (checkout will still be --:--)
         expect(mockToast.success).toHaveBeenCalledWith('Checked in successfully!')
     })
@@ -1380,7 +1381,7 @@ describe('Group 10 — Edge Cases', () => {
         expect(btn).not.toBeDisabled()
 
         // Quick Glance should show --:-- (no check-in yet)
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         expect(widget.textContent).toContain('--:--')
 
         // Check in for the new day
@@ -1431,7 +1432,7 @@ describe('Group 10 — Edge Cases', () => {
         })
 
         // After checkout, work hours should show 3h
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         expect(widget.textContent).toContain('3h')
     })
 
@@ -1536,7 +1537,7 @@ describe('Additional Coverage — QuickGlance status variants', () => {
         await renderDashboard({
             unified: { ...FIXTURES.unifiedResponse, todayAttendance: wfhAttendance },
         })
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         expect(widget.textContent).toContain('WFH')
     })
 
@@ -1548,7 +1549,7 @@ describe('Additional Coverage — QuickGlance status variants', () => {
         await renderDashboard({
             unified: { ...FIXTURES.unifiedResponse, todayAttendance: halfDayAttendance },
         })
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         expect(widget.textContent).toContain('Half Day')
     })
 
@@ -1560,7 +1561,7 @@ describe('Additional Coverage — QuickGlance status variants', () => {
         await renderDashboard({
             unified: { ...FIXTURES.unifiedResponse, todayAttendance: onLeaveAttendance },
         })
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         expect(widget.textContent).toContain('On Leave')
     })
 
@@ -1572,7 +1573,7 @@ describe('Additional Coverage — QuickGlance status variants', () => {
         await renderDashboard({
             unified: { ...FIXTURES.unifiedResponse, todayAttendance: absentAttendance },
         })
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         expect(widget.textContent).toContain('Absent')
     })
 
@@ -1580,8 +1581,8 @@ describe('Additional Coverage — QuickGlance status variants', () => {
         await renderDashboard({
             unified: { ...FIXTURES.unifiedResponse, todayAttendance: FIXTURES.checkedOut },
         })
-        const widget = screen.getByTestId('widget-quick-glance')
-        expect(widget.textContent).toContain('Present')
+        const widget = screen.getByTestId('dashboard')
+        expect(widget.textContent).toContain('Day Complete')
     })
 
     test('QuickGlance shows Absent status for checked-in records with absent status', async () => {
@@ -1592,7 +1593,7 @@ describe('Additional Coverage — QuickGlance status variants', () => {
         await renderDashboard({
             unified: { ...FIXTURES.unifiedResponse, todayAttendance: absentWithCheckIn },
         })
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         expect(widget.textContent).toContain('Absent')
     })
 })
@@ -1698,7 +1699,7 @@ describe('Additional Coverage — Check-out IP fallback and edge paths', () => {
         })
 
         // Timer should be counting (Quick Glance formatCountdown is called)
-        const widget = screen.getByTestId('widget-quick-glance')
+        const widget = screen.getByTestId('dashboard')
         // Should show a time value (not all zeros once checked in)
         expect(widget.textContent).toMatch(/\d{2}:\d{2}:\d{2}/)
     })

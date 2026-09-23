@@ -1,6 +1,6 @@
 import { NextResponse, after } from 'next/server'
 import { requirePermission } from '@/lib/permissions'
-import { notifyAssetAssignment } from '@/lib/assetNotifications.server'
+import { notifyAssetAssignment, assetNotificationRecipients } from '@/lib/assetNotifications.server'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
 import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
 import { generateContent } from '@/lib/gemini'
@@ -183,7 +183,7 @@ JSON only:`
 // POST - Bulk import assets
 export async function POST(request) {
   try {
-    const auth = await requirePermission('assets', 'create')(request, ['Asset', 'Employee', 'Notification'])
+    const auth = await requirePermission('assets', 'create')(request, ['Asset', 'Employee', 'Department', 'Team', 'Notification'])
     if (auth.denied) return auth.denied
     const { models } = auth
     const { Asset, Employee } = models
@@ -357,7 +357,8 @@ export async function POST(request) {
 
     // Emit real-time update
     if (results.created > 0) {
-      emitAssetUpdate({ action: 'bulk-import', count: results.created }, [], { broadcast: true })
+      const recipients = await assetNotificationRecipients(models, {})
+      if (recipients.length) emitAssetUpdate({ action: 'bulk-import', count: results.created }, recipients.map(user => user.id), { broadcast: false })
     }
     if (assignedAssets.length) after(async () => {
       for (const asset of assignedAssets) {

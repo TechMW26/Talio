@@ -1,7 +1,7 @@
 jest.mock('next/server', () => ({ NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) }, after: jest.fn() }))
 jest.mock('@/lib/permissions', () => ({ requirePermission: jest.fn(), checkPermission: jest.fn() }))
 jest.mock('@/lib/realtimeEvents', () => ({ emitAssetUpdate: jest.fn() }))
-jest.mock('@/lib/assetNotifications.server', () => ({ notifyAssetAssignment: jest.fn() }))
+jest.mock('@/lib/assetNotifications.server', () => ({ notifyAssetAssignment: jest.fn(), assetNotificationRecipients: jest.fn().mockResolvedValue([{ id: 'admin' }]) }))
 const { POST } = require('@/app/api/assets/route')
 const { requirePermission } = require('@/lib/permissions')
 const { after } = require('next/server')

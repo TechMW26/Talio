@@ -170,6 +170,14 @@ export default function ProjectDetailPage() {
   const [showRejectInvitationModal, setShowRejectInvitationModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [selectedTask, setSelectedTask] = useState(null)
+  const openedTaskLink = useRef(null)
+  useEffect(() => {
+    const id = searchParams.get('task')
+    if (!id) { openedTaskLink.current = null; return }
+    if (openedTaskLink.current === id) return
+    const task = tasks.find(item => String(item._id) === id)
+    if (task) { setSelectedTask(task); openedTaskLink.current = id }
+  }, [searchParams, tasks])
   const [updatingTaskId, setUpdatingTaskId] = useState(null)
   const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState(null)

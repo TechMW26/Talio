@@ -160,11 +160,11 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
   const allTasks = showPendingAcceptance ? [...pendingTasks, ...tasks] : tasks
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col h-full">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <FaProjectDiagram className="w-5 h-5 text-primary-500" />
-          <h3 className="text-base sm:text-lg font-bold text-default-900">Project Tasks</h3>
+          <h3 data-widget-heading="" className="text-base sm:text-lg font-bold text-default-900">Project Tasks</h3>
           {allTasks.length > 0 && (
             <Chip size="sm" color="primary" variant="flat">
               {allTasks.length}
@@ -191,11 +191,12 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
           <p className="text-sm">No project tasks due today</p>
         </div>
       ) : (
-        <ScrollShadow className="space-y-2 max-h-48">
+        <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
           {/* Pending Acceptance Tasks */}
           {showPendingAcceptance && pendingTasks.map(task => (
             <Card
               key={task._id}
+              data-widget-card=""
               className="bg-warning-50 border border-warning-200"
             >
               <CardBody className="p-3">
@@ -253,6 +254,7 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
             return (
               <Card
                 key={task._id}
+                data-widget-card=""
                 className={taskOverdue ? 'bg-danger-50' : ''}
               >
                 <CardBody className="p-3">

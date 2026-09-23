@@ -1,12 +1,25 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaChevronLeft, FaRegTrashAlt, FaCopy, FaCheck, FaDownload, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb } from 'react-icons/fa'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useMiraChat } from '@/contexts/MiraChatContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import MiraSphere from '@/components/ui/MiraSphere'
+import MiraSphere from '@/components/ui/MiraPet'
+import MiraGeneratedImage from '@/components/ui/MiraGeneratedImage'
+import AIActivityBeam from '@/components/ui/AIActivityBeam'
+import MiraWakeSetup from '@/components/MiraWakeSetup'
 import ReactMarkdown from 'react-markdown'
+import { VoiceBeam } from 'voice-glow'
+import useMiraVoice from '@/hooks/useMiraVoice'
+import useMiraSidebarDrag from '@/hooks/useMiraSidebarDrag'
+import { prepareMiraLocation } from '@/lib/miraClientContext'
+import { miraNavigationPath } from '@/lib/miraNavigation'
+import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
+import { prewarmMiraVoice } from '@/lib/miraVoiceReady'
+import MiraEditPrompt from './MiraEditPrompt'
+import { miraMessageDisplay } from '@/lib/miraMessageDisplay'
+import { Maximize2, Minimize2, Mic, Square, Pencil, RotateCcw, Reply } from 'lucide-react'
 
 // ─── Copy Button ────────────────────────────────────────────────────
 
@@ -107,6 +120,7 @@ function StatCard({ data }) {
 
 function ListCard({ data }) {
   const router = useRouter()
+  const { closeChat } = useMiraChat()
   if (!data?.items?.length) return null
   const statusColors = {
     active: 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400',
@@ -120,7 +134,10 @@ function ListCard({ data }) {
         <div
           key={i}
           className={`flex items-center justify-between p-2.5 rounded-lg bg-default-50 dark:bg-default-100 ${item.link ? 'cursor-pointer hover:bg-default-100 dark:hover:bg-default-200 transition-colors' : ''}`}
-          onClick={() => item.link && router.push(item.link)}
+          role={item.link ? 'link' : undefined}
+          tabIndex={item.link ? 0 : undefined}
+          onKeyDown={e => { if (item.link && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); closeChat(); router.push(item.link) } }}
+          onClick={() => { if (item.link) { closeChat(); router.push(item.link) } }}
         >
           <div className="flex-1 min-w-0 mr-2">
             <p className="text-sm font-medium text-default-800 truncate">{item.title}</p>
@@ -261,31 +278,14 @@ function AICard({ card }) {
 
 // ─── Thinking Indicator ─────────────────────────────────────────────
 
-const THINKING_PHRASES = [
-  'Analyzing your request...',
-  'Searching for information...',
-  'Crunching the data...',
-  'Putting it together...',
-  'Almost there...',
-  'Thinking deeply...',
-  'Processing your query...',
-]
-
 function ThinkingIndicator() {
-  const [phraseIdx, setPhraseIdx] = useState(0)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhraseIdx(prev => (prev + 1) % THINKING_PHRASES.length)
-    }, 2200)
-    return () => clearInterval(interval)
-  }, [])
   return (
     <div className="flex items-start gap-3 px-4 py-3">
       <div className="flex-shrink-0 mt-0.5">
         <MiraSphere size={28} isThinking={true} />
       </div>
       <div className="flex-1">
-        <p className="text-xs font-medium text-primary-500 mb-2 transition-all duration-300">{THINKING_PHRASES[phraseIdx]}</p>
+        <p className="text-xs font-medium text-primary-500 mb-2">Thinking…</p>
         <div className="flex gap-1.5">
           <span className="w-2 h-2 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '0ms' }} />
           <span className="w-2 h-2 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -316,33 +316,53 @@ function CodeBlock({ className, children }) {
 
 // ─── Message Bubble ─────────────────────────────────────────────────
 
-function MessageBubble({ message, onSuggestionClick }) {
-  const [showCopy, setShowCopy] = useState(false)
+function MiraActionPreview({ action, result, messageId, busy }) {
+  const { sendMessage } = useMiraChat()
+  if (!action || ['navigate', 'dismiss'].includes(action.type)) return null
+  if (!result?.resolution?.candidates?.length || result.resolved) return null
+  return <section className="my-3 space-y-2 text-sm" aria-label="Choose a matching person">
+    {result.resolution.candidates.map(person => <button key={person.value} disabled={busy} onClick={() => sendMessage(`Choose ${person.name}${person.code ? ` (${person.code})` : ''}.`, { resolvePerson: { messageId, value: person.value } })}
+      className="w-full rounded-xl border border-default-200 p-3 text-left hover:bg-white/10 disabled:opacity-40">
+      <strong className="block">{person.name}</strong><span className="text-xs text-default-500">{[person.code, person.department].filter(Boolean).join(' · ')}</span>
+    </button>)}
+    {result.resolution.more && <p>More matches exist. Add a surname or department to narrow the search.</p>}
+  </section>
+}
+
+const MessageBubble = memo(function MessageBubble({ message, onSuggestionClick, onEdit, onRetry, onReply, busy }) {
 
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end px-4 py-1.5">
-        <div className="max-w-[85%] bg-primary-500 text-white rounded-2xl rounded-br-md px-4 py-2.5 shadow-sm">
-          <p className="text-sm leading-relaxed">{message.content}</p>
+      <div className="group/msg flex flex-col items-end px-4 py-1.5">
+        <div className="max-w-[85%] bg-white/10 text-neutral-100 rounded-2xl rounded-br-md px-4 py-2.5 shadow-sm">
+          <p className="text-sm leading-relaxed">{miraMessageDisplay(message)}</p>
+        </div>
+        <div className="mt-1 flex gap-1 text-neutral-400 md:opacity-0 md:group-hover/msg:opacity-100 md:group-focus-within/msg:opacity-100">
+          <button aria-label="Edit and resend" title="Edit and resend" disabled={busy} onClick={() => onEdit(message)} className="rounded-md p-1.5 hover:bg-white/10 disabled:opacity-40"><Pencil size={13} /></button>
+          <button aria-label="Retry message" title="Retry" disabled={busy} onClick={() => onRetry(message)} className="rounded-md p-1.5 hover:bg-white/10 disabled:opacity-40"><RotateCcw size={13} /></button>
         </div>
       </div>
     )
   }
 
   const data = message.data || { message: message.content, cards: [], suggestedQuestions: [] }
+  // Keep concrete task results (including saved replies), not generic extra panels.
+  const taskCards = Array.isArray(data.cards) ? data.cards.filter(card =>
+    (card?.type === 'progress' && card.title === 'Your Pending Tasks' && card.data?.items?.length) ||
+    (card?.type === 'list' && card.title === 'Task Breakdown' && card.data?.items?.length)
+  ) : []
+  const visibleCards = data.structured ? sanitizeMiraCards(data.cards) : taskCards
 
   return (
     <div
-      className="flex items-start gap-2.5 px-4 py-1.5 group/msg"
-      onMouseEnter={() => setShowCopy(true)}
-      onMouseLeave={() => setShowCopy(false)}
+      className="flex items-start px-4 py-1.5 group/msg"
     >
-      <div className="flex-shrink-0 mt-1">
-        <MiraSphere size={28} />
+      <div aria-hidden={!message.streaming} className="mira-reply-avatar flex-shrink-0 mt-1" data-active={Boolean(message.streaming)}>
+        <MiraSphere size={28} isThinking={Boolean(message.streaming)} />
       </div>
       <div className="flex-1 min-w-0">
         {/* Message text */}
-        <div className="relative bg-default-50 dark:bg-default-100 rounded-2xl rounded-tl-md px-4 py-2.5 shadow-sm">
+        <div className="relative px-1 py-2.5">
           <div className="text-sm text-default-800 leading-relaxed mira-markdown">
             <ReactMarkdown
               components={{
@@ -376,45 +396,25 @@ function MessageBubble({ message, onSuggestionClick }) {
             </ReactMarkdown>
           </div>
           {/* Report actions */}
-          {showCopy && (
-            <div className="absolute -bottom-2 right-2 flex items-center gap-1">
-              <ExportButton message={data} className="shadow-sm" />
-              <CopyButton text={data.message} className="shadow-sm" />
-            </div>
-          )}
         </div>
 
-        {/* Cards */}
-        {data.cards?.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {data.cards.map((card, i) => (
-              <div key={i} className="bg-content1 rounded-xl p-3 shadow-sm border border-divider">
-                <AICard card={card} />
-              </div>
-            ))}
+        {visibleCards.length > 0 && (
+          <div className="my-3 space-y-3">
+            {visibleCards.map((card, index) => <AICard key={`${card.type}-${index}`} card={card} />)}
           </div>
         )}
-
-        {/* Suggested questions */}
-        {data.suggestedQuestions?.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {data.suggestedQuestions.map((q, i) => (
-              <button
-                key={i}
-                onClick={() => onSuggestionClick(q)}
-                className="text-xs px-3 py-1.5 rounded-full border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        )}
+        {data.image && <MiraGeneratedImage image={data.image} />}
+        <MiraActionPreview action={data.action} result={data.actionResult} messageId={message.id} busy={busy} />
+        <div hidden={message.streaming} className={message.streaming ? 'hidden' : 'mt-1 flex flex-wrap items-center gap-2 text-xs text-default-600 md:opacity-0 md:group-hover/msg:opacity-100 md:group-focus-within/msg:opacity-100'}>
+          <button disabled={busy} onClick={() => onReply(message)} className="hover:underline disabled:opacity-50">Reply</button>
+          <CopyButton text={data.message} />
+          <ExportButton message={data} />
+        </div>
+        {/* Follow-ups live beside the composer, not beneath every reply. */}
       </div>
     </div>
   )
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────
+})
 
 function formatTimeAgo(dateStr) {
   if (!dateStr) return ''
@@ -434,12 +434,48 @@ function formatTimeAgo(dateStr) {
 // ─── Main Sidebar ───────────────────────────────────────────────────
 
 export default function MiraChatSidebar() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const previousPath = useRef(pathname)
   const {
-    isOpen, closeChat, messages, sendMessage, isThinking, clearHistory, tokens,
+    isOpen, openChat, closeChat, messages, sendMessage, isThinking, clearHistory, tokens,
+    viewMode, setViewMode,
     sessions, activeSessionId, showHistory, toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
   } = useMiraChat()
   const { theme, isDarkMode } = useTheme()
   const [input, setInput] = useState('')
+  const [editing, setEditing] = useState(null)
+  const [replying, setReplying] = useState(null)
+  const minimized = viewMode === 'pip'
+  const expanded = viewMode === 'expanded'
+  const sidebarDragEnabled = isOpen && viewMode === 'chat'
+  const sidebarDrag = useMiraSidebarDrag(sidebarDragEnabled)
+  useEffect(() => { if (isOpen) { void prepareMiraLocation(); void prewarmMiraVoice() } }, [isOpen])
+  const latestReply = messages.at(-1)
+  const followUps = latestReply?.role === 'assistant' && Array.isArray(latestReply.data?.suggestedQuestions)
+    ? [...new Set(latestReply.data.suggestedQuestions.filter(q => typeof q === 'string' && q.trim()).map(q => q.trim()))].slice(0, 3) : []
+  useEffect(() => { setEditing(null); setReplying(null) }, [activeSessionId])
+  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, onDismiss: closeChat })
+  const [wakeRequested, setWakeRequested] = useState(false)
+  useEffect(() => {
+    if (isOpen && wakeRequested) { setWakeRequested(false); void voice.start() }
+  }, [isOpen, wakeRequested, voice.start])
+  useEffect(() => {
+    if (previousPath.current !== pathname && isOpen && voice.active) setViewMode('pip')
+    previousPath.current = pathname
+  }, [pathname, isOpen, voice.active, setViewMode])
+  useEffect(() => {
+    const navigate = event => {
+      const path = miraNavigationPath(event.detail?.page)
+      if (!path) return
+      setViewMode('pip')
+      router.push(path)
+    }
+    window.addEventListener('mira:navigate', navigate)
+    return () => window.removeEventListener('mira:navigate', navigate)
+  }, [router, setViewMode])
+  const pip = isOpen && minimized
+  const toggleMicrophone = () => voice.active ? voice.stop() : voice.start()
   const [slashResults, setSlashResults] = useState([])
   const [slashIdx, setSlashIdx] = useState(0)
   const messagesEndRef = useRef(null)
@@ -447,13 +483,16 @@ export default function MiraChatSidebar() {
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isThinking])
+    if (!isOpen || pip || showHistory) return
+    const frame = requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' }))
+    return () => cancelAnimationFrame(frame)
+  }, [messages, isThinking, isOpen, pip, showHistory])
 
   // Focus input when opened
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 300)
+      const timeout = setTimeout(() => inputRef.current?.focus(), 300)
+      return () => clearTimeout(timeout)
     }
   }, [isOpen])
 
@@ -470,14 +509,32 @@ export default function MiraChatSidebar() {
     if (!input.trim() || isThinking) return
     // Check if it's a slash command
     const matched = SLASH_COMMANDS.find(c => input.trim().toLowerCase() === c.cmd)
-    if (matched) {
+    if (editing || replying) {
+      const text = replying ? `Replying to this MIRA response:\n<quoted-response>\n${(replying.data?.message || replying.content).slice(0, 6000)}\n</quoted-response>\n\n${input.trim()}` : input.trim()
+      sendMessage(text, editing ? { replaceFromId: editing.id } : {})
+    } else if (matched) {
       sendMessage(matched.prompt)
     } else {
       sendMessage(input.trim())
     }
     setInput('')
     setSlashResults([])
-  }, [input, isThinking, sendMessage])
+    setEditing(null)
+    setReplying(null)
+  }, [input, isThinking, sendMessage, editing, replying])
+
+  const handleEdit = useCallback((message) => {
+    setEditing(message)
+    setReplying(null)
+  }, [])
+  const handleReply = useCallback((message) => {
+    setReplying(message)
+    setEditing(null)
+    inputRef.current?.focus()
+  }, [])
+  const handleRetry = useCallback((message) => {
+    if (message.role === 'user' && !isThinking) sendMessage(message.content, { replaceFromId: message.id })
+  }, [isThinking, sendMessage])
 
   const handleInputChange = useCallback((val) => {
     setInput(val)
@@ -548,85 +605,106 @@ export default function MiraChatSidebar() {
     "Explain how async/await works",
   ]
 
+  const latestCaptionMessage = messages.at(-1)
+  const showMiraCaption = voice.state === 'speaking' || latestCaptionMessage?.streaming
+  const pipCaption = voice.error || (showMiraCaption
+    ? latestCaptionMessage?.content
+    : voice.transcript || miraMessageDisplay(latestCaptionMessage)) || ''
+  const pipSpeaker = voice.error ? 'Voice issue' : showMiraCaption ? 'MIRA' : voice.transcript ? 'You' : latestCaptionMessage?.role === 'user' ? 'You' : 'MIRA'
+
   return (
     <>
       {/* Backdrop */}
-      {isOpen && (
+      {isOpen && !pip && (
         <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] transition-opacity duration-300 z-[99998]"
+          className="fixed inset-0 bg-black/30 transition-opacity duration-300 z-[99998]"
           onClick={closeChat}
         />
       )}
 
       {/* Floating Sidebar panel - glassmorphism */}
-      <div
-        className={`fixed top-3 left-3 bottom-3 w-[calc(100%-1.5rem)] max-w-[420px] flex flex-col z-[99999] transition-all duration-300 ease-out rounded-2xl overflow-hidden shadow-2xl ${isOpen ? 'translate-x-0 opacity-100 scale-100' : '-translate-x-[110%] opacity-0 scale-95'}`}
+      <VoiceBeam stream={voice.stream} processing={isThinking} active={isOpen && (voice.active || isThinking)} paused={!isOpen || (!voice.active && !isThinking)} theme="dark" colorVariant="mono" strength={0.95}
+        sensitivity={5.4} threshold={0.015} attack={0.12} release={0.42} reach={1.9} idle={0.14}
+        borderRadius={16}
+        role="dialog"
+        aria-label="MIRA assistant"
+        aria-hidden={!isOpen}
+        inert={!isOpen ? true : undefined}
+        className={`mira-workspace fixed flex flex-col z-[99999] duration-300 ease-out rounded-2xl overflow-hidden shadow-2xl ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-[110%] opacity-0 pointer-events-none'}`}
         style={{
+          left: pip ? '24px' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
+          right: undefined,
+          borderRadius: 16,
+          top: pip ? 'auto' : expanded ? 12 : sidebarDrag.position?.y ?? 12,
+          bottom: pip ? '24px' : 'auto',
+          height: pip ? 'auto' : 'calc(100dvh - 24px)',
+          transitionProperty: sidebarDrag.dragging || pip ? 'none' : 'opacity, transform, left, top, width',
+          width: pip ? 'min(340px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode
-            ? `linear-gradient(135deg, rgba(15,20,35,0.82), rgba(10,14,28,0.88))`
+            ? 'rgba(18, 18, 18, 0.72)'
             : `linear-gradient(135deg, rgba(255,255,255,0.78), rgba(250,252,255,0.85))`,
-          backdropFilter: 'blur(24px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          position: 'fixed', display: 'flex', flexDirection: 'column',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
           border: `1px solid ${isDarkMode ? `${theme.primary[500]}30` : `${theme.primary[400]}35`}`,
           boxShadow: isDarkMode
             ? `0 8px 60px -12px ${theme.primary[900]}80, 0 0 0 1px ${theme.primary[700]}15, inset 0 1px 0 ${theme.primary[400]}08`
             : `0 8px 60px -12px ${theme.primary[300]}60, 0 0 0 1px ${theme.primary[200]}40, inset 0 1px 0 rgba(255,255,255,0.6)`,
         }}
       >
-        {/* Header - gradient with theme tint */}
+        {isOpen && (isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active strength={0.95} theme="dark" borderRadius={16} />}
+        {pip && <div className="p-3 text-foreground">
+          <button aria-label="Restore MIRA chat" onClick={() => setViewMode('chat')} className="w-full flex items-center gap-3 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+            <MiraSphere size={28} isThinking={isThinking} />
+            <span className="flex-1 text-xs font-medium">MIRA · {isThinking ? 'Thinking' : voice.state === 'speaking' ? 'Speaking' : voice.active ? 'Listening' : 'Ready'}</span>
+            <span aria-hidden="true" className="text-default-500">↗</span>
+          </button>
+          <div role="status" aria-live="polite" aria-label="MIRA live captions" className="mt-3 max-h-36 overflow-y-auto text-sm leading-relaxed break-words whitespace-pre-wrap">
+            {pipCaption ? <><span className="block text-[11px] text-default-500 mb-1">{pipSpeaker}</span>{pipCaption}</> : <span className="text-default-500">{voice.active ? 'Speak naturally. Your words appear here.' : 'Your conversation captions appear here.'}</span>}
+          </div>
+        </div>}
+        <div className={pip ? 'hidden' : 'contents'}>
+        {/* Compact controls; identity stays in the conversation, not the toolbar. */}
         <div
-          className="flex items-center justify-between px-4 h-[58px] flex-shrink-0"
+          className="flex items-center justify-between px-4 h-[48px] flex-shrink-0"
+          role="toolbar"
+          aria-label="Chat controls"
+          {...sidebarDrag.handlers}
+          tabIndex={sidebarDragEnabled ? 0 : undefined}
+          title={sidebarDragEnabled ? 'Drag to move MIRA. Use arrow keys when focused.' : undefined}
           style={{
-            background: `linear-gradient(135deg, ${theme.primary[600]}, ${theme.primary[500]}, ${theme.primary[700]})`,
+            background: 'transparent',
             borderRadius: '16px 16px 0 0',
+            cursor: sidebarDragEnabled ? sidebarDrag.dragging ? 'grabbing' : 'grab' : undefined,
+            touchAction: sidebarDragEnabled ? 'none' : undefined,
+            userSelect: sidebarDragEnabled ? 'none' : undefined,
           }}
         >
           <div className="flex items-center gap-2.5">
-            {showHistory ? (
-              <button onClick={toggleHistory} className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+            {!showHistory && <button onClick={toggleHistory} title="Chat history" aria-label="Chat history" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10"><FaHistory className="w-3 h-3" /></button>}
+            <button onClick={startNewChat} title="New chat" aria-label="New chat" disabled={isThinking} className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-40"><FaPlus className="w-3 h-3" /></button>
+            {showHistory && <>
+              <button onClick={toggleHistory} aria-label="Back to chat" className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors">
                 <FaChevronLeft className="w-3.5 h-3.5" />
               </button>
-            ) : (
-              <div className="flex items-center justify-center rounded-full bg-white/20 backdrop-blur-sm" style={{ width: 34, height: 34 }}>
-                <MiraSphere size={28} isHovered={true} />
-              </div>
-            )}
             <div>
               <h2 className="text-sm font-bold text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>
-                {showHistory ? 'Chat History' : 'MIRA'}
+                Chat History
               </h2>
               <p className="text-[10px] text-white/60 font-medium">
-                {showHistory ? `${sessions.length} conversation${sessions.length !== 1 ? 's' : ''}` : 'Your AI Assistant'}
+                {`${sessions.length} conversation${sessions.length !== 1 ? 's' : ''}`}
               </p>
             </div>
+            </>}
           </div>
           <div className="flex items-center gap-0.5">
-            {/* Token balance */}
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm mr-1">
-              <svg className="w-3 h-3 text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm.75 4.75a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" /></svg>
-              <span className="text-[11px] font-bold text-white">{tokens.tokensRemaining}</span>
-              <span className="text-[10px] text-white/50">tokens</span>
-            </div>
-            {!showHistory && (
-              <>
-                <button
-                  onClick={toggleHistory}
-                  className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-                  title="Chat history"
-                >
-                  <FaHistory className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() => { startNewChat() }}
-                  className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-                  title="New chat"
-                >
-                  <FaPlus className="w-3 h-3" />
-                </button>
-              </>
-            )}
+            <button onClick={() => setViewMode('pip')} className="p-2 rounded-lg text-white/70 hover:bg-white/10" aria-label="Minimize MIRA to floating voice">−</button>
+            <button onClick={() => setViewMode(expanded ? 'chat' : 'expanded')} className="p-2 rounded-lg text-white/70 hover:bg-white/10" aria-label={expanded ? 'Collapse MIRA sidebar' : 'Expand MIRA workspace'} aria-pressed={expanded}>
+              {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
             <button
               onClick={closeChat}
+              aria-label="Close MIRA"
               className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
             >
               <FaTimes className="w-3.5 h-3.5" />
@@ -703,11 +781,12 @@ export default function MiraChatSidebar() {
           </div>
         ) : (
         /* Messages area */
-        <div className="flex-1 overflow-y-auto py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto py-4">
+          <div className="mx-auto w-full max-w-[1100px]">
           {messages.length === 0 && !isThinking ? (
             <div className="flex flex-col items-center justify-center h-full px-6 text-center">
               <div className="mb-4">
-                <MiraSphere size={64} enableRandomPulse={true} />
+                <MiraSphere size={64} />
               </div>
               <h3 className="text-lg font-bold text-default-800 mb-1">Hi! I&apos;m MIRA</h3>
               <p className="text-sm text-default-500 mb-6">Your all-rounder AI assistant. Ask me anything - code, research, math, writing, or your Talio data.</p>
@@ -730,44 +809,24 @@ export default function MiraChatSidebar() {
           ) : (
             <>
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} onSuggestionClick={handleSuggestionClick} />
+                <MessageBubble key={msg.id} message={msg} onSuggestionClick={handleSuggestionClick} onEdit={handleEdit} onRetry={handleRetry} onReply={handleReply} busy={isThinking} />
               ))}
-              {isThinking && <ThinkingIndicator />}
+              {isThinking && messages.at(-1)?.role !== 'assistant' && <ThinkingIndicator />}
               <div ref={messagesEndRef} />
             </>
           )}
+          </div>
         </div>
         )}
 
-        {/* Input area - frosted bottom bar */}
+        {/* One floating composer, aligned with the conversation above. */}
         {!showHistory && (
         <div
-          className="flex-shrink-0"
-          style={{
-            borderTop: `1px solid ${isDarkMode ? `${theme.primary[500]}15` : `${theme.primary[300]}20`}`,
-            background: isDarkMode ? 'rgba(10,14,28,0.5)' : 'rgba(255,255,255,0.4)',
-          }}
+          className="flex-shrink-0 mx-auto w-full max-w-[1100px] px-4 pb-5 pt-2"
         >
-          {/* Quick Actions - show when no messages */}
-          {messages.length === 0 && !isThinking ? null : (
-            <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-0 overflow-x-auto scrollbar-hide">
-              <FaBolt className="w-2.5 h-2.5 text-default-400 flex-shrink-0" />
-              {QUICK_ACTIONS.map((action, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleQuickAction(action.prompt)}
-                  disabled={isThinking}
-                  className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40"
-                  style={{
-                    borderColor: isDarkMode ? `${theme.primary[500]}25` : `${theme.primary[300]}35`,
-                    color: isDarkMode ? theme.primary[300] : theme.primary[600],
-                    background: isDarkMode ? `${theme.primary[500]}08` : `${theme.primary[50]}60`,
-                  }}
-                >
-                  <action.icon className="w-2.5 h-2.5" />
-                  {action.label}
-                </button>
-              ))}
+          {followUps.length > 0 && !isThinking && (
+            <div aria-label="Suggested follow-ups" className="mb-2 grid gap-1.5 max-h-40 overflow-y-auto">
+              {followUps.map(q => <button key={q} onClick={() => handleSuggestionClick(q)} className="w-full rounded-xl border border-default-200 px-3 py-2 text-left text-xs text-default-600 hover:bg-white/5">{q}</button>)}
             </div>
           )}
 
@@ -802,22 +861,26 @@ export default function MiraChatSidebar() {
             </div>
           )}
 
-          <div className="flex items-end gap-2 p-3">
+          {replying && <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-default-200 px-3 py-2 text-xs text-default-600">
+            <span className="truncate">{`Replying to: ${replying.data?.message || replying.content}`}</span>
+            <button aria-label="Cancel edit or reply" onClick={() => { setEditing(null); setReplying(null) }}><FaTimes /></button>
+          </div>}
+          <div className="flex items-end gap-2 p-2 rounded-2xl border border-default-200 bg-white/5">
             <div className="flex-1 relative">
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isThinking ? 'MIRA is thinking...' : 'Ask anything... or type / for commands'}
+                placeholder={voice.active ? (voice.transcript || (voice.state === 'loading' ? 'Preparing voice…' : voice.state === 'speaking' ? 'MIRA is speaking…' : voice.state === 'thinking' ? 'Thinking…' : 'Listening…')) : 'Ask MIRA…'}
                 disabled={isThinking}
                 rows={1}
-                className="w-full resize-none rounded-xl text-default-800 text-sm px-4 py-3 pr-10 focus:outline-none placeholder:text-default-400 disabled:opacity-50 transition-all"
+                className="block w-full resize-none rounded-xl text-default-800 text-sm px-3 py-2.5 focus:outline-none placeholder:text-default-400 disabled:opacity-50"
                 style={{
                   maxHeight: '120px',
                   minHeight: '44px',
-                  background: isDarkMode ? 'rgba(255,255,255,0.06)' : `${theme.primary[50]}50`,
-                  border: `1px solid ${isDarkMode ? `${theme.primary[500]}20` : `${theme.primary[200]}50`}`,
+                  background: 'transparent',
+                  border: 'none',
                 }}
                 onInput={(e) => {
                   e.target.style.height = 'auto'
@@ -825,21 +888,29 @@ export default function MiraChatSidebar() {
                 }}
               />
             </div>
+            <button onClick={toggleMicrophone} disabled={!voice.active && isThinking} className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-default-100 text-default-800" title={voice.active ? 'Stop voice conversation' : 'Talk in your language. Conversation audio and spoken replies use ElevenLabs.'} aria-label={voice.active ? 'Stop voice conversation' : 'Start voice conversation'} aria-pressed={voice.active}>
+              {voice.active ? <Square size={16} /> : <Mic size={16} />}
+            </button>
             <button
               onClick={handleSend}
+              aria-label="Send message"
               disabled={!input.trim() || isThinking}
               className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:brightness-110"
-              style={{ background: `linear-gradient(135deg, ${theme.primary[500]}, ${theme.primary[600]})` }}
+              style={{ background: '#f5f5f5', color: '#171717' }}
             >
               <FaPaperPlane className="w-3.5 h-3.5" />
             </button>
           </div>
-          <p className="text-[10px] text-default-400 text-center pb-2 px-3">
-            <span className="font-medium">{tokens.tokensRemaining}/{tokens.tokenLimit}</span> tokens remaining · Type <kbd className="px-1 py-0.5 rounded bg-default-200 text-default-500 font-mono text-[9px]">/</kbd> for commands
-          </p>
+          {voice.error && <p className="px-3 text-xs text-danger" role="alert">{voice.error}</p>}
+          <span className="sr-only" role="status">{voice.active ? voice.state : ''}</span>
         </div>
         )}
-      </div>
+        </div>
+        <div className={pip ? 'hidden' : 'flex-shrink-0 px-2 pb-2 empty:hidden'}>
+          <MiraWakeSetup onWake={() => { setWakeRequested(true); if (!isOpen) openChat() }} onStream={() => {}} suspended={voice.active} />
+        </div>
+      </VoiceBeam>
+      {editing && <MiraEditPrompt message={editing} busy={isThinking} onClose={() => setEditing(null)} onSave={(message, text) => { setEditing(null); sendMessage(text, { replaceFromId: message.id }) }} />}
     </>
   )
 }

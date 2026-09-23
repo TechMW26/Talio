@@ -28,6 +28,30 @@ export async function PATCH(request, { params }) {
     const body = await request.json()
     const update = {}
 
+    // Edit/retry replaces the selected user turn and its following replies,
+    // preserving the earlier conversation in the same tenant-owned session.
+    if (body.replaceFromIndex !== undefined) {
+      const index = body.replaceFromIndex
+      if (!Number.isInteger(index) || index < 0 || !Number.isInteger(body.expectedMessageCount) ||
+        !Array.isArray(body.messages) || body.messages.length !== 2 ||
+        body.messages[0]?.role !== 'user' || body.messages[1]?.role !== 'assistant' ||
+        body.messages.some(item => typeof item.content !== 'string' || !item.content.trim())) {
+        return NextResponse.json({ success: false, message: 'Invalid replacement turn' }, { status: 400 })
+      }
+      const session = await models.MiraChatSession.findOne({ _id: id, user: user._id }).lean()
+      if (!session) return NextResponse.json({ success: false, message: 'Session not found' }, { status: 404 })
+      if (session.messages.length !== body.expectedMessageCount || session.messages[index]?.role !== 'user') {
+        return NextResponse.json({ success: false, message: 'Conversation changed. Reload this conversation before retrying.' }, { status: 409 })
+      }
+      const updated = await models.MiraChatSession.findOneAndUpdate(
+        { _id: id, user: user._id, updatedAt: session.updatedAt },
+        { $set: { messages: [...session.messages.slice(0, index), ...body.messages], lastMessageAt: new Date() } },
+        { new: true, runValidators: true }
+      ).lean()
+      if (!updated) return NextResponse.json({ success: false, message: 'Conversation changed. Please try again.' }, { status: 409 })
+      return NextResponse.json({ success: true, session: { _id: updated._id, title: updated.title, lastMessageAt: updated.lastMessageAt } })
+    }
+
     // Rename title
     if (body.title) update.title = body.title.trim()
 

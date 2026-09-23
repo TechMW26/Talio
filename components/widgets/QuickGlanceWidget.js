@@ -2,7 +2,7 @@
 
 import { FaClock, FaSignInAlt, FaSignOutAlt, FaCheckCircle } from 'react-icons/fa'
 import { useMemo, useState, useEffect } from 'react'
-import { Card, CardBody, Chip } from '@heroui/react'
+import styles from './QuickGlanceWidget.module.css'
 
 // Helper to calculate displayed status based on time and settings
 function getDisplayedStatus(todayAttendance, companySettings) {
@@ -133,103 +133,40 @@ export default function QuickGlanceWidget({
     }
   }, [todayAttendance])
 
+  const formatTime = value => value && !Number.isNaN(new Date(value).getTime())
+    ? new Date(value).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+    : '--:--'
+  const tiles = [
+    { label: 'Check In', description: 'Time you started work', value: formatTime(todayAttendance?.checkIn), icon: FaSignInAlt, color: '39, 234, 179' },
+    { label: 'Check Out', description: 'Time you finished work', value: formatTime(todayAttendance?.checkOut), icon: FaSignOutAlt, color: '255, 113, 151' },
+    { label: 'Work Hours', description: 'Total time worked today', value: currentWorkHours, icon: FaClock, color: '167, 184, 210' },
+    { label: 'Status', description: 'Current attendance status', value: displayedStatus.label, icon: FaCheckCircle, color: '104, 174, 255' },
+  ]
+  const timerColor = !isCountingDown ? '167, 184, 210' : remainingTime > 3600 ? '39, 234, 179' : remainingTime > 1800 ? '255, 204, 70' : '255, 113, 131'
+
   return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <FaClock className="w-5 h-5 text-primary-500" />
-          <h3 className="text-base sm:text-lg font-bold text-default-900">Quick Glance</h3>
+    <section className={styles.panel} aria-label="Quick Glance">
+      <div className={styles.header}>
+        <div className={styles.heading}>
+          <span className={styles.clock}><FaClock aria-hidden="true" /></span>
+          <div><h3>Quick Glance</h3><p>Your attendance overview for today</p></div>
         </div>
-        <div className="flex items-center gap-2">
-          <Chip
-            size="sm"
-            variant="flat"
-            color={isCountingDown
-              ? remainingTime > 3600 ? 'success'
-                : remainingTime > 1800 ? 'warning'
-                  : 'danger'
-              : 'default'
-            }
-            startContent={<FaClock className="w-3 h-3" />}
-          >
-            {formatCountdown(remainingTime)}
-          </Chip>
-        </div>
+        <span className={styles.timer} style={{ '--accent': timerColor }} aria-label="Remaining work time">
+          <i aria-hidden="true" />{formatCountdown(remainingTime)}
+        </span>
       </div>
-
-      <div className="grid grid-cols-2 gap-2 flex-1">
-        {/* Check In Time */}
-        <Card className="bg-success-50 dark:bg-success-900/30 border border-success-100 dark:border-transparent">
-          <CardBody className="p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-full bg-success-100 flex items-center justify-center">
-                <FaSignInAlt className="w-3 h-3 text-success-600" />
-              </div>
-              <p className="text-xs font-medium text-default-600">Check In</p>
+      <div className={styles.grid}>
+        {tiles.map(({ label, description, value, icon: Icon, color }) => (
+          <div className={styles.tile} key={label} style={{ '--accent': color }}>
+            {label === 'Work Hours' ? <div className={styles.bars} aria-hidden="true">{[28, 46, 66, 88].map(height => <i key={height} style={{ height: height + '%' }} />)}</div> : label === 'Status' ? <FaCheckCircle className={styles.watermark} aria-hidden="true" /> : <FaClock className={styles.watermark} aria-hidden="true" />}
+            <div className={styles.tileHeading}>
+              <span className={styles.icon}><Icon aria-hidden="true" /></span>
+              <div><h4>{label}</h4><p>{description}</p></div>
             </div>
-            <p className="text-lg font-bold text-default-900">
-              {todayAttendance?.checkIn
-                ? new Date(todayAttendance.checkIn).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              })
-              : '--:--'}
-            </p>
-          </CardBody>
-        </Card>
-
-        {/* Check Out Time */}
-        <Card className="bg-danger-50 dark:bg-danger-900/30 border border-danger-100 dark:border-transparent">
-          <CardBody className="p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-full bg-danger-100 flex items-center justify-center">
-                <FaSignOutAlt className="w-3 h-3 text-danger-600" />
-              </div>
-              <p className="text-xs font-medium text-default-600">Check Out</p>
-            </div>
-            <p className="text-lg font-bold text-default-900">
-              {todayAttendance?.checkOut
-                ? new Date(todayAttendance.checkOut).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                })
-                : '--:--'}
-            </p>
-          </CardBody>
-        </Card>
-
-        {/* Work Hours */}
-        <Card className="bg-primary-50 dark:bg-primary-900/30 border border-primary-100 dark:border-transparent">
-          <CardBody className="p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
-                <FaClock className="w-3 h-3 text-primary-600" />
-              </div>
-              <p className="text-xs font-medium text-default-600">Work Hours</p>
-            </div>
-            <p className="text-lg font-bold text-default-900">
-              {currentWorkHours}
-            </p>
-          </CardBody>
-        </Card>
-
-        {/* Work Status */}
-        <Card className="bg-secondary-50 dark:bg-secondary-900/30 border border-secondary-100 dark:border-transparent">
-          <CardBody className="p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-full bg-secondary-100 flex items-center justify-center">
-                <FaCheckCircle className="w-3 h-3 text-secondary-600" />
-              </div>
-              <p className="text-xs font-medium text-default-600">Status</p>
-            </div>
-            <Chip size="sm" color={displayedStatus.color} variant="flat" className="capitalize">
-              {displayedStatus.label}
-            </Chip>
-          </CardBody>
-        </Card>
+            {label === 'Status' ? <span className={styles.status} data-status={displayedStatus.status}><i aria-hidden="true" />{value}</span> : <p className={styles.value}>{value}</p>}
+          </div>
+        ))}
       </div>
-    </div>
+    </section>
   )
 }

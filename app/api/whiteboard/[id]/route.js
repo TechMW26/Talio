@@ -112,7 +112,16 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { title, name, description, data, thumbnail, isPublic, sharedWith } = body;
+    const { title, name, description, data, thumbnail, isPublic, sharedWith, pages, aiAnalysis, theme, showGrid } = body;
+    if (pages !== undefined) {
+      if (!Array.isArray(pages) || pages.length === 0 || pages.length > 100 || pages.some(page => !page?.id || !Array.isArray(page.objects) || page.objects.length > 10000)) {
+        return NextResponse.json({ error: 'Invalid canvas pages' }, { status: 400 });
+      }
+      whiteboard.pages = pages;
+    }
+    if (aiAnalysis !== undefined) whiteboard.aiAnalysis = aiAnalysis;
+    if (theme !== undefined) whiteboard.theme = theme;
+    if (showGrid !== undefined) whiteboard.showGrid = Boolean(showGrid);
 
     // Update fields if provided
     if (name !== undefined) whiteboard.name = name;

@@ -1,12 +1,14 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import { useState, useEffect, useCallback } from 'react'
 import {
     FaCode, FaServer, FaRobot, FaCloud, FaMobileAlt,
     FaShieldAlt, FaDatabase, FaBriefcase, FaMicrochip,
     FaExternalLinkAlt
 } from 'react-icons/fa'
-import { HiOutlineNewspaper, HiSparkles } from 'react-icons/hi2'
+import { HiOutlineNewspaper } from 'react-icons/hi2'
 import { Button, Skeleton, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
 
 // Category icons and colors matching other widgets
@@ -132,7 +134,7 @@ export default function RoleNewsWidget() {
     // Loading skeleton
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
@@ -152,9 +154,9 @@ export default function RoleNewsWidget() {
     // Error state
     if (error) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base sm:text-lg font-bold text-default-900">Latest News</h3>
+                    <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Latest News</h3>
                 </div>
                 <div className="flex-1 flex items-center justify-center">
                     <div className="flex flex-col items-center text-center">
@@ -178,10 +180,10 @@ export default function RoleNewsWidget() {
     }
 
     return (
-        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-default-900">Latest News</h3>
+                <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Latest News</h3>
                 <Button
                     variant="light"
                     color="primary"
@@ -193,8 +195,8 @@ export default function RoleNewsWidget() {
             </div>
 
             {/* News List */}
-            <div className="flex-1 flex flex-col">
-                <ScrollShadow className="space-y-2 flex-1 max-h-[200px]">
+            <div className="flex-1 min-h-0 flex flex-col">
+                <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                     {news.length === 0 ? (
                         <div className="flex flex-col items-center justify-center text-center py-6">
                             <img
@@ -211,7 +213,7 @@ export default function RoleNewsWidget() {
                             const Icon = config.icon
 
                             return (
-                                <button
+                                <button data-widget-card=""
                                     key={index}
                                     onClick={() => openArticle(item)}
                                     className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors group border border-default-100 hover:bg-default-50 text-left cursor-pointer"
@@ -297,7 +299,6 @@ export default function RoleNewsWidget() {
                                         {articleData.summary && (
                                             <div className="rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 p-4">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <HiSparkles className="w-4 h-4 text-primary-600" />
                                                     <span className="text-xs font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wide">
                                                         AI Summary
                                                     </span>

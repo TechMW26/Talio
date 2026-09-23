@@ -2,6 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Board assistants are independent of the white canvas's light-theme overrides. */
+html:is(:root, .dark, .light) body .mira-board-panel {
+  --ai-surface: rgba(250, 252, 255, .94);
+  --ai-ink: #20252e;
+  --ai-muted: #566273;
+  --ai-tint: rgba(30, 41, 59, .06);
+  --ai-border: rgba(30, 41, 59, .14);
+  color-scheme: light;
+  color: var(--ai-ink) !important;
+  background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(242,245,249,.94)) !important;
+  border: 1px solid var(--ai-border);
+  border-radius: 24px;
+  box-shadow: 0 16px 48px rgba(15,23,42,.16), inset 0 1px 0 white;
+  backdrop-filter: blur(12px);
+}
+html:is(:root, .dark, .light) body .mira-board-panel .mira-board-toolbar {
+  min-height: 60px;
+  background: transparent !important;
+}
+html:is(:root, .dark, .light) body .mira-board-panel .mira-board-toolbar button[aria-label^="Close"] {
+  margin-left: auto;
+}
+html:is(:root, .dark, .light) body .mira-board-panel .mira-board-assistant {
+  background: transparent !important;
+  border: 0;
+}
+html:is(:root, .dark, .light) body .mira-board-panel .mira-board-messages {
+  display: block;
+  background: transparent !important;
+  align-content: start;
+}
+html:is(:root, .dark, .light) body .mira-board-panel .mira-board-messages > div {
+  flex: none;
+  min-height: 0;
+  height: auto;
+}
+html:is(:root, .dark, .light) body .mira-board-panel .mira-board-composer {
+  margin: 8px 16px 16px;
+  padding: 12px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--ai-tint) !important;
+}
+html:is(:root, .dark, .light) body .mira-board-panel :is(input, textarea) {
+  background: var(--ai-tint) !important;
+  color: var(--ai-ink) !important;
+  min-width: 0;
+  border-radius: 16px;
+}
+html:is(:root, .dark, .light) body .mira-board-panel :is(.mira-board-send, button[class*="bg-gradient-to-r"]) {
+  background: var(--ai-ink) !important;
+  background-image: none !important;
+  color: var(--ai-surface) !important;
+  box-shadow: none;
+  min-height: 44px;
+  border-radius: 16px;
+}
+html:is(:root, .dark, .light) body .mira-board-panel .mira-board-user {
+  background: var(--ai-tint) !important;
+  color: var(--ai-ink) !important;
+  border: 1px solid var(--ai-border);
+}
+html:is(:root, .dark, .light) body .mira-board-panel :is(.text-gray-600, .text-gray-700, .text-gray-800, .text-gray-900) {
+  color: var(--ai-ink) !important;
+}
+
+/* Search containers own their surface. Keep the editable element transparent,
+   including legacy text searches and HeroUI slots, in every theme and state.
+   The extra theme specificity beats the legacy forced dark input backgrounds. */
+html:is(:root, .dark, .light) body input:is(
+  [type="search"], [role="searchbox"], .input-search,
+  [placeholder*="search" i], [aria-label*="search" i]
+),
+html:is(:root, .dark, .light) body [data-slot="input-wrapper"] input {
+  background: transparent !important;
+}
+
+/* Wrapped searches already provide their own border and focus-within ring. */
+html:is(:root, .dark, .light) body [data-search-container] input {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+/* Floating AI surfaces share MIRA's glass treatment without changing canvas colors. */
+.ai-glass-panel {
+  --ai-surface: rgba(248, 250, 252, .88);
+  --ai-ink: #18212e;
+  --ai-muted: #566273;
+  --ai-tint: rgba(100, 116, 139, .07);
+  --ai-border: rgba(100, 116, 139, .22);
+  background: var(--ai-surface) !important;
+  color: var(--ai-ink);
+  border: 1px solid var(--ai-border);
+  border-radius: 24px;
+  backdrop-filter: blur(28px) saturate(140%);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255,255,255,.12);
+}
+html.dark .ai-glass-panel {
+  --ai-surface: rgba(20, 22, 25, .86);
+  --ai-ink: #f1f3f5;
+  --ai-muted: #aeb8c6;
+  --ai-tint: rgba(255, 255, 255, .055);
+  --ai-border: rgba(255, 255, 255, .14);
+  color-scheme: dark;
+}
+.ai-glass-panel :is(.bg-white, .bg-gray-50, .bg-gray-100, .bg-content1) { background: var(--ai-tint) !important; }
+.ai-glass-panel :is(.text-gray-600, .text-gray-700, .text-gray-800, .text-gray-900) { color: var(--ai-ink) !important; }
+.ai-glass-panel :is(.text-gray-400, .text-gray-500) { color: var(--ai-muted) !important; }
+.ai-glass-panel :is(.border-gray-100, .border-gray-200, .border-gray-300) { border-color: var(--ai-border) !important; }
+html.dark .ai-glass-panel [class*="bg-gradient-to-"] { background-image: none; background-color: var(--ai-tint); }
+html.dark .ai-glass-panel :is(.bg-violet-50, .bg-blue-50, .bg-emerald-50, .bg-amber-50, .bg-rose-50, .bg-cyan-50, .bg-red-50) { background: var(--ai-tint) !important; }
+html.dark .ai-glass-panel :is(.text-violet-600, .text-violet-700, .text-blue-700, .text-emerald-700, .text-amber-700, .text-rose-700, .text-cyan-700) { color: #c4caff !important; }
+
+/* BotAvatar overscans its canvas beyond the layout box for jumps and spins. */
+.mira-reply-avatar { width: 0; margin-right: 0; opacity: 0; overflow: visible; pointer-events: none; transition: width 400ms ease, margin-right 400ms ease, opacity 250ms ease; }
+.mira-reply-avatar[data-active="true"] { width: 28px; margin-right: 10px; opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .mira-reply-avatar { transition: none; } }
+
+/* Legacy primary actions use text-white; neutral light buttons need dark ink. */
+html.dark .bg-primary-500.text-white,
+html.dark .bg-primary-600.text-white { color:#111111; }
+
 /* ============================================
    FORCED INPUT BORDERS - Light & Dark Mode
    ============================================ */
@@ -200,6 +322,22 @@ html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-20
   animation-delay: var(--widget-enter-delay, 0ms);
 }
 
+/* Avoid costly glass repainting on touch devices and honor motion preferences. */
+@media (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .mira-workspace { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: #121212 !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mira-workspace { transition: none !important; }
+}
+
+/* Give list widgets a definite viewport without stretching individual rows. */
+[data-scrollable-widget="true"] { height: 320px; min-height: 320px; max-height: 320px; overflow: hidden; }
+@media (min-width: 640px) { [data-scrollable-widget="true"] { height: 400px; min-height: 400px; max-height: 400px; } }
+[data-scrollable-widget="true"] > * { min-height: 0; }
+[data-scrollable-widget="true"] [data-widget-list] { max-height: none; min-height: 0; flex: 1 1 0%; }
+[data-scrollable-widget="true"] [data-widget-list] > * { flex-shrink: 0; }
+[data-scrollable-widget="true"] :has(> [data-widget-list]) > :not([data-widget-list]) { flex-shrink: 0; }
+
 .dashboard-route-stage {
   min-height: 100%;
   position: relative;
@@ -209,14 +347,14 @@ html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-20
 .dashboard-route-page {
   min-height: 100%;
   transform-origin: 50% 18%;
-  animation: dashboard-route-enter 460ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  animation: dashboard-route-enter 160ms ease-out both;
   transition: opacity 180ms ease, filter 180ms ease, transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dashboard-route-stage.is-navigating .dashboard-route-page {
-  opacity: 0.62;
-  filter: blur(2.5px) saturate(0.82);
-  transform: perspective(1100px) translate3d(0, 5px, -28px) scale(0.988);
+  opacity: 1;
+  filter: none;
+  transform: none;
 }
 
 .dashboard-route-veil {
@@ -232,7 +370,7 @@ html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-20
 
 .dashboard-route-veil.is-active {
   opacity: 1;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .dashboard-route-grid {
@@ -274,7 +412,7 @@ html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-20
   }
 
   .dashboard-route-stage.is-navigating .dashboard-route-page {
-    opacity: 0.72;
+    opacity: 1;
     filter: none;
     transform: none;
   }
@@ -1317,6 +1455,12 @@ html.dark .prose table th {
 }
 
 /* ---- Header ---- */
+/* Dashboard navigation uses one surface across the header and sidebar. */
+header.talio-navigation-header,
+html.dark header.talio-navigation-header {
+  background-color: var(--color-bg-sidebar, #111111) !important;
+}
+
 html.dark header,
 html.dark header.bg-white {
   background-color: #18181b !important;

@@ -16,7 +16,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, ModalContent, ModalBody } from '@heroui/react'
-import { HiOutlineXMark, HiOutlineSparkles, HiOutlinePhoto } from 'react-icons/hi2'
+import { HiOutlineXMark, HiOutlinePhoto } from 'react-icons/hi2'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 
 function productivityBadge(tile) {
@@ -287,7 +287,6 @@ export default function AnalyzedComposite({ userId, date, refreshSignal = 0 }) {
     <div>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <HiOutlineSparkles className="w-5 h-5 text-green-500" />
           Analyzed Mosaic ({composite.tileCount})
         </h2>
         <div className="text-xs text-gray-500 flex items-center gap-2">

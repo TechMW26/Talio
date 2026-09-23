@@ -31,6 +31,28 @@ describe('whiteboard AI route', () => {
     jest.clearAllMocks();
   });
 
+  test.each([1, 0])('plots atomically and handles concurrent edits (matched %s)', async matchedCount => {
+    const existing = { id: 'mira-other', generationId: 'other', type: 'rect', x: 0, y: 0, width: 100, height: 100 };
+    const whiteboard = {
+      _id: 'board-1', updatedAt: new Date('2026-09-23'), pages: [{ objects: [existing] }],
+      aiAnalysis: { messages: [], agentContent: { generations: [] } },
+      getUserPermission: () => 'owner', markModified: jest.fn(),
+    };
+    const Whiteboard = { findById: jest.fn().mockResolvedValue(whiteboard), updateOne: jest.fn().mockResolvedValue({ matchedCount }) };
+    getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'user-1' }, models: { Whiteboard } });
+    const response = await POST(new Request('http://localhost/api/whiteboard/board-1/analyze', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'plot-from-content', templateType: 'adaptive', preparedContent: { title: 'A plan', sections: [{ id: 's1', title: 'Start', items: ['Begin'] }], diagram: { layout: 'grid', edges: [] } } }),
+    }), { params: Promise.resolve({ id: 'board-1' }) });
+    expect(response.status).toBe(matchedCount ? 200 : 409);
+    expect(Whiteboard.updateOne).toHaveBeenCalledTimes(1);
+    const [filter, update] = Whiteboard.updateOne.mock.calls[0];
+    expect(filter.updatedAt).toEqual(whiteboard.updatedAt);
+    expect(update.$set['pages.0.objects']).toContainEqual(existing);
+    expect(update.$set['pages.0.objects'].length).toBeGreaterThan(1);
+    expect(update.$push).toBeUndefined();
+  });
+
   test('prepares usable content from malformed model JSON without retrying', async () => {
     const whiteboard = {
       pages: [{ id: 'page-1', objects: [] }],

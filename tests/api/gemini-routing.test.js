@@ -1,13 +1,14 @@
-// Tests that lib/gemini.js correctly re-exports from the Pollinations-only
+// Tests that lib/gemini.js correctly re-exports from the DeepSeek text / Pollinations vision
 // aiProviderManager. All consumer imports from @/lib/gemini should work.
 
 const ORIGINAL_ENV = process.env
 
 function clearAIKeys(env) {
     delete env.POLLINATIONS_API_KEY
+    delete env.DEEPSEEK_API_KEY
 }
 
-describe('lib/gemini.js shim (Pollinations-only)', () => {
+describe('lib/gemini.js shim (DeepSeek text / Pollinations vision)', () => {
     beforeEach(() => {
         jest.resetModules()
         process.env = { ...ORIGINAL_ENV }
@@ -23,8 +24,8 @@ describe('lib/gemini.js shim (Pollinations-only)', () => {
         jest.restoreAllMocks()
     })
 
-    test('generateContent from lib/gemini calls Pollinations', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
+    test('generateContent from lib/gemini calls DeepSeek', async () => {
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -38,11 +39,11 @@ describe('lib/gemini.js shim (Pollinations-only)', () => {
 
         expect(result).toBe('shim works')
         expect(global.fetch).toHaveBeenCalledTimes(1)
-        expect(global.fetch.mock.calls[0][0]).toContain('gen.pollinations.ai/v1/chat/completions')
+        expect(global.fetch.mock.calls[0][0]).toContain('api.deepseek.com/chat/completions')
     })
 
     test('generateVisionContent from lib/gemini sends inline images', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
         const imgB64 = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>').toString('base64')
 
         global.fetch.mockResolvedValueOnce({
@@ -63,7 +64,7 @@ describe('lib/gemini.js shim (Pollinations-only)', () => {
     })
 
     test('generateStitchedVisionContent from lib/gemini accepts buffer payload', async () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
 
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -82,17 +83,17 @@ describe('lib/gemini.js shim (Pollinations-only)', () => {
     })
 
     test('getAIAvailability reports Pollinations status via lib/gemini', () => {
-        process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
+        process.env.DEEPSEEK_API_KEY = process.env.POLLINATIONS_API_KEY = 'sk_shim-testkey'
 
         const { getAIAvailability } = require('@/lib/gemini')
         const avail = getAIAvailability()
 
         expect(avail.anyAvailable).toBe(true)
-        expect(avail.provider).toBe('pollinations')
+        expect(avail.provider).toBe('deepseek')
     })
 
     test('throws when no Pollinations key configured via lib/gemini', async () => {
         const { generateContent } = require('@/lib/gemini')
-        await expect(generateContent('hi')).rejects.toThrow('Pollinations is not configured')
+        await expect(generateContent('hi')).rejects.toThrow('DeepSeek is not configured')
     })
 })

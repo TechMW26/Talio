@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Card, CardBody, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Progress, Spinner, Select, SelectItem } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -139,6 +139,20 @@ export default function MyTasksPage() {
   const [rejectRemark, setRejectRemark] = useState('')
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
+  const searchParams = useSearchParams()
+  const linkedTaskId = searchParams.get('task')
+  const openedTaskLink = useRef(null)
+  const { data: linkedTask, error: linkedTaskError } = useAuthedSWR(
+    linkedTaskId && /^[a-f\d]{24}$/i.test(linkedTaskId) ? `/api/tasks/${linkedTaskId}` : null,
+    { refreshInterval: 0 }
+  )
+  useEffect(() => {
+    if (!linkedTaskId) { openedTaskLink.current = null; return }
+    if (openedTaskLink.current === linkedTaskId) return
+    if (linkedTask?.success && linkedTask.data && String(linkedTask.data._id) === linkedTaskId) {
+      setSelectedTask(linkedTask.data); openedTaskLink.current = linkedTaskId
+    } else if (linkedTaskError) { toast.error('This task is unavailable or you no longer have access.'); openedTaskLink.current = linkedTaskId }
+  }, [linkedTaskId, linkedTask, linkedTaskError])
   const [showEtaModal, setShowEtaModal] = useState(false)
   const [taskForEta, setTaskForEta] = useState(null)
   const [eta, setEta] = useState({ days: '', hours: '' })

@@ -9,7 +9,8 @@ describe('asset assignment notifications', () => {
     jest.clearAllMocks()
     models = {
       Employee: { findById: jest.fn(() => ({ select: () => ({ lean: async () => ({ userId: 'user' }) }) })) },
-      User: {}, Notification: {},
+      Team: { find: jest.fn(() => ({ select: () => ({ lean: async () => [{ teamLeaders: ['lead'] }] }) })) },
+      User: { find: jest.fn(() => ({ select: () => ({ lean: async () => [{ _id: 'user', employeeId: 'employee' }] }) })) }, Notification: {},
     }
   })
   test('notifies on initial assignment with tenant models', async () => {
@@ -25,5 +26,15 @@ describe('asset assignment notifications', () => {
   test('notifies a new assignee', async () => {
     await notifyAssetAssignment({ models, asset, previousAssignee: 'old-employee' })
     expect(sendPushToUser).toHaveBeenCalledTimes(1)
+  })
+  test('targets only privileged users, the assignee and their heads', async () => {
+    models.Employee.findById.mockReturnValue({ select: () => ({ lean: async () => ({ userId: 'user', department: 'dept', assignedTeamLead: 'lead' }) }) })
+    models.Department = { findById: jest.fn(() => ({ select: () => ({ lean: async () => ({ head: 'head', heads: ['head', 'head2'] }) }) })) }
+    await notifyAssetAssignment({ models, asset })
+    expect(models.User.find).toHaveBeenCalledWith({ isActive: { $ne: false }, $or: [
+      { role: { $in: ['admin', 'hr'] } },
+      { employeeId: { $in: ['employee', 'lead', 'head', 'head2'] } },
+      { _id: 'user' },
+    ] })
   })
 })

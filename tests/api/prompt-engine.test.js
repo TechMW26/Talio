@@ -5,7 +5,7 @@ describe('prompt engine', () => {
         jest.resetModules()
         process.env = {
             ...ORIGINAL_ENV,
-            POLLINATIONS_API_KEY: 'sk_prompt-test-key-ok',
+            DEEPSEEK_API_KEY: 'sk_prompt-test-key-ok',
         }
 
         global.fetch = jest.fn().mockResolvedValue({

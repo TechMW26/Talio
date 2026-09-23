@@ -1,5 +1,7 @@
 'use client'
 
+import widgetStyles from './WidgetDesign.module.css'
+
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { FaCalendarAlt } from 'react-icons/fa'
 import { Card, CardBody, Progress, Skeleton, ScrollShadow } from '@heroui/react'
@@ -21,11 +23,11 @@ export default function LeaveBalanceWidget({ employeeId, initialData }) {
 
     if (isLoading) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
-                        <Card key={i} className="bg-transparent">
+                        <Card data-widget-card="" key={i} className="bg-transparent">
                             <CardBody className="p-3 space-y-2">
                                 <Skeleton className="h-4 w-1/2 rounded-lg" />
                                 <Skeleton className="h-2 w-full rounded-full" />
@@ -40,9 +42,9 @@ export default function LeaveBalanceWidget({ employeeId, initialData }) {
 
     if (error) {
         return (
-            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+            <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
                 <div className="mb-4">
-                    <h3 className="text-base sm:text-lg font-bold text-default-900">Leave Balance</h3>
+                    <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Leave Balance</h3>
                 </div>
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="w-12 h-12 rounded-full bg-danger-100 flex items-center justify-center mb-3">
@@ -57,12 +59,12 @@ export default function LeaveBalanceWidget({ employeeId, initialData }) {
     }
 
     return (
-        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             <div className="mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-default-900">Leave Balance</h3>
+                <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Leave Balance</h3>
             </div>
 
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 min-h-0 flex flex-col">
                 {balances.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-6 flex-1">
                         <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
@@ -71,11 +73,11 @@ export default function LeaveBalanceWidget({ employeeId, initialData }) {
                         <p className="text-sm text-default-500">No leave balance data</p>
                     </div>
                 ) : (
-                    <ScrollShadow className="space-y-2 flex-1 max-h-[200px]">
+                    <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                         {balances.map((balance, index) => {
                             const usedPercentage = Math.min(100, ((balance.used || 0) / (balance.total || 1)) * 100)
                             return (
-                                <Card
+                                <Card data-widget-card=""
                                     key={balance._id || index}
                                     className="border border-default-100"
                                 >

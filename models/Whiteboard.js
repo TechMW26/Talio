@@ -92,16 +92,19 @@ const AIMessageSchema = new mongoose.Schema({
 // Agent Generation Schema (for sidebar persistence with history support)
 const AgentGenerationSchema = new mongoose.Schema({
   id: { type: String, required: true }, // Unique ID for this generation
-  templateType: { type: String, enum: ['mindmap', 'flowchart', 'planning', 'ideas'] },
+  templateType: { type: String, enum: ['adaptive', 'mindmap', 'flowchart', 'planning', 'ideas', 'eventcircuit'] },
   title: { type: String },
   description: { type: String },
   sections: [{
+    id: String,
+    type: String,
     title: { type: String },
     summary: { type: String },
     items: [{ type: String }],
     color: { type: mongoose.Schema.Types.Mixed } // {fill, stroke, text, border, bg}
   }],
   conclusion: { type: String },
+  diagram: mongoose.Schema.Types.Mixed,
   userPrompt: { type: String },
   isPlotted: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },

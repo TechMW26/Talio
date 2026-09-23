@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Button, Select, SelectItem } from '@heroui/react'
 import { FaTimes, FaPlus, FaProjectDiagram } from 'react-icons/fa'
-import { HiOutlineSparkles } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import ModalPortal from '@/components/ui/ModalPortal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -305,8 +304,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
                     }}
                     isDisabled={generatingDescription || !taskForm.title.trim()}
                     isLoading={generatingDescription}
-                    startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
-                    className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                    className="ml-2 bg-default-100 text-foreground border border-default-200"
                   >
                     {generatingDescription ? 'Writing...' : 'AI Write'}
                   </Button>

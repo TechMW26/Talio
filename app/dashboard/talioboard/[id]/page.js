@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useParams } from 'next/navigation';
 import WhiteboardCanvas from '@/components/whiteboard/WhiteboardCanvas';
 import { Skeleton } from '@heroui/react';
@@ -8,6 +9,10 @@ import { FiArrowLeft, FiShare2, FiX, FiUsers, FiMaximize, FiMinimize } from 'rea
 import ModalPortal from '@/components/ui/ModalPortal';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
+
+function editorPortal(content) {
+  return typeof document === 'undefined' ? null : createPortal(content, document.body);
+}
 
 export default function WhiteboardEditorPage() {
   const router = useRouter();
@@ -18,12 +23,13 @@ export default function WhiteboardEditorPage() {
 
   // SWR data fetching for board
   const { data: boardRes, error: boardError, isLoading: boardSWRLoading, mutate: refreshBoard } = useAuthedSWR(
-    boardId ? `/api/whiteboard/${boardId}` : null
+    boardId ? `/api/whiteboard/${boardId}` : null,
+    { revalidateOnFocus: false, revalidateOnReconnect: false, refreshInterval: 0 }
   );
 
   const board = boardRes?.whiteboard || null;
   const permission = boardRes?.permission || 'view_only';
-  const loading = boardSWRLoading;
+  const loading = boardSWRLoading && !board;
   const error = boardError?.message || null;
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareEmail, setShareEmail] = useState('');
@@ -44,8 +50,6 @@ export default function WhiteboardEditorPage() {
     }
   }, [board]);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
-  const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Safe array length check helper
@@ -55,9 +59,8 @@ export default function WhiteboardEditorPage() {
   const enterFullscreen = useCallback(async () => {
     try {
       if (containerRef.current && !document.fullscreenElement) {
-        await containerRef.current.requestFullscreen();
+        await document.documentElement.requestFullscreen();
         setIsFullscreen(true);
-        setHasEnteredFullscreen(true);
       }
     } catch (err) {
       console.log('Fullscreen not supported or denied');
@@ -81,60 +84,15 @@ export default function WhiteboardEditorPage() {
       const isNowFullscreen = !!document.fullscreenElement;
       setIsFullscreen(isNowFullscreen);
 
-      // If user exits fullscreen (ESC key or other), re-enter fullscreen on next interaction
-      // Don't navigate back - just allow re-entry on user action
-      if (!isNowFullscreen && hasEnteredFullscreen && !isFilePickerOpen) {
-        // Don't navigate away - we'll re-enter fullscreen on next user interaction
-        // This prevents confusion and allows imports to work properly
-      }
-
-      // Re-enter fullscreen after file picker closes
-      if (!isNowFullscreen && isFilePickerOpen) {
-        // Wait a bit for file picker to fully close, then re-enter fullscreen
-        setTimeout(() => {
-          setIsFilePickerOpen(false);
-          if (hasEnteredFullscreen) {
-            enterFullscreen();
-          }
-        }, 500);
-      }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    handleFullscreenChange();
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [hasEnteredFullscreen, router, isFilePickerOpen, enterFullscreen]);
+  }, []);
 
-  // Re-enter fullscreen on any user interaction when not in fullscreen
-  useEffect(() => {
-    const handleUserInteraction = () => {
-      if (hasEnteredFullscreen && !document.fullscreenElement && !isFilePickerOpen) {
-        enterFullscreen();
-      }
-    };
-
-    // Listen for various user interactions
-    const events = ['mousedown', 'touchstart', 'keydown'];
-    events.forEach(event => {
-      document.addEventListener(event, handleUserInteraction, { once: true });
-    });
-
-    return () => {
-      events.forEach(event => {
-        document.removeEventListener(event, handleUserInteraction);
-      });
-    };
-  }, [hasEnteredFullscreen, isFilePickerOpen, enterFullscreen, isFullscreen]);
-
-  // Auto-enter fullscreen when board loads
-  useEffect(() => {
-    if (board && !loading && !hasEnteredFullscreen) {
-      // Small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
-        enterFullscreen();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [board, loading, hasEnteredFullscreen, enterFullscreen]);
+  // The editor always fills the app viewport. Browser fullscreen is opt-in:
+  // browsers require user activation, and Escape must not trigger re-entry.
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -182,10 +140,11 @@ export default function WhiteboardEditorPage() {
 
       if (!res.ok) {
         const result = await res.json();
-        console.error('Save failed:', result.error);
+        throw new Error(result.error || 'Unable to save board');
       }
     } catch (err) {
       console.error('Error saving:', err);
+      throw err;
     }
   }, [boardId]);
 
@@ -273,7 +232,7 @@ export default function WhiteboardEditorPage() {
       });
 
       if (res.ok) {
-        setBoard(prev => ({ ...prev, title: newTitle.trim() }));
+        await refreshBoard(current => ({ ...current, whiteboard: { ...current.whiteboard, title: newTitle.trim() } }), { revalidate: false });
         setShowRenameModal(false);
       }
     } catch (err) {
@@ -286,9 +245,8 @@ export default function WhiteboardEditorPage() {
     // Force save before closing
     if (canvasRef.current?.isDirty) {
       setIsSaving(true);
-      canvasRef.current.forceSave();
-      // Wait a brief moment for save to complete
-      await new Promise(resolve => setTimeout(resolve, 300));
+      try { await canvasRef.current.forceSave(); }
+      catch { setIsSaving(false); return; }
       setIsSaving(false);
     }
 
@@ -326,31 +284,29 @@ export default function WhiteboardEditorPage() {
   };
 
   if (loading) {
-    return (
-      <div className="h-screen flex flex-col bg-gray-50 whiteboard-light-override">
+    return editorPortal(
+      <div className="fixed inset-0 z-[80] h-[100dvh] flex flex-col bg-gray-50 whiteboard-light-override">
         <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
-          <Skeleton className="w-8 h-8 rounded-lg" />
-          <Skeleton className="h-6 w-48 rounded-lg" />
-          <div className="flex-1" />
-          <Skeleton className="w-20 h-8 rounded-lg" />
-        </div>
-        <div className="flex-1">
-          <Skeleton className="w-full h-full" />
+          <button onClick={handleClose} className="p-2 text-gray-700" aria-label="Back to boards"><FiArrowLeft size={20} /></button>
+          <span role="status" className="text-gray-700">Opening board…</span>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return <DataErrorState error={{ message: error }} onRetry={() => refreshBoard()} />;
+  if (error && !board) {
+    return editorPortal(<div className="fixed inset-0 z-[80] bg-gray-50 whiteboard-light-override p-6">
+      <button onClick={handleClose} className="p-2 text-gray-700">Back to boards</button>
+      <DataErrorState message={error} onRetry={() => refreshBoard()} />
+    </div>);
   }
 
   if (!board) {
     return null;
   }
 
-  return (
-    <div ref={containerRef} className="h-screen flex flex-col bg-gray-50 whiteboard-light-override">
+  return editorPortal(
+    <div ref={containerRef} data-testid="board-fullscreen-editor" className="fixed inset-0 z-[80] h-[100dvh] flex flex-col bg-gray-50 whiteboard-light-override">
       {/* Saving overlay */}
       <ModalPortal isOpen={isSaving}>
         <div className="modal-overlay whiteboard-light-override">
@@ -409,7 +365,7 @@ export default function WhiteboardEditorPage() {
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <WhiteboardCanvas
           ref={canvasRef}
           boardId={boardId}
@@ -417,7 +373,6 @@ export default function WhiteboardEditorPage() {
           onSave={handleSave}
           permission={permission}
           theme={board.theme}
-          onFilePickerOpen={() => setIsFilePickerOpen(true)}
         />
       </div>
 

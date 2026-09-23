@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Select, SelectItem, Button, Skeleton } from '@heroui/react'
-import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaPalette, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch } from 'react-icons/fa'
+import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
@@ -142,11 +142,6 @@ export default function SettingsPage() {
       )
     }
 
-    // All users get personalization
-    baseTabs.push(
-      { id: 'personalization', name: 'Appearance', description: 'Theme and personal display preferences', group: 'Personal', icon: FaPalette }
-    )
-
     return baseTabs
   }, [userRole, isDepartmentHead, isFeatureEnabled])
 
@@ -184,7 +179,7 @@ export default function SettingsPage() {
     } else if (userRole === 'department_head' || isDepartmentHead) {
       setActiveTab('notifications')
     } else {
-      setActiveTab('personalization')
+      setActiveTab(tabs[0]?.id || null)
     }
   }, [userRole, isDepartmentHead, tabs])
 
@@ -290,13 +285,13 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => selectTab(tab.id)}
                         aria-current={selected ? 'page' : undefined}
-                        className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${selected ? 'bg-primary-500 text-white' : 'text-foreground hover:bg-default-100'}`}
+                        className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${selected ? 'bg-primary-500 text-primary-foreground' : 'text-foreground hover:bg-default-100'}`}
                       >
                         <span className="flex items-start gap-3">
-                          <Icon className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'text-white' : 'text-primary-500'}`} />
+                          <Icon className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'text-primary-foreground' : 'text-primary-500'}`} />
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold">{tab.name}</span>
-                            <span className={`mt-0.5 block text-xs leading-4 ${selected ? 'text-white/75' : 'text-default-500'}`}>{tab.description}</span>
+                            <span className={`mt-0.5 block text-xs leading-4 ${selected ? 'text-primary-foreground opacity-80' : 'text-default-500'}`}>{tab.description}</span>
                           </span>
                         </span>
                       </button>
@@ -327,7 +322,6 @@ export default function SettingsPage() {
           {activeTab === 'attendance-machines' && <AttendanceMachinesSettings />}
           {activeTab === 'payroll' && <PayrollSettingsTab />}
           {activeTab === 'notifications' && <NotificationsTab />}
-          {activeTab === 'personalization' && <PersonalizationTab />}
         </section>
       </div>
     </div>
@@ -2452,226 +2446,6 @@ function GeneralTab() {
 
         <div className="flex justify-end pt-2">
           <Button color="primary" size="sm" className="w-full sm:w-auto">Save Changes</Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PersonalizationTab() {
-  const { currentTheme, changeTheme, themes, isDarkMode, darkModePref, setDarkModePreference } = useTheme()
-
-  const themeColors = {
-    default: {
-      primary: '#3B82F6',
-      secondary: '#2563EB',
-      border: '#3B82F6',
-      bgLight: '#EFF6FF',
-    },
-    purple: {
-      primary: '#A855F7',
-      secondary: '#9333EA',
-      border: '#A855F7',
-      bgLight: '#FAF5FF',
-    },
-    green: {
-      primary: '#22C55E',
-      secondary: '#16A34A',
-      border: '#22C55E',
-      bgLight: '#F0FDF4',
-    },
-    orange: {
-      primary: '#F97316',
-      secondary: '#EA580C',
-      border: '#F97316',
-      bgLight: '#FFF7ED',
-    },
-    teal: {
-      primary: '#14B8A6',
-      secondary: '#0D9488',
-      border: '#14B8A6',
-      bgLight: '#F0FDFA',
-    },
-  }
-
-  return (
-    <div>
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-        <FaPalette style={{ color: 'var(--color-primary-500)' }} />
-        <span>Personalization</span>
-      </h2>
-      <p className="text-gray-600 mb-6">Customize the look and feel of your dashboard</p>
-
-      {/* Appearance Mode Selector */}
-      <div className="rounded-xl border p-5 mb-6" style={{
-        backgroundColor: 'var(--color-bg-card)',
-        borderColor: isDarkMode ? '#27272a' : '#E5E7EB'
-      }}>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{
-                backgroundColor: isDarkMode ? '#27272a' : '#F1F5F9',
-                color: isDarkMode ? '#F59E0B' : '#F59E0B',
-              }}
-            >
-              {darkModePref === 'auto' ? <FaDesktop className="text-lg" /> : isDarkMode ? <FaMoon className="text-lg" /> : <FaSun className="text-lg" />}
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold" style={{ color: isDarkMode ? '#F1F5F9' : '#111827' }}>Appearance</h3>
-              <p className="text-sm text-gray-500">
-                {darkModePref === 'auto'
-                  ? 'Automatically matches your device settings'
-                  : isDarkMode
-                    ? 'Dark mode is always on'
-                    : 'Light mode is always on'}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 p-1 rounded-xl" style={{ backgroundColor: isDarkMode ? '#09090b' : '#F1F5F9' }}>
-            {[
-              { key: 'auto', label: 'Auto', icon: <FaDesktop className="text-sm" /> },
-              { key: 'light', label: 'Light', icon: <FaSun className="text-sm" /> },
-              { key: 'dark', label: 'Dark', icon: <FaMoon className="text-sm" /> },
-            ].map((opt) => (
-              <button
-                key={opt.key}
-                onClick={() => {
-                  setDarkModePreference(opt.key)
-                  const msgs = { auto: 'Following device settings', light: 'Switched to Light Mode!', dark: 'Switched to Dark Mode!' }
-                  toast.success(msgs[opt.key], { duration: 2000 })
-                }}
-                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${darkModePref === opt.key ? 'shadow-md' : ''}`}
-                style={{
-                  backgroundColor: darkModePref === opt.key ? (isDarkMode ? '#27272a' : '#FFFFFF') : 'transparent',
-                  color: darkModePref === opt.key ? (isDarkMode ? '#F1F5F9' : '#111827') : (isDarkMode ? '#94A3B8' : '#6B7280'),
-                }}
-              >
-                {opt.icon}
-                <span>{opt.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg" style={{ backgroundColor: 'var(--color-bg-card)' }}>
-        <h3 className="text-lg font-semibold mb-4" style={{ color: isDarkMode ? '#F1F5F9' : '#111827' }}>Choose Your Theme</h3>
-        <p className="text-sm text-gray-600 mb-6">Select a color theme that suits your preference. The theme will be applied across the entire application.</p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Object.keys(themes).map((themeKey) => {
-            const theme = themes[themeKey]
-            const colors = themeColors[themeKey]
-            const isActive = currentTheme === themeKey
-
-            return (
-              <button
-                key={themeKey}
-                onClick={() => {
-                  changeTheme(themeKey)
-                  toast.success(`Theme changed to ${theme.name}!`, {
-                    icon: '🎨',
-                    duration: 2000,
-                  })
-                }}
-                className="relative p-6 rounded-xl border-2 transition-all hover:shadow-lg"
-                style={{
-                  borderColor: isActive ? colors.border : (isDarkMode ? '#27272a' : '#E5E7EB'),
-                  backgroundColor: isActive ? (isDarkMode ? '#27272a' : colors.bgLight) : (isDarkMode ? '#18181b' : '#FFFFFF'),
-                }}
-              >
-                {/* Active Indicator */}
-                {isActive && (
-                  <div className="absolute top-3 right-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center shadow-md"
-                      style={{
-                        background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`
-                      }}
-                    >
-                      <FaCheck className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Theme Preview */}
-                <div className="flex items-center gap-4 mb-4">
-                  <div
-                    className="w-14 h-14 rounded-lg shadow-md flex-shrink-0"
-                    style={{
-                      background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`
-                    }}
-                  ></div>
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <div
-                      className="h-3 rounded-full"
-                      style={{
-                        background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
-                        width: '100%'
-                      }}
-                    ></div>
-                    <div
-                      className="h-3 rounded-full"
-                      style={{
-                        background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
-                        opacity: 0.6,
-                        width: '75%'
-                      }}
-                    ></div>
-                    <div
-                      className="h-3 rounded-full"
-                      style={{
-                        background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
-                        opacity: 0.3,
-                        width: '50%'
-                      }}
-                    ></div>
-                  </div>
-                </div>
-
-                {/* Theme Name */}
-                <div className="text-left">
-                  <h4 className={`font-bold text-lg mb-1 ${isActive ? 'text-gray-900' : 'text-gray-800'}`}>
-                    {theme.name}
-                  </h4>
-                  <p className="text-sm text-gray-600">
-                    {isActive ? 'Currently Active' : 'Click to apply'}
-                  </p>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-
-        <div
-          className="mt-8 p-4 border rounded-lg"
-          style={{
-            backgroundColor: 'var(--color-primary-50)',
-            borderColor: 'var(--color-primary-200)'
-          }}
-        >
-          <div className="flex items-start gap-3">
-            <FaPalette
-              className="w-5 h-5 mt-0.5 flex-shrink-0"
-              style={{ color: 'var(--color-primary-500)' }}
-            />
-            <div>
-              <h4
-                className="font-semibold mb-1"
-                style={{ color: 'var(--color-primary-900)' }}
-              >
-                Theme Preview
-              </h4>
-              <p
-                className="text-sm"
-                style={{ color: 'var(--color-primary-700)' }}
-              >
-                Your selected theme will be applied immediately across all pages. The theme preference is saved in your browser and will persist across sessions.
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

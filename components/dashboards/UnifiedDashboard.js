@@ -8,7 +8,7 @@ import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import { getRoleDisplayLabel } from '@/hooks/useRoles'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import { CustomizableDashboard } from '@/components/dashboard'
-import CallAlertButton from '@/components/CallAlertButton'
+import AttendanceHeaderSummary from '@/components/widgets/AttendanceHeaderSummary'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import { getTodayDateString } from '@/lib/timezone'
 import useLocationCapture, { getAttendanceLocationOptions } from '@/hooks/useLocationCapture'
@@ -19,7 +19,6 @@ import {
 } from 'react-icons/fa'
 import {
     CheckInOutWidget,
-    QuickGlanceWidget,
     KPIStatsWidget,
     LeaveRequestsWidget,
     DepartmentChartWidget,
@@ -794,18 +793,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             )
         }
 
-        // Quick Glance Widget
-        if (featurePermissions.quickGlance) {
-            components['quick-glance'] = (
-                <QuickGlanceWidget
-                    todayAttendance={todayAttendance}
-                    remainingTime={remainingTime}
-                    isCountingDown={isCountingDown}
-                    formatCountdown={formatCountdown}
-                    companySettings={companySettings}
-                />
-            )
-        }
+        // Punch times live beside their actions; work hours live in the header.
 
         // === MANAGEMENT WIDGETS (Admin, HR, Manager, Dept Head) ===
 
@@ -1109,19 +1097,13 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     return (
         <div className="page-container">
-            {/* Call Alert Button - Fixed position for easy access (management roles only) */}
-            {isManagementRole(userRole) && (
-                <div className="fixed bottom-6 right-6 z-40">
-                    <CallAlertButton user={user} />
-                </div>
-            )}
-
             {/* Dashboard Content */}
             <CustomizableDashboard
                 userId={user?._id || user?.userId || 'user'}
                 userRole={userRole}
                 displayName={user?.firstName || employeeData?.firstName || ''}
                 widgetComponents={widgetComponents}
+                attendanceSummary={featurePermissions.quickGlance && <AttendanceHeaderSummary todayAttendance={todayAttendance} remainingTime={remainingTime} isCountingDown={isCountingDown} formatCountdown={formatCountdown} />}
             />
         </div>
     )

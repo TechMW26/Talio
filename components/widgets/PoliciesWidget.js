@@ -1,4 +1,6 @@
 'use client'
+
+import widgetStyles from './WidgetDesign.module.css'
 import { useState, useEffect } from 'react'
 import { FaFileContract } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
@@ -37,7 +39,7 @@ export default function PoliciesWidget({ initialData }) {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+      <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
         <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
@@ -52,9 +54,9 @@ export default function PoliciesWidget({ initialData }) {
   }
 
   return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-default-900">Policies</h3>
+        <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>Policies</h3>
         <Button
           variant="light"
           color="primary"
@@ -74,9 +76,9 @@ export default function PoliciesWidget({ initialData }) {
           <p className="text-sm text-default-500">No policies found</p>
         </div>
       ) : (
-        <ScrollShadow className="space-y-2 max-h-[200px]">
+        <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
           {policies.slice(0, 5).map(policy => (
-            <Card
+            <Card data-widget-card=""
               key={policy._id}
               isPressable
               onPress={() => router.push('/dashboard/policies')}
