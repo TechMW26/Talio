@@ -39,6 +39,14 @@ test('locked desktop never begins or captures screenshots', async () => {
   expect(deps.runControl).not.toHaveBeenCalled()
   expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
 })
+test.each(['cmd.exe', 'pwsh.exe', 'WindowsTerminal.exe', 'regedit.exe', '1Password', 'Bitwarden'])('protected application %s refuses generated input', async app => {
+  const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, app })) })
+  const start = await call({ operation: 'begin', goal: 'Desktop task' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'key', key: 'enter' } })
+  expect(result.success).toBe(false)
+  expect(deps.runControl.mock.calls.every(([action]) => action.type === 'status')).toBe(true)
+})
 test.each(['win32', 'linux'])('desktop consent is required and available on %s', async platform => {
   const store = { get: jest.fn(() => false), set: jest.fn() }
   const permissions = createMiraPermissions({ platform, store, dialog: { showMessageBox: async () => ({ response: 1 }) } })

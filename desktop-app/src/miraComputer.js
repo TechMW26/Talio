@@ -96,7 +96,7 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
       if (!action || !observation || observation.id !== input.observationId || Date.now() - observation.time > 45000 || active.steps >= 24) throw new Error('The screen changed or this task reached its step limit. Please try again.');
       const foreground = await control({ type: 'status' });
       if (!foreground.success || isLocked() || session !== active || foreground.pid !== observation.pid) throw new Error('The active application changed. Desktop task paused to avoid acting in the wrong window.');
-      if (/terminal|iterm|powershell|command prompt|system settings|keychain|passwords/i.test(foreground.app || '') && action.type !== 'open_app') throw new Error('This application requires manual control. Desktop task stopped.');
+      if (/terminal|iterm|powershell|command prompt|^(cmd|pwsh|regedit|mmc)(\.exe)?$|system settings|keychain|password|keepass|lastpass|bitwarden/i.test(foreground.app || '') && action.type !== 'open_app') throw new Error('This application requires manual control. Desktop task stopped.');
       active.observation = null;
       active.steps++;
       if (action.type === 'click') {
