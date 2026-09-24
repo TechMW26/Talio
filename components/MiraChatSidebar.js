@@ -7,6 +7,7 @@ import { useMiraChat } from '@/contexts/MiraChatContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import MiraSphere from '@/components/ui/MiraPet'
 import MiraGeneratedImage from '@/components/ui/MiraGeneratedImage'
+import MiraAttachments from '@/components/ui/MiraAttachments'
 import AIActivityBeam from '@/components/ui/AIActivityBeam'
 import NativePipSurface from '@/components/ui/NativePipSurface'
 import MiraActivityPointer from '@/components/ui/MiraActivityPointer'
@@ -341,6 +342,7 @@ const MessageBubble = memo(function MessageBubble({ message, onSuggestionClick, 
       <div className="group/msg flex flex-col items-end px-4 py-1.5">
         <div className="max-w-[85%] bg-white/10 text-neutral-100 rounded-2xl rounded-br-md px-4 py-2.5 shadow-sm">
           <p className="text-sm leading-relaxed">{miraMessageDisplay(message)}</p>
+          {message.data?.attachments?.map((file, index) => <p key={index} className="mt-1 truncate text-xs text-neutral-400">Attachment: {file.name}</p>)}
         </div>
         <div className="mt-1 flex gap-1 text-neutral-400 md:opacity-0 md:group-hover/msg:opacity-100 md:group-focus-within/msg:opacity-100">
           <button aria-label="Edit and resend" title="Edit and resend" disabled={busy} onClick={() => onEdit(message)} className="rounded-md p-1.5 hover:bg-white/10 disabled:opacity-40"><Pencil size={13} /></button>
@@ -498,6 +500,8 @@ export default function MiraChatSidebar() {
   const [slashIdx, setSlashIdx] = useState(0)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const [attachments, setAttachments] = useState([])
+  const [attachmentsBusy, setAttachmentsBusy] = useState(false)
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -526,7 +530,15 @@ export default function MiraChatSidebar() {
   }, [isOpen, closeChat])
 
   const handleSend = useCallback(() => {
-    if (!input.trim() || isThinking) return
+    if ((!input.trim() && !attachments.length) || isThinking || attachmentsBusy) return
+    if (attachments.length) {
+      sendMessage(input.trim() || 'Please summarize the attached files.', { attachments })
+      setAttachments([])
+      setInput('')
+      setReplying(null)
+      setEditing(null)
+      return
+    }
     // Check if it's a slash command
     const matched = SLASH_COMMANDS.find(c => input.trim().toLowerCase() === c.cmd)
     if (editing || replying) {
@@ -541,7 +553,7 @@ export default function MiraChatSidebar() {
     setSlashResults([])
     setEditing(null)
     setReplying(null)
-  }, [input, isThinking, sendMessage, editing, replying])
+  }, [input, isThinking, sendMessage, editing, replying, attachments, attachmentsBusy])
 
   const handleEdit = useCallback((message) => {
     setEditing(message)
@@ -553,7 +565,7 @@ export default function MiraChatSidebar() {
     inputRef.current?.focus()
   }, [])
   const handleRetry = useCallback((message) => {
-    if (message.role === 'user' && !isThinking) sendMessage(message.content, { replaceFromId: message.id })
+    if (message.role === 'user' && !isThinking) sendMessage(message.content, { replaceFromId: message.id, attachments: message.data?.attachments })
   }, [isThinking, sendMessage])
 
   const handleInputChange = useCallback((val) => {
@@ -887,6 +899,7 @@ export default function MiraChatSidebar() {
             <span className="truncate">{`Replying to: ${replying.data?.message || replying.content}`}</span>
             <button aria-label="Cancel edit or reply" onClick={() => { setEditing(null); setReplying(null) }}><FaTimes /></button>
           </div>}
+          <MiraAttachments files={attachments} onChange={setAttachments} busy={isThinking} onBusyChange={setAttachmentsBusy} />
           <div className="flex items-end gap-2 p-2 rounded-2xl border border-default-200 bg-white/5">
             <div className="flex-1 relative">
               <textarea
@@ -916,7 +929,7 @@ export default function MiraChatSidebar() {
             <button
               onClick={handleSend}
               aria-label="Send message"
-              disabled={!input.trim() || isThinking}
+              disabled={(!input.trim() && !attachments.length) || isThinking || attachmentsBusy}
               className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:brightness-110"
               style={{ background: '#f5f5f5', color: '#171717' }}
             >
@@ -937,7 +950,7 @@ export default function MiraChatSidebar() {
         </div>
       </VoiceBeam>
       </NativePipSurface>
-      {editing && <MiraEditPrompt message={editing} busy={isThinking} onClose={() => setEditing(null)} onSave={(message, text) => { setEditing(null); sendMessage(text, { replaceFromId: message.id }) }} />}
+      {editing && <MiraEditPrompt message={editing} busy={isThinking} onClose={() => setEditing(null)} onSave={(message, text) => { setEditing(null); sendMessage(text, { replaceFromId: message.id, attachments: message.data?.attachments }) }} />}
     </>
   )
 }

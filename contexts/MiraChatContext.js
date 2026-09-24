@@ -118,7 +118,7 @@ export function MiraChatProvider({ children }) {
     try {
       const token = getAuthToken()
       const newMsgs = [
-        ...(userMsg ? [{ role: 'user', content: userMsg.content, timestamp: userMsg.timestamp }] : []),
+        ...(userMsg ? [{ role: 'user', content: userMsg.content, data: userMsg.data, timestamp: userMsg.timestamp }] : []),
         { role: 'assistant', content: aiMsg.content, data: aiMsg.data, timestamp: aiMsg.timestamp }
       ]
 
@@ -182,7 +182,7 @@ export function MiraChatProvider({ children }) {
   }, [fetchSessions])
 
   const sendMessage = useCallback(async (text, options = {}) => {
-    const dismissal = buildMiraDismissalResponse(text)
+    const dismissal = !options.attachments?.length && buildMiraDismissalResponse(text)
     if (dismissal) {
       setMessages(previous => {
         const id = Math.max(Date.now(), ...previous.map(message => (Number(message.id) || 0) + 1))
@@ -194,7 +194,7 @@ export function MiraChatProvider({ children }) {
       if (dismissal.action.type === 'dismiss') closeChat()
       return dismissal.message
     }
-    const requestedView = matchMiraViewMode(text)
+    const requestedView = !options.attachments?.length && matchMiraViewMode(text)
     if (requestedView) {
       setViewMode(requestedView)
       setIsOpen(true)
@@ -224,7 +224,7 @@ export function MiraChatProvider({ children }) {
       ? { ...m, data: { ...m.data, actionResult: { ...m.data.actionResult, resolved: true } } } : m)
 
     const nextId = Math.max(Date.now(), messages.reduce((max, message) => Math.max(max, Number(message.id) || 0), 0) + 1)
-    const userMsg = { id: nextId, role: 'user', content: text, timestamp: new Date() }
+    const userMsg = { id: nextId, role: 'user', content: text, ...(options.attachments?.length ? { data: { attachments: options.attachments } } : {}), timestamp: new Date() }
     let nextReplyId = userMsg.id + 1
     const saveTarget = sessionTargetRef.current
     setMessages([...history, userMsg])
@@ -249,7 +249,7 @@ export function MiraChatProvider({ children }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: queueMessage, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
+        body: JSON.stringify({ message: queueMessage, attachments: options.attachments || [], conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
         signal: abortControllerRef.current.signal
       })
 
