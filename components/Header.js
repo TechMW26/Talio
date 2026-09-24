@@ -31,7 +31,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [searching, setSearching] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [isMiraHovered, setIsMiraHovered] = useState(false)
-  const { openChat, isThinking } = useMiraChat()
+  const { openChat, isOpen: isMiraOpen, isThinking } = useMiraChat()
   const searchRef = useRef(null)
   const searchTimeoutRef = useRef(null)
 
@@ -209,7 +209,10 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
           {/* MIRA Cloud Pill Button - Desktop Only */}
           <div className="relative hidden md:block">
-          <div
+          <button
+            type="button"
+            aria-label={isMiraOpen ? 'Return to MIRA conversation' : 'Ask Mira'}
+            aria-expanded={isMiraOpen}
             className="hidden md:flex items-center cursor-pointer relative group -ml-3"
             data-mira-sphere="true"
             onClick={() => openChat()}
@@ -242,9 +245,10 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               <MiraSphere size={32} isThinking={isThinking} />
             </div>
             <span className="text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5" style={{ color: '#111111' }}>
-              Ask Mira
+              {isMiraOpen ? (isThinking ? 'On it…' : 'Mira is here') : 'Ask Mira'}
             </span>
-          </div>
+            {isMiraOpen && <span aria-hidden="true" className={`relative z-10 ml-2 h-1.5 w-1.5 rounded-full bg-emerald-700 ${isThinking ? 'motion-safe:animate-pulse' : ''}`} />}
+          </button>
 
           {/* Separator */}
           <MiraWakeReminder />

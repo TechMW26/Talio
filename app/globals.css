@@ -4,6 +4,7 @@
 
 html[data-desktop-platform="darwin"] { --desktop-safe-top: 52px; }
 html[data-desktop-platform="win32"] { --desktop-safe-top: 44px; }
+:root { --mira-panel-top: max(73px, calc(var(--desktop-safe-top, 0px) + 12px)); }
 html[data-desktop-platform] [data-meeting-fullscreen="true"] {
   top: var(--desktop-safe-top, 44px) !important;
   height: calc(100dvh - var(--desktop-safe-top, 44px)) !important;

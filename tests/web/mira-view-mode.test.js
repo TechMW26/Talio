@@ -9,11 +9,20 @@ function Consumer() {
   return <>
     <span data-testid="mode">{chat.viewMode}</span>
     <button onClick={chat.openChat}>Open</button>
+    <button onClick={() => chat.openChat({ mode: 'pip' })}>Background wake</button>
     <button onClick={() => chat.sendMessage('Go to projects')}>Navigate</button>
     <button onClick={() => chat.sendMessage('Show chatbox')}>Restore</button>
     <button onClick={() => chat.sendMessage('Switch to full width view')}>Expand</button>
   </>
 }
+test('background wake opens directly in PiP while ordinary opening restores chat', async () => {
+  global.fetch = jest.fn(async () => ({ json: async () => ({ success: false }) }))
+  render(<MiraChatProvider><Consumer /></MiraChatProvider>)
+  await act(async () => fireEvent.click(screen.getByText('Background wake')))
+  expect(screen.getByTestId('mode')).toHaveTextContent('pip')
+  await act(async () => fireEvent.click(screen.getByText('Open')))
+  expect(screen.getByTestId('mode')).toHaveTextContent('chat')
+})
 test('navigation persists PiP through sidebar remounts until an explicit view command', async () => {
   global.fetch = jest.fn(async url => ({ json: async () => url === '/api/ai/mira-chat'
     ? { success: true, response: { message: 'Opening projects.', action: { type: 'navigate', page: 'projects' } } }

@@ -482,7 +482,8 @@ export default function MiraChatSidebar() {
     window.addEventListener('mira:navigate', navigate)
     return () => window.removeEventListener('mira:navigate', navigate)
   }, [router, setViewMode])
-  const pip = isOpen && minimized
+  const [backgroundCompact, setBackgroundCompact] = useState(false)
+  const pip = isOpen && (minimized || backgroundCompact)
   const nativePipRef = useRef(null)
   useEffect(() => { if (!pip) nativePipRef.current?.restore() }, [pip])
   const popOutMira = () => {
@@ -507,11 +508,13 @@ export default function MiraChatSidebar() {
 
   // Focus input when opened
   useEffect(() => {
-    if (isOpen) {
-      const timeout = setTimeout(() => inputRef.current?.focus(), 300)
+    if (isOpen && !pip) {
+      const timeout = setTimeout(() => {
+        if (document.visibilityState === 'visible' && document.hasFocus()) inputRef.current?.focus()
+      }, 300)
       return () => clearTimeout(timeout)
     }
-  }, [isOpen])
+  }, [isOpen, pip])
 
   // Escape key to close
   useEffect(() => {
@@ -641,7 +644,7 @@ export default function MiraChatSidebar() {
       )}
 
       {/* Floating Sidebar panel - glassmorphism */}
-      <NativePipSurface ref={nativePipRef} enabled={pip} automatic>
+      <NativePipSurface ref={nativePipRef} enabled={isOpen} automatic onBackgroundChange={setBackgroundCompact}>
       <VoiceBeam stream={voice.stream} processing={isThinking} active={isOpen && (voice.active || isThinking)} paused={!isOpen || (!voice.active && !isThinking)} theme="dark" colorVariant="mono" strength={0.95}
         sensitivity={5.4} threshold={0.015} attack={0.12} release={0.42} reach={1.9} idle={0.14}
         borderRadius={16}
@@ -654,9 +657,9 @@ export default function MiraChatSidebar() {
           left: pip ? '24px' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
           right: undefined,
           borderRadius: 16,
-          top: pip ? 'auto' : `max(var(--desktop-safe-top, 12px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
+          top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? '24px' : 'auto',
-          height: pip ? 'auto' : 'calc(100dvh - var(--desktop-safe-top, 12px) - 12px)',
+          height: pip ? 'auto' : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
           transitionProperty: sidebarDrag.dragging || pip ? 'none' : 'opacity, transform, left, top, width',
           width: pip ? 'min(340px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode
@@ -926,7 +929,11 @@ export default function MiraChatSidebar() {
         )}
         </div>
         <div className={pip ? 'hidden' : 'flex-shrink-0 px-2 pb-2 empty:hidden'}>
-          <MiraWakeSetup onWake={() => { setWakeRequested(true); if (!isOpen) openChat() }} onStream={() => {}} suspended={voice.active} />
+          <MiraWakeSetup onWake={({ background } = {}) => {
+            setWakeRequested(true)
+            if (!isOpen) openChat({ mode: background ? 'pip' : 'chat' })
+            else if (background) setViewMode('pip')
+          }} onStream={() => {}} suspended={voice.active} />
         </div>
       </VoiceBeam>
       </NativePipSurface>

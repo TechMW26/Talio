@@ -15,16 +15,18 @@ test('meeting fields survive clarification and unrelated replies', () => {
   expect(bank.tasks[0].action.fields).toEqual({ ...draft.fields, scheduledStart: '2026-10-01T10:00:00Z' })
   expect(bank.tasks[0].status).not.toBe('completed')
 })
-test('queue advances only after real success and explicit confirmation', () => {
+test('queue advances automatically only after real success', () => {
   let bank = mergeMiraTaskPlan(null, { taskPlan: [{ request: 'Meeting', action: draft }, { request: 'Image', action: { type: 'generate_image', fields: { prompt: 'A tree' } } }] }, 'Two tasks')
   expect(advanceMiraTaskBank(bank, 'next').tasks[0].status).not.toBe('completed')
   bank = recordMiraTaskOutcome(bank, { success: true, message: 'Created' })
-  expect(bank.tasks[0].status).toBe('awaiting_confirmation')
-  expect(advanceMiraTaskBank(bank, 'What time?').tasks[0].status).toBe('awaiting_confirmation')
-  bank = advanceMiraTaskBank(bank, 'next')
   expect(bank.tasks[0].status).toBe('completed')
+  expect(bank.tasks[1].status).toBe('pending')
   bank = recordMiraTaskOutcome(bank, { success: true })
   expect(bank.tasks.every(task => task.status === 'completed')).toBe(true)
+})
+test('legacy successful confirmation gates are completed without replay', () => {
+  expect(advanceMiraTaskBank({ tasks: [{ request: 'Lookup', status: 'awaiting_confirmation' }] }, '').tasks[0].status).toBe('completed')
+  expect(recordMiraTaskOutcome({ tasks: [{ status: 'pending' }] }, { success: true, uncertain: true }).tasks[0].status).toBe('blocked')
 })
 test('uncertain outcomes stay blocked until explicitly verified, and queue can be cleared', () => {
   let bank = mergeMiraTaskPlan(null, { draftAction: draft }, 'Meeting')

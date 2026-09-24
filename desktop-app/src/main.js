@@ -1136,6 +1136,8 @@ function setupWindowEvents() {
   mainWindow.webContents.on('did-create-window', function (child, details) {
     if (details.frameName !== 'talio-live-pip') return;
     child.setAlwaysOnTop(true, 'floating');
+    // Do not steal focus from the application the user just switched to.
+    child.once('ready-to-show', () => { if (!child.isDestroyed()) child.showInactive(); });
     if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     child.webContents.on('will-navigate', event => event.preventDefault());
     child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

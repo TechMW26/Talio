@@ -73,6 +73,8 @@ const ActionableNotificationSchema = new mongoose.Schema({
     index: true
   },
 
+  snoozedUntil: Date,
+
   // Action taken (if any)
   actionTaken: {
     action: String,       // e.g., 'accepted', 'rejected', 'dismissed'
@@ -176,6 +178,7 @@ const ActionableNotificationSchema = new mongoose.Schema({
 
 // Compound indexes for efficient queries
 ActionableNotificationSchema.index({ user: 1, status: 1, createdAt: -1 })
+ActionableNotificationSchema.index({ user: 1, status: 1, snoozedUntil: 1 })
 ActionableNotificationSchema.index({ user: 1, type: 1, status: 1 })
 ActionableNotificationSchema.index({ 'reference.model': 1, 'reference.id': 1 })
 

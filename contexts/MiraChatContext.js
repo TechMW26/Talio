@@ -118,7 +118,7 @@ export function MiraChatProvider({ children }) {
     try {
       const token = getAuthToken()
       const newMsgs = [
-        { role: 'user', content: userMsg.content, timestamp: userMsg.timestamp },
+        ...(userMsg ? [{ role: 'user', content: userMsg.content, timestamp: userMsg.timestamp }] : []),
         { role: 'assistant', content: aiMsg.content, data: aiMsg.data, timestamp: aiMsg.timestamp }
       ]
 
@@ -138,7 +138,7 @@ export function MiraChatProvider({ children }) {
         const createRes = await fetch('/api/ai/mira-chat/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ title: userMsg.content.length > 50 ? userMsg.content.substring(0, 50) + '...' : userMsg.content })
+          body: JSON.stringify({ title: (userMsg?.content || 'MIRA task queue').slice(0, 50) })
         })
         const createData = await createRes.json()
         if (createData.success) {
@@ -157,8 +157,8 @@ export function MiraChatProvider({ children }) {
     } catch (error) { toast.error(error.message || 'Could not save this conversation. Please try again.') }
   }, [activeSessionId, messages.length])
 
-  const openChat = useCallback(() => {
-    setViewModeState('chat')
+  const openChat = useCallback((options = {}) => {
+    setViewModeState(options.mode === 'pip' ? 'pip' : 'chat')
     setIsOpen(true)
     fetchTokens()
     fetchSessions()
@@ -225,7 +225,7 @@ export function MiraChatProvider({ children }) {
 
     const nextId = Math.max(Date.now(), messages.reduce((max, message) => Math.max(max, Number(message.id) || 0), 0) + 1)
     const userMsg = { id: nextId, role: 'user', content: text, timestamp: new Date() }
-    const replyId = userMsg.id + 1
+    let nextReplyId = userMsg.id + 1
     const saveTarget = sessionTargetRef.current
     setMessages([...history, userMsg])
     setIsThinking(true)
@@ -233,17 +233,23 @@ export function MiraChatProvider({ children }) {
     try {
       const token = getAuthToken()
       abortControllerRef.current = new AbortController()
+      const requestController = abortControllerRef.current
 
-      const conversationHistory = compactMiraHistory(history)
-      const taskBank = advanceMiraTaskBank([...history].reverse().find(message => message.data?.taskBank)?.data.taskBank, text)
+      let conversationHistory = compactMiraHistory(history)
+      let taskBank = advanceMiraTaskBank([...history].reverse().find(message => message.data?.taskBank)?.data.taskBank, text)
+      let queueMessage = text
+      let lastReply = ''
+      for (let queueStep = 0; queueStep < 8; queueStep += 1) {
+      const replyId = nextReplyId
+      requestController.signal.throwIfAborted()
 
-      const res = resolvedAction ? { json: async () => ({ success: true, response: { message: '', action: resolvedAction, cards: [], suggestedQuestions: [] } }) } : await fetch('/api/ai/mira-chat', {
+      const res = resolvedAction && queueStep === 0 ? { json: async () => ({ success: true, response: { message: '', action: resolvedAction, cards: [], suggestedQuestions: [] } }) } : await fetch('/api/ai/mira-chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: text, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
+        body: JSON.stringify({ message: queueMessage, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
         signal: abortControllerRef.current.signal
       })
 
@@ -315,7 +321,6 @@ export function MiraChatProvider({ children }) {
         }
         data.response.taskBank = recordMiraTaskOutcome(data.response.taskBank, data.response.actionResult)
         const remainingTasks = data.response.taskBank.tasks.filter(task => task.status !== 'completed')
-        if (data.response.actionResult?.success && remainingTasks.length > 1) data.response.message += '\nConfirm this is done, then say next to continue the queue.'
         const aiMsg = {
           id: replyId,
           role: 'assistant',
@@ -342,9 +347,16 @@ export function MiraChatProvider({ children }) {
         }
         // Persistence is ordered but never holds the completed reply in thinking state.
         // Capture the target so switching chats cannot redirect a queued save.
+        const savedUser = queueStep === 0 ? userMsg : null
+        const savedBranch = queueStep === 0 && branchIndex >= 0 ? history : null
         saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() =>
-          saveToSession(userMsg, aiMsg, branchIndex >= 0 ? history : null, saveTarget))
-        return aiMsg.content
+          saveToSession(savedUser, aiMsg, savedBranch, saveTarget))
+        lastReply = aiMsg.content
+        if (!data.response.actionResult?.success || data.response.actionResult.uncertain || !remainingTasks.length || remainingTasks[0].status !== 'pending') return lastReply
+        taskBank = data.response.taskBank
+        conversationHistory = [...conversationHistory, ...(queueStep === 0 ? [{ role: 'user', content: text }] : []), ...compactMiraHistory([aiMsg])].slice(-10)
+        queueMessage = remainingTasks[0].request
+        nextReplyId += 1
       } else {
         if (data.tokens) setTokens(data.tokens)
         const errMsg = {
@@ -355,10 +367,13 @@ export function MiraChatProvider({ children }) {
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errMsg])
+        return
       }
+      }
+      return lastReply
     } catch (err) {
       window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: 'Stopped', phase: 'done' } }))
-      setMessages(prev => prev.filter(m => m.id !== replyId))
+      setMessages(prev => prev.filter(m => m.id !== nextReplyId))
       if (err.name !== 'AbortError') {
         setMessages(prev => [...prev, {
           id: Date.now() + 1,

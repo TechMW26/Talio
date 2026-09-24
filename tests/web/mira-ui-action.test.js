@@ -13,6 +13,7 @@ test('clicks a visible navigation control and announces its real target', async 
   expect(await executeMiraUiAction({ type: 'ui_action', fields: { operation: 'click', target: 'Pending' } })).toMatchObject({ success: true })
   expect(click).toHaveBeenCalledTimes(1)
   expect(activity.mock.calls[0][0].detail.target).toBe(button)
+  expect(activity.mock.calls.map(([event]) => event.detail.phase)).toEqual(['working', 'click'])
   window.removeEventListener('mira:activity', activity)
 })
 test('does not turn arbitrary destructive labels into clicks', async () => {

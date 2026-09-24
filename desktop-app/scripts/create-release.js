@@ -15,6 +15,7 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const TOKEN = process.env.GH_TOKEN;
 if (!TOKEN) {
@@ -51,6 +52,8 @@ const ASSETS = [
   { file: `Talio-${VERSION}-arm64.zip`, type: 'application/zip' },
   { file: `Talio-${VERSION}-x64.zip`, type: 'application/zip' },
   { file: `Talio.Setup.${VERSION}.exe`, type: 'application/octet-stream' },
+  { file: `Talio-${VERSION}-x86_64.AppImage`, type: 'application/octet-stream' },
+  { file: `Talio-${VERSION}-amd64.deb`, type: 'application/vnd.debian.binary-package' },
 ];
 
 function githubRequest(options, body) {
@@ -120,15 +123,21 @@ async function main() {
     console.error('ERROR: Missing release assets:', missingAssets.map(asset => asset.file).join(', '));
     process.exit(1);
   }
+  const checksums = ASSETS.map(asset => {
+    const digest = crypto.createHash('sha256').update(fs.readFileSync(path.join(distDir, asset.file))).digest('hex');
+    return `${digest}  ${asset.file}`;
+  }).join('\n') + '\n';
+  fs.writeFileSync(path.join(distDir, 'SHA256SUMS.txt'), checksums);
+  ASSETS.push({ file: 'SHA256SUMS.txt', type: 'text/plain' });
 
   // Step 1: Create release
   console.log('Creating release ' + TAG + '...');
   const releaseBody = JSON.stringify({
     tag_name: TAG,
-    target_commitish: 'main',
+    target_commitish: process.env.RELEASE_COMMIT || 'main',
     name: 'Talio Desktop ' + TAG,
     body: RELEASE_NOTES,
-    draft: false,
+    draft: true,
     prerelease: false,
   });
 
@@ -167,6 +176,14 @@ async function main() {
     console.error('\nRelease created, but one or more assets failed to upload.');
     process.exit(1);
   }
+
+  const published = await githubRequest({
+    hostname: 'api.github.com',
+    path: `/repos/${OWNER}/${REPO}/releases/${release.data.id}`,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' }
+  }, JSON.stringify({ draft: false, make_latest: 'true' }));
+  if (published.status !== 200) throw new Error('Assets uploaded, but publishing failed: ' + published.status);
 
   console.log('\nDone! Release URL:', release.data.html_url);
 }

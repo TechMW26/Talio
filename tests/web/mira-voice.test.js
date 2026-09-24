@@ -34,6 +34,7 @@ jest.mock('@/contexts/MiraChatContext', () => ({ useMiraChat: () => {
 }) } }))
 
 beforeEach(() => {
+  jest.spyOn(document, 'hasFocus').mockReturnValue(true)
   mockBeamProps = null
   mockOpen = true
   mockMessages = []

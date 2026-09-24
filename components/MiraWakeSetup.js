@@ -92,10 +92,8 @@ export default function MiraWakeSetup({ onWake, onStream, suspended = false }) {
           const audio = confirmation.current
           if (audio) { audio.currentTime = 0; audio.play()?.catch(() => {}) }
         } catch { /* Confirmation must not block activation. */ }
-        try {
-          window.electronAPI?.activateMira?.()?.catch(() => {})
-        } catch { /* Older desktop versions still open the in-app card. */ }
-        wake.current()
+        // Background wake must not restore/focus the full desktop application.
+        wake.current({ background: document.visibilityState === 'hidden' || !document.hasFocus() })
       }
       const local = await startMiraLocalRecognition({
         wakeOnly: true,

@@ -893,10 +893,6 @@ export async function POST(request) {
       delete parsed.action
       parsed.message = 'The previous action may have completed. Check the destination first. If it did not complete, say "verified not completed, retry"; otherwise clear the task queue.'
       parsed.speech = parsed.message
-    } else if (activeTask?.status === 'awaiting_confirmation') {
-      delete parsed.action
-      parsed.message = 'That task has completed. Please confirm or say next before I continue.'
-      parsed.speech = parsed.message
     } else if (parsed.action && task?.action?.type === parsed.action.type) {
       parsed.action.fields = { ...task.action.fields, ...parsed.action.fields }
     } else if (parsed.action && task?.action) {

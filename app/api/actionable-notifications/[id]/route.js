@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
+import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 
 /**
  * GET /api/actionable-notifications/[id]
@@ -78,6 +79,19 @@ export async function PATCH(request, { params }) {
 
     const body = await request.json()
     const { action, reason } = body
+
+    if (action === 'snooze') {
+      const userId = user._id || user.userId
+      const snoozedUntil = new Date(Date.now() + 60 * 60 * 1000)
+      const notification = await ActionableNotification.findOneAndUpdate({
+        _id: id, user: userId, status: 'pending',
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+      }, { $set: { snoozedUntil } }, { new: true, runValidators: true })
+      if (!notification) return NextResponse.json({ success: false, message: 'This notification is no longer pending.' }, { status: 409 })
+      await clearCachePattern(buildCachePattern({ tenantId: auth.tenant?.databaseName || ActionableNotification.db?.name, userId, namespace: 'actionable-notifications' })).catch(() => {})
+      global.io?.to(`user:${userId}`).emit('actionable-notification-updated', { notificationId: id, status: 'pending', snoozedUntil })
+      return NextResponse.json({ success: true, snoozedUntil, message: 'We will remind you in 1 hour.' })
+    }
 
     if (!action) {
       return NextResponse.json(

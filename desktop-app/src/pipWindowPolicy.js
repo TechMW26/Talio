@@ -10,8 +10,9 @@ function pipWindowOptions(details, openerUrl, appOrigin) {
     overrideBrowserWindowOptions: {
       title: 'Talio · Live', frame: false, alwaysOnTop: true,
       skipTaskbar: true, fullscreenable: false, minimizable: false,
-      maximizable: false, resizable: true, minWidth: 180, minHeight: 80,
-      useContentSize: true, backgroundColor: '#151518',
+      maximizable: false, resizable: false, minWidth: 180, minHeight: 80,
+      transparent: true, hasShadow: false, show: false,
+      useContentSize: true, backgroundColor: '#00000000',
       webPreferences: { nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false },
     },
   };

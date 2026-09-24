@@ -32,33 +32,39 @@ export async function GET(request) {
       namespace: 'actionable-notifications',
       params: { status, type: type || 'all', limit }
     })
-    const cached = await getCache(cacheKey)
-    if (cached) {
+    // Pending decisions must be fresh when an hour-long reminder wakes.
+    const cached = status === 'pending' ? null : await getCache(cacheKey)
+    if (cached && (!cached.nextReminderAt || new Date(cached.nextReminderAt).getTime() > Date.now())) {
       return NextResponse.json({ ...cached, cached: true })
     }
 
     // Build query
     const query = {
-      user: user.userId,
+      user: user._id || user.userId,
       status
     }
+
+    const now = new Date()
+    const unexpired = { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] }
+    if (status === 'pending') query.$and = [unexpired, { $or: [{ snoozedUntil: null }, { snoozedUntil: { $lte: now } }] }]
 
     if (type) {
       query.type = type
     }
 
-    const notifications = await ActionableNotification.find(query)
+    const [notifications, nextReminder] = await Promise.all([ActionableNotification.find(query)
       .sort({ priority: -1, createdAt: -1 })
       .limit(limit)
       .populate('createdBy', 'firstName lastName avatar')
-      .lean()
+      .lean(), status === 'pending' ? ActionableNotification.findOne({ user: query.user, status: 'pending', ...(type ? { type } : {}), snoozedUntil: { $gt: now }, ...unexpired }).sort({ snoozedUntil: 1 }).select('snoozedUntil').lean() : null])
 
     const responseData = {
       success: true,
       notifications,
+      nextReminderAt: nextReminder?.snoozedUntil || null,
       count: notifications.length
     }
-    await setCache(cacheKey, responseData, 30).catch(() => { })
+    if (status !== 'pending') await setCache(cacheKey, responseData, 30).catch(() => { })
 
     return NextResponse.json(responseData)
   } catch (error) {

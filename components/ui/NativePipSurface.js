@@ -7,6 +7,9 @@ import { createPortal } from 'react-dom'
 // ongoing meeting when the user also pops out MIRA.
 let nativeWindow = null
 let openingWindow = null
+function isAppAway() {
+  return document.visibilityState === 'hidden' || !document.hasFocus()
+}
 const automaticSurfaces = new Set()
 function registerAutomaticSurface(surface) {
   automaticSurfaces.add(surface)
@@ -15,7 +18,7 @@ function registerAutomaticSurface(surface) {
       navigator.mediaSession?.setActionHandler('enterpictureinpicture', () => {
         // Only the browser's eligible media-session callback grants automatic
         // PiP activation. A plain visibility event does not grant permission.
-        if (document.visibilityState !== 'hidden') return
+        if (!isAppAway()) return
         automaticSurfaces.forEach(entry => entry.open(true))
       })
     } catch { /* Unsupported browsers keep the in-app PiP. */ }
@@ -78,7 +81,7 @@ async function getPipWindow(size) {
     const theme = document.documentElement.getAttribute('data-theme')
     if (theme) target.document.documentElement.setAttribute('data-theme', theme)
     const style = target.document.createElement('style')
-    style.textContent = `html,body{margin:0;padding:0}body{display:flex;flex-direction:column;gap:0;overflow:auto;background:#151518;color:#f4f4f5}
+    style.textContent = `html,body{margin:0;padding:0;${desktop ? 'background:transparent!important;' : ''}}body{display:flex;flex-direction:column;gap:0;overflow:auto;background:${desktop ? 'transparent' : '#151518'};color:#f4f4f5}
       [data-meeting-pip]{color:#f4f4f5!important;background:#18181b!important}
       [data-meeting-pip] main,[data-meeting-pip] header,[data-meeting-pip] footer{background:#18181b!important;color:inherit}
       [data-meeting-pip] button{flex-shrink:0}
@@ -88,7 +91,18 @@ async function getPipWindow(size) {
       [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;transform:none!important}
       [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0!important;width:100%!important}
       [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none}
-      [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}`
+      [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}
+      ${desktop ? '' : `
+      [data-native-pip-surface] .mira-workspace,
+      [data-native-pip-surface] .mira-workspace::before,
+      [data-native-pip-surface] .mira-workspace::after,
+      [data-native-pip-surface] .mira-workspace > [data-voice-beam-bloom],
+      [data-native-pip-surface] .mira-workspace > [data-voice-beam-warp],
+      [data-native-pip-surface] [data-meeting-pip],
+      [data-native-pip-surface] [data-meeting-pip] > header,
+      [data-native-pip-surface] [data-meeting-pip] > footer,
+      [data-native-pip-surface] .mira-workspace [data-ai-activity-beam],
+      [data-native-pip-surface] .mira-workspace [data-ai-activity-beam] *{border-radius:0!important}`}`
     target.document.head.append(style)
     target.addEventListener('pagehide', () => { if (nativeWindow === target) nativeWindow = null }, { once: true })
     return target
@@ -97,7 +111,7 @@ async function getPipWindow(size) {
   }
 }
 
-const NativePipSurface = forwardRef(function NativePipSurface({ children, enabled = true, automatic = false }, ref) {
+const NativePipSurface = forwardRef(function NativePipSurface({ children, enabled = true, automatic = false, onBackgroundChange }, ref) {
   const placeholder = useRef(null)
   const [host, setHost] = useState(null)
   const targetRef = useRef(null)
@@ -106,6 +120,8 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
   const enabledRef = useRef(enabled)
   const automaticRef = useRef(automatic)
   automaticRef.current = automatic
+  const backgroundCallback = useRef(onBackgroundChange)
+  backgroundCallback.current = onBackgroundChange
   enabledRef.current = enabled
   const [error, setError] = useState('')
 
@@ -141,12 +157,12 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
   useEffect(() => { if (!enabled) restore() }, [enabled, host]) // Preserve the portal target and live media components.
 
   async function open(fromBrowser = false) {
-      if (automaticRef.current && document.visibilityState !== 'hidden') return
+      if (automaticRef.current && !isAppAway()) return
       setError('')
       try {
         const size = panelSize(host)
         const target = await getPipWindow(size)
-        if (!mounted.current || !enabledRef.current || !host || (automaticRef.current && document.visibilityState !== 'hidden')) {
+        if (!mounted.current || !enabledRef.current || !host || (automaticRef.current && !isAppAway())) {
           if (!target.document.querySelector('[data-native-pip-surface]')) target.close()
           return
         }
@@ -166,7 +182,9 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
         fitWindow(target)
         cleanupRef.current = () => { observer?.disconnect(); target.removeEventListener('pagehide', onClose) }
       } catch (cause) {
-        if (mounted.current && !fromBrowser) setError(cause?.message || 'Unable to open a separate window. Try the pop-out button again.')
+        if (mounted.current && !fromBrowser) setError(cause?.name === 'NotAllowedError'
+          ? 'MIRA is active in mini mode. Your browser blocked the external window. Allow automatic picture-in-picture for Talio, or use the desktop app for background wake.'
+          : cause?.message || 'Unable to open a separate window. Try the pop-out button again.')
       }
   }
 
@@ -175,16 +193,27 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
   useEffect(() => {
     if (!automatic || !enabled || !host) return
     const unregister = registerAutomaticSurface({ open: (...args) => controls.current.open(...args) })
+    let transitionTimer
     const returnWhenVisible = () => {
-      if (document.visibilityState === 'visible') controls.current.restore()
-      else if (window.electronAPI?.nativePip === true) controls.current.open(true)
+      clearTimeout(transitionTimer)
+      const away = isAppAway()
+      backgroundCallback.current?.(away)
+      if (!away) controls.current.restore()
+      else if (window.electronAPI?.nativePip === true || window.documentPictureInPicture?.requestWindow) {
+        // Let React render the compact panel before measuring its native window.
+        transitionTimer = setTimeout(() => controls.current.open(false), 100)
+      }
     }
     document.addEventListener('visibilitychange', returnWhenVisible)
     window.addEventListener('focus', returnWhenVisible)
+    window.addEventListener('blur', returnWhenVisible)
+    returnWhenVisible()
     return () => {
+      clearTimeout(transitionTimer)
       unregister()
       document.removeEventListener('visibilitychange', returnWhenVisible)
       window.removeEventListener('focus', returnWhenVisible)
+      window.removeEventListener('blur', returnWhenVisible)
     }
   }, [automatic, enabled, host])
 

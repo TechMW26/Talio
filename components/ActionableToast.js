@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { FaTimes, FaExclamationTriangle, FaHourglassHalf } from 'react-icons/fa'
+import { useState, useCallback, useEffect, useRef, useId } from 'react'
+import { FaTimes, FaExclamationTriangle, FaHourglassHalf, FaRegBell, FaRegClock } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
@@ -13,7 +13,9 @@ import Loader from '@/components/ui/Loader'
  * Supports multiple action buttons with different styles and behaviors.
  * Can call API endpoints or navigate to URLs.
  */
-export default function ActionableToast({ notification, onDismiss, onAction }) {
+export default function ActionableToast({ notification, onDismiss, onAction, onSnooze }) {
+  const titleId = useId()
+  const reasonId = useId()
   const [isVisible, setIsVisible] = useState(false)
   const [loadingAction, setLoadingAction] = useState(null)
   const [showReasonInput, setShowReasonInput] = useState(false)
@@ -22,6 +24,19 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const isMountedRef = useRef(true)
   const router = useRouter()
+  const canSnooze = typeof onSnooze === 'function'
+  const handleSnooze = async () => {
+    if (loadingAction !== null) return
+    setLoadingAction('snooze')
+    try {
+      await onSnooze()
+      toast.success('Reminder set for 1 hour. No decision was made.')
+    } catch (error) {
+      toast.error(error.message || 'Unable to set reminder. Please try again.')
+    } finally {
+      if (isMountedRef.current) setLoadingAction(null)
+    }
+  }
 
   // Animation on mount
   useEffect(() => {
@@ -182,30 +197,17 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
     if (notification.type === 'probation_approval' || notification.icon === 'probation') {
       return <FaHourglassHalf className="h-5 w-5 text-amber-500" aria-hidden="true" />
     }
-    const icons = {
-      project_invitation: '📊',
-      task_assignment: '✅',
-      meeting_invitation: '📅',
-      leave_approval: '🏖️',
-      expense_approval: '💰',
-      document_approval: '📄',
-      travel_approval: '✈️',
-      attendance_correction: '⏰',
-      helpdesk_assignment: '🎫',
-      announcement: '📢',
-      generic: '🔔'
-    }
-    return notification.icon || icons[notification.type] || '🔔'
+    return <FaRegBell className="h-4 w-4 text-default-500" aria-hidden="true" />
   }
 
   // Get button style based on variant
   const getButtonStyle = (variant) => {
     const styles = {
-      primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-      secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-700',
-      success: 'bg-green-600 hover:bg-green-700 text-white',
-      danger: 'bg-red-600 hover:bg-red-700 text-white',
-      warning: 'bg-amber-500 hover:bg-amber-600 text-white'
+      primary: 'bg-primary text-primary-foreground hover:opacity-90',
+      secondary: 'border border-default-200 bg-transparent text-default-700 hover:bg-default-100',
+      success: 'bg-primary text-primary-foreground hover:opacity-90',
+      danger: 'border border-danger-200 bg-transparent text-danger-600 dark:text-danger-400 hover:bg-danger-50',
+      warning: 'border border-default-200 bg-transparent text-default-700 hover:bg-default-100'
     }
     return styles[variant] || styles.primary
   }
@@ -220,33 +222,28 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
         </span>
       )
     }
-    if (notification.priority === 'high') {
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-          High Priority
-        </span>
-      )
-    }
     return null
   }
 
   return (
     <div
+      role="region"
+      aria-labelledby={titleId}
       className={`
-        w-full max-w-md bg-white dark:bg-zinc-950 rounded-xl shadow-2xl border border-transparent dark:border-zinc-800
+        w-full bg-white dark:bg-zinc-950 rounded-2xl shadow-lg border border-gray-200 dark:border-zinc-800
         overflow-hidden
-        transition-all duration-300 transform
+        transition-[transform,opacity] duration-200 motion-reduce:transition-none transform
         ${isVisible ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'}
       `}
     >
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-50 dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
+      <div className="px-4 pt-4 pb-2">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="text-2xl flex-shrink-0">{getTypeIcon()}</span>
+            <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-default-100 flex-shrink-0">{getTypeIcon()}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-gray-900 dark:text-zinc-100 text-sm">
+                <h3 id={titleId} className="font-semibold text-gray-900 dark:text-zinc-100 text-sm leading-5">
                   {notification.title}
                 </h3>
                 {getPriorityBadge()}
@@ -259,11 +256,13 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
               </p>
             </div>
           </div>
-          {notification.displaySettings?.dismissible !== false && (
+          {(notification.displaySettings?.dismissible !== false || canSnooze) && (
             <button
-              onClick={() => handleDismiss()}
-              className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
-              aria-label="Dismiss notification"
+              onClick={notification.displaySettings?.dismissible === false ? handleSnooze : () => handleDismiss()}
+              disabled={loadingAction !== null}
+              className="p-2 rounded-full hover:bg-default-100 transition-colors disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              aria-label={notification.displaySettings?.dismissible === false ? 'Dismiss and remind me in 1 hour' : 'Dismiss notification'}
+              title={notification.displaySettings?.dismissible === false ? 'Remind me in 1 hour' : 'Dismiss'}
             >
               <FaTimes className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
             </button>
@@ -273,7 +272,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
 
       {/* Body */}
       <div className="px-4 py-3">
-        <p className="text-sm text-gray-700 dark:text-zinc-200 whitespace-pre-wrap">
+        <p className="max-h-40 overflow-y-auto text-sm leading-6 text-gray-600 dark:text-zinc-300 whitespace-pre-wrap break-words">
           {notification.message}
         </p>
       </div>
@@ -282,10 +281,11 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
       {showReasonInput && selectedAction && (
         <div className="px-4 pb-3">
           <form onSubmit={handleReasonSubmit}>
-            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-200 mb-1">
+            <label htmlFor={reasonId} className="block text-sm font-medium text-gray-700 dark:text-zinc-200 mb-1">
               {selectedAction.reasonPrompt || 'Please provide a reason'}
             </label>
             <textarea
+              id={reasonId}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Enter reason..."
@@ -313,7 +313,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
                 {loadingAction === selectedAction.id ? (
                   <Loader size="xs" />
                 ) : (
-                  'Submit'
+                  selectedAction.label
                 )}
               </button>
             </div>
@@ -324,8 +324,8 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
       {/* Confirmation Dialog */}
       {showConfirmation && selectedAction && (
         <div className="px-4 pb-3">
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800">
+          <div className="p-3 bg-default-50 border border-default-200 rounded-xl">
+            <p className="text-sm text-default-700">
               {selectedAction.confirmationMessage || 'Are you sure you want to proceed?'}
             </p>
             <div className="flex justify-end gap-2 mt-2">
@@ -339,7 +339,8 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
               <button
                 type="button"
                 onClick={() => handleActionClick(selectedAction)}
-                className={`px-3 py-1.5 text-sm rounded-lg ${getButtonStyle(selectedAction.variant)}`}
+                disabled={loadingAction !== null}
+                className={`px-3 py-1.5 text-sm rounded-full disabled:opacity-50 ${getButtonStyle(selectedAction.variant)}`}
               >
                 {loadingAction === selectedAction.id ? (
                   <Loader size="xs" />
@@ -354,7 +355,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
 
       {/* Actions */}
       {!showReasonInput && !showConfirmation && notification.actions && notification.actions.length > 0 && (
-        <div className="px-4 py-3 bg-gray-50 dark:bg-zinc-900 border-t border-gray-100 dark:border-zinc-800">
+        <div className="px-4 pb-3 pt-1">
           <div className="flex flex-wrap gap-2 justify-end">
             {notification.actions.map((action) => (
               <button
@@ -362,7 +363,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
                 onClick={() => handleActionClick(action)}
                 disabled={loadingAction !== null}
                 className={`
-                  px-4 py-2 text-sm font-medium rounded-lg transition-all
+                  px-4 py-2 text-sm font-medium rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary
                   disabled:opacity-50 disabled:cursor-not-allowed
                   flex items-center gap-2
                   ${getButtonStyle(action.variant)}
@@ -378,13 +379,22 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
         </div>
       )}
 
+      {canSnooze && <div className="px-4 pb-3 flex justify-end">
+        <button type="button" onClick={handleSnooze} disabled={loadingAction !== null}
+          className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs text-default-500 hover:text-default-800 hover:bg-default-100 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+          <FaRegClock aria-hidden="true" className="h-3 w-3" />
+          {loadingAction === 'snooze' ? 'Setting reminder…' : 'Remind me in 1 hour'}
+        </button>
+      </div>}
+
       {/* View button if URL exists and no other actions */}
       {!showReasonInput && !showConfirmation && notification.url && (!notification.actions || notification.actions.length === 0) && (
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
+        <div className="px-4 pb-3 pt-1">
           <div className="flex gap-2 justify-end">
             <button
               onClick={handleDismiss}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"
+              disabled={loadingAction !== null || notification.displaySettings?.dismissible === false}
+              className="px-4 py-2 text-sm font-medium rounded-full text-default-600 hover:bg-default-100 disabled:opacity-40"
             >
               Dismiss
             </button>
@@ -393,7 +403,8 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
                 router.push(notification.url)
                 handleDismiss()
               }}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={loadingAction !== null}
+              className="px-4 py-2 text-sm font-medium rounded-full bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"
             >
               View Details
             </button>

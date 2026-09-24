@@ -77,7 +77,8 @@ test('accepted wake plays the supplied sound once; blocked audio does not block 
   await act(async () => { recognition.onResult({}); recognition.onResult({}) })
   expect(playConfirmation).toHaveBeenCalledTimes(1)
   expect(onWake).toHaveBeenCalledTimes(1)
-  expect(window.electronAPI.activateMira).toHaveBeenCalledTimes(1)
+  expect(window.electronAPI.activateMira).not.toHaveBeenCalled()
+  expect(onWake).toHaveBeenCalledWith({ background: true })
 })
 
 test('remembered opt-in starts once and resumes after voice chat, but not after explicit Stop', async () => {

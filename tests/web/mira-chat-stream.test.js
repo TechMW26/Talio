@@ -8,6 +8,41 @@ global.TextDecoder = TextDecoder
 const wrapper = ({ children }) => <MiraChatProvider>{children}</MiraChatProvider>
 const bytes = value => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`)
 
+test.each([true, false])('queue automatically continues only after verified success (%s)', async success => {
+  const lookup = { type: 'lookup_people', fields: { query: 'Sahil' } }
+  const send = { type: 'send_message', fields: { recipient: 'Sahil', content: 'Hello' } }
+  let chats = 0
+  global.fetch = jest.fn(async url => ({ ok: true, json: async () => {
+    if (url === '/api/ai/mira-chat') return { success: true, response: ++chats === 1
+      ? { message: 'Looking up Sahil.', action: lookup, taskPlan: [{ request: 'Find Sahil', action: lookup }, { request: 'Send Hello to Sahil', action: send }] }
+      : { message: 'Sending.', action: send } }
+    if (url === '/api/ai/mira-actions') return { success, message: success ? 'Completed.' : 'Choose which Sahil.' }
+    return { success: false }
+  } }))
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { await result.current.sendMessage('Find Sahil and send Hello to him') })
+  expect(fetch.mock.calls.filter(([url]) => url === '/api/ai/mira-actions')).toHaveLength(success ? 2 : 1)
+  expect(result.current.messages.filter(m => m.role === 'user')).toHaveLength(1)
+  expect(result.current.messages.filter(m => m.role === 'assistant')).toHaveLength(success ? 2 : 1)
+  expect(result.current.messages.at(-1).data.taskBank.tasks.map(t => t.status)).toEqual(success ? ['completed', 'completed'] : ['blocked', 'pending'])
+  expect(result.current.messages.some(m => /say next|confirm this is done/i.test(m.content))).toBe(false)
+  expect(result.current.isThinking).toBe(false)
+})
+
+test('closing MIRA stops automatic queue continuation', async () => {
+  const action = { type: 'lookup_people', fields: { query: 'Sahil' } }
+  global.fetch = jest.fn(async url => ({ ok: true, json: async () => {
+    if (url === '/api/ai/mira-chat') return { success: true, response: { message: '', action, taskPlan: [{ request: 'Find Sahil', action }, { request: 'Find Rahul', action: { ...action, fields: { query: 'Rahul' } } }] } }
+    if (url === '/api/ai/mira-actions') return { success: true, message: 'Found Sahil.' }
+    return { success: false }
+  } }))
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { await result.current.sendMessage('Find Sahil and Rahul', { onResponse: () => result.current.closeChat() }) })
+  expect(fetch.mock.calls.filter(([url]) => url === '/api/ai/mira-actions')).toHaveLength(1)
+  expect(result.current.messages.at(-1).content).toBe('Found Sahil.')
+  expect(result.current.isThinking).toBe(false)
+})
+
 test('completed replies release thinking while ordered session creation is still pending', async () => {
   let finishCreate
   global.fetch = jest.fn(async url => {

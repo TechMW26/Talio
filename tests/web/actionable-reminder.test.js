@@ -1,0 +1,50 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
+jest.mock('@/contexts/SocketContext', () => ({ useSocket: () => ({ socket: null, isConnected: false }) }))
+jest.mock('@/lib/notificationSounds', () => ({ playNotificationSound: jest.fn(), NotificationSoundTypes: {} }))
+jest.mock('@/utils/userHelper', () => ({ handleSessionExpired: jest.fn() }))
+jest.mock('@/components/ActionableToast', () => ({ notification, onSnooze }) => <div>{notification.title}<button onClick={onSnooze}>Later</button></div>)
+const item = { _id: 'n1', status: 'pending', title: 'Probation review' }
+const response = data => ({ ok: true, status: 200, json: async () => ({ success: true, ...data }) })
+beforeEach(() => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-09-24T12:00:00Z'))
+  localStorage.setItem('token', 'test')
+  global.fetch = jest.fn()
+})
+afterEach(() => { jest.useRealTimers(); localStorage.clear() })
+test('snoozing hides the popup and revalidates at exactly one hour', async () => {
+  fetch.mockResolvedValueOnce(response({ notifications: [item] }))
+    .mockResolvedValueOnce(response({ snoozedUntil: '2026-09-24T13:00:00Z' }))
+    .mockResolvedValue(response({ notifications: [item], nextReminderAt: null }))
+  render(<ActionableToastProvider><div>Dashboard</div></ActionableToastProvider>)
+  await waitFor(() => expect(screen.getByText('Probation review')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('Later'))
+  await waitFor(() => expect(screen.queryByText('Probation review')).toBeNull())
+  await act(async () => jest.advanceTimersByTime(3599000))
+  expect(fetch).toHaveBeenCalledTimes(2)
+  await act(async () => jest.advanceTimersByTime(1000))
+  expect(screen.getByText('Probation review')).toBeInTheDocument()
+})
+test('a reopened app restores the deadline but does not resurrect a resolved decision', async () => {
+  fetch.mockResolvedValueOnce(response({ notifications: [], nextReminderAt: '2026-09-24T12:01:00Z' }))
+    .mockResolvedValue(response({ notifications: [], nextReminderAt: null }))
+  render(<ActionableToastProvider><div>Dashboard</div></ActionableToastProvider>)
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  await act(async () => jest.advanceTimersByTime(60000))
+  expect(fetch.mock.calls.length).toBeGreaterThan(1)
+  expect(screen.queryByText('Probation review')).toBeNull()
+})
+
+test('an older refresh cannot restore a popup after snoozing succeeds', async () => {
+  let finishRefresh
+  fetch.mockResolvedValueOnce(response({ notifications: [item] }))
+    .mockImplementationOnce(() => new Promise(resolve => { finishRefresh = resolve }))
+    .mockResolvedValueOnce(response({ snoozedUntil: '2026-09-24T13:00:00Z' }))
+  render(<ActionableToastProvider><div>Dashboard</div></ActionableToastProvider>)
+  await waitFor(() => expect(screen.getByText('Probation review')).toBeInTheDocument())
+  fireEvent.focus(window)
+  fireEvent.click(screen.getByText('Later'))
+  await waitFor(() => expect(screen.queryByText('Probation review')).toBeNull())
+  await act(async () => finishRefresh(response({ notifications: [item] })))
+  expect(screen.queryByText('Probation review')).toBeNull()
+})

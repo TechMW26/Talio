@@ -352,6 +352,10 @@ export default function MiraAgentSidebar({
   const [error, setError] = useState(null);
   const [loadingSectionIndex, setLoadingSectionIndex] = useState(null);
   const [isChatLoading, setIsChatLoading] = useState(false);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: Boolean(isOpen && (isLoading || isChatLoading)) } }));
+    return () => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false } }));
+  }, [isOpen, isLoading, isChatLoading]);
   
   // Track content modifications after plotting
   const [contentModifiedAfterPlot, setContentModifiedAfterPlot] = useState(false);

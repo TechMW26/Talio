@@ -13,7 +13,63 @@ function fakeWindow() {
   return target
 }
 
-afterEach(() => { delete window.documentPictureInPicture; delete document.visibilityState; delete navigator.mediaSession })
+beforeEach(() => { jest.spyOn(document, 'hasFocus').mockReturnValue(true) })
+afterEach(() => { delete window.documentPictureInPicture; delete window.electronAPI; delete document.visibilityState; delete navigator.mediaSession; jest.restoreAllMocks(); jest.useRealTimers() })
+
+test('a background browser wake attempts PiP and explains blocked activation without losing the panel', async () => {
+  jest.useFakeTimers()
+  jest.spyOn(document, 'hasFocus').mockReturnValue(false)
+  window.documentPictureInPicture = { requestWindow: jest.fn().mockRejectedValue(new DOMException('Requires activation', 'NotAllowedError')) }
+  render(<NativePipSurface automatic>Listening after wake</NativePipSurface>)
+  await act(async () => { jest.advanceTimersByTime(100) })
+  expect(window.documentPictureInPicture.requestWindow).toHaveBeenCalledTimes(1)
+  expect(screen.getByText('Listening after wake')).toBeInTheDocument()
+  expect(screen.getByRole('alert')).toHaveTextContent('browser blocked the external window')
+})
+
+test('desktop blur opens a transparent external panel and focus restores the same live component', async () => {
+  jest.useFakeTimers()
+  window.electronAPI = { nativePip: true }
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+  const focus = jest.spyOn(document, 'hasFocus').mockReturnValue(true)
+  const target = fakeWindow()
+  jest.spyOn(window, 'open').mockReturnValue(target)
+  const onBackgroundChange = jest.fn()
+  render(<NativePipSurface automatic onBackgroundChange={onBackgroundChange}>Desktop MIRA</NativePipSurface>)
+  const element = screen.getByText('Desktop MIRA')
+  focus.mockReturnValue(false)
+  await act(async () => { window.dispatchEvent(new Event('blur')); jest.advanceTimersByTime(100) })
+  expect(onBackgroundChange).toHaveBeenLastCalledWith(true)
+  expect(target.document.body.contains(element)).toBe(true)
+  expect(target.document.head.textContent).toContain('background:transparent!important')
+  expect(target.document.head.textContent).not.toContain('border-radius:0!important')
+  focus.mockReturnValue(true)
+  act(() => window.dispatchEvent(new Event('focus')))
+  expect(document.body.contains(element)).toBe(true)
+  expect(onBackgroundChange).toHaveBeenLastCalledWith(false)
+  expect(target.close).toHaveBeenCalledTimes(1)
+})
+
+test('desktop already minimized opens on mount and a quick refocus cancels pending opening', async () => {
+  jest.useFakeTimers()
+  window.electronAPI = { nativePip: true }
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+  const focus = jest.spyOn(document, 'hasFocus').mockReturnValue(false)
+  const target = fakeWindow()
+  jest.spyOn(window, 'open').mockReturnValue(target)
+  render(<NativePipSurface automatic>MIRA</NativePipSurface>)
+  await act(async () => { jest.advanceTimersByTime(100) })
+  expect(window.open).toHaveBeenCalledTimes(1)
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+  focus.mockReturnValue(true)
+  act(() => window.dispatchEvent(new Event('focus')))
+  focus.mockReturnValue(false)
+  act(() => window.dispatchEvent(new Event('blur')))
+  focus.mockReturnValue(true)
+  act(() => window.dispatchEvent(new Event('focus')))
+  await act(async () => { jest.advanceTimersByTime(100) })
+  expect(window.open).toHaveBeenCalledTimes(1)
+})
 
 test('moves a stable portal without remounting and returns it on window close', async () => {
   const mounted = jest.fn()
@@ -98,5 +154,7 @@ test('initial native dimensions match the element rather than a fixed 480x640 wi
   await act(async () => { await ref.current.open() })
   expect(window.documentPictureInPicture.requestWindow).toHaveBeenCalledWith({ width: 340, height: 164 })
   expect(target.document.head.textContent).toContain('margin:0;padding:0')
+  expect(target.document.head.textContent).toContain('border-radius:0!important')
+  expect(target.document.head.textContent).toContain('.mira-workspace [data-ai-activity-beam]')
   act(() => target.close())
 })

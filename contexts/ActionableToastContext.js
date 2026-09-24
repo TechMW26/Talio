@@ -18,11 +18,14 @@ const ActionableToastContext = createContext({
 export function ActionableToastProvider({ children }) {
   const [notifications, setNotifications] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [nextReminderAt, setNextReminderAt] = useState(null)
   const { socket, isConnected, subscribe } = useSocket()
   const hasFetchedRef = useRef(false)
+  const notificationRevisionRef = useRef(0)
 
   // Fetch pending notifications on mount
   const fetchPendingNotifications = useCallback(async () => {
+    const revision = notificationRevisionRef.current
     try {
       const token = localStorage.getItem('token')
       if (!token) {
@@ -44,8 +47,9 @@ export function ActionableToastProvider({ children }) {
 
       if (response.ok) {
         const data = await response.json()
-        if (data.success && data.notifications) {
+        if (revision === notificationRevisionRef.current && data.success && Array.isArray(data.notifications)) {
           setNotifications(data.notifications)
+          setNextReminderAt(data.nextReminderAt || null)
         }
       }
     } catch (error) {
@@ -64,6 +68,21 @@ export function ActionableToastProvider({ children }) {
     }
   }, [fetchPendingNotifications])
 
+  // A durable server deadline survives reloads. Revalidate before showing a reminder,
+  // including when a suspended tab wakes, so completed decisions never reappear.
+  useEffect(() => {
+    if (!nextReminderAt) return
+    const timer = setTimeout(fetchPendingNotifications, Math.max(500, Math.min(2147483647, new Date(nextReminderAt).getTime() - Date.now())))
+    const retry = setInterval(() => { if (Date.now() >= new Date(nextReminderAt).getTime()) fetchPendingNotifications() }, 60000)
+    return () => { clearTimeout(timer); clearInterval(retry) }
+  }, [nextReminderAt, fetchPendingNotifications])
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') fetchPendingNotifications() }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+  }, [fetchPendingNotifications])
+
   // Listen for new actionable notifications via Socket.IO
   useEffect(() => {
     if (!socket || !isConnected) return
@@ -73,6 +92,7 @@ export function ActionableToastProvider({ children }) {
         console.log('[ActionableToast] New notification received:', data)
         
         if (data?.notification) {
+          if (new Date(data.notification.snoozedUntil || 0).getTime() > Date.now()) { fetchPendingNotifications(); return }
           setNotifications(prev => {
             // Check if notification already exists
             const exists = prev.some(n => n._id === data.notification._id)
@@ -111,9 +131,11 @@ export function ActionableToastProvider({ children }) {
         console.log('[ActionableToast] Notification updated:', data)
         
         if (data?.notificationId) {
+          notificationRevisionRef.current += 1
           setNotifications(prev => 
             prev.filter(n => n._id !== data.notificationId)
           )
+          if (data.snoozedUntil) fetchPendingNotifications()
         }
       } catch (error) {
         console.error('[ActionableToast] Error handling update:', error)
@@ -123,6 +145,7 @@ export function ActionableToastProvider({ children }) {
     const handleNotificationRemoved = (data) => {
       try {
         if (data?.notificationId) {
+          notificationRevisionRef.current += 1
           setNotifications(prev => 
             prev.filter(n => n._id !== data.notificationId)
           )
@@ -142,7 +165,21 @@ export function ActionableToastProvider({ children }) {
       socket.off('actionable-notification-updated', handleNotificationUpdated)
       socket.off('actionable-notification-removed', handleNotificationRemoved)
     }
-  }, [socket, isConnected])
+  }, [socket, isConnected, fetchPendingNotifications])
+
+  const snoozeNotification = useCallback(async (notificationId) => {
+    const token = localStorage.getItem('token')
+    const response = await fetch(`/api/actionable-notifications/${notificationId}`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'snooze' }),
+    })
+    const result = await response.json()
+    if (!response.ok || !result.success) throw new Error(result.message || 'Unable to snooze notification')
+    notificationRevisionRef.current += 1
+    setNotifications(previous => previous.filter(item => item._id !== notificationId))
+    setNextReminderAt(previous => !previous || new Date(result.snoozedUntil) < new Date(previous) ? result.snoozedUntil : previous)
+    return result
+  }, [])
 
   // Show a new actionable toast (for local creation)
   const showActionableToast = useCallback((notification) => {
@@ -244,15 +281,16 @@ export function ActionableToastProvider({ children }) {
       {children}
       {/* Render actionable toasts - higher z-index than regular notifications */}
       <div 
-        className="fixed bottom-4 right-4 pointer-events-none" 
+        className="fixed bottom-4 right-4 left-4 sm:left-auto pointer-events-none"
         style={{ zIndex: 2147483649 }}
       >
-        <div className="flex flex-col-reverse gap-3 pointer-events-auto max-w-md">
+        <div className="flex max-h-[calc(100dvh-6rem)] flex-col-reverse gap-3 overflow-y-auto pointer-events-auto w-full sm:w-[380px]">
           {notifications.slice(0, 5).map((notification) => (
             <ActionableToast
               key={notification._id}
               notification={notification}
               onDismiss={() => dismissNotification(notification._id)}
+              onSnooze={() => snoozeNotification(notification._id)}
               onAction={(actionId, reason, skipEndpoint) => executeAction(notification._id, actionId, reason, skipEndpoint)}
             />
           ))}
