@@ -85,6 +85,7 @@ describe('whiteboard AI route', () => {
       'Record evidence',
     ]);
     expect(generateSmartContent).toHaveBeenCalledTimes(1);
+    expect(generateSmartContent).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ timeoutMs: 45000, maxAttempts: 1, thinking: false }));
     expect(whiteboard.save).toHaveBeenCalledTimes(1);
   });
 

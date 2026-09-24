@@ -26,7 +26,7 @@ export async function POST(request) {
     // Fixed in-process delegates: no arbitrary URLs, headers, IDs or database queries from the model.
     const headers = new Headers({ 'Content-Type': 'application/json' })
     for (const key of ['authorization', 'cookie']) if (request.headers.get(key)) headers.set(key, request.headers.get(key))
-    const delegated = new Request(new URL(prepared.path, request.url), { method: 'POST', headers, body: JSON.stringify(prepared.body), signal: request.signal })
+    const delegated = new Request(new URL(prepared.path, request.url), { method: prepared.method || 'POST', headers, body: JSON.stringify(prepared.body), signal: request.signal })
     let result
     if (prepared.path === '/api/chat/start-and-send') {
       const created = await (await import('@/app/api/chat/route')).POST(new Request(new URL('/api/chat', request.url), { method: 'POST', headers, body: JSON.stringify({ isGroup: false, participants: [prepared.recipient] }), signal: request.signal }))
@@ -34,13 +34,16 @@ export async function POST(request) {
       if (!created.ok || !chat.success || !chat.data?._id) return NextResponse.json({ success: false, message: 'Could not open the private conversation. No message was sent.' }, { status: 400 })
       result = await (await import('@/app/api/chat/[chatId]/messages/route')).POST(delegated, { params: Promise.resolve({ chatId: String(chat.data._id) }) })
     }
+    else if (prepared.path === '/api/projects/invite-existing') result = await (await import('@/app/api/projects/[projectId]/members/route')).POST(delegated, { params: Promise.resolve({ projectId: prepared.id }) })
+    else if (prepared.path === '/api/meetings/invite-existing') result = await (await import('@/app/api/meetings/[id]/route')).PUT(delegated, { params: Promise.resolve({ id: prepared.id }) })
     else if (prepared.path === '/api/tasks/create') result = await (await import('@/app/api/tasks/create/route')).POST(delegated)
     else if (prepared.path === '/api/projects') result = await (await import('@/app/api/projects/route')).POST(delegated)
     else if (prepared.path === '/api/meetings') result = await (await import('@/app/api/meetings/route')).POST(delegated)
     else if (prepared.path === '/api/tasks/assign-existing') result = await (await import('@/app/api/tasks/[taskId]/assign/route')).POST(delegated, { params: Promise.resolve({ taskId: prepared.id }) })
     else result = await (await import('@/app/api/chat/[chatId]/messages/route')).POST(delegated, { params: Promise.resolve({ chatId: prepared.id }) })
     const data = await result.json()
-    if (!result.ok || data.success === false) return NextResponse.json({ success: false, message: result.status === 403 ? 'Higher clearance is required for this action.' : data.message || 'The action could not be completed.' }, { status: result.status })
+    if (!result.ok || data.success === false) return NextResponse.json({ success: false, uncertain: result.status >= 500, message: result.status === 403 ? 'Higher clearance is required for this action.' : data.message || 'The action could not be completed.' }, { status: result.status })
+    if (Array.isArray(data.errors) && data.errors.length) return NextResponse.json({ success: false, uncertain: true, message: `${data.message || 'Some invitations were processed.'} Not all requested invitations succeeded. Check the member list before retrying.` })
     const createdId = String(data.data?._id || data.project?._id || data.task?._id || '')
     const resource = /^[a-f\d]{24}$/i.test(createdId) && ['create_project', 'create_meeting'].includes(validation.action.type)
       ? { page: prepared.page, id: createdId } : undefined

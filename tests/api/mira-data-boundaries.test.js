@@ -21,6 +21,16 @@ beforeEach(() => {
   generateContent.mockResolvedValue(JSON.stringify({ message: 'Here is your data.', cards: [], suggestedQuestions: [] }))
 })
 const run = body => POST(new Request('http://localhost/api/ai/mira-chat', { method: 'POST', body: JSON.stringify(body) }))
+test('image decisions include generation capability instructions', async () => {
+  await run({ message: 'Create an image of a forest' })
+  expect(generateContent.mock.calls[0][1]).toContain('generate_image')
+})
+test('uncertain task outcomes cannot be automatically replayed', async () => {
+  generateContent.mockResolvedValue(JSON.stringify({ message: 'Sending', action: { type: 'send_message', fields: { recipient: 'Sahil', content: 'Hello' } } }))
+  const response = await (await run({ message: 'Retry', taskBank: { tasks: [{ id: '1', request: 'Send hello', status: 'blocked', uncertain: true, action: { type: 'send_message', fields: { recipient: 'Sahil', content: 'Hello' } } }] } })).json()
+  expect(response.response.action).toBeUndefined()
+  expect(response.response.message).toContain('Check the destination')
+})
 test('opening a named project bypasses generation and dashboard reads', async () => {
   const response = await (await run({ message: 'Open Talio project' })).json()
   expect(response.response.action).toEqual({ type: 'open_project', fields: { query: 'Talio' } })

@@ -21,6 +21,11 @@ test('Hindi phonetic matches are suggestions, never automatic recipients', async
 test('ambiguous names provide bounded real choices and no guessed identity', async () => {
   await expect(resolveMiraPerson('Sahil', user, models([person, { ...person, _id: 'cccccccccccccccccccccccc', lastName: 'Sharma' }]), { type: 'send_message' })).rejects.toMatchObject({ resolution: { candidates: expect.any(Array) } })
 })
+test('misspelled names use fuzzy candidates but require a choice', async () => {
+  const db = models([person])
+  db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([person])
+  await expect(resolveMiraPerson('Sahl', user, db, { type: 'send_message' })).rejects.toMatchObject({ resolution: { candidates: [expect.objectContaining({ name: 'Sahil Sahu' })] } })
+})
 test('selected identifiers are looked up again within the current scope', async () => {
   const db = models([])
   await expect(resolveMiraPerson(`employee:${person._id}`, user, db, { type: 'create_task' })).rejects.toThrow('No matching person')

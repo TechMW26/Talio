@@ -1160,7 +1160,7 @@ Return ONLY valid JSON array. No explanations.`;
       // ═══════════════════════════════════════════════════════════════
       // ROBUST CONTENT GENERATION WITH RETRY & FALLBACK
       // ═══════════════════════════════════════════════════════════════
-      const MAX_RETRIES = 2;
+      const MAX_RETRIES = 1;
       const RETRY_DELAY = 1000; // ms
 
       const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -1179,6 +1179,10 @@ Return ONLY valid JSON array. No explanations.`;
             userId: user._id || user.userId,
             feature: 'whiteboard-prepare',
             useCase: 'reasoning',
+            thinking: false,
+            maxTokens: 5000,
+            timeoutMs: 45000,
+            maxAttempts: 1,
             skipRefinement: true,
             skipContext: true,
             skipSaveContext: true,

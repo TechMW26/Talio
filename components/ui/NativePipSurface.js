@@ -69,10 +69,20 @@ async function getPipWindow(size) {
     document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => target.document.head.append(node.cloneNode(true)))
     target.document.documentElement.className = document.documentElement.className
     target.document.body.className = document.body.className
+    // Native children have no overlaid app title bar. Do not inherit its safe area.
+    target.document.documentElement.removeAttribute('data-desktop-platform')
+    for (let i = 0; i < document.documentElement.style.length; i++) {
+      const key = document.documentElement.style[i]
+      if (key.startsWith('--')) target.document.documentElement.style.setProperty(key, document.documentElement.style.getPropertyValue(key))
+    }
     const theme = document.documentElement.getAttribute('data-theme')
     if (theme) target.document.documentElement.setAttribute('data-theme', theme)
     const style = target.document.createElement('style')
-    style.textContent = `html,body{margin:0;padding:0}body{display:flex;flex-direction:column;gap:0;overflow:auto;background:#151518}
+    style.textContent = `html,body{margin:0;padding:0}body{display:flex;flex-direction:column;gap:0;overflow:auto;background:#151518;color:#f4f4f5}
+      [data-meeting-pip]{color:#f4f4f5!important;background:#18181b!important}
+      [data-meeting-pip] main,[data-meeting-pip] header,[data-meeting-pip] footer{background:#18181b!important;color:inherit}
+      [data-meeting-pip] button{flex-shrink:0}
+      [data-meeting-pip] button svg{width:20px!important;height:20px!important;min-width:20px;flex-shrink:0}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
       [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;transform:none!important}

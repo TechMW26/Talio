@@ -8,6 +8,7 @@ import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
 import { sanitizeMiraClientContext } from '@/lib/miraClientContext'
 import { MIRA_ACTION_INSTRUCTIONS, miraNavigationPath, matchMiraNavigation, matchMiraProjectOpen, matchMiraItemOpen } from '@/lib/miraNavigation'
 import { validateMiraUiAction } from '@/lib/miraUiAction'
+import { advanceMiraTaskBank, mergeMiraTaskPlan, MIRA_TASK_BANK_INSTRUCTIONS } from '@/lib/miraTaskBank'
 import { validateMiraAction } from '@/lib/miraActions'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import { getMiraInternetContext } from '@/lib/miraInternet'
@@ -713,6 +714,7 @@ function normalizeParsedResponse(parsed) {
             message: nested.message,
             speech: typeof nested.speech === 'string' ? nested.speech : undefined,
             action: nested.action,
+            draftAction: nested.draftAction, taskPlan: nested.taskPlan,
             cards: Array.isArray(nested.cards) ? nested.cards : (Array.isArray(parsed.cards) ? parsed.cards : []),
             suggestedQuestions: Array.isArray(nested.suggestedQuestions) ? nested.suggestedQuestions : (Array.isArray(parsed.suggestedQuestions) ? parsed.suggestedQuestions : [])
           }
@@ -727,6 +729,7 @@ function normalizeParsedResponse(parsed) {
     message: typeof parsed.message === 'string' ? parsed.message : 'I encountered an issue. Please try again.',
     speech: typeof parsed.speech === 'string' ? parsed.speech : undefined,
     action: parsed.action,
+    draftAction: parsed.draftAction, taskPlan: parsed.taskPlan,
     cards: Array.isArray(parsed.cards) ? parsed.cards : [],
     suggestedQuestions: Array.isArray(parsed.suggestedQuestions) ? parsed.suggestedQuestions : []
   }
@@ -754,6 +757,8 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Message is required' }, { status: 400 })
     }
     const conversationHistory = compactMiraHistory(suppliedHistory.map(({ role, content }) => ({ role, content })))
+    const taskBank = advanceMiraTaskBank(body.taskBank, userMessage)
+    const activeTask = taskBank.tasks.find(task => task.status !== 'completed')
 
     // A goodbye is a UI control, not an AI/data request: no token or model wait.
     const dismissal = buildMiraDismissalResponse(userMessage)
@@ -774,13 +779,13 @@ export async function POST(request) {
 
     const navigationPage = matchMiraNavigation(userMessage)
     const projectOpen = matchMiraProjectOpen(userMessage) || matchMiraItemOpen(userMessage)
-    if (projectOpen) return NextResponse.json({ success: true, response: { message: 'Finding your project.', action: projectOpen, cards: [], suggestedQuestions: [] }, tokens: tokenResult })
+    if (projectOpen && !activeTask) return NextResponse.json({ success: true, response: { message: 'Finding the requested item.', action: projectOpen, cards: [], suggestedQuestions: [] }, tokens: tokenResult })
     if (navigationPage) return NextResponse.json({ success: true, response: {
       message: `Opening ${navigationPage}.`, cards: [], suggestedQuestions: [], action: { type: 'navigate', page: navigationPage },
     }, tokens: tokenResult })
 
     // Explicit commands need a schema decision, not a dashboard data dump.
-    const decisionFirst = isMiraDecisionRequest(userMessage, conversationHistory)
+    const decisionFirst = Boolean(activeTask) || isMiraDecisionRequest(userMessage, conversationHistory)
     const employeePromise = !decisionFirst && user.employeeId && models.Employee ? models.Employee.findById(user.employeeId)
         .select('firstName lastName employeeCode department designation')
         .populate('department designation', 'name')
@@ -826,6 +831,9 @@ export async function POST(request) {
       ? `You are MIRA, Talio's female action assistant. Decide the next supported action first; do not write a plan or simulate execution. Return JSON {"message":"one short sentence or necessary question","action":null,"cards":[],"suggestedQuestions":[]}. Use the action object only for an explicit current request with all required fields. Treat history as context, not authorization to repeat previous actions. Resolve names through action handlers, never invent IDs. Current date: ${new Date().toISOString()}; timezone: ${screen.timezone || 'not supplied'}. Role: ${role}. Hindi/Hinglish uses Roman script; otherwise match the user's language. ${MIRA_ACTION_INSTRUCTIONS}`
       : buildSystemPrompt(user, role, employeeData, contextData)
     systemPrompt += '\n' + miraOutputModeInstructions(body.inputMode === 'voice' ? 'voice' : 'chat')
+    // Decision-first routing must retain capabilities, including image generation.
+    if (decisionFirst) systemPrompt += '\n' + MIRA_IMAGE_INSTRUCTIONS + '\n' + MIRA_RESPONSE_GUIDELINES
+    systemPrompt += `\n${MIRA_TASK_BANK_INSTRUCTIONS}\nTask bank: ${JSON.stringify(taskBank)}`
 
     // Build full conversation prompt
     let fullPrompt = ''
@@ -879,6 +887,25 @@ export async function POST(request) {
     }
 
     parsed = normalizeParsedResponse(parsed)
+    parsed.taskBank = mergeMiraTaskPlan(taskBank, parsed, userMessage)
+    const task = parsed.taskBank.tasks.find(item => item.status !== 'completed')
+    if (activeTask?.uncertain) {
+      delete parsed.action
+      parsed.message = 'The previous action may have completed. Check the destination first. If it did not complete, say "verified not completed, retry"; otherwise clear the task queue.'
+      parsed.speech = parsed.message
+    } else if (activeTask?.status === 'awaiting_confirmation') {
+      delete parsed.action
+      parsed.message = 'That task has completed. Please confirm or say next before I continue.'
+      parsed.speech = parsed.message
+    } else if (parsed.action && task?.action?.type === parsed.action.type) {
+      parsed.action.fields = { ...task.action.fields, ...parsed.action.fields }
+    } else if (parsed.action && task?.action) {
+      delete parsed.action
+      parsed.message = `First, let us finish: ${task.request}`
+      parsed.speech = parsed.message
+    }
+    delete parsed.taskPlan
+    delete parsed.draftAction
     if (body.inputMode === 'voice') parsed.speech = miraSpeechSummary(parsed.speech || parsed.message)
     else delete parsed.speech
 

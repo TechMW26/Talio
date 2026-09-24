@@ -12,6 +12,11 @@ export default function MiraPet({ size = 40, isThinking = false }) {
         ink="#101820"
         size={size}
         state={isThinking ? 'working' : 'default'}
+        jumpHeight={0.1}
+        jumpSpin={0}
+        jumpEvery={0}
+        turn={0.15}
+        interactive={false}
         shading="plastic"
         theme="auto"
         aria-label={isThinking ? 'MIRA thinking' : 'MIRA'}

@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+html[data-desktop-platform="darwin"] { --desktop-safe-top: 52px; }
+html[data-desktop-platform="win32"] { --desktop-safe-top: 44px; }
+html[data-desktop-platform] [data-meeting-fullscreen="true"] {
+  top: var(--desktop-safe-top, 44px) !important;
+  height: calc(100dvh - var(--desktop-safe-top, 44px)) !important;
+}
+[data-meeting-pip] button { flex-shrink: 0; }
+[data-meeting-pip] button svg { width: 20px; height: 20px; min-width: 20px; flex-shrink: 0; }
+
 /* Board assistants are independent of the white canvas's light-theme overrides. */
 html:is(:root, .dark, .light) body .mira-board-panel {
   --ai-surface: rgba(250, 252, 255, .94);

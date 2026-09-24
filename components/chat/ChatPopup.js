@@ -1,4 +1,5 @@
 'use client'
+import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { FaTimes, FaPaperPlane, FaUsers, FaPaperclip, FaFile, FaFilePdf, FaMinus, FaExpand, FaCompress } from 'react-icons/fa'
@@ -281,6 +282,7 @@ export default function ChatPopup({ chat, index }) {
   }, [chat, currentEmployeeId])
 
   const updatePresenceState = (updates) => {
+    updates = normalizePresenceUpdates(updates)
     if (!updates || updates.length === 0) return
     setPresenceByEmployee(prev => {
       const next = { ...prev }

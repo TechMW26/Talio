@@ -54,6 +54,9 @@ function ClientDataSyncBridge() {
 }
 
 export function Providers({ children }) {
+    useEffect(() => {
+        if (window.electronAPI) document.documentElement.dataset.desktopPlatform = window.platform || 'desktop'
+    }, [])
     const nonCriticalInitializedRef = useRef(false)
 
     // Defer non-critical initialization (audio only)

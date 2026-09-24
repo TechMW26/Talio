@@ -409,6 +409,9 @@ const MessageBubble = memo(function MessageBubble({ message, onSuggestionClick, 
           </div>
         )}
         {data.image && <MiraGeneratedImage image={data.image} />}
+        {Array.isArray(data.taskBank?.tasks) && data.taskBank.tasks.length > 1 && <ol aria-label="MIRA task queue" className="my-3 space-y-1 rounded-xl border border-default-200 p-3 text-xs text-default-600">
+          {data.taskBank.tasks.map((task, index) => <li key={task.id}>{index + 1}. {task.request} · {task.status.replaceAll('_', ' ')}</li>)}
+        </ol>}
         <MiraActionPreview action={data.action} result={data.actionResult} messageId={message.id} busy={busy} />
         <div hidden={message.streaming} className={message.streaming ? 'hidden' : 'mt-1 flex flex-wrap items-center gap-2 text-xs text-default-600 md:opacity-0 md:group-hover/msg:opacity-100 md:group-focus-within/msg:opacity-100'}>
           <button disabled={busy} onClick={() => onReply(message)} className="hover:underline disabled:opacity-50">Reply</button>
@@ -651,9 +654,9 @@ export default function MiraChatSidebar() {
           left: pip ? '24px' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
           right: undefined,
           borderRadius: 16,
-          top: pip ? 'auto' : expanded ? 12 : sidebarDrag.position?.y ?? 12,
+          top: pip ? 'auto' : `max(var(--desktop-safe-top, 12px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? '24px' : 'auto',
-          height: pip ? 'auto' : 'calc(100dvh - 24px)',
+          height: pip ? 'auto' : 'calc(100dvh - var(--desktop-safe-top, 12px) - 12px)',
           transitionProperty: sidebarDrag.dragging || pip ? 'none' : 'opacity, transform, left, top, width',
           width: pip ? 'min(340px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode

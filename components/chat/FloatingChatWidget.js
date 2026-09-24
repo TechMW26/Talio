@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
+import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
 export default function FloatingChatWidget() {
   const { 
@@ -266,6 +267,7 @@ export default function FloatingChatWidget() {
   }
 
   const updatePresenceState = (updates) => {
+    updates = normalizePresenceUpdates(updates)
     if (!updates || updates.length === 0) return
     setPresenceByEmployee(prev => {
       const next = { ...prev }

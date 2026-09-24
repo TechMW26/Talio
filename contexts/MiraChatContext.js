@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { getMiraClientContext } from '@/lib/miraClientContext'
 import { executeMiraUiAction } from '@/lib/miraUiAction'
+import { advanceMiraTaskBank, mergeMiraTaskPlan, recordMiraTaskOutcome } from '@/lib/miraTaskBank'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
 import { readMiraEvents } from '@/lib/miraStream'
@@ -234,6 +235,7 @@ export function MiraChatProvider({ children }) {
       abortControllerRef.current = new AbortController()
 
       const conversationHistory = compactMiraHistory(history)
+      const taskBank = advanceMiraTaskBank([...history].reverse().find(message => message.data?.taskBank)?.data.taskBank, text)
 
       const res = resolvedAction ? { json: async () => ({ success: true, response: { message: '', action: resolvedAction, cards: [], suggestedQuestions: [] } }) } : await fetch('/api/ai/mira-chat', {
         method: 'POST',
@@ -241,7 +243,7 @@ export function MiraChatProvider({ children }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: text, conversationHistory, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
+        body: JSON.stringify({ message: text, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
         signal: abortControllerRef.current.signal
       })
 
@@ -261,21 +263,27 @@ export function MiraChatProvider({ children }) {
       } else data = await res.json()
 
       if (data.success) {
+        data.response.taskBank = data.response.taskBank || mergeMiraTaskPlan(taskBank, data.response, text)
         if (data.tokens) setTokens(data.tokens)
         if (data.response.action?.type === 'generate_image') {
           const pendingImage = { id: replyId, role: 'assistant', content: data.response.message, data: { ...data.response, image: { status: 'pending' } }, timestamp: new Date() }
           setMessages(prev => prev.some(m => m.id === replyId) ? prev.map(m => m.id === replyId ? pendingImage : m) : [...prev, pendingImage])
+          let outcome
+          try {
           const imageResponse = await fetch('/api/ai/mira-images', {
             method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({ action: data.response.action, requestId: crypto.randomUUID() }),
             signal: abortControllerRef.current.signal,
           })
-          const outcome = await imageResponse.json()
+          outcome = await imageResponse.json()
+          } catch {
+            outcome = { success: false, uncertain: true, message: 'Image generation was interrupted. Check whether an image was produced before retrying.' }
+          }
           data.response.image = outcome.success ? outcome.image : { status: 'failed' }
           data.response.message = outcome.success
             ? (/[\u0900-\u097f]/u.test(text) ? 'Aapki image taiyaar hai.' : 'Your image is ready.')
             : (outcome.message || 'Image generation failed. Please try again.')
-          data.response.actionResult = { success: Boolean(outcome.success), message: data.response.message }
+          data.response.actionResult = { success: Boolean(outcome.success), uncertain: outcome.uncertain === true, message: data.response.message }
           data.response.suggestedQuestions = []
         }
         if (data.response.action?.type === 'ui_action') {
@@ -305,6 +313,9 @@ export function MiraChatProvider({ children }) {
           data.response.message = outcome.message || (outcome.success ? 'Completed successfully.' : 'The action could not be completed.')
           data.response.suggestedQuestions = []
         }
+        data.response.taskBank = recordMiraTaskOutcome(data.response.taskBank, data.response.actionResult)
+        const remainingTasks = data.response.taskBank.tasks.filter(task => task.status !== 'completed')
+        if (data.response.actionResult?.success && remainingTasks.length > 1) data.response.message += '\nConfirm this is done, then say next to continue the queue.'
         const aiMsg = {
           id: replyId,
           role: 'assistant',

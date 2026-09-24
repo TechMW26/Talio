@@ -16,6 +16,11 @@ test('meeting lookup is limited to organizer and invitee', async () => {
   expect(await prepareMiraAction({ type: 'open_meeting', fields: { query: 'Delio' } }, { employeeId: 'own' }, models)).toMatchObject({ page: 'meetings', id })
   expect(models.Meeting.find.mock.calls[0][0].$and[0]).toEqual({ $or: [{ organizer: 'own' }, { 'invitees.employee': 'own' }] })
 })
+test('existing meeting invitations resolve the meeting and recipient before delegating', async () => {
+  const models = { Meeting: { find: jest.fn(() => chain([{ _id: id, title: 'Delio' }])) } }
+  const prepared = await prepareMiraAction({ type: 'invite_meeting', fields: { query: 'Delio', invitees: ['me'] } }, { employeeId: 'own' }, models)
+  expect(prepared).toEqual({ path: '/api/meetings/invite-existing', id, method: 'PUT', body: { addInvitees: ['own'] } })
+})
 test('task lookup uses user assignments and retains ambiguity choices', async () => {
   const models = { TaskAssignee: { find: jest.fn(() => chain([{ task: id }])) }, Task: { find: jest.fn(() => chain([{ _id: id, title: 'Paper' }, { _id: '507f1f77bcf86cd799439012', title: 'Paper' }])) } }
   await expect(prepareMiraAction({ type: 'open_task', fields: { query: 'Paper' } }, { employeeId: 'own' }, models)).rejects.toMatchObject({ resolution: { kind: 'task' } })
