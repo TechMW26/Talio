@@ -13,6 +13,7 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { buildHelpdeskReport } from '@/lib/client/helpdeskReport'
 
 export default function HelpdeskManagePage() {
   const router = useRouter()
@@ -25,10 +26,11 @@ export default function HelpdeskManagePage() {
   const [newStatus, setNewStatus] = useState('')
   const [assignTo, setAssignTo] = useState('')
   const [filter, setFilter] = useState('all') // all, open, in-progress, resolved
+  const [categoryFilter, setCategoryFilter] = useState('all')
 
   // SWR data fetching - only fetch when user has access
   const { data: ticketsRes, error, isLoading, isValidating, mutate: refreshTickets } = useAuthedSWR(hasAccess ? '/api/helpdesk' : null)
-  const tickets = ticketsRes?.data || []
+  const tickets = Array.isArray(ticketsRes?.data) ? ticketsRes.data : []
 
   const { data: employeesRes } = useAuthedSWR(hasAccess ? '/api/employees?all=true&limit=1000' : null)
   const employeesRaw = employeesRes?.data
@@ -75,9 +77,19 @@ export default function HelpdeskManagePage() {
   }
 
   const filteredTickets = tickets.filter(t => {
+    if (categoryFilter !== 'all' && t.category !== categoryFilter) return false
     if (filter === 'all') return true
     return t.status === filter
   })
+
+  const exportReport = () => {
+    const url = URL.createObjectURL(new Blob([buildHelpdeskReport(filteredTickets)], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `helpdesk-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
 
   const stats = [
     {
@@ -199,6 +211,15 @@ export default function HelpdeskManagePage() {
       </div>
 
       {/* Tickets Table */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+        <Select label="Ticket category" className="sm:max-w-xs" selectedKeys={[categoryFilter]} onChange={event => setCategoryFilter(event.target.value || 'all')}>
+          <SelectItem key="all">All categories</SelectItem>
+          {[...new Set(tickets.map(ticket => ticket.category).filter(Boolean))].sort().map(category => (
+            <SelectItem key={category}>{category.replaceAll('-', ' ')}</SelectItem>
+          ))}
+        </Select>
+        <Button variant="flat" onPress={exportReport} isDisabled={isLoading || !filteredTickets.length}>Export report</Button>
+      </div>
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-800">

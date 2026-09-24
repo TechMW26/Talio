@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import OffboardingAssetChecklistModal from '@/components/employees/OffboardingAssetChecklistModal'
+import SettlementEditor from '@/components/employees/SettlementEditor'
+import EmploymentLetterEditor from '@/components/employees/EmploymentLetterEditor'
 import OnboardingVerificationModal from '@/components/employees/OnboardingVerificationModal'
 import toast from '@/utils/toast'
 import { Button, Chip, Progress, Skeleton } from '@heroui/react'
@@ -32,7 +34,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
   const [showOffboarding, setShowOffboarding] = useState(false)
   const [showAssetClearance, setShowAssetClearance] = useState(false)
   const [verificationItem, setVerificationItem] = useState(null)
-  const [extension, setExtension] = useState({ months: 1, reason: '' })
+  const [extension, setExtension] = useState({ months: 1, reason: '', pip: { enabled: false, goals: '', reviewDate: '' } })
   const [offboarding, setOffboarding] = useState({ separationType: 'resignation', resignationDate: '', lastWorkingDate: '', reason: '' })
 
   const runAction = async (action, payload = {}) => {
@@ -176,6 +178,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
         </div>
       )}
 
+      {details.enabled?.onboarding && canOffboard && <EmploymentLetterEditor name={details.employeeName} value={lifecycle.letterDraft} busy={processing === 'save_onboarding_letter'} onSave={payload => runAction('save_onboarding_letter', payload)} />}
       {details.enabled?.probation && probation.applicable && (
         <div className="mt-4 rounded-2xl border border-slate-200 p-5 dark:border-zinc-800">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -230,6 +233,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
               {probationApproval.requestRemarks && (
                 <p className="mt-2 text-xs text-slate-600 dark:text-zinc-400"><span className="font-semibold">Request note:</span> {probationApproval.requestRemarks}</p>
               )}
+              {probationApproval.pip?.enabled && <p className="mt-2 text-sm">PIP review: {probationApproval.pip.reviewDate} · {probationApproval.pip.goals}</p>}
               {probationApproval.decisionRemarks && (
                 <p className="mt-1 text-xs text-slate-600 dark:text-zinc-400"><span className="font-semibold">Manager remarks:</span> {probationApproval.decisionRemarks}</p>
               )}
@@ -245,10 +249,15 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
                 color="primary"
                 isDisabled={!extension.reason.trim()}
                 isLoading={processing === 'request_probation_extension'}
-                onPress={() => requestProbationApproval('extension', { months: extension.months, remarks: extension.reason })}
+                onPress={() => requestProbationApproval('extension', { months: extension.months, remarks: extension.reason, pip: extension.pip })}
               >
                 Request approval
               </Button>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={extension.pip.enabled} onChange={e => setExtension({ ...extension, pip: { ...extension.pip, enabled: e.target.checked } })} />Include a performance improvement plan</label>
+              {extension.pip.enabled && <>
+                <textarea aria-label="PIP goals" placeholder="Measurable goals and support to be provided" value={extension.pip.goals} onChange={e => setExtension({ ...extension, pip: { ...extension.pip, goals: e.target.value } })} className="rounded-lg border bg-transparent p-2 text-sm" />
+                <input aria-label="PIP review date" type="date" value={extension.pip.reviewDate} onChange={e => setExtension({ ...extension, pip: { ...extension.pip, reviewDate: e.target.value } })} className="rounded-lg border bg-transparent p-2 text-sm" />
+              </>}
             </div>
           )}
         </div>
@@ -279,6 +288,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
           {exit.status !== 'not_started' && (
             <div className="mt-4">
               <p className="mb-3 text-xs text-slate-500">Last working date: {formatIstDate(exit.lastWorkingDate)}</p>
+              <SettlementEditor value={exit.settlement} busy={processing === 'save_settlement'} onSave={settlement => runAction('save_settlement', { settlement })} />
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                   { field: 'exitInterviewCompleted', label: 'Exit interview', completed: Boolean(exit.exitInterviewCompleted) },

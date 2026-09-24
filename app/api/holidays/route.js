@@ -29,14 +29,14 @@ export async function GET(request) {
       role: 'any',
       userId: 'all',
       namespace: 'holidays:list',
-      params: { year, startDate: startDateParam, endDate: endDateParam, upcoming, limit, type },
+      params: { version: 2, year, startDate: startDateParam, endDate: endDateParam, upcoming, limit, type },
     })
     const cached = await getCache(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
     }
 
-    const query = {}
+    const query = { isActive: { $ne: false } }
 
     // Filter by holiday type (e.g. 'public', 'optional', 'restricted')
     if (type && HOLIDAY_TYPES.includes(type)) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
-import { buildLeaveBalanceFields, normalizeLeaveType } from '@/lib/leaveData'
+import { buildLeaveBalanceFields, normalizeLeaveType, prorateAnnualLeave } from '@/lib/leaveData'
 import { EMPLOYED_STATUSES } from '@/lib/leaveAllocation.server'
 // POST - Bulk allocate leave for all employees
 export async function POST(request) {
@@ -17,11 +17,12 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
-    const { year } = await request.json()
+    const body = await request.json().catch(() => null)
+    const year = Number(body?.year)
     
-    if (!year) {
+    if (!Number.isInteger(year) || year < 1900 || year > 9998) {
       return NextResponse.json(
-        { success: false, message: 'Year is required' },
+        { success: false, message: 'A valid leave year is required' },
         { status: 400 }
       )
     }
@@ -71,7 +72,7 @@ export async function POST(request) {
           leaveType: leaveType._id,
           year: year,
           ...buildLeaveBalanceFields({
-            totalDays: normalizedLeaveType.maxDaysPerYear,
+            totalDays: prorateAnnualLeave(normalizedLeaveType.maxDaysPerYear, employee.dateOfJoining, year),
           }),
         })
 

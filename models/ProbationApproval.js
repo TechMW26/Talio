@@ -4,6 +4,7 @@ const ProbationApprovalSchema = new mongoose.Schema({
   employee: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
   requestType: { type: String, enum: ['confirmation', 'extension'], required: true },
   extensionMonths: { type: Number, min: 1, max: 24, default: null },
+  pip: { enabled: Boolean, goals: String, reviewDate: String },
   requestRemarks: { type: String, trim: true, maxlength: 2000, default: '' },
   requestedByUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   requestedByEmployee: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', default: null },

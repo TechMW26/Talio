@@ -651,6 +651,7 @@ export default function AttendanceReportPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-default-800">Attendance Report & Analytics</h1>
+            <p className="mt-2 text-xs text-default-500">Expand an employee row to view daily punch-in and punch-out times. Dates follow the company timezone; device punches appear after the attendance bridge syncs. Today’s record may change until the workday is complete.</p>
             <p className="text-default-500 mt-1">
               Comprehensive attendance KPIs, shrinkage analysis, and employee metrics
               <BackgroundRefreshIndicator isValidating={isValidating} />

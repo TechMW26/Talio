@@ -30,6 +30,7 @@ function serializeProbationApproval(approval) {
     _id: approval._id,
     requestType: approval.requestType,
     extensionMonths: approval.extensionMonths,
+    pip: approval.pip,
     requestRemarks: approval.requestRemarks,
     status: approval.status,
     approverSource: approval.approverSource,
@@ -127,6 +128,7 @@ async function getLifecycle(request, { params }) {
     success: true,
     data: {
       lifecycle,
+      employeeName: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
       progress: getLifecycleProgress(lifecycle),
       automation: { enabled: true, signals },
       workflows,
@@ -163,6 +165,9 @@ async function patchLifecycle(request, { params }) {
     }, { status: 409 })
   }
   const moduleName = moduleForAction(action)
+  if (action === 'save_onboarding_letter' && !HR_ROLES.has(auth.user?.role)) {
+    return NextResponse.json({ success: false, message: 'Only HR can prepare employment letters' }, { status: 403 })
+  }
   if (!MANAGER_ROLES.has(auth.user?.role)) {
     return NextResponse.json({ success: false, message: 'HR or manager access is required' }, { status: 403 })
   }

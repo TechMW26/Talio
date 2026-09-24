@@ -8,6 +8,11 @@ import {
 } from '@/lib/hrms/probationApproval.server'
 
 describe('probation approval workflow', () => {
+  test('requires and preserves PIP goals and review date', () => {
+    const input = { requestType: 'extension', months: 1, remarks: 'Review progress', pip: { enabled: true, goals: 'Complete training', reviewDate: '2026-10-25' } }
+    expect(validateProbationApprovalRequest(input).pip).toEqual(input.pip)
+    expect(() => validateProbationApprovalRequest({ ...input, pip: { enabled: true } })).toThrow('PIP')
+  })
   const ids = {
     employee: '66c000000000000000000001',
     reporting: '66c000000000000000000002',

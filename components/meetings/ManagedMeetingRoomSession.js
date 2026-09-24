@@ -397,7 +397,10 @@ export default function ManagedMeetingRoomSession({
         // Bind feedback to LiveKit's authenticated sender, not a payload identity.
         if (!feedbackRef.current({ topic, data, sender: participant?.identity, localIdentity: roomRef.current?.localParticipant.identity })) return
         if (topic === 'talio-reaction') showReaction(participant.identity, data.reaction)
-        else setRaisedHands((current) => ({ ...current, [participant.identity]: data.raised }))
+        else {
+          setRaisedHands((current) => ({ ...current, [participant.identity]: data.raised }))
+          if (data.raised) toast.success(`${participant.name || 'A participant'} raised their hand`, { id: `meeting-hand-${participant.identity}` })
+        }
       }
     } catch {
       // Ignore malformed participant data packets.

@@ -113,6 +113,7 @@ const EmployeeSchema = new mongoose.Schema({
     type: Date,
   },
   lifecycle: {
+    letterDraft: { kind: String, content: String, savedAt: Date },
     stage: {
       type: String,
       enum: ['preboarding', 'onboarding', 'probation', 'confirmed', 'notice_period', 'offboarding', 'alumni'],
@@ -164,6 +165,7 @@ const EmployeeSchema = new mongoose.Schema({
       confirmedAt: Date,
       extendedAt: Date,
       extensionReason: { type: String, trim: true, maxlength: 1000 },
+      pip: { enabled: Boolean, goals: String, reviewDate: String },
     },
     noticePeriodDays: { type: Number, min: 0, max: 365, default: 30 },
     backgroundVerificationRequired: { type: Boolean, default: true },
@@ -191,6 +193,14 @@ const EmployeeSchema = new mongoose.Schema({
       }],
       accessRevoked: { type: Boolean, default: false },
       fullAndFinalStatus: { type: String, enum: ['not_started', 'pending', 'completed'], default: 'not_started' },
+      settlement: {
+        date: String,
+        currency: String,
+        items: [{ label: String, type: { type: String, enum: ['earning', 'deduction'] }, amount: Number }],
+        netAmount: Number,
+        notes: String,
+        savedAt: Date,
+      },
       experienceLetterStatus: { type: String, enum: ['not_started', 'pending', 'issued'], default: 'not_started' },
       completedAt: Date,
     },

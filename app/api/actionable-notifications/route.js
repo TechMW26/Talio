@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
+import { ensureProbationReviewReminder } from '@/lib/hrms/probationReminder.server'
+import { isFeatureEnabled } from '@/lib/planFeatures'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 
 /**
@@ -17,6 +19,10 @@ export async function GET(request) {
 
     const { user, models, tenant } = auth
     const { ActionableNotification } = models
+
+    if (isFeatureEnabled(auth.companyFeatures, 'probation')) {
+      await ensureProbationReviewReminder({ models, user }).catch(error => console.error('[Probation reminder]', error.message))
+    }
 
     // Parse query params
     const { searchParams } = new URL(request.url)

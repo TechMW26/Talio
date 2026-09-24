@@ -9,8 +9,11 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Holiday } = models
+    const { user } = auth
+
+    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
 
     const { country, year } = await request.json()
 
@@ -58,33 +61,13 @@ export async function POST(request) {
       throw new Error('AI did not return an array')
     }
 
-    // Save to database
-    let addedCount = 0
-    for (const h of holidays) {
-      // Check if exists
-      const exists = await Holiday.findOne({
-        date: new Date(h.date),
-        name: h.name
-      })
-
-      if (!exists) {
-        await Holiday.create({
-          name: h.name,
-          date: new Date(h.date),
-          type: h.type || 'public',
-          description: h.description,
-          category: h.category || 'public',
-          year: parseInt(year),
-          applicableTo: 'all',
-          isActive: true
-        })
-        addedCount++
-      }
-    }
+    // Suggestions are not company approvals. Only the normal management
+    // create flow may persist a holiday that affects attendance or leave.
 
     return NextResponse.json({
       success: true,
-      message: `Successfully fetched and added ${addedCount} holidays for ${country}`,
+      message: 'Holiday suggestions ready. Review and add approved dates through holiday management.',
+      requiresApproval: true,
       data: holidays
     })
 
