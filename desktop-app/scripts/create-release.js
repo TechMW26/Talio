@@ -123,6 +123,13 @@ async function main() {
     console.error('ERROR: Missing release assets:', missingAssets.map(asset => asset.file).join(', '));
     process.exit(1);
   }
+  for (const asset of ASSETS) {
+    if (fs.statSync(path.join(distDir, asset.file)).size < 1024 * 1024) throw new Error('Invalid or truncated installer: ' + asset.file);
+    if (asset.file.endsWith('.deb')) {
+      const result = require('child_process').spawnSync('ar', ['t', path.join(distDir, asset.file)], { encoding: 'utf8' });
+      if (result.status !== 0 || !result.stdout.includes('debian-binary') || !result.stdout.includes('data.tar')) throw new Error('Invalid Debian package: ' + asset.file);
+    }
+  }
   const checksums = ASSETS.map(asset => {
     const digest = crypto.createHash('sha256').update(fs.readFileSync(path.join(distDir, asset.file))).digest('hex');
     return `${digest}  ${asset.file}`;
@@ -141,17 +148,19 @@ async function main() {
     prerelease: false,
   });
 
-  const release = await githubRequest({
+  const resumeId = process.env.RESUME_RELEASE_ID;
+  const release = resumeId ? await githubRequest({ hostname: 'api.github.com', path: `/repos/${OWNER}/${REPO}/releases/${resumeId}`, method: 'GET' }) : await githubRequest({
     hostname: 'api.github.com',
     path: `/repos/${OWNER}/${REPO}/releases`,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(releaseBody) }
   }, releaseBody);
 
-  if (release.status !== 201) {
+  if (release.status !== (resumeId ? 200 : 201)) {
     console.error('Failed to create release:', release.status, JSON.stringify(release.data, null, 2));
     process.exit(1);
   }
+  if (resumeId && (!release.data.draft || release.data.tag_name !== TAG)) throw new Error('Can only resume the matching draft release');
 
   console.log('Release created! ID:', release.data.id);
   console.log('URL:', release.data.html_url);
@@ -161,6 +170,12 @@ async function main() {
   let uploadFailed = false;
   for (const asset of ASSETS) {
     const filePath = path.join(distDir, asset.file);
+    const existing = release.data.assets?.find(item => item.name === asset.file && item.state === 'uploaded');
+    if (existing && existing.digest === 'sha256:' + crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')) {
+      console.log('Already uploaded and hash verified: ' + asset.file);
+      continue;
+    }
+    if (existing) throw new Error('Existing draft asset does not match: ' + asset.file);
     const sizeMB = (fs.statSync(filePath).size / 1024 / 1024).toFixed(1);
     console.log(`Uploading ${asset.file} (${sizeMB} MB)...`);
     const result = await uploadAsset(uploadUrl, filePath, asset.type);
