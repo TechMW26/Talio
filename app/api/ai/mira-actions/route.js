@@ -15,6 +15,7 @@ export async function POST(request) {
       if (assignment.denied) return NextResponse.json({ success: false, message: 'Higher clearance is required to assign tasks to other people.' }, { status: 403 })
     }
     const prepared = await prepareMiraAction(validation.action, auth.user, auth.models)
+    if (prepared.path === 'navigate') return NextResponse.json({ success: true, message: `Opening ${prepared.name}.`, navigation: { page: prepared.page, id: prepared.id } })
     if (prepared.path === 'lookup') {
       const people = prepared.resolution.candidates
       return NextResponse.json({ success: true, resolution: { ...prepared.resolution, resolved: true }, message: people.length
@@ -40,7 +41,10 @@ export async function POST(request) {
     else result = await (await import('@/app/api/chat/[chatId]/messages/route')).POST(delegated, { params: Promise.resolve({ chatId: prepared.id }) })
     const data = await result.json()
     if (!result.ok || data.success === false) return NextResponse.json({ success: false, message: result.status === 403 ? 'Higher clearance is required for this action.' : data.message || 'The action could not be completed.' }, { status: result.status })
-    return NextResponse.json({ success: true, message: data.message || 'Completed successfully.', page: prepared.page })
+    const createdId = String(data.data?._id || data.project?._id || data.task?._id || '')
+    const resource = /^[a-f\d]{24}$/i.test(createdId) && ['create_project', 'create_meeting'].includes(validation.action.type)
+      ? { page: prepared.page, id: createdId } : undefined
+    return NextResponse.json({ success: true, message: data.message || 'Completed successfully.', page: prepared.page, ...(resource ? { resource } : {}) })
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof SyntaxError ? 'Invalid action request.' : error.message || 'Action failed. Check the page before retrying.', ...(error.resolution ? { resolution: error.resolution } : {}) }, { status: error.resolution ? 409 : 400 })
   }

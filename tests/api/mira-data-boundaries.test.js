@@ -21,6 +21,18 @@ beforeEach(() => {
   generateContent.mockResolvedValue(JSON.stringify({ message: 'Here is your data.', cards: [], suggestedQuestions: [] }))
 })
 const run = body => POST(new Request('http://localhost/api/ai/mira-chat', { method: 'POST', body: JSON.stringify(body) }))
+test('opening a named project bypasses generation and dashboard reads', async () => {
+  const response = await (await run({ message: 'Open Talio project' })).json()
+  expect(response.response.action).toEqual({ type: 'open_project', fields: { query: 'Talio' } })
+  expect(generateContent).not.toHaveBeenCalled()
+  expect(models.Attendance.findOne).not.toHaveBeenCalled()
+})
+test('explicit action decisions avoid unrelated database context', async () => {
+  await run({ message: 'Create a task called Review with assignee me' })
+  expect(models.Attendance.findOne).not.toHaveBeenCalled()
+  expect(models.Meeting.find).not.toHaveBeenCalled()
+  expect(generateContent.mock.calls[0][1]).toContain('Decide the next supported action first')
+})
 test('dashboard meeting reads start before a slow attendance read finishes', async () => {
   let release
   models.Attendance.findOne.mockReturnValue({ select() { return this }, lean: () => new Promise(resolve => { release = resolve }) })

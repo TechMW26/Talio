@@ -20,7 +20,7 @@ test('recognized speech sends a turn, speaks its reply and resumes listening wit
   expect(result.current.state).toBe('listening')
   let pending
   await act(async () => { pending = callbacks.onResult({ text: 'hello mira' }); await Promise.resolve() })
-  expect(sendMessage).toHaveBeenCalledWith('hello mira', expect.objectContaining({ onResponse: expect.any(Function) }))
+  expect(sendMessage).toHaveBeenCalledWith('hello mira', expect.objectContaining({ inputMode: 'voice', onSpeech: expect.any(Function) }))
   expect(engine.setPaused).not.toHaveBeenCalled()
   expect(result.current.state).toBe('speaking')
   await act(async () => callbacks.onResult({ text: 'hello there' }))
@@ -51,7 +51,7 @@ test('closing stops capture and speech playback', async () => {
   expect(result.current.state).toBe('idle')
 })
 test('speech output skips code syntax and markdown decoration', () => {
-  expect(speechText('**Hello**\n```js\nalert(1)\n```')).toBe('Hello\n Code is shown in the chat.')
+  expect(speechText('**Hello**\n```js\nalert(1)\n```')).toBe('Hello')
 })
 
 test('a final goodbye stops a busy session and passes through the local structured-dismiss path', async () => {

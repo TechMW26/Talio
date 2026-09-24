@@ -5,6 +5,7 @@ import MiraChatSidebar from '@/components/MiraChatSidebar'
 const mockStop = jest.fn()
 const mockStart = jest.fn()
 const mockPush = jest.fn()
+const mockCloseChat = jest.fn()
 jest.mock('@/lib/miraSpeechPlayback', () => ({ createMiraSpeechPlayback: () => ({ close: jest.fn(), cancel: jest.fn(), speak: jest.fn() }) }))
 let mockOpen = true
 let mockMessages = []
@@ -27,7 +28,7 @@ jest.mock('@/contexts/MiraChatContext', () => ({ useMiraChat: () => {
   const [viewMode, setViewMode] = require('react').useState('chat')
   return ({
   viewMode, setViewMode,
-  isOpen: mockOpen, closeChat: jest.fn(), messages: mockMessages, sendMessage: jest.fn(), isThinking: mockThinking,
+  isOpen: mockOpen, closeChat: mockCloseChat, messages: mockMessages, sendMessage: jest.fn(), isThinking: mockThinking,
   clearHistory: jest.fn(), tokens: { tokensRemaining: 100, tokenLimit: 100 }, sessions: [],
   showHistory: false, toggleHistory: jest.fn(), startNewChat: jest.fn(),
 }) } }))
@@ -40,6 +41,7 @@ beforeEach(() => {
   mockStart.mockReset()
   mockStop.mockReset()
   mockPush.mockReset()
+  mockCloseChat.mockReset()
   window.speechSynthesis = { getVoices: () => [], cancel: jest.fn() }
   window.SpeechSynthesisUtterance = function () {}
   Element.prototype.scrollIntoView = jest.fn()
@@ -81,6 +83,15 @@ test('user bubbles hide internal reply context from restored messages', () => {
   expect(screen.getByText('Baat chaat')).toBeVisible()
   expect(screen.queryByText(/Replying to this MIRA response/)).not.toBeInTheDocument()
   expect(screen.queryByText(/Hidden previous answer/)).not.toBeInTheDocument()
+})
+
+test('resolved project navigation opens the record and stays minimized', () => {
+  render(<MiraChatSidebar />)
+  const id = '507f1f77bcf86cd799439011'
+  act(() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: 'projects', id } })))
+  expect(mockPush).toHaveBeenCalledWith(`/dashboard/projects/${id}`)
+  expect(screen.getByLabelText('Restore MIRA chat')).toBeInTheDocument()
+  expect(screen.getByText('MIRA · Opening projects')).toBeInTheDocument()
 })
 test('chat toolbar is unbranded while keeping history, new chat and window controls', () => {
   render(<MiraChatSidebar />)
@@ -161,6 +172,18 @@ test('PiP shows streaming and completed assistant captions', () => {
   mockMessages = [{ id: 1, role: 'assistant', content: 'Project khul gaya hai.' }]
   rerender(<MiraChatSidebar />)
   expect(screen.getByLabelText('MIRA live captions')).toHaveTextContent('Project khul gaya hai.')
+})
+
+test('PiP captions expand on click and its dismiss button does not expand', () => {
+  render(<MiraChatSidebar />)
+  fireEvent.click(screen.getByLabelText('Minimize MIRA to floating voice'))
+  expect(screen.queryByText('↗')).toBeNull()
+  fireEvent.click(screen.getByLabelText('MIRA live captions'))
+  expect(screen.getByLabelText('Minimize MIRA to floating voice')).toBeVisible()
+  fireEvent.click(screen.getByLabelText('Minimize MIRA to floating voice'))
+  fireEvent.click(screen.getByLabelText('Dismiss MIRA'))
+  expect(mockCloseChat).toHaveBeenCalledTimes(1)
+  expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible()
 })
 
 test('the same sidebar smoothly expands to full width and collapses', () => {

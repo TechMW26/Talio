@@ -123,15 +123,19 @@ export default function CandidatesPage() {
             <Card shadow="sm" className="p-0.5">
               <CardBody className="p-0 flex flex-row">
                 <button
+                  type="button"
+                  aria-pressed={viewMode === 'list'}
                   onClick={() => setViewMode('list')}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${viewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-default-500 hover:text-default-700'
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${viewMode === 'list' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-default-500 hover:text-default-700'
                     }`}
                 >
                   List
                 </button>
                 <button
+                  type="button"
+                  aria-pressed={viewMode === 'pipeline'}
                   onClick={() => setViewMode('pipeline')}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${viewMode === 'pipeline' ? 'bg-primary text-white shadow-sm' : 'text-default-500 hover:text-default-700'
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${viewMode === 'pipeline' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-default-500 hover:text-default-700'
                     }`}
                 >
                   Pipeline

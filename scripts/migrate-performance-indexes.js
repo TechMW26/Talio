@@ -5,13 +5,18 @@
  * Dry-run is the default. Apply with:
  *   DRY_RUN=false npm run migrate:performance-indexes
  */
-require('dotenv/config')
+require('dotenv').config({ path: '.env.local', quiet: true })
+require('dotenv').config({ quiet: true })
 const mongoose = require('mongoose')
 
 const dryRun = process.env.DRY_RUN !== 'false'
 const mongoUri = process.env.MONGODB_URI
 
 const INDEXES = Object.freeze({
+  tasks: [{ key: { updatedAt: -1 }, name: 'updatedAt_-1' }],
+  projects: [{ key: { updatedAt: -1 }, name: 'updatedAt_-1' }],
+  announcements: [{ key: { status: 1, createdAt: -1 }, name: 'status_1_createdAt_-1' }],
+  meetings: [{ key: { scheduledStart: -1 }, name: 'scheduledStart_-1' }],
   employees: [
     { key: { createdAt: -1, _id: -1 }, name: 'createdAt_-1__id_-1' },
     { key: { status: 1, createdAt: -1, _id: -1 }, name: 'status_1_createdAt_-1__id_-1' },
@@ -29,6 +34,7 @@ const INDEXES = Object.freeze({
 async function ensureTenantIndexes(connection) {
   let created = 0
   for (const [collectionName, definitions] of Object.entries(INDEXES)) {
+    if (process.env.INDEX_COLLECTIONS && !process.env.INDEX_COLLECTIONS.split(',').includes(collectionName)) continue
     const collection = connection.collection(collectionName)
     const existing = await collection.listIndexes().toArray().catch(error => {
       if (error.code === 26) return [] // Namespace not created yet.

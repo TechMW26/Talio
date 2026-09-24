@@ -44,8 +44,8 @@ export default function MiraGeneratedImage({ image }) {
   }, [image?.id, image?.status])
   useEffect(() => {
     if (!src) return
-    // Always show the image even if the GPU effect never emits completion.
-    const timer = setTimeout(() => setRevealed(true), 8000)
+    // The loader must not add seconds of waiting after generation completes.
+    const timer = setTimeout(() => setRevealed(true), 400)
     return () => clearTimeout(timer)
   }, [src])
   if (!image || image.status === 'failed') return null

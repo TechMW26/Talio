@@ -8,6 +8,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Expose protected methods to the renderer
 contextBridge.exposeInMainWorld('electronAPI', {
+  nativePip: true,
   activateMira: function() {
     return ipcRenderer.invoke('mira-wake');
   },

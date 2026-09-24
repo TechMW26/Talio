@@ -4,16 +4,20 @@
  * for instant playback on first load
  */
 
+import { UI_SOUNDS } from '@/lib/uiSounds'
+
 // Sound file paths
 const SOUNDS = {
-  loginSuccess: '/sounds/login-success.mp3',
-  messageNotification: '/sounds/message-notifications.mp3',
-  error: '/sounds/error.mp3',
-  notification: '/sounds/notification.mp3',
-  success: '/sounds/success.mp3',
-  taskDone: '/sounds/taskdone.mp3',
-  gameInvite: '/sounds/yay-6120.mp3',
-  gameOver: '/sounds/game-over.wav'
+  loginSuccess: UI_SOUNDS.success,
+  messageNotification: UI_SOUNDS.pop,
+  error: UI_SOUNDS.error,
+  notification: UI_SOUNDS.notification,
+  success: UI_SOUNDS.success,
+  taskDone: UI_SOUNDS.success,
+  gameInvite: UI_SOUNDS.pop,
+  gameOver: UI_SOUNDS.error,
+  click: UI_SOUNDS.click,
+  alert: UI_SOUNDS.alert,
 }
 
 // Global AudioContext instance (same pattern as CallAlertReceiver)
@@ -23,8 +27,8 @@ let audioContextUnlocked = false
 // In-memory audio buffer cache
 const audioBufferCache = {}
 
-// localStorage key for cached audio data (v2 includes new sounds)
-const AUDIO_CACHE_KEY = 'talio_audio_cache_v2'
+// localStorage key for cached audio data (v3 uses the supplied UI sound pack)
+const AUDIO_CACHE_KEY = 'talio_audio_cache_v3'
 
 /**
  * Get or create AudioContext instance
@@ -264,7 +268,7 @@ function playWithHTML5Audio(url, volume = 0.7) {
 /**
  * Main play function - tries Web Audio API first, then HTML5 Audio
  */
-async function playSound(key, volume = 0.7) {
+export async function playSound(key, volume = 0.7) {
   if (typeof window === 'undefined') return false
 
   console.log('[Audio] Playing sound:', key)
@@ -407,116 +411,26 @@ export const playGameOverSound = async () => {
   return playSound('gameOver', 0.8)
 }
 
-// ── Timer Alarm (looping, loud, alarm-like) ──
-let timerAlarmNodes = null
+// Timer alarm uses the same supplied alert tone, with explicit stop control.
+let timerAlarmAudio = null
 
-/**
- * Start a looping alarm tone for the focus timer.
- * Uses two detuned oscillators for a classic alarm sound.
- * Returns immediately - call stopTimerAlarm() to silence it.
- */
 export const startTimerAlarm = () => {
-  stopTimerAlarm() // clear any previous alarm
-
-  const ctx = getAudioContext()
-  if (!ctx || ctx.state !== 'running') {
-    // Fallback: loop the taskDone mp3 at full volume
-    try {
-      const audio = new Audio(SOUNDS.taskDone)
-      audio.volume = 1.0
-      audio.loop = true
-      audio.play().catch(() => {})
-      timerAlarmNodes = { fallbackAudio: audio }
-    } catch { /* ignore */ }
-    return
-  }
-
+  stopTimerAlarm()
+  if (typeof window === 'undefined') return
   try {
-    const masterGain = ctx.createGain()
-    masterGain.gain.value = 0.95
-    masterGain.connect(ctx.destination)
-
-    // Two oscillators for a richer alarm
-    const osc1 = ctx.createOscillator()
-    osc1.type = 'square'
-    osc1.frequency.value = 880
-
-    const osc2 = ctx.createOscillator()
-    osc2.type = 'sawtooth'
-    osc2.frequency.value = 740
-
-    const gain1 = ctx.createGain()
-    gain1.gain.value = 0.5
-    const gain2 = ctx.createGain()
-    gain2.gain.value = 0.35
-
-    osc1.connect(gain1)
-    osc2.connect(gain2)
-    gain1.connect(masterGain)
-    gain2.connect(masterGain)
-
-    // Pulse the alarm on/off (beep-beep pattern)
-    const now = ctx.currentTime
-    for (let t = 0; t < 60; t += 1) {
-      // 0.4s on, 0.6s off
-      masterGain.gain.setValueAtTime(0.95, now + t)
-      masterGain.gain.setValueAtTime(0, now + t + 0.4)
-    }
-
-    osc1.start()
-    osc2.start()
-
-    timerAlarmNodes = { osc1, osc2, gain1, gain2, masterGain }
-    console.log('[Audio] Timer alarm started')
-  } catch (err) {
-    console.error('[Audio] Timer alarm error:', err)
-  }
+    const audio = new Audio(UI_SOUNDS.alert)
+    audio.volume = 0.8
+    audio.loop = true
+    timerAlarmAudio = audio
+    audio.play()?.catch(() => {})
+  } catch { /* Audio may be unavailable on this device. */ }
 }
 
-/**
- * Stop the timer alarm immediately.
- */
 export const stopTimerAlarm = () => {
-  if (!timerAlarmNodes) return
-
-  try {
-    if (timerAlarmNodes.fallbackAudio) {
-      timerAlarmNodes.fallbackAudio.pause()
-      timerAlarmNodes.fallbackAudio.currentTime = 0
-    }
-    if (timerAlarmNodes.osc1) timerAlarmNodes.osc1.stop()
-    if (timerAlarmNodes.osc2) timerAlarmNodes.osc2.stop()
-    if (timerAlarmNodes.masterGain) timerAlarmNodes.masterGain.disconnect()
-  } catch { /* already stopped */ }
-
-  timerAlarmNodes = null
-  console.log('[Audio] Timer alarm stopped')
+  if (!timerAlarmAudio) return
+  timerAlarmAudio.pause()
+  timerAlarmAudio.currentTime = 0
+  timerAlarmAudio = null
 }
 
-/**
- * Play message sent sound (Web Audio API beep)
- */
-export const playMessageSentSound = () => {
-  const ctx = getAudioContext()
-  if (!ctx || ctx.state !== 'running') return
-
-  try {
-    const oscillator = ctx.createOscillator()
-    const gainNode = ctx.createGain()
-
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
-
-    oscillator.frequency.value = 600
-    oscillator.type = 'sine'
-
-    gainNode.gain.setValueAtTime(0, ctx.currentTime)
-    gainNode.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.01)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1)
-
-    oscillator.start(ctx.currentTime)
-    oscillator.stop(ctx.currentTime + 0.1)
-  } catch (err) {
-    console.error('[Audio] Error playing message sent sound:', err)
-  }
-}
+export const playMessageSentSound = () => playSound('click', 0.4)

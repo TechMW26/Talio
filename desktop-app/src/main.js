@@ -19,6 +19,7 @@ const screenshotService = require('./screenshotService');
 const socketHandler = require('./socketHandler');
 const { inspectRendererHealth, resolveAppNavigationUrl } = require('./rendererHealth');
 const { revealMiraWindow } = require('./miraWakeBridge');
+const { pipWindowOptions } = require('./pipWindowPolicy');
 
 // PERFORMANCE: Optimized GPU and rendering settings
 const forceDisableGPU = process.env.TALIO_DISABLE_GPU === '1';
@@ -1127,8 +1128,17 @@ function setupWindowEvents() {
 
   // Handle new window requests (open in browser)
   mainWindow.webContents.setWindowOpenHandler(function (details) {
-    shell.openExternal(details.url);
+    const pip = pipWindowOptions(details, mainWindow.webContents.getURL(), APP_ORIGIN);
+    if (pip) return pip;
+    if (/^https?:\/\//i.test(details.url)) shell.openExternal(details.url);
     return { action: 'deny' };
+  });
+  mainWindow.webContents.on('did-create-window', function (child, details) {
+    if (details.frameName !== 'talio-live-pip') return;
+    child.setAlwaysOnTop(true, 'floating');
+    if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    child.webContents.on('will-navigate', event => event.preventDefault());
+    child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   });
 
   // Handle certificate errors gracefully
@@ -1223,6 +1233,9 @@ function saveWindowBounds() {
  * MUST be called at dom-ready, before React hydration
  */
 function injectAudioDisable() {
+  // Native Web Audio is required by MIRA's worklet capture and streaming TTS.
+  // Retain the old compatibility shim only as an explicit diagnostic fallback.
+  if (process.env.TALIO_LEGACY_AUDIO_FALLBACK !== 'true') return;
   const disableAudioScript = '(' + (function () {
     // CRITICAL: Disable AudioContext to prevent renderer crashes in Electron
     // This must run before any audio initialization

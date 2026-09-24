@@ -6,7 +6,7 @@ import { normalizeLeaveBalance } from '@/lib/leaveData'
 import { miraTaskLink } from '@/lib/miraTaskLink'
 import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
 import { sanitizeMiraClientContext } from '@/lib/miraClientContext'
-import { MIRA_ACTION_INSTRUCTIONS, miraNavigationPath, matchMiraNavigation } from '@/lib/miraNavigation'
+import { MIRA_ACTION_INSTRUCTIONS, miraNavigationPath, matchMiraNavigation, matchMiraProjectOpen } from '@/lib/miraNavigation'
 import { validateMiraAction } from '@/lib/miraActions'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import { getMiraInternetContext } from '@/lib/miraInternet'
@@ -15,6 +15,8 @@ import { partialMiraMessage } from '@/lib/miraStream'
 import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
 import { MIRA_IMAGE_INSTRUCTIONS, validateMiraImageAction } from '@/lib/miraImageGeneration'
 import { compactMiraHistory, miraChatUseCase } from '@/lib/miraChatBudget'
+import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
+import { miraOutputModeInstructions, miraSpeechSummary } from '@/lib/miraSpokenReply'
 
 // Get current month key in "YYYY-MM" format
 function getCurrentMonth() {
@@ -708,6 +710,7 @@ function normalizeParsedResponse(parsed) {
         if (nested && typeof nested === 'object' && typeof nested.message === 'string') {
           return {
             message: nested.message,
+            speech: typeof nested.speech === 'string' ? nested.speech : undefined,
             action: nested.action,
             cards: Array.isArray(nested.cards) ? nested.cards : (Array.isArray(parsed.cards) ? parsed.cards : []),
             suggestedQuestions: Array.isArray(nested.suggestedQuestions) ? nested.suggestedQuestions : (Array.isArray(parsed.suggestedQuestions) ? parsed.suggestedQuestions : [])
@@ -721,6 +724,7 @@ function normalizeParsedResponse(parsed) {
 
   return {
     message: typeof parsed.message === 'string' ? parsed.message : 'I encountered an issue. Please try again.',
+    speech: typeof parsed.speech === 'string' ? parsed.speech : undefined,
     action: parsed.action,
     cards: Array.isArray(parsed.cards) ? parsed.cards : [],
     suggestedQuestions: Array.isArray(parsed.suggestedQuestions) ? parsed.suggestedQuestions : []
@@ -768,12 +772,15 @@ export async function POST(request) {
     }
 
     const navigationPage = matchMiraNavigation(userMessage)
+    const projectOpen = matchMiraProjectOpen(userMessage)
+    if (projectOpen) return NextResponse.json({ success: true, response: { message: 'Finding your project.', action: projectOpen, cards: [], suggestedQuestions: [] }, tokens: tokenResult })
     if (navigationPage) return NextResponse.json({ success: true, response: {
       message: `Opening ${navigationPage}.`, cards: [], suggestedQuestions: [], action: { type: 'navigate', page: navigationPage },
     }, tokens: tokenResult })
 
-    // Fetch employee data for context
-    const employeePromise = user.employeeId && models.Employee ? models.Employee.findById(user.employeeId)
+    // Explicit commands need a schema decision, not a dashboard data dump.
+    const decisionFirst = isMiraDecisionRequest(userMessage, conversationHistory)
+    const employeePromise = !decisionFirst && user.employeeId && models.Employee ? models.Employee.findById(user.employeeId)
         .select('firstName lastName employeeCode department designation')
         .populate('department designation', 'name')
         .lean() : Promise.resolve(null)
@@ -784,12 +791,12 @@ export async function POST(request) {
     const recentUserContext = conversationHistory.filter(m => m.role === 'user').slice(-2).map(m => m.content).join(' ')
     const isFollowUp = /\b(it|that|those|them|yes|same|above|did you|go ahead)\b|उस|उसी|कर दिया|हाँ|वही/i.test(userMessage)
     const contextQuery = isFollowUp ? `${recentUserContext} ${userMessage}` : userMessage
-    const useCase = miraChatUseCase(contextQuery)
+    const useCase = decisionFirst ? 'mira' : miraChatUseCase(contextQuery)
     const screen = sanitizeMiraClientContext(body.clientContext)
     const contextStarted = performance.now()
     let databaseContextMs = 0
     const timedContext = async () => {
-      const result = await (/^(?:hi|hello|hey|ssup|sup|what'?s up|thanks|thank you|नमस्ते|धन्यवाद)[\s!?.।]*$/iu.test(userMessage.trim())
+      const result = await (decisionFirst || /^(?:hi|hello|hey|ssup|sup|what'?s up|thanks|thank you|नमस्ते|धन्यवाद)[\s!?.।]*$/iu.test(userMessage.trim())
         ? Promise.resolve({}) : fetchContextData(models, user, role, contextQuery))
       databaseContextMs = performance.now() - contextStarted
       return result
@@ -797,7 +804,7 @@ export async function POST(request) {
     const [employeeData, contextData, internet] = await Promise.all([
       employeePromise,
       timedContext(),
-      getMiraInternetContext(userMessage, screen, conversationHistory.filter(m => m.role === 'user').at(-1)?.content),
+      decisionFirst ? null : getMiraInternetContext(userMessage, screen, conversationHistory.filter(m => m.role === 'user').at(-1)?.content),
     ])
     contextData.currentScreen = screen
     if (internet) contextData.internet = internet
@@ -814,7 +821,10 @@ export async function POST(request) {
     }
 
     // Build conversation for AI
-    const systemPrompt = buildSystemPrompt(user, role, employeeData, contextData)
+    let systemPrompt = decisionFirst
+      ? `You are MIRA, Talio's female action assistant. Decide the next supported action first; do not write a plan or simulate execution. Return JSON {"message":"one short sentence or necessary question","action":null,"cards":[],"suggestedQuestions":[]}. Use the action object only for an explicit current request with all required fields. Treat history as context, not authorization to repeat previous actions. Resolve names through action handlers, never invent IDs. Current date: ${new Date().toISOString()}; timezone: ${screen.timezone || 'not supplied'}. Role: ${role}. Hindi/Hinglish uses Roman script; otherwise match the user's language. ${MIRA_ACTION_INSTRUCTIONS}`
+      : buildSystemPrompt(user, role, employeeData, contextData)
+    systemPrompt += '\n' + miraOutputModeInstructions(body.inputMode === 'voice' ? 'voice' : 'chat')
 
     // Build full conversation prompt
     let fullPrompt = ''
@@ -829,7 +839,8 @@ export async function POST(request) {
     }
 
     const generateReply = async (onDelta, signal = request.signal) => {
-    const aiResponse = onDelta
+    // A compact decision must be validated before any execution narration is shown.
+    const aiResponse = onDelta && !decisionFirst
       ? await streamContent(fullPrompt, systemPrompt, { signal, onDelta, useCase })
       : await generateContentWithSearch(fullPrompt, systemPrompt, useCase)
 
@@ -867,6 +878,8 @@ export async function POST(request) {
     }
 
     parsed = normalizeParsedResponse(parsed)
+    if (body.inputMode === 'voice') parsed.speech = miraSpeechSummary(parsed.speech || parsed.message)
+    else delete parsed.speech
 
     parsed.cards = sanitizeMiraCards(parsed.cards)
     // Only the authenticated generation endpoint may supply image metadata.
@@ -904,10 +917,15 @@ export async function POST(request) {
         async start(controller) {
           const send = value => { if (!cancelled) controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`)) }
           let previous = ''
+          let previousSpeech = ''
           try {
             const result = await generateReply(raw => {
               const message = partialMiraMessage(raw)
               if (message && message !== previous) { previous = message; send({ type: 'message', message }) }
+              if (body.inputMode === 'voice') {
+                const speech = partialMiraMessage(raw, 'speech')
+                if (speech && speech !== previousSpeech) { previousSpeech = speech; send({ type: 'speech', speech }) }
+              }
             }, aborter.signal)
             send({ type: 'complete', ...result })
           } catch { send({ type: 'error', message: 'MIRA could not finish this reply. Please retry.' }) }

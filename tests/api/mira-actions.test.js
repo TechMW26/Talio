@@ -1,6 +1,7 @@
 jest.mock('next/server', () => ({ NextResponse: { json: (body, options = {}) => new Response(JSON.stringify(body), options) } }))
 jest.mock('@/lib/permissions', () => ({ requirePermission: jest.fn() }))
 jest.mock('@/app/api/tasks/create/route', () => ({ POST: jest.fn() }))
+jest.mock('@/app/api/projects/route', () => ({ POST: jest.fn() }))
 jest.mock('@/app/api/chat/route', () => ({ POST: jest.fn() }))
 jest.mock('@/app/api/chat/[chatId]/messages/route', () => ({ POST: jest.fn() }))
 import { requirePermission } from '@/lib/permissions'
@@ -9,12 +10,20 @@ import { prepareMiraAction, validateMiraAction } from '@/lib/miraActions'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { POST as createTask } from '@/app/api/tasks/create/route'
+import { POST as createProject } from '@/app/api/projects/route'
 import { POST as createChat } from '@/app/api/chat/route'
 import { POST as sendChatMessage } from '@/app/api/chat/[chatId]/messages/route'
 
 const action = { type: 'create_task', fields: { title: 'Review draft', assignees: ['me'] } }
 const run = body => POST(new Request('https://talio.test/api/ai/mira-actions', { method: 'POST', body: JSON.stringify(body) }))
 beforeEach(() => jest.clearAllMocks())
+test('project creation preserves the new record identity for opening and follow-ups', async () => {
+  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own', role: 'admin' }, models: {} }))
+  const id = '507f1f77bcf86cd799439011'
+  createProject.mockResolvedValue(new Response(JSON.stringify({ success: true, data: { _id: id } })))
+  const result = await (await run({ confirmed: true, action: { type: 'create_project', fields: { name: 'Test', startDate: '2026-09-24', endDate: '2026-10-01', heads: ['me'] } } })).json()
+  expect(result.resource).toEqual({ page: 'projects', id })
+})
 test('rejects incomplete actions, unknown operations and invalid meeting dates', () => {
   expect(validateMiraAction({ type: 'create_task', fields: { title: 'Draft' } }).error).toContain('assignees')
   expect(validateMiraAction({ type: 'delete_database', fields: {} }).error).toBeTruthy()

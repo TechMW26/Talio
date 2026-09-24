@@ -1,5 +1,12 @@
 const { INDEXES, sameIndex } = require('../../scripts/migrate-performance-indexes')
 
+test('recent list indexes cover audited MIRA sort patterns', () => {
+  expect(INDEXES.tasks[0].key).toEqual({ updatedAt: -1 })
+  expect(INDEXES.projects[0].key).toEqual({ updatedAt: -1 })
+  expect(INDEXES.announcements[0].key).toEqual({ status: 1, createdAt: -1 })
+  expect(INDEXES.meetings[0].key).toEqual({ scheduledStart: -1 })
+})
+
 test('index audit compares ordered key definitions, not names', () => {
   const definition = INDEXES.employees[0]
   expect(sameIndex({ key: definition.key, name: 'legacy-name' }, definition)).toBe(true)

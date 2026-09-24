@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
+import NativePipSurface from '@/components/ui/NativePipSurface'
 
 const MeetingSessionContext = createContext(null)
 const ROOM_PATH_PATTERN = /^\/dashboard\/meetings\/room\/([^/]+)/
@@ -119,6 +120,7 @@ export function MeetingSessionProvider({ children }) {
   const [activeRoomId, setActiveRoomId] = useState(routeRoomId)
   const [isJoined, setIsJoined] = useState(false)
   const [pipSize, setPipSize] = useState('expanded')
+  const nativePipRef = useRef(null)
   const [autoJoinRoomId, setAutoJoinRoomId] = useState(null)
   const [didRestoreSession, setDidRestoreSession] = useState(false)
 
@@ -183,6 +185,7 @@ export function MeetingSessionProvider({ children }) {
   }, [router])
 
   const restoreMeeting = useCallback(() => {
+    nativePipRef.current?.restore()
     if (activeRoomId) {
       router.push(`/dashboard/meetings/room/${activeRoomId}`)
     }
@@ -228,6 +231,7 @@ export function MeetingSessionProvider({ children }) {
             />
           )}
         >
+          <NativePipSurface ref={nativePipRef} enabled={!isFullRoom && isJoined} automatic>
           <MeetingRoomSession
             roomId={activeRoomId}
             displayMode={isFullRoom ? 'full' : pipSize}
@@ -238,6 +242,7 @@ export function MeetingSessionProvider({ children }) {
             onSetPipSize={setPipSize}
             onSessionEnded={endSession}
           />
+          </NativePipSurface>
         </ErrorBoundaryWithRetry>
       )}
     </MeetingSessionContext.Provider>

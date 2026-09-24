@@ -27,13 +27,16 @@ export async function POST(request) {
   try {
     record = await Image.create(owner)
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(150000)])
+    const generationStarted = performance.now()
     const image = await generatePollinationsImage(action.fields.prompt, signal)
+    const generationMs = performance.now() - generationStarted
+    const storageStarted = performance.now()
     signal.throwIfAborted()
     if (image.buffer.length > 8 * 1024 * 1024) throw new Error('Generated image is too large.')
     if (isBlobStorageConfigured()) stored = await uploadTenantBlob({ tenantId: auth.tenant.databaseName, category: 'mira-images', ownerId: String(auth.user._id), filename: 'generated.png', body: image.buffer, contentType: image.contentType, access: 'private' })
     signal.throwIfAborted()
     await Image.updateOne({ _id: record._id, user: auth.user._id }, { $set: { status: 'ready', ...(stored ? { pathname: stored.pathname } : { imageBuffer: image.buffer }), model: image.model } })
-    return NextResponse.json({ success: true, image: { id: String(record._id), status: 'ready' } })
+    return NextResponse.json({ success: true, image: { id: String(record._id), status: 'ready' } }, { headers: { 'Server-Timing': `image_generation;dur=${generationMs.toFixed(1)}, image_storage;dur=${(performance.now() - storageStarted).toFixed(1)}` } })
   } catch (error) {
     if (stored) await deleteTenantBlob(stored.url).catch(() => {})
     if (record) await Image.updateOne({ _id: record._id }, { $set: { status: 'failed' } }).catch(() => {})

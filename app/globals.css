@@ -121,6 +121,7 @@ html.dark .ai-glass-panel :is(.text-violet-600, .text-violet-700, .text-blue-700
 @media (prefers-reduced-motion: reduce) { .mira-reply-avatar { transition: none; } }
 
 /* Legacy primary actions use text-white; neutral light buttons need dark ink. */
+html.dark .bg-primary.text-white,
 html.dark .bg-primary-500.text-white,
 html.dark .bg-primary-600.text-white { color:#111111; }
 

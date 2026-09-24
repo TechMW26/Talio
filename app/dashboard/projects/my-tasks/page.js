@@ -709,7 +709,7 @@ export default function MyTasksPage() {
               <button
                 onClick={() => setViewMode('list')}
                 className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${viewMode === 'list'
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-content1 text-default-600 hover:bg-default-100'
                   }`}
                 title="List View"
@@ -719,7 +719,7 @@ export default function MyTasksPage() {
               <button
                 onClick={() => setViewMode('kanban')}
                 className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-default-300 ${viewMode === 'kanban'
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-content1 text-default-600 hover:bg-default-100'
                   }`}
                 title="Kanban View"

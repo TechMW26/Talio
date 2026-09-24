@@ -9,7 +9,7 @@ import { getRoleDisplayLabel } from '@/hooks/useRoles';
 import ModalPortal from '@/components/ui/ModalPortal';
 
 // Alert sound URL - using existing notification sound
-const ALERT_SOUND_URL = '/sounds/notification.mp3';
+const ALERT_SOUND_URL = '/sounds/ui-v3-alert.mp3';
 
 // Priority-based styling matching project theme
 const priorityConfig = {

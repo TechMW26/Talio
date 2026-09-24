@@ -5,9 +5,10 @@ import { createMiraSpeechPlayback } from '@/lib/miraSpeechPlayback'
 import { isMiraPlaybackEcho } from '@/lib/miraEchoGuard'
 import { isMiraDismissal } from '@/lib/miraDismissal'
 import { createMiraStreamingSpeech } from '@/lib/miraStreamingSpeech'
+import { naturalMiraSpeech, miraSpeechSummary } from '@/lib/miraSpokenReply'
 
 export function speechText(text) {
-  return String(text || '').replace(/```[\s\S]*?```/g, ' Code is shown in the chat. ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*#`_>|]/g, '').trim()
+  return naturalMiraSpeech(text)
 }
 
 export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
@@ -84,13 +85,15 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
               },
             })
             run.reply = ''
+            let spokenReply
             const response = await current.current.sendMessage(text, {
-              onPartialResponse: content => speech.update(content),
-              onResponse: content => speech.update(content, true),
+              inputMode: 'voice',
+              onPartialSpeech: content => speech.update(miraSpeechSummary(content)),
+              onSpeech: content => { spokenReply = content; speech.update(content, true) },
             })
             if (!live() || turn !== run.turn) return
             if (!response) { setError('No spoken reply received. Check the chat and try again.'); listen(); return }
-            await speech.finish(response)
+            await speech.finish(spokenReply ?? miraSpeechSummary(response))
             if (live() && turn === run.turn) { setTranscript(''); listen() }
           } catch (err) { if (live() && turn === run.turn) { run.turn++; run.playback.cancel(); if (err.name !== 'AbortError') setError(err.message || 'Voice request failed.'); listen() } }
         },

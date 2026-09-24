@@ -8,6 +8,7 @@ import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
 import { readMiraEvents } from '@/lib/miraStream'
 import { matchMiraViewMode } from '@/lib/miraViewMode'
 import { compactMiraHistory } from '@/lib/miraChatBudget'
+import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 
 const MiraChatContext = createContext()
 
@@ -239,7 +240,7 @@ export function MiraChatProvider({ children }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: text, conversationHistory, clientContext: getMiraClientContext(), stream: true }),
+        body: JSON.stringify({ message: text, conversationHistory, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
         signal: abortControllerRef.current.signal
       })
 
@@ -248,6 +249,7 @@ export function MiraChatProvider({ children }) {
         await readMiraEvents(res.body, event => {
           if (event.type === 'error') throw new Error(event.message)
           if (event.type === 'complete') data = event
+          if (event.type === 'speech') options.onPartialSpeech?.(event.speech)
           if (event.type === 'message') {
             options.onPartialResponse?.(event.message)
             const partial = { id: replyId, role: 'assistant', content: event.message, streaming: true, timestamp: new Date() }
@@ -276,6 +278,7 @@ export function MiraChatProvider({ children }) {
           data.response.suggestedQuestions = []
         }
         if (data.response.action && !['navigate', 'dismiss', 'generate_image'].includes(data.response.action.type)) {
+          window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: data.response.action.type.replaceAll('_', ' '), phase: 'working' } }))
           // Execute only a newly generated requested action, never a rendered/saved message.
           let outcome
           try {
@@ -289,6 +292,7 @@ export function MiraChatProvider({ children }) {
             outcome = { success: false, uncertain: true, message: 'The connection was interrupted. Check the destination before trying again; the action may have completed.' }
           }
           data.response.actionResult = outcome
+          window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: outcome.success ? 'Completed' : outcome.resolution ? 'Waiting for your choice' : 'Action failed', phase: 'done' } }))
           if (outcome.resolution) data.response.selectionId = String(userMsg.id)
           if (resolvedSelectionId) data.response.resolvedSelectionId = resolvedSelectionId
           data.response.message = outcome.message || (outcome.success ? 'Completed successfully.' : 'The action could not be completed.')
@@ -305,9 +309,18 @@ export function MiraChatProvider({ children }) {
         // Start voice as soon as the reply is visible, without waiting on persistence.
         if (data.response.action?.type === 'dismiss') closeChat()
         else options.onResponse?.(aiMsg.content)
+        if (data.response.action?.type !== 'dismiss') {
+          // Execution results supersede any proposed action narration.
+          options.onSpeech?.(miraSpeechSummary(data.response.actionResult ? aiMsg.content : data.response.speech || aiMsg.content))
+        }
         if (data.response.action?.type === 'navigate' && miraNavigationPath(data.response.action.page)) {
           setViewMode('pip')
           window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: data.response.action.page } }))
+        }
+        const navigation = data.response.actionResult?.navigation
+        if (navigation && miraNavigationPath(navigation.page, navigation.id)) {
+          setViewMode('pip')
+          window.dispatchEvent(new CustomEvent('mira:navigate', { detail: navigation }))
         }
         // Persistence is ordered but never holds the completed reply in thinking state.
         // Capture the target so switching chats cannot redirect a queued save.
@@ -326,6 +339,7 @@ export function MiraChatProvider({ children }) {
         setMessages(prev => [...prev, errMsg])
       }
     } catch (err) {
+      window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: 'Stopped', phase: 'done' } }))
       setMessages(prev => prev.filter(m => m.id !== replyId))
       if (err.name !== 'AbortError') {
         setMessages(prev => [...prev, {

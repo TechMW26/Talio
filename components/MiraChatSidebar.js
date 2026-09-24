@@ -8,6 +8,8 @@ import { useTheme } from '@/contexts/ThemeContext'
 import MiraSphere from '@/components/ui/MiraPet'
 import MiraGeneratedImage from '@/components/ui/MiraGeneratedImage'
 import AIActivityBeam from '@/components/ui/AIActivityBeam'
+import NativePipSurface from '@/components/ui/NativePipSurface'
+import MiraActivityPointer from '@/components/ui/MiraActivityPointer'
 import MiraWakeSetup from '@/components/MiraWakeSetup'
 import ReactMarkdown from 'react-markdown'
 import { VoiceBeam } from 'voice-glow'
@@ -319,13 +321,16 @@ function CodeBlock({ className, children }) {
 function MiraActionPreview({ action, result, messageId, busy }) {
   const { sendMessage } = useMiraChat()
   if (!action || ['navigate', 'dismiss'].includes(action.type)) return null
+  const resource = result?.resource
+  const href = resource && miraNavigationPath(resource.page, resource.id)
+  if (result?.success && href) return <button className="my-2 rounded-xl border border-default-200 px-3 py-2 text-sm" onClick={() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: resource }))}>Open created {resource.page === 'projects' ? 'project' : 'meeting'} ↗</button>
   if (!result?.resolution?.candidates?.length || result.resolved) return null
-  return <section className="my-3 space-y-2 text-sm" aria-label="Choose a matching person">
+  return <section className="my-3 space-y-2 text-sm" aria-label={result.resolution.kind === 'project' ? 'Choose a matching project' : 'Choose a matching person'}>
     {result.resolution.candidates.map(person => <button key={person.value} disabled={busy} onClick={() => sendMessage(`Choose ${person.name}${person.code ? ` (${person.code})` : ''}.`, { resolvePerson: { messageId, value: person.value } })}
       className="w-full rounded-xl border border-default-200 p-3 text-left hover:bg-white/10 disabled:opacity-40">
       <strong className="block">{person.name}</strong><span className="text-xs text-default-500">{[person.code, person.department].filter(Boolean).join(' · ')}</span>
     </button>)}
-    {result.resolution.more && <p>More matches exist. Add a surname or department to narrow the search.</p>}
+    {result.resolution.more && <p>More matches exist. Add more details to narrow the search.</p>}
   </section>
 }
 
@@ -466,7 +471,7 @@ export default function MiraChatSidebar() {
   }, [pathname, isOpen, voice.active, setViewMode])
   useEffect(() => {
     const navigate = event => {
-      const path = miraNavigationPath(event.detail?.page)
+      const path = miraNavigationPath(event.detail?.page, event.detail?.id)
       if (!path) return
       setViewMode('pip')
       router.push(path)
@@ -475,6 +480,11 @@ export default function MiraChatSidebar() {
     return () => window.removeEventListener('mira:navigate', navigate)
   }, [router, setViewMode])
   const pip = isOpen && minimized
+  const nativePipRef = useRef(null)
+  useEffect(() => { if (!pip) nativePipRef.current?.restore() }, [pip])
+  const popOutMira = () => {
+    setViewMode('pip')
+  }
   const toggleMicrophone = () => voice.active ? voice.stop() : voice.start()
   const [slashResults, setSlashResults] = useState([])
   const [slashIdx, setSlashIdx] = useState(0)
@@ -614,6 +624,7 @@ export default function MiraChatSidebar() {
 
   return (
     <>
+      <MiraActivityPointer />
       {/* Backdrop */}
       {isOpen && !pip && (
         <div
@@ -623,6 +634,7 @@ export default function MiraChatSidebar() {
       )}
 
       {/* Floating Sidebar panel - glassmorphism */}
+      <NativePipSurface ref={nativePipRef} enabled={pip} automatic>
       <VoiceBeam stream={voice.stream} processing={isThinking} active={isOpen && (voice.active || isThinking)} paused={!isOpen || (!voice.active && !isThinking)} theme="dark" colorVariant="mono" strength={0.95}
         sensitivity={5.4} threshold={0.015} attack={0.12} release={0.42} reach={1.9} idle={0.14}
         borderRadius={16}
@@ -652,12 +664,12 @@ export default function MiraChatSidebar() {
             : `0 8px 60px -12px ${theme.primary[300]}60, 0 0 0 1px ${theme.primary[200]}40, inset 0 1px 0 rgba(255,255,255,0.6)`,
         }}
       >
-        {isOpen && (isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active strength={0.95} theme="dark" borderRadius={16} />}
-        {pip && <div className="p-3 text-foreground">
-          <button aria-label="Restore MIRA chat" onClick={() => setViewMode('chat')} className="w-full flex items-center gap-3 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+        {isOpen && (isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={16} />}
+        {pip && <div className="p-3 text-foreground relative cursor-pointer" onClick={() => setViewMode('chat')}>
+          <button aria-label="Dismiss MIRA" onClick={event => { event.stopPropagation(); closeChat() }} className="absolute right-2 top-2 z-10 p-2 rounded-full hover:bg-default-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><FaTimes className="w-4 h-4" /></button>
+          <button aria-label="Restore MIRA chat" onClick={() => setViewMode('chat')} className="w-full flex items-center gap-3 pr-10 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
             <MiraSphere size={28} isThinking={isThinking} />
             <span className="flex-1 text-xs font-medium">MIRA · {isThinking ? 'Thinking' : voice.state === 'speaking' ? 'Speaking' : voice.active ? 'Listening' : 'Ready'}</span>
-            <span aria-hidden="true" className="text-default-500">↗</span>
           </button>
           <div role="status" aria-live="polite" aria-label="MIRA live captions" className="mt-3 max-h-36 overflow-y-auto text-sm leading-relaxed break-words whitespace-pre-wrap">
             {pipCaption ? <><span className="block text-[11px] text-default-500 mb-1">{pipSpeaker}</span>{pipCaption}</> : <span className="text-default-500">{voice.active ? 'Speak naturally. Your words appear here.' : 'Your conversation captions appear here.'}</span>}
@@ -698,7 +710,7 @@ export default function MiraChatSidebar() {
             </>}
           </div>
           <div className="flex items-center gap-0.5">
-            <button onClick={() => setViewMode('pip')} className="p-2 rounded-lg text-white/70 hover:bg-white/10" aria-label="Minimize MIRA to floating voice">−</button>
+            <button onClick={popOutMira} className="p-2 rounded-lg text-white/70 hover:bg-white/10" aria-label="Minimize MIRA to floating voice">−</button>
             <button onClick={() => setViewMode(expanded ? 'chat' : 'expanded')} className="p-2 rounded-lg text-white/70 hover:bg-white/10" aria-label={expanded ? 'Collapse MIRA sidebar' : 'Expand MIRA workspace'} aria-pressed={expanded}>
               {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
@@ -910,6 +922,7 @@ export default function MiraChatSidebar() {
           <MiraWakeSetup onWake={() => { setWakeRequested(true); if (!isOpen) openChat() }} onStream={() => {}} suspended={voice.active} />
         </div>
       </VoiceBeam>
+      </NativePipSurface>
       {editing && <MiraEditPrompt message={editing} busy={isThinking} onClose={() => setEditing(null)} onSave={(message, text) => { setEditing(null); sendMessage(text, { replaceFromId: message.id }) }} />}
     </>
   )

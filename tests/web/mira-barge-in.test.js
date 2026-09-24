@@ -19,7 +19,7 @@ test('new speech interrupts playback, while echo does not', async () => {
   expect(mockCancel).toHaveBeenCalledTimes(1)
   expect(result.current.state).toBe('listening')
   await act(async () => { void mockOptions.onResult({ text: 'What about tomorrow?' }); await Promise.resolve() })
-  expect(sendMessage).toHaveBeenLastCalledWith('What about tomorrow?', expect.objectContaining({ onResponse: expect.any(Function) }))
+  expect(sendMessage).toHaveBeenLastCalledWith('What about tomorrow?', expect.objectContaining({ inputMode: 'voice', onSpeech: expect.any(Function) }))
   unmount()
   expect(mockClose).toHaveBeenCalledTimes(1)
   expect(mockStop).toHaveBeenCalledTimes(1)

@@ -7,8 +7,9 @@ test('board chat uses an explicit light MIRA surface and stronger chat-only beam
     expect(read(file)).toContain('sm:w-[460px]')
     expect(read(file)).toContain('mira-board-toolbar')
   }
-  expect(read('components/MiraChatSidebar.js')).toContain('strength={0.95} theme="dark"')
-  expect(read('components/ui/AIActivityBeam.js')).toContain('strength = 0.55')
+  expect(read('components/MiraChatSidebar.js')).toContain('<AIActivityBeam active theme="dark" borderRadius={16}')
+  expect(read('components/ui/AIActivityBeam.js')).toContain('size="pulse-inner"')
+  expect(read('components/ui/AIActivityBeam.js')).not.toContain('strength = 0.55')
   expect(read('app/globals.css')).toContain('color-scheme: light;')
 })
 test('search and both board panels render floating glass and activity beams', () => {

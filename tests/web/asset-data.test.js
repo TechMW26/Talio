@@ -91,7 +91,7 @@ describe('asset data normalization', () => {
     expect(pageSource).toContain('`/api/assets/${selectedAsset._id}`')
     expect(dashboardSource).toContain(".select('name assetCode category uin serialNumber manufacturer model status')")
     expect(updateRouteSource).toContain('const { id } = await params')
-    expect(updateRouteSource).toContain("emitAssetUpdate(asset, [], { action: 'update', broadcast: true })")
+    expect(updateRouteSource).toContain("emitAssetUpdate(asset, recipients.map(user => user.id), { action: 'update', broadcast: false })")
   })
 
   test.each([

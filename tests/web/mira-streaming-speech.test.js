@@ -16,15 +16,27 @@ test('starts before completion, queues in order and never repeats the final answ
   expect(speak).toHaveBeenCalledTimes(2)
 })
 
-test('chunks a long phrase without punctuation and flushes a short final tail', async () => {
+test('holds a long unfinished sentence until the final answer instead of splitting it', async () => {
   const speak = jest.fn().mockResolvedValue(undefined)
   const speech = createMiraStreamingSpeech({ speak, live: () => true })
   const text = 'Yeh aapke project ki jaankari hai '.repeat(5)
   speech.update(text)
   await Promise.resolve()
-  expect(speak).toHaveBeenCalled()
+  expect(speak).not.toHaveBeenCalled()
   await speech.finish(text)
   expect(speak.mock.calls.map(([chunk]) => chunk).join('')).toBe(text)
+  expect(speak).toHaveBeenCalledTimes(1)
+})
+
+test('keeps long sentences, titles, decimals and closing quotes intact', async () => {
+  const speak = jest.fn().mockResolvedValue(undefined)
+  const speech = createMiraStreamingSpeech({ speak, live: () => true })
+  const first = 'Dr. Sharma says "' + 'please review the project carefully '.repeat(7) + 'before 3.30 pm." '
+  speech.update(first + 'Then reply')
+  await Promise.resolve()
+  expect(speak).toHaveBeenCalledWith(first)
+  await speech.finish(first + 'Then reply when ready.')
+  expect(speak.mock.calls.map(([chunk]) => chunk)).toEqual([first, 'Then reply when ready.'])
 })
 
 test('does not play queued chunks after interruption', async () => {
