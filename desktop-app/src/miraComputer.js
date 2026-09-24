@@ -21,6 +21,9 @@ function validateComputerAction(value) {
 function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform, resourcesPath, packaged, runControl, agentS, isLocked = () => false }) {
   let session = null;
   let expiryTimer = null;
+  // Ctrl+Shift+Esc belongs to Task Manager on Windows and cannot reliably be
+  // registered. Keep the familiar Mac shortcut and use a non-reserved chord elsewhere.
+  const stopShortcut = platform === 'darwin' ? 'CommandOrControl+Shift+Escape' : 'Control+Alt+Shift+Escape';
   const helper = packaged ? path.join(resourcesPath, 'mira-control') : path.join(__dirname, '..', 'build', `mira-control-${process.arch}`);
   async function control(action) {
     if (runControl) return runControl(action);
@@ -37,7 +40,7 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
     const result = await run(helper, [JSON.stringify(action)], { timeout: 10000, maxBuffer: 100000 });
     return JSON.parse(result.stdout);
   }
-  function cancel() { clearTimeout(expiryTimer); session = null; agentS?.stop(); pointer?.hide(); globalShortcut.unregister('CommandOrControl+Shift+Escape'); }
+  function cancel() { clearTimeout(expiryTimer); session = null; agentS?.stop(); pointer?.hide(); globalShortcut.unregister(stopShortcut); }
   return async function handle(event, window, origin, input) {
     if (!trustedMiraSender(event, window, origin)) return { success: false, message: 'Desktop controls require the Talio application.' };
     if (input?.operation === 'cancel') { cancel(); return { success: true }; }
@@ -53,7 +56,7 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         if (probe.accessibility === false) return { success: false, message: 'Allow Talio desktop controls in Accessibility settings, then restart Talio.' };
         if (store?.get('miraDesktopConsentV1') !== true) return { success: false, message: 'Enable desktop control once in the Talio permission checklist, then retry your command.' };
         session = { id: randomUUID(), expires: Date.now() + 300000, steps: 0, observation: null };
-        if (!globalShortcut.register('CommandOrControl+Shift+Escape', cancel)) { cancel(); return { success: false, message: 'The emergency stop shortcut is unavailable. Close the app using it and try again.' }; }
+        if (!globalShortcut.register(stopShortcut, cancel)) { cancel(); return { success: false, message: 'The emergency stop shortcut is unavailable. Close the app using it and try again.' }; }
         pointer?.show();
         expiryTimer = setTimeout(cancel, 300000);
         expiryTimer.unref?.();

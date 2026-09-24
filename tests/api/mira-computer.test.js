@@ -54,6 +54,13 @@ test.each(['win32', 'linux'])('desktop consent is required and available on %s',
   await permissions.request('desktopControl')
   expect(store.set).toHaveBeenCalledWith('miraDesktopConsentV1', true)
 })
+test.each(['win32', 'linux'])('uses a non-reserved emergency shortcut on %s', async platform => {
+  const { call, deps } = harness({ platform })
+  const result = await call({ operation: 'begin', goal: 'Open WhatsApp' })
+  expect(result.success).toBe(true)
+  expect(deps.globalShortcut.register).toHaveBeenCalledWith('Control+Alt+Shift+Escape', expect.any(Function))
+  await call({ operation: 'cancel' })
+})
 test('native controls reject arbitrary commands, invalid coordinates and keys', () => {
   for (const action of [{ type: 'exec', command: 'anything' }, { type: 'click', x: 20, y: 0 }, { type: 'key', key: 'script' }, { type: 'open_app', name: 'foo;bar' }, { type: 'scroll', amount: 999 }]) expect(validateComputerAction(action)).toBeNull()
   expect(validateComputerAction({ type: 'click', x: .5, y: .3 })).toEqual({ type: 'click', x: .5, y: .3 })

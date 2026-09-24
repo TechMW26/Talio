@@ -12,7 +12,8 @@ function createMiraPermissions({ systemPreferences, shell, platform, store, dial
   }
   async function request(kind) {
     if (kind === 'desktopControl' && dialog && store) {
-      const consent = await dialog.showMessageBox({ type: 'question', title: 'Enable MIRA desktop control', message: 'Allow MIRA to carry out your desktop commands?', detail: 'For desktop tasks you request, MIRA can share screen captures with its vision provider and use your mouse and keyboard. This permission is remembered on this device. Keep sensitive information out of view. Press Command+Shift+Escape to stop. You can revoke this permission in the Talio setup checklist.', buttons: ['Not now', 'Enable desktop control'], defaultId: 0, cancelId: 0, noLink: true });
+      const stopKey = platform === 'darwin' ? 'Command+Shift+Escape' : 'Control+Alt+Shift+Escape';
+      const consent = await dialog.showMessageBox({ type: 'question', title: 'Enable MIRA desktop control', message: 'Allow MIRA to carry out your desktop commands?', detail: `For desktop tasks you request, MIRA can share screen captures with its vision provider and use your mouse and keyboard. This permission is remembered on this device. Keep sensitive information out of view. Press ${stopKey} to stop. You can revoke this permission in the Talio setup checklist.`, buttons: ['Not now', 'Enable desktop control'], defaultId: 0, cancelId: 0, noLink: true });
       if (consent.response === 1) store.set('miraDesktopConsentV1', true);
       return { success: true, permissions: status() };
     }
