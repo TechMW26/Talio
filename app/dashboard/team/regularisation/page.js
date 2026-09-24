@@ -213,7 +213,7 @@ export default function TeamRegularisationPage() {
   const filteredCorrections = getFilteredCorrections()
 
   return (
-    <div className="min-h-screen bg-default-50 px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
+    <div className="dashboard-page-canvas min-h-screen bg-default-50 px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>

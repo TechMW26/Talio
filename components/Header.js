@@ -1,5 +1,6 @@
 'use client'
 import AIActivityBeam from '@/components/ui/AIActivityBeam'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import CallAlertButton from '@/components/CallAlertButton'
 import { getCurrentUser } from '@/utils/userHelper'
 
@@ -17,6 +18,13 @@ import { useMiraChat } from '@/contexts/MiraChatContext'
 import { Button, Input, ScrollShadow } from '@heroui/react'
 
 export default function Header({ toggleSidebar, sidebarCollapsed }) {
+  const reducedMotion = useReducedMotion()
+  const searchMotion = {
+    initial: { opacity: 0, y: reducedMotion ? 0 : -12, scale: reducedMotion ? 1 : 0.97 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    exit: { opacity: 0, y: reducedMotion ? 0 : -8, scale: reducedMotion ? 1 : 0.98, transition: { duration: reducedMotion ? 0 : 0.18 } },
+    transition: { duration: reducedMotion ? 0 : 0.28, ease: [0.2, 0.8, 0.2, 1] },
+  }
   const { theme, isDarkMode, setDarkModePreference } = useTheme()
   const router = useRouter()
   const pathname = usePathname()
@@ -311,16 +319,20 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             </button>
 
             {/* Floating Search Overlay (Desktop) */}
+            <AnimatePresence>
             {(showSearchResults || searchQuery.length >= 2) && (
               <>
-                <div
+                <motion.div
+                  key="search-backdrop"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  transition={{ duration: reducedMotion ? 0 : 0.2 }}
                   className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-[10px]"
                   onClick={() => {
                     setSearchQuery('')
                     setShowSearchResults(false)
                   }}
                 />
-                <div className="ai-glass-panel fixed left-1/2 -translate-x-1/2 top-20 w-[90%] max-w-xl overflow-hidden z-[101] search-overlay-input">
+                <motion.div key="desktop-search" {...searchMotion} style={{ x: '-50%', transformOrigin: 'top center' }} className="ai-glass-panel fixed left-1/2 top-20 w-[90%] max-w-xl overflow-hidden z-[101] search-overlay-input">
                   <AIActivityBeam active={searching} />
                   <Input
                     size="lg"
@@ -391,9 +403,10 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                       )}
                     </ScrollShadow>
                   )}
-                </div>
+                </motion.div>
               </>
             )}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -427,8 +440,9 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       </div>
 
       {/* Mobile Search Fullscreen Modal */}
+      <AnimatePresence>
       {showMobileSearch && (
-        <div className="ai-glass-panel fixed inset-x-3 top-20 bottom-4 z-[100] lg:!hidden overflow-hidden">
+        <motion.div key="mobile-search" {...searchMotion} style={{ transformOrigin: 'top center' }} className="ai-glass-panel fixed inset-x-3 top-20 bottom-4 z-[100] lg:!hidden overflow-hidden">
           <AIActivityBeam active={searching} />
           <div className="flex flex-col h-full">
             {/* Search Header - Match header height */}
@@ -534,9 +548,9 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               ) : null}
             </ScrollShadow>
           </div>
-        </div>
+        </motion.div>
       )}
-
+      </AnimatePresence>
 
     </header>
   )

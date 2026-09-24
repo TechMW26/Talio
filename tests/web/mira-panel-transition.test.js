@@ -32,8 +32,9 @@ test('rapid closing cancels pending entry frames and unmount cleans up', () => {
 
 test('panel uses explicit matching transform transitions and keeps backdrop mounted for exit', () => {
   const source = fs.readFileSync(path.join(process.cwd(), 'components/MiraChatSidebar.js'), 'utf8')
-  expect(source).toContain("transform: panelVisible ? 'translate3d(0, 0, 0)' : 'translate3d(-24px, 0, 0)'")
-  expect(source).toContain("transitionDuration: '300ms'")
+  expect(source).toContain("transform: panelVisible ? 'translate3d(0, 0, 0)' : 'translate3d(-40px, 0, 0)'")
+  expect(source.match(/transitionDuration: '450ms'/g)).toHaveLength(2)
+  expect(source).toContain("transitionTimingFunction: panelVisible ? 'cubic-bezier(0.22, 0.65, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.6, 1)'")
   expect(source).not.toContain("isOpen ? 'translate-x-0 opacity-100'")
   expect(source).not.toContain('{isOpen && !pip && (')
   expect(source).toContain('motion-reduce:transition-none')

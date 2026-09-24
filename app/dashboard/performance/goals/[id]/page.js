@@ -127,7 +127,7 @@ export default function GoalDetailsPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
+      <div className="dashboard-page-canvas p-4 sm:p-6 bg-gray-50 min-h-screen">
         <div className="flex items-center gap-4 mb-6">
           <Skeleton className="h-10 w-10 rounded-lg" />
           <div>
@@ -178,7 +178,7 @@ export default function GoalDetailsPage() {
   const totalMilestones = (goal.milestones || []).length
 
   return (
-    <div className="p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
+    <div className="dashboard-page-canvas p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div className="flex items-center gap-4">

@@ -3,7 +3,7 @@
 export default function MeetingRoomRoute() {
   return (
     <div
-      className="fixed inset-0 z-[100] flex h-[100dvh] w-screen items-center justify-center bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white"
+      className="dashboard-page-canvas fixed inset-0 z-[100] flex h-[100dvh] w-screen items-center justify-center bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white"
       role="status"
       aria-live="polite"
     >

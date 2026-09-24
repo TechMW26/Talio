@@ -635,7 +635,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                       Are you sure you want to logout?
                     </p>
                   </ModalBody>
-                  <ModalFooter>
+                  <ModalFooter className="justify-center">
                     <Button variant="light" onPress={onClose}>
                       Cancel
                     </Button>

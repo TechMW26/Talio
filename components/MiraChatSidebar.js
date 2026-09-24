@@ -652,8 +652,8 @@ export default function MiraChatSidebar() {
       {/* Backdrop */}
         <div
           aria-hidden="true"
-          className="fixed inset-0 bg-black/30 transition-opacity duration-300 motion-reduce:transition-none z-[99998]"
-          style={{ opacity: panelVisible && !pip ? 1 : 0, pointerEvents: isOpen && !pip ? 'auto' : 'none' }}
+          className="fixed inset-0 bg-black/30 transition-opacity motion-reduce:transition-none z-[99998]"
+          style={{ opacity: panelVisible && !pip ? 1 : 0, pointerEvents: isOpen && !pip ? 'auto' : 'none', transitionDuration: '450ms', transitionTimingFunction: 'ease-in-out' }}
           onClick={closeChat}
         />
 
@@ -669,10 +669,10 @@ export default function MiraChatSidebar() {
         className="mira-workspace fixed flex flex-col z-[99999] rounded-2xl overflow-hidden shadow-2xl"
         style={{
           opacity: panelVisible ? 1 : 0,
-          transform: panelVisible ? 'translate3d(0, 0, 0)' : 'translate3d(-24px, 0, 0)',
+          transform: panelVisible ? 'translate3d(0, 0, 0)' : 'translate3d(-40px, 0, 0)',
           pointerEvents: isOpen ? 'auto' : 'none',
-          transitionDuration: '300ms',
-          transitionTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+          transitionDuration: '450ms',
+          transitionTimingFunction: panelVisible ? 'cubic-bezier(0.22, 0.65, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.6, 1)',
           left: pip ? '24px' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
           right: undefined,
           borderRadius: 16,

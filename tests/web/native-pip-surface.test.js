@@ -123,6 +123,21 @@ test('disabling or unmounting returns/closes the native surface', async () => {
   view.unmount()
 })
 
+test('closing an inline panel does not reinsert its DOM and cancel the exit transition', () => {
+  const ref = createRef()
+  const view = render(<NativePipSurface ref={ref}>Inline panel</NativePipSurface>)
+  const host = document.querySelector('[data-native-pip-surface]')
+  const parent = host.parentNode
+  const append = jest.spyOn(parent, 'append')
+  view.rerender(<NativePipSurface ref={ref} enabled={false}>Inline panel</NativePipSurface>)
+  act(() => ref.current.restore())
+  expect(host.parentNode).toBe(parent)
+  expect(append).not.toHaveBeenCalled()
+  view.rerender(<NativePipSurface ref={ref} enabled>Inline panel</NativePipSurface>)
+  act(() => ref.current.restore())
+  expect(append).not.toHaveBeenCalled()
+})
+
 test('automatic PiP stays inline while visible, opens on browser activation, and returns on visibility', async () => {
   let handler
   Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { setActionHandler: jest.fn((name, callback) => { handler = callback }) } })

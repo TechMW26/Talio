@@ -134,7 +134,9 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
     cleanupRef.current?.()
     cleanupRef.current = null
     targetRef.current = null
-    if (host && placeholder.current) placeholder.current.append(host)
+    // Re-appending an already inline host detaches its rendered subtree and
+    // cancels CSS transitions (notably MIRA's fade-out on enabled=false).
+    if (host && placeholder.current && host.parentNode !== placeholder.current) placeholder.current.append(host)
     if (target && !target.closed && !target.document.querySelector('[data-native-pip-surface]')) target.close()
     else fitWindow(target)
   }

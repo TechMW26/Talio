@@ -558,7 +558,7 @@ export default function SlidingSidebar({
                   Are you sure you want to logout?
                 </p>
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter className="justify-center">
                 <Button variant="light" onPress={onClose}>
                   Cancel
                 </Button>

@@ -18,7 +18,7 @@ export default function DashboardRouteTransition({ children }) {
       className={`dashboard-route-stage ${isNavigating ? 'is-navigating' : ''}`}
       data-navigation-state={isNavigating ? 'loading' : 'idle'}
     >
-      <div key={pathname} className="dashboard-route-page">
+      <div key={pathname} className="dashboard-route-page dashboard-page-canvas">
         {children}
       </div>
 

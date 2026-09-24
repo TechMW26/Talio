@@ -207,7 +207,7 @@ export default function PerformanceGoalsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
+      <div className="dashboard-page-canvas p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
         <div className="mb-6">
           <Skeleton className="h-8 w-64 rounded-lg mb-2" />
           <Skeleton className="h-4 w-48 rounded-lg" />
@@ -240,14 +240,14 @@ export default function PerformanceGoalsPage() {
 
   if (error) {
     return (
-      <div className="p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
+      <div className="dashboard-page-canvas p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
         <DataErrorState message="Failed to load performance goals" onRetry={refresh} />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
+    <div className="dashboard-page-canvas p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
         <div>

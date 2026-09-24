@@ -362,6 +362,12 @@ html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-20
   .mira-workspace { transition: none !important; }
 }
 
+/* Page canvas is distinct from raised card/input surfaces. Do not override
+   descendant backgrounds: grey cards and tinted status areas keep contrast. */
+html.dark body .dashboard-page-canvas {
+  background: var(--color-bg-main, #090909) !important;
+}
+
 /* Give list widgets a definite viewport without stretching individual rows. */
 [data-scrollable-widget="true"] { height: 320px; min-height: 320px; max-height: 320px; overflow: hidden; }
 @media (min-width: 640px) { [data-scrollable-widget="true"] { height: 400px; min-height: 400px; max-height: 400px; } }

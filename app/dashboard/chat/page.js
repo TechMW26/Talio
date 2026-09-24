@@ -675,7 +675,7 @@ export default function ChatPage() {
 
   if (chatsLoading) {
     return (
-      <div className="fixed inset-0 bg-gray-50 pt-20 px-4">
+      <div className="dashboard-page-canvas fixed inset-0 bg-gray-50 pt-20 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div>
