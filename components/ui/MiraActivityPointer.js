@@ -43,16 +43,13 @@ export default function MiraActivityPointer() {
     return () => { clearTimeout(timer); window.removeEventListener('mira:activity', action); window.removeEventListener('mira:navigate', navigate); window.removeEventListener('mira:agent-state', agent); window.removeEventListener('resize', resize) }
   }, [])
   if (!mounted) return null
-  const labelWidth = Math.min(220, window.innerWidth - 48)
-  const labelLeft = Math.max(12, Math.min(window.innerWidth - labelWidth - 12, activity.x + 32)) - activity.x
   return createPortal(<>
     {(activity.visible || boardActive) && <div aria-hidden="true" data-testid="mira-page-glow" className={styles.pageGlow}>
       <AIActivityBeam active borderRadius={0} />
     </div>}
     <div role="status" aria-label="MIRA activity" aria-live="polite" aria-hidden={!activity.visible} className={styles.pointer} style={{ opacity: activity.visible ? 1 : 0, transform: `translate3d(${activity.x}px, ${activity.y}px, 0)` }}>
       {activity.click > 0 && <span key={activity.click} className={styles.clickRing} aria-hidden="true" />}
-      <img src="/mira-cursor.png" width="48" height="48" alt="" draggable={false} className={`${styles.icon} ${activity.click ? styles.click : ''}`} />
-      <span className={styles.label} style={{ left: labelLeft, top: activity.y > window.innerHeight - 100 ? -40 : 24 }}>MIRA · {activity.label}</span>
+      <img src="/mira-cursor.png" width="24" height="24" alt="" draggable={false} className={`${styles.icon} ${activity.click ? styles.click : ''}`} />
     </div>
   </>, document.body)
 }

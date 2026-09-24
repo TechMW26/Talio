@@ -7,6 +7,7 @@ import { isWithinOfficeHours } from '@/lib/officeHours';
 import { processImage, ImagePipelineError } from '@/lib/imagePipeline';
 import { getDateKeyInTimezone } from '@/lib/timezone';
 import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
+import { canViewUserScreenshots } from '@/lib/productivityPermissions';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -306,44 +307,7 @@ export async function GET(request) {
     }
 
     // Access control - check if user can view this screenshot
-    let hasAccess = false;
-
-    // Admin, HR, Manager can view all
-    if (['admin', 'hr', 'manager'].includes(userRole)) {
-      hasAccess = true;
-    }
-    // Same user
-    else if (screenshot.user.toString() === userId.toString()) {
-      hasAccess = true;
-    }
-    // Department head check
-    else {
-      const viewer = await User.findById(userId).select('employeeId');
-      const screenshotOwner = await User.findById(screenshot.user).select('employeeId');
-
-      if (viewer?.employeeId && screenshotOwner?.employeeId) {
-        const viewerEmployee = await Employee.findById(viewer.employeeId).select('_id');
-        const ownerEmployee = await Employee.findById(screenshotOwner.employeeId).select('department departments');
-
-        if (viewerEmployee && ownerEmployee) {
-          // Get owner's departments
-          const ownerDepartments = [];
-          if (ownerEmployee.department) ownerDepartments.push(ownerEmployee.department);
-          if (ownerEmployee.departments?.length) ownerDepartments.push(...ownerEmployee.departments);
-
-          // Check if viewer is head of any department
-          const departments = await Department.find({
-            _id: { $in: ownerDepartments },
-            $or: [
-              { head: viewerEmployee._id },
-              { heads: viewerEmployee._id }
-            ]
-          });
-
-          hasAccess = departments.length > 0;
-        }
-      }
-    }
+    const hasAccess = await canViewUserScreenshots(userId, screenshot.user, userRole, models);
 
     if (!hasAccess) {
       return NextResponse.json({
@@ -369,7 +333,7 @@ export async function GET(request) {
       headers: {
         'Content-Type': screenshot.metadata?.mimeType || 'image/png',
         'Content-Length': imageBuffer.length.toString(),
-        'Cache-Control': 'private, max-age=3600'
+        'Cache-Control': 'private, no-store'
       }
     });
 

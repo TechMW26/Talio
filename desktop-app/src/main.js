@@ -1151,8 +1151,10 @@ function setupWindowEvents() {
   mainWindow.webContents.on('did-create-window', function (child, details) {
     if (details.frameName === 'talio-live-pip') livePipWindow = child;
     if (details.frameName !== 'talio-live-pip') return;
-    child.setAlwaysOnTop(true, 'floating');
-    let savedPipPosition = store.get('livePipPosition', null);
+    child.setAlwaysOnTop(true, 'screen-saver');
+    // Version the preference to discard positions accidentally saved while the
+    // old window was first loading/resizing at the top of the display.
+    let savedPipPosition = store.get('livePipPositionV2', null);
     let positioning = false;
     let applyingBounds = false;
     const positionPip = () => {
@@ -1174,12 +1176,8 @@ function setupWindowEvents() {
       } finally { positioning = false; }
     };
     positionPip();
-    child.on('moved', () => {
-      if (positioning || applyingBounds || child.isDestroyed()) return;
-      const { x, y } = child.getBounds();
-      savedPipPosition = { x, y };
-      store.set('livePipPosition', savedPipPosition);
-    });
+    const rememberDrag = point => { savedPipPosition = point; };
+    child.on('mira-user-moved', rememberDrag);
     child.on('resize', positionPip);
     mainWindow.on('move', positionPip);
     screen.on('display-metrics-changed', positionPip);
@@ -1507,7 +1505,8 @@ function setupIPCHandlers() {
 
   // Permission management
   const { createMiraComputer } = require('./miraComputer');
-  const computer = createMiraComputer({ desktopCapturer, screen, dialog, systemPreferences, shell, globalShortcut, platform: process.platform, resourcesPath: process.resourcesPath, packaged: app.isPackaged });
+  const pointer = require('./miraPointer').createMiraPointer({ BrowserWindow, screen });
+  const computer = createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform: process.platform, resourcesPath: process.resourcesPath, packaged: app.isPackaged });
   ipcMain.handle('mira-computer', (event, input) => computer(event, mainWindow, APP_ORIGIN, input));
   const { trustedMiraSender, createMiraPermissions } = require('./miraPermissions');
   ipcMain.handle('mira-move-pip', (event, position) => {
@@ -1515,9 +1514,12 @@ function setupIPCHandlers() {
     const point = { x: Math.round(Math.max(-100000, Math.min(100000, position.x))), y: Math.round(Math.max(-100000, Math.min(100000, position.y))) };
     const display = screen.getDisplayNearestPoint(point);
     livePipWindow.setBounds(pipBounds(display.workArea, livePipWindow.getBounds(), 0, point));
+    const { x, y } = livePipWindow.getBounds();
+    store.set('livePipPositionV2', { x, y });
+    livePipWindow.emit('mira-user-moved', { x, y });
     return { success: true };
   });
-  const miraPermissions = createMiraPermissions({ systemPreferences, shell, platform: process.platform });
+  const miraPermissions = createMiraPermissions({ systemPreferences, shell, store, dialog, platform: process.platform });
   ipcMain.handle('mira-permissions', (event, kind) => {
     if (!trustedMiraSender(event, mainWindow, APP_ORIGIN)) return { success: false };
     return kind ? miraPermissions.request(kind) : { success: true, permissions: miraPermissions.status() };

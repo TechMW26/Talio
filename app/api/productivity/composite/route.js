@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'ScreenshotComposite']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ScreenshotComposite']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }

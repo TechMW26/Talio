@@ -30,6 +30,14 @@ test('rejects unauthenticated callers before generation', async () => {
   expect((await run({ text: 'Hello' })).status).toBe(401)
   expect(global.fetch).not.toHaveBeenCalled()
 })
+test.each(['माझ्या बैठका दाखवा.', 'मेरो बैठक देखाउनुहोस्।', 'Bonjour.', 'こんにちは。', 'مرحبًا', 'Hello.'])('does not force a language from the script: %s', async text => {
+  const response = await run({ text })
+  expect(response.status).toBe(200)
+  await response.arrayBuffer()
+  const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+  expect(body.text).toBe(text)
+  expect(body).not.toHaveProperty('language_code')
+})
 test.each([null, '', 'a'.repeat(5001), { $ne: '' }])('rejects invalid text', async text => {
   expect((await run({ text })).status).toBe(400)
   expect(global.fetch).not.toHaveBeenCalled()

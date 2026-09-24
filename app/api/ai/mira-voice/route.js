@@ -25,13 +25,13 @@ export async function POST(request) {
     const chunks = splitMiraSpeech(text)
     const model = ['eleven_v3_conversational', 'eleven_flash_v2_5', 'eleven_multilingual_v2'].includes(process.env.MIRA_TTS_MODEL)
       ? process.env.MIRA_TTS_MODEL : 'eleven_v3_conversational'
-    const hindi = /[\u0900-\u097f]/.test(text)
+    // Let the multilingual provider detect language. Script is not language:
+    // Devanagari also includes Marathi, Nepali and other non-Hindi languages.
     const generate = chunk => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, {
       method: 'POST',
       headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
       signal,
       body: JSON.stringify({ text: chunk, model_id: model, apply_text_normalization: 'on',
-        ...(hindi && model !== 'eleven_multilingual_v2' ? { language_code: 'hi' } : {}),
         voice_settings: { stability: model.startsWith('eleven_v3') ? 0.5 : 0.45, similarity_boost: 0.75, use_speaker_boost: false } }),
     })
     const upstream = await generate(chunks[0])

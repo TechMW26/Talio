@@ -538,10 +538,14 @@ function StickyNoteCard() {
   const [draft, setDraft] = useState('')
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('talio_sticky_note')
-      if (saved) setNote(saved)
-    } catch {}
+    const refresh = () => {
+      try { setNote(localStorage.getItem('talio_sticky_note') || '') } catch {}
+    }
+    const storage = event => { if (event.key === 'talio_sticky_note' || event.key === null) refresh() }
+    refresh()
+    window.addEventListener('talio:quick-note-updated', refresh)
+    window.addEventListener('storage', storage)
+    return () => { window.removeEventListener('talio:quick-note-updated', refresh); window.removeEventListener('storage', storage) }
   }, [])
 
   const save = useCallback(() => {

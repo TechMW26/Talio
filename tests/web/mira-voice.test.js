@@ -94,7 +94,8 @@ test('resolved project navigation opens the record and stays minimized', () => {
   act(() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: 'projects', id } })))
   expect(mockPush).toHaveBeenCalledWith(`/dashboard/projects/${id}`)
   expect(screen.getByLabelText('Restore MIRA chat')).toBeInTheDocument()
-  expect(screen.getByText('MIRA · Opening projects')).toBeInTheDocument()
+  expect(screen.queryByText('MIRA · Opening projects')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('MIRA activity')).toBeInTheDocument()
 })
 test('chat toolbar is unbranded while keeping history, new chat and window controls', () => {
   render(<MiraChatSidebar />)

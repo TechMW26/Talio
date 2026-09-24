@@ -18,8 +18,9 @@ function validateComputerAction(value) {
   return null;
 }
 
-function createMiraComputer({ desktopCapturer, screen, dialog, systemPreferences, shell, globalShortcut, platform, resourcesPath, packaged, runControl }) {
+function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform, resourcesPath, packaged, runControl }) {
   let session = null;
+  let expiryTimer = null;
   const helper = packaged ? path.join(resourcesPath, 'mira-control') : path.join(__dirname, '..', 'build', `mira-control-${process.arch}`);
   async function control(action) {
     if (runControl) return runControl(action);
@@ -27,7 +28,7 @@ function createMiraComputer({ desktopCapturer, screen, dialog, systemPreferences
     const result = await run(helper, [JSON.stringify(action)], { timeout: 10000, maxBuffer: 100000 });
     return JSON.parse(result.stdout);
   }
-  function cancel() { session = null; globalShortcut.unregister('CommandOrControl+Shift+Escape'); }
+  function cancel() { clearTimeout(expiryTimer); session = null; pointer?.hide(); globalShortcut.unregister('CommandOrControl+Shift+Escape'); }
   return async function handle(event, window, origin, input) {
     if (!trustedMiraSender(event, window, origin)) return { success: false, message: 'Desktop controls require the Talio application.' };
     if (input?.operation === 'cancel') { cancel(); return { success: true }; }
@@ -41,13 +42,16 @@ function createMiraComputer({ desktopCapturer, screen, dialog, systemPreferences
         const probe = await control({ type: 'status' });
         if (!probe.success) return probe;
         if (probe.accessibility === false) return { success: false, message: 'Allow Talio desktop controls in Accessibility settings, then restart Talio.' };
-        const consent = await dialog.showMessageBox({ type: 'question', title: 'MIRA desktop task', message: input.goal, detail: 'MIRA will share screenshots with its vision provider and use your mouse and keyboard for this task. Keep sensitive information out of view. Stop from chat or press Command+Shift+Escape at any time.', buttons: ['Cancel', 'Start task'], defaultId: 0, cancelId: 0, noLink: true });
-        if (consent.response !== 1) return { success: false, message: 'Desktop task cancelled.' };
+        if (store?.get('miraDesktopConsentV1') !== true) return { success: false, message: 'Enable desktop control once in the Talio permission checklist, then retry your command.' };
         session = { id: randomUUID(), expires: Date.now() + 300000, steps: 0, observation: null };
         if (!globalShortcut.register('CommandOrControl+Shift+Escape', cancel)) { cancel(); return { success: false, message: 'The emergency stop shortcut is unavailable. Close the app using it and try again.' }; }
+        pointer?.show();
+        expiryTimer = setTimeout(cancel, 300000);
+        expiryTimer.unref?.();
         return { success: true, sessionId: session.id };
       }
       const active = session;
+      if (store?.get('miraDesktopConsentV1') !== true) { cancel(); return { success: false, message: 'Desktop control permission was revoked.' }; }
       if (!active || input?.sessionId !== active.id || Date.now() > active.expires) { cancel(); return { success: false, message: 'Desktop task stopped or expired.' }; }
       if (input.operation === 'observe') {
         const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());

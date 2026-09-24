@@ -7,6 +7,8 @@ function harness() {
   const event = { sender: contents, senderFrame: contents.mainFrame }
   const deps = {
     platform: 'darwin', packaged: false,
+    store: { get: jest.fn(() => true) },
+    pointer: { show: jest.fn(), hide: jest.fn() },
     desktopCapturer: { getSources: jest.fn(async () => [{ display_id: '1', thumbnail: { isEmpty: () => false, toJPEG: () => Buffer.from('image') } }]) },
     screen: { getCursorScreenPoint: () => ({ x: 10, y: 10 }), getDisplayNearestPoint: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1000, height: 800 } }) },
     dialog: { showMessageBox: jest.fn(async () => ({ response: 1 })) },
@@ -44,6 +46,25 @@ test('native sender gate rejects child frames and other origins', () => {
   event.senderFrame.url = 'https://evil.example/dashboard'
   expect(trustedMiraSender(event, window, 'https://app.talio.in')).toBe(false)
 })
+test('saved consent avoids repeated task dialogs and shows desktop pointer', async () => {
+  const { call, deps } = harness()
+  expect((await call({ operation: 'begin', goal: 'Open WhatsApp' })).success).toBe(true)
+  expect(deps.dialog.showMessageBox).not.toHaveBeenCalled()
+  expect(deps.pointer.show).toHaveBeenCalledTimes(1)
+  await call({ operation: 'cancel' })
+  expect(deps.pointer.hide).toHaveBeenCalled()
+})
+test('missing or revoked consent blocks desktop input', async () => {
+  const { call, deps } = harness()
+  deps.store.get.mockReturnValue(false)
+  expect((await call({ operation: 'begin', goal: 'Open WhatsApp' })).success).toBe(false)
+  expect(deps.pointer.show).not.toHaveBeenCalled()
+  deps.store.get.mockReturnValue(true)
+  const start = await call({ operation: 'begin', goal: 'Open WhatsApp' })
+  deps.store.get.mockReturnValue(false)
+  expect((await call({ operation: 'observe', sessionId: start.sessionId })).success).toBe(false)
+  expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
+})
 test('permission requests only open allowlisted OS settings and recheck actual status', async () => {
   const shell = { openExternal: jest.fn() }
   const permissions = createMiraPermissions({ platform: 'darwin', shell, systemPreferences: { getMediaAccessStatus: () => 'denied', isTrustedAccessibilityClient: () => false } })
@@ -51,4 +72,17 @@ test('permission requests only open allowlisted OS settings and recheck actual s
   await permissions.request('microphone')
   expect(shell.openExternal).toHaveBeenCalledWith('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone')
   expect((await permissions.request('arbitrary')).success).toBe(false)
+})
+test('desktop setup records explicit consent and allows revocation', async () => {
+  let enabled = false
+  const store = { get: () => enabled, set: jest.fn(() => { enabled = true }), delete: jest.fn(() => { enabled = false }) }
+  const dialog = { showMessageBox: jest.fn(async () => ({ response: 0 })) }
+  const permissions = createMiraPermissions({ platform: 'darwin', store, dialog, shell: {}, systemPreferences: { getMediaAccessStatus: () => 'granted', isTrustedAccessibilityClient: () => true } })
+  await permissions.request('desktopControl')
+  expect(permissions.status().desktopControl).toBe('denied')
+  dialog.showMessageBox.mockResolvedValue({ response: 1 })
+  await permissions.request('desktopControl')
+  expect(permissions.status().desktopControl).toBe('granted')
+  await permissions.request('revokeDesktopControl')
+  expect(permissions.status().desktopControl).toBe('denied')
 })

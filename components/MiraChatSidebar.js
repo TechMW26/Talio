@@ -8,6 +8,7 @@ import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import MiraSphere from '@/components/ui/MiraPet'
 import MiraGeneratedImage from '@/components/ui/MiraGeneratedImage'
+import MiraScreenshotGallery from '@/components/ui/MiraScreenshotGallery'
 import MiraAttachments from '@/components/ui/MiraAttachments'
 import AIActivityBeam from '@/components/ui/AIActivityBeam'
 import NativePipSurface from '@/components/ui/NativePipSurface'
@@ -413,6 +414,7 @@ const MessageBubble = memo(function MessageBubble({ message, onSuggestionClick, 
           </div>
         )}
         {data.image && <MiraGeneratedImage image={data.image} />}
+        {data.gallery && <MiraScreenshotGallery gallery={data.gallery} />}
         {Array.isArray(data.taskBank?.tasks) && data.taskBank.tasks.length > 1 && <ol aria-label="MIRA task queue" className="my-3 space-y-1 rounded-xl border border-default-200 p-3 text-xs text-default-600">
           {data.taskBank.tasks.map((task, index) => <li key={task.id}>{index + 1}. {task.request} · {task.status.replaceAll('_', ' ')}</li>)}
         </ol>}
@@ -497,6 +499,20 @@ export default function MiraChatSidebar() {
   const [backgroundCompact, setBackgroundCompact] = useState(false)
   const panelVisible = useMiraPanelVisible(isOpen)
   const pip = isOpen && (minimized || backgroundCompact)
+  useEffect(() => {
+    let panel = null
+    const update = () => document.documentElement.style.setProperty('--mira-pip-stack-height', pip && panel?.ownerDocument === document ? `${panel.getBoundingClientRect().height + 12}px` : '0px')
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    const locate = () => {
+      const next = document.querySelector('.mira-workspace')
+      if (next !== panel) { observer?.disconnect(); panel = next; if (panel) observer?.observe(panel) }
+      update()
+    }
+    locate()
+    const mounts = new MutationObserver(locate)
+    mounts.observe(document.body, { childList: true, subtree: true })
+    return () => { mounts.disconnect(); observer?.disconnect(); document.documentElement.style.removeProperty('--mira-pip-stack-height') }
+  }, [pip])
   const nativePipRef = useRef(null)
   useEffect(() => { if (!pip) nativePipRef.current?.restore() }, [pip])
   const popOutMira = () => {
@@ -682,8 +698,9 @@ export default function MiraChatSidebar() {
           pointerEvents: isOpen ? 'auto' : 'none',
           transitionDuration: '450ms',
           transitionTimingFunction: panelVisible ? 'cubic-bezier(0.22, 0.65, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.6, 1)',
-          left: pip ? 'auto' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
-          right: pip ? '24px' : undefined,
+          left: pip ? '24px' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
+          right: undefined,
+          zIndex: pip ? 2147483647 : undefined,
           borderRadius: 16,
           top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? 'max(24px, env(safe-area-inset-bottom))' : 'auto',
@@ -712,6 +729,7 @@ export default function MiraChatSidebar() {
           <div role="status" aria-live="polite" aria-label="MIRA live captions" className="mt-3 max-h-36 overflow-y-auto text-sm leading-relaxed break-words whitespace-pre-wrap">
             {pipCaption ? <><span className="block text-[11px] text-default-500 mb-1">{pipSpeaker}</span>{miraPlainCaption(pipCaption)}</> : <span className="text-default-500">{voice.active ? 'Speak naturally. Your words appear here.' : 'Your conversation captions appear here.'}</span>}
           </div>
+          {latestReply?.data?.image && <div className="max-h-64 overflow-y-auto" onClick={event => event.stopPropagation()}><MiraGeneratedImage image={latestReply.data.image} compact /></div>}
         </div>}
         <div className={pip ? 'hidden' : 'contents'}>
         {/* Compact controls; identity stays in the conversation, not the toolbar. */}

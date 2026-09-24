@@ -14,7 +14,7 @@ import { compactMiraHistory } from '@/lib/miraChatBudget'
 import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
 import { readMiraDesktopScreen } from '@/lib/miraDesktopScreen'
-import { executeMiraFocusTimer } from '@/lib/miraLocalActions'
+import { executeMiraFocusTimer, executeMiraQuickNote } from '@/lib/miraLocalActions'
 import { executeMiraComputerTask } from '@/lib/miraComputerClient'
 
 const MiraChatContext = createContext()
@@ -327,6 +327,13 @@ export function MiraChatProvider({ children }) {
           data.response.message = outcome.message
           data.response.suggestedQuestions = []
         }
+        if (data.response.action?.type === 'quick_note') {
+          const outcome = executeMiraQuickNote(data.response.action, { signal: requestController.signal })
+          data.response.actionResult = outcome
+          data.response.message = outcome.message
+          data.response.speech = outcome.message
+          data.response.suggestedQuestions = []
+        }
         if (data.response.action?.type === 'focus_timer') {
           const outcome = executeMiraFocusTimer(data.response.action, { signal: requestController.signal })
           data.response.actionResult = outcome
@@ -343,7 +350,7 @@ export function MiraChatProvider({ children }) {
           data.response.speech = outcome.message
           data.response.suggestedQuestions = []
         }
-        if (data.response.action && !['navigate', 'dismiss', 'generate_image', 'ui_action', 'focus_timer', 'desktop_task'].includes(data.response.action.type)) {
+        if (data.response.action && !['navigate', 'dismiss', 'generate_image', 'ui_action', 'focus_timer', 'quick_note', 'desktop_task'].includes(data.response.action.type)) {
           window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: data.response.action.type.replaceAll('_', ' '), phase: 'working' } }))
           // Execute only a newly generated requested action, never a rendered/saved message.
           let outcome
@@ -359,6 +366,7 @@ export function MiraChatProvider({ children }) {
           }
           data.response.actionResult = outcome
           window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: outcome.success ? 'Completed' : outcome.resolution ? 'Waiting for your choice' : 'Action failed', phase: 'done' } }))
+          if (outcome.success && outcome.gallery) data.response.gallery = outcome.gallery
           if (outcome.resolution) data.response.selectionId = String(userMsg.id)
           if (resolvedSelectionId) data.response.resolvedSelectionId = resolvedSelectionId
           data.response.message = outcome.message || (outcome.success ? 'Completed successfully.' : 'The action could not be completed.')

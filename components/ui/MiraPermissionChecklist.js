@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
-const labels = { microphone: 'Microphone — voice commands', screenRecording: 'Screen Recording — screen context', accessibility: 'Accessibility — desktop controls', camera: 'Camera — video meetings' }
+const labels = { desktopControl: 'MIRA — desktop task consent', microphone: 'Microphone — voice commands', screenRecording: 'Screen Recording — screen context', accessibility: 'Accessibility — desktop controls', camera: 'Camera — video meetings' }
 export default function MiraPermissionChecklist() {
   const pathname = usePathname()
   const [permissions, setPermissions] = useState(null)
@@ -28,7 +28,8 @@ export default function MiraPermissionChecklist() {
     return () => { clearInterval(timer); window.removeEventListener('focus', check) }
   }, [pathname])
   const missing = Object.keys(labels).filter(key => permissions && ['denied', 'restricted', 'not-determined'].includes(permissions[key]))
-  if (!pathname?.startsWith('/dashboard') || (!missing.length && !error)) return null
+  if (!pathname?.startsWith('/dashboard')) return null
+  if (!missing.length && !error) return permissions?.desktopControl === 'granted' ? <button className="fixed bottom-2 right-4 z-[100100] rounded-lg bg-content1 px-3 py-1 text-xs text-default-500" onClick={() => refresh('revokeDesktopControl')}>Disable MIRA desktop control</button> : null
   return <aside aria-label="Talio permissions required" className="fixed bottom-4 right-4 z-[100100] w-[min(360px,calc(100vw-32px))] rounded-2xl border border-default-200 bg-content1 p-4 shadow-xl">
     <h2 className="font-semibold">Finish setting up Talio</h2>
     <p className="mt-1 text-xs text-default-500">These features need your permission. This checklist stays until access is enabled. macOS may require restarting Talio after Screen Recording is allowed.</p>

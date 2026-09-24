@@ -9,13 +9,14 @@ import mongoose from 'mongoose';
 import { getAuthAndModels } from '@/lib/auth';
 import { canViewUserScreenshots } from '@/lib/productivityPermissions';
 import { getScreenshot } from '@/lib/gridfs';
+import sharp from 'sharp';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'ScreenshotComposite']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ScreenshotComposite']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
@@ -45,7 +46,7 @@ export async function GET(request) {
       _id: id,
       user: targetUserId,
       dateString: date,
-    }).select('user dateString gridfsFileId mimeType').lean();
+    }).select('user dateString gridfsFileId mimeType tiles').lean();
 
     if (!composite || !composite.gridfsFileId) {
       return NextResponse.json({ success: false, error: 'Composite not found' }, { status: 404 });
@@ -56,15 +57,22 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
 
-    const buffer = await getScreenshot(composite.gridfsFileId, {
+    let buffer = await getScreenshot(composite.gridfsFileId, {
       databaseName: tenant.databaseName,
     });
+    const tileValue = searchParams.get('tile');
+    if (tileValue !== null) {
+      const index = Number(tileValue);
+      const tile = Number.isInteger(index) && index >= 0 && composite.tiles?.find(t => t.index === index);
+      if (!tile) return NextResponse.json({ success: false, error: 'Tile not found' }, { status: 404 });
+      buffer = await sharp(buffer).extract({ left: tile.x, top: tile.y, width: tile.width, height: tile.height }).webp().toBuffer();
+    }
 
     return new NextResponse(buffer, {
       headers: {
-        'Content-Type': composite.mimeType || 'image/jpeg',
+        'Content-Type': tileValue !== null ? 'image/webp' : composite.mimeType || 'image/jpeg',
         'Content-Length': buffer.length.toString(),
-        'Cache-Control': 'private, max-age=300',
+        'Cache-Control': 'private, no-store',
       },
     });
   } catch (err) {

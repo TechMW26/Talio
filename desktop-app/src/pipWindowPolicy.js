@@ -24,7 +24,7 @@ function pipBounds(workArea, size, margin = 16, saved) {
   const width = Math.min(size.width, Math.max(1, workArea.width - margin * 2));
   const height = Math.min(size.height, Math.max(1, workArea.height - margin * 2));
   return {
-    x: Math.max(workArea.x, Math.min(workArea.x + workArea.width - width, Number.isFinite(saved?.x) ? saved.x : workArea.x + workArea.width - width - margin)),
+    x: Math.max(workArea.x, Math.min(workArea.x + workArea.width - width, Number.isFinite(saved?.x) ? saved.x : workArea.x + margin)),
     y: Math.max(workArea.y, Math.min(workArea.y + workArea.height - height, Number.isFinite(saved?.y) ? saved.y : workArea.y + workArea.height - height - margin)),
     width, height,
   };

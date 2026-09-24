@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/permissions'
 import { MIRA_ACTION_PERMISSIONS, prepareMiraAction, validateMiraAction } from '@/lib/miraActions'
+import { miraProductivityGallery } from '@/lib/miraProductivity'
 
 export async function POST(request) {
   try {
@@ -8,8 +9,9 @@ export async function POST(request) {
     const validation = validateMiraAction(input.action)
     if (validation.error) return NextResponse.json({ success: false, message: validation.error }, { status: 400 })
     const [page, permission] = MIRA_ACTION_PERMISSIONS[validation.action.type]
-    const auth = await requirePermission(page, permission)(request, ['Employee', 'Department', 'Task', 'TaskAssignee', 'Meeting', 'Chat', 'Project', 'ProjectMember'])
+    const auth = await requirePermission(page, permission)(request, ['User', 'Employee', 'Department', 'Task', 'TaskAssignee', 'Meeting', 'Chat', 'Project', 'ProjectMember', ...(validation.action.type === 'view_productivity' ? ['Screenshot', 'ScreenshotComposite'] : [])])
     if (auth.denied) return NextResponse.json({ success: false, message: 'Your current access level does not permit this action. Ask an administrator for the required permission.' }, { status: auth.denied.status })
+    if (validation.action.type === 'view_productivity') return NextResponse.json(await miraProductivityGallery(validation.action.fields, auth.user, auth.models), { headers: { 'Cache-Control': 'no-store' } })
     if (validation.action.type === 'create_task' && validation.action.fields.assignees.some(name => !/^(me|myself|self)$/i.test(name))) {
       const assignment = await requirePermission('tasks', 'assign')(request)
       if (assignment.denied) return NextResponse.json({ success: false, message: 'Higher clearance is required to assign tasks to other people.' }, { status: 403 })

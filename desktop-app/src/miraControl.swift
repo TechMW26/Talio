@@ -13,6 +13,14 @@ switch type {
 case "click":
     guard let x = action["x"] as? Double, let y = action["y"] as? Double else { exit(1) }
     let point = CGPoint(x: x, y: y)
+    let start = CGEvent(source: nil)?.location ?? point
+    for step in 1...12 {
+        let t = Double(step) / 12.0
+        let eased = t * t * (3 - 2 * t)
+        let intermediate = CGPoint(x: start.x + (point.x - start.x) * eased, y: start.y + (point.y - start.y) * eased)
+        CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: intermediate, mouseButton: .left)?.post(tap: .cghidEventTap)
+        usleep(16000)
+    }
     for kind in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] { CGEvent(mouseEventSource: nil, mouseType: kind, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap); usleep(50000) }
 case "type":
     guard let text = action["text"] as? String, text.count <= 2000 else { exit(1) }
@@ -31,12 +39,20 @@ case "scroll":
 case "lock": key(12, [.maskCommand, .maskControl])
 case "open_app":
     guard let name = action["name"] as? String else { exit(1) }
+    if let running = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName?.caseInsensitiveCompare(name) == .orderedSame && $0.activationPolicy == .regular }) {
+        running.unhide()
+        let activated = running.activate(options: [.activateAllWindows])
+        output(["success": activated, "message": activated ? "Existing application brought to front; verify the screen." : "Application could not be focused."])
+        exit(0)
+    }
     let roots = ["/Applications", NSHomeDirectory() + "/Applications", "/System/Applications", "/System/Applications/Utilities"]
     let matches = roots.flatMap { root -> [URL] in
         ((try? FileManager.default.contentsOfDirectory(atPath: root)) ?? []).filter { $0.hasSuffix(".app") && String($0.dropLast(4)).caseInsensitiveCompare(name) == .orderedSame }.map { URL(fileURLWithPath: root).appendingPathComponent($0) }
     }
     guard let app = matches.first else { output(["success":false,"notInstalled":true,"message":"No installed app matched that exact name."]); exit(0) }
-    NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = true
+    NSWorkspace.shared.openApplication(at: app, configuration: configuration) { _, error in
         output(["success":error == nil,"message":error == nil ? "Application opened." : "The application could not be opened."]); exit(0)
     }
     RunLoop.main.run()

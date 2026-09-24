@@ -42,7 +42,7 @@ function fitWindow(target) {
   const sizes = [...target.document.querySelectorAll('[data-native-pip-surface]')].map(panelSize)
   if (!sizes.length) return
   const width = Math.max(...sizes.map(size => size.width))
-  const height = sizes.reduce((sum, size) => sum + size.height, 0)
+  const height = sizes.reduce((sum, size) => sum + size.height, 0) + Math.max(0, sizes.length - 1) * 12
   // Browser-owned title bars and minimum dimensions cannot be removed.
   const chromeWidth = Math.max(0, (target.outerWidth || width) - (target.innerWidth || width))
   const chromeHeight = Math.max(0, (target.outerHeight || height) - (target.innerHeight || height))
@@ -81,7 +81,9 @@ async function getPipWindow(size) {
     const theme = document.documentElement.getAttribute('data-theme')
     if (theme) target.document.documentElement.setAttribute('data-theme', theme)
     const style = target.document.createElement('style')
-    style.textContent = `html,body{margin:0;padding:0;${desktop ? 'background:transparent!important;' : ''}}body{display:flex;flex-direction:column;gap:0;overflow:auto;background:${desktop ? 'transparent' : '#151518'};color:#f4f4f5}
+    style.textContent = `html,body{margin:0;padding:0;${desktop ? 'background:transparent!important;' : ''}}body{display:flex;flex-direction:column;gap:12px;overflow:auto;background:${desktop ? 'transparent' : '#151518'};color:#f4f4f5}
+      [data-native-pip-surface]:has(.mira-workspace){order:2;z-index:2147483647}
+      [data-native-pip-surface]:has([data-meeting-pip]){order:1}
       [data-meeting-pip]{color:#f4f4f5!important;background:#18181b!important}
       [data-meeting-pip] main,[data-meeting-pip] header,[data-meeting-pip] footer{background:#18181b!important;color:inherit}
       [data-meeting-pip] button{flex-shrink:0}

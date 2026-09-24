@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import MiraGeneratedImage from '@/components/ui/MiraGeneratedImage'
 
 jest.mock('next/dynamic', () => () => function MockEffect({ children, images, onCycle }) {
@@ -20,6 +20,18 @@ test('pending generation shows pixel effect without fetching an image', () => {
   render(<MiraGeneratedImage image={{ status: 'pending' }} />)
   expect(screen.getByText('Mosaic loading')).toBeTruthy()
   expect(fetch).not.toHaveBeenCalled()
+})
+test('compact PiP renders generation status, then a clickable output', async () => {
+  HTMLDialogElement.prototype.showModal = jest.fn(function () { this.setAttribute('open', '') })
+  HTMLDialogElement.prototype.close = jest.fn()
+  const { rerender } = render(<MiraGeneratedImage compact image={{ status: 'pending' }} />)
+  expect(screen.getByRole('status')).toHaveTextContent('Generating image')
+  expect(screen.queryByTestId('pixel-effect')).toBeNull()
+  rerender(<MiraGeneratedImage compact image={{ status: 'ready', id: '1234567890abcdef12345678' }} />)
+  fireEvent.click(await screen.findByLabelText('Open generated image'))
+  expect(screen.getByLabelText('Image viewer')).toBeInTheDocument()
+  fireEvent.click(screen.getByLabelText('Close image viewer'))
+  expect(screen.queryByLabelText('Image viewer')).toBeNull()
 })
 
 test('saved image is fetched privately and offers a download without regeneration', async () => {
