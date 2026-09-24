@@ -906,6 +906,13 @@ export async function POST(request) {
     }
 
     parsed = normalizeParsedResponse(parsed)
+    // A contact choice in an external-app task must not fall back into the HR
+    // directory just because the follow-up contains only a person's name.
+    if (activeTask?.action?.type === 'desktop_task' && !activeTask.uncertain &&
+        ['lookup_people', 'send_message'].includes(parsed.action?.type)) {
+      parsed.action = { type: 'desktop_task' }
+      parsed.cards = []
+    }
     parsed.taskBank = mergeMiraTaskPlan(taskBank, parsed, userMessage)
     const task = parsed.taskBank.tasks.find(item => item.status !== 'completed')
     if (activeTask?.uncertain) {
