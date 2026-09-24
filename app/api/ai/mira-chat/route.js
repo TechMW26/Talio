@@ -8,6 +8,8 @@ import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
 import { buildMiraConversationPrompt } from '@/lib/miraLanguage'
 import { validMiraAttachments, miraAttachmentContext } from '@/lib/miraAttachments'
 import { MIRA_SCREEN_INSTRUCTIONS } from '@/lib/miraDesktopScreen'
+import { miraAppKnowledge } from '@/lib/miraAppMap'
+import { validateMiraFocusTimer, matchMiraFocusTimer } from '@/lib/miraLocalActions'
 import { sanitizeMiraClientContext } from '@/lib/miraClientContext'
 import { MIRA_ACTION_INSTRUCTIONS, miraNavigationPath, matchMiraNavigation, matchMiraProjectOpen, matchMiraItemOpen } from '@/lib/miraNavigation'
 import { validateMiraUiAction } from '@/lib/miraUiAction'
@@ -717,7 +719,7 @@ function normalizeParsedResponse(parsed) {
             message: nested.message,
             speech: typeof nested.speech === 'string' ? nested.speech : undefined,
             action: nested.action,
-            draftAction: nested.draftAction, taskPlan: nested.taskPlan,
+            draftAction: nested.draftAction, taskPlan: nested.taskPlan, continueUi: nested.continueUi === true,
             cards: Array.isArray(nested.cards) ? nested.cards : (Array.isArray(parsed.cards) ? parsed.cards : []),
             suggestedQuestions: Array.isArray(nested.suggestedQuestions) ? nested.suggestedQuestions : (Array.isArray(parsed.suggestedQuestions) ? parsed.suggestedQuestions : [])
           }
@@ -732,7 +734,7 @@ function normalizeParsedResponse(parsed) {
     message: typeof parsed.message === 'string' ? parsed.message : 'I encountered an issue. Please try again.',
     speech: typeof parsed.speech === 'string' ? parsed.speech : undefined,
     action: parsed.action,
-    draftAction: parsed.draftAction, taskPlan: parsed.taskPlan,
+    draftAction: parsed.draftAction, taskPlan: parsed.taskPlan, continueUi: parsed.continueUi === true,
     cards: Array.isArray(parsed.cards) ? parsed.cards : [],
     suggestedQuestions: Array.isArray(parsed.suggestedQuestions) ? parsed.suggestedQuestions : []
   }
@@ -783,6 +785,8 @@ export async function POST(request) {
     }
 
     const navigationPage = matchMiraNavigation(userMessage)
+    const timerAction = matchMiraFocusTimer(userMessage)
+    if (timerAction && !activeTask && !attachments.length) return NextResponse.json({ success: true, response: { message: 'Updating focus timer.', action: timerAction, cards: [], suggestedQuestions: [] }, tokens: tokenResult })
     const projectOpen = matchMiraProjectOpen(userMessage) || matchMiraItemOpen(userMessage)
     if (projectOpen && !activeTask && !attachments.length) return NextResponse.json({ success: true, response: { message: 'Finding the requested item.', action: projectOpen, cards: [], suggestedQuestions: [] }, tokens: tokenResult })
     if (navigationPage && !attachments.length) return NextResponse.json({ success: true, response: {
@@ -836,6 +840,7 @@ export async function POST(request) {
       ? `You are MIRA, Talio's female action assistant. Decide the next supported action first; do not write a plan or simulate execution. Return JSON {"message":"one short sentence or necessary question","action":null,"cards":[],"suggestedQuestions":[]}. Use the action object only for an explicit current request with all required fields. Treat history as context, not authorization to repeat previous actions. Resolve names through action handlers, never invent IDs. Current date: ${new Date().toISOString()}; timezone: ${screen.timezone || 'not supplied'}. Role: ${role}. Hindi/Hinglish uses Roman script; otherwise match the user's language. ${MIRA_ACTION_INSTRUCTIONS}`
       : buildSystemPrompt(user, role, employeeData, contextData)
     systemPrompt += '\n' + miraOutputModeInstructions(body.inputMode === 'voice' ? 'voice' : 'chat')
+    systemPrompt += '\n' + miraAppKnowledge(userMessage, screen)
     systemPrompt += `\n${MIRA_SCREEN_INSTRUCTIONS}\ndesktopScreenAvailable: ${screen.desktopScreenAvailable === true}; screenContextAttempted: ${body.screenContextAttempted === true}`
     // Decision-first routing must retain capabilities, including image generation.
     if (decisionFirst) systemPrompt += '\n' + MIRA_IMAGE_INSTRUCTIONS + '\n' + MIRA_RESPONSE_GUIDELINES
@@ -907,7 +912,10 @@ export async function POST(request) {
     // Only the authenticated generation endpoint may supply image metadata.
     delete parsed.image
     parsed.structured = true
-    if (parsed.action?.type === 'read_screen') {
+    if (parsed.action?.type === 'focus_timer') {
+      parsed.action = validateMiraFocusTimer(parsed.action) || undefined
+      if (!parsed.action) parsed.message = 'Please choose start, pause, resume or reset, with a duration between 1 and 180 minutes.'
+    } else if (parsed.action?.type === 'read_screen') {
       parsed.action = screen.desktopScreenAvailable && body.screenContextAttempted !== true ? { type: 'read_screen' } : undefined
       if (!parsed.action) parsed.message = 'Please attach a screenshot so I can help with what you see.'
     } else if (parsed.action?.type === 'generate_image') {

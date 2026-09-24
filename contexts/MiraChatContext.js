@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { getMiraClientContext } from '@/lib/miraClientContext'
-import { executeMiraUiAction } from '@/lib/miraUiAction'
+import { executeMiraUiAction, waitForMiraPage } from '@/lib/miraUiAction'
 import { resolveMiraSnapshot } from '@/lib/miraSnapshotClient'
 import { advanceMiraTaskBank, mergeMiraTaskPlan, recordMiraTaskOutcome } from '@/lib/miraTaskBank'
 import { miraNavigationPath } from '@/lib/miraNavigation'
@@ -14,6 +14,7 @@ import { compactMiraHistory } from '@/lib/miraChatBudget'
 import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
 import { readMiraDesktopScreen } from '@/lib/miraDesktopScreen'
+import { executeMiraFocusTimer } from '@/lib/miraLocalActions'
 
 const MiraChatContext = createContext()
 
@@ -325,7 +326,13 @@ export function MiraChatProvider({ children }) {
           data.response.message = outcome.message
           data.response.suggestedQuestions = []
         }
-        if (data.response.action && !['navigate', 'dismiss', 'generate_image', 'ui_action'].includes(data.response.action.type)) {
+        if (data.response.action?.type === 'focus_timer') {
+          const outcome = executeMiraFocusTimer(data.response.action, { signal: requestController.signal })
+          data.response.actionResult = outcome
+          data.response.message = outcome.message
+          data.response.suggestedQuestions = []
+        }
+        if (data.response.action && !['navigate', 'dismiss', 'generate_image', 'ui_action', 'focus_timer'].includes(data.response.action.type)) {
           window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: data.response.action.type.replaceAll('_', ' '), phase: 'working' } }))
           // Execute only a newly generated requested action, never a rendered/saved message.
           let outcome
@@ -346,6 +353,15 @@ export function MiraChatProvider({ children }) {
           data.response.message = outcome.message || (outcome.success ? 'Completed successfully.' : 'The action could not be completed.')
           data.response.suggestedQuestions = []
         }
+        if (data.response.action?.type === 'navigate' && miraNavigationPath(data.response.action.page)) {
+          setViewMode('pip')
+          window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: data.response.action.page } }))
+          if (data.response.continueUi) {
+            const arrived = await waitForMiraPage(miraNavigationPath(data.response.action.page), requestController.signal)
+            data.response.actionResult = { success: arrived, message: arrived ? 'Requested page opened.' : 'The requested page did not become available. Please check access or loading status.' }
+            if (!arrived) data.response.message = data.response.actionResult.message
+          }
+        }
         data.response.taskBank = recordMiraTaskOutcome(data.response.taskBank, data.response.actionResult)
         const remainingTasks = data.response.taskBank.tasks.filter(task => task.status !== 'completed')
         const aiMsg = {
@@ -363,10 +379,6 @@ export function MiraChatProvider({ children }) {
           // Execution results supersede any proposed action narration.
           options.onSpeech?.(miraSpeechSummary(data.response.actionResult ? aiMsg.content : data.response.speech || aiMsg.content))
         }
-        if (data.response.action?.type === 'navigate' && miraNavigationPath(data.response.action.page)) {
-          setViewMode('pip')
-          window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: data.response.action.page } }))
-        }
         const navigation = data.response.actionResult?.navigation
         if (navigation && miraNavigationPath(navigation.page, navigation.id)) {
           setViewMode('pip')
@@ -379,6 +391,14 @@ export function MiraChatProvider({ children }) {
         saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() =>
           saveToSession(savedUser, aiMsg, savedBranch, saveTarget))
         lastReply = aiMsg.content
+        if (data.response.continueUi && ['ui_action', 'navigate'].includes(data.response.action?.type) && data.response.actionResult?.success && queueStep < 7) {
+          conversationHistory = [...conversationHistory, ...compactMiraHistory([aiMsg])].slice(-10)
+          queueMessage = text
+          nextReplyId += 1
+          // Let React commit the new tab/dialog before capturing its controls.
+          await new Promise(resolve => setTimeout(resolve, 120))
+          continue
+        }
         if (!data.response.actionResult?.success || data.response.actionResult.uncertain || !remainingTasks.length || remainingTasks[0].status !== 'pending') return lastReply
         taskBank = data.response.taskBank
         conversationHistory = [...conversationHistory, ...(queueStep === 0 ? [{ role: 'user', content: text }] : []), ...compactMiraHistory([aiMsg])].slice(-10)

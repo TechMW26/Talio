@@ -149,6 +149,7 @@ export default function MeetingsPage() {
 
         <Button
           onPress={() => setShowCreateModal(true)}
+          data-mira-control="navigation"
           color="primary"
           startContent={<HiOutlinePlus key="create-meeting-icon" className="w-5 h-5" />}
         >

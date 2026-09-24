@@ -262,6 +262,7 @@ export default function AssetsPage() {
           <div className="flex gap-2">
             <Button
               onPress={() => setIsBulkImportOpen(true)}
+              data-mira-control="navigation"
               variant="flat"
               startContent={<FaFileUpload />}
             >
@@ -269,6 +270,7 @@ export default function AssetsPage() {
             </Button>
             <Button
               onPress={() => setIsModalOpen(true)}
+              data-mira-control="navigation"
               color="primary"
               startContent={<FaPlus />}
             >

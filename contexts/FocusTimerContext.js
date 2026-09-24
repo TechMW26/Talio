@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { startTimerAlarm, stopTimerAlarm } from '@/utils/audio'
+import { registerMiraFocusTimer } from '@/lib/miraLocalActions'
 
 const FocusTimerContext = createContext(null)
 
@@ -103,6 +104,18 @@ export function FocusTimerProvider({ children }) {
   }, [duration, dismissAlarm])
 
   const pct = total > 0 ? ((total - left) / total) * 100 : 0
+  useEffect(() => registerMiraFocusTimer(({ operation, minutes }) => {
+    if (operation === 'dismiss') { dismissAlarm(); return { success: true, message: 'Focus timer alarm dismissed.' } }
+    if (operation === 'reset') { reset(); return { success: true, message: 'Focus timer reset.' } }
+    if (operation === 'pause') { setRunning(false); return { success: true, message: 'Focus timer paused.' } }
+    dismissAlarm()
+    if (minutes !== undefined || left === 0) {
+      const next = minutes ?? duration
+      setDuration(next); setTotal(next * 60); setLeft(next * 60)
+    }
+    setRunning(true)
+    return { success: true, message: minutes !== undefined ? `Focus timer started for ${minutes} minutes.` : 'Focus timer running.' }
+  }), [left, duration, dismissAlarm, reset])
   const done = left === 0
   const mins = String(Math.floor(left / 60)).padStart(2, '0')
   const secs = String(left % 60).padStart(2, '0')

@@ -310,6 +310,7 @@ export default function TodoPage() {
           <Button
             color="primary"
             onPress={() => setShowCreateModal(true)}
+            data-mira-control="navigation"
             startContent={<HiOutlinePlus className="w-5 h-5" />}
           >
             Add To-do

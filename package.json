@@ -6,6 +6,9 @@
     "node": ">=20 <23"
   },
   "scripts": {
+    "mira:map": "node scripts/generate-mira-app-map.cjs",
+    "prebuild": "npm run mira:map",
+    "prevercel-build": "npm run mira:map",
     "dev": "cross-env TZ=Asia/Kolkata NODE_ENV=development NEXT_DIST_DIR=.next-dev-next next dev",
     "dev:next": "cross-env TZ=Asia/Kolkata NODE_ENV=development NEXT_DIST_DIR=.next-dev-next next dev",
     "build": "cross-env TZ=Asia/Kolkata NODE_OPTIONS=--max-old-space-size=6144 SKIP_ENV_VALIDATION=true next build",

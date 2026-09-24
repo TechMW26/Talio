@@ -8,6 +8,34 @@ global.TextDecoder = TextDecoder
 const wrapper = ({ children }) => <MiraChatProvider>{children}</MiraChatProvider>
 const bytes = value => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`)
 
+test('navigation prerequisites continue with executor evidence and the original request', async () => {
+  window.history.replaceState({}, '', '/dashboard')
+  const navigate = event => window.history.replaceState({}, '', event.detail.page)
+  window.addEventListener('mira:navigate', navigate)
+  let chats = 0
+  const requests = []
+  global.fetch = jest.fn(async (url, options) => ({ ok: true, json: async () => {
+    if (url === '/api/ai/mira-chat') {
+      requests.push(JSON.parse(options.body))
+      return { success: true, response: ++chats === 1
+        ? { message: 'Opening Assets.', action: { type: 'navigate', page: '/dashboard/assets' }, continueUi: true }
+        : { message: 'Assets is open. Add Asset is in the page header.' } }
+    }
+    return { success: false }
+  } }))
+  try {
+    const { result } = renderHook(useMiraChat, { wrapper })
+    await act(async () => { await result.current.sendMessage('Open Assets and show me where to add one') })
+    expect(chats).toBe(2)
+    expect(requests[1].message).toBe(requests[0].message)
+    expect(requests[1].conversationHistory.some(m => m.content.includes('Requested page opened.'))).toBe(true)
+    expect(result.current.isThinking).toBe(false)
+  } finally {
+    window.removeEventListener('mira:navigate', navigate)
+    window.history.replaceState({}, '', '/')
+  }
+})
+
 test.each([true, false])('queue automatically continues only after verified success (%s)', async success => {
   const lookup = { type: 'lookup_people', fields: { query: 'Sahil' } }
   const send = { type: 'send_message', fields: { recipient: 'Sahil', content: 'Hello' } }

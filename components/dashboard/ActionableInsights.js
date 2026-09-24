@@ -350,7 +350,7 @@ function FocusTimerCard() {
   const [picking, setPicking] = useState(false)
 
   return (
-    <div className={`rounded-2xl p-5 bg-white dark:bg-zinc-800/60 border shadow-sm flex flex-col justify-between min-h-[140px] transition-all ${
+    <div data-mira-focus-timer className={`rounded-2xl p-5 bg-white dark:bg-zinc-800/60 border shadow-sm flex flex-col justify-between min-h-[140px] transition-all ${
       alarming
         ? 'border-red-300 dark:border-red-500/50 ring-2 ring-red-400/50 animate-pulse'
         : 'border-gray-100 dark:border-zinc-700/50'
@@ -362,6 +362,8 @@ function FocusTimerCard() {
         </div>
         <button
           onClick={() => { if (!running && !alarming) setPicking(p => !p) }}
+          aria-label="Choose focus timer duration"
+          data-mira-control="navigation"
           className={`text-[10px] px-2 py-0.5 rounded-full font-semibold transition-colors ${
             alarming
               ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 animate-pulse'
@@ -417,6 +419,7 @@ function FocusTimerCard() {
         <div className="flex items-center justify-center gap-3">
           <button
             onClick={toggle}
+            aria-label={done ? 'Restart focus timer' : running ? 'Pause focus timer' : 'Start focus timer'}
             className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
             title={done ? 'Restart' : running ? 'Pause' : 'Start'}
           >
@@ -429,6 +432,7 @@ function FocusTimerCard() {
           {!done && (
             <button
               onClick={reset}
+              aria-label="Reset focus timer"
               className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
               title="Reset"
             >

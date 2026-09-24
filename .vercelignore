@@ -12,7 +12,8 @@ nginx
 tmp
 tests
 docs
-scripts
+scripts/*
+!scripts/generate-mira-app-map.cjs
 Dockerfile
 docker-compose.yml
 deploy-production.sh
@@ -20,6 +21,9 @@ deploy-production.sh
 *.exe
 *.zip
 *.tgz
+*.deb
+*.AppImage
+Talio-*-SHA256SUMS.txt
 .env
 .env.*
 !.env.example
