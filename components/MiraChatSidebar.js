@@ -4,6 +4,7 @@ import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaChevronLeft, FaRegTrashAlt, FaCopy, FaCheck, FaDownload, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb } from 'react-icons/fa'
 import { useRouter, usePathname } from 'next/navigation'
 import { useMiraChat } from '@/contexts/MiraChatContext'
+import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import MiraSphere from '@/components/ui/MiraPet'
 import MiraGeneratedImage from '@/components/ui/MiraGeneratedImage'
@@ -445,6 +446,7 @@ function formatTimeAgo(dateStr) {
 // ─── Main Sidebar ───────────────────────────────────────────────────
 
 export default function MiraChatSidebar() {
+  const { openWidget } = useChatWidget()
   const router = useRouter()
   const pathname = usePathname()
   const previousPath = useRef(pathname)
@@ -480,11 +482,15 @@ export default function MiraChatSidebar() {
       const path = miraNavigationPath(event.detail?.page, event.detail?.id)
       if (!path) return
       setViewMode('pip')
+      if (path === '/dashboard/chat' && (window.electronAPI || window.innerWidth >= 1024)) {
+        openWidget('button')
+        return
+      }
       router.push(path)
     }
     window.addEventListener('mira:navigate', navigate)
     return () => window.removeEventListener('mira:navigate', navigate)
-  }, [router, setViewMode])
+  }, [router, setViewMode, openWidget])
   const [backgroundCompact, setBackgroundCompact] = useState(false)
   const panelVisible = useMiraPanelVisible(isOpen)
   const pip = isOpen && (minimized || backgroundCompact)
@@ -673,11 +679,11 @@ export default function MiraChatSidebar() {
           pointerEvents: isOpen ? 'auto' : 'none',
           transitionDuration: '450ms',
           transitionTimingFunction: panelVisible ? 'cubic-bezier(0.22, 0.65, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.6, 1)',
-          left: pip ? '24px' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
-          right: undefined,
+          left: pip ? 'auto' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
+          right: pip ? '24px' : undefined,
           borderRadius: 16,
           top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
-          bottom: pip ? '24px' : 'auto',
+          bottom: pip ? 'max(24px, env(safe-area-inset-bottom))' : 'auto',
           height: pip ? 'auto' : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
           transitionProperty: sidebarDrag.dragging ? 'none' : pip ? 'opacity, transform' : 'opacity, transform, left, top, width',
           width: pip ? 'min(340px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',

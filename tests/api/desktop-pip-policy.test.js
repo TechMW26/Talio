@@ -18,3 +18,15 @@ test('desktop retains screenshot entitlements and enables real audio by default'
   for (const permission of ['device.camera', 'device.microphone', 'personal-information.location', 'network.client']) expect(entitlements).toContain('com.apple.security.' + permission)
   expect(require('../../desktop-app/package.json').build.appId).toBe('in.talio.desktop')
 })
+
+const { pipBounds } = require('../../desktop-app/src/pipWindowPolicy')
+test.each([
+  [{ x: 0, y: 25, width: 1440, height: 815 }, { x: 1084, y: 644, width: 340, height: 180 }],
+  [{ x: 0, y: 0, width: 1920, height: 1040 }, { x: 1564, y: 844, width: 340, height: 180 }],
+  [{ x: -1920, y: 0, width: 1872, height: 1080 }, { x: -404, y: 884, width: 340, height: 180 }],
+])('places PiP inside the OS work area including alternate monitors', (workArea, expected) => {
+  expect(pipBounds(workArea, { width: 340, height: 180 })).toEqual(expected)
+})
+test('clamps oversized live windows to the work area', () => {
+  expect(pipBounds({ x: 0, y: 0, width: 300, height: 200 }, { width: 500, height: 800 })).toEqual({ x: 16, y: 16, width: 268, height: 168 })
+})

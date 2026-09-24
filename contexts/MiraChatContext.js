@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { getMiraClientContext } from '@/lib/miraClientContext'
 import { executeMiraUiAction } from '@/lib/miraUiAction'
+import { resolveMiraSnapshot } from '@/lib/miraSnapshotClient'
 import { advanceMiraTaskBank, mergeMiraTaskPlan, recordMiraTaskOutcome } from '@/lib/miraTaskBank'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
@@ -293,7 +294,10 @@ export function MiraChatProvider({ children }) {
           data.response.suggestedQuestions = []
         }
         if (data.response.action?.type === 'ui_action') {
-          const outcome = await executeMiraUiAction(data.response.action)
+          const outcome = await executeMiraUiAction(data.response.action, {
+            signal: abortControllerRef.current.signal,
+            resolveSnapshot: snapshot => resolveMiraSnapshot(snapshot, { token, signal: abortControllerRef.current.signal }),
+          })
           data.response.actionResult = outcome
           data.response.message = outcome.message
           data.response.suggestedQuestions = []

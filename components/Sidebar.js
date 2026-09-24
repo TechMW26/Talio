@@ -57,7 +57,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const [isDesktop, setIsDesktop] = useState(false)
   const [menuQuery, setMenuQuery] = useState('')
   const { unreadCount } = useUnreadMessages()
-  const { toggleWidget } = useChatWidget()
+  const { toggleWidget, openWidget } = useChatWidget()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
   const { subscribe, isConnected } = useSocket()
   const { features: companyFeatures } = useCompanyFeatures()
@@ -358,7 +358,13 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     setExpandedMenus((current) => current[menuName] ? {} : { [menuName]: true })
   }
 
-  const handleLinkClick = (path) => {
+  const handleLinkClick = (path, event) => {
+    if (path === '/dashboard/chat') {
+      event?.preventDefault()
+      openWidget('sidebar')
+      setIsOpen(false)
+      return
+    }
     setIsOpen(false)
     if (path && path !== pathname) {
       startNavigation(path)
@@ -556,7 +562,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                     ) : (
                       <Link
                         href={item.path}
-                        onClick={() => handleLinkClick(item.path)}
+                        onClick={(event) => handleLinkClick(item.path, event)}
                         aria-current={isActive ? 'page' : undefined}
                         data-active={isActive}
                         className="talio-sidebar-row text-left"

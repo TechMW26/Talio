@@ -482,7 +482,7 @@ export default function SlidingSidebar({
                   ) : (
                     <Link
                       href={item.path}
-                      onClick={() => handleLinkClick(item.path)}
+                      onClick={(event) => handleLinkClick(item.path, event)}
                       aria-current={isActive ? 'page' : undefined}
                       data-active={isActive}
                       className="talio-sidebar-row text-left"

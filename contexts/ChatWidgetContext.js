@@ -90,6 +90,23 @@ export function ChatWidgetProvider({ children }) {
     setIsWidgetOpen(true)
   }, [])
 
+  // Intercept at capture phase so grouped Next links cannot also mount the
+  // full chat page after opening the desktop overlay. Mobile keeps its page.
+  useEffect(() => {
+    const openDesktopChat = event => {
+      if (!(window.electronAPI || window.matchMedia('(min-width: 1024px)').matches)) return
+      const anchor = event.target?.closest?.('a[href]')
+      if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const url = new URL(anchor.href, window.location.href)
+      if (url.origin !== window.location.origin || url.pathname !== '/dashboard/chat' || anchor.target === '_blank') return
+      event.preventDefault()
+      event.stopPropagation()
+      openWidget('sidebar')
+    }
+    document.addEventListener('click', openDesktopChat, true)
+    return () => document.removeEventListener('click', openDesktopChat, true)
+  }, [openWidget])
+
   const closeWidget = useCallback(() => {
     setIsWidgetOpen(false)
   }, [])

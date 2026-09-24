@@ -19,7 +19,8 @@ const screenshotService = require('./screenshotService');
 const socketHandler = require('./socketHandler');
 const { inspectRendererHealth, resolveAppNavigationUrl } = require('./rendererHealth');
 const { revealMiraWindow } = require('./miraWakeBridge');
-const { pipWindowOptions } = require('./pipWindowPolicy');
+const { captureMiraAppSnapshot } = require('./miraAppSnapshot');
+const { pipWindowOptions, pipBounds } = require('./pipWindowPolicy');
 
 // PERFORMANCE: Optimized GPU and rendering settings
 const forceDisableGPU = process.env.TALIO_DISABLE_GPU === '1';
@@ -1136,6 +1137,28 @@ function setupWindowEvents() {
   mainWindow.webContents.on('did-create-window', function (child, details) {
     if (details.frameName !== 'talio-live-pip') return;
     child.setAlwaysOnTop(true, 'floating');
+    let positioning = false;
+    const positionPip = () => {
+      if (positioning || child.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) return;
+      positioning = true;
+      try {
+        const display = screen.getDisplayMatching(mainWindow.getBounds());
+        const bounds = pipBounds(display.workArea, child.getBounds());
+        const current = child.getBounds();
+        if (Object.keys(bounds).some(key => bounds[key] !== current[key])) child.setBounds(bounds);
+      } finally { positioning = false; }
+    };
+    positionPip();
+    child.on('resize', positionPip);
+    mainWindow.on('move', positionPip);
+    screen.on('display-metrics-changed', positionPip);
+    screen.on('display-removed', positionPip);
+    const parent = mainWindow;
+    child.once('closed', () => {
+      parent.removeListener('move', positionPip);
+      screen.removeListener('display-metrics-changed', positionPip);
+      screen.removeListener('display-removed', positionPip);
+    });
     // Do not steal focus from the application the user just switched to.
     child.once('ready-to-show', () => { if (!child.isDestroyed()) child.showInactive(); });
     if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -1410,6 +1433,8 @@ function setupIPCHandlers() {
   }
 
   ipcHandlersRegistered = true;
+
+  ipcMain.handle('mira-app-snapshot', event => captureMiraAppSnapshot(event, mainWindow, APP_ORIGIN));
 
   ipcMain.handle('mira-wake', function (event) {
     return revealMiraWindow(event, mainWindow, APP_ORIGIN);

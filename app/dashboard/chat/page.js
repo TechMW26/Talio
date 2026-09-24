@@ -1,11 +1,12 @@
 'use client'
 
+import { normalizePresenceUpdates } from '@/lib/chatPresence'
+
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { FaUserPlus, FaUsers, FaTimes, FaFile, FaImage, FaFilePdf, FaUser, FaComments, FaArrowDown, FaArrowLeft } from 'react-icons/fa'
 import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import MemberAvatar from '@/components/chat/MemberAvatar'
 import { playNotificationSound } from '@/utils/audio'
@@ -15,7 +16,6 @@ import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 
 export default function ChatPage() {
-  const { openWidget } = useChatWidget()
   // --- SWR: Initial data loads ---
   const { data: chatsRes, isLoading: chatsLoading, mutate: refreshChats } = useAuthedSWR('/api/chat')
   const currentUserId = useMemo(() => chatsRes?.currentUserId || null, [chatsRes])
@@ -57,14 +57,7 @@ export default function ChatPage() {
   const longPressTimer = useRef(null)
   const { currentTheme, themes } = useTheme()
 
-  // A direct desktop chat URL opens the overlay in place. Sidebar launches are
-  // intercepted before navigation, so the page the user is working on remains
-  // mounted behind the widget.
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
-      openWidget('route')
-    }
-  }, [openWidget])
+
 
   // Available reactions
   const reactions = ['👍', '❤️', '😂', '😮', '😢', '🙏']
@@ -519,6 +512,7 @@ export default function ChatPage() {
   }
 
   const updatePresenceState = (updates) => {
+    updates = normalizePresenceUpdates(updates)
     if (!updates || updates.length === 0) return
     setPresenceByEmployee(prev => {
       const next = { ...prev }

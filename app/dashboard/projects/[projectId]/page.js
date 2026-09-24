@@ -1564,7 +1564,7 @@ export default function ProjectDetailPage() {
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
         <div className="">
-          <nav className="flex overflow-x-auto">
+          <nav role="tablist" aria-label="Project sections" className="flex overflow-x-auto">
             {[
               { id: 'overview', label: 'Overview', icon: HiOutlineChartBar },
               { id: 'tasks', label: 'Tasks', icon: HiOutlineClipboardDocumentList },
@@ -1574,6 +1574,8 @@ export default function ProjectDetailPage() {
             ].map(tab => (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
                     ? 'border-primary-500 text-primary-600'

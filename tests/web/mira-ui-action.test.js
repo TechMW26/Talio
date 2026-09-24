@@ -22,3 +22,34 @@ test('does not turn arbitrary destructive labels into clicks', async () => {
   expect(await executeMiraUiAction({ type: 'ui_action', fields: { operation: 'click', target: 'Delete task' } })).toMatchObject({ success: false })
   expect(click).not.toHaveBeenCalled()
 })
+
+function addTab(text = 'Tasks') {
+  const tab = document.createElement('button')
+  tab.textContent = text; tab.setAttribute('role', 'tab')
+  tab.getClientRects = () => [{ width: 100, height: 30 }]
+  tab.getBoundingClientRect = () => ({ x: 10, y: 10, width: 100, height: 30, top: 10, left: 10, bottom: 40, right: 110 })
+  tab.scrollIntoView = jest.fn()
+  document.querySelector('main').append(tab)
+  return tab
+}
+test('snapshot resolves a translated local navigation request to a real tab', async () => {
+  const tab = addTab(), click = jest.fn(); tab.addEventListener('click', click)
+  const resolveSnapshot = jest.fn(async snapshot => snapshot.controls.find(c => c.label === 'Tasks').id)
+  expect(await executeMiraUiAction({ type: 'ui_action', fields: { operation: 'click', target: 'टास्क' } }, { resolveSnapshot })).toMatchObject({ success: true, message: 'Selected Tasks.' })
+  expect(resolveSnapshot.mock.calls[0][0].controls.some(c => c.label === 'Delete task')).toBe(false)
+  expect(click).toHaveBeenCalledTimes(1)
+})
+test('rejects a snapshot decision after the selected control changes', async () => {
+  const tab = addTab(), click = jest.fn(); tab.addEventListener('click', click)
+  const resolveSnapshot = async snapshot => { tab.textContent = 'Other tab'; return snapshot.controls.find(c => c.label === 'Tasks').id }
+  expect(await executeMiraUiAction({ type: 'ui_action', fields: { operation: 'click', target: 'टास्क' } }, { resolveSnapshot })).toMatchObject({ success: false })
+  expect(click).not.toHaveBeenCalled()
+})
+test('rejects invented snapshot IDs and cancelled clicks', async () => {
+  const tab = addTab(), click = jest.fn(); tab.addEventListener('click', click)
+  const controller = new AbortController()
+  const action = { type: 'ui_action', fields: { operation: 'click', target: 'टास्क' } }
+  expect((await executeMiraUiAction(action, { resolveSnapshot: async () => '999' })).success).toBe(false)
+  expect((await executeMiraUiAction(action, { signal: controller.signal, resolveSnapshot: async () => { controller.abort(); return '0' } })).success).toBe(false)
+  expect(click).not.toHaveBeenCalled()
+})

@@ -5,6 +5,8 @@ import MiraChatSidebar from '@/components/MiraChatSidebar'
 const mockStop = jest.fn()
 const mockStart = jest.fn()
 const mockPush = jest.fn()
+const mockOpenWidget = jest.fn()
+jest.mock('@/contexts/ChatWidgetContext', () => ({ useChatWidget: () => ({ openWidget: mockOpenWidget }) }))
 const mockCloseChat = jest.fn()
 jest.mock('@/lib/miraSpeechPlayback', () => ({ createMiraSpeechPlayback: () => ({ close: jest.fn(), cancel: jest.fn(), speak: jest.fn() }) }))
 let mockOpen = true
@@ -214,4 +216,12 @@ test('stops capture if permission resolves after closing', async () => {
   expect(mockStart.mock.calls[0][0].signal.aborted).toBe(true)
   await act(async () => { resolve({ stop: mockStop, stream: {} }) })
   expect(mockStop).toHaveBeenCalledTimes(1)
+})
+
+test('MIRA opens desktop messages as an overlay without navigating', () => {
+  mockOpenWidget.mockClear()
+  render(<MiraChatSidebar />)
+  act(() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: 'messages' } })))
+  expect(mockOpenWidget).toHaveBeenCalledWith('button')
+  expect(mockPush).not.toHaveBeenCalled()
 })
