@@ -79,6 +79,8 @@ public/releases/
 *.exe
 *.blockmap
 /Talio-*.zip
+/Talio-*.AppImage
+/Talio-*.deb
 
 # Sensitive uploads
 uploads/aadhaar/

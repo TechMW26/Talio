@@ -55,7 +55,8 @@ separate from cross-platform package creation and must be reported explicitly.
 
 ### Verified locally on 25 September 2026
 
-- 44 focused JavaScript tests passed; four Python adapter/Agent S tests passed.
+- 452 JavaScript regression tests across 63 suites passed; four Python
+  adapter/Agent S tests passed.
 - Production Next build passed (267 pages; repository skips lint/type checks).
 - Frozen macOS ARM worker startup, inference exchange, continuity and restart passed.
 - Live DeepSeek synthetic vision response: approximately 0.7 seconds.
@@ -65,3 +66,11 @@ separate from cross-platform package creation and must be reported explicitly.
   was selected and no message was sent. Search results were independently viewed.
 - This was a local end-to-end component test, not an authenticated production
   MIRA chat acceptance test. Windows/Linux GUI acceptance remains outstanding.
+- All four native runtime/build matrix jobs passed (GitHub run 36062594145).
+  Final installers include subsequent protected-app and emergency-shortcut fixes;
+  extracted application source was compared against the release checkout.
+- Both final Mac app signatures passed `codesign --verify --deep --strict` and
+  both frozen runtimes started successfully from their signed app resources.
+- Windows PE certificate table is empty: this release is unsigned. Mac packages
+  are signed but not notarized. Linux AppImage and Debian archive structures were
+  checked; no native Windows/Linux interactive desktop test is claimed.
