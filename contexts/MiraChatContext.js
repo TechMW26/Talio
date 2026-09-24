@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { getMiraClientContext } from '@/lib/miraClientContext'
+import { executeMiraUiAction } from '@/lib/miraUiAction'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
 import { readMiraEvents } from '@/lib/miraStream'
@@ -277,7 +278,13 @@ export function MiraChatProvider({ children }) {
           data.response.actionResult = { success: Boolean(outcome.success), message: data.response.message }
           data.response.suggestedQuestions = []
         }
-        if (data.response.action && !['navigate', 'dismiss', 'generate_image'].includes(data.response.action.type)) {
+        if (data.response.action?.type === 'ui_action') {
+          const outcome = await executeMiraUiAction(data.response.action)
+          data.response.actionResult = outcome
+          data.response.message = outcome.message
+          data.response.suggestedQuestions = []
+        }
+        if (data.response.action && !['navigate', 'dismiss', 'generate_image', 'ui_action'].includes(data.response.action.type)) {
           window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: data.response.action.type.replaceAll('_', ' '), phase: 'working' } }))
           // Execute only a newly generated requested action, never a rendered/saved message.
           let outcome

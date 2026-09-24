@@ -8,7 +8,7 @@ export async function POST(request) {
     const validation = validateMiraAction(input.action)
     if (validation.error) return NextResponse.json({ success: false, message: validation.error }, { status: 400 })
     const [page, permission] = MIRA_ACTION_PERMISSIONS[validation.action.type]
-    const auth = await requirePermission(page, permission)(request, ['Employee', 'Department', 'Task', 'Chat', 'Project', 'ProjectMember'])
+    const auth = await requirePermission(page, permission)(request, ['Employee', 'Department', 'Task', 'TaskAssignee', 'Meeting', 'Chat', 'Project', 'ProjectMember'])
     if (auth.denied) return NextResponse.json({ success: false, message: 'Your current access level does not permit this action. Ask an administrator for the required permission.' }, { status: auth.denied.status })
     if (validation.action.type === 'create_task' && validation.action.fields.assignees.some(name => !/^(me|myself|self)$/i.test(name))) {
       const assignment = await requirePermission('tasks', 'assign')(request)

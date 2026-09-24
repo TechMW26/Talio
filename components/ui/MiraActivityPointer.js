@@ -15,7 +15,7 @@ export default function MiraActivityPointer() {
       setActivity({ label, visible: true, x: Math.max(12, Math.min(innerWidth - 200, visible ? rect.left + rect.width / 2 : innerWidth - 220)), y: Math.max(12, Math.min(innerHeight - 70, visible ? rect.top + rect.height / 2 : 88)) })
       timer = setTimeout(() => setActivity(previous => ({ ...previous, visible: false })), phase === 'done' ? 2200 : 30000)
     }
-    const action = event => show(event.detail?.label || 'Working', event.detail?.phase)
+    const action = event => show(event.detail?.label || 'Working', event.detail?.phase, event.detail?.target)
     const navigate = event => {
       const path = miraNavigationPath(event.detail?.page, event.detail?.id)
       if (!path) return

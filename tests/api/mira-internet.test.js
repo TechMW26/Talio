@@ -20,3 +20,9 @@ test('a city clarification continues the weather lookup without sending GPS', as
   await getMiraInternetContext('Bhopal', { location: { latitude: 23.25, longitude: 77.4 } }, 'आज का मौसम कैसा है?')
   expect(searchMiraInternet).toHaveBeenLastCalledWith(expect.stringContaining('Bhopal weather today'))
 })
+test('mixed Hindi and Hinglish weather requests use the explicit city', async () => {
+  await getMiraInternetContext('भोपाल का weather बताओ', {})
+  expect(searchMiraInternet).toHaveBeenLastCalledWith(expect.stringContaining('भोपाल weather today'))
+  await getMiraInternetContext('Bhopal ka weather batao', {})
+  expect(searchMiraInternet).toHaveBeenLastCalledWith(expect.stringContaining('Bhopal weather today'))
+})

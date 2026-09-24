@@ -20,7 +20,7 @@ import { miraNavigationPath } from '@/lib/miraNavigation'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import { prewarmMiraVoice } from '@/lib/miraVoiceReady'
 import MiraEditPrompt from './MiraEditPrompt'
-import { miraMessageDisplay } from '@/lib/miraMessageDisplay'
+import { miraMessageDisplay, miraPlainCaption } from '@/lib/miraMessageDisplay'
 import { Maximize2, Minimize2, Mic, Square, Pencil, RotateCcw, Reply } from 'lucide-react'
 
 // ─── Copy Button ────────────────────────────────────────────────────
@@ -320,7 +320,7 @@ function CodeBlock({ className, children }) {
 
 function MiraActionPreview({ action, result, messageId, busy }) {
   const { sendMessage } = useMiraChat()
-  if (!action || ['navigate', 'dismiss'].includes(action.type)) return null
+  if (!action || ['navigate', 'dismiss', 'ui_action'].includes(action.type)) return null
   const resource = result?.resource
   const href = resource && miraNavigationPath(resource.page, resource.id)
   if (result?.success && href) return <button className="my-2 rounded-xl border border-default-200 px-3 py-2 text-sm" onClick={() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: resource }))}>Open created {resource.page === 'projects' ? 'project' : 'meeting'} ↗</button>
@@ -676,7 +676,7 @@ export default function MiraChatSidebar() {
             <span className="flex-1 text-xs font-medium">MIRA · {isThinking ? 'Thinking' : voice.state === 'speaking' ? 'Speaking' : voice.active ? 'Listening' : 'Ready'}</span>
           </button>
           <div role="status" aria-live="polite" aria-label="MIRA live captions" className="mt-3 max-h-36 overflow-y-auto text-sm leading-relaxed break-words whitespace-pre-wrap">
-            {pipCaption ? <><span className="block text-[11px] text-default-500 mb-1">{pipSpeaker}</span>{pipCaption}</> : <span className="text-default-500">{voice.active ? 'Speak naturally. Your words appear here.' : 'Your conversation captions appear here.'}</span>}
+            {pipCaption ? <><span className="block text-[11px] text-default-500 mb-1">{pipSpeaker}</span>{miraPlainCaption(pipCaption)}</> : <span className="text-default-500">{voice.active ? 'Speak naturally. Your words appear here.' : 'Your conversation captions appear here.'}</span>}
           </div>
         </div>}
         <div className={pip ? 'hidden' : 'contents'}>

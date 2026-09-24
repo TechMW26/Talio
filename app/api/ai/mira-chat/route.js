@@ -6,7 +6,8 @@ import { normalizeLeaveBalance } from '@/lib/leaveData'
 import { miraTaskLink } from '@/lib/miraTaskLink'
 import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
 import { sanitizeMiraClientContext } from '@/lib/miraClientContext'
-import { MIRA_ACTION_INSTRUCTIONS, miraNavigationPath, matchMiraNavigation, matchMiraProjectOpen } from '@/lib/miraNavigation'
+import { MIRA_ACTION_INSTRUCTIONS, miraNavigationPath, matchMiraNavigation, matchMiraProjectOpen, matchMiraItemOpen } from '@/lib/miraNavigation'
+import { validateMiraUiAction } from '@/lib/miraUiAction'
 import { validateMiraAction } from '@/lib/miraActions'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import { getMiraInternetContext } from '@/lib/miraInternet'
@@ -772,7 +773,7 @@ export async function POST(request) {
     }
 
     const navigationPage = matchMiraNavigation(userMessage)
-    const projectOpen = matchMiraProjectOpen(userMessage)
+    const projectOpen = matchMiraProjectOpen(userMessage) || matchMiraItemOpen(userMessage)
     if (projectOpen) return NextResponse.json({ success: true, response: { message: 'Finding your project.', action: projectOpen, cards: [], suggestedQuestions: [] }, tokens: tokenResult })
     if (navigationPage) return NextResponse.json({ success: true, response: {
       message: `Opening ${navigationPage}.`, cards: [], suggestedQuestions: [], action: { type: 'navigate', page: navigationPage },
@@ -888,6 +889,8 @@ export async function POST(request) {
     if (parsed.action?.type === 'generate_image') {
       parsed.action = validateMiraImageAction(parsed.action) || undefined
       if (!parsed.action) parsed.message = 'Please describe the image you want to generate.'
+    } else if (parsed.action?.type === 'ui_action') {
+      parsed.action = validateMiraUiAction(parsed.action) || undefined
     } else if (parsed.action?.type === 'dismiss') {
       parsed.action = { type: 'dismiss' }
     } else if (parsed.action?.type === 'navigate') {
