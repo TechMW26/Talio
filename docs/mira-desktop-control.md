@@ -1,6 +1,6 @@
 # MIRA desktop control
 
-The desktop runtime now exposes a task-scoped computer-control bridge. macOS is
+The desktop runtime now exposes a task-scoped computer-control bridge. macOS
 14 or newer is the initial supported platform; browser, Windows and Linux builds do not advertise
 this capability. They retain normal Talio navigation and screen-sharing support.
 

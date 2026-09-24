@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
+import { fetchLatestGitHubRelease } from '@/lib/platform/releaseCatalog.server';
 
 // Minimum desktop app version required to use the platform.
 // Bump this when a critical/breaking update is released.
 const MIN_DESKTOP_VERSION = '4.2.0';
 
 // Fallback if GitHub API is unreachable
-const FALLBACK_LATEST_VERSION = '6.0.4';
+const FALLBACK_LATEST_VERSION = '6.0.7';
 
-const GITHUB_REPO = 'TechMW26/Talio';
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 60 * 1000;
 
 let cachedLatestVersion = null;
 let cacheTimestamp = 0;
@@ -19,18 +19,9 @@ async function getLatestVersion() {
     return cachedLatestVersion;
   }
   try {
-    const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
-      {
-        headers: {
-          Accept: 'application/vnd.github.v3+json',
-          'User-Agent': 'Talio-Version-Check',
-        },
-        signal: AbortSignal.timeout(5000),
-      }
-    );
-    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
-    const release = await res.json();
+    // Share the authenticated, no-store source used by website downloads.
+    // Anonymous GitHub quotas can otherwise strand the updater on an old version.
+    const release = await fetchLatestGitHubRelease();
     const version = release.tag_name?.replace(/^v/, '');
     if (version) {
       cachedLatestVersion = version;
@@ -52,5 +43,5 @@ export async function GET(request) {
     latestVersion,
     message: 'A critical update is available. Please update Talio Desktop to continue.',
     clientVersion,
-  });
+  }, { headers: { 'Cache-Control': 'no-store' } });
 }
