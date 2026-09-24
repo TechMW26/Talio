@@ -1519,9 +1519,6 @@ export default function ProjectDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <HiOutlineCalendarDays className="w-5 h-5 text-blue-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{formatDate(project.endDate)}</p>
               <p className="text-sm text-gray-500">Deadline</p>
@@ -1530,9 +1527,6 @@ export default function ProjectDetailPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <HiOutlineChartBar className="w-5 h-5 text-green-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{project.completionPercentage || 0}%</p>
               <p className="text-sm text-gray-500">Progress</p>
@@ -1541,9 +1535,6 @@ export default function ProjectDetailPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <HiOutlineClipboardDocumentList className="w-5 h-5 text-purple-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">
                 {project.taskStats?.completed || 0}/{project.taskStats?.total || 0}
@@ -1554,9 +1545,6 @@ export default function ProjectDetailPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <HiOutlineUsers className="w-5 h-5 text-orange-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{project.members?.length || 0}</p>
               <p className="text-sm text-gray-500">Members</p>
@@ -1565,9 +1553,6 @@ export default function ProjectDetailPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <HiOutlineExclamationTriangle className="w-5 h-5 text-red-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{project.taskStats?.overdue || 0}</p>
               <p className="text-sm text-gray-500">Overdue Tasks</p>

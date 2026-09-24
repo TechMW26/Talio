@@ -438,9 +438,6 @@ export default function LiveUsersPage() {
                   className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <HiOutlineBuildingOffice2 className="h-5 w-5 text-blue-600" />
-                    </div>
                     <div>
                       <h3 className="font-medium text-gray-800">{dept.name}</h3>
                       <p className="text-sm text-gray-600">{dept.users?.length || 0} users</p>

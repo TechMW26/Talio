@@ -160,7 +160,6 @@ export default function CoursesPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <FaBook className="text-blue-600" />
           Course Library
         </h1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">

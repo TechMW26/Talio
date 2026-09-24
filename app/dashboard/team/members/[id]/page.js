@@ -237,7 +237,6 @@ export default function TeamMemberDetailsPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Basic Information</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-center text-gray-600">
-                <FaBriefcase className="mr-3 text-gray-400" />
                 <div>
                   <p className="text-xs text-gray-500">Designation</p>
                   <p className="font-medium">
@@ -246,21 +245,18 @@ export default function TeamMemberDetailsPage() {
                 </div>
               </div>
               <div className="flex items-center text-gray-600">
-                <FaEnvelope className="mr-3 text-gray-400" />
                 <div>
                   <p className="text-xs text-gray-500">Email</p>
                   <p className="font-medium">{employee.email}</p>
                 </div>
               </div>
               <div className="flex items-center text-gray-600">
-                <FaPhone className="mr-3 text-gray-400" />
                 <div>
                   <p className="text-xs text-gray-500">Phone</p>
                   <p className="font-medium">{employee.phone}</p>
                 </div>
               </div>
               <div className="flex items-center text-gray-600">
-                <FaCalendarAlt className="mr-3 text-gray-400" />
                 <div>
                   <p className="text-xs text-gray-500">Date of Joining</p>
                   <p className="font-medium">{new Date(employee.dateOfJoining).toLocaleDateString()}</p>
@@ -289,7 +285,6 @@ export default function TeamMemberDetailsPage() {
           {/* Task Statistics */}
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-              <FaTasks className="mr-2" />
               Task Statistics
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -317,7 +312,6 @@ export default function TeamMemberDetailsPage() {
             {/* Month Navigator */}
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 flex items-center">
-                <FaTasks className="mr-2" />
                 Tasks
               </h2>
               <div className="flex items-center gap-2">

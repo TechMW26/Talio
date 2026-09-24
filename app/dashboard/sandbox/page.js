@@ -138,7 +138,6 @@ export default function SandboxPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <HiOutlineLightBulb className="w-7 h-7 text-yellow-500" />
             Ideas Sandbox
           </h1>
           <p className="text-gray-600 mt-1 flex items-center gap-2">
@@ -160,9 +159,6 @@ export default function SandboxPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <HiOutlineLightBulb className="w-5 h-5 text-yellow-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{ideas.length}</p>
               <p className="text-sm text-gray-500">Total Ideas</p>
@@ -172,9 +168,6 @@ export default function SandboxPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <HiOutlineUserCircle className="w-5 h-5 text-blue-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{myIdeas.length}</p>
               <p className="text-sm text-gray-500">My Ideas</p>
@@ -184,9 +177,6 @@ export default function SandboxPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <FaThumbtack className="w-5 h-5 text-amber-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{pinnedIdeas.length}</p>
               <p className="text-sm text-gray-500">Pinned</p>
@@ -196,9 +186,6 @@ export default function SandboxPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <HiOutlineHandThumbUp className="w-5 h-5 text-green-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{totalVotes}</p>
               <p className="text-sm text-gray-500">Total Votes</p>

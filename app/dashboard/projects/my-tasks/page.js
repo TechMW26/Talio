@@ -517,7 +517,6 @@ export default function MyTasksPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-default-800 flex items-center gap-2">
-            <HiOutlineClipboardDocumentList className="w-7 h-7 text-indigo-600" />
             My Tasks
           </h1>
           <p className="text-default-600 mt-1">
@@ -538,9 +537,6 @@ export default function MyTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-default-100 rounded-lg">
-                <HiOutlineListBullet className="w-5 h-5 text-default-600" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.total}</p>
                 <p className="text-sm text-default-500">Total</p>
@@ -552,9 +548,6 @@ export default function MyTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning-100 rounded-lg">
-                <HiOutlineClock className="w-5 h-5 text-warning" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.pendingAcceptance}</p>
                 <p className="text-sm text-default-500">Pending Accept</p>
@@ -566,9 +559,6 @@ export default function MyTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-default-100 rounded-lg">
-                <HiOutlineClipboardDocumentList className="w-5 h-5 text-default-600" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.todo}</p>
                 <p className="text-sm text-default-500">To Do</p>
@@ -580,9 +570,6 @@ export default function MyTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <HiOutlinePlayCircle className="w-5 h-5 text-primary" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.inProgress}</p>
                 <p className="text-sm text-default-500">In Progress</p>
@@ -594,9 +581,6 @@ export default function MyTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <HiOutlineCheckCircle className="w-5 h-5 text-success" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.completed}</p>
                 <p className="text-sm text-default-500">Completed</p>
@@ -608,9 +592,6 @@ export default function MyTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-danger-100 rounded-lg">
-                <HiOutlineExclamationTriangle className="w-5 h-5 text-danger" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.overdue}</p>
                 <p className="text-sm text-default-500">Overdue</p>
@@ -738,7 +719,6 @@ export default function MyTasksPage() {
           {pendingAcceptance.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
-                <HiOutlineClock className="w-5 h-5 text-warning" />
                 Pending Acceptance ({pendingAcceptance.length})
               </h2>
               <div className="grid gap-4">
@@ -793,7 +773,6 @@ export default function MyTasksPage() {
           {pendingAcceptance.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
-                <HiOutlineClock className="w-5 h-5 text-warning" />
                 Pending Acceptance ({pendingAcceptance.length})
               </h2>
               <div className="grid gap-4">
@@ -835,7 +814,6 @@ export default function MyTasksPage() {
           {overdueTasks.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
-                <HiOutlineExclamationTriangle className="w-5 h-5 text-danger" />
                 Overdue ({overdueTasks.length})
               </h2>
               <div className="grid gap-4">
@@ -859,7 +837,6 @@ export default function MyTasksPage() {
           {todayTasks.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
-                <HiOutlineClock className="w-5 h-5 text-primary" />
                 Due Today ({todayTasks.length})
               </h2>
               <div className="grid gap-4">

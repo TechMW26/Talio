@@ -306,9 +306,6 @@ export default function MyPerformancePage() {
                 <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FaBullseye className="w-4 h-4 text-blue-600" />
-                      </div>
                       <h3 className="text-lg font-semibold text-gray-800">Recent Goals</h3>
                     </div>
                     <button
@@ -367,9 +364,6 @@ export default function MyPerformancePage() {
                 <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <FaStar className="w-4 h-4 text-yellow-600" />
-                      </div>
                       <h3 className="text-lg font-semibold text-gray-800">Recent Feedback</h3>
                     </div>
                     <button

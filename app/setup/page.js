@@ -226,9 +226,6 @@ export default function SetupPage() {
         {/* Setup Form Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <FaUserShield className="text-xl text-blue-600" />
-            </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Create Admin Account</h2>
               <p className="text-sm text-gray-500">This will be the main administrator</p>

@@ -14,3 +14,13 @@ test('header exposes open state and creative active and thinking labels', () => 
   expect(header).toContain("isMiraOpen ? (isThinking ? 'On it…' : 'Mira is here') : 'Ask Mira'")
   expect(header).toContain('motion-safe:animate-pulse')
 })
+
+test('opening collapses the smiley slot with panel-timed motion and reduced-motion support', () => {
+  const styles = fs.readFileSync('app/globals.css', 'utf8')
+  const header = fs.readFileSync('components/Header.js', 'utf8')
+  expect(header).toContain('mira-header-avatar')
+  expect(styles).toContain('.mira-header-pill[aria-expanded="true"] .mira-header-avatar { width: 0; opacity: 0; transform: scale(0); }')
+  expect(styles).toContain('width 300ms ease-out')
+  expect(styles).toContain('min-height: 40px')
+  expect(styles).toContain('.mira-header-pill, .mira-header-avatar, .mira-header-label { transition: none; }')
+})

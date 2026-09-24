@@ -749,7 +749,6 @@ export default function AttendanceReportPage() {
               >
                 <div>
                   <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
-                    <FaChartLine className="text-primary" />
                     <span>Overview Metrics</span>
                   </h2>
                   <p className="text-sm text-default-500 mt-1">
@@ -764,7 +763,6 @@ export default function AttendanceReportPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div className="bg-primary-50 rounded-lg p-4">
                       <div className="flex items-center space-x-2 mb-2">
-                        <FaUsers className="text-primary" />
                         <span className="text-sm text-primary-700 font-medium">Total Employees</span>
                       </div>
                       <p className="text-3xl font-bold text-primary">{reportData.overview.totalEmployees}</p>
@@ -772,7 +770,6 @@ export default function AttendanceReportPage() {
 
                     <div className="bg-success-50 rounded-lg p-4">
                       <div className="flex items-center space-x-2 mb-2">
-                        <FaCheckCircle className="text-success" />
                         <span className="text-sm text-success-700 font-medium">Attendance Rate</span>
                       </div>
                       <p className="text-3xl font-bold text-success">{reportData.overview.attendanceRate}%</p>
@@ -780,7 +777,6 @@ export default function AttendanceReportPage() {
 
                     <div className="bg-danger-50 rounded-lg p-4">
                       <div className="flex items-center space-x-2 mb-2">
-                        <FaTimesCircle className="text-danger" />
                         <span className="text-sm text-danger-700 font-medium">Absenteeism Rate</span>
                       </div>
                       <p className="text-3xl font-bold text-danger">{reportData.overview.absenteeismRate}%</p>
@@ -788,7 +784,6 @@ export default function AttendanceReportPage() {
 
                     <div className="bg-warning-50 rounded-lg p-4">
                       <div className="flex items-center space-x-2 mb-2">
-                        <FaClock className="text-warning" />
                         <span className="text-sm text-warning-700 font-medium">Punctuality Rate</span>
                       </div>
                       <p className="text-3xl font-bold text-warning">{reportData.overview.punctualityRate}%</p>
@@ -831,7 +826,6 @@ export default function AttendanceReportPage() {
               >
                 <div>
                   <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
-                    <FaChartPie className="text-danger" />
                     <span>Shrinkage Analysis</span>
                   </h2>
                   <p className="text-sm text-default-500 mt-1">
@@ -916,7 +910,6 @@ export default function AttendanceReportPage() {
                   onClick={() => toggleSection('departmentBreakdown')}
                 >
                   <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
-                    <FaBuilding className="text-primary" />
                     <span>Department Breakdown</span>
                   </h2>
                   {expandedSections.departmentBreakdown ? <FaChevronUp /> : <FaChevronDown />}
@@ -964,7 +957,6 @@ export default function AttendanceReportPage() {
                 onClick={() => toggleSection('employeeDetails')}
               >
                 <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
-                  <FaUserTie className="text-primary" />
                   <span>Individual Employee Metrics</span>
                 </h2>
                 {expandedSections.employeeDetails ? <FaChevronUp /> : <FaChevronDown />}

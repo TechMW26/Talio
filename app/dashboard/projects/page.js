@@ -139,7 +139,6 @@ export default function ProjectsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-default-800 flex items-center gap-2">
-            <HiOutlineRectangleStack className="w-7 h-7 text-primary" />
             Projects
           </h1>
           <p className="text-default-500 mt-1 flex items-center gap-2">
@@ -163,9 +162,6 @@ export default function ProjectsPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <HiOutlineRectangleStack className="w-5 h-5 text-primary" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.total}</p>
                 <p className="text-sm text-default-500">Total</p>
@@ -177,9 +173,6 @@ export default function ProjectsPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <HiOutlineClock className="w-5 h-5 text-success" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.active}</p>
                 <p className="text-sm text-default-500">Active</p>
@@ -191,9 +184,6 @@ export default function ProjectsPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <HiOutlineCheckCircle className="w-5 h-5 text-success" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.completed}</p>
                 <p className="text-sm text-default-500">Completed</p>
@@ -205,9 +195,6 @@ export default function ProjectsPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-danger-100 rounded-lg">
-                <HiOutlineExclamationTriangle className="w-5 h-5 text-danger" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.overdue}</p>
                 <p className="text-sm text-default-500">Overdue</p>

@@ -56,7 +56,6 @@ export default function TeamMembersPage() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center mb-2">
-          <FaUsers className="text-blue-600 mr-3 text-2xl" />
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Team Members</h1>
             <p className="text-gray-600 text-sm sm:text-base">
@@ -207,21 +206,17 @@ export default function TeamMembersPage() {
               {/* Details */}
               <div className="space-y-2 mb-4">
                 <div className="flex items-center text-sm text-gray-600">
-                  <FaBriefcase className="mr-2 text-gray-400" />
                   <span>
                     {formatDesignation(member.designation, member) || 'No designation'}
                   </span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <FaEnvelope className="mr-2 text-gray-400" />
                   <span className="truncate">{member.email}</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <FaPhone className="mr-2 text-gray-400" />
                   <span>{member.phone}</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <FaCalendarAlt className="mr-2 text-gray-400" />
                   <span>Joined {new Date(member.dateOfJoining).toLocaleDateString()}</span>
                 </div>
               </div>

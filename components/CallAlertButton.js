@@ -373,9 +373,6 @@ export default function CallAlertButton({ user, floating = false }) {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-primary/10 rounded-full">
-                    <HiOutlinePhone className="w-6 h-6 text-primary" />
-                  </div>
                   <div>
                     <h2 id="call-alert-title" className="text-xl font-semibold text-foreground">
                       {step === 1 ? 'Select Recipients' : 'Compose Alert'}

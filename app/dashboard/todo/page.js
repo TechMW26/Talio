@@ -289,8 +289,7 @@ export default function TodoPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <HiOutlineListBullet className="w-7 h-7 text-indigo-600" />
+          <h1 className="text-2xl font-bold text-gray-800">
             To-Do's
           </h1>
           <p className="text-gray-600 mt-1">
@@ -322,9 +321,6 @@ export default function TodoPage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <HiOutlineListBullet className="w-5 h-5 text-blue-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{(analytics?.summary?.total || 0) + projectTasks.length}</p>
               <p className="text-sm text-gray-500">Total</p>
@@ -334,9 +330,6 @@ export default function TodoPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <HiOutlineClock className="w-5 h-5 text-amber-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{(analytics?.summary?.pending || 0) + projectTasks.length}</p>
               <p className="text-sm text-gray-500">Pending</p>
@@ -346,9 +339,6 @@ export default function TodoPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <HiOutlineBriefcase className="w-5 h-5 text-purple-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{projectTasks.length}</p>
               <p className="text-sm text-gray-500">Project Tasks</p>
@@ -358,9 +348,6 @@ export default function TodoPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <HiOutlineCheckCircle className="w-5 h-5 text-green-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{analytics?.summary?.completed || 0}</p>
               <p className="text-sm text-gray-500">Completed</p>
@@ -370,9 +357,6 @@ export default function TodoPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <HiOutlineStar className="w-5 h-5 text-indigo-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{analytics?.summary?.productivityScore || 0}%</p>
               <p className="text-sm text-gray-500">Score</p>
@@ -400,7 +384,6 @@ export default function TodoPage() {
                   : 'text-gray-700 hover:bg-gray-50'
                   }`}
               >
-                <HiOutlineListBullet className="w-5 h-5 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">All To-dos</span>
                 <span className="text-sm text-gray-500">{(analytics?.summary?.total || 0) + projectTasks.length}</span>
               </button>
@@ -412,7 +395,6 @@ export default function TodoPage() {
                   : 'text-gray-700 hover:bg-gray-50'
                   }`}
               >
-                <HiOutlineStar className="w-5 h-5 text-amber-500 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">Today</span>
               </button>
 
@@ -423,7 +405,6 @@ export default function TodoPage() {
                   : 'text-gray-700 hover:bg-gray-50'
                   }`}
               >
-                <HiOutlineCalendarDays className="w-5 h-5 text-blue-500 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">Upcoming</span>
               </button>
 
@@ -435,7 +416,6 @@ export default function TodoPage() {
                     : 'text-red-600 hover:bg-red-50'
                     }`}
                 >
-                  <HiOutlineExclamationTriangle className="w-5 h-5 flex-shrink-0" />
                   <span className="flex-1 text-left font-medium">Overdue</span>
                   <span className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
                     {analytics?.summary?.overdue}
@@ -450,7 +430,6 @@ export default function TodoPage() {
                   : 'text-gray-700 hover:bg-gray-50'
                   }`}
               >
-                <HiOutlineCheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">Completed</span>
               </button>
             </div>
@@ -519,7 +498,6 @@ export default function TodoPage() {
                     : 'text-gray-700 hover:bg-gray-50'
                     }`}
                 >
-                  <HiOutlineBriefcase className="w-5 h-5 text-purple-500 flex-shrink-0" />
                   <span className="flex-1 text-left font-medium">Project Tasks</span>
                   <span className="text-sm bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
                     {projectTasks.length}
@@ -610,7 +588,6 @@ export default function TodoPage() {
             // Project Tasks View
             projectTasks.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
-                <HiOutlineBriefcase className="w-16 h-16 mx-auto text-gray-300 mb-4" />
                 <h3 className="text-lg font-medium text-gray-800 mb-2">No project tasks</h3>
                 <p className="text-gray-500">You don't have any project tasks assigned to you in todo status.</p>
               </div>
@@ -694,7 +671,6 @@ export default function TodoPage() {
             )
           ) : combinedTodos.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
-              <HiOutlineCheckCircle className="w-16 h-16 mx-auto text-gray-300 mb-4" />
               <h3 className="text-lg font-medium text-gray-800 mb-2">
                 {activeTab === 'completed' ? 'No completed to-dos' : 'No to-dos yet'}
               </h3>

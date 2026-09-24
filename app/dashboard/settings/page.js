@@ -917,7 +917,6 @@ function CompanySettingsTab() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FaBuilding className="text-indigo-600" />
             Company Settings
           </h2>
           <p className="text-gray-600 mt-1">Manage your companies and their individual settings</p>
@@ -1062,7 +1061,6 @@ function CompanySettingsTab() {
                 {/* Company Basic Info */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-                    <FaBuilding className="text-indigo-600" />
                     <span>Company Information</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1168,7 +1166,6 @@ function CompanySettingsTab() {
                 {/* Company Address */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-                    <FaMapMarkerAlt className="text-indigo-600" />
                     <span>Company Address</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1228,7 +1225,6 @@ function CompanySettingsTab() {
                 {/* Working Hours & Attendance Settings */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-                    <FaClock className="text-indigo-600" />
                     <span>Working Hours & Attendance Settings</span>
                   </h3>
 
@@ -1588,7 +1584,6 @@ function GeofenceLocationsManager({ companyId }) {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <FaMapMarkerAlt className="text-primary-500" />
             <span>Office Locations</span>
           </h3>
           <p className="text-sm text-gray-600 mt-1">Manage multiple office locations. Employees can check in from any configured location.</p>
@@ -1689,9 +1684,6 @@ function GeofenceLocationsManager({ companyId }) {
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
               <h3 className="text-xl font-bold flex items-center gap-3 text-gray-900">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <FaMapMarkerAlt className="text-blue-500" size={20} />
-                </div>
                 {editingLocation ? 'Edit Location' : 'Add New Location'}
               </h3>
               <button
@@ -2012,7 +2004,6 @@ function GeofencingTab() {
       <div>
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FaMapMarkerAlt className="text-indigo-600" />
             Geofencing Settings
           </h2>
           <p className="text-gray-600 mt-1">Configure location tracking and office premises boundaries per company</p>
@@ -2038,7 +2029,6 @@ function GeofencingTab() {
       />
 
       <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-        <FaMapMarkerAlt className="text-indigo-600" />
         <span>Geofencing Settings</span>
       </h2>
       <p className="text-gray-600 mb-6">Configure location tracking and office premises boundaries</p>
@@ -2066,7 +2056,6 @@ function GeofencingTab() {
         {/* Geofence Options */}
         <div className="bg-white rounded-lg">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FaCog className="text-primary-500" />
             <span>Geofence Enforcement Options</span>
           </h3>
           <div className="space-y-4">
@@ -2138,7 +2127,6 @@ function GeofencingTab() {
           <div className="flex justify-between items-center mb-4">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FaClock className="text-primary-500" />
                 <span>Break Timings</span>
               </h3>
               <p className="text-sm text-gray-600 mt-1">Configure break times when geofencing tracking is paused</p>
@@ -2577,7 +2565,6 @@ function PayrollSettingsTab() {
       <div>
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FaMoneyBillWave className="text-green-600" />
             Payroll Settings
           </h2>
           <p className="text-gray-600 mt-1">Configure payroll deductions and statutory compliance per company</p>
@@ -2605,7 +2592,6 @@ function PayrollSettingsTab() {
       />
 
       <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-        <FaMoneyBillWave className="text-green-600" />
         <span>Payroll Settings</span>
       </h2>
       <p className="text-gray-600 mb-6">Configure salary deductions, overtime rules, and statutory compliance</p>
@@ -2614,7 +2600,6 @@ function PayrollSettingsTab() {
         {/* General Settings */}
         <div className="bg-white rounded-lg">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FaCog className="text-blue-500" />
             General Settings
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2638,7 +2623,6 @@ function PayrollSettingsTab() {
         {/* Attendance-Based Deductions */}
         <div className="bg-white rounded-lg">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FaClock className="text-orange-500" />
             Attendance-Based Deductions
           </h3>
 
@@ -2790,7 +2774,6 @@ function PayrollSettingsTab() {
         {/* Overtime Settings */}
         <div className="bg-white rounded-lg">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FaClock className="text-green-500" />
             Overtime Settings
           </h3>
           <div className="p-4 bg-green-50 rounded-lg border border-green-200">
@@ -2843,7 +2826,6 @@ function PayrollSettingsTab() {
         {/* Statutory Deductions */}
         <div className="bg-white rounded-lg">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FaMoneyBillWave className="text-purple-500" />
             Statutory Deductions
           </h3>
 
@@ -3170,7 +3152,6 @@ function NotificationsTab() {
       <div>
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FaBell className="text-indigo-600" />
             Notification Settings
           </h2>
           <p className="text-gray-600 mt-1">Configure email and push notification preferences per company</p>

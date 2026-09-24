@@ -121,11 +121,9 @@ export default function MyTeamsPage() {
     return (
       <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
         <div className="flex items-center mb-6">
-          <HiOutlineUserGroup className="text-primary-500 mr-3 text-3xl" />
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Teams</h1>
         </div>
         <div className="bg-white rounded-xl shadow-md p-8 text-center">
-          <FaUserFriends className="text-gray-300 text-5xl mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">No Teams Found</h3>
           <p className="text-gray-500">You are not leading any teams yet.</p>
         </div>
@@ -149,9 +147,6 @@ export default function MyTeamsPage() {
             <span className="font-medium">Back to My Teams</span>
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
-              <FaUserFriends className="text-primary-600 text-xl" />
-            </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                 {currentTeam?.teamName || selectedTeam?.teamName || 'Team'}

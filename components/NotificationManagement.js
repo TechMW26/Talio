@@ -119,7 +119,6 @@ export default function NotificationManagement() {
       {/* Header */}
       <div className="mb-4 md:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-          <FaBell className="text-primary-500" />
           <span>Notification Management</span>
         </h2>
         <p className="text-gray-600 mb-6">Send, schedule, and manage push notifications</p>

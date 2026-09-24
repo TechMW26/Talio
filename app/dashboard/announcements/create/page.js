@@ -113,7 +113,6 @@ export default function CreateAnnouncementPage() {
       {/* Header */}
       <div className="mb-4 sm:mb-6">
         <div className="flex items-center space-x-2 sm:space-x-3 mb-2">
-          <FaBullhorn className="w-6 h-6 sm:w-8 sm:h-8 text-primary-500 flex-shrink-0" />
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Create Announcement</h1>
         </div>
         <p className="text-sm sm:text-base text-gray-600">

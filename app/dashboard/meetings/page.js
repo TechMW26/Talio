@@ -140,7 +140,6 @@ export default function MeetingsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <HiOutlineCalendarDays className="w-7 h-7 text-indigo-600" />
             Meetings
           </h1>
           <p className="text-gray-600 mt-1">
@@ -174,9 +173,6 @@ export default function MeetingsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <HiOutlineCalendarDays className="w-5 h-5 text-blue-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{todayMeetings.length}</p>
               <p className="text-sm text-gray-500">Today</p>
@@ -186,9 +182,6 @@ export default function MeetingsPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <HiOutlineClock className="w-5 h-5 text-green-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{upcomingMeetings.length}</p>
               <p className="text-sm text-gray-500">Upcoming</p>
@@ -198,9 +191,6 @@ export default function MeetingsPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <HiOutlineQuestionMarkCircle className="w-5 h-5 text-amber-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{pendingInvites.length}</p>
               <p className="text-sm text-gray-500">Pending</p>
@@ -210,9 +200,6 @@ export default function MeetingsPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <HiOutlineUserGroup className="w-5 h-5 text-purple-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{meetings.length}</p>
               <p className="text-sm text-gray-500">Total</p>
@@ -277,7 +264,6 @@ export default function MeetingsPage() {
       {pendingInvites.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <HiOutlineQuestionMarkCircle className="w-5 h-5 text-amber-500" />
             Pending Invitations ({pendingInvites.length})
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -298,7 +284,6 @@ export default function MeetingsPage() {
       {todayMeetings.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <HiOutlineClock className="w-5 h-5 text-green-500" />
             Today's Meetings ({todayMeetings.length})
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

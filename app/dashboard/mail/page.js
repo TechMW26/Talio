@@ -2224,7 +2224,6 @@ export default function MailPage() {
           <div className="bg-white dark:bg-zinc-800 rounded-[30px] shadow-xl w-full max-w-md p-6 animate-modal-enter">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
-                <FaMagic className="text-purple-600 dark:text-purple-400" />
                 Write with AI
               </h3>
               <button onClick={() => setShowAiCompose(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">

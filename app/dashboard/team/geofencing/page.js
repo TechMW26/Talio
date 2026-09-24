@@ -126,7 +126,6 @@ export default function GeofencingPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <FaMapMarkerAlt className="text-primary-500" />
           Geofencing Monitoring
         </h1>
         <p className="text-gray-600 mt-1">Track employee locations and manage out-of-premises requests</p>

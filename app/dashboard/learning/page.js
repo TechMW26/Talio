@@ -78,7 +78,6 @@ export default function LearningDashboard() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <FaGraduationCap className="text-blue-600" />
           Learning Management System
         </h1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">

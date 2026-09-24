@@ -20,7 +20,6 @@ import {
   getNavigationBadgeCount,
   getNavigationLeafBadgeCount,
   isNavigationPathActive,
-  SIDEBAR_ACTION_ICONS,
 } from '@/utils/menuInformationArchitecture'
 import toast from '@/utils/toast'
 import { handleSessionExpired, getCurrentUser } from '@/utils/userHelper'
@@ -515,9 +514,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                           className="talio-sidebar-row justify-between text-left"
                         >
                           <div className="flex items-center gap-3 flex-1">
-                            <div className="talio-sidebar-icon">
-                              <item.icon className="h-[18px] w-[18px]" />
-                            </div>
+
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="truncate text-[13px] font-semibold">{item.name}</span>
@@ -550,12 +547,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                         className="talio-sidebar-row text-left"
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <div className="talio-sidebar-icon relative">
-                            <item.icon className="h-[18px] w-[18px]" />
-                            {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
-                          </div>
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="truncate text-[13px] font-medium">{item.name}</span>
+                            {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
                           </div>
                         </div>
                       </button>
@@ -568,9 +562,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                         className="talio-sidebar-row text-left"
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <div className="talio-sidebar-icon">
-                            <item.icon className="h-[18px] w-[18px]" />
-                          </div>
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="truncate text-[13px] font-medium">{item.name}</span>
                             {item.name !== 'Chat' && <InlineBadge count={getLeafBadgeCount(item)} />}
@@ -605,10 +596,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                   className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors hover:bg-primary-50 dark:hover:bg-primary-900/20 relative"
                   style={{ color: 'var(--color-text-primary)' }}
                 >
-                  <SIDEBAR_ACTION_ICONS.chat
-                    className="h-4 w-4"
-                    style={{ color: 'var(--color-primary-600)' }}
-                  />
                   <span className="text-xs font-medium">Chat</span>
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 right-1 bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{unreadCount > 99 ? '99+' : unreadCount}</span>
@@ -622,10 +609,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                   className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors hover:bg-primary-50 dark:hover:bg-primary-900/20"
                   style={{ color: 'var(--color-text-primary)' }}
                 >
-                  <SIDEBAR_ACTION_ICONS.settings
-                    className="h-4 w-4"
-                    style={{ color: effectivePath === '/dashboard/settings' ? 'var(--color-primary-600)' : 'var(--color-primary-500)' }}
-                  />
                   <span className="text-xs font-medium">Settings</span>
                 </Link>
 
@@ -635,10 +618,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                   className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
                   style={{ color: 'var(--color-text-primary)' }}
                 >
-                  <SIDEBAR_ACTION_ICONS.logout
-                    className="h-4 w-4"
-                    style={{ color: '#f43f5e' }}
-                  />
                   <span className="text-xs font-medium text-danger-500">Logout</span>
                 </button>
               </div>

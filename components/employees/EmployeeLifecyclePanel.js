@@ -180,7 +180,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
         <div className="mt-4 rounded-2xl border border-slate-200 p-5 dark:border-zinc-800">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-zinc-100"><FaHourglassHalf className="text-amber-500" /> Probation and confirmation</h3>
+              <h3 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-zinc-100">Probation and confirmation</h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">{probation.durationMonths} months · review due {formatIstDate(probation.reviewDate)}</p>
               <p className="mt-1 text-xs capitalize text-slate-500">Status: {String(probation.status || '').replaceAll('_', ' ')}</p>
             </div>
@@ -258,7 +258,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
         <div className="mt-4 rounded-2xl border border-slate-200 p-5 dark:border-zinc-800">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-zinc-100"><FaFlagCheckered className="text-rose-500" /> Separation and offboarding</h3>
+              <h3 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-zinc-100">Separation and offboarding</h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">Start the notice, clearance, settlement and alumni flow here when needed.</p>
             </div>
             {exit.status === 'not_started' && <Button size="sm" variant="flat" color="danger" onPress={() => setShowOffboarding((value) => !value)}>Start offboarding</Button>}

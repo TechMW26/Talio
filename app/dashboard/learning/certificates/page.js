@@ -114,7 +114,6 @@ export default function CertificatesPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <FaTrophy className="text-yellow-500" />
           My Certificates
         </h1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">

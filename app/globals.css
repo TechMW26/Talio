@@ -5,6 +5,27 @@
 html[data-desktop-platform="darwin"] { --desktop-safe-top: 52px; }
 html[data-desktop-platform="win32"] { --desktop-safe-top: 44px; }
 :root { --mira-panel-top: max(73px, calc(var(--desktop-safe-top, 0px) + 12px)); }
+.mira-header-pill {
+  min-height: 40px;
+  padding: 3px 14px 3px 3px;
+  transition: padding-left 300ms ease-out;
+}
+.mira-header-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  overflow: hidden;
+  opacity: 1;
+  transform: scale(1);
+  transition: width 300ms ease-out, opacity 200ms ease-out, transform 300ms ease-out;
+}
+.mira-header-label { margin-left: 6px; transition: margin-left 300ms ease-out; }
+.mira-header-pill[aria-expanded="true"] { padding-left: 14px; }
+.mira-header-pill[aria-expanded="true"] .mira-header-avatar { width: 0; opacity: 0; transform: scale(0); }
+.mira-header-pill[aria-expanded="true"] .mira-header-label { margin-left: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .mira-header-pill, .mira-header-avatar, .mira-header-label { transition: none; }
+}
 html[data-desktop-platform] [data-meeting-fullscreen="true"] {
   top: var(--desktop-safe-top, 44px) !important;
   height: calc(100dvh - var(--desktop-safe-top, 44px)) !important;

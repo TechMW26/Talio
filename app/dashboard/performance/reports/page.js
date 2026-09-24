@@ -1006,7 +1006,6 @@ export default function PerformanceReportsPage() {
             onClick={() => toggleSection('aiInsights')}
           >
             <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-              <FaBrain className="text-purple-600" />
               <span>AI-Powered Insights</span>
             </h2>
             {expandedSections.aiInsights ? <FaChevronUp /> : <FaChevronDown />}
@@ -1017,7 +1016,6 @@ export default function PerformanceReportsPage() {
               {/* Key Strengths */}
               <div className="bg-white rounded-lg p-4 border border-green-200">
                 <h3 className="font-semibold text-green-800 mb-3 flex items-center space-x-2">
-                  <FaTrophy className="text-yellow-500" />
                   <span>Key Strengths</span>
                 </h3>
                 <ul className="space-y-2">
@@ -1033,7 +1031,6 @@ export default function PerformanceReportsPage() {
               {/* Areas for Improvement */}
               <div className="bg-white rounded-lg p-4 border border-amber-200">
                 <h3 className="font-semibold text-amber-800 mb-3 flex items-center space-x-2">
-                  <FaChartBar className="text-amber-500" />
                   <span>Areas to Improve</span>
                 </h3>
                 <ul className="space-y-2">
@@ -1049,7 +1046,6 @@ export default function PerformanceReportsPage() {
               {/* Recommendations */}
               <div className="bg-white rounded-lg p-4 border border-blue-200">
                 <h3 className="font-semibold text-blue-800 mb-3 flex items-center space-x-2">
-                  <FaBullseye className="text-blue-500" />
                   <span>Action Items</span>
                 </h3>
                 <ul className="space-y-2">
@@ -1066,7 +1062,6 @@ export default function PerformanceReportsPage() {
               {aiInsights.predictions && aiInsights.predictions.length > 0 && (
                 <div className="bg-white rounded-lg p-4 border border-purple-200">
                   <h3 className="font-semibold text-purple-800 mb-3 flex items-center space-x-2">
-                    <FaBrain className="text-purple-500" />
                     <span>Predictions</span>
                   </h3>
                   <ul className="space-y-2">
@@ -1084,7 +1079,6 @@ export default function PerformanceReportsPage() {
               {aiInsights.riskAlerts && aiInsights.riskAlerts.length > 0 && (
                 <div className="bg-white rounded-lg p-4 border border-red-200">
                   <h3 className="font-semibold text-red-800 mb-3 flex items-center space-x-2">
-                    <FaExclamationTriangle className="text-red-500" />
                     <span>Risk Alerts</span>
                   </h3>
                   <ul className="space-y-2">
@@ -1102,7 +1096,6 @@ export default function PerformanceReportsPage() {
               {aiInsights.quickWins && aiInsights.quickWins.length > 0 && (
                 <div className="bg-white rounded-lg p-4 border border-teal-200">
                   <h3 className="font-semibold text-teal-800 mb-3 flex items-center space-x-2">
-                    <FaRocket className="text-teal-500" />
                     <span>Quick Wins</span>
                   </h3>
                   <ul className="space-y-2">
@@ -1127,9 +1120,6 @@ export default function PerformanceReportsPage() {
           onClick={() => toggleSection('executive')}
         >
           <h2 className="text-2xl font-bold text-gray-800 flex items-center space-x-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <FaChartBar className="text-white text-xl" />
-            </div>
             <span>Executive Summary</span>
           </h2>
           {expandedSections.executive ? <FaChevronUp className="text-gray-500" /> : <FaChevronDown className="text-gray-500" />}
@@ -1252,7 +1242,6 @@ export default function PerformanceReportsPage() {
           onClick={() => toggleSection('attendance')}
         >
           <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-            <FaUserCheck className="text-green-600" />
             <span>Attendance Analytics</span>
           </h2>
           {expandedSections.attendance ? <FaChevronUp /> : <FaChevronDown />}
@@ -1338,7 +1327,6 @@ export default function PerformanceReportsPage() {
           onClick={() => toggleSection('tasks')}
         >
           <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-            <FaClipboardCheck className="text-blue-600" />
             <span>Task Analytics</span>
           </h2>
           {expandedSections.tasks ? <FaChevronUp /> : <FaChevronDown />}
@@ -1446,7 +1434,6 @@ export default function PerformanceReportsPage() {
           onClick={() => toggleSection('actionableInsights')}
         >
           <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-            <FaLightbulb className="text-orange-500" />
             <span>Actionable Insights</span>
           </h2>
           {expandedSections.actionableInsights ? <FaChevronUp /> : <FaChevronDown />}
@@ -1457,7 +1444,6 @@ export default function PerformanceReportsPage() {
             {/* Top Performers */}
             <div className="bg-white rounded-lg p-4 border border-green-200">
               <h3 className="text-lg font-semibold text-green-700 mb-4 flex items-center">
-                <FaTrophy className="mr-2 text-yellow-500" />
                 Top Performers (Attendance)
               </h3>
               <div className="space-y-3">
@@ -1484,7 +1470,6 @@ export default function PerformanceReportsPage() {
             {/* Needs Attention */}
             <div className="bg-white rounded-lg p-4 border border-red-200">
               <h3 className="text-lg font-semibold text-red-700 mb-4 flex items-center">
-                <FaExclamationCircle className="mr-2 text-red-500" />
                 Needs Attention
               </h3>
               <div className="space-y-3">
@@ -1510,7 +1495,6 @@ export default function PerformanceReportsPage() {
             {/* Quick Actions */}
             <div className="bg-white rounded-lg p-4 border border-blue-200">
               <h3 className="text-lg font-semibold text-blue-700 mb-4 flex items-center">
-                <FaFire className="mr-2 text-orange-500" />
                 Key Metrics Summary
               </h3>
               <div className="space-y-3">

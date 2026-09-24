@@ -14,7 +14,7 @@ export default function AnalyticsPanel({ analytics, onClose }) {
   const maximum = Math.max(1, ...days.map(d => num(d.count)))
   const colors = { urgent: '#f05265', high: '#fb7185', medium: '#f7ad39', low: '#59de79' }
   return <section className={s.panel} aria-label="To-do Analytics">
-    <header className={s.header}><HiOutlineChartBar className={s.headingIcon} aria-hidden="true" /><div><h2>To-do Analytics</h2><p>Track your productivity and completion trends.</p></div><button onClick={onClose} aria-label="Close to-do analytics" className={s.close}><HiOutlineXMark /></button></header>
+    <header className={s.header}><div><h2>To-do Analytics</h2><p>Track your productivity and completion trends.</p></div><button onClick={onClose} aria-label="Close to-do analytics" className={s.close}><HiOutlineXMark /></button></header>
     <div className={s.metrics}>
       <Metric featured icon={HiOutlineTrophy} value={`${pct(summary.productivityScore).toFixed(0)}%`} label="Productivity Score" color="#fff" />
       <Metric icon={HiOutlineCheckCircle} value={`${pct(summary.completionRate).toFixed(0)}%`} label="Completion Rate" color="#59de79" />

@@ -52,9 +52,6 @@ export default function RecruitmentAnalyticsPage() {
       <div className="page-container">
         <Card shadow="sm">
           <CardBody className="p-8 sm:p-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-default-100 flex items-center justify-center mx-auto mb-4">
-              <FaChartBar className="w-7 h-7 text-default-400" />
-            </div>
             <h1 className="text-2xl font-bold text-default-800 mb-2">No Analytics Data</h1>
             <Button color="primary" onPress={() => router.push('/dashboard/recruitment')}>
               Back to Recruitment

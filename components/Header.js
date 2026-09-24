@@ -213,7 +213,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             type="button"
             aria-label={isMiraOpen ? 'Return to MIRA conversation' : 'Ask Mira'}
             aria-expanded={isMiraOpen}
-            className="hidden md:flex items-center cursor-pointer relative group -ml-3"
+            className="mira-header-pill hidden md:flex items-center cursor-pointer relative group -ml-3"
             data-mira-sphere="true"
             onClick={() => openChat()}
             onMouseEnter={() => setIsMiraHovered(true)}
@@ -223,7 +223,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               backgroundSize: '300% 300%',
               animation: 'mira-gradient-shift 6s ease infinite',
               borderRadius: '9999px',
-              padding: '3px 14px 3px 3px',
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -241,10 +240,10 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               }}
             />
             {/* White circular background behind globe */}
-            <div className="relative z-10 flex items-center justify-center rounded-full bg-white dark:bg-white/90" style={{ width: 34, height: 34 }}>
+            <div aria-hidden="true" className="mira-header-avatar relative z-10 flex items-center justify-center rounded-full bg-white dark:bg-white/90">
               <MiraSphere size={32} isThinking={isThinking} />
             </div>
-            <span className="text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5" style={{ color: '#111111' }}>
+            <span className="mira-header-label text-sm font-semibold whitespace-nowrap relative z-10" style={{ color: '#111111' }}>
               {isMiraOpen ? (isThinking ? 'On it…' : 'Mira is here') : 'Ask Mira'}
             </span>
             {isMiraOpen && <span aria-hidden="true" className={`relative z-10 ml-2 h-1.5 w-1.5 rounded-full bg-emerald-700 ${isThinking ? 'motion-safe:animate-pulse' : ''}`} />}

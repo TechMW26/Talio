@@ -367,7 +367,7 @@ export default function EmployeeDetailPage() {
           <div className="rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
-                <FaListUl className="text-sky-500" /> Manual KRIs
+                Manual KRIs
               </h2>
               {canManageKriKpi && (
                 <Button
@@ -423,7 +423,7 @@ export default function EmployeeDetailPage() {
           <div className="rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
-                <FaBullseye className="text-amber-500" /> Manual KPIs
+                Manual KPIs
               </h2>
               {canManageKriKpi && (
                 <Button
@@ -486,7 +486,7 @@ export default function EmployeeDetailPage() {
           {/* AI suggested */}
           <div className="xl:col-span-2 rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-gradient-to-br from-indigo-50/60 to-fuchsia-50/40 dark:from-indigo-950/30 dark:to-fuchsia-950/20 p-6">
             <h2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2 mb-4">
-              <HiOutlineSparkles className="text-indigo-500" /> AI Suggested KRIs
+              AI Suggested KRIs
             </h2>
             {aiGeneratedKRIs.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-zinc-400">

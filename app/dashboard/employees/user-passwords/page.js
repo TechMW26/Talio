@@ -179,7 +179,6 @@ export default function UserPasswordsPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-2">
-              <HiOutlineKey className="w-7 h-7 text-warning" />
               User Passwords
               <HiOutlineShieldCheck className="w-5 h-5 text-success ml-1" title="Passwords are encrypted at rest" />
             </h1>

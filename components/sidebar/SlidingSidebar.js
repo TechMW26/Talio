@@ -18,7 +18,6 @@ import {
   getNavigationBadgeCount,
   getNavigationLeafBadgeCount,
   isNavigationPathActive,
-  SIDEBAR_ACTION_ICONS,
 } from '@/utils/menuInformationArchitecture'
 import { getCurrentUser } from '@/utils/userHelper'
 import toast from '@/utils/toast'
@@ -442,9 +441,6 @@ export default function SlidingSidebar({
                         className="talio-sidebar-row justify-between text-left"
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <div className="talio-sidebar-icon">
-                            <item.icon className="h-[18px] w-[18px]" />
-                          </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="truncate text-[13px] font-semibold">{item.name}</span>
@@ -477,12 +473,9 @@ export default function SlidingSidebar({
                       className="talio-sidebar-row text-left"
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <div className="talio-sidebar-icon relative">
-                          <item.icon className="h-[18px] w-[18px]" />
-                          {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
-                        </div>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <span className="truncate text-[13px] font-medium">{item.name}</span>
+                          {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
                         </div>
                       </div>
                     </button>
@@ -495,9 +488,6 @@ export default function SlidingSidebar({
                       className="talio-sidebar-row text-left"
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <div className="talio-sidebar-icon">
-                          <item.icon className="h-[18px] w-[18px]" />
-                        </div>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <span className="truncate text-[13px] font-medium">{item.name}</span>
                           {item.name !== 'Chat' && <InlineBadge count={getLeafBadgeCount(item)} />}
@@ -528,9 +518,6 @@ export default function SlidingSidebar({
             className="talio-sidebar-row text-left"
           >
             <div className="flex items-center gap-3 flex-1">
-              <div className="talio-sidebar-icon">
-                <SIDEBAR_ACTION_ICONS.settings className="h-[18px] w-[18px]" />
-              </div>
               <span className="truncate text-[13px] font-medium">Settings</span>
             </div>
           </Link>
@@ -544,9 +531,6 @@ export default function SlidingSidebar({
               className="talio-sidebar-row text-left"
             >
               <div className="flex items-center gap-3 flex-1">
-                <div className="talio-sidebar-icon">
-                  <SIDEBAR_ACTION_ICONS.appInfo className="h-[18px] w-[18px]" />
-                </div>
                 <span className="truncate text-[13px] font-medium">App Info</span>
               </div>
             </Link>
@@ -557,9 +541,6 @@ export default function SlidingSidebar({
             className="talio-sidebar-row text-left hover:!bg-danger-50 dark:hover:!bg-danger-900/20"
           >
             <div className="flex items-center gap-3 flex-1">
-              <div className="talio-sidebar-icon !bg-danger-50 !text-danger-500 dark:!bg-danger-900/20">
-                <SIDEBAR_ACTION_ICONS.logout className="h-[18px] w-[18px]" />
-              </div>
               <span className="truncate text-[13px] font-medium text-danger-500">Logout</span>
             </div>
           </button>

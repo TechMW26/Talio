@@ -283,7 +283,6 @@ export default function OnboardingEmailsPage() {
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-3">
-            <HiOutlineEnvelope className="w-7 h-7 text-purple-500" />
             Onboarding Emails
           </h1>
           <p className="text-theme-text-secondary mt-1">

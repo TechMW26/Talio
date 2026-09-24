@@ -411,13 +411,6 @@ export default function MeetingDetailPage({ params }) {
           <div className={`border-b border-gray-200 dark:border-gray-800 px-5 py-5 ${meeting.type === 'online' ? 'bg-indigo-50 dark:bg-slate-950' : 'bg-amber-50 dark:bg-slate-950'}`}>
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 flex items-start gap-4">
-                <div className={`flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl ${meeting.type === 'online' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
-                  {meeting.type === 'online' ? (
-                    <HiOutlineVideoCamera className="w-7 h-7" />
-                  ) : (
-                    <HiOutlineMapPin className="w-7 h-7" />
-                  )}
-                </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
                     <h1 className="truncate text-2xl font-semibold text-gray-900">
@@ -500,7 +493,6 @@ export default function MeetingDetailPage({ params }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date */}
                   <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                    <HiOutlineCalendarDays className="w-6 h-6 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-500">Date</p>
                       <p className="font-medium text-gray-800">
@@ -511,7 +503,6 @@ export default function MeetingDetailPage({ params }) {
 
                   {/* Time */}
                   <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                    <HiOutlineClock className="w-6 h-6 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-500">Time</p>
                       <p className="font-medium text-gray-800">
@@ -524,7 +515,6 @@ export default function MeetingDetailPage({ params }) {
                   {/* Location (offline) or Meeting Link (online) */}
                   {meeting.type === 'offline' && meeting.location && (
                     <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl md:col-span-2">
-                      <HiOutlineMapPin className="w-6 h-6 text-gray-400" />
                       <div>
                         <p className="text-sm text-gray-500">Location</p>
                         <p className="font-medium text-gray-800">
@@ -536,7 +526,6 @@ export default function MeetingDetailPage({ params }) {
 
                   {meeting.type === 'online' && meeting.roomId && (
                     <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl md:col-span-2">
-                      <HiOutlineVideoCamera className="w-6 h-6 text-gray-400" />
                       <div className="flex-1">
                         <p className="text-sm text-gray-500">Meeting Room</p>
                         <MeetingJoinLink
@@ -555,7 +544,6 @@ export default function MeetingDetailPage({ params }) {
                     <div className="p-4 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl md:col-span-2 border border-indigo-100 dark:border-indigo-800">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <HiOutlineGlobeAlt className="w-5 h-5 text-indigo-600" />
                           <span className="font-medium text-gray-800">Guest Access</span>
                         </div>
                         <button
@@ -642,7 +630,6 @@ export default function MeetingDetailPage({ params }) {
               {/* Invitees */}
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
-                  <HiOutlineUserGroup className="w-5 h-5" />
                   Invitees ({meeting.invitees?.length || 0})
                 </h3>
 
@@ -728,7 +715,6 @@ export default function MeetingDetailPage({ params }) {
               {meeting.agenda && meeting.agenda.length > 0 && (
                 <div className="p-6 border-b border-gray-200">
                   <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
-                    <HiOutlineClipboardDocumentList className="w-5 h-5" />
                     Agenda
                   </h3>
                   <ul className="space-y-2">
@@ -749,7 +735,6 @@ export default function MeetingDetailPage({ params }) {
                 <div className="flex flex-col overflow-hidden p-6 lg:h-full lg:min-h-0 lg:flex-1">
                   <div className="flex items-center justify-between gap-3 mb-4">
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-300 flex items-center gap-2">
-                      <HiOutlineMicrophone className="w-5 h-5" />
                       Transcript History
                     </h3>
                     {meeting.transcriptLanguages?.length > 0 && (
@@ -794,7 +779,6 @@ export default function MeetingDetailPage({ params }) {
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                       <div>
                         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-300 flex items-center gap-2">
-                          <HiOutlineSparkles className="w-5 h-5 text-purple-500 dark:text-purple-300" />
                           Mira Notes Timeline
                         </h3>
                         {latestSummary?.generatedAt && (

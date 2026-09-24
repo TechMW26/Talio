@@ -306,7 +306,6 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <HiOutlineSparkles className="w-5 h-5 text-indigo-600" />
               {analysis.sessionTitle || 'MIRA Daily Analysis'}
             </h3>
             {lastAnalyzedAt ? (
@@ -845,7 +844,6 @@ export default function ProductivityPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <HiOutlineComputerDesktop className="w-7 h-7 text-indigo-600" />
             Productivity
           </h1>
           <p className="text-gray-600 mt-1">
@@ -935,7 +933,6 @@ export default function ProductivityPage() {
       {activeTab === 'team' && !selectedTeamUserId ? (
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <HiOutlineUsers className="w-5 h-5 text-indigo-500" />
             Team
           </h2>
           {renderTeamGrid()}
@@ -1032,7 +1029,6 @@ export default function ProductivityPage() {
               {pendingShots.length > 0 ? (
                 <div>
                   <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                    <HiOutlineExclamationCircle className="w-5 h-5 text-amber-500" />
                     Pending Captures ({pendingShots.length})
                   </h2>
                   <ScreenshotGrid

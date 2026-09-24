@@ -225,7 +225,6 @@ export default function WhiteboardDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <HiOutlineRectangleGroup className="w-7 h-7 text-indigo-600" />
             TalioBoard
           </h1>
           <p className="text-gray-600 mt-1">
@@ -256,9 +255,6 @@ export default function WhiteboardDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <HiOutlineSquares2X2 className="w-5 h-5 text-blue-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{data ? boards.length : '—'}</p>
               <p className="text-sm text-gray-500">Total Boards</p>
@@ -268,9 +264,6 @@ export default function WhiteboardDashboard() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <HiOutlineUser className="w-5 h-5 text-green-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{data ? boards.filter(b => b.isOwner).length : '—'}</p>
               <p className="text-sm text-gray-500">My Boards</p>
@@ -280,9 +273,6 @@ export default function WhiteboardDashboard() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <HiOutlineUserGroup className="w-5 h-5 text-amber-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{data ? boards.filter(b => !b.isOwner).length : '—'}</p>
               <p className="text-sm text-gray-500">Shared</p>
@@ -292,9 +282,6 @@ export default function WhiteboardDashboard() {
 
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <HiOutlineClock className="w-5 h-5 text-purple-600" />
-            </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{data ? recentBoards.length : '—'}</p>
               <p className="text-sm text-gray-500">Recent</p>
@@ -380,7 +367,6 @@ export default function WhiteboardDashboard() {
           {ownedBoards.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <HiOutlineUser className="w-5 h-5 text-green-500" />
                 My Boards ({ownedBoards.length})
               </h2>
               <BoardGrid
@@ -401,7 +387,6 @@ export default function WhiteboardDashboard() {
           {sharedBoards.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <HiOutlineUserGroup className="w-5 h-5 text-amber-500" />
                 Shared with me ({sharedBoards.length})
               </h2>
               <BoardGrid

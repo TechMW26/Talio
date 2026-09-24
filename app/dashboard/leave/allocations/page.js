@@ -611,7 +611,6 @@ export default function LeaveAllocationsPage() {
             <>
               <ModalHeader className="flex flex-col gap-1">
                 <h2 className="text-xl font-bold text-default-800 flex items-center gap-2">
-                  <FaRobot className="text-secondary" />
                   AI-Powered Bulk Import
                 </h2>
                 <p className="text-sm text-default-500 font-normal">

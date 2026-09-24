@@ -608,9 +608,6 @@ export default function AssignedTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-default-100 rounded-lg">
-                <FaTasks className="w-5 h-5 text-default-600" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.total || 0}</p>
                 <p className="text-sm text-default-500">Total</p>
@@ -621,9 +618,6 @@ export default function AssignedTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning-100 rounded-lg">
-                <FaClock className="w-5 h-5 text-warning" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.pendingAcceptance || 0}</p>
                 <p className="text-sm text-default-500">Pending Accept</p>
@@ -634,9 +628,6 @@ export default function AssignedTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <FaPlay className="w-5 h-5 text-primary" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.inProgress || 0}</p>
                 <p className="text-sm text-default-500">In Progress</p>
@@ -647,9 +638,6 @@ export default function AssignedTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-secondary-100 rounded-lg">
-                <FaEye className="w-5 h-5 text-secondary" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.review || 0}</p>
                 <p className="text-sm text-default-500">In Review</p>
@@ -660,9 +648,6 @@ export default function AssignedTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <FaCheckCircle className="w-5 h-5 text-success" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.completed || 0}</p>
                 <p className="text-sm text-default-500">Completed</p>
@@ -673,9 +658,6 @@ export default function AssignedTasksPage() {
         <Card shadow="sm">
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-danger-100 rounded-lg">
-                <FaTrash className="w-5 h-5 text-danger" />
-              </div>
               <div>
                 <p className="text-2xl font-bold text-default-800">{stats.pendingDeletion || 0}</p>
                 <p className="text-sm text-default-500">Pending Delete</p>
@@ -808,7 +790,6 @@ export default function AssignedTasksPage() {
           {pendingDeletion.length > 0 && (
             <div className="mt-6 p-4 bg-danger-50 border border-danger-200 rounded-lg">
               <h3 className="text-sm font-medium text-danger-700 mb-2 flex items-center gap-2">
-                <FaTrash className="w-4 h-4" />
                 {pendingDeletion.length} task(s) pending deletion approval
               </h3>
               <button

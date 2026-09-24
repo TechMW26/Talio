@@ -206,7 +206,6 @@ export default function GeofenceLocationsPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FaMapMarkerAlt className="text-primary-500" />
             Geofence Locations
           </h1>
           <p className="text-gray-600 mt-1">Manage multiple office locations and geofence boundaries</p>

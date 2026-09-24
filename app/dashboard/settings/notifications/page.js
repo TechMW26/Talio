@@ -55,7 +55,6 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="mb-4 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <FaBell className="text-blue-600" />
           Notification Management
         </h1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">
