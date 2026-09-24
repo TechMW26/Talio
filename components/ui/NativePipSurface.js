@@ -34,7 +34,8 @@ function registerAutomaticSurface(surface) {
 function panelSize(host) {
   const panel = host?.querySelector('[data-meeting-pip], .mira-workspace') || host
   const rect = panel?.getBoundingClientRect()
-  return { width: Math.ceil(rect?.width || 340), height: Math.ceil(rect?.height || 180) }
+  const dragHeight = host?.querySelector('[data-native-pip-drag]')?.getBoundingClientRect().height || 0
+  return { width: Math.ceil(rect?.width || 340), height: Math.ceil(rect?.height || 180) + dragHeight }
 }
 
 function fitWindow(target) {
@@ -85,6 +86,7 @@ async function getPipWindow(size) {
       [data-meeting-pip]{color:#f4f4f5!important;background:#18181b!important}
       [data-meeting-pip] main,[data-meeting-pip] header,[data-meeting-pip] footer{background:#18181b!important;color:inherit}
       [data-meeting-pip] button{flex-shrink:0}
+      ${desktop ? '[data-native-pip-drag]{display:flex!important;-webkit-app-region:drag;app-region:drag;user-select:none;height:20px;align-items:center;justify-content:center;cursor:grab;background:#18181b;color:#a1a1aa;font-size:10px}button,input,textarea,a{ -webkit-app-region:no-drag;app-region:no-drag; }' : ''}
       [data-meeting-pip] button svg{width:20px!important;height:20px!important;min-width:20px;flex-shrink:0}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
@@ -221,7 +223,7 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
 
   useImperativeHandle(ref, () => ({ restore, open }))
 
-  return <><div ref={placeholder} />{host && createPortal(<>{children}{error && <p role="alert" className="fixed bottom-3 left-3 z-[100000] max-w-sm rounded-xl bg-slate-900 p-3 text-sm text-white">{error}<button className="ml-2 underline" onClick={() => setError('')}>Dismiss</button></p>}</>, host)}</>
+  return <><div ref={placeholder} />{host && createPortal(<><div data-native-pip-drag style={{ display: 'none' }} title="Drag to move this window">⠿</div>{children}{error && <p role="alert" className="fixed bottom-3 left-3 z-[100000] max-w-sm rounded-xl bg-slate-900 p-3 text-sm text-white">{error}<button className="ml-2 underline" onClick={() => setError('')}>Dismiss</button></p>}</>, host)}</>
 })
 
 export default NativePipSurface

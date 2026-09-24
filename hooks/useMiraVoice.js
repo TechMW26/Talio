@@ -36,10 +36,12 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
     session.current = run
     const live = () => session.current === run && current.current.open
     const listen = () => { if (live()) {
-      if (run.speaking) run.echoUntil = Date.now() + 8000
+      // Keep the post-playback guard short enough for a natural follow-up while
+      // still covering audio-buffer tail/OS speaker latency.
+      if (run.speaking) run.echoUntil = Date.now() + 1800
       run.locked = false; run.speaking = false; setState('listening')
     } }
-    const isEcho = text => (run.speaking || Date.now() < run.echoUntil) && isMiraPlaybackEcho(text, run.reply)
+    const isEcho = text => (run.speaking || Date.now() < run.echoUntil) && isMiraPlaybackEcho(text, run.reply.slice(-1800))
     const interrupt = text => {
       if (!run.speaking) return
       const normalized = text.toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, '').trim()

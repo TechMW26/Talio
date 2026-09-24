@@ -10,6 +10,6 @@ test('speech has a short first chunk, bounded later chunks, and no lost text', (
 })
 test('client context rejects malicious paths and stale or invalid location', () => {
   const context = sanitizeMiraClientContext({ page: '/dashboard?token=secret', timezone: 'bad-zone', location: { latitude: 91, longitude: 77, capturedAt: Date.now() }, role: 'admin' })
-  expect(context).toEqual({ page: '/dashboard', location: null })
+  expect(context).toEqual({ page: '/dashboard', location: null, desktopScreenAvailable: false })
   expect(sanitizeMiraClientContext({ location: { latitude: 23, longitude: 77, capturedAt: Date.now() - 600000 } }).location).toBeNull()
 })

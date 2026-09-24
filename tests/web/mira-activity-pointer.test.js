@@ -50,3 +50,12 @@ test('board agent activity keeps the edge light on independently of cursor compl
   act(() => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false } })))
   expect(screen.queryByTestId('mira-page-glow')).toBeNull()
 })
+test('chat activity cannot turn off the board edge light while board work is active', () => {
+  render(<MiraActivityPointer />)
+  act(() => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: true, source: 'board' } })))
+  act(() => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: true, source: 'chat' } })))
+  act(() => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false, source: 'chat' } })))
+  expect(screen.getByTestId('mira-page-glow')).toBeInTheDocument()
+  act(() => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false, source: 'board' } })))
+  expect(screen.queryByTestId('mira-page-glow')).toBeNull()
+})

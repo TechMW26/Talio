@@ -30,3 +30,8 @@ test.each([
 test('clamps oversized live windows to the work area', () => {
   expect(pipBounds({ x: 0, y: 0, width: 300, height: 200 }, { width: 500, height: 800 })).toEqual({ x: 16, y: 16, width: 268, height: 168 })
 })
+test('restores a saved position and clamps it after a display/work-area change', () => {
+  const area = { x: 0, y: 0, width: 1440, height: 815 }
+  expect(pipBounds(area, { width: 340, height: 180 }, 16, { x: 240, y: 180 })).toEqual({ x: 240, y: 180, width: 340, height: 180 })
+  expect(pipBounds(area, { width: 340, height: 180 }, 16, { x: 5000, y: -500 })).toEqual({ x: 1100, y: 0, width: 340, height: 180 })
+})

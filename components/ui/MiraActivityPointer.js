@@ -22,7 +22,13 @@ export default function MiraActivityPointer() {
       timer = setTimeout(() => setActivity(previous => ({ ...previous, visible: false })), ['done', 'click'].includes(phase) ? 1800 : 90000)
     }
     const action = event => show(event.detail?.label || 'Working', event.detail?.phase, event.detail?.target)
-    const agent = event => setBoardActive(Boolean(event.detail?.active))
+    const activeSources = new Set()
+    const agent = event => {
+      const source = event.detail?.source || 'board'
+      if (event.detail?.active) activeSources.add(source)
+      else activeSources.delete(source)
+      setBoardActive(activeSources.size > 0)
+    }
     const resize = () => setActivity(previous => ({ ...previous, x: Math.max(20, Math.min(innerWidth - 32, previous.x)), y: Math.max(20, Math.min(innerHeight - 48, previous.y)) }))
     const navigate = event => {
       const path = miraNavigationPath(event.detail?.page, event.detail?.id)

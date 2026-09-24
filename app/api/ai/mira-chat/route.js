@@ -7,6 +7,7 @@ import { miraTaskLink } from '@/lib/miraTaskLink'
 import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
 import { buildMiraConversationPrompt } from '@/lib/miraLanguage'
 import { validMiraAttachments, miraAttachmentContext } from '@/lib/miraAttachments'
+import { MIRA_SCREEN_INSTRUCTIONS } from '@/lib/miraDesktopScreen'
 import { sanitizeMiraClientContext } from '@/lib/miraClientContext'
 import { MIRA_ACTION_INSTRUCTIONS, miraNavigationPath, matchMiraNavigation, matchMiraProjectOpen, matchMiraItemOpen } from '@/lib/miraNavigation'
 import { validateMiraUiAction } from '@/lib/miraUiAction'
@@ -835,6 +836,7 @@ export async function POST(request) {
       ? `You are MIRA, Talio's female action assistant. Decide the next supported action first; do not write a plan or simulate execution. Return JSON {"message":"one short sentence or necessary question","action":null,"cards":[],"suggestedQuestions":[]}. Use the action object only for an explicit current request with all required fields. Treat history as context, not authorization to repeat previous actions. Resolve names through action handlers, never invent IDs. Current date: ${new Date().toISOString()}; timezone: ${screen.timezone || 'not supplied'}. Role: ${role}. Hindi/Hinglish uses Roman script; otherwise match the user's language. ${MIRA_ACTION_INSTRUCTIONS}`
       : buildSystemPrompt(user, role, employeeData, contextData)
     systemPrompt += '\n' + miraOutputModeInstructions(body.inputMode === 'voice' ? 'voice' : 'chat')
+    systemPrompt += `\n${MIRA_SCREEN_INSTRUCTIONS}\ndesktopScreenAvailable: ${screen.desktopScreenAvailable === true}; screenContextAttempted: ${body.screenContextAttempted === true}`
     // Decision-first routing must retain capabilities, including image generation.
     if (decisionFirst) systemPrompt += '\n' + MIRA_IMAGE_INSTRUCTIONS + '\n' + MIRA_RESPONSE_GUIDELINES
     systemPrompt += `\n${MIRA_TASK_BANK_INSTRUCTIONS}\nTask bank: ${JSON.stringify(taskBank)}`
@@ -905,7 +907,10 @@ export async function POST(request) {
     // Only the authenticated generation endpoint may supply image metadata.
     delete parsed.image
     parsed.structured = true
-    if (parsed.action?.type === 'generate_image') {
+    if (parsed.action?.type === 'read_screen') {
+      parsed.action = screen.desktopScreenAvailable && body.screenContextAttempted !== true ? { type: 'read_screen' } : undefined
+      if (!parsed.action) parsed.message = 'Please attach a screenshot so I can help with what you see.'
+    } else if (parsed.action?.type === 'generate_image') {
       parsed.action = validateMiraImageAction(parsed.action) || undefined
       if (!parsed.action) parsed.message = 'Please describe the image you want to generate.'
     } else if (parsed.action?.type === 'ui_action') {

@@ -20,6 +20,8 @@ const socketHandler = require('./socketHandler');
 const { inspectRendererHealth, resolveAppNavigationUrl } = require('./rendererHealth');
 const { revealMiraWindow } = require('./miraWakeBridge');
 const { captureMiraAppSnapshot } = require('./miraAppSnapshot');
+const { createMiraDesktopScreenCapture } = require('./miraDesktopScreen');
+const captureMiraDesktopScreen = createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, systemPreferences, platform: process.platform });
 const { pipWindowOptions, pipBounds } = require('./pipWindowPolicy');
 
 // PERFORMANCE: Optimized GPU and rendering settings
@@ -1137,18 +1139,34 @@ function setupWindowEvents() {
   mainWindow.webContents.on('did-create-window', function (child, details) {
     if (details.frameName !== 'talio-live-pip') return;
     child.setAlwaysOnTop(true, 'floating');
+    let savedPipPosition = store.get('livePipPosition', null);
     let positioning = false;
+    let applyingBounds = false;
     const positionPip = () => {
       if (positioning || child.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) return;
       positioning = true;
       try {
-        const display = screen.getDisplayMatching(mainWindow.getBounds());
-        const bounds = pipBounds(display.workArea, child.getBounds());
+        const display = savedPipPosition && Number.isFinite(savedPipPosition.x) && Number.isFinite(savedPipPosition.y)
+          ? screen.getDisplayNearestPoint({ x: Math.round(savedPipPosition.x), y: Math.round(savedPipPosition.y) })
+          : screen.getDisplayMatching(mainWindow.getBounds());
+        const bounds = pipBounds(display.workArea, child.getBounds(), 16, savedPipPosition);
         const current = child.getBounds();
-        if (Object.keys(bounds).some(key => bounds[key] !== current[key])) child.setBounds(bounds);
+        if (Object.keys(bounds).some(key => bounds[key] !== current[key])) {
+          applyingBounds = true;
+          child.setBounds(bounds);
+          // Electron emits `moved` asynchronously on some platforms. Keep the
+          // restored/clamped bounds from overwriting the user's saved position.
+          setImmediate(() => { applyingBounds = false; });
+        }
       } finally { positioning = false; }
     };
     positionPip();
+    child.on('moved', () => {
+      if (positioning || applyingBounds || child.isDestroyed()) return;
+      const { x, y } = child.getBounds();
+      savedPipPosition = { x, y };
+      store.set('livePipPosition', savedPipPosition);
+    });
     child.on('resize', positionPip);
     mainWindow.on('move', positionPip);
     screen.on('display-metrics-changed', positionPip);
@@ -1435,6 +1453,7 @@ function setupIPCHandlers() {
   ipcHandlersRegistered = true;
 
   ipcMain.handle('mira-app-snapshot', event => captureMiraAppSnapshot(event, mainWindow, APP_ORIGIN));
+  ipcMain.handle('mira-desktop-screen', event => captureMiraDesktopScreen(event, mainWindow, APP_ORIGIN));
 
   ipcMain.handle('mira-wake', function (event) {
     return revealMiraWindow(event, mainWindow, APP_ORIGIN);
