@@ -20,7 +20,12 @@ run(python, ['-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--name'
   '--distpath', path.join(root, 'build', `agent-s-dist-${target}`), '--workpath', path.join(root, 'build', `agent-s-work-${target}`),
   '--specpath', path.join(root, 'build'), path.join(source, 'worker.py')]);
 const bundled = path.join(root, 'build', `agent-s-${target}`);
-fs.cpSync(path.join(root, 'build', `agent-s-dist-${target}`, 'mira-agent-s'), bundled, { recursive: true });
+// Preserve PyInstaller's relative library links. Node's default copy rewrites
+// them to absolute build-machine paths, breaking repeat builds and installers.
+const staging = path.join(root, 'build', `agent-s-staging-${target}-${Date.now()}`);
+fs.cpSync(path.join(root, 'build', `agent-s-dist-${target}`, 'mira-agent-s'), staging, { recursive: true, verbatimSymlinks: true });
+if (fs.existsSync(bundled)) fs.renameSync(bundled, `${bundled}-previous-${Date.now()}`);
+fs.renameSync(staging, bundled);
 // License is supplied by the pinned upstream package (Apache-2.0).
 run(python, ['-c', 'import importlib.metadata as m, pathlib, shutil, sys; d=m.distribution("gui-agents"); files=[f for f in (d.files or []) if f.name.lower() in ("license", "license.txt", "license.md")]; assert files, "Upstream license missing"; shutil.copyfile(d.locate_file(files[0]), pathlib.Path(sys.argv[1])/"AGENT-S-LICENSE")', bundled]);
 fs.writeFileSync(path.join(bundled, 'runtime.json'), JSON.stringify({ platform: process.platform, arch: process.arch, revision: '3aa272d23d2994c7bbde1acbbe0ef8e8d06b8693' }));
