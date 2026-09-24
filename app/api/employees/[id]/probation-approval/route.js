@@ -352,11 +352,13 @@ export async function PATCH(request, { params }) {
     if (decision === 'approve' && lockedApproval.pip?.enabled) {
       try {
         const recipient = await Employee.findById(id).select('email').lean()
+        const message = `Your probation extension has been approved for ${lockedApproval.extensionMonths} month(s).\n\nGoals: ${lockedApproval.pip.goals}\nReview date: ${lockedApproval.pip.reviewDate}\nManager remarks: ${decisionRemarks}\n\nPlease contact HR or your manager to discuss this plan.`
+        const html = '<p>' + message.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('\n', '<br />') + '</p>'
         const sent = recipient?.email && await sendEmail({
           to: recipient.email,
           subject: 'Probation extension and performance improvement plan',
-          html: '<p>Your probation review has been completed. Please contact HR for the performance improvement plan. The plain-text version of this email contains your review details.</p>',
-          text: `Your probation extension has been approved for ${lockedApproval.extensionMonths} month(s).\n\nGoals: ${lockedApproval.pip.goals}\nReview date: ${lockedApproval.pip.reviewDate}\nManager remarks: ${decisionRemarks}\n\nPlease contact HR or your manager to discuss this plan.`,
+          html,
+          text: message,
         })
         if (!sent?.messageId) workflowWarning = [workflowWarning, 'Decision saved; PIP email could not be confirmed. HR should follow up.'].filter(Boolean).join('. ')
       } catch { workflowWarning = [workflowWarning, 'Decision saved; PIP email delivery failed. HR should follow up.'].filter(Boolean).join('. ') }
