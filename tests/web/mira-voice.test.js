@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, act, within } from '@testing-library/react'
+import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'
 import MiraChatSidebar from '@/components/MiraChatSidebar'
 
 const mockStop = jest.fn()
@@ -78,10 +78,10 @@ test('search-style edge runs during thinking and streaming, but not idle or clos
   expect(screen.queryByTestId('activity-edge')).toBeNull()
 })
 
-test('user bubbles hide internal reply context from restored messages', () => {
+test('user bubbles hide internal reply context from restored messages', async () => {
   mockMessages = [{ id: 1, role: 'user', content: 'Replying to this MIRA response:\n<quoted-response>\nHidden previous answer\n</quoted-response>\n\nBaat chaat' }]
   render(<MiraChatSidebar />)
-  expect(screen.getByText('Baat chaat')).toBeVisible()
+  await waitFor(() => expect(screen.getByText('Baat chaat')).toBeVisible())
   expect(screen.queryByText(/Replying to this MIRA response/)).not.toBeInTheDocument()
   expect(screen.queryByText(/Hidden previous answer/)).not.toBeInTheDocument()
 })
@@ -117,7 +117,7 @@ test('only the latest three follow-ups stay visible beside the composer, with no
   expect(screen.queryByText('Fourth')).not.toBeInTheDocument()
 })
 
-test('task details render inline without a disclosure and task rows still navigate', () => {
+test('task details render inline without a disclosure and task rows still navigate', async () => {
   mockMessages = [{ id: 1, role: 'assistant', data: { message: 'You have one pending task.', cards: [
     { type: 'progress', title: 'Your Pending Tasks', data: { items: [{ label: 'Task progress', value: 20, max: 100 }] } },
     { type: 'list', title: 'Task Breakdown', data: { items: [{ title: 'My task', link: '/dashboard/projects/my-tasks' }] } },
@@ -125,7 +125,7 @@ test('task details render inline without a disclosure and task rows still naviga
   ] } }]
   render(<MiraChatSidebar />)
   expect(screen.getByText('Your Pending Tasks').closest('details')).toBeNull()
-  expect(screen.getByText('20/100')).toBeVisible()
+  await waitFor(() => expect(screen.getByText('20/100')).toBeVisible())
   expect(screen.queryByText('Supporting details')).not.toBeInTheDocument()
   expect(screen.queryByText('Unrelated information')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('link', { name: 'My task' }))
@@ -145,7 +145,7 @@ test('page navigation minimizes the mounted live session and can restore it', as
   await act(async () => fireEvent.click(screen.getByLabelText('Start voice conversation')))
   act(() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: 'meetings' } })))
   expect(mockPush).toHaveBeenCalledWith('/dashboard/meetings')
-  expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible()
+  await waitFor(() => expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible())
   expect(mockStop).not.toHaveBeenCalled()
   fireEvent.click(screen.getByLabelText('Restore MIRA chat'))
   expect(screen.getByLabelText('Stop voice conversation')).toBeVisible()
@@ -161,7 +161,7 @@ test('PiP shows live user transcription without reopening the chat', async () =>
   const captions = screen.getByLabelText('MIRA live captions')
   expect(captions).toHaveTextContent('You')
   expect(captions).toHaveTextContent('Mere projects dikhao')
-  expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible()
+  await waitFor(() => expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible())
   expect(mockStop).not.toHaveBeenCalled()
 })
 
@@ -175,12 +175,12 @@ test('PiP shows streaming and completed assistant captions', () => {
   expect(screen.getByLabelText('MIRA live captions')).toHaveTextContent('Project khul gaya hai.')
 })
 
-test('PiP captions expand on click and its dismiss button does not expand', () => {
+test('PiP captions expand on click and its dismiss button does not expand', async () => {
   render(<MiraChatSidebar />)
   fireEvent.click(screen.getByLabelText('Minimize MIRA to floating voice'))
   expect(screen.queryByText('↗')).toBeNull()
   fireEvent.click(screen.getByLabelText('MIRA live captions'))
-  expect(screen.getByLabelText('Minimize MIRA to floating voice')).toBeVisible()
+  await waitFor(() => expect(screen.getByLabelText('Minimize MIRA to floating voice')).toBeVisible())
   fireEvent.click(screen.getByLabelText('Minimize MIRA to floating voice'))
   fireEvent.click(screen.getByLabelText('Dismiss MIRA'))
   expect(mockCloseChat).toHaveBeenCalledTimes(1)

@@ -16,6 +16,7 @@ import ReactMarkdown from 'react-markdown'
 import { VoiceBeam } from 'voice-glow'
 import useMiraVoice from '@/hooks/useMiraVoice'
 import useMiraSidebarDrag from '@/hooks/useMiraSidebarDrag'
+import useMiraPanelVisible from '@/hooks/useMiraPanelVisible'
 import { prepareMiraLocation } from '@/lib/miraClientContext'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
@@ -485,6 +486,7 @@ export default function MiraChatSidebar() {
     return () => window.removeEventListener('mira:navigate', navigate)
   }, [router, setViewMode])
   const [backgroundCompact, setBackgroundCompact] = useState(false)
+  const panelVisible = useMiraPanelVisible(isOpen)
   const pip = isOpen && (minimized || backgroundCompact)
   const nativePipRef = useRef(null)
   useEffect(() => { if (!pip) nativePipRef.current?.restore() }, [pip])
@@ -648,12 +650,12 @@ export default function MiraChatSidebar() {
     <>
       <MiraActivityPointer />
       {/* Backdrop */}
-      {isOpen && !pip && (
         <div
-          className="fixed inset-0 bg-black/30 transition-opacity duration-300 z-[99998]"
+          aria-hidden="true"
+          className="fixed inset-0 bg-black/30 transition-opacity duration-300 motion-reduce:transition-none z-[99998]"
+          style={{ opacity: panelVisible && !pip ? 1 : 0, pointerEvents: isOpen && !pip ? 'auto' : 'none' }}
           onClick={closeChat}
         />
-      )}
 
       {/* Floating Sidebar panel - glassmorphism */}
       <NativePipSurface ref={nativePipRef} enabled={isOpen} automatic onBackgroundChange={setBackgroundCompact}>
@@ -664,15 +666,20 @@ export default function MiraChatSidebar() {
         aria-label="MIRA assistant"
         aria-hidden={!isOpen}
         inert={!isOpen ? true : undefined}
-        className={`mira-workspace fixed flex flex-col z-[99999] duration-300 ease-out rounded-2xl overflow-hidden shadow-2xl ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-[110%] opacity-0 pointer-events-none'}`}
+        className="mira-workspace fixed flex flex-col z-[99999] rounded-2xl overflow-hidden shadow-2xl"
         style={{
+          opacity: panelVisible ? 1 : 0,
+          transform: panelVisible ? 'translate3d(0, 0, 0)' : 'translate3d(-24px, 0, 0)',
+          pointerEvents: isOpen ? 'auto' : 'none',
+          transitionDuration: '300ms',
+          transitionTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
           left: pip ? '24px' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
           right: undefined,
           borderRadius: 16,
           top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? '24px' : 'auto',
           height: pip ? 'auto' : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
-          transitionProperty: sidebarDrag.dragging || pip ? 'none' : 'opacity, transform, left, top, width',
+          transitionProperty: sidebarDrag.dragging ? 'none' : pip ? 'opacity, transform' : 'opacity, transform, left, top, width',
           width: pip ? 'min(340px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode
             ? 'rgba(18, 18, 18, 0.72)'
