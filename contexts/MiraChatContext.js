@@ -334,7 +334,10 @@ export function MiraChatProvider({ children }) {
           data.response.suggestedQuestions = []
         }
         if (data.response.action?.type === 'desktop_task') {
-          const outcome = await executeMiraComputerTask(text, { token, signal: requestController.signal })
+          const pendingDesktop = data.response.taskBank?.tasks?.find(task => task.status !== 'completed' && task.action?.type === 'desktop_task')
+          const goal = pendingDesktop?.request && pendingDesktop.request !== text
+            ? `Original task: ${pendingDesktop.request}\nUser clarification: ${text}`.slice(0, 3000) : text.slice(0, 3000)
+          const outcome = await executeMiraComputerTask(goal, { token, signal: requestController.signal })
           data.response.actionResult = outcome
           data.response.message = outcome.message
           data.response.speech = outcome.message
