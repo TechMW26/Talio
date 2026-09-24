@@ -481,6 +481,9 @@ export default function MiraChatSidebar() {
     const navigate = event => {
       const path = miraNavigationPath(event.detail?.page, event.detail?.id)
       if (!path) return
+      // A command from an external PiP must bring its destination back into view.
+      if (window.electronAPI?.activateMira) window.electronAPI.activateMira().catch(() => {})
+      else window.focus()
       setViewMode('pip')
       if (path === '/dashboard/chat' && (window.electronAPI || window.innerWidth >= 1024)) {
         openWidget('button')

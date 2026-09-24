@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "6.0.6",
+  "version": "6.0.7",
   "description": "Talio HRMS Desktop - Productivity & Collaboration Hub",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
@@ -55,7 +55,14 @@
     "asarUnpack": [
       "src/guardian.js"
     ],
+    "beforePack": "scripts/build-mira-control.js",
     "mac": {
+      "extraResources": [
+        {
+          "from": "build/mira-control-${arch}",
+          "to": "mira-control"
+        }
+      ],
       "category": "public.app-category.productivity",
       "target": [
         {

@@ -92,3 +92,5 @@ uploads/aadhaar/
 .vercel
 .env*
 .next-dev-next/
+desktop-app/build/mira-control-*
+desktop-app/dist-*/

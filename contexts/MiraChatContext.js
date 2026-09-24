@@ -15,6 +15,7 @@ import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
 import { readMiraDesktopScreen } from '@/lib/miraDesktopScreen'
 import { executeMiraFocusTimer } from '@/lib/miraLocalActions'
+import { executeMiraComputerTask } from '@/lib/miraComputerClient'
 
 const MiraChatContext = createContext()
 
@@ -332,7 +333,14 @@ export function MiraChatProvider({ children }) {
           data.response.message = outcome.message
           data.response.suggestedQuestions = []
         }
-        if (data.response.action && !['navigate', 'dismiss', 'generate_image', 'ui_action', 'focus_timer'].includes(data.response.action.type)) {
+        if (data.response.action?.type === 'desktop_task') {
+          const outcome = await executeMiraComputerTask(text, { token, signal: requestController.signal })
+          data.response.actionResult = outcome
+          data.response.message = outcome.message
+          data.response.speech = outcome.message
+          data.response.suggestedQuestions = []
+        }
+        if (data.response.action && !['navigate', 'dismiss', 'generate_image', 'ui_action', 'focus_timer', 'desktop_task'].includes(data.response.action.type)) {
           window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: data.response.action.type.replaceAll('_', ' '), phase: 'working' } }))
           // Execute only a newly generated requested action, never a rendered/saved message.
           let outcome

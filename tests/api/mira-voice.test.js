@@ -23,7 +23,7 @@ test('streams provider audio with server-only credentials and fixed voice', asyn
   expect(await response.arrayBuffer()).toHaveProperty('byteLength', 4)
   expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/fixed-voice/stream?output_format=pcm_24000', expect.objectContaining({ headers: expect.objectContaining({ 'xi-api-key': 'test-key' }) }))
   expect(rateLimit).toHaveBeenCalledWith('MIRA_VOICE', 'tenantA:u')
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ model_id: 'eleven_v3', apply_text_normalization: 'on' })
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ model_id: 'eleven_v3_conversational', apply_text_normalization: 'on' })
 })
 test('rejects unauthenticated callers before generation', async () => {
   getAuthAndModels.mockResolvedValue({ success: false })

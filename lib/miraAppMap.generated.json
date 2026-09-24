@@ -1,11 +1,79 @@
 [
   {
+    "route": "/auth/callback",
+    "name": " / auth / callback",
+    "controls": [],
+    "sources": [
+      "app/auth/callback/page.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/auth/change-password",
+    "name": " / auth / change password",
+    "controls": [
+      "Change Your Password",
+      "Confirm New Password",
+      "Confirm new password",
+      "Current Password",
+      "Enter current password",
+      "Enter new password",
+      "New Password"
+    ],
+    "sources": [
+      "app/auth/change-password/page.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/auth/forgot-password",
+    "name": " / auth / forgot password",
+    "controls": [
+      "Check Your Email",
+      "Forgot Password?",
+      "Try a different email",
+      "name@company.com",
+      "text-default-700 font-semibold"
+    ],
+    "sources": [
+      "app/auth/forgot-password/page.js"
+    ]
+  },
+  {
+    "route": "/auth/reset-password/[token]",
+    "name": " / auth / reset password / [token]",
+    "controls": [
+      "At least 8 characters",
+      "Confirm Password",
+      "Create New Password",
+      "Invalid Reset Link",
+      "New Password",
+      "One lowercase letter",
+      "One number",
+      "One special character",
+      "One uppercase letter",
+      "Password Reset Successful!",
+      "••••••••"
+    ],
+    "sources": [
+      "app/auth/reset-password/[token]/page.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
     "route": "/dashboard/admin/live-users",
     "name": "Live Users",
     "controls": [
+      "Active Now",
+      "All Users",
+      "By Department",
+      "Checked In",
+      "Checked In Today",
       "Connection Error",
       "Error Loading Data",
       "Live Users",
+      "Logged In",
+      "Logged In Today",
       "No Users Found",
       "Refresh Dept",
       "Refresh Selected ( )",
@@ -13,7 +81,13 @@
       "Retry",
       "Search by name, email, or department...",
       "Something went wrong",
+      "Total Employees",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/admin/live-users/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -34,6 +108,10 @@
       "Select Department(s)",
       "Target Audience",
       "Target Audience *"
+    ],
+    "sources": [
+      "app/dashboard/announcements/create/page.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -47,6 +125,13 @@
       "Retry",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/announcements/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/heroui/Button.js",
+      "components/ui/heroui/Modal.js"
     ]
   },
   {
@@ -58,6 +143,9 @@
       "System",
       "System Details",
       "Update to v"
+    ],
+    "sources": [
+      "app/dashboard/app-info/page.js"
     ]
   },
   {
@@ -90,21 +178,40 @@
       "Try Again",
       "UIN",
       "Under Maintenance",
-      "View"
+      "View",
+      "category",
+      "status"
+    ],
+    "sources": [
+      "app/dashboard/assets/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js",
+      "components/ui/heroui/SearchableSelect.js"
     ]
   },
   {
     "route": "/dashboard/attendance/checkins",
     "name": "Employee Check-ins",
     "controls": [
+      "Absent",
       "Check-ins for",
       "Connection Error",
       "Employee Check-ins",
       "Export",
+      "In Progress",
+      "Present",
       "Retry",
       "Search by employee name or code...",
       "Something went wrong",
+      "Total Employees",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/attendance/checkins/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -142,6 +249,14 @@
       "Today&apos;s Attendance",
       "Why did you miss clocking in/out?",
       "Your shift ended at"
+    ],
+    "sources": [
+      "app/dashboard/attendance/page.js",
+      "components/OvertimePrompt.js",
+      "components/attendance/LocationAccessStatus.js",
+      "components/ui/Loader.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js"
     ]
   },
   {
@@ -151,17 +266,27 @@
       "Access Restricted",
       "Attendance Report & Analytics",
       "Connection Error",
+      "Daily Punches",
       "Date Range",
       "Department",
+      "Department Breakdown",
+      "Employee Details",
       "End Date",
       "Export CSV",
       "Export Excel",
+      "Overview",
       "Retry",
       "Search by name, code, or department...",
+      "Shrinkage Analysis",
       "Shrinkage Breakdown",
       "Something went wrong",
       "Start Date",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/attendance/report/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -180,6 +305,11 @@
       "Something went wrong",
       "Team Filter",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/attendance/team/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -192,6 +322,10 @@
       "Retry",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/calendar/page.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -214,6 +348,11 @@
       "Type a message...",
       "View Members",
       "🗑️"
+    ],
+    "sources": [
+      "app/dashboard/chat/page.js",
+      "components/UnreadBadge.js",
+      "components/chat/MemberAvatar.js"
     ]
   },
   {
@@ -253,6 +392,15 @@
       "e.g., ENG-FE",
       "e.g., Engineering",
       "e.g., Frontend Squad"
+    ],
+    "sources": [
+      "app/dashboard/departments/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js",
+      "components/ui/heroui/Button.js",
+      "components/ui/heroui/Modal.js"
     ]
   },
   {
@@ -273,6 +421,13 @@
       "Total Designations",
       "Try Again",
       "e.g., Software Engineer"
+    ],
+    "sources": [
+      "app/dashboard/designations/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js"
     ]
   },
   {
@@ -297,6 +452,12 @@
       "Try Again",
       "Upload Document",
       "View"
+    ],
+    "sources": [
+      "app/dashboard/documents/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -305,6 +466,7 @@
     "controls": [
       "AI Suggested KRIs",
       "About",
+      "Access revoked",
       "Add",
       "Add a key responsibility…",
       "Asset clearance progress",
@@ -320,8 +482,10 @@
       "Emergency Contact",
       "Employee lifecycle",
       "Employment",
+      "Exit interview",
       "Explain why this verification must be reviewed again",
       "Extend",
+      "Full and final",
       "KPI name",
       "KRI · KPI",
       "Last working date",
@@ -348,6 +512,14 @@
       "Target",
       "Try Again",
       "Unit"
+    ],
+    "sources": [
+      "app/dashboard/employees/[id]/page.js",
+      "components/employees/EmployeeLifecyclePanel.js",
+      "components/employees/OffboardingAssetChecklistModal.js",
+      "components/employees/OnboardingVerificationModal.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -434,6 +606,12 @@
       "💰 Salary & Statutory Details",
       "📋 Professional Tax",
       "📧 Login Credentials"
+    ],
+    "sources": [
+      "app/dashboard/employees/add/page.js",
+      "components/employees/BulkImportEmployees.js",
+      "components/ui/Loader.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -505,6 +683,10 @@
       "e.g., ABCDE1234F",
       "e.g., ICICI Lombard, Star Health",
       "🏥 Corporate Health Insurance"
+    ],
+    "sources": [
+      "app/dashboard/employees/edit/[id]/page.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -515,15 +697,24 @@
       "Clear filters",
       "Connection Error",
       "Employee Email Address",
+      "Failed",
       "Onboarding Emails",
+      "Pending",
       "Queue all failed emails for automatic retry with rate limit protection",
       "Retry",
       "Search by name, email, or employee code...",
       "Send Email",
       "Send Onboarding Email",
+      "Sent",
       "Something went wrong",
       "Try Again",
       "employee@company.com"
+    ],
+    "sources": [
+      "app/dashboard/employees/onboarding-emails/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -532,6 +723,7 @@
     "controls": [
       "-- Don't change --",
       "Access Denied",
+      "Active",
       "Add Employee",
       "All Departments",
       "All Designations",
@@ -544,20 +736,41 @@
       "Clear Selection",
       "Clear filters to see all employees",
       "Connection Error",
+      "Current Workforce",
       "Edit Employee",
       "Employee Status",
       "Employees",
       "Filters",
       "Go to Dashboard",
+      "Inactive",
+      "Level 1 - Entry",
+      "Level 2 - Mid",
+      "Level 3 - Senior",
+      "Level 4 - Team Lead",
+      "Level 5 - Assistant Manager",
+      "Level 6 - Manager",
+      "Level 7 - C-Suite",
+      "Level 8 - Assistant Director",
+      "Level 9 - Director",
       "Next",
+      "On Leave",
       "Permanently Delete Employee",
       "Previous",
+      "Probation",
+      "Resigned",
       "Retry",
       "Search by name, email, or employee code...",
       "Something went wrong",
       "Sort by",
+      "Terminated",
       "Try Again",
       "View Details"
+    ],
+    "sources": [
+      "app/dashboard/employees/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -576,6 +789,11 @@
       "User Passwords",
       "With Password",
       "Without Password"
+    ],
+    "sources": [
+      "app/dashboard/employees/user-passwords/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -588,6 +806,12 @@
       "Retry",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/expenses/approvals/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -611,7 +835,15 @@
       "Something went wrong",
       "Submit Expense",
       "Total Expenses",
-      "Try Again"
+      "Try Again",
+      "category"
+    ],
+    "sources": [
+      "app/dashboard/expenses/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js"
     ]
   },
   {
@@ -625,6 +857,10 @@
       "🔍 FCM Diagnostic Tool",
       "🗑️ Clear All FCM Tokens",
       "🗑️ Clear FCM Tokens from Database"
+    ],
+    "sources": [
+      "app/dashboard/fcm-diagnostic/page.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -643,6 +879,11 @@
       "Type your reply...",
       "Update Status",
       "Update status"
+    ],
+    "sources": [
+      "app/dashboard/helpdesk/[id]/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -654,11 +895,21 @@
       "Comments ( )",
       "Connection Error",
       "Helpdesk Management",
+      "In Progress",
+      "Open",
+      "Resolved",
       "Retry",
       "Something went wrong",
       "Ticket:",
+      "Total Tickets",
       "Try Again",
       "Unassigned"
+    ],
+    "sources": [
+      "app/dashboard/helpdesk/manage/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -672,11 +923,21 @@
       "Description *",
       "Detailed description of the issue",
       "Helpdesk",
+      "In Progress",
       "My Tickets",
+      "Open",
+      "Resolved",
       "Retry",
       "Select Category",
       "Something went wrong",
+      "Total Tickets",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/helpdesk/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -686,6 +947,9 @@
       "Retry",
       "Search employee by name, role, or department",
       "⊙ Find Me"
+    ],
+    "sources": [
+      "app/dashboard/hierarchy/page.js"
     ]
   },
   {
@@ -708,12 +972,21 @@
       "Try Again",
       "Upcoming Holidays",
       "e.g., New Year's Day"
+    ],
+    "sources": [
+      "app/dashboard/holidays/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
     "route": "/dashboard/hrms",
     "name": "hrms",
-    "controls": []
+    "controls": [],
+    "sources": [
+      "app/dashboard/hrms/page.js"
+    ]
   },
   {
     "route": "/dashboard/learning/certificates",
@@ -724,45 +997,76 @@
       "My Certificates",
       "Share",
       "✕"
+    ],
+    "sources": [
+      "app/dashboard/learning/certificates/page.js",
+      "components/ui/Loader.js",
+      "components/ui/ModalPortal.js"
     ]
   },
   {
     "route": "/dashboard/learning/courses",
     "name": "Courses",
     "controls": [
+      "Advanced JavaScript Programming",
       "Clear Filters",
       "Continue Learning",
       "Course Library",
+      "Data Analytics with Python",
+      "Effective Communication Skills",
       "Enroll Now",
       "Filter by category",
       "Filter by level",
-      "Search courses..."
+      "Leadership & Team Building",
+      "Project Management Fundamentals",
+      "Search courses...",
+      "Time Management Mastery"
+    ],
+    "sources": [
+      "app/dashboard/learning/courses/page.js",
+      "components/ui/Loader.js"
     ]
   },
   {
     "route": "/dashboard/learning",
     "name": "Learning (LMS)",
     "controls": [
+      "Advanced JavaScript",
+      "Browse Courses",
       "Certificates",
+      "Communication Skills",
       "Completed",
       "Continue Learning",
       "Enrolled",
       "Hours Learned",
       "Learning Management System",
+      "My Trainings",
+      "Project Management Basics",
       "Total Courses"
+    ],
+    "sources": [
+      "app/dashboard/learning/page.js"
     ]
   },
   {
     "route": "/dashboard/learning/trainings",
     "name": "My Trainings",
     "controls": [
+      "Advanced JavaScript Programming",
       "All ( )",
       "Completed ( )",
       "Continue Learning",
+      "Effective Communication Skills",
       "In Progress ( )",
+      "Leadership & Team Building",
       "My Trainings",
+      "Project Management Fundamentals",
       "Review Course",
       "View Certificate"
+    ],
+    "sources": [
+      "app/dashboard/learning/trainings/page.js",
+      "components/ui/Loader.js"
     ]
   },
   {
@@ -784,6 +1088,12 @@
       "Try Again",
       "e.g., CL",
       "e.g., Casual Leave"
+    ],
+    "sources": [
+      "app/dashboard/leave-types/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -804,12 +1114,22 @@
       "Export",
       "Half-Day Limits by Hierarchy",
       "Leave Allocations",
+      "Leave Types",
+      "Pending Allocations",
       "Retry",
       "Select Employee",
       "Select Leave Type",
       "Select Year",
       "Something went wrong",
+      "Total Allocations",
+      "Total Employees",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/leave/allocations/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -827,6 +1147,12 @@
       "Retry",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/leave/apply/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -846,6 +1172,12 @@
       "Something went wrong",
       "Total Requests",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/leave/approvals/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -856,12 +1188,22 @@
       "Leave Balance",
       "Leave Balance Details",
       "Leave Balance by Type",
+      "Leave Requests",
       "Monthly Leave Usage",
       "Recent Leave History",
+      "Remaining Balance",
       "Retry",
       "Select Year",
       "Something went wrong",
+      "Total Allocated",
+      "Total Used",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/leave/balance/page.js",
+      "components/charts/CustomTooltip.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -875,6 +1217,12 @@
       "Retry",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/leave/early-leave/page.js",
+      "components/leave/SpecialRequestPage.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -894,6 +1242,12 @@
       "Select Leave Type",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/leave/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -901,7 +1255,9 @@
     "name": "Leave Requests",
     "controls": [
       "( )",
+      "All Requests",
       "Applied Date",
+      "Approved",
       "Approved By",
       "Close",
       "Connection Error",
@@ -910,14 +1266,22 @@
       "Leave Request Details",
       "Leave Type",
       "My Leave Requests",
+      "Pending",
       "Reason",
+      "Rejected",
       "Rejection Reason",
       "Retry",
       "Something went wrong",
       "Start Date",
       "Status",
+      "Total Requests",
       "Try Again",
       "View"
+    ],
+    "sources": [
+      "app/dashboard/leave/requests/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -931,12 +1295,19 @@
       "Something went wrong",
       "Try Again",
       "Work From Home"
+    ],
+    "sources": [
+      "app/dashboard/leave/work-from-home/page.js",
+      "components/leave/SpecialRequestPage.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
     "route": "/dashboard/mail",
     "name": "Mail",
     "controls": [
+      "All Mail",
       "Archive",
       "Attach files",
       "Bold (Ctrl+B)",
@@ -947,13 +1318,17 @@
       "Compose",
       "Connect Your Email",
       "Create new label",
+      "Critical",
       "Delete",
       "Discard draft",
+      "Drafts",
       "Filter messages like this",
       "Formatting options",
       "Forward",
       "Generate",
       "I&apos;ve connected my email - Refresh",
+      "Important",
+      "Inbox",
       "Insert emoji",
       "Insert link",
       "Italic (Ctrl+I)",
@@ -966,6 +1341,7 @@
       "Move to",
       "Move to Inbox",
       "Move to Trash",
+      "New",
       "Numbered list",
       "Open in Browser to Connect",
       "Print",
@@ -976,17 +1352,25 @@
       "Reply",
       "Report spam",
       "Search mail...",
+      "Sent",
       "Snooze",
+      "Snoozed",
+      "Spam",
+      "Starred",
       "Strikethrough",
       "Subject",
       "Summarize with AI",
       "Tone",
+      "Trash",
       "Try Again",
       "Underline (Ctrl+U)",
       "Welcome to Mail",
       "What should this email say?",
       "Write with AI",
       "e.g. Write a polite decline to the meeting invitation for next Tuesday..."
+    ],
+    "sources": [
+      "app/dashboard/mail/page.js"
     ]
   },
   {
@@ -994,23 +1378,29 @@
     "name": "meetings / [id]",
     "controls": [
       "Accept",
+      "Action Items",
       "Agenda",
       "Allow guests to join with a shareable link",
       "Cancel",
       "Connection Error",
       "Copy",
+      "Decisions",
       "Decline",
       "Decline Meeting",
       "Delete",
       "Description",
       "Edit meeting",
+      "Follow Ups",
       "Guest meeting link",
       "Invitees ( )",
+      "Key Contributions",
+      "Key Points",
       "Location",
       "Maybe",
       "Meeting not found",
       "Meeting title",
       "Mira Notes Timeline",
+      "Next Steps",
       "One meeting at a time",
       "Organizer",
       "Priority",
@@ -1023,6 +1413,14 @@
       "Stay here",
       "Transcript History",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/meetings/[id]/page.js",
+      "app/dashboard/meetings/components/EditMeetingModal.js",
+      "app/dashboard/meetings/components/MeetingJoinLink.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -1043,6 +1441,7 @@
       "Duration *",
       "Edit meeting",
       "Error loading meetings",
+      "Fri",
       "Location",
       "Location *",
       "Meeting Time *",
@@ -1052,6 +1451,7 @@
       "Meeting title",
       "Meetings",
       "Min",
+      "Mon",
       "No meetings found",
       "One meeting at a time",
       "Pending Invitations ( )",
@@ -1061,6 +1461,7 @@
       "Repeat every *",
       "Retry",
       "Return to meeting",
+      "Sat",
       "Save changes",
       "Schedule Meeting",
       "Search employees...",
@@ -1070,41 +1471,89 @@
       "Something went wrong",
       "Start Date & Time *",
       "Stay here",
+      "Sun",
+      "Thu",
       "Today's Meetings ( )",
       "Try Again",
+      "Tue",
+      "Wed",
       "e.g., Conference Room A, 3rd Floor",
       "e.g., Weekly Team Standup"
+    ],
+    "sources": [
+      "app/dashboard/meetings/components/CreateMeetingModal.js",
+      "app/dashboard/meetings/components/EditMeetingModal.js",
+      "app/dashboard/meetings/components/MeetingCard.js",
+      "app/dashboard/meetings/components/MeetingJoinLink.js",
+      "app/dashboard/meetings/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/Loader.js"
     ]
   },
   {
     "route": "/dashboard/meetings/room/[roomId]",
     "name": "meetings / room / [roomId]",
-    "controls": []
+    "controls": [],
+    "sources": [
+      "app/dashboard/meetings/room/[roomId]/page.js"
+    ]
   },
   {
     "route": "/dashboard",
     "name": "Dashboard",
     "controls": [
-      "Today's work hours"
+      "Active Today",
+      "Completed Tasks",
+      "Late Today",
+      "On Leave",
+      "Open Positions",
+      "Pending Approvals",
+      "Pending Tasks",
+      "Present Today",
+      "Team Size",
+      "Today's work hours",
+      "Total Employees"
+    ],
+    "sources": [
+      "app/dashboard/page.js",
+      "components/dashboard/index.js",
+      "components/dashboards/UnifiedDashboard.js",
+      "components/widgets/AttendanceHeaderSummary.js",
+      "components/widgets/index.js"
     ]
   },
   {
     "route": "/dashboard/payroll/generate",
     "name": "Generate Payroll",
     "controls": [
+      "Absent",
       "Attendance Correction -",
       "Clear Filters",
       "Done",
       "Filters",
       "Generate Payroll",
+      "Half Day",
+      "Holiday",
+      "Late",
+      "No Department",
+      "On Leave",
       "Payroll Period",
       "Payroll Preview -",
       "Pending Leave Requests",
+      "Present",
       "Refresh",
       "Salary Calculation Method",
       "Search by name, code, email, department...",
       "Select Employees",
+      "WFH",
       "← Back to Selection"
+    ],
+    "sources": [
+      "app/dashboard/payroll/generate/page.js",
+      "components/payroll/AttendanceCorrectionModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/heroui/index.js"
     ]
   },
   {
@@ -1112,7 +1561,10 @@
     "name": "Payroll",
     "controls": [
       "-- Select Bank --",
+      "Axis Bank",
       "Bank Sheet",
+      "Bank of Baroda",
+      "Canara Bank",
       "Deductions",
       "Delete Payroll",
       "Download Payslip",
@@ -1120,23 +1572,41 @@
       "Earnings",
       "Edit Payroll",
       "Employees",
+      "Federal Bank",
       "Filter by status",
       "Filter by venture",
+      "Generic Format (All Banks)",
+      "HDFC Bank",
+      "ICICI Bank",
+      "IDBI Bank",
+      "IndusInd Bank",
+      "Kotak Mahindra Bank",
       "Latest Net Salary",
       "Mark Paid",
       "Net Payable",
       "No payroll records found",
       "Paid",
+      "Payroll",
       "Payroll records table",
       "Process",
+      "Punjab National Bank",
+      "RBL Bank",
       "Select month",
       "Select year",
       "Sheet will include:",
+      "State Bank of India",
       "Summary",
       "Total Deductions",
       "Total Earnings",
       "Total Gross",
-      "View Payslip"
+      "Union Bank of India",
+      "View Payslip",
+      "Yes Bank"
+    ],
+    "sources": [
+      "app/dashboard/payroll/page.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/heroui/index.js"
     ]
   },
   {
@@ -1153,29 +1623,56 @@
       "Salary Slip -",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/payroll/payslips/[id]/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
     "route": "/dashboard/payroll/payslips",
     "name": "Payslips",
     "controls": [
+      "Active",
+      "Approved",
+      "Cancelled",
       "Connection Error",
       "Data table",
       "Deductions",
+      "Draft",
       "Earnings",
       "Employee Details",
+      "Failed",
+      "Inactive",
       "My Payslips",
       "Net Salary",
+      "Paid",
       "Payslip -",
       "Payslips for",
       "Payslips table",
+      "Pending",
+      "Processing",
+      "Rejected",
       "Retry",
       "Something went wrong",
       "Total Payslips",
       "Try Again",
       "YTD Deductions",
       "YTD Gross",
-      "YTD Net Pay"
+      "YTD Net Pay",
+      "text-default-600 font-medium text-sm",
+      "text-default-700 text-sm"
+    ],
+    "sources": [
+      "app/dashboard/payroll/payslips/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/heroui/Button.js",
+      "components/ui/heroui/Card.js",
+      "components/ui/heroui/Input.js",
+      "components/ui/heroui/Modal.js",
+      "components/ui/heroui/Table.js"
     ]
   },
   {
@@ -1203,6 +1700,10 @@
       "Teamwork",
       "What are the employee's key strengths?",
       "What areas need improvement?"
+    ],
+    "sources": [
+      "app/dashboard/performance/create/page.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -1222,6 +1723,9 @@
       "Timeline",
       "Update Progress",
       "Updates History"
+    ],
+    "sources": [
+      "app/dashboard/performance/goals/[id]/page.js"
     ]
   },
   {
@@ -1245,7 +1749,15 @@
       "Progress (%)",
       "Select Category",
       "Select Employee",
-      "Start Date"
+      "Start Date",
+      "category",
+      "employeeId",
+      "priority",
+      "status"
+    ],
+    "sources": [
+      "app/dashboard/performance/goals/create/page.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -1269,7 +1781,15 @@
       "Progress (%)",
       "Select Category",
       "Select Employee",
-      "Start Date"
+      "Start Date",
+      "category",
+      "employeeId",
+      "priority",
+      "status"
+    ],
+    "sources": [
+      "app/dashboard/performance/goals/edit/[id]/page.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -1277,6 +1797,8 @@
     "name": "Goals & Objectives",
     "controls": [
       "%",
+      "Cancelled",
+      "Completed",
       "Connection Error",
       "Create Goal",
       "Delete",
@@ -1285,7 +1807,11 @@
       "Filter by priority",
       "Filter by status",
       "Filter by team",
+      "In Progress",
       "No goals found",
+      "Not Started",
+      "On Hold",
+      "Pending",
       "Performance Goals",
       "Refresh",
       "Retry",
@@ -1293,6 +1819,11 @@
       "Something went wrong",
       "Try Again",
       "View"
+    ],
+    "sources": [
+      "app/dashboard/performance/goals/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -1300,19 +1831,28 @@
     "name": "My Performance",
     "controls": [
       "Add Goal",
+      "Below Expectations",
       "Connection Error",
+      "Exceeds Expectations",
+      "Exceptional",
       "Failed to load performance data",
+      "Formal",
       "Formal Performance Reviews ( )",
+      "Meets Expectations",
+      "My Goals",
       "My Goals ( )",
       "My Performance",
+      "Needs Improvement",
       "No Formal Reviews",
       "No Goals Set Yet",
       "No Reviews Yet",
       "No goals set yet",
       "No reviews yet",
+      "Overview",
       "Recent Feedback",
       "Recent Goals",
       "Retry",
+      "Reviews",
       "Reviews & Feedback ( )",
       "Set New Goal",
       "Set Your First Goal",
@@ -1322,6 +1862,11 @@
       "Try Again",
       "View All",
       "View Details"
+    ],
+    "sources": [
+      "app/dashboard/performance/my-performance/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -1329,31 +1874,52 @@
     "name": "Performance",
     "controls": [
       "Areas of Improvement:",
+      "Average Rating",
       "Comments:",
+      "Completed Goals",
       "Connection Error",
+      "Employee Ratings",
+      "Goals & Objectives",
+      "Pending Reviews",
       "Performance Management",
+      "Performance Reports",
       "Performance Reviews",
       "Retry",
       "Something went wrong",
       "Strengths:",
+      "Total Reviews",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/performance/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
     "route": "/dashboard/performance/ratings",
     "name": "Employee Ratings",
     "controls": [
+      "Average Rating",
       "Connection Error",
       "Employee Ratings",
       "Filter by category",
       "Filter by department",
       "Filter by team",
+      "High Performers",
       "No ratings found",
       "Retry",
       "Search employees...",
       "Something went wrong",
+      "This Month",
+      "Total Reviews",
       "Try Again",
       "View Profile"
+    ],
+    "sources": [
+      "app/dashboard/performance/ratings/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -1361,17 +1927,21 @@
     "name": "Performance Reports",
     "controls": [
       "AI Productivity Scores (Top 10)",
+      "Attendance",
       "Attendance by Day of Week",
       "Connection Error",
       "Department",
       "Department Analysis",
       "Department Attendance",
+      "Department Performance",
       "Department Performance Comparison",
       "Dept Task Performance",
+      "Employee Metrics",
       "End Date",
       "Individual Employee Performance",
       "Key Metrics Summary",
       "Needs Attention",
+      "Overview",
       "Performance Overview",
       "Performance Reports & Analytics",
       "Rating Distribution",
@@ -1382,11 +1952,18 @@
       "Something went wrong",
       "Start Date",
       "Task Status Distribution",
+      "Tasks",
       "Tasks by Priority",
       "Team",
       "Top Performers (Attendance)",
       "Top Skills Analysis",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/performance/reports/page.js",
+      "components/charts/CustomTooltip.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -1412,6 +1989,12 @@
       "Total Policies",
       "Try Again",
       "e.g., Work From Home Policy"
+    ],
+    "sources": [
+      "app/dashboard/policies/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -1438,6 +2021,10 @@
       "Strengths",
       "Suggestions for Improvement",
       "Team"
+    ],
+    "sources": [
+      "app/dashboard/productivity/page.js",
+      "components/productivity/AnalyzedComposite.js"
     ]
   },
   {
@@ -1473,6 +2060,15 @@
       "Zoom in",
       "Zoom out",
       "e.g., Spouse, Parent, Sibling"
+    ],
+    "sources": [
+      "app/dashboard/profile/page.js",
+      "components/AadhaarVerificationSection.js",
+      "components/ActiveSessionsSection.js",
+      "components/ModalPortal.js",
+      "components/TiltWrapper.js",
+      "components/ui/Loader.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -1498,6 +2094,11 @@
       "Start Date",
       "Status",
       "Team Members"
+    ],
+    "sources": [
+      "app/dashboard/projects/[projectId]/edit/page.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/Portal.js"
     ]
   },
   {
@@ -1507,6 +2108,7 @@
       "0",
       "Accept",
       "Accept Invitation",
+      "Activity",
       "Add Comment",
       "Add Note",
       "Add Task",
@@ -1520,6 +2122,7 @@
       "Cancel",
       "Color",
       "Complete",
+      "Completed",
       "Confirm Change",
       "Content",
       "Create New Note",
@@ -1541,17 +2144,20 @@
       "Immediate Actions",
       "In Progress",
       "Mark Complete",
+      "Members",
       "Move Task To",
       "Next month",
       "Note title...",
       "Notes",
       "Open Project Chat",
+      "Overview",
       "Personal note",
       "Pin",
       "Pinned Notes",
       "Post",
       "Previous month",
       "Priority",
+      "Progress",
       "Progress Overview",
       "Project Completion Forecast",
       "Project sections",
@@ -1576,19 +2182,25 @@
       "Search activity...",
       "Select a team member",
       "Set Your ETA",
+      "Smart Insights",
       "Subtask Progress",
       "Subtask title...",
       "Subtasks",
       "Subtasks ( / )",
       "Task Burndown",
       "Task Details",
+      "Task Insights",
       "Task Priority Distribution",
+      "Task Progress",
       "Task Status Distribution",
       "Task Title",
       "Task Title *",
+      "Tasks",
+      "Team Analytics",
       "Team Member Analysis",
       "Team Task Distribution",
       "This Week's Focus",
+      "Time Elapsed",
       "Time vs Task Progress",
       "Title (optional)",
       "To Do",
@@ -1596,6 +2208,15 @@
       "Visibility",
       "Workload Distribution",
       "Write your note..."
+    ],
+    "sources": [
+      "app/dashboard/projects/[projectId]/page.js",
+      "components/projects/ProjectOverview.js",
+      "components/tasks/KanbanBoard.js",
+      "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/Loader.js",
+      "components/ui/ModalPortal.js",
+      "components/ui/Portal.js"
     ]
   },
   {
@@ -1607,12 +2228,21 @@
       "Approve",
       "Cancel",
       "Explain why this task is being rejected...",
+      "In Progress",
+      "On Hold",
       "Reject",
       "Reject Task Review",
       "Rejection Reason",
       "Request Approvals",
       "Select subtasks to mark as incomplete",
-      "Set task status to"
+      "Set task status to",
+      "To Do"
+    ],
+    "sources": [
+      "app/dashboard/projects/approvals/page.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js",
+      "components/ui/Portal.js"
     ]
   },
   {
@@ -1646,6 +2276,7 @@
       "Enter task title",
       "Filters",
       "Hours",
+      "In Progress",
       "Kanban View",
       "List View",
       "Next month",
@@ -1663,6 +2294,7 @@
       "Reassign",
       "Reassign Task",
       "Respond",
+      "Review",
       "Search employees...",
       "Search tasks...",
       "Select New Assignee",
@@ -1678,12 +2310,23 @@
       "Task Details",
       "Task Title",
       "Title *",
+      "To Do",
       "Update Status",
       "View Project",
       "Why are you changing this task&apos;s status?",
       "Why are you rejecting this deletion?",
       "Why do you want to delete this task?",
       "task(s) pending deletion approval"
+    ],
+    "sources": [
+      "app/dashboard/projects/assigned-tasks/page.js",
+      "components/tasks/CreateTaskModal.js",
+      "components/tasks/KanbanBoard.js",
+      "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/Loader.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js",
+      "components/ui/Portal.js"
     ]
   },
   {
@@ -1713,6 +2356,12 @@
       "Tags (comma-separated)",
       "Team Members",
       "e.g., frontend, urgent, Q1"
+    ],
+    "sources": [
+      "app/dashboard/projects/create/page.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js",
+      "components/ui/Portal.js"
     ]
   },
   {
@@ -1730,6 +2379,7 @@
       "Assignees",
       "Attachments",
       "Cancel",
+      "Completed",
       "Days",
       "Delete Task",
       "Delete subtask",
@@ -1743,6 +2393,7 @@
       "Filter by Project",
       "Filter by Status",
       "Hours",
+      "In Progress",
       "Kanban View",
       "List View",
       "My Tasks",
@@ -1757,6 +2408,7 @@
       "Reason for rejection...",
       "Reject",
       "Reject Assignment",
+      "Review",
       "Search employees...",
       "Search tasks...",
       "Set Estimated Time",
@@ -1766,8 +2418,19 @@
       "Switch to List View to Accept/Reject",
       "Task Details",
       "Task Title",
+      "To Do",
       "Update Status",
       "View Project"
+    ],
+    "sources": [
+      "app/dashboard/projects/my-tasks/page.js",
+      "components/tasks/CreateTaskModal.js",
+      "components/tasks/KanbanBoard.js",
+      "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/Loader.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js",
+      "components/ui/Portal.js"
     ]
   },
   {
@@ -1785,6 +2448,12 @@
       "Search projects...",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/projects/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -1793,6 +2462,7 @@
     "controls": [
       "Access Denied",
       "All",
+      "All Events",
       "Assign to User",
       "Assign users",
       "Audit Log",
@@ -1810,14 +2480,28 @@
       "Next",
       "No roles configured",
       "None",
+      "Permission Denied",
       "Previous",
       "RBAC Audit Log",
+      "Role Created",
+      "Role Deleted",
       "Role Management",
+      "Role Updated",
       "Search users by name or email...",
       "Seed System Roles",
+      "User Role Changed",
       "Your Access Level:",
       "e.g. Sales Manager",
       "e.g. sales_manager"
+    ],
+    "sources": [
+      "app/dashboard/rbac/roles/page.js",
+      "components/RoleBasedAccess.js",
+      "components/rbac/AuditLogPanel.js",
+      "components/rbac/RoleAssignModal.js",
+      "components/rbac/RoleBuilder.js",
+      "components/ui/Loader.js",
+      "components/ui/Modal.js"
     ]
   },
   {
@@ -1850,24 +2534,41 @@
       "View All",
       "View Candidates ( )",
       "View Interviews"
+    ],
+    "sources": [
+      "app/dashboard/recruitment/[id]/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
     "route": "/dashboard/recruitment/analytics",
     "name": "Analytics",
     "controls": [
+      "Avg Time to Hire",
       "Back to Recruitment",
       "Candidate Sources",
       "Connection Error",
+      "Conversion Rate",
+      "Hired",
       "Hiring by Department",
       "Interview Statistics",
       "No Analytics Data",
       "Offer Metrics",
+      "Open Jobs",
       "Pipeline Breakdown",
       "Recruitment Analytics",
       "Retry",
       "Something went wrong",
+      "Total Candidates",
+      "Total Jobs",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/recruitment/analytics/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -1908,6 +2609,12 @@
       "Update Rating",
       "Update Stage",
       "e.g., EMP-001"
+    ],
+    "sources": [
+      "app/dashboard/recruitment/candidates/[id]/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -1927,6 +2634,11 @@
       "Search candidates...",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/recruitment/candidates/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -1937,16 +2649,25 @@
       "Add Skill",
       "Auto-generated if empty",
       "Basic Information",
+      "Benefit",
+      "Benefits",
       "Cancel",
       "Create Job Posting",
       "Describe the role, team, and what the ideal candidate will do...",
       "Experience & Compensation",
       "Job Description",
       "Publish Job",
+      "Requirement",
+      "Requirements",
+      "Responsibilities",
+      "Responsibility",
       "Save as Draft",
       "Skills",
       "e.g. Mumbai, India",
       "e.g. Senior Software Engineer"
+    ],
+    "sources": [
+      "app/dashboard/recruitment/create/page.js"
     ]
   },
   {
@@ -1957,16 +2678,25 @@
       "Add Skill",
       "Auto-generated if empty",
       "Basic Information",
+      "Benefit",
+      "Benefits",
       "Cancel",
       "Describe the role, team, and what the ideal candidate will do...",
       "Edit Job Posting",
       "Experience & Compensation",
       "Job Description",
       "Publish Job",
+      "Requirement",
+      "Requirements",
+      "Responsibilities",
+      "Responsibility",
       "Save Changes",
       "Skills",
       "e.g. Mumbai, India",
       "e.g. Senior Software Engineer"
+    ],
+    "sources": [
+      "app/dashboard/recruitment/edit/[id]/page.js"
     ]
   },
   {
@@ -1993,6 +2723,12 @@
       "Try Again",
       "e.g., Technical Interview Round 1",
       "https://meet.google.com/..."
+    ],
+    "sources": [
+      "app/dashboard/recruitment/interviews/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -2006,25 +2742,45 @@
       "Connection Error",
       "Create Job",
       "Employment Type",
+      "Hired",
       "Interviews",
       "No job postings found",
+      "Open Positions",
       "Recruitment",
       "Retry",
       "Search jobs...",
       "Something went wrong",
+      "Total Candidates",
+      "Total Jobs",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/recruitment/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
     "route": "/dashboard/reports",
     "name": "reports",
     "controls": [
+      "Attendance Report",
       "Custom Report",
+      "Employee Directory",
       "Generate Custom Report",
       "Generate Report",
+      "Leave Report",
+      "Payroll Report",
+      "Performance Report",
+      "Recruitment Report",
       "Report Type",
       "Reports",
       "Select Type"
+    ],
+    "sources": [
+      "app/dashboard/reports/page.js",
+      "components/mobile/MobileComponents.js",
+      "components/ui/Loader.js"
     ]
   },
   {
@@ -2037,21 +2793,42 @@
       "Category",
       "Comments ( )",
       "Connection Error",
+      "Cost",
       "Delete",
       "Describe your idea...",
       "Description *",
       "Enter your idea title...",
+      "Env",
+      "Environment",
       "Filters",
       "Ideas Sandbox",
+      "Learn",
       "My Ideas",
       "New Idea",
       "No ideas found",
+      "Office",
+      "Other",
+      "Process",
+      "Product",
       "Retry",
+      "Safety",
       "Search ideas...",
+      "Service",
       "Share an Idea",
       "Something went wrong",
+      "Tech",
       "Title *",
-      "Try Again"
+      "Training",
+      "Try Again",
+      "Workplace"
+    ],
+    "sources": [
+      "app/dashboard/sandbox/components/CreateIdeaModal.js",
+      "app/dashboard/sandbox/components/IdeaCard.js",
+      "app/dashboard/sandbox/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/Loader.js"
     ]
   },
   {
@@ -2067,6 +2844,7 @@
       "Connection Error",
       "Delete",
       "Description",
+      "Drag to set geofence center",
       "Edit",
       "End Time",
       "Failed to load geofence locations",
@@ -2087,6 +2865,13 @@
       "Use current location",
       "e.g., Main Office, Branch Office",
       "×"
+    ],
+    "sources": [
+      "app/dashboard/settings/geofence-locations/page.js",
+      "components/GeofenceMap.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/ModalPortal.js"
     ]
   },
   {
@@ -2110,6 +2895,7 @@
       "Failed",
       "Frequency",
       "Frequency *",
+      "History",
       "Last Sent",
       "Message",
       "Message *",
@@ -2118,13 +2904,16 @@
       "Notification History",
       "Notification Management",
       "Recipients",
+      "Recurring",
       "Recurring Notifications",
       "Schedule For *",
       "Schedule Notification",
+      "Scheduled",
       "Scheduled For",
       "Scheduled Notifications",
       "Select Department",
       "Select Roles",
+      "Send Notification",
       "Send To *",
       "Sent At",
       "Start Date *",
@@ -2135,6 +2924,12 @@
       "Title *",
       "Total Times Sent",
       "Type"
+    ],
+    "sources": [
+      "app/dashboard/settings/notifications/page.js",
+      "components/ui/Loader.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/ModalPortal.js"
     ]
   },
   {
@@ -2151,6 +2946,7 @@
       "77.2090",
       "Absent Day Deduction",
       "Absent Threshold (min)",
+      "Absent days",
       "Active Days",
       "Add Break",
       "Add Company",
@@ -2162,7 +2958,9 @@
       "Add Your First Location",
       "Add machine",
       "Add the first machine",
+      "Add your redirect URL exactly",
       "Address",
+      "Associate the correct company page",
       "Attendance machines",
       "Attendance machines could not be loaded",
       "Attendance-Based Deductions",
@@ -2174,11 +2972,15 @@
       "Check-out Time *",
       "City",
       "Clear search",
+      "Clock in",
       "Company Code *",
       "Company Email",
       "Company Name",
       "Company Name *",
       "Company Settings",
+      "Connected At",
+      "Connection",
+      "Copy Client ID and Client Secret",
       "Copy URL",
       "Copy token",
       "Country",
@@ -2197,6 +2999,7 @@
       "Email",
       "Email Notifications",
       "Enable Overtime Pay",
+      "Enable the auth product",
       "End Time",
       "Engineering",
       "Enter company name",
@@ -2210,17 +3013,20 @@
       "HR Manager",
       "Half Day Hours",
       "Half-Day Deduction",
+      "Half-day days",
       "Head office, Gate 1",
       "Holidays",
       "How To Grab The Credentials",
       "Human Resources",
       "Import CSV",
       "Independence Day",
+      "Last Sync",
       "Late Arrival Deduction",
       "Late Threshold (min)",
       "Latitude",
       "Leave Types",
       "Location Name",
+      "Login",
       "Longitude",
       "Main entrance",
       "Minimum Hours",
@@ -2231,13 +3037,18 @@
       "No companies yet",
       "No machines configured",
       "Notification Settings",
+      "Notifications",
+      "Open LinkedIn Developers",
       "Optional but recommended",
       "Optional description for this location",
+      "Organisation",
       "Overtime Settings",
       "PF Percentage (%)",
       "Paid Time Off",
+      "Payroll",
       "Payroll Settings",
       "Phone",
+      "Present days",
       "Primary Location",
       "Professional Tax",
       "Professional setup for your current env-based LinkedIn flow",
@@ -2245,6 +3056,7 @@
       "Push Notifications",
       "Radius (meters)",
       "Rate Multiplier",
+      "Recruitment",
       "Recruitment Integrations",
       "Remove",
       "Required .env Keys",
@@ -2269,9 +3081,11 @@
       "TDS Percentage (%)",
       "Time Zone",
       "Timezone *",
+      "Token Health",
       "United States",
       "Value",
       "Website",
+      "Work locations",
       "Working Days *",
       "Working Days Per Month",
       "Zip / Postal Code",
@@ -2284,6 +3098,12 @@
       "✕",
       "📊 Settings Summary",
       "🗑️"
+    ],
+    "sources": [
+      "app/dashboard/settings/page.js",
+      "components/settings/AttendanceMachinesSettings.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/heroui/SearchableSelect.js"
     ]
   },
   {
@@ -2306,12 +3126,18 @@
       "Your Company Name",
       "info@company.com",
       "₹"
+    ],
+    "sources": [
+      "app/dashboard/settings/preferences/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
     "route": "/dashboard/talioboard/[id]",
     "name": "talioboard / [id]",
     "controls": [
+      "Aa",
       "Add Page",
       "Agent Mode",
       "Agent workspace",
@@ -2326,6 +3152,7 @@
       "Border Radius",
       "Cancel",
       "Canvas conversation",
+      "Caveat",
       "Center to drawing",
       "Change",
       "Clean up layout: align elements, fix spacing, straighten lines",
@@ -2337,6 +3164,7 @@
       "Copy (Cmd+C)",
       "Curved",
       "Curved Arrow",
+      "Dancing Script",
       "Dashed",
       "Dashed Line",
       "Delete",
@@ -2353,8 +3181,10 @@
       "Elbow/Flowchart Arrow",
       "Ellipse (O)",
       "Eraser Size",
+      "Event Circuit",
       "Exit (Esc)",
       "Fill Color",
+      "Flowchart",
       "Font Size",
       "Font Style",
       "Font Weight",
@@ -2362,8 +3192,11 @@
       "Group (Cmd+G)",
       "Hexagon",
       "Highlighter Width",
+      "Ideas",
+      "Indie Flower",
       "JPG",
       "Key Points",
+      "Let MIRA plan",
       "Line Style",
       "MIRA",
       "MIRA agent workspace",
@@ -2373,6 +3206,7 @@
       "Message MIRA Agent",
       "Message MIRA about your canvas",
       "Message MIRA about your canvas…",
+      "Mindmap",
       "Minimize",
       "Mira",
       "New",
@@ -2384,7 +3218,10 @@
       "PDF",
       "PNG",
       "Paste (Cmd+V)",
+      "Patrick Hand",
       "Pentagon",
+      "Planning",
+      "Poppins",
       "Re-analyse",
       "Recent Generations",
       "Rectangle (R)",
@@ -2399,6 +3236,7 @@
       "Search for users...",
       "Send (Ctrl+Enter)",
       "Send changes to MIRA",
+      "Shadows Into Light",
       "Shapes",
       "Share",
       "Share board",
@@ -2426,6 +3264,17 @@
       "View all →",
       "View history",
       "What would you like to create?"
+    ],
+    "sources": [
+      "app/dashboard/talioboard/[id]/page.js",
+      "components/ui/AIActivityBeam.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/Loader.js",
+      "components/ui/MiraLoadingOverlay.js",
+      "components/ui/MiraPet.js",
+      "components/ui/ModalPortal.js",
+      "components/whiteboard/MiraAgentSidebar.js",
+      "components/whiteboard/WhiteboardCanvas.js"
     ]
   },
   {
@@ -2453,6 +3302,11 @@
       "Something went wrong",
       "TalioBoard",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/talioboard/page.js",
+      "components/ui/ErrorBoundary.js",
+      "components/whiteboard/WhiteboardDashboard.js"
     ]
   },
   {
@@ -2469,6 +3323,12 @@
       "Retry",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/team/geofencing/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -2478,20 +3338,34 @@
       "Add Review / Remark",
       "Back to Team Members",
       "Basic Information",
+      "Blocked",
       "Category",
+      "Completed",
       "Connection Error",
       "Content",
       "Enter your review, remark, or feedback...",
       "Go Back",
+      "In Progress",
       "Member Not Found",
+      "Pending",
       "Rating",
       "Retry",
+      "Review",
       "Reviews & Remarks",
       "Something went wrong",
       "Task Statistics",
       "Tasks",
+      "Todo",
+      "Total",
       "Try Again",
       "Type"
+    ],
+    "sources": [
+      "app/dashboard/team/members/[id]/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/Loader.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -2508,6 +3382,11 @@
       "Team Members",
       "Try Again",
       "View Details & Reviews"
+    ],
+    "sources": [
+      "app/dashboard/team/members/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -2515,6 +3394,7 @@
     "name": "team / my teams",
     "controls": [
       "Connection Error",
+      "Cross Department",
       "My Teams",
       "No Members Found",
       "No Teams Found",
@@ -2524,6 +3404,11 @@
       "Team Leader",
       "Try Again",
       "View Details"
+    ],
+    "sources": [
+      "app/dashboard/team/my-teams/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
     ]
   },
   {
@@ -2546,6 +3431,12 @@
       "Reviewer Comments",
       "Something went wrong",
       "Try Again"
+    ],
+    "sources": [
+      "app/dashboard/team/regularisation/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js",
+      "components/ui/LoadingButton.js"
     ]
   },
   {
@@ -2553,10 +3444,15 @@
     "name": "To-Do",
     "controls": [
       "#6366f1",
+      "1 day before",
+      "1 hour before",
+      "15 minutes before",
+      "30 minutes before",
       "Add Category",
       "Add To-do",
       "Add description...",
       "Add subtask...",
+      "At time of due date",
       "Brief description...",
       "By Priority",
       "Cancel",
@@ -2571,6 +3467,10 @@
       "Due Date",
       "Enter to-do title",
       "Filter category",
+      "High",
+      "Low",
+      "Medium",
+      "No Priority",
       "No project tasks",
       "Priority",
       "Search to-dos...",
@@ -2584,10 +3484,22 @@
       "To-do Analytics",
       "To-do Details",
       "To-dos Completed (Last 7 Days)",
+      "Urgent",
       "View Analytics",
       "Weekly completions",
       "e.g., Work, Personal, Shopping",
       "work, urgent, follow-up"
+    ],
+    "sources": [
+      "app/dashboard/todo/components/AnalyticsPanel.js",
+      "app/dashboard/todo/components/AnalyticsPanel.module.css",
+      "app/dashboard/todo/components/CategoryModal.js",
+      "app/dashboard/todo/components/CreateTodoModal.js",
+      "app/dashboard/todo/components/TodoDetailPanel.js",
+      "app/dashboard/todo/page.js",
+      "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/Loader.js"
     ]
   },
   {
@@ -2601,6 +3513,565 @@
       "Something went wrong",
       "Try Again",
       "Users Management"
+    ],
+    "sources": [
+      "app/dashboard/users/page.js",
+      "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/ErrorBoundary.js"
+    ]
+  },
+  {
+    "route": "/debug/tasks",
+    "name": " / debug / tasks",
+    "controls": [
+      "Clear",
+      "Debug Test Task",
+      "Results:",
+      "Task API Debug"
+    ],
+    "sources": [
+      "app/debug/tasks/page.js"
+    ]
+  },
+  {
+    "route": "/download",
+    "name": " / download",
+    "controls": [
+      "Desktop (macOS/Windows)",
+      "Desktop App",
+      "Download links always point to the latest release",
+      "Features",
+      "Important",
+      "Installation",
+      "Talio"
+    ],
+    "sources": [
+      "app/download/page.js"
+    ]
+  },
+  {
+    "route": "/join/[guestLink]",
+    "name": " / join / [guestLink]",
+    "controls": [
+      "Enter your name to join",
+      "Go to Homepage",
+      "Talio",
+      "Unable to Join Meeting",
+      "Your name"
+    ],
+    "sources": [
+      "app/join/[guestLink]/page.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/join/[guestLink]/room",
+    "name": " / join / [guestLink] / room",
+    "controls": [
+      "Add people",
+      "Applause",
+      "Camera preview",
+      "Cancel",
+      "Celebrate",
+      "Close panel",
+      "Close transcript",
+      "Continue without camera",
+      "Copy link",
+      "Dismiss media warning",
+      "Enable meeting audio &amp; video",
+      "Ending meeting...",
+      "Expand Talio Meet",
+      "Expand Talio Meet picture in picture",
+      "Guest meeting link",
+      "Heart",
+      "Invite",
+      "Laugh",
+      "Leave meeting",
+      "Meeting notes",
+      "Meeting reactions",
+      "Message everyone",
+      "Minimise meeting",
+      "Minimise picture in picture",
+      "Minimise picture in picture to bubble",
+      "Minimise to bubble",
+      "Open participants",
+      "Preview camera &amp; microphone",
+      "Reactions",
+      "Restore meeting",
+      "Return to",
+      "Return to join page",
+      "Search by name, email, role, or department",
+      "Search employees",
+      "Send message",
+      "Surprised",
+      "Talio Meet compact picture in picture",
+      "Thumbs up",
+      "Transcript History",
+      "Try camera again"
+    ],
+    "sources": [
+      "app/dashboard/meetings/components/AddMeetingParticipantsModal.js",
+      "app/dashboard/meetings/components/MeetingNotetakerPanel.js",
+      "app/join/[guestLink]/room/page.js",
+      "components/meetings/ManagedMeetingRoomSession.js",
+      "components/meetings/MeetingMedia.js",
+      "components/meetings/MeetingReactionPicker.js",
+      "components/meetings/MeetingVisualIcons.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/login",
+    "name": " / login",
+    "controls": [
+      "Connection Error",
+      "Email Address",
+      "Enter your password",
+      "Incorrect Email Address !",
+      "Incorrect Password",
+      "Login Failed",
+      "Password",
+      "Welcome Back",
+      "name@company.com",
+      "text-default-600 text-sm"
+    ],
+    "sources": [
+      "app/login/page.js"
+    ]
+  },
+  {
+    "route": "/offline",
+    "name": " / offline",
+    "controls": [
+      "Possible Reasons:",
+      "✨ Available Offline:",
+      "💡 Quick Tips:"
+    ],
+    "sources": [
+      "app/offline/page.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/",
+    "name": " / ",
+    "controls": [
+      "Clear Cache & Session"
+    ],
+    "sources": [
+      "app/page.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/resources",
+    "name": " / resources",
+    "controls": [
+      "All Platforms",
+      "Apple Silicon (M1/M2/M3/M4)",
+      "Get Talio for Your Device",
+      "Intel (x64)",
+      "System Requirements",
+      "Windows",
+      "Windows 10/11 (64-bit)",
+      "macOS"
+    ],
+    "sources": [
+      "app/resources/page.js"
+    ]
+  },
+  {
+    "route": "/setup/[code]",
+    "name": " / setup / [code]",
+    "controls": [
+      "Confirm Password",
+      "Confirm your password",
+      "Create Admin Account",
+      "Doe",
+      "Email Address",
+      "First Name",
+      "Go to Login",
+      "Invalid Setup Link",
+      "John",
+      "Last Name",
+      "Min. 8 characters",
+      "Password",
+      "Welcome to Talio",
+      "john@yourcompany.com"
+    ],
+    "sources": [
+      "app/setup/[code]/page.js"
+    ]
+  },
+  {
+    "route": "/setup",
+    "name": " / setup",
+    "controls": [
+      "Confirm Password",
+      "Confirm your password",
+      "Create Admin Account",
+      "Doe",
+      "Email Address",
+      "First Name",
+      "John",
+      "Last Name",
+      "Minimum 8 characters",
+      "Organization Name",
+      "Password",
+      "Welcome to Talio",
+      "Your Company Name",
+      "admin@company.com"
+    ],
+    "sources": [
+      "app/setup/page.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/superadmin/analytics",
+    "name": " / superadmin / analytics",
+    "controls": [
+      "Analytics",
+      "Plan Distribution",
+      "Refresh",
+      "Storage by Company",
+      "Top Storage Usage",
+      "User Statistics by Company"
+    ],
+    "sources": [
+      "app/superadmin/analytics/page.js"
+    ]
+  },
+  {
+    "route": "/superadmin/companies/[id]",
+    "name": " / superadmin / companies / [id]",
+    "controls": [
+      "+91 98765 43210",
+      "0",
+      "Activate Service",
+      "Add Admin",
+      "Add Note",
+      "Add Reminder",
+      "Add a note...",
+      "Admin Users",
+      "Admins",
+      "Amount (₹)",
+      "Back",
+      "Billing Address",
+      "Billing Cycle",
+      "Business Details",
+      "Business Info",
+      "Cancel",
+      "Company Information",
+      "Copy URL",
+      "Create Admin User",
+      "Create First Admin",
+      "Delete",
+      "Delete Company",
+      "Description (optional)...",
+      "Disable All",
+      "Doe",
+      "Email *",
+      "Email subject...",
+      "Enable All",
+      "Feature Sets",
+      "Features",
+      "First Name *",
+      "HRMS Workflow Modules",
+      "John",
+      "Last Name",
+      "MIRA AI Token Allocation",
+      "Mark as complete",
+      "Max Storage (GB)",
+      "Max Users",
+      "Message",
+      "Min 6 characters",
+      "New password (min 6 chars)",
+      "No Admin Users",
+      "Note Category",
+      "Notes",
+      "Onboarding Payment",
+      "Overview",
+      "Password *",
+      "Pause Service",
+      "Payment History",
+      "Payments",
+      "Phone",
+      "Plan",
+      "Primary Contact",
+      "Regenerate",
+      "Reminder Priority",
+      "Reminder title...",
+      "Reminders",
+      "Reset Password",
+      "Reset to Plan",
+      "Save",
+      "Send Email",
+      "Start Date",
+      "Status",
+      "Subject",
+      "Subscription",
+      "Subscription Details",
+      "Subscription Plan",
+      "Subscription Progress",
+      "Subscription Status",
+      "Suspend",
+      "Tax & Registration",
+      "Technical",
+      "Technical Details",
+      "Tenure (Days)",
+      "To",
+      "Tokens per user",
+      "Type to confirm:",
+      "Type your message...",
+      "User Statistics",
+      "admin@company.com"
+    ],
+    "sources": [
+      "app/superadmin/companies/[id]/page.js",
+      "components/superadmin/HrmsModuleControls.js",
+      "components/ui/Loader.js",
+      "components/ui/ModalPortal.js"
+    ]
+  },
+  {
+    "route": "/superadmin/companies/new",
+    "name": " / superadmin / companies / new",
+    "controls": [
+      "+91 98765 43210",
+      "0",
+      "123 Business Street, Suite 100",
+      "27AAAAA0000A1Z5",
+      "30",
+      "400001",
+      "AAAA00000A",
+      "AAAAA0000A",
+      "Acme Corporation",
+      "Add New Company",
+      "Additional notes about the payment...",
+      "Amount (₹/user/month)",
+      "Amount Paid (₹)",
+      "Back",
+      "Basic Info",
+      "Billing Address",
+      "Billing Cycle",
+      "Brief description of the company...",
+      "Business Details",
+      "Business Type",
+      "CIN Number",
+      "City",
+      "Company Information",
+      "Company Name *",
+      "Contact & Address",
+      "Contact Email *",
+      "Contact Name *",
+      "Country",
+      "Description",
+      "Disable All",
+      "Enable All",
+      "End Date (Calculated)",
+      "Feature Sets",
+      "Features",
+      "GST Number",
+      "Generate",
+      "HRMS Workflow Modules",
+      "INV-2024-001",
+      "India",
+      "Industry",
+      "Invoice Number",
+      "John Doe",
+      "Lowercase letters, numbers, and hyphens only (min 2 chars, no leading/trailing hyphens)",
+      "MIRA AI Token Allocation",
+      "Maharashtra",
+      "Max Storage (GB)",
+      "Max Users",
+      "Mumbai",
+      "Next",
+      "Notes",
+      "Onboarding Payment",
+      "PAN Number",
+      "Payment Method",
+      "Phone Number",
+      "Plan & Subscription",
+      "Postal Code",
+      "Primary Contact",
+      "Reset to Plan",
+      "Select Method",
+      "Select Plan",
+      "Select Type",
+      "Slug (URL identifier) *",
+      "Start Date",
+      "State",
+      "Street Address",
+      "Subscription Details",
+      "Summary",
+      "TAN Number",
+      "TXN123456789",
+      "Tags (comma-separated)",
+      "Technology, Manufacturing, etc.",
+      "Tenure (Days)",
+      "Tokens per user",
+      "Transaction ID",
+      "U00000MH0000PTC000000",
+      "Usage Limits",
+      "Website",
+      "acme-corp",
+      "businessDetails.businessType",
+      "https://www.acme.com",
+      "john@acme.com",
+      "onboarding.paymentMethod",
+      "partner, enterprise, priority",
+      "subscription.billingCycle"
+    ],
+    "sources": [
+      "app/superadmin/companies/new/page.js",
+      "components/superadmin/HrmsModuleControls.js"
+    ]
+  },
+  {
+    "route": "/superadmin/companies",
+    "name": " / superadmin / companies",
+    "controls": [
+      "All Status",
+      "All Subscriptions",
+      "Companies",
+      "No companies found",
+      "Search companies...",
+      "Status Filter",
+      "Subscription Filter"
+    ],
+    "sources": [
+      "app/superadmin/companies/page.js"
+    ]
+  },
+  {
+    "route": "/superadmin/dashboard",
+    "name": " / superadmin / dashboard",
+    "controls": [
+      "Active",
+      "Dashboard",
+      "Overdue Reminders",
+      "Pending Setup",
+      "Quick Actions",
+      "Recent Companies",
+      "Subscription Overview",
+      "Total Companies"
+    ],
+    "sources": [
+      "app/superadmin/dashboard/page.js"
+    ]
+  },
+  {
+    "route": "/superadmin/email",
+    "name": " / superadmin / email",
+    "controls": [
+      "CC (optional)",
+      "Compose Email",
+      "Email",
+      "Email Templates",
+      "Email subject...",
+      "Message *",
+      "Select Company",
+      "Selected Company",
+      "Subject *",
+      "Template Placeholders",
+      "To *",
+      "Type your message...",
+      "cc@example.com",
+      "recipient@example.com"
+    ],
+    "sources": [
+      "app/superadmin/email/page.js",
+      "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/superadmin/login",
+    "name": " / superadmin / login",
+    "controls": [
+      "Email Address",
+      "Enter your password",
+      "Password",
+      "Talio SuperAdmin",
+      "superadmin@talio.in"
+    ],
+    "sources": [
+      "app/superadmin/login/page.js"
+    ]
+  },
+  {
+    "route": "/superadmin",
+    "name": " / superadmin",
+    "controls": [],
+    "sources": [
+      "app/superadmin/page.js"
+    ]
+  },
+  {
+    "route": "/superadmin/reminders",
+    "name": " / superadmin / reminders",
+    "controls": [
+      "Complete",
+      "Completed",
+      "No reminders",
+      "Pending",
+      "Reminders"
+    ],
+    "sources": [
+      "app/superadmin/reminders/page.js"
+    ]
+  },
+  {
+    "route": "/superadmin/security",
+    "name": " / superadmin / security",
+    "controls": [
+      "Account locked",
+      "Account lockouts (24h)",
+      "Account unlocked",
+      "Active IP blocks",
+      "Admin action",
+      "Apply filters",
+      "Bad webhook signature",
+      "Block",
+      "Block IP",
+      "Block an IP",
+      "Blocked IPs",
+      "CSRF violation",
+      "Desktop token anomaly",
+      "Email",
+      "Events",
+      "Events by type (24h)",
+      "Expired token",
+      "Failed login",
+      "Failed logins (24h)",
+      "Generated",
+      "IP",
+      "IP address",
+      "IP blocked",
+      "IP unblocked",
+      "Invalid token",
+      "Login success",
+      "Overview",
+      "Permission denied",
+      "Rate limit hit",
+      "Rate limit hits (24h)",
+      "Reason",
+      "Refresh",
+      "Reset completed",
+      "Reset requested",
+      "Security Center",
+      "Session revoked",
+      "Successful logins (24h)",
+      "Superadmin action",
+      "Suspicious input",
+      "Suspicious inputs (24h)",
+      "Top offending IPs (24h)",
+      "Top targeted accounts (24h)",
+      "Total events (24h)",
+      "Unblock"
+    ],
+    "sources": [
+      "app/superadmin/security/page.js"
     ]
   }
 ]

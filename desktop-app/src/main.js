@@ -7,7 +7,7 @@
  * Force-persistent mode: app cannot be closed by users, auto-restarts if killed
  */
 
-const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog, screen, powerMonitor, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog, screen, powerMonitor, desktopCapturer, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -23,6 +23,7 @@ const { captureMiraAppSnapshot } = require('./miraAppSnapshot');
 const { createMiraDesktopScreenCapture } = require('./miraDesktopScreen');
 const captureMiraDesktopScreen = createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, systemPreferences, platform: process.platform });
 const { pipWindowOptions, pipBounds } = require('./pipWindowPolicy');
+let livePipWindow = null;
 
 // PERFORMANCE: Optimized GPU and rendering settings
 const forceDisableGPU = process.env.TALIO_DISABLE_GPU === '1';
@@ -429,16 +430,27 @@ async function requestPermissions() {
 }
 
 // Single instance lock
+function revealMainWindow() {
+  if (process.platform === 'darwin') {
+    app.setActivationPolicy('regular');
+    app.dock?.show();
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    mainWindow.once('ready-to-show', () => { mainWindow.show(); mainWindow.focus(); });
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', function () {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    revealMainWindow();
   });
 }
 
@@ -1137,6 +1149,7 @@ function setupWindowEvents() {
     return { action: 'deny' };
   });
   mainWindow.webContents.on('did-create-window', function (child, details) {
+    if (details.frameName === 'talio-live-pip') livePipWindow = child;
     if (details.frameName !== 'talio-live-pip') return;
     child.setAlwaysOnTop(true, 'floating');
     let savedPipPosition = store.get('livePipPosition', null);
@@ -1493,6 +1506,22 @@ function setupIPCHandlers() {
   });
 
   // Permission management
+  const { createMiraComputer } = require('./miraComputer');
+  const computer = createMiraComputer({ desktopCapturer, screen, dialog, systemPreferences, shell, globalShortcut, platform: process.platform, resourcesPath: process.resourcesPath, packaged: app.isPackaged });
+  ipcMain.handle('mira-computer', (event, input) => computer(event, mainWindow, APP_ORIGIN, input));
+  const { trustedMiraSender, createMiraPermissions } = require('./miraPermissions');
+  ipcMain.handle('mira-move-pip', (event, position) => {
+    if (!trustedMiraSender(event, mainWindow, APP_ORIGIN) || !livePipWindow || livePipWindow.isDestroyed() || !Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return { success: false };
+    const point = { x: Math.round(Math.max(-100000, Math.min(100000, position.x))), y: Math.round(Math.max(-100000, Math.min(100000, position.y))) };
+    const display = screen.getDisplayNearestPoint(point);
+    livePipWindow.setBounds(pipBounds(display.workArea, livePipWindow.getBounds(), 0, point));
+    return { success: true };
+  });
+  const miraPermissions = createMiraPermissions({ systemPreferences, shell, platform: process.platform });
+  ipcMain.handle('mira-permissions', (event, kind) => {
+    if (!trustedMiraSender(event, mainWindow, APP_ORIGIN)) return { success: false };
+    return kind ? miraPermissions.request(kind) : { success: true, permissions: miraPermissions.status() };
+  });
   ipcMain.handle('check-screen-permission', function () {
     return {
       status: checkScreenRecordingPermission(),
@@ -2201,10 +2230,7 @@ function createTray() {
   updateTrayMenu();
 
   tray.on('click', function () {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    revealMainWindow();
   });
 
   logger.log('info', 'Main', 'Tray created');
@@ -2215,7 +2241,7 @@ function createTray() {
  */
 function updateTrayMenu() {
   var menuItems = [
-    { label: 'Open Talio', click: function () { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+    { label: 'Open Talio', click: revealMainWindow },
     { type: 'separator' }
   ];
 
@@ -3744,11 +3770,7 @@ app.whenReady().then(async function () {
   restoreSavedAuthentication();
 
   app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    } else if (mainWindow) {
-      mainWindow.show();
-    }
+    revealMainWindow();
   });
 });
 

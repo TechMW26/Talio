@@ -146,6 +146,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Screen recording & permission management
+  computerTask: function(input) {
+    return ipcRenderer.invoke('mira-computer', input);
+  },
+  moveLivePip: function(position) {
+    return ipcRenderer.invoke('mira-move-pip', position);
+  },
+  miraPermissions: function(kind) {
+    return ipcRenderer.invoke('mira-permissions', kind);
+  },
   checkScreenPermission: function() {
     return ipcRenderer.invoke('check-screen-permission');
   },

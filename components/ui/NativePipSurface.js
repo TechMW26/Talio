@@ -34,8 +34,7 @@ function registerAutomaticSurface(surface) {
 function panelSize(host) {
   const panel = host?.querySelector('[data-meeting-pip], .mira-workspace') || host
   const rect = panel?.getBoundingClientRect()
-  const dragHeight = host?.querySelector('[data-native-pip-drag]')?.getBoundingClientRect().height || 0
-  return { width: Math.ceil(rect?.width || 340), height: Math.ceil(rect?.height || 180) + dragHeight }
+  return { width: Math.ceil(rect?.width || 340), height: Math.ceil(rect?.height || 180) }
 }
 
 function fitWindow(target) {
@@ -86,7 +85,7 @@ async function getPipWindow(size) {
       [data-meeting-pip]{color:#f4f4f5!important;background:#18181b!important}
       [data-meeting-pip] main,[data-meeting-pip] header,[data-meeting-pip] footer{background:#18181b!important;color:inherit}
       [data-meeting-pip] button{flex-shrink:0}
-      ${desktop ? '[data-native-pip-drag]{display:flex!important;-webkit-app-region:drag;app-region:drag;user-select:none;height:20px;align-items:center;justify-content:center;cursor:grab;background:#18181b;color:#a1a1aa;font-size:10px}button,input,textarea,a{ -webkit-app-region:no-drag;app-region:no-drag; }' : ''}
+      ${desktop ? '[data-native-pip-surface]{user-select:none;-webkit-app-region:no-drag;app-region:no-drag}input,textarea{user-select:text}' : ''}
       [data-meeting-pip] button svg{width:20px!important;height:20px!important;min-width:20px;flex-shrink:0}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
@@ -106,6 +105,28 @@ async function getPipWindow(size) {
       [data-native-pip-surface] .mira-workspace [data-ai-activity-beam],
       [data-native-pip-surface] .mira-workspace [data-ai-activity-beam] *{border-radius:0!important}`}`
     target.document.head.append(style)
+    if (desktop && window.electronAPI?.moveLivePip) {
+      let drag = null, moved = false, frame = null
+      target.document.addEventListener('pointerdown', event => {
+        if (event.button !== 0 || event.target.closest('button,input,textarea,a,select,[role="button"],[role="slider"]')) return
+        moved = false
+        drag = { x: event.screenX, y: event.screenY, left: target.screenX, top: target.screenY }
+        event.target.setPointerCapture?.(event.pointerId)
+      })
+      target.document.addEventListener('pointermove', event => {
+        if (!drag) return
+        const dx = event.screenX - drag.x, dy = event.screenY - drag.y
+        if (!moved && Math.hypot(dx, dy) < 5) return
+        moved = true
+        if (frame) target.cancelAnimationFrame(frame)
+        frame = target.requestAnimationFrame(() => {
+          if (drag) window.electronAPI.moveLivePip({ x: drag.left + dx, y: drag.top + dy }).catch(() => {})
+        })
+      })
+      target.document.addEventListener('pointerup', () => { drag = null })
+      target.document.addEventListener('pointercancel', () => { drag = null })
+      target.document.addEventListener('click', event => { if (moved) { event.preventDefault(); event.stopPropagation(); moved = false } }, true)
+    }
     target.addEventListener('pagehide', () => { if (nativeWindow === target) nativeWindow = null }, { once: true })
     return target
   } finally {
@@ -223,7 +244,7 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
 
   useImperativeHandle(ref, () => ({ restore, open }))
 
-  return <><div ref={placeholder} />{host && createPortal(<><div data-native-pip-drag style={{ display: 'none' }} title="Drag to move this window">⠿</div>{children}{error && <p role="alert" className="fixed bottom-3 left-3 z-[100000] max-w-sm rounded-xl bg-slate-900 p-3 text-sm text-white">{error}<button className="ml-2 underline" onClick={() => setError('')}>Dismiss</button></p>}</>, host)}</>
+  return <><div ref={placeholder} />{host && createPortal(<>{children}{error && <p role="alert" className="fixed bottom-3 left-3 z-[100000] max-w-sm rounded-xl bg-slate-900 p-3 text-sm text-white">{error}<button className="ml-2 underline" onClick={() => setError('')}>Dismiss</button></p>}</>, host)}</>
 })
 
 export default NativePipSurface
