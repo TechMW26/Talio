@@ -14,6 +14,7 @@ test('fills the viewport without browser permission, and only requests native fu
     const editor = screen.getByTestId('board-fullscreen-editor')
     expect(editor.parentElement).toBe(document.body)
     expect(editor).toHaveClass('fixed', 'inset-0', 'h-[100dvh]')
+    expect(screen.getByTitle('Exit (Esc)').parentElement).toHaveClass('talioboard-window-header')
     expect(request).not.toHaveBeenCalled()
     fireEvent.click(screen.getByTitle('Enter Fullscreen'))
     expect(request).toHaveBeenCalledTimes(1)

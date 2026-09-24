@@ -10,7 +10,7 @@ function createMiraPointer({ BrowserWindow, screen }) {
   }
   function show() {
     hide();
-    window = new BrowserWindow({ width: 32, height: 32, transparent: true, frame: false, focusable: false, skipTaskbar: true, resizable: false, hasShadow: false, show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+    window = new BrowserWindow({ width: 32, height: 32, transparent: true, backgroundColor: '#00000000', frame: false, focusable: false, skipTaskbar: true, resizable: false, hasShadow: false, show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
     window.setIgnoreMouseEvents(true);
     window.setAlwaysOnTop(true, 'screen-saver');
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });

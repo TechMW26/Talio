@@ -1043,7 +1043,7 @@ export default function ManagedMeetingRoomSession({
           title="Expand Talio Meet"
           aria-label="Expand Talio Meet picture in picture"
           data-meeting-pip="bubble"
-          style={{ left: 24, right: 'auto', bottom: 'calc(max(24px, env(safe-area-inset-bottom)) + var(--mira-pip-stack-height, 0px))' }}
+          style={{ left: 'auto', right: 24, bottom: 'calc(max(24px, env(safe-area-inset-bottom)) + var(--mira-pip-stack-height, 0px))' }}
         >
           <HiOutlineVideoCamera className="h-6 w-6" />
           <span className={`absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white ${muted ? 'bg-red-500' : 'bg-emerald-400'}`} aria-hidden="true" />
@@ -1067,7 +1067,7 @@ export default function ManagedMeetingRoomSession({
           className="fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex min-h-[5.25rem] w-[min(94vw,22rem)] items-center gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 px-3 py-2.5 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950/95 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0"
           aria-label="Talio Meet compact picture in picture"
           data-meeting-pip="compact"
-          style={{ left: 24, right: 'auto', margin: 0, bottom: 'calc(max(24px, env(safe-area-inset-bottom)) + var(--mira-pip-stack-height, 0px))' }}
+          style={{ left: 'auto', right: 24, margin: 0, bottom: 'calc(max(24px, env(safe-area-inset-bottom)) + var(--mira-pip-stack-height, 0px))' }}
         >
         {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
           <span key={`audio-${participant.identity}`}>
@@ -1141,7 +1141,7 @@ export default function ManagedMeetingRoomSession({
         ? 'fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex h-[min(26rem,calc(100dvh-2rem))] w-[min(94vw,28rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-100 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0'
         : 'fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white'}
       data-meeting-pip={isPip ? 'expanded' : undefined}
-      style={isPip ? { left: 24, right: 'auto', margin: 0, bottom: 'calc(max(24px, env(safe-area-inset-bottom)) + var(--mira-pip-stack-height, 0px))', maxHeight: 'calc(100dvh - 48px - var(--mira-pip-stack-height, 0px))' } : undefined}
+      style={isPip ? { left: 'auto', right: 24, margin: 0, bottom: 'calc(max(24px, env(safe-area-inset-bottom)) + var(--mira-pip-stack-height, 0px))', maxHeight: 'calc(100dvh - 48px - var(--mira-pip-stack-height, 0px))' } : undefined}
       data-meeting-fullscreen={!isPip ? 'true' : undefined}
     >
       {mediaStatusBanner}
@@ -1161,7 +1161,7 @@ export default function ManagedMeetingRoomSession({
         </div>
       </header>
 
-      {!isCompact && <main className="relative flex min-h-0 flex-1 gap-3 p-3">
+      {!isCompact && <main className="relative flex min-h-0 flex-1 gap-3 overflow-auto p-3">
         {presenter ? (
           <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden" data-meeting-layout="presentation">
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
@@ -1201,7 +1201,7 @@ export default function ManagedMeetingRoomSession({
           </span>
       ))}
 
-      <footer className="flex min-h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-slate-200 bg-white/90 px-3 dark:border-white/10 dark:bg-slate-900/90">
+      <footer className="flex min-h-20 shrink-0 flex-wrap items-center justify-center gap-2 border-t border-slate-200 bg-white/90 px-3 py-3 dark:border-white/10 dark:bg-slate-900/90">
         <button onClick={toggleMute} aria-label={muted ? 'Turn microphone on' : 'Mute microphone'} className={`flex h-11 w-11 items-center justify-center rounded-full ${muted ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={muted}><HiOutlineMicrophone className="h-5 w-5" /></CutLineIcon></button>
         {!isCompact && <>
           <button onClick={toggleVideo} aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'} className={`flex h-11 w-11 items-center justify-center rounded-full ${videoOff ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}><CutLineIcon isOff={videoOff}><HiOutlineVideoCamera className="h-5 w-5" /></CutLineIcon></button>

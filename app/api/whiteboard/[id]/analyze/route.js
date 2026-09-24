@@ -4,7 +4,7 @@ import { generateVisionContent as generateBaseVisionContent } from '@/lib/gemini
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 import { generateSmartContent as generateBaseSmartContent } from '@/lib/promptEngine';
 import { MIRA_LANGUAGE_POLICY } from '@/lib/miraLanguage';
-import { buildWhiteboardPlanPrompt, plotWhiteboardPlan } from '@/lib/whiteboardAIPlan';
+import { buildWhiteboardTemplatePrompt, resolveWhiteboardTemplate } from '@/lib/whiteboardTemplates';
 import { compressScreenshot } from '@/lib/imageCompression';
 import { normalizePreparedWhiteboardContent } from '@/lib/whiteboardAIContent';
 
@@ -1153,9 +1153,9 @@ Return ONLY valid JSON array. No explanations.`;
         return NextResponse.json({ error: 'Content description is required' }, { status: 400 });
       }
 
-      const templateType = body.templateType || 'mindmap';
+      const templateType = resolveWhiteboardTemplate(body.templateType);
 
-      const preparePrompt = buildWhiteboardPlanPrompt(message, templateType, (whiteboard.pages || []).flatMap(page => (page.objects || []).map(object => object.text || '')).join('\n').slice(0, 6000));
+      const preparePrompt = buildWhiteboardTemplatePrompt(message, templateType, (whiteboard.pages || []).flatMap(page => (page.objects || []).map(object => object.text || '')).join('\n').slice(0, 6000));
 
       // ═══════════════════════════════════════════════════════════════
       // ROBUST CONTENT GENERATION WITH RETRY & FALLBACK
@@ -1490,7 +1490,7 @@ Apply the user's requested changes to the content. You can:
 4. Rephrase or reorganize content
 5. Change the overall structure if requested
 
-IMPORTANT: Maintain the same JSON structure, just update the content as requested. Preserve section IDs where possible. Update diagram.edges when sections change, removing invalid references. Include the diagram layout and a brief user-facing summary of the updated plan; no hidden reasoning.
+IMPORTANT: Maintain the selected template and section structure, just update content as requested. Preserve section IDs where possible. Do not add a diagram layout; the template renderer controls plotting.
 
 Return ONLY the updated JSON structure (same format as input, but modified):
 {
@@ -1498,7 +1498,6 @@ Return ONLY the updated JSON structure (same format as input, but modified):
   "description": "...",
   "templateType": "${templateType}",
   "sections": [...],
-  "diagram": {"layout":"layered|radial|grid", "summary":"brief updated plan", "edges":[{"from":"section-id", "to":"section-id", "label":"relationship"}]},
   "conclusion": "...",
   "metadata": {...}
 }`;
@@ -1540,7 +1539,8 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
     } else if (action === 'plot-from-content') {
       // Generate canvas objects from prepared content using COLLISION-AWARE SEQUENTIAL PLACEMENT
-      const { preparedContent, templateType, targetPageIndex = 0 } = body;
+      const { preparedContent, targetPageIndex = 0 } = body;
+      const templateType = resolveWhiteboardTemplate(body.templateType || preparedContent?.templateType);
 
       if (!preparedContent) {
         return NextResponse.json({ error: 'Prepared content required' }, { status: 400 });
@@ -3783,15 +3783,8 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       // EXECUTE LAYOUT GENERATOR WITH ERROR HANDLING
       // ═══════════════════════════════════════════════════════════════
       try {
-        if (preparedContent.diagram) {
-          const plan = plotWhiteboardPlan(normalizePreparedWhiteboardContent(preparedContent), baseX, baseY, generateId);
-          contentElements.push(...plan.objects);
-          Object.assign(sectionMapping, plan.sectionMapping);
-        } else {
-          // Legacy saved generations retain their original layout.
-          const generator = layoutGenerators[templateType] || layoutGenerators.mindmap;
-          generator();
-        }
+        // Template choice is authoritative, including previously saved generic plans.
+        layoutGenerators[templateType]();
       } catch (layoutError) {
         console.error('[MIRA] Layout generation failed:', layoutError);
 

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import MiraSphere from '@/components/ui/MiraPet';
 import AIActivityBeam from '@/components/ui/AIActivityBeam';
 import { requestWhiteboardAI } from '@/lib/whiteboardAIClient';
+import { resolveWhiteboardTemplate } from '@/lib/whiteboardTemplates';
 
 // Quirky loading messages for different phases
 const LOADING_PHASES = {
@@ -36,12 +37,6 @@ const LOADING_PHASES = {
 
 // Template icons and colors
 const TEMPLATE_CONFIG = {
-  adaptive: {
-    icon: <span className="text-xl" aria-hidden="true">✧</span>,
-    gradient: 'from-slate-500 to-indigo-600', lightGradient: 'from-slate-50 to-indigo-100',
-    border: 'border-gray-200', text: 'text-gray-700', label: 'Let MIRA plan',
-    description: 'A layout and structure tailored to your goal', prompt: 'What would you like to understand, plan or build?',
-  },
   mindmap: {
     icon: (
       <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -403,7 +398,7 @@ export default function MiraAgentSidebar({
       // If we have existing content from the database, restore it
       if (existingContent && !hasInitializedRef.current) {
         setPreparedContent(existingContent);
-        setSelectedTemplate(existingContent.templateType || 'mindmap');
+        setSelectedTemplate(resolveWhiteboardTemplate(existingContent.templateType));
         setUserInput(existingContent.userPrompt || '');
         setStep('preview');
         hasInitializedRef.current = true;
@@ -424,7 +419,7 @@ export default function MiraAgentSidebar({
       const initialPrompt = typeof window !== 'undefined' ? window.__miraSidebarInitialPrompt : null;
       
       if (preSelectedTemplate && TEMPLATE_CONFIG[preSelectedTemplate]) {
-        setSelectedTemplate(preSelectedTemplate);
+        setSelectedTemplate(resolveWhiteboardTemplate(preSelectedTemplate));
         setStep('input');
         if (initialPrompt) {
           setUserInput(initialPrompt);
@@ -470,7 +465,7 @@ export default function MiraAgentSidebar({
 
   // Handle template selection
   const handleTemplateSelect = (templateKey) => {
-    setSelectedTemplate(templateKey);
+    setSelectedTemplate(resolveWhiteboardTemplate(templateKey));
     setStep('input');
   };
 
@@ -857,7 +852,7 @@ export default function MiraAgentSidebar({
                               userPrompt: gen.userPrompt,
                               isPlotted: gen.isPlotted,
                             });
-                            setSelectedTemplate(gen.templateType);
+                            setSelectedTemplate(resolveWhiteboardTemplate(gen.templateType));
                             setUserInput(gen.userPrompt || '');
                             setStep('preview');
                           }}
@@ -1023,7 +1018,6 @@ export default function MiraAgentSidebar({
               </div>
 
               {/* Content sections */}
-              {preparedContent.diagram?.summary && <div className="rounded-xl border border-gray-200 p-3 text-sm text-gray-600"><strong className="block mb-1">Board plan</strong>{preparedContent.diagram.summary}</div>}
               <div className="space-y-3">
                 {preparedContent.sections?.map((section, index) => (
                   <ContentSection
@@ -1124,7 +1118,7 @@ export default function MiraAgentSidebar({
                             userPrompt: gen.userPrompt,
                             isPlotted: gen.isPlotted,
                           });
-                          setSelectedTemplate(gen.templateType);
+                          setSelectedTemplate(resolveWhiteboardTemplate(gen.templateType));
                           setUserInput(gen.userPrompt || '');
                           setStep('preview');
                         }}

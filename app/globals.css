@@ -4,6 +4,25 @@
 
 html[data-desktop-platform="darwin"] { --desktop-safe-top: 52px; }
 html[data-desktop-platform="win32"] { --desktop-safe-top: 44px; }
+/* The portaled board editor sits above the dashboard's title-bar safe area. */
+html[data-desktop-platform="darwin"] .talioboard-window-header {
+  padding-left: 112px;
+  min-height: 56px;
+}
+html[data-desktop-platform="win32"] .talioboard-window-header {
+  padding-right: 144px;
+  min-height: 56px;
+}
+html[data-desktop-platform] .talioboard-window-header {
+  -webkit-app-region: drag;
+}
+html[data-desktop-platform] .talioboard-window-header button,
+html[data-desktop-platform] .talioboard-window-header button * {
+  -webkit-app-region: no-drag;
+}
+html[data-desktop-platform] .talioboard-window-error {
+  padding-top: calc(var(--desktop-safe-top, 0px) + 24px);
+}
 :root { --mira-panel-top: max(73px, calc(var(--desktop-safe-top, 0px) + 12px)); }
 .mira-header-pill {
   min-height: 40px;

@@ -286,7 +286,7 @@ export default function WhiteboardEditorPage() {
   if (loading) {
     return editorPortal(
       <div className="fixed inset-0 z-[80] h-[100dvh] flex flex-col bg-gray-50 whiteboard-light-override">
-        <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
+        <div className="talioboard-window-header flex shrink-0 items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
           <button onClick={handleClose} className="p-2 text-gray-700" aria-label="Back to boards"><FiArrowLeft size={20} /></button>
           <span role="status" className="text-gray-700">Opening board…</span>
         </div>
@@ -295,7 +295,7 @@ export default function WhiteboardEditorPage() {
   }
 
   if (error && !board) {
-    return editorPortal(<div className="fixed inset-0 z-[80] bg-gray-50 whiteboard-light-override p-6">
+    return editorPortal(<div className="talioboard-window-error fixed inset-0 z-[80] bg-gray-50 whiteboard-light-override p-6">
       <button onClick={handleClose} className="p-2 text-gray-700">Back to boards</button>
       <DataErrorState message={error} onRetry={() => refreshBoard()} />
     </div>);
@@ -318,7 +318,7 @@ export default function WhiteboardEditorPage() {
       </ModalPortal>
 
       {/* Header - FigJam style */}
-      <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
+      <div className="talioboard-window-header flex shrink-0 items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
         <button
           onClick={handleClose}
           className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
@@ -331,7 +331,7 @@ export default function WhiteboardEditorPage() {
 
         <button
           onClick={() => permission === 'owner' && setShowRenameModal(true)}
-          className={`text-lg font-semibold text-gray-900 ${permission === 'owner' ? 'hover:text-violet-600 cursor-pointer' : ''}`}
+          className={`min-w-0 truncate text-lg font-semibold text-gray-900 ${permission === 'owner' ? 'hover:text-violet-600 cursor-pointer' : ''}`}
         >
           {board.title}
         </button>

@@ -2,6 +2,10 @@ import AppKit
 import ApplicationServices
 
 func output(_ value: [String: Any]) { let data = try! JSONSerialization.data(withJSONObject: value); print(String(data: data, encoding: .utf8)!) }
+// Some installed apps prefix their display names with invisible bidi marks.
+func appKey(_ name: String) -> String {
+    String(name.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) && ![0x200B, 0x200E, 0x200F, 0xFEFF].contains(Int($0.value)) }).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+}
 guard CommandLine.arguments.count == 2, let data = CommandLine.arguments[1].data(using: .utf8), let action = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let type = action["type"] as? String else { output(["success": false]); exit(1) }
 let front = NSWorkspace.shared.frontmostApplication
 if type == "status" { let point = CGEvent(source:nil)?.location ?? .zero; output(["success": true, "accessibility": AXIsProcessTrusted(), "app": front?.localizedName ?? "Unknown", "pid": front?.processIdentifier ?? 0,"x":point.x,"y":point.y]); exit(0) }
@@ -24,10 +28,38 @@ case "click":
     for kind in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] { CGEvent(mouseEventSource: nil, mouseType: kind, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap); usleep(50000) }
 case "type":
     guard let text = action["text"] as? String, text.count <= 2000 else { exit(1) }
-    let chars = Array(text.utf16)
-    for offset in stride(from: 0, to: chars.count, by: 20) {
-        let chunk = Array(chars[offset..<min(offset + 20, chars.count)])
-        for down in [true, false] { let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down); event?.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: chunk); event?.post(tap: .cghidEventTap) }
+    // Catalyst apps (including WhatsApp) can ignore synthetic Unicode key
+    // payloads. Paste into the verified focused field, preserving all clipboard
+    // formats and never overwriting a concurrent user clipboard change.
+    if appKey(front?.localizedName ?? "") != "whatsapp" {
+        let chars = Array(text.utf16)
+        for offset in stride(from: 0, to: chars.count, by: 20) {
+            let chunk = Array(chars[offset..<min(offset + 20, chars.count)])
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down)
+                event?.flags = []
+                event?.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: chunk)
+                event?.post(tap: .cghidEventTap)
+            }
+        }
+        usleep(50000)
+        output(["success":true,"message":"Input delivered; verify the updated screen."])
+        exit(0)
+    }
+    let board = NSPasteboard.general
+    let previous = (board.pasteboardItems ?? []).map { item -> NSPasteboardItem in
+        let copy = NSPasteboardItem()
+        for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
+        return copy
+    }
+    board.clearContents()
+    board.setString(text, forType: .string)
+    let ownedChange = board.changeCount
+    key(9, .maskCommand)
+    usleep(300000)
+    if board.changeCount == ownedChange {
+        board.clearContents()
+        if !previous.isEmpty { board.writeObjects(previous) }
     }
 case "key":
     let keys: [String: CGKeyCode] = ["enter":36,"tab":48,"escape":53,"backspace":51,"up":126,"down":125,"left":123,"right":124,"select_all":0,"copy":8,"paste":9,"find":3]
@@ -39,7 +71,7 @@ case "scroll":
 case "lock": key(12, [.maskCommand, .maskControl])
 case "open_app":
     guard let name = action["name"] as? String else { exit(1) }
-    if let running = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName?.caseInsensitiveCompare(name) == .orderedSame && $0.activationPolicy == .regular }) {
+    if let running = NSWorkspace.shared.runningApplications.first(where: { appKey($0.localizedName ?? "") == appKey(name) && $0.activationPolicy == .regular }) {
         running.unhide()
         let activated = running.activate(options: [.activateAllWindows])
         output(["success": activated, "message": activated ? "Existing application brought to front; verify the screen." : "Application could not be focused."])

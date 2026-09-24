@@ -120,6 +120,9 @@ describe('managed meeting implementation', () => {
     expect(source).toContain('min-h-[5.25rem]')
     expect(source).toContain('flex-col overflow-hidden rounded-3xl')
     expect(source).toContain('min-h-20 shrink-0')
+    expect(source).toContain('shrink-0 flex-wrap items-center justify-center')
+    expect(source).toContain("left: 'auto', right: 24")
+    expect(source).toContain('min-h-0 flex-1 gap-3 overflow-auto')
     expect(source).not.toContain("isCompact ? 'absolute bottom-2 right-2")
   })
 

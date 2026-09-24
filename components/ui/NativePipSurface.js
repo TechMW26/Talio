@@ -87,6 +87,9 @@ async function getPipWindow(size) {
       [data-meeting-pip]{color:#f4f4f5!important;background:#18181b!important}
       [data-meeting-pip] main,[data-meeting-pip] header,[data-meeting-pip] footer{background:#18181b!important;color:inherit}
       [data-meeting-pip] button{flex-shrink:0}
+      [data-meeting-pip] footer{display:flex;flex-wrap:wrap;overflow:visible;gap:8px;padding:12px;box-sizing:border-box}
+      [data-meeting-pip] main{min-height:120px;overflow:auto}
+      [data-meeting-pip] [data-participant-tile="grid"]{min-height:120px}
       ${desktop ? '[data-native-pip-surface]{user-select:none;-webkit-app-region:no-drag;app-region:no-drag}input,textarea{user-select:text}' : ''}
       [data-meeting-pip] button svg{width:20px!important;height:20px!important;min-width:20px;flex-shrink:0}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}

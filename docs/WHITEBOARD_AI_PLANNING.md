@@ -1,4 +1,8 @@
-# Context-aware board planning
+# Template-based board plotting
+
+Restored September 25: choose Mindmap, Flowchart, Event Circuit, Planning or Ideas, generate/edit sections, then explicitly plot with the corresponding original template renderer. Generic `diagram` metadata no longer overrides template selection. Saved adaptive generations map to Mindmap when reopened or replotted; existing canvas objects are not migrated or deleted. Atomic saves, conflict checks and generation-scoped replacement remain intact.
+
+The following describes the superseded adaptive planner retained in the repository for compatibility/testing, not the active generation/plotting flow.
 
 AI Search and both Talio Board AI panels use a shared floating glass treatment. `AIActivityBeam` lazily loads Libraries.dev `border-beam`, runs only for active requests, respects reduced motion, and never reparents the form. Search aborts stale requests to prevent old results overwriting new queries.
 
