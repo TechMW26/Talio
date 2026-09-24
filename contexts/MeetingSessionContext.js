@@ -185,7 +185,7 @@ export function MeetingSessionProvider({ children }) {
   }, [router])
 
   const restoreMeeting = useCallback(() => {
-    nativePipRef.current?.restore()
+    nativePipRef.current?.restore({ focus: true })
     if (activeRoomId) {
       router.push(`/dashboard/meetings/room/${activeRoomId}`)
     }

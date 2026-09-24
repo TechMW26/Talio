@@ -99,8 +99,12 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
   enabledRef.current = enabled
   const [error, setError] = useState('')
 
-  function restore() {
+  function restore({ focus = false } = {}) {
     const target = targetRef.current
+    if (focus && target) {
+      if (window.electronAPI?.activateMira) window.electronAPI.activateMira().catch(() => {})
+      else window.focus()
+    }
     cleanupRef.current?.()
     cleanupRef.current = null
     targetRef.current = null

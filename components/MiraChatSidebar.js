@@ -485,6 +485,10 @@ export default function MiraChatSidebar() {
   const popOutMira = () => {
     setViewMode('pip')
   }
+  const restoreMira = () => {
+    nativePipRef.current?.restore({ focus: true })
+    setViewMode('chat')
+  }
   const toggleMicrophone = () => voice.active ? voice.stop() : voice.start()
   const [slashResults, setSlashResults] = useState([])
   const [slashIdx, setSlashIdx] = useState(0)
@@ -665,9 +669,9 @@ export default function MiraChatSidebar() {
         }}
       >
         {isOpen && (isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={16} />}
-        {pip && <div className="p-3 text-foreground relative cursor-pointer" onClick={() => setViewMode('chat')}>
+        {pip && <div className="p-3 text-foreground relative cursor-pointer" onClick={restoreMira}>
           <button aria-label="Dismiss MIRA" onClick={event => { event.stopPropagation(); closeChat() }} className="absolute right-2 top-2 z-10 p-2 rounded-full hover:bg-default-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><FaTimes className="w-4 h-4" /></button>
-          <button aria-label="Restore MIRA chat" onClick={() => setViewMode('chat')} className="w-full flex items-center gap-3 pr-10 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+          <button aria-label="Restore MIRA chat" className="w-full flex items-center gap-3 pr-10 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
             <MiraSphere size={28} isThinking={isThinking} />
             <span className="flex-1 text-xs font-medium">MIRA · {isThinking ? 'Thinking' : voice.state === 'speaking' ? 'Speaking' : voice.active ? 'Listening' : 'Ready'}</span>
           </button>
