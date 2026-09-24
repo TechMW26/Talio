@@ -197,7 +197,7 @@ async function main() {
     path: `/repos/${OWNER}/${REPO}/releases/${release.data.id}`,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' }
-  }, JSON.stringify({ draft: false, make_latest: 'true' }));
+  }, JSON.stringify({ tag_name: TAG, draft: false, make_latest: 'true' }));
   if (published.status !== 200) throw new Error('Assets uploaded, but publishing failed: ' + published.status);
 
   console.log('\nDone! Release URL:', release.data.html_url);
