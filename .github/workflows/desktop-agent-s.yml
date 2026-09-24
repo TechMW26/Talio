@@ -1,0 +1,71 @@
+name: Desktop local Agent S builds
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            platform: darwin
+            arch: arm64
+            target: mac
+          - runner: macos-15-intel
+            platform: darwin
+            arch: x64
+            target: mac
+          - runner: windows-2022
+            platform: win32
+            arch: x64
+            target: win
+          - runner: ubuntu-22.04
+            platform: linux
+            arch: x64
+            target: linux
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux runtime utilities
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfuse2 xclip x11-utils wmctrl xvfb
+      - run: npm ci
+        working-directory: desktop-app
+      - name: Build local planner runtime
+        if: runner.os != 'Linux'
+        run: npm run build:agent-s
+        working-directory: desktop-app
+      - name: Build local planner runtime (X11)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run build:agent-s
+        working-directory: desktop-app
+      - name: Package desktop (no automatic publication)
+        run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }} --publish never
+        working-directory: desktop-app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Archive native runtime preserving executable permissions
+        run: tar -czf agent-s-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz -C desktop-app/build agent-s-${{ matrix.platform }}-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-s-${{ matrix.platform }}-${{ matrix.arch }}
+          path: agent-s-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            desktop-app/dist/*.dmg
+            desktop-app/dist/*.zip
+            desktop-app/dist/*.exe
+            desktop-app/dist/*.AppImage
+            desktop-app/dist/*.deb
+          if-no-files-found: error

@@ -1,0 +1,10 @@
+numpy==2.2.6
+Pillow==11.3.0
+pytesseract==0.3.13
+backoff==2.2.1
+openai==1.109.1
+anthropic==0.69.0
+pyinstaller==6.16.0
+PyAutoGUI==0.9.54
+pyperclip==1.11.0
+psutil==7.1.0

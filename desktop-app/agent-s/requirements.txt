@@ -1,0 +1,3 @@
+# Agent S3 is pinned to a reviewed immutable source revision. Install --no-deps
+# for this package: older Agent S generations pull unused OCR/training runtimes.
+gui-agents @ git+https://github.com/simular-ai/Agent-S.git@3aa272d23d2994c7bbde1acbbe0ef8e8d06b8693

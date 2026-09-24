@@ -7,11 +7,11 @@ function trustedMiraSender(event, window, origin) {
 
 function createMiraPermissions({ systemPreferences, shell, platform, store, dialog }) {
   function status() {
-    if (platform !== 'darwin') return { platform, microphone: 'runtime', camera: 'runtime', screenRecording: 'runtime', accessibility: 'runtime' };
+    if (platform !== 'darwin') return { platform, desktopControl: store?.get('miraDesktopConsentV1') === true ? 'granted' : 'denied', microphone: 'runtime', camera: 'runtime', screenRecording: 'runtime', accessibility: 'runtime' };
     return { platform, desktopControl: store?.get('miraDesktopConsentV1') === true ? 'granted' : 'denied', microphone: systemPreferences.getMediaAccessStatus('microphone'), camera: systemPreferences.getMediaAccessStatus('camera'), screenRecording: systemPreferences.getMediaAccessStatus('screen'), accessibility: systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'denied' };
   }
   async function request(kind) {
-    if (kind === 'desktopControl' && platform === 'darwin' && dialog && store) {
+    if (kind === 'desktopControl' && dialog && store) {
       const consent = await dialog.showMessageBox({ type: 'question', title: 'Enable MIRA desktop control', message: 'Allow MIRA to carry out your desktop commands?', detail: 'For desktop tasks you request, MIRA can share screen captures with its vision provider and use your mouse and keyboard. This permission is remembered on this device. Keep sensitive information out of view. Press Command+Shift+Escape to stop. You can revoke this permission in the Talio setup checklist.', buttons: ['Not now', 'Enable desktop control'], defaultId: 0, cancelId: 0, noLink: true });
       if (consent.response === 1) store.set('miraDesktopConsentV1', true);
       return { success: true, permissions: status() };

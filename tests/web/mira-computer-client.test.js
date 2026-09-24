@@ -1,5 +1,20 @@
 import { executeMiraComputerTask } from '@/lib/miraComputerClient'
 afterEach(() => { delete window.electronAPI })
+test('local Agent S exchanges model messages without sending the task to the legacy planner', async () => {
+  const calls = []
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    calls.push(input.operation)
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+    if (input.operation === 'observe') return { success: true, observationId: 'o' }
+    if (input.operation === 'plan') return { success: true, kind: 'model_request', messages: [{ role: 'user', content: [] }] }
+    if (input.operation === 'model_response') return { success: true, kind: 'result', done: true, message: 'WhatsApp is open.' }
+    return { success: true }
+  }) }
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, text: 'agent.done("WhatsApp is open.")' }) }))
+  expect(await executeMiraComputerTask('Open WhatsApp', { token: 't' })).toEqual({ success: true, message: 'WhatsApp is open.' })
+  expect(calls).toEqual(['begin', 'observe', 'plan', 'model_response', 'cancel'])
+  expect(fetch.mock.calls[0][0]).toBe('/api/ai/mira-agent-s')
+})
 test('does not claim desktop capability in browsers', async () => {
   expect((await executeMiraComputerTask('Open Notes', { token: 't' })).success).toBe(false)
 })

@@ -11,6 +11,7 @@
     "start": "electron .",
     "dev": "cross-env NODE_ENV=development electron .",
     "build": "npm run build:mac && npm run build:win",
+    "build:agent-s": "node scripts/build-agent-s.js",
     "build:mac": "electron-builder --mac --x64 --arm64",
     "build:mac-intel": "electron-builder --mac --x64",
     "build:mac-arm": "electron-builder --mac --arm64",
@@ -58,6 +59,7 @@
     "beforePack": "scripts/build-mira-control.js",
     "mac": {
       "extraResources": [
+        { "from": "build/agent-s-darwin-${arch}", "to": "agent-s" },
         {
           "from": "build/mira-control-${arch}",
           "to": "mira-control"
@@ -95,6 +97,7 @@
     },
     "afterSign": "scripts/notarize.js",
     "win": {
+      "extraResources": [{ "from": "build/agent-s-win32-${arch}", "to": "agent-s" }],
       "target": [
         {
           "target": "nsis",
@@ -133,6 +136,7 @@
       "artifactName": "${productName}.Setup.${version}.${ext}"
     },
     "linux": {
+      "extraResources": [{ "from": "build/agent-s-linux-${arch}", "to": "agent-s" }],
       "target": [
         {
           "target": "deb",
@@ -161,7 +165,10 @@
         "libnotify4",
         "libappindicator3-1",
         "libsecret-1-0",
-        "libxss1"
+        "libxss1",
+        "xclip",
+        "x11-utils",
+        "wmctrl"
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },

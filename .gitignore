@@ -94,3 +94,6 @@ uploads/aadhaar/
 .next-dev-next/
 desktop-app/build/mira-control-*
 desktop-app/dist-*/
+desktop-app/build/agent-s-*/
+desktop-app/build/mira-agent-s.spec
+desktop-app/agent-s/__pycache__/

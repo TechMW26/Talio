@@ -18,27 +18,36 @@ function validateComputerAction(value) {
   return null;
 }
 
-function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform, resourcesPath, packaged, runControl }) {
+function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform, resourcesPath, packaged, runControl, agentS, isLocked = () => false }) {
   let session = null;
   let expiryTimer = null;
   const helper = packaged ? path.join(resourcesPath, 'mira-control') : path.join(__dirname, '..', 'build', `mira-control-${process.arch}`);
   async function control(action) {
     if (runControl) return runControl(action);
-    if (platform !== 'darwin') throw new Error('Computer controls are not available on this platform yet.');
+    if (platform !== 'darwin') {
+      const runtime = path.join(packaged ? resourcesPath : path.join(__dirname, '..', 'build', `agent-s-${platform}-${process.arch}`), ...(packaged ? ['agent-s'] : []), platform === 'win32' ? 'mira-agent-s.exe' : 'mira-agent-s');
+      return new Promise((resolve, reject) => {
+        const child = execFile(runtime, ['--control'], { timeout: 12000, maxBuffer: 100000, windowsHide: true }, (error, stdout) => {
+          if (error) return reject(error);
+          try { resolve(JSON.parse(stdout)); } catch (parseError) { reject(parseError); }
+        });
+        child.stdin.end(JSON.stringify(action) + '\n');
+      });
+    }
     const result = await run(helper, [JSON.stringify(action)], { timeout: 10000, maxBuffer: 100000 });
     return JSON.parse(result.stdout);
   }
-  function cancel() { clearTimeout(expiryTimer); session = null; pointer?.hide(); globalShortcut.unregister('CommandOrControl+Shift+Escape'); }
+  function cancel() { clearTimeout(expiryTimer); session = null; agentS?.stop(); pointer?.hide(); globalShortcut.unregister('CommandOrControl+Shift+Escape'); }
   return async function handle(event, window, origin, input) {
     if (!trustedMiraSender(event, window, origin)) return { success: false, message: 'Desktop controls require the Talio application.' };
     if (input?.operation === 'cancel') { cancel(); return { success: true }; }
     try {
+      if (isLocked()) { cancel(); return { success: false, message: 'Unlock your laptop before using desktop controls.' }; }
       if (input?.operation === 'begin') {
         if (session) return { success: false, message: 'Another desktop task is already running.' };
-        if (platform !== 'darwin') return { success: false, message: 'Desktop computer control is currently available on macOS only.' };
-        if (platform === process.platform && Number(require('os').release().split('.')[0]) < 23) return { success: false, message: 'Computer controls require macOS 14 or newer. Other Talio features remain available.' };
+        if (platform === 'darwin' && platform === process.platform && Number(require('os').release().split('.')[0]) < 23) return { success: false, message: 'Computer controls require macOS 14 or newer. Other Talio features remain available.' };
         if (typeof input.goal !== 'string' || !input.goal.trim() || input.goal.length > 3000) return { success: false };
-        if (!systemPreferences.isTrustedAccessibilityClient(false) || systemPreferences.getMediaAccessStatus('screen') !== 'granted') return { success: false, message: 'Enable Accessibility and Screen Recording in the Talio permission checklist first.' };
+        if (platform === 'darwin' && (!systemPreferences.isTrustedAccessibilityClient(false) || systemPreferences.getMediaAccessStatus('screen') !== 'granted')) return { success: false, message: 'Enable Accessibility and Screen Recording in the Talio permission checklist first.' };
         const probe = await control({ type: 'status' });
         if (!probe.success) return probe;
         if (probe.accessibility === false) return { success: false, message: 'Allow Talio desktop controls in Accessibility settings, then restart Talio.' };
@@ -48,7 +57,10 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         pointer?.show();
         expiryTimer = setTimeout(cancel, 300000);
         expiryTimer.unref?.();
-        return { success: true, sessionId: session.id };
+        const started = session;
+        if (agentS) await agentS.begin(input.goal);
+        if (session !== started || isLocked()) throw new Error('Desktop task stopped.');
+        return { success: true, sessionId: session.id, planner: agentS ? 'agent-s-local' : 'legacy' };
       }
       const active = session;
       if (store?.get('miraDesktopConsentV1') !== true) { cancel(); return { success: false, message: 'Desktop control permission was revoked.' }; }
@@ -59,21 +71,38 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         const source = sources.find(item => String(item.display_id) === String(display.id));
         if (!source || source.thumbnail.isEmpty()) throw new Error('Screen capture is unavailable. Check Screen Recording permission.');
         const foreground = await control({ type: 'status' });
+        if (!foreground.success) throw new Error(foreground.message || 'Foreground application unavailable.');
         if (session !== active) throw new Error('Desktop task stopped.');
-        active.observation = { id: randomUUID(), time: Date.now(), bounds: display.bounds, pid: foreground.pid };
+        active.observation = { id: randomUUID(), time: Date.now(), bounds: display.bounds, pid: foreground.pid, image: source.thumbnail.toJPEG(75).toString('base64'), app: foreground.app };
         return { success: true, observationId: active.observation.id, image: source.thumbnail.toJPEG(75).toString('base64'), app: foreground.app };
+      }
+      if (input.operation === 'plan' || input.operation === 'model_response') {
+        if (!agentS || !active.observation || active.observation.id !== input.observationId) throw new Error('Observe the desktop before planning.');
+        if (input.operation === 'plan' && active.planning) throw new Error('A plan is already in progress.');
+        if (input.operation === 'model_response' && (!active.awaitingModel || typeof input.text !== 'string' || input.text.length > 16000)) throw new Error('Unexpected model response.');
+        active.planning = true; active.awaitingModel = false;
+        const result = input.operation === 'plan'
+          ? await agentS.predict({ image: active.observation.image, app: active.observation.app })
+          : await agentS.respond(input.text);
+        if (session !== active || isLocked()) throw new Error('Desktop task stopped.');
+        active.awaitingModel = result.kind === 'model_request';
+        active.planning = active.awaitingModel;
+        // Planning can take longer than the input freshness window. Never refresh
+        // the observation timestamp: stale actions must be rejected, not replayed.
+        return { success: true, ...result };
       }
       const action = validateComputerAction(input.action);
       const observation = active.observation;
       if (!action || !observation || observation.id !== input.observationId || Date.now() - observation.time > 45000 || active.steps >= 24) throw new Error('The screen changed or this task reached its step limit. Please try again.');
       const foreground = await control({ type: 'status' });
-      if (session !== active || foreground.pid !== observation.pid) throw new Error('The active application changed. Desktop task paused to avoid acting in the wrong window.');
+      if (!foreground.success || isLocked() || session !== active || foreground.pid !== observation.pid) throw new Error('The active application changed. Desktop task paused to avoid acting in the wrong window.');
       if (/terminal|iterm|powershell|command prompt|system settings|keychain|passwords/i.test(foreground.app || '') && action.type !== 'open_app') throw new Error('This application requires manual control. Desktop task stopped.');
       active.observation = null;
       active.steps++;
       if (action.type === 'click') {
         action.x = observation.bounds.x + Math.round(action.x * (observation.bounds.width - 1));
         action.y = observation.bounds.y + Math.round(action.y * (observation.bounds.height - 1));
+        if (platform === 'win32' && screen.dipToScreenPoint) Object.assign(action, screen.dipToScreenPoint({ x: action.x, y: action.y }));
       }
       const outcome = await control(action);
       if (action.type === 'open_app' && outcome.notInstalled) {

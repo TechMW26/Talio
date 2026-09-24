@@ -8,6 +8,9 @@ func appKey(_ name: String) -> String {
 }
 guard CommandLine.arguments.count == 2, let data = CommandLine.arguments[1].data(using: .utf8), let action = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let type = action["type"] as? String else { output(["success": false]); exit(1) }
 let front = NSWorkspace.shared.frontmostApplication
+if let session = CGSessionCopyCurrentDictionary() as? [String: Any], session["CGSSessionScreenIsLocked"] as? Bool == true {
+    output(["success": false, "message": "Unlock your Mac before using desktop controls."]); exit(0)
+}
 if type == "status" { let point = CGEvent(source:nil)?.location ?? .zero; output(["success": true, "accessibility": AXIsProcessTrusted(), "app": front?.localizedName ?? "Unknown", "pid": front?.processIdentifier ?? 0,"x":point.x,"y":point.y]); exit(0) }
 guard AXIsProcessTrusted() else { output(["success": false, "message": "Enable Accessibility for Talio in System Settings."]); exit(0) }
 func key(_ code: CGKeyCode, _ flags: CGEventFlags = []) {
