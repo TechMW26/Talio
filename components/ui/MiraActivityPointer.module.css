@@ -9,6 +9,7 @@
   overflow: hidden;
 }
 .pointer {
+  background: transparent !important;
   position: fixed;
   left: 0;
   top: 0;
@@ -17,10 +18,11 @@
   transition: transform 320ms cubic-bezier(.22,.8,.3,1), opacity 180ms ease;
 }
 .icon {
+  background: transparent !important;
   display: block;
   max-width: none;
   transform: translate(-12px, -6px);
-  filter: drop-shadow(0 0 2px white) drop-shadow(0 3px 7px #173678aa);
+  filter: none;
 }
 .label {
   position: absolute;

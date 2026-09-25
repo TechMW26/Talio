@@ -22,7 +22,6 @@ export default function DashboardRouteTransition({ children }) {
         {children}
       </div>
 
-      {/* RouteProgressBar indicates navigation without covering usable content. */}
     </div>
   )
 }

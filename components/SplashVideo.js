@@ -56,7 +56,7 @@ export default function SplashVideo({ children }) {
         // Set theme color for mobile
         const metaTheme = document.querySelector('meta[name="theme-color"]');
         if (metaTheme) {
-          metaTheme.setAttribute('content', '#fbfcfc');
+          metaTheme.setAttribute('content', '#09090b');
         }
 
         // Auto-close after 2.5 seconds
@@ -85,7 +85,7 @@ export default function SplashVideo({ children }) {
     // Restore theme color
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
-      metaTheme.setAttribute('content', '#ffffff');
+      metaTheme.setAttribute('content', '#09090b');
     }
   };
 
@@ -103,7 +103,7 @@ export default function SplashVideo({ children }) {
             left: 0,
             width: '100vw',
             height: '100vh',
-            backgroundColor: '#fbfcfc',
+            backgroundColor: '#09090b',
             zIndex: 999999,
             display: 'flex',
             alignItems: 'center',

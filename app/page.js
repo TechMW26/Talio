@@ -114,10 +114,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-white" style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', width: '100%' }}>
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#09090b] text-zinc-100" style={{ backgroundColor: '#09090b', minHeight: '100vh', width: '100%' }}>
       <style jsx global>{`
         html, body {
-          background-color: #FFFFFF !important;
+          background-color: #09090b !important;
           margin: 0;
           padding: 0;
           width: 100%;
@@ -126,11 +126,11 @@ export default function Home() {
       `}</style>
       <div className="text-center flex flex-col items-center justify-center">
         <Loader size="lg" />
-        <p className="mt-4 text-gray-600 text-center">Checking session...</p>
+        <p className="mt-4 text-zinc-400 text-center">Checking session...</p>
 
         {showClearOption && (
-          <div className="mt-6 p-4 bg-white rounded-lg shadow-lg max-w-sm mx-auto">
-            <p className="text-sm text-gray-700 mb-3">Taking longer than expected?</p>
+          <div className="mt-6 p-4 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg max-w-sm mx-auto">
+            <p className="text-sm text-zinc-300 mb-3">Taking longer than expected?</p>
             <button
               onClick={clearCacheAndRedirect}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"

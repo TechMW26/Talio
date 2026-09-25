@@ -511,7 +511,7 @@ function createWindow() {
     },
     icon: getAppIcon(),
     show: false,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#09090b',
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     titleBarOverlay: process.platform === 'win32' ? {
@@ -2805,13 +2805,13 @@ function showUpdateRequiredScreen(currentVersion, targetVersion, serverMessage) 
     '<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
     '<style>' +
     '*{margin:0;padding:0;box-sizing:border-box}' +
-    'body{font-family:Raleway,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:linear-gradient(145deg,#FEF2F2 0%,#FFF7ED 50%,#FFFBEB 100%);height:100vh;display:flex;align-items:center;justify-content:center;-webkit-app-region:drag;user-select:none}' +
+    'body{font-family:Raleway,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:#09090b;color:#f4f4f5;color-scheme:dark;height:100vh;display:flex;align-items:center;justify-content:center;-webkit-app-region:drag;user-select:none}' +
     '.c{text-align:center;max-width:440px;padding:40px;animation:fadeIn .5s ease-out}' +
     '@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}' +
     '.shield{width:80px;height:80px;margin:0 auto 28px;background:linear-gradient(135deg,#FEE2E2,#FECACA);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;animation:pulse 2s ease-in-out infinite}' +
     '@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}' +
-    'h1{font-size:24px;font-weight:700;color:#991B1B;margin-bottom:10px}' +
-    'p{font-size:14px;color:#78716C;line-height:1.6;margin-bottom:24px}' +
+    'h1{font-size:24px;font-weight:700;color:#fca5a5;margin-bottom:10px}' +
+    'p{font-size:14px;color:#a1a1aa;line-height:1.6;margin-bottom:24px}' +
     '.vr{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:28px}' +
     '.vb{padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600}' +
     '.vo{background:#FEE2E2;color:#DC2626;text-decoration:line-through}' +

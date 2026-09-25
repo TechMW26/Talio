@@ -17,7 +17,6 @@ import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { PageTransitionProvider } from '@/contexts/PageTransitionContext'
 import { TicTacToeProvider } from '@/contexts/TicTacToeContext'
-import RouteProgressBar from '@/components/ui/RouteProgressBar'
 import DashboardRouteTransition from '@/components/ui/DashboardRouteTransition'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
 import toast from '@/utils/toast'
@@ -410,7 +409,6 @@ export default function DashboardLayout({ children }) {
                     <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
 
                     {/* Route progress bar - slim top bar during navigation */}
-                    <RouteProgressBar />
 
                     {/* Main Layout Container - Flex Row */}
                     <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>

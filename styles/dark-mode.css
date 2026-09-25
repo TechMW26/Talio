@@ -4,6 +4,12 @@
    ============================================ */
 
 /* Global ring-offset fix - default offset color is white, override to dark bg */
+/* Full-page states must use the page canvas, not the legacy light/card fill. */
+html.dark body .min-h-screen:not(.whiteboard-light-override) {
+  background-color: #09090b !important;
+  background-image: none !important;
+}
+
 html.dark * {
   --tw-ring-offset-color: #09090b;
 }
