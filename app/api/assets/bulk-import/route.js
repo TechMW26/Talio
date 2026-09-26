@@ -3,7 +3,6 @@ import { requirePermission } from '@/lib/permissions'
 import { notifyAssetAssignment, assetNotificationRecipients } from '@/lib/assetNotifications.server'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
 import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
-import { generateContent } from '@/lib/gemini'
 import { ASSET_TRACKER_FIELDS, ASSET_STATUSES, normalizeAssetStatus, normalizeAssetInput } from '@/utils/assetData'
 import { assetHistoryEvent, prepareAssetTransition } from '@/lib/assetHistory'
 
@@ -134,58 +133,6 @@ function normalizeCondition(value) {
   return 'good'
 }
 
-/**
- * AI-powered column mapping
- */
-async function aiMapColumns(headers, sampleRows) {
-  try {
-    const columnSamples = headers.map((header, idx) => {
-      const samples = sampleRows.slice(0, 5).map(row => row[idx]).filter(v => v !== undefined && v !== null && v !== '').slice(0, 4)
-      return { index: idx, header: header || `Column ${idx + 1}`, samples: samples.map(s => String(s).substring(0, 80)) }
-    })
-
-    const targetFieldsList = ASSET_FIELDS.map(f => `- ${f.key}: ${f.description}`).join('\n')
-
-    const prompt = `Analyze this Excel asset/inventory data and map columns to our system fields.
-
-COLUMNS IN UPLOADED FILE:
-${columnSamples.map(c => `[${c.index}] Header: "${c.header}" | Samples: [${c.samples.map(s => `"${s}"`).join(', ')}]`).join('\n')}
-
-MAP TO THESE FIELDS (use "null" for columns that don't match any field):
-${targetFieldsList}
-
-RULES:
-1. Asset Code/ID/Number → "assetCode"
-2. Name/Title/Asset Name → "name"
-3. Category/Type matching laptop/desktop/mobile etc → "category"
-4. Serial Number/S.N → "serialNumber"
-5. Brand/Manufacturer/Make → "manufacturer"
-6. Model/Model Number → "model"
-7. Columns with email addresses for assignment → "assignedToEmail"
-8. Columns with employee codes for assignment → "assignedToCode"
-9. Price/Cost/Amount → "purchasePrice"
-10. Purchase Date → "purchaseDate"
-11. Warranty expiry/end date → "warrantyExpiry"
-12. Status → "status"
-13. Condition → "condition"
-14. Location/Office/Branch → "location"
-15. UIN/Unique ID → "uin"
-16. Description/Notes → "description"
-17. Specs/Configuration → "specs"
-18. IGNORE: S.No, serial columns that are just row numbers
-
-Return ONLY a JSON object mapping column index (string) to field name or "null":
-JSON only:`
-
-    const response = await generateContent(prompt, 'Return only valid JSON, no markdown.', { useCase: 'json' })
-    let jsonStr = response.trim().replace(/```json\s*/gi, '').replace(/```\s*/gi, '')
-    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/)
-    if (jsonMatch) return JSON.parse(jsonMatch[0])
-  } catch (error) {
-    console.error('[Asset AI Mapping Error]:', error.message)
-  }
-  return null
-}
 
 // POST - Bulk import assets
 export async function POST(request) {
@@ -201,13 +148,19 @@ export async function POST(request) {
     const mappingJson = formData.get('mapping')
     const mode = formData.get('mode') || 'import' // 'preview' or 'import'
 
+    if (!['preview', 'import'].includes(mode)) return NextResponse.json({ success: false, message: 'Invalid import mode' }, { status: 400 })
+
     if (!file) {
       return NextResponse.json({ success: false, message: 'No file uploaded' }, { status: 400 })
     }
+    if (typeof file.arrayBuffer !== 'function' || !/\.xlsx$/i.test(file.name || '')) return NextResponse.json({ success: false, message: 'Upload an .xlsx workbook. Save older .xls files as .xlsx first.' }, { status: 400 })
+    if (file.size > 4 * 1024 * 1024) return NextResponse.json({ success: false, message: 'Maximum upload size is 4 MB.' }, { status: 400 })
 
     // Read the Excel file
     const buffer = Buffer.from(await file.arrayBuffer())
-    const rawData = await readFirstWorksheetRows(buffer)
+    let rawData
+    try { rawData = await readFirstWorksheetRows(buffer, { maxRows: 1001, maxColumns: 100, maxFileBytes: 4 * 1024 * 1024 }) }
+    catch { return NextResponse.json({ success: false, message: 'Could not read this workbook. Use a valid .xlsx file with at most 1,000 data rows and 100 columns.' }, { status: 400 }) }
 
     if (rawData.length < 2) {
       return NextResponse.json({ success: false, message: 'File has no data rows' }, { status: 400 })
@@ -219,10 +172,15 @@ export async function POST(request) {
     // Get column mapping
     let mapping = null
     if (mappingJson) {
-      mapping = JSON.parse(mappingJson)
+      try { mapping = JSON.parse(mappingJson) } catch { return NextResponse.json({ success: false, message: 'Invalid column mapping' }, { status: 400 }) }
+      if (!mapping || Array.isArray(mapping) || typeof mapping !== 'object') return NextResponse.json({ success: false, message: 'Invalid column mapping' }, { status: 400 })
     } else {
-      // AI-powered auto-mapping
-      mapping = await aiMapColumns(headers, dataRows.slice(0, 5))
+      const normalize = value => String(value).toLowerCase().replace(/[^a-z0-9]/g, '')
+      const aliases = { assetid: 'assetCode', assetnumber: 'assetCode', type: 'category', brand: 'manufacturer', employeecode: 'assignedToCode', employeeemail: 'assignedToEmail', assignedname: 'assignedToName', serialno: 'serialNumber', modelno: 'model', price: 'purchasePrice', cost: 'purchasePrice' }
+      const known = { ...aliases }
+      for (const field of ASSET_FIELDS) { known[normalize(field.key)] = field.key; known[normalize(field.label)] = field.key }
+      for (const [key, label] of ASSET_TRACKER_FIELDS) known[normalize(label)] = key === 'assignedTo' ? 'assignedToName' : key
+      mapping = Object.fromEntries(headers.flatMap((header, index) => known[normalize(header)] ? [[index, known[normalize(header)]]] : []))
     }
 
     if (!mapping) {
@@ -240,6 +198,9 @@ export async function POST(request) {
     }
     const allowed = new Set(ASSET_FIELDS.map(field => field.key))
     mapping = Object.fromEntries(Object.entries(mapping).filter(([index, field]) => /^\d+$/.test(index) && Number(index) < headers.length && allowed.has(field)))
+    if (new Set(Object.values(mapping)).size !== Object.values(mapping).length) return NextResponse.json({ success: false, message: 'Map each asset field to only one column.' }, { status: 400 })
+    const missingFields = ['assetCode', 'name'].filter(key => !Object.values(mapping).includes(key))
+    if (mode === 'import' && missingFields.length) return NextResponse.json({ success: false, message: 'Map Asset Code and Asset Name before importing.' }, { status: 400 })
 
     // Preview mode — return parsed data for user review
     if (mode === 'preview') {
@@ -260,7 +221,9 @@ export async function POST(request) {
         headers,
         totalRows: dataRows.length,
         data: previewRows,
+        samples: dataRows.slice(0, 50),
         fields: ASSET_FIELDS,
+        missingFields,
       })
     }
 
@@ -400,8 +363,10 @@ export async function POST(request) {
 
     // Emit real-time update
     if (results.created > 0) {
-      const recipients = await assetNotificationRecipients(models, {})
-      if (recipients.length) emitAssetUpdate({ action: 'bulk-import', count: results.created }, recipients.map(user => user.id), { broadcast: false })
+      try {
+        const recipients = await assetNotificationRecipients(models, {})
+        if (recipients.length) emitAssetUpdate({ action: 'bulk-import', count: results.created }, recipients.map(user => user.id), { broadcast: false })
+      } catch (error) { console.error('[Asset import] Realtime refresh failed:', error.message) }
     }
     if (assignedAssets.length) after(async () => {
       for (const asset of assignedAssets) {

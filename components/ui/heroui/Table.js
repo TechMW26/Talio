@@ -70,12 +70,14 @@ export function HRMSTable({
   onSortChange,
   className,
   classNames,
+  stickyActions = /^(actions?|operations)$/i.test(String(columns?.at(-1)?.key || '')),
   ...props
 }) {
   // If children are provided, use composable pattern
   if (children) {
     return (
       <HeroTable
+        data-sticky-actions-table={stickyActions || undefined}
         aria-label="Data table"
         className={cn('w-full', className)}
         selectionMode={selectionMode}
@@ -110,6 +112,7 @@ export function HRMSTable({
   // Data-driven pattern
   return (
     <HeroTable
+      data-sticky-actions-table={stickyActions || undefined}
       aria-label="Data table"
       className={cn('w-full', className)}
       selectionMode={selectionMode}

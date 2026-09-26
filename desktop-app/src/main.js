@@ -1524,7 +1524,7 @@ function setupIPCHandlers() {
     livePipWindow.emit('mira-user-moved', { x, y });
     return { success: true };
   });
-  const miraPermissions = createMiraPermissions({ systemPreferences, shell, store, dialog, platform: process.platform });
+  const miraPermissions = createMiraPermissions({ systemPreferences, shell, store, dialog, desktopCapturer, platform: process.platform });
   ipcMain.handle('mira-permissions', (event, kind) => {
     if (!trustedMiraSender(event, mainWindow, APP_ORIGIN)) return { success: false };
     return kind ? miraPermissions.request(kind) : { success: true, permissions: miraPermissions.status() };

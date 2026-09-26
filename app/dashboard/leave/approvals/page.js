@@ -236,7 +236,7 @@ export default function LeaveApprovalsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+<th data-sticky-actions="true" className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>

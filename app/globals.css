@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Action columns stay reachable while wide tables scroll. Opt in by marking
+   the final header, or through HRMSTable's stickyActions prop. Never pin a
+   colspan loading/empty-state row as though it were an action cell. */
+:is(table:has(> thead > tr > th[data-sticky-actions]:last-child), table[data-sticky-actions-table], [data-sticky-actions-table] table) > :is(thead, tbody) > tr > :is(th, td):last-child:not([colspan]) {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background-color: #fff;
+  box-shadow: -1px 0 0 #e5e7eb, -6px 0 10px -8px rgb(0 0 0 / 35%);
+  white-space: nowrap;
+}
+:is(table:has(> thead > tr > th[data-sticky-actions]:last-child), table[data-sticky-actions-table], [data-sticky-actions-table] table) > thead > tr > th:last-child:not([colspan]) {
+  z-index: 3;
+  background-color: #f9fafb;
+}
+:is(table:has(> thead > tr > th[data-sticky-actions]:last-child), table[data-sticky-actions-table], [data-sticky-actions-table] table) > tbody > tr:is(:hover, :focus-within) > td:last-child:not([colspan]) {
+  background-color: #f3f4f6;
+}
+.dark :is(table:has(> thead > tr > th[data-sticky-actions]:last-child), table[data-sticky-actions-table], [data-sticky-actions-table] table) > :is(thead, tbody) > tr > :is(th, td):last-child:not([colspan]) {
+  background-color: #18181b;
+  box-shadow: -1px 0 0 #3f3f46, -6px 0 10px -8px rgb(0 0 0 / 60%);
+}
+.dark :is(table:has(> thead > tr > th[data-sticky-actions]:last-child), table[data-sticky-actions-table], [data-sticky-actions-table] table) > tbody > tr:is(:hover, :focus-within) > td:last-child:not([colspan]) {
+  background-color: #27272a;
+}
+
 html[data-desktop-platform="darwin"] { --desktop-safe-top: 52px; }
 html[data-desktop-platform="win32"] { --desktop-safe-top: 44px; }
 /* The portaled board editor sits above the dashboard's title-bar safe area. */

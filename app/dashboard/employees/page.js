@@ -575,7 +575,7 @@ export default function EmployeesPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Designation</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Level</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Status</th>
-                      <th className="sticky right-0 z-10 bg-content1 px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
+<th data-sticky-actions="true" className="sticky right-0 z-10 bg-content1 px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-content1 divide-y divide-default-200">

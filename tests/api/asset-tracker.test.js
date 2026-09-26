@@ -16,6 +16,57 @@ jest.mock('@/lib/assetNotifications.server', () => ({ notifyAssetAssignment: jes
 jest.mock('@/lib/spreadsheets.server', () => ({ readFirstWorksheetRows: jest.fn() }))
 jest.mock('@/lib/gemini', () => ({ generateContent: jest.fn().mockResolvedValue('{}') }))
 
+test('preview, corrected mapping, import and repeat upload work without AI', async () => {
+  readFirstWorksheetRows.mockResolvedValue([['Identifier', 'Item', 'Bill Number'], ['E2E-1', 'Monitor', 'BILL-1']])
+  const form = new FormData()
+  form.set('file', new Blob(['test workbook']), 'assets.xlsx')
+  form.set('mode', 'preview')
+  const preview = await (await importAssets({ formData: async () => form })).json()
+  expect(preview.success).toBe(true)
+  expect(preview.missingFields).toEqual(['assetCode', 'name'])
+  expect(preview.samples).toHaveLength(1)
+  form.set('mode', 'import')
+  form.set('mapping', JSON.stringify({ 0: 'assetCode', 1: 'name', 2: 'billNumber' }))
+  const imported = await (await importAssets({ formData: async () => form })).json()
+  expect(imported.results).toMatchObject({ created: 1, skipped: 0 })
+  expect(await Asset.findOne({ assetCode: 'E2E-1' }).lean()).toMatchObject({ name: 'Monitor', billNumber: 'BILL-1' })
+  const repeat = await (await importAssets({ formData: async () => form })).json()
+  expect(repeat.results).toMatchObject({ created: 0, skipped: 1 })
+})
+
+test('rejects old file formats and malformed or duplicate column mappings', async () => {
+  const form = new FormData()
+  form.set('file', new Blob(['test']), 'assets.xls')
+  expect((await importAssets({ formData: async () => form })).status).toBe(400)
+  form.set('file', new Blob(['test']), 'assets.xlsx')
+  readFirstWorksheetRows.mockResolvedValue([['Code', 'Name'], ['C1', 'Laptop']])
+  for (const mapping of ['{bad', '[]', '{"0":"name","1":"name"}']) {
+    form.set('mapping', mapping)
+    expect((await importAssets({ formData: async () => form })).status).toBe(400)
+  }
+  expect(await Asset.countDocuments()).toBe(0)
+})
+
+test('real xlsx workbook previews and persists assets with all mapped tracker data', async () => {
+  const spreadsheets = jest.requireActual('@/lib/spreadsheets.server')
+  const buffer = await spreadsheets.createWorkbookBuffer([{ name: 'Assets', rows: [
+    ['Asset Code', 'Asset Name', 'Bill Date', 'Box', 'Charger', 'Status'],
+    ['XLSX-1', 'Real workbook laptop', '2026-09-26', 'Yes', 'No', 'In Stock'],
+  ] }])
+  readFirstWorksheetRows.mockImplementationOnce(spreadsheets.readFirstWorksheetRows)
+  const form = new FormData()
+  form.set('file', new Blob([buffer]), 'assets.xlsx'); form.set('mode', 'preview')
+  const preview = await (await importAssets({ formData: async () => form })).json()
+  expect(preview.missingFields).toEqual([])
+  expect(preview.totalRows).toBe(1)
+  form.set('mode', 'import'); form.set('mapping', JSON.stringify(preview.mapping))
+  readFirstWorksheetRows.mockImplementationOnce(spreadsheets.readFirstWorksheetRows)
+  expect((await (await importAssets({ formData: async () => form })).json()).results.created).toBe(1)
+  const asset = await Asset.findOne({ assetCode: 'XLSX-1' }).lean()
+  expect(asset).toMatchObject({ name: 'Real workbook laptop', box: true, charger: false, status: 'available' })
+  expect(asset.billDate.toISOString()).toBe('2026-09-26T00:00:00.000Z')
+})
+
 let server, Employee, first, second, auth
 const request = body => new Request('https://talio.test/api/assets', { method: 'POST', body: JSON.stringify(body) })
 const edit = (id, data) => PUT(request(data), { params: Promise.resolve({ id: String(id) }) })

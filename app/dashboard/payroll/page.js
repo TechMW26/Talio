@@ -949,7 +949,7 @@ export default function PayrollPage() {
                   <TableColumn align="end">DEDUCTIONS</TableColumn>
                   <TableColumn align="end">NET SALARY</TableColumn>
                   <TableColumn align="center">STATUS</TableColumn>
-                  <TableColumn align="center">ACTIONS</TableColumn>
+                  <TableColumn data-sticky-actions="true" align="center">ACTIONS</TableColumn>
                 </TableHeader>
                 <TableBody items={filteredPayrolls}>
                   {(payroll) => (

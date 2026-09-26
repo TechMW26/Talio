@@ -27,3 +27,23 @@ test('Linux reports runtime access honestly and provides guidance, not a fabrica
   expect(shell.openExternal).not.toHaveBeenCalled()
   expect(await service.request('arbitrary')).toEqual({ success: false })
 })
+
+test('first macOS camera request uses native prompt without sending denial straight into Settings', async () => {
+  const { service, shell, systemPreferences } = setup('darwin')
+  systemPreferences.getMediaAccessStatus.mockReturnValue('not-determined')
+  systemPreferences.askForMediaAccess.mockImplementation(async () => { systemPreferences.getMediaAccessStatus.mockReturnValue('denied'); return false })
+  expect((await service.request('camera')).permissions.camera).toBe('denied')
+  expect(systemPreferences.askForMediaAccess).toHaveBeenCalledWith('camera')
+  expect(shell.openExternal).not.toHaveBeenCalled()
+  await service.request('camera:settings')
+  expect(shell.openExternal).toHaveBeenCalledWith(expect.stringContaining('Privacy_Camera'))
+})
+
+test('screen request enumerates through Electron but never claims macOS access from sources alone', async () => {
+  const { shell, systemPreferences } = setup('darwin')
+  const desktopCapturer = { getSources: jest.fn(async () => [{ id: 'screen:1' }]) }
+  const service = createMiraPermissions({ platform: 'darwin', shell, systemPreferences, desktopCapturer })
+  expect((await service.request('screenRecording')).permissions.screenRecording).toBe('denied')
+  expect(desktopCapturer.getSources).toHaveBeenCalledWith(expect.objectContaining({ thumbnailSize: { width: 0, height: 0 } }))
+  expect(shell.openExternal).not.toHaveBeenCalled()
+})

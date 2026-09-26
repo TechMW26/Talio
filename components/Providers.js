@@ -12,6 +12,7 @@ import AIAssistant from '@/components/AIAssistant'
 import AIAssistantBridge from '@/components/AIAssistantBridge'
 import WebNetworkRecovery from '@/components/WebNetworkRecovery'
 import MiraPermissionChecklist from '@/components/ui/MiraPermissionChecklist'
+import DesktopPermissionGate from '@/components/ui/DesktopPermissionGate'
 import ScrollToTop from '@/components/ScrollToTop'
 import { FocusTimerProvider } from '@/contexts/FocusTimerContext'
 import { MiraChatProvider } from '@/contexts/MiraChatContext'
@@ -138,6 +139,7 @@ export function Providers({ children }) {
                             provider: () => new Map(),
                         }}
                     >
+                        <DesktopPermissionGate>
                         <ClientDataSyncBridge />
                         <MiraPermissionChecklist />
                         <MiraTransitionOverlay />
@@ -149,6 +151,7 @@ export function Providers({ children }) {
                         <MeetingSessionProvider>
                             {children}
                         </MeetingSessionProvider>
+                        </DesktopPermissionGate>
                     </SWRConfig>
                 </MiraChatProvider>
                 </FocusTimerProvider>

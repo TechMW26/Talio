@@ -532,7 +532,7 @@ export default function BulkImportEmployees() {
                       {field.required && <span className="text-red-500 ml-1">*</span>}
                     </th>
                   ))}
-                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-16">Actions</th>
+<th data-sticky-actions="true" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-16">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

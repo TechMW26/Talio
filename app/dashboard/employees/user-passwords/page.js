@@ -296,7 +296,7 @@ export default function UserPasswordsPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-default-500 uppercase tracking-wider">
                     Last Updated
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-default-500 uppercase tracking-wider">
+<th data-sticky-actions="true" className="px-4 py-3 text-right text-xs font-semibold text-default-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>

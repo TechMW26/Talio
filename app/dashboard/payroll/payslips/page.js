@@ -210,7 +210,7 @@ Generated on: ${new Date().toLocaleDateString()}
                 <HRMSTableColumn>Deductions</HRMSTableColumn>
                 <HRMSTableColumn>Net Salary</HRMSTableColumn>
                 <HRMSTableColumn>Status</HRMSTableColumn>
-                <HRMSTableColumn>Actions</HRMSTableColumn>
+                <HRMSTableColumn data-sticky-actions="true">Actions</HRMSTableColumn>
               </HRMSTableHeader>
               <HRMSTableBody>
                 {payslips.map((payslip) => (

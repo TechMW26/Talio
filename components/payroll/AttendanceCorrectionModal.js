@@ -404,7 +404,7 @@ export default function AttendanceCorrectionModal({
                                             <th className="px-4 py-3 text-center font-medium text-default-600">Check Out</th>
                                             <th className="px-4 py-3 text-center font-medium text-default-600">Work Hours</th>
                                             <th className="px-4 py-3 text-center font-medium text-default-600">Status</th>
-                                            <th className="px-4 py-3 text-center font-medium text-default-600">Actions</th>
+<th data-sticky-actions="true" className="px-4 py-3 text-center font-medium text-default-600">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-default-200">

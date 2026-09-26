@@ -67,6 +67,7 @@ export default function AssetsPage() {
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
   const [bulkFile, setBulkFile] = useState(null)
   const [bulkPreview, setBulkPreview] = useState(null)
+  const [bulkResult, setBulkResult] = useState(null)
   const [bulkImporting, setBulkImporting] = useState(false)
   const [bulkPreviewing, setBulkPreviewing] = useState(false)
   const [generatingDescription, setGeneratingDescription] = useState(false)
@@ -199,6 +200,7 @@ export default function AssetsPage() {
 
   const handleBulkPreview = async () => {
     if (!bulkFile) return toast.error('Please select a file')
+    if (!/\.xlsx$/i.test(bulkFile.name) || bulkFile.size > 4 * 1024 * 1024) return toast.error('Choose an .xlsx workbook smaller than 4 MB.')
     setBulkPreviewing(true)
     try {
       const token = localStorage.getItem('token')
@@ -224,7 +226,7 @@ export default function AssetsPage() {
   }
 
   const handleBulkImport = async () => {
-    if (!bulkFile || !bulkPreview?.mapping) return
+    if (!bulkFile || !bulkPreview?.mapping || bulkImporting || bulkPreview.missingFields?.length) return
     setBulkImporting(true)
     try {
       const token = localStorage.getItem('token')
@@ -240,10 +242,10 @@ export default function AssetsPage() {
       const data = await res.json()
       if (data.success) {
         toast.success(data.message)
-        setIsBulkImportOpen(false)
+        setBulkResult(data.results)
         setBulkFile(null)
         setBulkPreview(null)
-        refreshAssets()
+        await refreshAssets()
       } else {
         toast.error(data.message || 'Import failed')
       }
@@ -268,7 +270,7 @@ export default function AssetsPage() {
         {canCreateAsset && (
           <div className="flex gap-2">
             <Button
-              onPress={() => setIsBulkImportOpen(true)}
+              onPress={() => { setBulkResult(null); setBulkPreview(null); setBulkFile(null); setIsBulkImportOpen(true) }}
               data-mira-control="navigation"
               variant="flat"
               startContent={<FaFileUpload />}
@@ -405,7 +407,7 @@ export default function AssetsPage() {
                   </th>
                   {extraTrackerFields.map(([key, label]) => <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 whitespace-nowrap">{label}</th>)}
                   {isAdmin && (
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+<th data-sticky-actions="true" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   )}
@@ -821,31 +823,37 @@ export default function AssetsPage() {
       {/* Bulk Import Modal */}
       <ModalPortal isOpen={isBulkImportOpen}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-label="Bulk Import Assets" className="bg-white rounded-[30px] animate-modal-enter w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Bulk Import Assets</h2>
-              <button onClick={() => { setIsBulkImportOpen(false); setBulkFile(null); setBulkPreview(null) }} className="text-gray-500 hover:text-gray-700">
+              <button aria-label="Close bulk import" disabled={bulkImporting || bulkPreviewing} onClick={() => { setIsBulkImportOpen(false); setBulkFile(null); setBulkPreview(null); setBulkResult(null) }} className="text-gray-500 hover:text-gray-700">
                 <FaTimes />
               </button>
             </div>
 
-            {!bulkPreview ? (
+            {bulkResult ? <div className="space-y-4">
+              <p role="status">Created {bulkResult.created} assets. Skipped {bulkResult.skipped} rows.</p>
+              {bulkResult.errors?.length > 0 && <div className="max-h-72 overflow-y-auto"><p>Correct these rows before uploading them again. Existing asset codes are skipped.</p><ul className="mt-2 space-y-1">{bulkResult.errors.map((item, index) => <li key={index}>Row {item.row}: {item.message}</li>)}</ul></div>}
+              <Button onPress={() => { setBulkResult(null) }}>Import another file</Button>
+              <Button onPress={() => setIsBulkImportOpen(false)}>Done</Button>
+            </div> : !bulkPreview ? (
               <div className="space-y-4">
                 <p className="text-sm text-gray-600">
-                  Upload an Excel file (.xlsx) containing your asset data. Our AI will automatically detect and map columns.
+                  Upload an Excel workbook (.xlsx, up to 4 MB and 1,000 rows). Put column headers in the first row of the first sheet. Asset Code and Asset Name are required. Review and correct the detected column mapping before importing.
                 </p>
                 <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
                   <FaFileUpload className="mx-auto text-3xl text-gray-400 mb-3" />
                   <input
                     type="file"
-                    accept=".xlsx,.xls"
+                    aria-label="Asset import workbook"
+                    accept=".xlsx"
                     onChange={(e) => setBulkFile(e.target.files[0])}
                     className="block mx-auto text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
                   />
                   {bulkFile && <p className="mt-2 text-sm text-gray-700 font-medium">{bulkFile.name}</p>}
                 </div>
                 <div className="flex justify-end gap-3">
-                  <Button variant="flat" onPress={() => { setIsBulkImportOpen(false); setBulkFile(null) }}>Cancel</Button>
+                  <Button isDisabled={bulkPreviewing} variant="flat" onPress={() => { setIsBulkImportOpen(false); setBulkFile(null) }}>Cancel</Button>
                   <Button
                     color="primary"
                     onPress={handleBulkPreview}
@@ -858,6 +866,18 @@ export default function AssetsPage() {
               </div>
             ) : (
               <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {bulkPreview.headers?.map((header, index) => <label key={index} className="text-sm">{header || `Column ${index + 1}`}
+                    <select aria-label={`Map column ${index + 1}`} className="block w-full rounded-lg border border-default-200 bg-content1 p-2" value={bulkPreview.mapping[index] || ''} disabled={bulkImporting} onChange={event => {
+                      const mapping = { ...bulkPreview.mapping }
+                      if (event.target.value) mapping[index] = event.target.value; else delete mapping[index]
+                      const data = bulkPreview.samples.map((row, rowIndex) => ({ _rowNum: rowIndex + 2, ...Object.fromEntries(Object.entries(mapping).map(([column, field]) => [field, row[Number(column)] ?? ''])) }))
+                      setBulkPreview({ ...bulkPreview, mapping, data, missingFields: ['assetCode', 'name'].filter(field => !Object.values(mapping).includes(field)) })
+                    }}><option value="">Ignore column</option>{bulkPreview.fields?.map(field => <option key={field.key} value={field.key}>{field.label}{field.required ? ' (required)' : ''}</option>)}</select>
+                  </label>)}
+                </div>
+                {!!bulkPreview.missingFields?.length && <p role="alert" className="text-danger">Map Asset Code and Asset Name to continue.</p>}
+                {new Set(Object.values(bulkPreview.mapping)).size !== Object.values(bulkPreview.mapping).length && <p role="alert" className="text-danger">Each asset field can be mapped only once. Change a duplicate mapping to Ignore column.</p>}
                 <div className="flex items-center gap-3 text-sm text-gray-600">
                   <span className="font-semibold">{bulkPreview.totalRows}</span> rows detected
                   <span className="text-gray-300">|</span>
@@ -894,11 +914,12 @@ export default function AssetsPage() {
                 </div>
 
                 <div className="flex justify-end gap-3">
-                  <Button variant="flat" onPress={() => { setBulkPreview(null); setBulkFile(null) }}>Back</Button>
+                  <Button isDisabled={bulkImporting} variant="flat" onPress={() => { setBulkPreview(null); setBulkFile(null) }}>Back</Button>
                   <Button
                     color="primary"
                     onPress={handleBulkImport}
                     isLoading={bulkImporting}
+                    isDisabled={bulkImporting || !!bulkPreview.missingFields?.length || new Set(Object.values(bulkPreview.mapping)).size !== Object.values(bulkPreview.mapping).length}
                   >
                     {bulkImporting ? 'Importing...' : `Import ${bulkPreview.totalRows} Assets`}
                   </Button>
