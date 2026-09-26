@@ -38,7 +38,7 @@ test('named app opening bypasses a vision call but completion still requires obs
   }) }
   expect(await executeMiraComputerTask('Open WhatsApp', { token: 't' })).toMatchObject({ success: true })
   const calls = window.electronAPI.computerTask.mock.calls.map(([input]) => input)
-  expect(calls.map(c => c.operation)).toEqual(['begin', 'observe', 'act', 'observe', 'plan', 'cancel'])
+  expect(calls.map(c => c.operation)).toEqual(['begin', 'observe', 'act', 'observe', 'cancel'])
   expect(calls[2].action).toEqual({ type: 'open_app', name: 'WhatsApp' })
 })
 test('local Agent S exchanges model messages without sending the task to the legacy planner', async () => {
@@ -68,7 +68,7 @@ test('completion comes from a fresh observation and always ends the native sessi
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, done: true, message: 'Notes is open.' }) }))
   expect(await executeMiraComputerTask('Open Notes', { token: 't' })).toEqual({ success: true, message: 'Notes is open.' })
   expect(calls).toEqual(['begin', 'observe', 'cancel'])
-  expect(JSON.parse(fetch.mock.calls[0][1].body).goal).toBe('Open Notes')
+  expect(fetch).not.toHaveBeenCalled()
 })
 test('abort during native consent never executes a desktop input', async () => {
   const controller = new AbortController()

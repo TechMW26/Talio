@@ -8,6 +8,43 @@ global.TextDecoder = TextDecoder
 const wrapper = ({ children }) => <MiraChatProvider>{children}</MiraChatProvider>
 const bytes = value => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`)
 
+test('unique person lookup continues the original activity request once', async () => {
+  let chats = 0
+  global.fetch = jest.fn(async url => ({ json: async () => {
+    if (url === '/api/ai/mira-chat') return { success: true, response: ++chats === 1
+      ? { message: 'Finding Sahil.', action: { type: 'lookup_people', fields: { query: 'Sahil' } } }
+      : { message: 'Checking activity.', action: { type: 'view_productivity', fields: { employee: 'employee:U46' } } } }
+    if (url === '/api/ai/mira-actions') return chats === 1
+      ? { success: true, message: 'Found Sahil.', resolution: { resolved: true, candidates: [{ value: 'employee:bbbbbbbbbbbbbbbbbbbbbbbb', name: 'Sahil Sahu', code: 'U46' }] } }
+      : { success: true, message: 'No activity screenshots available today.' }
+    return { success: false }
+  } }))
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { await result.current.sendMessage('Please check what Sahil is doing today') })
+  expect(chats).toBe(2)
+  expect(result.current.messages.at(-1).content).toBe('No activity screenshots available today.')
+})
+
+test('voice ignores provisional narration and speaks the visible action outcome', async () => {
+  const onPartialSpeech = jest.fn(), onSpeech = jest.fn()
+  global.fetch = jest.fn(async url => {
+    if (url === '/api/ai/mira-chat') return {
+      headers: { get: () => 'text/event-stream' },
+      body: new ReadableStream({ start(controller) {
+        controller.enqueue(bytes({ type: 'speech', speech: 'Theek hai, details nikal rahi hu.' }))
+        controller.enqueue(bytes({ type: 'complete', success: true, response: { message: 'Looking up Sahil.', speech: 'Unrelated narration.', action: { type: 'lookup_people', fields: { query: 'Sahil' } } } }))
+        controller.close()
+      } }),
+    }
+    return { json: async () => ({ success: false, message: 'Please clarify which Sahil you mean.' }) }
+  })
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { await result.current.sendMessage('Find Sahil', { inputMode: 'voice', onPartialSpeech, onSpeech }) })
+  expect(onPartialSpeech).not.toHaveBeenCalled()
+  expect(onSpeech).toHaveBeenCalledTimes(1)
+  expect(onSpeech).toHaveBeenCalledWith(result.current.messages.at(-1).content)
+})
+
 test('a new instruction interrupts thinking and stale replies cannot execute actions', async () => {
   let finishOld, oldSignal, oldRun
   global.fetch = jest.fn(async (url, options) => {

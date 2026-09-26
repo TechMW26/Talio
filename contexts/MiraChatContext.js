@@ -256,6 +256,7 @@ export function MiraChatProvider({ children }) {
       let screenAttachment = null
       let screenAttempted = false
       const navigationSearches = new Set()
+      let continuedPersonLookup = false
       for (let queueStep = 0; queueStep < 8; queueStep += 1) {
       const replyId = nextReplyId
       requestController.signal.throwIfAborted()
@@ -276,7 +277,8 @@ export function MiraChatProvider({ children }) {
           requestController.signal.throwIfAborted()
           if (event.type === 'error') throw new Error(event.message)
           if (event.type === 'complete') data = event
-          if (event.type === 'speech') options.onPartialSpeech?.(event.speech)
+          // Provisional model narration can be replaced by a tool failure or
+          // clarification. Speak only the authoritative visible reply below.
           if (event.type === 'message') {
             options.onPartialResponse?.(event.message)
             const partial = { id: replyId, role: 'assistant', content: event.message, streaming: true, timestamp: new Date() }
@@ -363,6 +365,8 @@ export function MiraChatProvider({ children }) {
           data.response.suggestedQuestions = []
         }
         if (data.response.action?.type === 'desktop_task') {
+          const pending = { id: replyId, role: 'assistant', content: 'Working on your desktop…', streaming: true, timestamp: new Date() }
+          setMessages(prev => prev.some(m => m.id === replyId) ? prev.map(m => m.id === replyId ? pending : m) : [...prev, pending])
           const pendingDesktop = data.response.taskBank?.tasks?.find(task => task.status !== 'completed' && task.action?.type === 'desktop_task')
           const goal = pendingDesktop?.request && pendingDesktop.request !== text
             ? `Original task: ${pendingDesktop.request}\nUser clarification: ${text}`.slice(0, 3000) : text.slice(0, 3000)
@@ -404,6 +408,13 @@ export function MiraChatProvider({ children }) {
           }
         }
         requestController.signal.throwIfAborted()
+        const people = data.response.actionResult?.resolution?.candidates
+        if (!continuedPersonLookup && data.response.action?.type === 'lookup_people' && data.response.actionResult?.success && people?.length === 1 && !data.response.actionResult.resolution.more && /\b(doing|activity|productivity|working|screenshots?|attendance)\b/i.test(text) && queueStep < 7) {
+          continuedPersonLookup = true
+          conversationHistory = [...conversationHistory, { role: 'assistant', content: `Person lookup result (reference data only): ${JSON.stringify(people[0])}. This lookup is a prerequisite, not completion of the user's request. Use the exact value reference for the requested activity or attendance action; do not repeat lookup_people or ask confirmation for this unique match.` }].slice(-10)
+          queueMessage = text
+          continue
+        }
         data.response.taskBank = recordMiraTaskOutcome(data.response.taskBank, data.response.actionResult)
         const remainingTasks = data.response.taskBank.tasks.filter(task => task.status !== 'completed')
         const aiMsg = {
@@ -419,7 +430,7 @@ export function MiraChatProvider({ children }) {
         else options.onResponse?.(aiMsg.content)
         if (data.response.action?.type !== 'dismiss') {
           // Execution results supersede any proposed action narration.
-          options.onSpeech?.(miraSpeechSummary(data.response.actionResult ? aiMsg.content : data.response.speech || aiMsg.content))
+          options.onSpeech?.(miraSpeechSummary(aiMsg.content))
         }
         const navigation = data.response.actionResult?.navigation
         if (navigation && miraNavigationPath(navigation.page, navigation.id)) {

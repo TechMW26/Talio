@@ -14,9 +14,9 @@ test('fallback speaks at most two sentences rather than a long message', () => {
   expect(miraSpeechSummary('The total is 3.5 hours. You are on track. Extra detail.')).toBe('The total is 3.5 hours. You are on track.')
 })
 
-test('voice gets a curated summary while typed chat can contain full detail', () => {
-  expect(miraOutputModeInstructions('voice')).toContain('"speech" FIRST')
-  expect(miraOutputModeInstructions('voice')).toContain('Never read URLs')
+test('voice uses the final visible answer while typed chat can contain full detail', () => {
+  expect(miraOutputModeInstructions('voice')).toContain('Do not generate a separate speech answer')
+  expect(miraOutputModeInstructions('voice')).toContain('after execution')
   expect(miraOutputModeInstructions('chat')).toContain('Do not force a short voice-style summary')
 })
 

@@ -35,9 +35,11 @@ test('local planner consumes native observations and relays only expected model 
   const { call } = harness({ agentS })
   const start = await call({ operation: 'begin', goal: 'Find a contact in WhatsApp' })
   expect(start.planner).toBe('agent-s-local')
+  expect(agentS.begin).not.toHaveBeenCalled()
   const observation = await call({ operation: 'observe', sessionId: start.sessionId })
   const args = { sessionId: start.sessionId, observationId: observation.observationId }
   expect((await call({ ...args, operation: 'plan', image: 'untrusted renderer image' })).kind).toBe('model_request')
+  expect(agentS.begin).toHaveBeenCalledWith('Find a contact in WhatsApp')
   expect(agentS.predict).toHaveBeenCalledWith({ image: Buffer.from('image').toString('base64'), app: expect.stringContaining('TextEdit') })
   expect((await call({ ...args, operation: 'model_response', text: 'agent.key("find")' })).action.type).toBe('key')
   expect((await call({ ...args, operation: 'model_response', text: 'unsolicited' })).success).toBe(false)
@@ -48,6 +50,17 @@ test('locked desktop never begins or captures screenshots', async () => {
   expect((await call({ operation: 'begin', goal: 'Open WhatsApp' })).success).toBe(false)
   expect(deps.runControl).not.toHaveBeenCalled()
   expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
+})
+test('native app opening is independent of a failing planner startup', async () => {
+  const agentS = { begin: jest.fn(async () => { throw new Error('Planner unavailable') }), stop: jest.fn() }
+  const { call, deps } = harness({ agentS })
+  const start = await call({ operation: 'begin', goal: 'Open Notes' })
+  expect(start.success).toBe(true)
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'open_app', name: 'Notes' } })).success).toBe(true)
+  expect(deps.runControl).toHaveBeenCalledWith({ type: 'open_app', name: 'Notes' })
+  expect(agentS.begin).not.toHaveBeenCalled()
+  await call({ operation: 'cancel', sessionId: start.sessionId })
 })
 test.each(['cmd.exe', 'pwsh.exe', 'WindowsTerminal.exe', 'regedit.exe', '1Password', 'Bitwarden'])('protected application %s refuses generated input', async app => {
   const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, app })) })

@@ -79,9 +79,9 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         pointer?.show();
         expiryTimer = setTimeout(cancel, 300000);
         expiryTimer.unref?.();
-        const started = session;
-        if (agentS) await agentS.begin(input.goal);
-        if (session !== started || isLocked()) throw new Error('Desktop task stopped.');
+        // Basic app activation needs no model. Start the worker only when a
+        // visual plan is actually needed, not before the first native action.
+        session.goal = input.goal;
         return { success: true, sessionId: session.id, planner: agentS ? 'agent-s-local' : 'legacy' };
       }
       const active = session;
@@ -118,6 +118,11 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         if (input.operation === 'plan' && active.planning) throw new Error('A plan is already in progress.');
         if (input.operation === 'model_response' && (!active.awaitingModel || typeof input.text !== 'string' || input.text.length > 16000)) throw new Error('Unexpected model response.');
         active.planning = true; active.awaitingModel = false;
+        if (!active.plannerReady) {
+          await agentS.begin(active.goal);
+          if (session !== active || isLocked()) throw new Error('Desktop task stopped.');
+          active.plannerReady = true;
+        }
         const result = input.operation === 'plan'
           ? await agentS.predict({ image: active.observation.image, app: `${active.observation.app}. Last input evidence: ${active.lastOutcome || 'None'}` })
           : await agentS.respond(input.text);

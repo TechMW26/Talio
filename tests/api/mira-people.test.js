@@ -35,6 +35,19 @@ test('selected identifiers are looked up again within the current scope', async 
   await expect(resolveMiraPerson(`employee:${person._id}`, user, db, { type: 'create_task' })).rejects.toThrow('No matching person')
   expect(JSON.stringify(db.Employee.find.mock.calls[0][0])).toContain('reportingManager')
 })
+test('prefixed employee codes resolve exactly without dropping authorization scope', async () => {
+  const db = models([person])
+  expect(await resolveMiraPerson('employee:U22', user, db, { type: 'create_task' })).toBe(person._id)
+  const filter = db.Employee.find.mock.calls[0][0]
+  expect(filter.$and[2].$or[0].employeeCode.test('U22')).toBe(true)
+  expect(filter.$and[2].$or[0].employeeCode.test('U220')).toBe(false)
+  expect(JSON.stringify(filter)).toContain('reportingManager')
+})
+test('unknown prefixed code does not fall back to a fuzzy name search', async () => {
+  const db = models([])
+  await expect(resolveMiraPerson('employee:U46', user, db, { type: 'create_task' })).rejects.toThrow('No matching person')
+  expect(db.Employee.find).toHaveBeenCalledTimes(1)
+})
 test('missing private conversations are prepared for authenticated create-and-send', async () => {
   const result = await prepareMiraAction({ type: 'send_message', fields: { recipient: 'Sahil', content: 'Hello' } }, user, models([person]))
   expect(result).toMatchObject({ path: '/api/chat/start-and-send', recipient: person._id, body: { content: 'Hello' } })

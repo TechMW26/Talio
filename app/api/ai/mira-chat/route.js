@@ -979,15 +979,10 @@ export async function POST(request) {
         async start(controller) {
           const send = value => { if (!cancelled) controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`)) }
           let previous = ''
-          let previousSpeech = ''
           try {
             const result = await generateReply(raw => {
               const message = partialMiraMessage(raw)
               if (message && message !== previous) { previous = message; send({ type: 'message', message }) }
-              if (body.inputMode === 'voice') {
-                const speech = partialMiraMessage(raw, 'speech')
-                if (speech && speech !== previousSpeech) { previousSpeech = speech; send({ type: 'speech', speech }) }
-              }
             }, aborter.signal)
             send({ type: 'complete', ...result })
           } catch { send({ type: 'error', message: 'MIRA could not finish this reply. Please retry.' }) }
