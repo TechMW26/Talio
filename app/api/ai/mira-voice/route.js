@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { splitMiraSpeech } from '@/lib/miraSpeechChunks'
+import { getMiraElevenLabsVoiceId } from '@/lib/audio'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -18,7 +19,7 @@ export async function POST(request) {
     const bucket = await rateLimit('MIRA_VOICE', `${auth.tenant.databaseName}:${auth.user._id}`)
     if (!bucket.allowed) return NextResponse.json({ message: 'Please wait before requesting more speech.' }, { status: 429, headers: { 'Retry-After': String(bucket.retryAfterSeconds) } })
     const key = process.env.ELEVENLABS_API_KEY
-    const voice = process.env.ELEVENLABS_VOICE_ID
+    const voice = getMiraElevenLabsVoiceId()
     if (!key || !voice) return NextResponse.json({ message: 'MIRA voice is not configured.' }, { status: 503 })
     const controller = new AbortController()
     const signal = AbortSignal.any([request.signal, controller.signal, AbortSignal.timeout(55000)])

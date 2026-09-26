@@ -9,6 +9,12 @@ test('call-alert TTS uses ElevenLabs, never Pollinations', async () => {
   expect(fetch.mock.calls[0][1].headers['xi-api-key']).toBe('audio-test')
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ text: 'Hello' })
 })
+test('call-alert TTS uses MIRA default voice when no override is configured', async () => {
+  delete process.env.ELEVENLABS_VOICE_ID
+  fetch.mockResolvedValueOnce(new Response('audio'))
+  expect((await generateSpeech('Hello')).success).toBe(true)
+  expect(fetch.mock.calls[0][0]).toContain('api.elevenlabs.io/v1/text-to-speech/komDQG4wp0wC5IDFwetv/stream')
+})
 test('meeting uploads use native Scribe fields and return the detected language', async () => {
   fetch.mockResolvedValueOnce(new Response(JSON.stringify({ text: 'Hello', language_code: 'eng' })))
   const result = await transcribeAudio(new Blob(['audio'], { type: 'audio/webm' }))

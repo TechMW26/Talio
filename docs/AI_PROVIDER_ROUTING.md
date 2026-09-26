@@ -16,7 +16,9 @@ MIRA image generation uses `POLLINATIONS_API_KEY` and optionally `POLLINATIONS_I
 An explicit image request produces a validated `generate_image` action. The browser submits it once to `/api/ai/mira-images`; the authenticated server generates one 1024px image, validates/re-encodes it as PNG, and stores it privately. Tenant-scoped metadata binds each image to its owner; `/api/ai/mira-images/[id]` checks ownership before delivery. Only opaque IDs are saved in chat history. The default per-user limit is five requests per hour. Request IDs prevent duplicate execution, cancellation stops upstream work, and paid requests are not automatically retried.
 
 The chat displays the lazy-loaded `img-fx` pixel mosaic while generating and reveals the image with a download link. Reduced-motion/no-WebGL clients use a static placeholder. Reopening history retrieves saved images without regenerating them. Image editing and reference uploads are not part of this flow. Stored images are retained independently of chat deletion; operators should include generated images in their tenant storage retention policy.
-Audio requires `ELEVENLABS_API_KEY` and TTS requires `ELEVENLABS_VOICE_ID`; optional `ELEVENLABS_STT_MODEL` defaults to `scribe_v2`.
+Audio requires `ELEVENLABS_API_KEY`. TTS uses MIRA's default ElevenLabs voice
+`komDQG4wp0wC5IDFwetv`; set `ELEVENLABS_VOICE_ID` to override it per deployment.
+Optional `ELEVENLABS_STT_MODEL` defaults to `scribe_v2`.
 Never put provider keys in `NEXT_PUBLIC_*` variables or tracked templates.
 
 Streaming forwards final-answer content only, never reasoning tokens, and rejects truncated output. User cancellation and deadlines abort upstream requests. Streams are not replayed after partial output. Provider errors do not include raw DeepSeek response bodies.

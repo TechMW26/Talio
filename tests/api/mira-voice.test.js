@@ -25,6 +25,13 @@ test('streams provider audio with server-only credentials and fixed voice', asyn
   expect(rateLimit).toHaveBeenCalledWith('MIRA_VOICE', 'tenantA:u')
   expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ model_id: 'eleven_v3_conversational', apply_text_normalization: 'on' })
 })
+test('streams with MIRA default voice when no deployment override is set', async () => {
+  delete process.env.ELEVENLABS_VOICE_ID
+  const response = await run({ text: 'Hello' })
+  expect(response.status).toBe(200)
+  await response.arrayBuffer()
+  expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/komDQG4wp0wC5IDFwetv/stream?output_format=pcm_24000', expect.anything())
+})
 test('rejects unauthenticated callers before generation', async () => {
   getAuthAndModels.mockResolvedValue({ success: false })
   expect((await run({ text: 'Hello' })).status).toBe(401)
