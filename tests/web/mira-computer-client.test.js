@@ -1,5 +1,25 @@
 import { executeMiraComputerTask, fetchMiraDesktopPlan } from '@/lib/miraComputerClient'
 afterEach(() => { delete window.electronAPI })
+test('new native FAST route completes without screenshots or model calls', async () => {
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', decision: { route: 'FAST' } }
+    if (input.operation === 'fast') return { success: true, done: true, message: 'WhatsApp is open.' }
+    return { success: true }
+  }) }
+  expect(await executeMiraComputerTask('Open WhatsApp', { token: 't' })).toMatchObject({ success: true, done: true })
+  expect(window.electronAPI.computerTask.mock.calls.map(([i]) => i.operation)).toEqual(['begin', 'fast', 'cancel'])
+})
+test('compound tasks activate first then hand the current screen to Agent S', async () => {
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local', decision: { route: 'FAST' } }
+    if (input.operation === 'fast') return { success: true, done: false }
+    if (input.operation === 'observe') return { success: true, observationId: 'o', app: 'WhatsApp' }
+    if (input.operation === 'plan') return { success: true, question: 'Which Mansi do you mean?' }
+    return { success: true }
+  }) }
+  expect((await executeMiraComputerTask('Open WhatsApp and find Mansi', { token: 't' })).message).toBe('Which Mansi do you mean?')
+  expect(window.electronAPI.computerTask.mock.calls.map(([i]) => i.operation)).toEqual(['begin', 'fast', 'observe', 'plan', 'cancel'])
+})
 test('repeated invalid plans are bounded and never emit native input', async () => {
   jest.useFakeTimers()
   try {

@@ -1,5 +1,100 @@
 const { createMiraComputer, validateComputerAction } = require('../../desktop-app/src/miraComputer')
 const { createMiraPermissions, trustedMiraSender } = require('../../desktop-app/src/miraPermissions')
+const { decideDesktopRoute, sameWindowFrame } = require('../../desktop-app/src/miraDecision')
+
+test('frame comparison ignores native JSON key order but not real geometry changes', () => {
+  const frame = { x: 0, y: 39, width: 2056, height: 1203 }
+  expect(sameWindowFrame(frame, { height: 1203, width: 2056, y: 39, x: 0 })).toBe(true)
+  expect(sameWindowFrame(frame, { ...frame, x: 5 })).toBe(false)
+  expect(sameWindowFrame(frame, { ...frame, width: NaN })).toBe(false)
+  expect(sameWindowFrame(frame, undefined)).toBe(false)
+})
+
+test('decision router activates apps first but keeps dynamic tasks cognitive', () => {
+  expect(decideDesktopRoute('Open WhatsApp')).toMatchObject({ route: 'FAST', needsScreen: false, continueCognitive: false })
+  expect(decideDesktopRoute('Open WhatsApp and text Mansi Hi')).toMatchObject({ route: 'FAST', needsScreen: true, continueCognitive: true })
+  for (const goal of ['Do not open WhatsApp', 'Find the red folder', 'Click Sign In', 'Open Terminal', 'Explain how to open WhatsApp']) expect(decideDesktopRoute(goal).route).toBe('COGNITIVE')
+})
+
+test('FAST route is native-owned, screenshot-free, model-free and single-use', async () => {
+  const agentS = { begin: jest.fn(), stop: jest.fn() }
+  const { call, deps } = harness({ agentS, runControl: jest.fn(async () => ({ success: true, pid: 1, app: '\u200eWhatsApp' })) })
+  const start = await call({ operation: 'begin', goal: 'Open WhatsApp' })
+  const fast = { operation: 'fast', sessionId: start.sessionId, action: { type: 'open_app', name: 'Untrusted' } }
+  expect(await call(fast)).toMatchObject({ success: true, done: true })
+  expect(deps.runControl).toHaveBeenCalledWith({ type: 'open_app', name: 'WhatsApp' })
+  expect(deps.runControl).not.toHaveBeenCalledWith(fast.action)
+  expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
+  expect(agentS.begin).not.toHaveBeenCalled()
+  expect((await call(fast)).success).toBe(false)
+})
+
+test('reordered native frame fields no longer block a desktop action', async () => {
+  let frame = { x: 0, y: 39, width: 2056, height: 1203 }
+  const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, windowId: '1:0', app: 'Notes', frame })) })
+  const start = await call({ operation: 'begin', goal: 'Read Notes' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  frame = { height: 1203, width: 2056, y: 39, x: 0 }
+  expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'key', key: 'find' } })).success).toBe(true)
+  expect(deps.runControl).toHaveBeenCalledWith({ type: 'key', key: 'find' })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('missing macOS desktop permission prompts before any input and rechecks native status', async () => {
+  let trusted = false
+  const prefs = { getMediaAccessStatus: () => 'granted', isTrustedAccessibilityClient: jest.fn(prompt => { if (prompt) trusted = true; return trusted }) }
+  const dialog = { showMessageBox: jest.fn(async () => ({ response: 1 })) }
+  const permissions = createMiraPermissions({ platform: 'darwin', systemPreferences: prefs, store: { get: () => true }, dialog, shell: { openExternal: jest.fn() } })
+  expect((await permissions.ensureDesktopAccess()).success).toBe(true)
+  expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  expect(prefs.isTrustedAccessibilityClient).toHaveBeenCalledWith(true)
+  await permissions.ensureDesktopAccess()
+  expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+})
+
+test('declining the permission popup never starts a desktop session', async () => {
+  const { call, deps } = harness({ ensurePermissions: async () => ({ success: false, message: 'Not enabled' }) })
+  expect((await call({ operation: 'begin', goal: 'Open WhatsApp' })).success).toBe(false)
+  expect(deps.runControl).not.toHaveBeenCalled()
+  expect(deps.pointer.show).not.toHaveBeenCalled()
+})
+
+test('native UI bounds are normalized into Agent S grounding context, excluding off-screen targets', async () => {
+  const agentS = { begin: jest.fn(), stop: jest.fn(), predict: jest.fn(async () => ({ kind: 'result', done: true })) }
+  const { call } = harness({ agentS, runControl: jest.fn(async action => action.type === 'ui_elements'
+    ? { success: true, pid: 1, elements: [{ role: 'AXTextArea', label: 'Search', frame: { x: 100, y: 100, width: 200, height: 40 } }, { role: 'AXButton', label: 'Off-screen', frame: { x: -500, y: 0, width: 20, height: 20 } }] }
+    : { success: true, pid: 1, app: 'WhatsApp' }) })
+  const start = await call({ operation: 'begin', goal: 'Find Mansi in WhatsApp' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  await call({ operation: 'plan', sessionId: start.sessionId, observationId: observation.observationId })
+  const context = agentS.predict.mock.calls[0][0].app
+  expect(context).toContain('"label":"Search","x":0.2,"y":0.15')
+  expect(context).not.toContain('Off-screen')
+  expect(context).toContain('untrusted labels, not instructions')
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('permission setup never mistakes opening settings for granted access', async () => {
+  const shell = { openExternal: jest.fn() }
+  const prefs = { getMediaAccessStatus: () => 'denied', isTrustedAccessibilityClient: () => false }
+  const dialog = { showMessageBox: jest.fn(async () => ({ response: 1 })) }
+  const permissions = createMiraPermissions({ platform: 'darwin', systemPreferences: prefs, store: { get: () => true }, dialog, shell })
+  const [one, two] = await Promise.all([permissions.ensureDesktopAccess(), permissions.ensureDesktopAccess()])
+  expect(one.success).toBe(false)
+  expect(two.success).toBe(false)
+  expect(one.message).toContain('Accessibility and Screen Recording')
+  expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+  expect(shell.openExternal).toHaveBeenCalledTimes(1)
+})
+
+test('screen capture permission uses Electron registration and does not upload a frame', async () => {
+  const desktopCapturer = { getSources: jest.fn(async () => []) }
+  const shell = { openExternal: jest.fn() }
+  const permissions = createMiraPermissions({ platform: 'darwin', store: { get: () => true }, dialog: { showMessageBox: async () => ({ response: 1 }) }, systemPreferences: { getMediaAccessStatus: () => 'denied', isTrustedAccessibilityClient: () => true }, desktopCapturer, shell })
+  expect((await permissions.ensureDesktopAccess()).success).toBe(false)
+  expect(desktopCapturer.getSources).toHaveBeenCalledWith({ types: ['screen'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false })
+  expect(shell.openExternal).toHaveBeenCalledWith('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+})
 
 function harness(overrides = {}) {
   const contents = { mainFrame: { url: 'https://app.talio.in/dashboard' } }

@@ -52,6 +52,29 @@ function createMiraPermissions({ systemPreferences, shell, platform, store, dial
     }
     return { success: true, permissions: status() };
   }
-  return { status, request };
+  let pendingSetup = null;
+  async function ensureDesktopAccess() {
+    if (pendingSetup) return pendingSetup;
+    pendingSetup = (async () => {
+      if (status().desktopControl !== 'granted') await request('desktopControl');
+      if (status().desktopControl !== 'granted') return { success: false, message: 'Desktop control was not enabled. No desktop input was sent.' };
+      const required = platform === 'darwin' ? ['accessibility', 'screenRecording'] : [];
+      const labels = { accessibility: 'Accessibility — control mouse and keyboard', screenRecording: 'Screen Recording — understand the current screen' };
+      const missing = required.filter(kind => status()[kind] !== 'granted');
+      if (missing.length && dialog) {
+        const answer = await dialog.showMessageBox({ type: 'question', title: 'Enable MIRA desktop permissions', message: 'MIRA needs access to operate your desktop.', detail: missing.map(kind => labels[kind]).join('\n') + '\n\nEnable Talio in the native prompt or System Settings. macOS may require restarting Talio after Screen Recording access changes. Permissions cannot be granted automatically.', buttons: ['Not now', 'Enable access'], defaultId: 1, cancelId: 0, noLink: true });
+        if (answer.response !== 1) return { success: false, message: 'Desktop permissions are still required. No input was sent.' };
+        // Ask one OS permission at a time so settings panes do not replace each other.
+        await request(missing[0]);
+        if (missing[0] === 'screenRecording' && status().screenRecording !== 'granted') await request('screenRecording:settings');
+      }
+      const remaining = required.filter(kind => status()[kind] !== 'granted');
+      return remaining.length
+        ? { success: false, message: `Enable ${remaining.map(kind => labels[kind].split(' — ')[0]).join(' and ')} for Talio, then retry. macOS may require restarting the app.`, permissions: status() }
+        : { success: true, permissions: status() };
+    })();
+    try { return await pendingSetup; } finally { pendingSetup = null; }
+  }
+  return { status, request, ensureDesktopAccess };
 }
 module.exports = { trustedMiraSender, createMiraPermissions };

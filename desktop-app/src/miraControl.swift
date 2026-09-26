@@ -47,6 +47,30 @@ func key(_ code: CGKeyCode, _ flags: CGEventFlags = []) {
     for down in [true, false] { let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down); event?.flags = flags; event?.post(tap: .cghidEventTap) }
 }
 switch type {
+case "ui_elements":
+    guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); exit(0) }
+    let root = focused as! AXUIElement
+    AXUIElementSetMessagingTimeout(root, 0.15)
+    var queue: [(AXUIElement, Int)] = [(root, 0)]
+    var elements: [[String:Any]] = []
+    var visited = 0
+    let deadline = Date().addingTimeInterval(0.8)
+    while !queue.isEmpty && visited < 250 && elements.count < 60 && Date() < deadline {
+        let (element, depth) = queue.removeFirst(); visited += 1
+        let role = attribute(element, kAXRoleAttribute) as? String ?? ""
+        let label = [kAXTitleAttribute, kAXDescriptionAttribute, "AXPlaceholderValue"].compactMap { attribute(element, $0) as? String }.first(where: { !$0.isEmpty }) ?? ""
+        // Do not read AXValue or secure text; collect bounded visible labels only.
+        if !label.isEmpty && role != "AXSecureTextField" && attribute(element, kAXSubroleAttribute) as? String != "AXSecureTextField",
+           attribute(element, "AXHidden") as? Bool != true, attribute(element, kAXEnabledAttribute) as? Bool != false,
+           let frame = geometry(element), frame["width"]! > 0, frame["height"]! > 0,
+           ["AXButton", "AXTextField", "AXTextArea", "AXSearchField", "AXStaticText", "AXLink", "AXCheckBox", "AXPopUpButton"].contains(role) {
+            elements.append(["role":role, "label":String(label.prefix(100)), "frame":frame])
+        }
+        if depth < 12, role != "AXSecureTextField", let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] {
+            queue.append(contentsOf: children.prefix(100).map { ($0, depth + 1) })
+        }
+    }
+    output(["success":true,"pid":pid,"elements":elements]); exit(0)
 case "prepare_window":
     guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); exit(0) }
     let window = focused as! AXUIElement
