@@ -27,6 +27,8 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
   const stop = useCallback(() => {
     const run = session.current
     session.current = null
+    clearTimeout(run?.startupTimer)
+    run?.rejectStartup?.(new DOMException('Voice cancelled', 'AbortError'))
     run?.abort.abort()
     run?.engine?.stop()
     run?.playback?.close()
@@ -59,7 +61,7 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
     try {
       // Resume Web Audio in the same user gesture as microphone activation.
       run.playback = createMiraSpeechPlayback()
-      run.engine = await startMiraConversationRecognition({
+      const engineReady = startMiraConversationRecognition({
         signal: run.abort.signal,
         onError: err => { if (live()) { stop(); setError(err.message) } },
         onPartial: text => { if (live() && !isEcho(text)) { interrupt(text); if (!run.locked) setTranscript(text) } },
@@ -107,8 +109,17 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
             if (live() && turn === run.turn) { setTranscript(''); listen() }
           } catch (err) { if (live() && turn === run.turn) { run.turn++; run.playback.cancel(); setTranscript(''); if (err.name !== 'AbortError') setError('Audio is unavailable. You can continue; the reply is in chat.'); listen() } }
         },
-      })
-      if (!live()) { run.engine.stop(); return }
+      }).then(engine => { if (!live()) engine.stop(); return engine })
+      run.engine = await Promise.race([
+        engineReady,
+        new Promise((_, reject) => {
+          run.rejectStartup = reject
+          run.startupTimer = setTimeout(() => reject(new Error('Voice is taking too long to connect. You can type now or retry the microphone.')), 10000)
+        }),
+      ])
+      clearTimeout(run.startupTimer)
+      run.rejectStartup = null
+      if (!live()) return
       setStream(run.engine.stream); setState('listening')
     } catch (err) { if (session.current === run) { stop(); if (err.name !== 'AbortError') setError(err.message) } }
   }, [stop])

@@ -939,9 +939,9 @@ export default function MiraChatSidebar() {
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => handleInputChange(e.target.value)}
+                onChange={(e) => { if (voice.active) voice.stop(); handleInputChange(e.target.value) }}
                 onKeyDown={handleKeyDown}
-                placeholder={voice.active ? (voice.transcript || (voice.state === 'loading' ? 'Preparing voice…' : voice.state === 'speaking' ? 'MIRA is speaking…' : voice.state === 'thinking' ? 'Thinking…' : 'Listening…')) : 'Ask MIRA…'}
+                placeholder={voice.active ? (voice.transcript || (voice.state === 'loading' ? 'Connecting voice… or type here' : voice.state === 'speaking' ? 'MIRA is speaking…' : voice.state === 'thinking' ? 'Thinking…' : 'Listening…')) : 'Ask MIRA…'}
                 rows={1}
                 className="block w-full resize-none rounded-xl text-default-800 text-sm px-3 py-2.5 focus:outline-none placeholder:text-default-400 disabled:opacity-50"
                 style={{

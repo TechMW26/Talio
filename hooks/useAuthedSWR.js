@@ -107,9 +107,10 @@ const authedFetcher = async (url) => {
 }
 
 export default function useAuthedSWR(key, options = {}) {
-  return useSWR(key, authedFetcher, {
+  const result = useSWR(key, authedFetcher, {
     // Stale-while-revalidate: show cached data immediately
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
+    revalidateOnMount: true,
     revalidateOnReconnect: true,
     // Coalesce duplicate mounts and realtime bursts. Explicit mutate calls are
     // still immediate, so this does not delay post-mutation updates.
@@ -125,6 +126,9 @@ export default function useAuthedSWR(key, options = {}) {
     suspense: false,
     ...options,
   })
+  // SWR marks fallback/previous data as loading. Keep that data visible while
+  // isValidating reports the background request instead of showing a skeleton.
+  return { ...result, isLoading: result.isLoading && result.data === undefined }
 }
 
 /**
@@ -132,11 +136,11 @@ export default function useAuthedSWR(key, options = {}) {
  * Use for data that rarely changes (e.g., departments, designations)
  */
 export function useAuthedSWRStatic(key, options = {}) {
-  return useSWR(key, authedFetcher, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    revalidateIfStale: false, // Don't revalidate if we have data
-    dedupingInterval: 5 * 60 * 1000, // 5 minutes
+  return useAuthedSWR(key, {
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    revalidateIfStale: true,
+    dedupingInterval: 5000,
     shouldRetryOnError: false,
     keepPreviousData: true,
     ...options,
@@ -148,8 +152,8 @@ export function useAuthedSWRStatic(key, options = {}) {
  * Use for data that needs to be always fresh (e.g., notifications, chat)
  */
 export function useAuthedSWRRealtime(key, options = {}) {
-  return useSWR(key, authedFetcher, {
-    revalidateOnFocus: false,
+  return useAuthedSWR(key, {
+    revalidateOnFocus: true,
     revalidateOnReconnect: true,
     // Realtime screens are event-driven. Callers may opt into polling only for
     // protocols that require a liveness check (for example meeting sessions).

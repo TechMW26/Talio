@@ -11,7 +11,7 @@ const logger = require('./logger');
 const offlineQueue = require('./offlineQueue');
 
 // Configuration
-const CAPTURE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
+const CAPTURE_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes for every eligible employee
 const DEFAULT_API_BASE_URL = 'https://app.talio.in';
 const API_BASE_URL = (process.env.TALIO_APP_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
 const JPEG_QUALITY = 80;
@@ -28,6 +28,7 @@ class ScreenshotService {
     this.mainWindow = null;
     this.captureCount = 0;
     this.lastCaptureTime = null;
+    this.lastScheduledCaptureAt = null;
     this.onPermissionError = null; // Callback for permission errors
     this.permissionErrorShown = false; // Only show once per session
     this.getDesktopSources = null; // IPC function to get desktop sources from renderer
@@ -49,6 +50,7 @@ class ScreenshotService {
       this.isCapturing = false;
     }
 
+    if (this.userId !== config.userId) this.lastScheduledCaptureAt = null;
     this.userId = config.userId;
     this.employeeId = config.employeeId;
     this.userRole = config.role;
@@ -139,9 +141,9 @@ class ScreenshotService {
       return false;
     }
 
-    // Debounce: if already capturing and start was called recently (within 30s), skip
+    // An active timer owns the cadence; repeated startup events must not reset it.
     var now = Date.now();
-    if (this.isCapturing && this.captureTimer && (now - this.lastStartTime) < 30000) {
+    if (this.isCapturing && this.captureTimer) {
       logger.log('debug', 'ScreenshotService', 'start() debounced — already capturing (started ' + Math.round((now - this.lastStartTime) / 1000) + 's ago)');
       return true;
     }
@@ -210,6 +212,12 @@ class ScreenshotService {
     }
 
     try {
+      // Reconnects/repeated start calls must not produce extra employee captures.
+      if (captureType === 'automatic' || captureType === 'session_start') {
+        const now = Date.now();
+        if (this.lastScheduledCaptureAt !== null && now - this.lastScheduledCaptureAt < CAPTURE_INTERVAL_MS) return null;
+        this.lastScheduledCaptureAt = now;
+      }
       logger.log('debug', 'ScreenshotService', 'Capturing screen (' + captureType + ')');
 
       if (!this.getDesktopSources) {

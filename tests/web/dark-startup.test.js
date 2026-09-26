@@ -19,6 +19,7 @@ describe('Dark startup and navigation surfaces', () => {
   })
 
   test.each([
+    'desktop-app/src/loader.html',
     'desktop-app/src/welcome.html',
     'desktop-app/src/offline.html',
     'desktop-app/src/update.html',
@@ -31,6 +32,7 @@ describe('Dark startup and navigation surfaces', () => {
   })
 
   test('keeps updater download progress and existing onboarding controls', () => {
+    expect(source('desktop-app/src/loader.html')).not.toContain('class="status-line"')
     expect(source('desktop-app/src/update.html')).toContain('id="progressBar"')
     expect(source('desktop-app/src/welcome.html')).toContain('-webkit-app-region: drag')
   })

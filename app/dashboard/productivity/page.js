@@ -969,7 +969,7 @@ export default function ProductivityPage() {
                     </span>
                   </span>
                 ) : (
-                  <span className="text-gray-500">Captures are taken every 3 minutes during configured office hours.</span>
+                  <span className="text-gray-500">Captures are taken every 4 minutes during configured office hours.</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -1045,7 +1045,7 @@ export default function ProductivityPage() {
                   <HiOutlinePhoto className="w-16 h-16 mx-auto text-gray-300 mb-4" />
                   <h3 className="text-lg font-medium text-gray-800 mb-2">No captures for this day</h3>
                   <p className="text-gray-500">
-                    Screenshots are captured every 3 minutes during your company&apos;s office hours.
+                    Screenshots are captured every 4 minutes during your company&apos;s office hours.
                   </p>
                 </div>
               ) : null}

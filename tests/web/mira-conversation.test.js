@@ -6,6 +6,24 @@ jest.mock('@/lib/miraConversationRecognition', () => ({ startMiraConversationRec
 jest.mock('@/lib/miraSpeechPlayback', () => ({ createMiraSpeechPlayback: jest.fn() }))
 let callbacks, engine, spoken
 let playback
+test('hung voice initialization exits loading and releases a late microphone session', async () => {
+  jest.useFakeTimers()
+  let resolveEngine, pending
+  startMiraConversationRecognition.mockImplementationOnce(() => new Promise(resolve => { resolveEngine = resolve }))
+  const { result, unmount } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage: jest.fn() }))
+  try {
+    act(() => { pending = result.current.start() })
+    expect(result.current.state).toBe('loading')
+    await act(async () => { await jest.advanceTimersByTimeAsync(10000); await pending })
+    expect(result.current.state).toBe('idle')
+    expect(result.current.error).toMatch(/type now or retry/)
+    expect(playback.close).toHaveBeenCalled()
+    const late = { stop: jest.fn() }
+    await act(async () => { resolveEngine(late); await Promise.resolve() })
+    expect(late.stop).toHaveBeenCalled()
+    expect(result.current.state).toBe('idle')
+  } finally { unmount(); jest.useRealTimers() }
+})
 test('empty action return does not block subsequent voice turns or replay actions', async () => {
   const sendMessage = jest.fn(async () => undefined)
   const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import { SCREENSHOT_CAPTURE_INTERVAL_MINUTES } from '@/lib/productivitySessionRules';
 
 export async function POST(request) {
   try {
@@ -22,10 +23,10 @@ export async function POST(request) {
     }
 
     // Validate interval
-    if (!interval || interval < 1 || interval > 1440) {
+    if (interval !== SCREENSHOT_CAPTURE_INTERVAL_MINUTES) {
       return NextResponse.json({
         success: false,
-        error: 'Invalid interval. Must be between 1 and 1440 minutes'
+        error: 'Screenshot capture is fixed at 4 minutes for all employees'
       }, { status: 400 });
     }
 
@@ -67,7 +68,8 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }
 
-    const interval = userRecord.settings?.screenshotInterval || 3; // Default 3 minutes
+    // Old per-user values must not override the organization-wide capture policy.
+    const interval = SCREENSHOT_CAPTURE_INTERVAL_MINUTES;
 
     return NextResponse.json({
       success: true,

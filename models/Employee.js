@@ -370,7 +370,7 @@ const EmployeeSchema = new mongoose.Schema({
   // Productivity monitoring settings
   screenshotInterval: {
     type: Number,
-    default: 30 * 60 * 1000, // 30 minutes in milliseconds
+    default: 4 * 60 * 1000, // 4 minutes in milliseconds
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,

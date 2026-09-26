@@ -112,6 +112,19 @@ test('mouse movement while planning stops input rather than fighting the user', 
   expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'click', x: .5, y: .5 } })).success).toBe(false)
   expect(deps.runControl.mock.calls.some(([a]) => a.type === 'click')).toBe(false)
 })
+test('window layout changes re-observe without executing stale input or ending the session', async () => {
+  let frame = { x: 0, y: 0, width: 800, height: 600 }
+  const runControl = jest.fn(async () => ({ success: true, pid: 1, windowId: 'one', frame, app: 'Notes', keyIdleSeconds: 999 }))
+  const { call } = harness({ runControl })
+  const start = await call({ operation: 'begin', goal: 'Read Notes' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  frame = { ...frame, width: 1000 }
+  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'click', x: .5, y: .5 } })
+  expect(result).toMatchObject({ success: false, retryable: true })
+  expect(runControl.mock.calls.some(([action]) => action.type === 'click')).toBe(false)
+  expect((await call({ operation: 'observe', sessionId: start.sessionId })).success).toBe(true)
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
 test('native sender gate rejects child frames and other origins', () => {
   const { event, window } = harness()
   expect(trustedMiraSender(event, window, 'https://app.talio.in')).toBe(true)

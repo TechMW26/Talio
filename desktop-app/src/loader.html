@@ -7,11 +7,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-main: #f8fafc;
-      --bg-card: rgba(255, 255, 255, 0.82);
+      color-scheme: dark;
+      --bg-main: #09090b;
+      --bg-card: #18181b;
       --border: rgba(148, 163, 184, 0.18);
-      --text-primary: #0f172a;
-      --text-secondary: #475569;
+      --text-primary: #f4f4f5;
+      --text-secondary: #a1a1aa;
       --brand: #7dbcaf;
       --brand-deep: #2563eb;
     }
@@ -30,10 +31,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background:
-        radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 34%),
-        radial-gradient(circle at bottom left, rgba(125, 188, 175, 0.20), transparent 36%),
-        linear-gradient(145deg, #f8fafc 0%, #eef6ff 50%, #f4fbf9 100%);
+      background: var(--bg-main);
       color: var(--text-primary);
       -webkit-app-region: drag;
       user-select: none;
@@ -45,7 +43,7 @@
       border-radius: 28px;
       background: var(--bg-card);
       border: 1px solid var(--border);
-      box-shadow: 0 28px 60px rgba(15, 23, 42, 0.10);
+      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.35);
       backdrop-filter: blur(18px);
       text-align: center;
     }
@@ -76,42 +74,20 @@
       line-height: 1.6;
     }
 
-    .status-line {
-      width: 100%;
-      height: 8px;
-      margin: 28px 0 16px;
-      border-radius: 999px;
-      background: rgba(148, 163, 184, 0.14);
-      overflow: hidden;
-      position: relative;
-    }
-
-    .status-line::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      width: 38%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--brand), var(--brand-deep));
-      animation: progress 1.35s ease-in-out infinite;
-    }
-
     .hint {
       margin-top: 18px;
       font-size: 12px;
-      color: #64748b;
+      color: var(--text-secondary);
       letter-spacing: 0.04em;
       text-transform: uppercase;
-    }
-
-    @keyframes progress {
-      0% { transform: translateX(-110%); }
-      100% { transform: translateX(320%); }
     }
 
     @keyframes float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-5px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .logo-wrap { animation: none; }
     }
   </style>
 </head>
@@ -124,9 +100,8 @@
     </div>
 
     <h1>Opening Talio</h1>
-    <p>Preparing a clean, fresh workspace and connecting to your company environment.</p>
-    <div class="status-line" aria-hidden="true"></div>
-    <p class="hint">Secure desktop session starting</p>
+    <p>Connecting to your company workspace.</p>
+    <p class="hint" role="status">Secure desktop session starting</p>
   </div>
 </body>
 </html>
