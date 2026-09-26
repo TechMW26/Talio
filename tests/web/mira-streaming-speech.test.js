@@ -1,5 +1,43 @@
 import { createMiraStreamingSpeech } from '@/lib/miraStreamingSpeech'
 
+test('prepares one sentence ahead while playback is busy, with bounded lookahead', async () => {
+  let release
+  const prepare = jest.fn(phrase => ({ phrase, cancel: jest.fn() }))
+  const speak = jest.fn().mockImplementationOnce(() => new Promise(resolve => { release = resolve })).mockResolvedValue(undefined)
+  const speech = createMiraStreamingSpeech({ prepare, speak, live: () => true })
+  speech.update('First sentence. Second sentence. Third sentence.')
+  await Promise.resolve()
+  expect(prepare.mock.calls.map(([text]) => text)).toEqual(['First sentence. ', 'Second sentence. '])
+  expect(speak).toHaveBeenCalledTimes(1)
+  expect(speak.mock.calls[0][1]).toBe(prepare.mock.results[0].value)
+  release()
+  await speech.finish('First sentence. Second sentence. Third sentence.')
+  expect(prepare).toHaveBeenCalledTimes(3)
+  expect(speak.mock.calls.map(([text]) => text)).toEqual(['First sentence. ', 'Second sentence. ', 'Third sentence.'])
+})
+
+test('cancels prefetched audio when the turn becomes stale', async () => {
+  let live = true
+  const prepare = jest.fn(() => ({ cancel: jest.fn() }))
+  const speak = jest.fn()
+  const speech = createMiraStreamingSpeech({ prepare, speak, live: () => live })
+  speech.update('First sentence. Second sentence.')
+  live = false
+  await speech.finish('First sentence. Second sentence.')
+  expect(speak).not.toHaveBeenCalled()
+  for (const result of prepare.mock.results) expect(result.value.cancel).toHaveBeenCalled()
+})
+
+test('a playback failure cancels lookahead and never acquires later phrases', async () => {
+  const prepare = jest.fn(() => ({ cancel: jest.fn() }))
+  const speak = jest.fn().mockRejectedValue(new Error('audio failed'))
+  const speech = createMiraStreamingSpeech({ prepare, speak, live: () => true })
+  await expect(speech.finish('First sentence. Second sentence. Third sentence.')).rejects.toThrow('audio failed')
+  expect(prepare).toHaveBeenCalledTimes(2)
+  expect(speak).toHaveBeenCalledTimes(1)
+  expect(prepare.mock.results[1].value.cancel).toHaveBeenCalled()
+})
+
 test('starts before completion, queues in order and never repeats the final answer', async () => {
   let release
   const speak = jest.fn().mockImplementationOnce(() => new Promise(resolve => { release = resolve })).mockResolvedValue(undefined)

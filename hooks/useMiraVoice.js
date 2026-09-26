@@ -86,10 +86,11 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
             const speech = createMiraStreamingSpeech({
               live: () => live() && turn === run.turn,
               clean: speechText,
-              speak: spoken => {
+              prepare: run.playback.prepare,
+              speak: (spoken, prepared) => {
                 run.reply = `${run.reply} ${spoken}`.slice(-5000)
                 run.speaking = true
-                return run.playback.speak(spoken, () => { if (live() && turn === run.turn) setState('speaking') })
+                return run.playback.speak(spoken, () => { if (live() && turn === run.turn) setState('speaking') }, prepared)
               },
             })
             run.reply = ''
