@@ -55,6 +55,22 @@ jobs:
           path: agent-s-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
 
+      - name: Package desktop (no automatic publication)
+        run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }} --publish never
+        working-directory: desktop-app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            desktop-app/dist/*.dmg
+            desktop-app/dist/*.zip
+            desktop-app/dist/*.exe
+            desktop-app/dist/*.AppImage
+            desktop-app/dist/*.deb
+          if-no-files-found: error
+
   publish:
     name: Publish desktop release
     needs: build
@@ -88,18 +104,3 @@ jobs:
             release-assets/**/*.AppImage
             release-assets/**/*.deb
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Package desktop (no automatic publication)
-        run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }} --publish never
-        working-directory: desktop-app
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            desktop-app/dist/*.dmg
-            desktop-app/dist/*.zip
-            desktop-app/dist/*.exe
-            desktop-app/dist/*.AppImage
-            desktop-app/dist/*.deb
-          if-no-files-found: error
