@@ -52,3 +52,28 @@ test('permission resolving after cancellation releases the microphone without co
   expect(track.stop).toHaveBeenCalled()
   expect(socket).toBeNull()
 })
+
+test('voice streams and cleans up in runtimes without audioWorklet', async () => {
+  const OriginalContext = window.AudioContext
+  window.AudioContext = function () {
+    const value = new OriginalContext()
+    delete value.audioWorklet
+    value.createScriptProcessor = jest.fn(() => {
+      processor = { connect: jest.fn(), disconnect: jest.fn() }
+      return processor
+    })
+    return value
+  }
+  const pending = startMiraConversationRecognition({ onResult: jest.fn(), onError: jest.fn() })
+  await waitFor(() => expect(socket).not.toBeNull())
+  socket.onmessage({ data: JSON.stringify({ message_type: 'session_started' }) })
+  const engine = await pending
+  const output = new Float32Array([1, 1])
+  processor.onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array([.1, -.1]) }, outputBuffer: { getChannelData: () => output } })
+  expect(JSON.parse(socket.send.mock.calls[0][0])).toMatchObject({ message_type: 'input_audio_chunk', sample_rate: 16000 })
+  expect([...output]).toEqual([0, 0])
+  engine.stop()
+  expect(processor.onaudioprocess).toBeNull()
+  expect(track.stop).toHaveBeenCalled()
+  expect(socket.close).toHaveBeenCalled()
+})

@@ -40,3 +40,22 @@ test('rejects untrusted renderer and non-dashboard URLs', async () => {
   await expect(capture({ ...event, senderFrame: { url: 'https://evil.example/dashboard' } }, window, 'https://app.talio.in')).resolves.toMatchObject({ success: false })
   await expect(capture({ ...event, senderFrame: { url: 'https://app.talio.in/login' } }, window, 'https://app.talio.in')).resolves.toMatchObject({ success: false })
 })
+
+test('reuses desktop consent for successive frames and honors revocation', async () => {
+  let approved = true
+  const { capture, deps, event, window } = harness({ hasDesktopConsent: () => approved })
+  await expect(capture(event, window, 'https://app.talio.in')).resolves.toMatchObject({ success: true })
+  await expect(capture(event, window, 'https://app.talio.in')).resolves.toMatchObject({ success: true })
+  expect(deps.dialog.showMessageBox).not.toHaveBeenCalled()
+  approved = false
+  deps.dialog.showMessageBox.mockResolvedValue({ response: 0 })
+  await expect(capture(event, window, 'https://app.talio.in')).resolves.toMatchObject({ success: false })
+  expect(deps.dialog.showMessageBox).toHaveBeenCalledTimes(1)
+})
+
+test('desktop consent does not bypass OS permission or renderer validation', async () => {
+  const { capture, deps, event, window } = harness({ hasDesktopConsent: () => true, systemPreferences: { getMediaAccessStatus: () => 'denied' } })
+  await expect(capture(event, window, 'https://app.talio.in')).resolves.toMatchObject({ success: false })
+  await expect(capture({ ...event, sender: {} }, window, 'https://app.talio.in')).resolves.toMatchObject({ success: false })
+  expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
+})

@@ -2,7 +2,7 @@
 
 // Separate from attendance capture: one frame, initiated by a MIRA question,
 // never uploaded until the user approves sharing with the vision provider.
-function createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, systemPreferences, platform }) {
+function createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, systemPreferences, platform, hasDesktopConsent = () => false }) {
   let capturing = false;
   return async function capture(event, window, appOrigin) {
     const contents = window?.webContents;
@@ -21,7 +21,7 @@ function createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, syste
       const bytes = selected.thumbnail.toJPEG(80);
       if (bytes.length > 2 * 1024 * 1024) return { success: false, message: 'Screen image is too large. Please attach a smaller screenshot.' };
       const capturedAt = Date.now();
-      const consent = await dialog.showMessageBox({ type: 'question', title: 'MIRA screen context', message: 'Share a screenshot of your current display with MIRA?', detail: 'A single frame from the display containing your mouse pointer will be sent to the Pollinations vision service to answer your question. It may include another app or sensitive content. Cancel to keep it private.', buttons: ['Cancel', 'Share screenshot'], defaultId: 0, cancelId: 0, noLink: true });
+      const consent = hasDesktopConsent() ? { response: 1 } : await dialog.showMessageBox({ type: 'question', title: 'MIRA screen context', message: 'Share a screenshot of your current display with MIRA?', detail: 'A single frame from the display containing your mouse pointer will be sent to the Pollinations vision service to answer your question. It may include another app or sensitive content. Enable desktop control in MIRA permissions to allow screen context without repeated prompts. Cancel to keep it private.', buttons: ['Cancel', 'Share screenshot'], defaultId: 0, cancelId: 0, noLink: true });
       if (consent.response !== 1) return { success: false, message: 'Screen sharing cancelled. You can describe what you see instead.' };
       if (contents.isDestroyed() || contents.getURL() !== source.href) return { success: false, message: 'Talio changed pages before screen sharing completed. Please try again.' };
       return { success: true, image: bytes.toString('base64'), mimeType: 'image/jpeg', capturedAt };

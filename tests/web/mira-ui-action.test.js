@@ -53,3 +53,32 @@ test('rejects invented snapshot IDs and cancelled clicks', async () => {
   expect((await executeMiraUiAction(action, { signal: controller.signal, resolveSnapshot: async () => { controller.abort(); return '0' } })).success).toBe(false)
   expect(click).not.toHaveBeenCalled()
 })
+
+test('missing navigation uses search without falsely claiming completion', async () => {
+  const pages = [{ title: 'Team Attendance', path: '/dashboard/attendance/team' }]
+  const searchNavigation = jest.fn(async () => pages)
+  const outcome = await executeMiraUiAction({ type: 'ui_action', fields: { operation: 'click', target: 'Team Attendance' } }, { resolveSnapshot: async () => null, searchNavigation })
+  expect(outcome).toMatchObject({ success: false, navigationRecovery: true, pages })
+  expect(searchNavigation).toHaveBeenCalledWith('Team Attendance')
+})
+
+test('does not search past ambiguous controls or cancellation', async () => {
+  addTab('Pending')
+  const searchNavigation = jest.fn(async () => [])
+  const action = { type: 'ui_action', fields: { operation: 'click', target: 'Pending' } }
+  expect((await executeMiraUiAction(action, { searchNavigation })).success).toBe(false)
+  const controller = new AbortController(); controller.abort()
+  await executeMiraUiAction({ ...action, fields: { operation: 'click', target: 'Attendance' } }, { searchNavigation, signal: controller.signal })
+  expect(searchNavigation).not.toHaveBeenCalled()
+})
+
+test('registered employee attendance cards are executable even when rendered as a div', async () => {
+  const card = document.createElement('div')
+  card.setAttribute('data-mira-control', 'navigation')
+  card.setAttribute('aria-label', 'Open attendance for Devesh Nageshwar (U43)')
+  card.getClientRects = () => [{}]; card.scrollIntoView = jest.fn()
+  document.querySelector('main').append(card)
+  const clicked = jest.fn(); card.addEventListener('click', clicked)
+  expect((await executeMiraUiAction({ type: 'ui_action', fields: { operation: 'click', target: card.getAttribute('aria-label') } })).success).toBe(true)
+  expect(clicked).toHaveBeenCalledTimes(1)
+})

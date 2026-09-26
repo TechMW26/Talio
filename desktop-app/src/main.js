@@ -21,7 +21,7 @@ const { inspectRendererHealth, resolveAppNavigationUrl } = require('./rendererHe
 const { revealMiraWindow } = require('./miraWakeBridge');
 const { captureMiraAppSnapshot } = require('./miraAppSnapshot');
 const { createMiraDesktopScreenCapture } = require('./miraDesktopScreen');
-const captureMiraDesktopScreen = createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, systemPreferences, platform: process.platform });
+const captureMiraDesktopScreen = createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, systemPreferences, platform: process.platform, hasDesktopConsent: () => store.get('miraDesktopConsentV1') === true });
 const { pipWindowOptions, pipBounds } = require('./pipWindowPolicy');
 let livePipWindow = null;
 

@@ -34,6 +34,21 @@ test('map locates timer on Dashboard and supports nested routes without arbitrar
   for (const path of ['https://evil.test', '/dashboard/unknown', '/dashboard/employees/user-passwords', '/dashboard/../admin', '/dashboard/settings?tab=bad']) expect(miraAppPath(path)).toBeNull()
 })
 
+test('plans employee attendance as a route plus an entity selection, not a fabricated deep link', () => {
+  const knowledge = miraAppKnowledge('Open their attendance', { page: '/dashboard/settings' }, [{ role: 'user', content: 'Show Devesh attendance' }])
+  expect(knowledge).toContain('/dashboard/attendance/team')
+  expect(knowledge).toContain('Employee selection is UI state')
+  expect(knowledge).toContain('continueUi:true')
+  expect(knowledge).toContain('execute only one grounded step at a time')
+  expect(miraAppPath('/dashboard/attendance/team?employee=Devesh')).toBeNull()
+})
+
+test('referential follow-ups retrieve prior subjects but a new task does not reuse them', () => {
+  const history = [{ role: 'user', content: 'Show employee team attendance calendar' }]
+  expect(miraAppKnowledge('Open their page', {}, history)).toContain('Another employee attendance:')
+  expect(miraAppKnowledge('Open payroll', {}, history)).not.toContain('Another employee attendance:')
+})
+
 test('live inventory understands icon titles, excludes password values, and executes real header controls', async () => {
   document.body.innerHTML = '<header><button title="Open notifications"></button></header><main><input type="password" value="secret"><input aria-label="Search tasks" value="private draft"><button>Delete employee</button></main>'
   document.querySelectorAll('button,input').forEach(el => { el.getClientRects = () => [{ width: 20, height: 20 }]; el.scrollIntoView = jest.fn() })

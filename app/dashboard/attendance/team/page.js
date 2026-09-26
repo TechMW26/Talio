@@ -500,6 +500,8 @@ export default function TeamAttendancePage() {
                   return (
                     <Card
                       key={emp._id}
+                      data-mira-control="navigation"
+                      aria-label={`Open attendance for ${emp.firstName} ${emp.lastName} (${emp.employeeCode || emp._id})`}
                       isPressable
                       onPress={() => handleEmployeeClick(emp)}
                       className={`shadow-md hover:shadow-lg transition-all duration-200 border-l-4 ${deptColor.border} ${isHeadedDept ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-[#09090b]' : ''}`}

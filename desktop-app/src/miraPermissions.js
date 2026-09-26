@@ -7,8 +7,11 @@ function trustedMiraSender(event, window, origin) {
 
 function createMiraPermissions({ systemPreferences, shell, platform, store, dialog }) {
   function status() {
-    if (platform !== 'darwin') return { platform, desktopControl: store?.get('miraDesktopConsentV1') === true ? 'granted' : 'denied', microphone: 'runtime', camera: 'runtime', screenRecording: 'runtime', accessibility: 'runtime' };
-    return { platform, desktopControl: store?.get('miraDesktopConsentV1') === true ? 'granted' : 'denied', microphone: systemPreferences.getMediaAccessStatus('microphone'), camera: systemPreferences.getMediaAccessStatus('camera'), screenRecording: systemPreferences.getMediaAccessStatus('screen'), accessibility: systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'denied' };
+    const media = kind => {
+      if (!['darwin', 'win32'].includes(platform)) return 'runtime';
+      try { return systemPreferences.getMediaAccessStatus(kind); } catch { return 'runtime'; }
+    };
+    return { platform, desktopControl: store?.get('miraDesktopConsentV1') === true ? 'granted' : 'denied', microphone: media('microphone'), camera: media('camera'), location: 'runtime', notifications: 'runtime', screenRecording: platform === 'darwin' ? media('screen') : 'runtime', accessibility: platform === 'darwin' ? (systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'denied') : 'runtime' };
   }
   async function request(kind) {
     if (kind === 'desktopControl' && dialog && store) {
@@ -18,14 +21,18 @@ function createMiraPermissions({ systemPreferences, shell, platform, store, dial
       return { success: true, permissions: status() };
     }
     if (kind === 'revokeDesktopControl' && store) { store.delete('miraDesktopConsentV1'); return { success: true, permissions: status() }; }
-    const panels = { microphone: 'Microphone', camera: 'Camera', screenRecording: 'ScreenCapture', accessibility: 'Accessibility' };
+    const panels = { microphone: 'Microphone', camera: 'Camera', screenRecording: 'ScreenCapture', accessibility: 'Accessibility', location: 'LocationServices', notifications: 'Notifications' };
     if (!panels[kind]) return { success: false };
     if (platform === 'darwin') {
       if (['microphone', 'camera'].includes(kind) && systemPreferences.getMediaAccessStatus(kind) === 'not-determined') await systemPreferences.askForMediaAccess(kind);
       else if (kind === 'accessibility') systemPreferences.isTrustedAccessibilityClient(true);
-      if (status()[kind] !== 'granted') await shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?Privacy_${panels[kind]}`);
-    } else if (platform === 'win32' && ['microphone', 'camera'].includes(kind)) {
-      await shell.openExternal(kind === 'camera' ? 'ms-settings:privacy-webcam' : 'ms-settings:privacy-microphone');
+      if (status()[kind] !== 'granted') await shell.openExternal(kind === 'notifications' ? 'x-apple.systempreferences:com.apple.preference.notifications' : `x-apple.systempreferences:com.apple.preference.security?Privacy_${panels[kind]}`);
+    } else if (platform === 'win32') {
+      const targets = { camera: 'ms-settings:privacy-webcam', microphone: 'ms-settings:privacy-microphone', location: 'ms-settings:privacy-location', notifications: 'ms-settings:notifications' };
+      if (targets[kind]) await shell.openExternal(targets[kind]);
+      else return { success: true, permissions: status(), message: 'Windows manages screen capture and desktop input at runtime. Secure desktops and elevated applications may not be controllable.' };
+    } else {
+      return { success: true, permissions: status(), message: 'Open your Linux desktop Settings → Privacy or Notifications. Screen sharing may use a system portal; desktop control depends on X11/Wayland support. Talio cannot grant these permissions for you.' };
     }
     return { success: true, permissions: status() };
   }
