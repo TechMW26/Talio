@@ -95,9 +95,15 @@ class SafeACI:
         """Lock the laptop only when explicitly requested. Cannot unlock or bypass the lock screen."""
         return {"type": "lock"}
 
-    def wait(self, seconds):
-        # Upstream uses wait as its invalid-plan fallback: fail closed, never invent input.
-        return {"question": "I could not verify the next desktop action, so I stopped."}
+    @action
+    def wait(self, seconds=1):
+        """Wait briefly for the app to settle, then observe and plan again. Sends no input."""
+        if type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0 <= seconds <= 5:
+            raise ValueError("Invalid wait")
+        # Upstream also calls wait after an invalid plan. Recover without input,
+        # rather than turning a formatting failure into a user clarification.
+        return {"retryable": True, "retryAfterMs": max(200, int(seconds * 1000)),
+                "message": "Refreshing the screen and planning the next step."}
 
 
 def parse_action(agent, code, observation):

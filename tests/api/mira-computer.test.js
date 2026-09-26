@@ -116,14 +116,15 @@ test('prepares each window once and restores its saved geometry on cancellation'
   expect(deps.runControl.mock.calls.filter(([a]) => a.type === 'prepare_window')).toHaveLength(1)
   expect(deps.runControl).toHaveBeenCalledWith({ type: 'restore_window', state })
 })
-test('mouse movement while planning stops input rather than fighting the user', async () => {
+test('mouse movement alone does not stop the desktop session', async () => {
   let cursor = { x: 10, y: 10 }
   const { call, deps } = harness({ screen: { getCursorScreenPoint: () => cursor, getDisplayNearestPoint: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1000, height: 800 } }) } })
   const start = await call({ operation: 'begin', goal: 'Read Notes' })
   const obs = await call({ operation: 'observe', sessionId: start.sessionId })
   cursor = { x: 60, y: 10 }
-  expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'click', x: .5, y: .5 } })).success).toBe(false)
-  expect(deps.runControl.mock.calls.some(([a]) => a.type === 'click')).toBe(false)
+  expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'click', x: .5, y: .5 } })).success).toBe(true)
+  expect(deps.runControl.mock.calls.some(([a]) => a.type === 'click')).toBe(true)
+  await call({ operation: 'cancel', sessionId: start.sessionId })
 })
 test('window layout changes re-observe without executing stale input or ending the session', async () => {
   let frame = { x: 0, y: 0, width: 800, height: 600 }
@@ -137,6 +138,24 @@ test('window layout changes re-observe without executing stale input or ending t
   expect(runControl.mock.calls.some(([action]) => action.type === 'click')).toBe(false)
   expect((await call({ operation: 'observe', sessionId: start.sessionId })).success).toBe(true)
   await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+test('keyboard activity refreshes the observation and resumes the same session', async () => {
+  let now = 100000, idle = 999
+  const clock = jest.spyOn(Date, 'now').mockImplementation(() => now)
+  const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, app: 'Notes', keyIdleSeconds: idle })) })
+  try {
+    const start = await call({ operation: 'begin', goal: 'Read Notes' })
+    const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+    now += 1000; idle = 0
+    const action = { type: 'key', key: 'find' }
+    expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action })).toMatchObject({ success: false, retryable: true })
+    expect(deps.runControl).not.toHaveBeenCalledWith(action)
+    idle = 999
+    const fresh = await call({ operation: 'observe', sessionId: start.sessionId })
+    expect(fresh.evidence).toContain('NOT executed')
+    expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: fresh.observationId, action })).success).toBe(true)
+    await call({ operation: 'cancel', sessionId: start.sessionId })
+  } finally { clock.mockRestore() }
 })
 test('native sender gate rejects child frames and other origins', () => {
   const { event, window } = harness()

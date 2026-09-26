@@ -136,15 +136,25 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
       const action = validateComputerAction(input.action);
       const observation = active.observation;
       if (!action || !observation || observation.id !== input.observationId || active.steps >= 24) throw new Error('The screen changed or this task reached its step limit. Please try again.');
-      if (Date.now() - observation.time > 45000) return { success: false, retryable: true, message: 'Observation expired; capture a fresh screen before acting.' };
+      if (Date.now() - observation.time > 45000) {
+        active.observation = null;
+        active.lastOutcome = 'The proposed input was NOT executed because the observation expired. Replan from the fresh screen.';
+        return { success: false, retryable: true, message: 'Observation expired; capture a fresh screen before acting.' };
+      }
       const foreground = await control({ type: 'status' });
-      const cursor = screen.getCursorScreenPoint();
       if (!foreground.success || isLocked() || session !== active) throw new Error('Desktop control is unavailable or the session stopped.');
-      if ((Number.isFinite(foreground.keyIdleSeconds) && foreground.keyIdleSeconds < (Date.now() - observation.time) / 1000 - .1) || Math.hypot(cursor.x - observation.cursor.x, cursor.y - observation.cursor.y) > 8) throw new Error('Mouse or keyboard activity detected. Desktop task paused so you retain control. When ready, ask MIRA to continue and leave the controls idle.');
+      // Pointer movement alone does not invalidate a screen target. Keyboard
+      // input may change focus/content: refresh instead of killing the session.
+      if (Number.isFinite(foreground.keyIdleSeconds) && foreground.keyIdleSeconds < (Date.now() - observation.time) / 1000 - .1) {
+        active.observation = null;
+        active.lastOutcome = 'The proposed input was NOT executed because keyboard activity changed the screen. Replan from the fresh screen.';
+        return { success: false, retryable: true, message: 'Input changed the screen; refreshing before continuing.' };
+      }
       // Window activation/maximization can settle during planning. Do not click
       // stale coordinates, but recover by observing again rather than ending the task.
       if (foreground.pid !== observation.pid || foreground.windowId !== observation.windowId || JSON.stringify(foreground.frame) !== JSON.stringify(observation.frame)) {
         active.observation = null;
+        active.lastOutcome = 'The proposed input was NOT executed because the foreground window changed. Replan from the fresh screen and restore the requested app if necessary.';
         return { success: false, retryable: true, message: 'The window layout changed. Observing the current screen again before acting.' };
       }
       if (/terminal|iterm|powershell|command prompt|^(cmd|pwsh|regedit|mmc)(\.exe)?$|system settings|keychain|password|keepass|lastpass|bitwarden/i.test(foreground.app || '') && action.type !== 'open_app') throw new Error('This application requires manual control. Desktop task stopped.');

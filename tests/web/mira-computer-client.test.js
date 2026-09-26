@@ -1,5 +1,46 @@
 import { executeMiraComputerTask, fetchMiraDesktopPlan } from '@/lib/miraComputerClient'
 afterEach(() => { delete window.electronAPI })
+test('repeated invalid plans are bounded and never emit native input', async () => {
+  jest.useFakeTimers()
+  try {
+    window.electronAPI = { computerTask: jest.fn(async input => {
+      if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+      if (input.operation === 'observe') return { success: true, observationId: 'o' }
+      if (input.operation === 'plan') return { success: true, retryable: true }
+      return { success: true }
+    }) }
+    const pending = executeMiraComputerTask('Read the note', { token: 't' })
+    await jest.runAllTimersAsync()
+    expect(await pending).toMatchObject({ success: false, message: expect.stringContaining('several fresh observations') })
+    expect(window.electronAPI.computerTask.mock.calls.filter(([i]) => i.operation === 'plan')).toHaveLength(7)
+    expect(window.electronAPI.computerTask.mock.calls.some(([i]) => i.operation === 'act')).toBe(false)
+  } finally { jest.useRealTimers() }
+})
+test('planner fallback automatically re-observes and resumes without asking the user', async () => {
+  let plans = 0
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+    if (input.operation === 'observe') return { success: true, observationId: 'o', app: 'Notes' }
+    if (input.operation === 'plan') return ++plans === 1
+      ? { success: true, retryable: true, retryAfterMs: 200 }
+      : { success: true, done: true, message: 'Task verified.' }
+    return { success: true }
+  }) }
+  expect(await executeMiraComputerTask('Read the note', { token: 't' })).toEqual({ success: true, message: 'Task verified.' })
+  expect(plans).toBe(2)
+  expect(window.electronAPI.computerTask.mock.calls.some(([i]) => i.operation === 'act')).toBe(false)
+})
+test('voice override aborts recovery without another observation or input', async () => {
+  const controller = new AbortController()
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+    if (input.operation === 'observe') return { success: true, observationId: 'o' }
+    if (input.operation === 'plan') { controller.abort(); return { success: true, retryable: true } }
+    return { success: true }
+  }) }
+  await expect(executeMiraComputerTask('Read the note', { token: 't', signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+  expect(window.electronAPI.computerTask.mock.calls.map(([i]) => i.operation)).toEqual(['begin', 'observe', 'plan', 'cancel'])
+})
 test('retries transient model failures with a bounded backoff', async () => {
   jest.useFakeTimers()
   try {

@@ -95,7 +95,9 @@ def main():
                     if len(actions) != 1 or not isinstance(actions[0], dict):
                         raise ValueError("Invalid plan")
                     value = actions[0]
-                    emit({"kind": "result", **(value if "done" in value or "question" in value else {"action": value})})
+                    if value.get("retryable"):
+                        agent.grounding_agent.notes.append("The previous plan was not executed. Return one valid documented agent action using literal arguments and normalized 0..1 coordinates. Observe the current screen again; do not claim completion.")
+                    emit({"kind": "result", **(value if "done" in value or "question" in value or "retryable" in value else {"action": value})})
                 else:
                     raise ValueError("Unsupported operation")
         except EOFError:

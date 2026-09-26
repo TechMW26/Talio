@@ -20,6 +20,29 @@ class ActionsTest(unittest.TestCase):
             with self.subTest(code=code), self.assertRaises(Exception):
                 parse_action(SafeACI(), code, {})
 
+    def test_wait_is_recoverable_without_input(self):
+        result = parse_action(SafeACI(), 'agent.wait(1)', {})
+        self.assertTrue(result['retryable'])
+        self.assertNotIn('question', result)
+        for seconds in [-1, 6, float('nan'), True]:
+            with self.assertRaises(ValueError):
+                SafeACI().wait(seconds)
+
+    def test_invalid_upstream_plan_recovers_on_next_observation(self):
+        import io
+        from PIL import Image
+        from unittest.mock import patch
+        from worker import planner, PipeEngine
+        png = io.BytesIO()
+        Image.new('RGB', (30, 30), 'white').save(png, format='PNG')
+        instance = planner()
+        with patch.object(PipeEngine, 'generate', return_value='invalid plan'):
+            _, actions = instance.predict('Find a contact', {'screenshot': png.getvalue()})
+        self.assertTrue(actions[0]['retryable'])
+        with patch.object(PipeEngine, 'generate', return_value='```python\nagent.key("find")\n```'):
+            _, actions = instance.predict('Find a contact', {'screenshot': png.getvalue()})
+        self.assertEqual(actions, [{'type': 'key', 'key': 'find'}])
+
     def test_worker_retains_agent_s(self):
         from worker import planner
         from gui_agents.s3.agents.agent_s import AgentS3
