@@ -2,7 +2,7 @@ name: Desktop local Agent S builds
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     strategy:
@@ -54,6 +54,40 @@ jobs:
           name: agent-s-${{ matrix.platform }}-${{ matrix.arch }}
           path: agent-s-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
+
+  publish:
+    name: Publish desktop release
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download desktop packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish v6.0.17
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v6.0.17
+          target_commitish: ${{ github.sha }}
+          name: Talio Desktop 6.0.17 — MIRA desktop control fixes
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          body: |
+            MIRA decision-first desktop control, macOS frame comparison fix, native accessibility grounding, and permission prompts.
+
+            Validation: 505 automated tests passed. Live macOS testing verified Calculator activation and WhatsApp contact search through the native executor and local Python/Agent S worker. No messages were sent.
+
+            Signing: macOS Developer ID signed but not notarized. Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval.
+          files: |
+            release-assets/**/*.dmg
+            release-assets/**/*.zip
+            release-assets/**/*.exe
+            release-assets/**/*.AppImage
+            release-assets/**/*.deb
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Package desktop (no automatic publication)
         run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }} --publish never
         working-directory: desktop-app
