@@ -36,7 +36,12 @@ def status():
         handle = user.GetForegroundWindow()
         pid = ctypes.c_ulong()
         user.GetWindowThreadProcessId(handle, ctypes.byref(pid))
-        return {"success": True, "pid": pid.value, "app": psutil.Process(pid.value).name()}
+        from ctypes import wintypes
+        rect = wintypes.RECT()
+        user.GetWindowRect.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.RECT)]
+        user.GetWindowRect(handle, ctypes.byref(rect))
+        # Let Electron map physical coordinates across mixed-DPI monitors.
+        return {"success": True, "pid": pid.value, "app": psutil.Process(pid.value).name(), "windowId": str(handle), "frame": {"x":rect.left, "y":rect.top, "width":rect.right-rect.left, "height":rect.bottom-rect.top}, "physicalCenter": {"x": (rect.left + rect.right) // 2, "y": (rect.top + rect.bottom) // 2}}
     if sys.platform == "linux":
         if os.environ.get("XDG_SESSION_TYPE") == "wayland" or not os.environ.get("DISPLAY"):
             return {"success": False, "message": "Desktop controls currently require a Linux X11 session. Wayland blocks this input method."}
@@ -48,7 +53,14 @@ def status():
             raise ValueError("No foreground window")
         pid = int(run(["xprop", "-id", active, "_NET_WM_PID"]).split()[-1])
         import psutil
-        return {"success": True, "pid": pid, "app": psutil.Process(pid).name()}
+        result = {"success": True, "pid": pid, "app": psutil.Process(pid).name(), "windowId": active}
+        for line in run(['wmctrl', '-lG']).splitlines():
+            fields = line.split(None, 7)
+            if len(fields) >= 6 and int(fields[0], 16) == int(active, 16):
+                x, y, width, height = map(int, fields[2:6])
+                result.update(frame={"x":x,"y":y,"width":width,"height":height}, center={"x":x+width//2,"y":y+height//2})
+                break
+        return result
     raise ValueError("Unsupported platform")
 
 
@@ -88,6 +100,47 @@ def control(value):
     if not probe["success"] or value.get("type") == "status":
         return probe
     kind = value.get("type")
+    if kind in ("prepare_window", "restore_window"):
+        if sys.platform == "win32":
+            from ctypes import wintypes
+            user = ctypes.windll.user32
+            class Placement(ctypes.Structure):
+                _fields_ = [("length", wintypes.UINT), ("flags", wintypes.UINT), ("showCmd", wintypes.UINT), ("min", wintypes.POINT), ("max", wintypes.POINT), ("rect", wintypes.RECT)]
+            handle = int(probe['windowId'] if kind == 'prepare_window' else value['state']['handle'])
+            user.GetWindowPlacement.argtypes = [ctypes.c_void_p, ctypes.POINTER(Placement)]
+            user.SetWindowPlacement.argtypes = [ctypes.c_void_p, ctypes.POINTER(Placement)]
+            user.ShowWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            placement = Placement(length=ctypes.sizeof(Placement))
+            if not user.GetWindowPlacement(handle, ctypes.byref(placement)):
+                return {"success": False}
+            if kind == 'prepare_window':
+                if placement.showCmd == 3:
+                    return {"success": True}
+                state = {"handle": str(handle), "pid": probe['pid'], "placement": list(bytes(placement))}
+                user.ShowWindow(handle, 3)
+                time.sleep(.15)
+                return {"success": True, "state": state}
+            pid = ctypes.c_ulong()
+            user.GetWindowThreadProcessId(handle, ctypes.byref(pid))
+            if pid.value == value['state']['pid'] and placement.showCmd == 3:
+                original = Placement.from_buffer_copy(bytes(value['state']['placement']))
+                user.SetWindowPlacement(handle, ctypes.byref(original))
+            return {"success": True}
+        handle = probe['windowId'] if kind == 'prepare_window' else value['state']['handle']
+        states = run(['xprop', '-id', handle, '_NET_WM_STATE'])
+        maximized = [axis for axis in ('vert', 'horz') if '_NET_WM_STATE_MAXIMIZED_' + axis.upper() in states]
+        if kind == 'prepare_window':
+            if '_NET_WM_STATE_FULLSCREEN' in states:
+                return {"success": True}
+            run(['wmctrl', '-ir', handle, '-b', 'add,maximized_vert,maximized_horz'])
+            time.sleep(.15)
+            return {"success": True, "state": {"handle":handle, "pid":probe['pid'], "maximized":maximized}}
+        pid = int(run(['xprop', '-id', handle, '_NET_WM_PID']).split()[-1])
+        if pid == value['state']['pid'] and len(maximized) == 2:
+            remove = ['maximized_' + axis for axis in ('vert', 'horz') if axis not in value['state']['maximized']]
+            if remove:
+                run(['wmctrl', '-ir', handle, '-b', 'remove,' + ','.join(remove)])
+        return {"success": True}
     if kind == "open_app":
         return open_app(value.get("name"))
     if kind == "lock":
@@ -106,6 +159,15 @@ def control(value):
             raise ValueError("Invalid click")
         pyautogui.moveTo(x, y, duration=0.2)
         pyautogui.click()
+    elif kind == 'drag':
+        points = [(value['x'], value['y']), (value['toX'], value['toY'])]
+        if not all(pyautogui.onScreen(x, y) for x, y in points):
+            raise ValueError('Drag must remain on the captured display')
+        pyautogui.moveTo(*points[0], duration=.15)
+        try:
+            pyautogui.dragTo(*points[1], duration=.6)
+        finally:
+            pyautogui.mouseUp()
     elif kind == "type" and isinstance(value.get("text"), str) and len(value["text"]) <= 2000:
         if sys.platform == 'win32':
             # Unicode input preserves all clipboard formats, unlike text-only
@@ -136,7 +198,7 @@ def control(value):
         if pyperclip.paste() == value["text"]:
             pyperclip.copy(previous)
     elif kind == "key":
-        keys = {"select_all": ["ctrl", "a"], "find": ["ctrl", "f"], "copy": ["ctrl", "c"], "paste": ["ctrl", "v"]}
+        keys = {"select_all": ["ctrl", "a"], "find": ["ctrl", "f"], "copy": ["ctrl", "c"], "paste": ["ctrl", "v"], "open_location": ["ctrl", "l"]}
         if value.get("key") in keys:
             pyautogui.hotkey(*keys[value["key"]])
         elif value.get("key") in ("enter", "tab", "escape", "backspace", "up", "down", "left", "right"):

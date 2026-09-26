@@ -8,15 +8,74 @@ func appKey(_ name: String) -> String {
 }
 guard CommandLine.arguments.count == 2, let data = CommandLine.arguments[1].data(using: .utf8), let action = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let type = action["type"] as? String else { output(["success": false]); exit(1) }
 let front = NSWorkspace.shared.frontmostApplication
+func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
+    var value: CFTypeRef?; AXUIElementCopyAttributeValue(element, name as CFString, &value); return value
+}
+func windows(_ pid: pid_t) -> [AXUIElement] { attribute(AXUIElementCreateApplication(pid), kAXWindowsAttribute) as? [AXUIElement] ?? [] }
+func geometry(_ window: AXUIElement) -> [String: Double]? {
+    guard let p = attribute(window, kAXPositionAttribute), let s = attribute(window, kAXSizeAttribute), CFGetTypeID(p) == AXValueGetTypeID(), CFGetTypeID(s) == AXValueGetTypeID() else { return nil }
+    var point = CGPoint.zero, size = CGSize.zero
+    AXValueGetValue(p as! AXValue, .cgPoint, &point); AXValueGetValue(s as! AXValue, .cgSize, &size)
+    return ["x": point.x, "y": point.y, "width": size.width, "height": size.height]
+}
+func resize(_ window: AXUIElement, _ frame: [String: Double]) -> Bool {
+    guard let x = frame["x"], let y = frame["y"], let width = frame["width"], let height = frame["height"] else { return false }
+    var point = CGPoint(x: x, y: y), size = CGSize(width: width, height: height)
+    let p = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, AXValueCreate(.cgPoint, &point)!)
+    let s = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, AXValueCreate(.cgSize, &size)!)
+    return p == .success && s == .success
+}
 if let session = CGSessionCopyCurrentDictionary() as? [String: Any], session["CGSSessionScreenIsLocked"] as? Bool == true {
     output(["success": false, "message": "Unlock your Mac before using desktop controls."]); exit(0)
 }
-if type == "status" { let point = CGEvent(source:nil)?.location ?? .zero; output(["success": true, "accessibility": AXIsProcessTrusted(), "app": front?.localizedName ?? "Unknown", "pid": front?.processIdentifier ?? 0,"x":point.x,"y":point.y]); exit(0) }
+if type == "status" {
+    let point = CGEvent(source:nil)?.location ?? .zero
+    var result: [String: Any] = ["success": true, "accessibility": AXIsProcessTrusted(), "app": front?.localizedName ?? "Unknown", "pid": front?.processIdentifier ?? 0,"x":point.x,"y":point.y]
+    result["keyIdleSeconds"] = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown)
+    if let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) {
+        let window = focused as! AXUIElement
+        if let index = windows(pid).firstIndex(where: { CFEqual($0, window) }), let frame = geometry(window) {
+            result["windowId"] = "\(pid):\(index)"
+            result["frame"] = frame
+            result["center"] = ["x": frame["x"]! + frame["width"]! / 2, "y": frame["y"]! + frame["height"]! / 2]
+        }
+    }
+    output(result); exit(0)
+}
 guard AXIsProcessTrusted() else { output(["success": false, "message": "Enable Accessibility for Talio in System Settings."]); exit(0) }
 func key(_ code: CGKeyCode, _ flags: CGEventFlags = []) {
     for down in [true, false] { let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down); event?.flags = flags; event?.post(tap: .cghidEventTap) }
 }
 switch type {
+case "prepare_window":
+    guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); exit(0) }
+    let window = focused as! AXUIElement
+    guard let index = windows(pid).firstIndex(where: { CFEqual($0, window) }), let frame = geometry(window), attribute(window, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole else { output(["success":false]); exit(0) }
+    if attribute(window, "AXFullScreen") as? Bool == true { output(["success":true]); exit(0) }
+    let top = NSScreen.screens.first?.frame.maxY ?? 0
+    let center = CGPoint(x: frame["x"]! + frame["width"]! / 2, y: top - frame["y"]! - frame["height"]! / 2)
+    guard let display = NSScreen.screens.first(where: { $0.frame.contains(center) }) else { output(["success":false]); exit(0) }
+    let visible = display.visibleFrame
+    let expanded: [String: Double] = ["x":Double(visible.minX), "y":Double(top - visible.maxY), "width":Double(visible.width), "height":Double(visible.height)]
+    let success = resize(window, expanded)
+    usleep(150000)
+    output(["success":success, "state":["pid":pid,"index":index,"title":attribute(window, kAXTitleAttribute) as? String ?? "", "frame":frame,"expanded":geometry(window) ?? expanded]]); exit(0)
+case "restore_window":
+    guard let state = action["state"] as? [String:Any], let pid = state["pid"] as? Int32, let index = state["index"] as? Int, let frame = state["frame"] as? [String:Double], let expanded = state["expanded"] as? [String:Double] else { exit(1) }
+    let list = windows(pid)
+    // Do not undo a resize performed by the user while MIRA was active.
+    if list.indices.contains(index), (attribute(list[index], kAXTitleAttribute) as? String ?? "") == state["title"] as? String, let current = geometry(list[index]), current.allSatisfy({ abs($0.value - (expanded[$0.key] ?? -99999)) < 3 }) { _ = resize(list[index], frame) }
+    output(["success":true]); exit(0)
+case "drag":
+    guard let x = action["x"] as? Double, let y = action["y"] as? Double, let tx = action["toX"] as? Double, let ty = action["toY"] as? Double else { exit(1) }
+    let start = CGPoint(x:x,y:y)
+    CGEvent(mouseEventSource:nil, mouseType:.leftMouseDown, mouseCursorPosition:start, mouseButton:.left)?.post(tap:.cghidEventTap)
+    for step in 1...30 {
+        let t = Double(step) / 30
+        CGEvent(mouseEventSource:nil, mouseType:.leftMouseDragged, mouseCursorPosition:CGPoint(x:x+(tx-x)*t,y:y+(ty-y)*t), mouseButton:.left)?.post(tap:.cghidEventTap)
+        usleep(20000)
+    }
+    CGEvent(mouseEventSource:nil, mouseType:.leftMouseUp, mouseCursorPosition:CGPoint(x:tx,y:ty), mouseButton:.left)?.post(tap:.cghidEventTap)
 case "click":
     guard let x = action["x"] as? Double, let y = action["y"] as? Double else { exit(1) }
     let point = CGPoint(x: x, y: y)
@@ -65,6 +124,7 @@ case "type":
         if !previous.isEmpty { board.writeObjects(previous) }
     }
 case "key":
+    if action["key"] as? String == "open_location" { key(5, [.maskCommand, .maskShift]); break }
     let keys: [String: CGKeyCode] = ["enter":36,"tab":48,"escape":53,"backspace":51,"up":126,"down":125,"left":123,"right":124,"select_all":0,"copy":8,"paste":9,"find":3]
     guard let name = action["key"] as? String, let code = keys[name] else { exit(1) }
     key(code, ["select_all","copy","paste","find"].contains(name) ? .maskCommand : [])

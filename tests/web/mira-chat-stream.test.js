@@ -8,6 +8,29 @@ global.TextDecoder = TextDecoder
 const wrapper = ({ children }) => <MiraChatProvider>{children}</MiraChatProvider>
 const bytes = value => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`)
 
+test('a new instruction interrupts thinking and stale replies cannot execute actions', async () => {
+  let finishOld, oldSignal, oldRun
+  global.fetch = jest.fn(async (url, options) => {
+    if (url === '/api/ai/mira-chat') {
+      if (JSON.parse(options.body).message === 'Open WhatsApp') {
+        oldSignal = options.signal
+        return new Promise(resolve => { finishOld = () => resolve({ json: async () => ({ success: true, response: { message: 'Old result', action: { type: 'desktop_task' } } }) }) })
+      }
+      return { json: async () => ({ success: true, response: { message: 'New request handled.' } }) }
+    }
+    return { json: async () => ({ success: false }) }
+  })
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { oldRun = result.current.sendMessage('Open WhatsApp') })
+  expect(result.current.isThinking).toBe(true)
+  await act(async () => { await result.current.sendMessage('Check Priyanka at 11 today') })
+  expect(oldSignal.aborted).toBe(true)
+  await act(async () => { finishOld(); await oldRun })
+  expect(result.current.messages.at(-1).content).toBe('New request handled.')
+  expect(result.current.messages.some(m => m.content === 'Old result')).toBe(false)
+  expect(result.current.isThinking).toBe(false)
+})
+
 test('navigation prerequisites continue with executor evidence and the original request', async () => {
   window.history.replaceState({}, '', '/dashboard')
   const navigate = event => window.history.replaceState({}, '', event.detail.page)

@@ -8,7 +8,7 @@ beforeEach(() => {
   track = { stop: jest.fn(), addEventListener: jest.fn() }
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: jest.fn().mockResolvedValue({ getTracks: () => [track], getAudioTracks: () => [track] }) } })
   window.AudioContext = function () {
-    context = { sampleRate: 16000, state: 'running', resume: async () => {}, close: jest.fn().mockResolvedValue(), audioWorklet: { addModule: async () => {} }, createMediaStreamSource: () => ({ connect: jest.fn(), disconnect: jest.fn() }) }
+    context = { sampleRate: 16000, state: 'running', resume: async () => {}, close: jest.fn().mockResolvedValue(), audioWorklet: { addModule: jest.fn(async () => {}) }, createMediaStreamSource: () => ({ connect: jest.fn(), disconnect: jest.fn() }) }
     return context
   }
   window.AudioWorkletNode = function () { processor = { port: { close: jest.fn() }, connect: jest.fn(), disconnect: jest.fn() }; return processor }
@@ -44,6 +44,8 @@ test('permission resolving after cancellation releases the microphone without co
   const abort = new AbortController()
   const pending = startMiraConversationRecognition({ signal: abort.signal })
   await waitFor(() => expect(resolve).toBeDefined())
+  expect(context.audioWorklet.addModule).toHaveBeenCalledWith('/audio/mira-capture-worklet.js')
+  expect(fetch).toHaveBeenCalled()
   abort.abort()
   resolve({ getTracks: () => [track] })
   await expect(pending).rejects.toHaveProperty('name', 'AbortError')

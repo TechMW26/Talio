@@ -6,6 +6,27 @@ jest.mock('@/lib/miraConversationRecognition', () => ({ startMiraConversationRec
 jest.mock('@/lib/miraSpeechPlayback', () => ({ createMiraSpeechPlayback: jest.fn() }))
 let callbacks, engine, spoken
 let playback
+test('empty action return does not block subsequent voice turns or replay actions', async () => {
+  const sendMessage = jest.fn(async () => undefined)
+  const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))
+  await act(async () => result.current.start())
+  await act(async () => callbacks.onResult({ text: 'Open Notes' }))
+  expect(result.current.error).toBe('')
+  expect(result.current.state).toBe('listening')
+  await act(async () => callbacks.onResult({ text: 'Open Calendar' }))
+  expect(sendMessage).toHaveBeenCalledTimes(2)
+})
+test('callback speech is used even when the action has no return text', async () => {
+  playback = { ...playback, speak: jest.fn(async () => {}) }
+  createMiraSpeechPlayback.mockReturnValue(playback)
+  const sendMessage = jest.fn(async (_, options) => { options.onSpeech('Notes is open.'); return undefined })
+  const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))
+  await act(async () => result.current.start())
+  await act(async () => callbacks.onResult({ text: 'Open Notes' }))
+  expect(playback.speak).toHaveBeenCalled()
+  expect(result.current.error).toBe('')
+  expect(result.current.state).toBe('listening')
+})
 beforeEach(() => {
   spoken = []
   engine = { stream: {}, stop: jest.fn(), setPaused: jest.fn() }

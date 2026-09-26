@@ -176,6 +176,9 @@ export function MiraChatProvider({ children }) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
+    sendingRef.current = false
+    setIsThinking(false)
+    window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false, source: 'chat' } }))
   }, [])
 
   const toggleChat = useCallback(() => { setViewModeState('chat'); setIsOpen(prev => !prev) }, [])
@@ -207,7 +210,10 @@ export function MiraChatProvider({ children }) {
       options.onResponse?.(reply)
       return reply
     }
-    if (!text.trim() || isThinking || sendingRef.current) return
+    if (!text.trim()) return
+    // A new user instruction interrupts generation/automation, rather than being
+    // silently dropped while an earlier task is still running.
+    abortControllerRef.current?.abort()
     let resolvedAction = null
     let resolvedSelectionId = null
     if (options.resolvePerson) {
@@ -237,10 +243,10 @@ export function MiraChatProvider({ children }) {
     const agentState = active => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active, source: 'chat' } }))
     if (isMiraDecisionRequest(text, history)) agentState(true)
 
+    const requestController = new AbortController()
+    abortControllerRef.current = requestController
     try {
       const token = getAuthToken()
-      abortControllerRef.current = new AbortController()
-      const requestController = abortControllerRef.current
 
       let conversationHistory = compactMiraHistory(history)
       let taskBank = advanceMiraTaskBank([...history].reverse().find(message => message.data?.taskBank)?.data.taskBank, text)
@@ -259,12 +265,13 @@ export function MiraChatProvider({ children }) {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ message: queueMessage, attachments: screenAttachment ? [...(options.attachments || []), screenAttachment] : options.attachments || [], screenContextAttempted: screenAttempted, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
-        signal: abortControllerRef.current.signal
+        signal: requestController.signal
       })
 
       let data
       if (res.headers?.get('content-type')?.includes('text/event-stream')) {
         await readMiraEvents(res.body, event => {
+          requestController.signal.throwIfAborted()
           if (event.type === 'error') throw new Error(event.message)
           if (event.type === 'complete') data = event
           if (event.type === 'speech') options.onPartialSpeech?.(event.speech)
@@ -277,6 +284,7 @@ export function MiraChatProvider({ children }) {
         if (!data) throw new Error('Incomplete reply')
       } else data = await res.json()
 
+      requestController.signal.throwIfAborted()
       if (data.success) {
         if (data.response.action) agentState(true)
         if (data.response.action?.type === 'read_screen') {
@@ -295,7 +303,7 @@ export function MiraChatProvider({ children }) {
           delete data.response.action
           data.response.speech = data.response.message
         }
-        data.response.taskBank = data.response.taskBank || mergeMiraTaskPlan(taskBank, data.response, text)
+        data.response.taskBank = data.response.taskBank || mergeMiraTaskPlan(taskBank, data.response, queueMessage)
         if (data.tokens) setTokens(data.tokens)
         if (data.response.action?.type === 'generate_image') {
           const pendingImage = { id: replyId, role: 'assistant', content: data.response.message, data: { ...data.response, image: { status: 'pending' } }, timestamp: new Date() }
@@ -305,7 +313,7 @@ export function MiraChatProvider({ children }) {
           const imageResponse = await fetch('/api/ai/mira-images', {
             method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({ action: data.response.action, requestId: crypto.randomUUID() }),
-            signal: abortControllerRef.current.signal,
+            signal: requestController.signal,
           })
           outcome = await imageResponse.json()
           } catch {
@@ -320,8 +328,8 @@ export function MiraChatProvider({ children }) {
         }
         if (data.response.action?.type === 'ui_action') {
           const outcome = await executeMiraUiAction(data.response.action, {
-            signal: abortControllerRef.current.signal,
-            resolveSnapshot: snapshot => resolveMiraSnapshot(snapshot, { token, signal: abortControllerRef.current.signal }),
+            signal: requestController.signal,
+            resolveSnapshot: snapshot => resolveMiraSnapshot(snapshot, { token, signal: requestController.signal }),
           })
           data.response.actionResult = outcome
           data.response.message = outcome.message
@@ -358,7 +366,7 @@ export function MiraChatProvider({ children }) {
             const actionResponse = await fetch('/api/ai/mira-actions', {
               method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
               body: JSON.stringify({ action: data.response.action, confirmed: true }),
-              signal: abortControllerRef.current.signal,
+              signal: requestController.signal,
             })
             outcome = await actionResponse.json()
           } catch {
@@ -381,6 +389,7 @@ export function MiraChatProvider({ children }) {
             if (!arrived) data.response.message = data.response.actionResult.message
           }
         }
+        requestController.signal.throwIfAborted()
         data.response.taskBank = recordMiraTaskOutcome(data.response.taskBank, data.response.actionResult)
         const remainingTasks = data.response.taskBank.tasks.filter(task => task.status !== 'completed')
         const aiMsg = {
@@ -438,6 +447,7 @@ export function MiraChatProvider({ children }) {
       }
       return lastReply
     } catch (err) {
+      if (abortControllerRef.current !== requestController) return
       window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: 'Stopped', phase: 'done' } }))
       setMessages(prev => prev.filter(m => m.id !== nextReplyId))
       if (err.name !== 'AbortError') {
@@ -450,10 +460,12 @@ export function MiraChatProvider({ children }) {
         }])
       }
     } finally {
-      agentState(false)
-      sendingRef.current = false
-      setIsThinking(false)
-      abortControllerRef.current = null
+      if (abortControllerRef.current === requestController) {
+        agentState(false)
+        sendingRef.current = false
+        setIsThinking(false)
+        abortControllerRef.current = null
+      }
     }
   }, [messages, isThinking, saveToSession, closeChat, setViewMode])
 

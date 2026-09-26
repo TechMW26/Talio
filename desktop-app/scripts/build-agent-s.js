@@ -28,6 +28,8 @@ if (fs.existsSync(bundled)) fs.renameSync(bundled, `${bundled}-previous-${Date.n
 fs.renameSync(staging, bundled);
 // License is supplied by the pinned upstream package (Apache-2.0).
 run(python, ['-c', 'import importlib.metadata as m, pathlib, shutil, sys; d=m.distribution("gui-agents"); files=[f for f in (d.files or []) if f.name.lower() in ("license", "license.txt", "license.md")]; assert files, "Upstream license missing"; shutil.copyfile(d.locate_file(files[0]), pathlib.Path(sys.argv[1])/"AGENT-S-LICENSE")', bundled]);
-fs.writeFileSync(path.join(bundled, 'runtime.json'), JSON.stringify({ platform: process.platform, arch: process.arch, revision: '3aa272d23d2994c7bbde1acbbe0ef8e8d06b8693' }));
+const sourceHash = require('crypto').createHash('sha256');
+for (const file of ['actions.py', 'control.py', 'worker.py']) sourceHash.update(fs.readFileSync(path.join(source, file)));
+fs.writeFileSync(path.join(bundled, 'runtime.json'), JSON.stringify({ platform: process.platform, arch: process.arch, revision: '3aa272d23d2994c7bbde1acbbe0ef8e8d06b8693', sourceHash: sourceHash.digest('hex') }));
 run(process.execPath, [path.join(root, 'scripts/test-agent-s.cjs')]);
 console.log(`Agent S runtime prepared for ${target}`);

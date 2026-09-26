@@ -16,6 +16,11 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
   const [stream, setStream] = useState(null)
   const [transcript, setTranscript] = useState('')
   const [error, setError] = useState('')
+  useEffect(() => {
+    if (!error) return
+    const timer = setTimeout(() => setError(''), 5000)
+    return () => clearTimeout(timer)
+  }, [error])
   const current = useRef({ open, busy, sendMessage, onDismiss })
   current.current = { open, busy, sendMessage, onDismiss }
   const session = useRef(null)
@@ -75,6 +80,7 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
           if (run.locked || current.current.busy) return
           const turn = ++run.turn
           run.locked = true
+          setError('')
           setTranscript(text); setState('thinking')
           try {
             const speech = createMiraStreamingSpeech({
@@ -94,10 +100,11 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
               onSpeech: content => { spokenReply = content; speech.update(content, true) },
             })
             if (!live() || turn !== run.turn) return
-            if (!response) { setError('No spoken reply received. Check the chat and try again.'); listen(); return }
-            await speech.finish(spokenReply ?? miraSpeechSummary(response))
+            // Actions may deliver their outcome through callbacks without returning
+            // text. Never replay the task just because its voice reply is missing.
+            await speech.finish(spokenReply || miraSpeechSummary(response || ''))
             if (live() && turn === run.turn) { setTranscript(''); listen() }
-          } catch (err) { if (live() && turn === run.turn) { run.turn++; run.playback.cancel(); if (err.name !== 'AbortError') setError(err.message || 'Voice request failed.'); listen() } }
+          } catch (err) { if (live() && turn === run.turn) { run.turn++; run.playback.cancel(); setTranscript(''); if (err.name !== 'AbortError') setError('Audio is unavailable. You can continue; the reply is in chat.'); listen() } }
         },
       })
       if (!live()) { run.engine.stop(); return }

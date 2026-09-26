@@ -1,10 +1,12 @@
 jest.mock('next/server', () => ({ NextResponse: { json: (body, options = {}) => new Response(JSON.stringify(body), options) } }))
 jest.mock('@/lib/permissions', () => ({ requirePermission: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
 jest.mock('@/app/api/tasks/create/route', () => ({ POST: jest.fn() }))
 jest.mock('@/app/api/projects/route', () => ({ POST: jest.fn() }))
 jest.mock('@/app/api/chat/route', () => ({ POST: jest.fn() }))
 jest.mock('@/app/api/chat/[chatId]/messages/route', () => ({ POST: jest.fn() }))
 import { requirePermission } from '@/lib/permissions'
+import { getAuthAndModels } from '@/lib/auth'
 import { POST } from '@/app/api/ai/mira-actions/route'
 import { prepareMiraAction, validateMiraAction } from '@/lib/miraActions'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
@@ -17,6 +19,20 @@ import { POST as sendChatMessage } from '@/app/api/chat/[chatId]/messages/route'
 const action = { type: 'create_task', fields: { title: 'Review draft', assignees: ['me'] } }
 const run = body => POST(new Request('https://talio.test/api/ai/mira-actions', { method: 'POST', body: JSON.stringify(body) }))
 beforeEach(() => jest.clearAllMocks())
+test('personal reminder targets only the authenticated user and persists its due time', async () => {
+  const create = jest.fn(async () => ({ _id: 'reminder' }))
+  getAuthAndModels.mockResolvedValue({ success: true, user: { userId: 'self', employeeId: 'employee', role: 'employee' }, models: { ScheduledNotification: { create } } })
+  const scheduledFor = new Date(Date.now() + 1200000).toISOString()
+  const result = await (await run({ confirmed: true, action: { type: 'schedule_reminder', fields: { message: 'Drink water', scheduledFor, timezone: 'Asia/Kolkata', targetUsers: ['other'] } } })).json()
+  expect(result.success).toBe(true)
+  expect(create).toHaveBeenCalledWith(expect.objectContaining({ targetUsers: ['self'], scheduledFor: new Date(scheduledFor), status: 'pending' }))
+})
+test('reminders reject past times, missing offsets and invalid timezones', () => {
+  const fields = { message: 'Test', scheduledFor: new Date(Date.now() + 120000).toISOString(), timezone: 'Asia/Kolkata' }
+  for (const changes of [{ scheduledFor: '2000-01-01T00:00:00Z' }, { scheduledFor: '2099-01-01T09:00:00' }, { timezone: 'Mars/Test' }]) {
+    expect(validateMiraAction({ type: 'schedule_reminder', fields: { ...fields, ...changes } }).error).toBeTruthy()
+  }
+})
 test('project creation preserves the new record identity for opening and follow-ups', async () => {
   requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own', role: 'admin' }, models: {} }))
   const id = '507f1f77bcf86cd799439011'

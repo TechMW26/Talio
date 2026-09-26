@@ -8,7 +8,7 @@ function harness(overrides = {}) {
   const deps = {
     platform: 'darwin', packaged: false,
     store: { get: jest.fn(() => true) },
-    pointer: { show: jest.fn(), hide: jest.fn() },
+    pointer: { show: jest.fn(), hide: jest.fn(), moveTo: jest.fn() },
     desktopCapturer: { getSources: jest.fn(async () => [{ display_id: '1', thumbnail: { isEmpty: () => false, toJPEG: () => Buffer.from('image') } }]) },
     screen: { getCursorScreenPoint: () => ({ x: 10, y: 10 }), getDisplayNearestPoint: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1000, height: 800 } }) },
     dialog: { showMessageBox: jest.fn(async () => ({ response: 1 })) },
@@ -20,6 +20,16 @@ function harness(overrides = {}) {
   const handler = createMiraComputer(deps)
   return { deps, event, window, call: input => handler(event, window, 'https://app.talio.in', input) }
 }
+test('old session cancellation and observations cannot stop a replacement session', async () => {
+  const { call } = harness()
+  const first = await call({ operation: 'begin', goal: 'Open WhatsApp' })
+  await call({ operation: 'cancel', sessionId: first.sessionId })
+  const second = await call({ operation: 'begin', goal: 'Open Notes' })
+  await call({ operation: 'cancel', sessionId: first.sessionId })
+  expect((await call({ operation: 'observe', sessionId: first.sessionId })).success).toBe(false)
+  expect((await call({ operation: 'observe', sessionId: second.sessionId })).success).toBe(true)
+  await call({ operation: 'cancel', sessionId: second.sessionId })
+})
 test('local planner consumes native observations and relays only expected model replies', async () => {
   const agentS = { begin: jest.fn(async () => ({ kind: 'ready' })), stop: jest.fn(), predict: jest.fn(async () => ({ kind: 'model_request', messages: [] })), respond: jest.fn(async () => ({ kind: 'result', action: { type: 'key', key: 'find' } })) }
   const { call } = harness({ agentS })
@@ -28,7 +38,7 @@ test('local planner consumes native observations and relays only expected model 
   const observation = await call({ operation: 'observe', sessionId: start.sessionId })
   const args = { sessionId: start.sessionId, observationId: observation.observationId }
   expect((await call({ ...args, operation: 'plan', image: 'untrusted renderer image' })).kind).toBe('model_request')
-  expect(agentS.predict).toHaveBeenCalledWith({ image: Buffer.from('image').toString('base64'), app: 'TextEdit' })
+  expect(agentS.predict).toHaveBeenCalledWith({ image: Buffer.from('image').toString('base64'), app: expect.stringContaining('TextEdit') })
   expect((await call({ ...args, operation: 'model_response', text: 'agent.key("find")' })).action.type).toBe('key')
   expect((await call({ ...args, operation: 'model_response', text: 'unsolicited' })).success).toBe(false)
   expect(agentS.stop).toHaveBeenCalled()
@@ -72,7 +82,9 @@ test('one fresh observation permits one input, never a duplicate', async () => {
   const input = { operation: 'act', sessionId: start.sessionId, observationId: observed.observationId, action: { type: 'click', x: .5, y: .5 } }
   expect((await call(input)).success).toBe(true)
   expect(deps.runControl).toHaveBeenCalledWith({ type: 'click', x: 500, y: 400 })
+  expect(deps.pointer.moveTo).toHaveBeenCalledWith({ x: 500, y: 400 })
   expect((await call(input)).success).toBe(false)
+  expect(deps.pointer.moveTo).toHaveBeenCalledTimes(1)
 })
 test('user cancellation and emergency stop prevent further observations', async () => {
   const { call, deps } = harness()
@@ -80,6 +92,25 @@ test('user cancellation and emergency stop prevent further observations', async 
   deps.globalShortcut.register.mock.calls[0][1]()
   expect((await call({ operation: 'observe', sessionId: start.sessionId })).success).toBe(false)
   expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
+})
+test('prepares each window once and restores its saved geometry on cancellation', async () => {
+  const state = { pid: 1, index: 0, frame: { x: 10, y: 10, width: 300, height: 200 } }
+  const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'prepare_window' ? { success: true, state } : { success: true, pid: 1, app: 'Notes', windowId: '1:0', center: { x: 500, y: 400 } }) })
+  const start = await call({ operation: 'begin', goal: 'Read Notes' })
+  await call({ operation: 'observe', sessionId: start.sessionId })
+  await call({ operation: 'observe', sessionId: start.sessionId })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+  expect(deps.runControl.mock.calls.filter(([a]) => a.type === 'prepare_window')).toHaveLength(1)
+  expect(deps.runControl).toHaveBeenCalledWith({ type: 'restore_window', state })
+})
+test('mouse movement while planning stops input rather than fighting the user', async () => {
+  let cursor = { x: 10, y: 10 }
+  const { call, deps } = harness({ screen: { getCursorScreenPoint: () => cursor, getDisplayNearestPoint: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1000, height: 800 } }) } })
+  const start = await call({ operation: 'begin', goal: 'Read Notes' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  cursor = { x: 60, y: 10 }
+  expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'click', x: .5, y: .5 } })).success).toBe(false)
+  expect(deps.runControl.mock.calls.some(([a]) => a.type === 'click')).toBe(false)
 })
 test('native sender gate rejects child frames and other origins', () => {
   const { event, window } = harness()

@@ -3,6 +3,8 @@ import fs from 'fs'
 import path from 'path'
 import { MIRA_LANGUAGE_POLICY, buildMiraConversationPrompt } from '@/lib/miraLanguage'
 import { buildWhiteboardPlanPrompt } from '@/lib/whiteboardAIPlan'
+import { MIRA_CLARIFICATION_POLICY } from '@/lib/miraClarification'
+import { validateAgentSMessages } from '@/lib/ai/agentSProxy'
 
 test('chat and generated board content share multilingual policy with exact-data exceptions', () => {
   expect(MIRA_RESPONSE_GUIDELINES).toContain(MIRA_LANGUAGE_POLICY)
@@ -40,7 +42,8 @@ test('action-first guidance delivers work, reuses known details and avoids redun
 
 test('language switches are user-led and apply equally to speech and image acknowledgements', () => {
   expect(MIRA_LANGUAGE_POLICY).toContain('professional, natural English without unsolicited Hindi or Hinglish')
-  expect(MIRA_LANGUAGE_POLICY).toContain('Hindi written in Devanagari receives Hindi in Devanagari')
+  expect(MIRA_LANGUAGE_POLICY).toContain('Hindi and Hindi-English requests always receive natural Roman-script Hinglish')
+  expect(MIRA_LANGUAGE_POLICY).toContain('Do not generate Devanagari Hindi conversational prose or spoken summaries')
   expect(MIRA_LANGUAGE_POLICY).toContain('Switch immediately when the user switches languages')
   expect(MIRA_LANGUAGE_POLICY).toContain('most recent clear USER language')
   expect(MIRA_LANGUAGE_POLICY).toContain('spoken summaries, image-generation acknowledgements')
@@ -84,4 +87,22 @@ test('neutral follow-ups preserve user history and new conversations have no inh
   expect(buildMiraConversationPrompt('Hello')).toBe('Latest user message:\nHello')
   const route = fs.readFileSync(path.join(process.cwd(), 'app/api/ai/mira-chat/route.js'), 'utf8')
   expect(route).toContain('buildMiraConversationPrompt(userMessage, conversationHistory)')
+})
+
+test('spelling clarification preserves pending work and does not switch language', () => {
+  expect(MIRA_RESPONSE_GUIDELINES).toContain(MIRA_CLARIFICATION_POLICY)
+  expect(MIRA_CLARIFICATION_POLICY).toContain('spell it letter by letter')
+  expect(MIRA_CLARIFICATION_POLICY).toContain('Spelling alone cannot distinguish people with the same name')
+  expect(MIRA_CLARIFICATION_POLICY).toContain('update only the clarified field and search again')
+  expect(MIRA_CLARIFICATION_POLICY).toContain('Do not request spelling for an already verified unambiguous name')
+  expect(MIRA_LANGUAGE_POLICY).toContain('do not switch a Hinglish conversation to English')
+  expect(MIRA_LANGUAGE_POLICY).toContain('Switch smoothly without announcing the switch')
+})
+
+test('Agent S receives the same language and clarification contract as chat', () => {
+  const messages = validateAgentSMessages([{ role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,YQ==' } }] }])
+  for (const entry of [messages[0], messages.at(-1)]) {
+    expect(entry.content).toContain(MIRA_LANGUAGE_POLICY)
+    expect(entry.content).toContain(MIRA_CLARIFICATION_POLICY)
+  }
 })

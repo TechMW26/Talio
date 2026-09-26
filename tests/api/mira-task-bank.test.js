@@ -2,6 +2,23 @@ import { advanceMiraTaskBank, mergeMiraTaskPlan, recordMiraTaskOutcome, sanitize
 import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
 const draft = { type: 'create_meeting', fields: { title: 'Planning', invitees: ['Sahil'] } }
+const oldDesktop = { tasks: [{ id: 'old', request: 'Open WhatsApp and text Harshad Hi', action: { type: 'desktop_task', fields: {} }, status: 'blocked' }] }
+test.each([
+  "Uh, Mira, let's skip that task. Uh, first, check what Priyanka was doing at 11:00.",
+  'Can you check what Priyanka Srivastava was doing at 11:00 a.m. today?',
+  'Please show my meetings',
+  'Cancel the previous task',
+  'Clear pending tasks',
+])('latest instruction displaces the stale desktop task: %s', message => {
+  expect(advanceMiraTaskBank(oldDesktop, message).tasks).toEqual([])
+})
+test('new same-type request never inherits old recipients or fields', () => {
+  const bank = mergeMiraTaskPlan({ tasks: [{ request: 'Create a meeting with Sahil', action: draft, status: 'awaiting_details' }] }, { action: { type: 'create_meeting', fields: { title: 'New meeting', invitees: ['Priyanka'] } } }, 'Create a new meeting with Priyanka')
+  expect(bank.tasks[0].action.fields).toEqual({ title: 'New meeting', invitees: ['Priyanka'] })
+})
+test.each(['Harshit Patil', 'H-A-R-S-H-I-T', 'At 11 today', 'verified not completed, retry'])('clarifications retain the original task: %s', message => {
+  expect(advanceMiraTaskBank(oldDesktop, message).tasks[0].id).toBe('old')
+})
 test('presence tolerates single, keyed, null and malformed payloads', () => {
   const row = { employeeId: 'abc', online: true }
   expect(normalizePresenceUpdates(row)).toEqual([row])

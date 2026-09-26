@@ -111,6 +111,8 @@ async function processNotificationsForTenant(tenant, now) {
               body: scheduledNotif.message
             },
             {
+              models,
+              skipPersistence: savedNotifications.length > 0,
               data: {
                 type: 'custom',
                 sentBy: scheduledNotif.createdBy.toString(),

@@ -557,7 +557,7 @@ export default function MiraChatSidebar() {
   }, [isOpen, closeChat])
 
   const handleSend = useCallback(() => {
-    if ((!input.trim() && !attachments.length) || isThinking || attachmentsBusy) return
+    if ((!input.trim() && !attachments.length) || attachmentsBusy) return
     if (attachments.length) {
       sendMessage(input.trim() || 'Please summarize the attached files.', { attachments })
       setAttachments([])
@@ -942,7 +942,6 @@ export default function MiraChatSidebar() {
                 onChange={(e) => handleInputChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={voice.active ? (voice.transcript || (voice.state === 'loading' ? 'Preparing voice…' : voice.state === 'speaking' ? 'MIRA is speaking…' : voice.state === 'thinking' ? 'Thinking…' : 'Listening…')) : 'Ask MIRA…'}
-                disabled={isThinking}
                 rows={1}
                 className="block w-full resize-none rounded-xl text-default-800 text-sm px-3 py-2.5 focus:outline-none placeholder:text-default-400 disabled:opacity-50"
                 style={{
@@ -963,7 +962,7 @@ export default function MiraChatSidebar() {
             <button
               onClick={handleSend}
               aria-label="Send message"
-              disabled={(!input.trim() && !attachments.length) || isThinking || attachmentsBusy}
+              disabled={(!input.trim() && !attachments.length) || attachmentsBusy}
               className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:brightness-110"
               style={{ background: '#f5f5f5', color: '#171717' }}
             >

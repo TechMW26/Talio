@@ -21,6 +21,27 @@ class SafeACI:
         self.instruction = instruction
 
     @action
+    def create_file(self, name: str, content: str):
+        """Create a NEW txt/md/csv/json data file in Documents/MIRA. Never overwrite. Maximum 4000 characters. Only when requested by the user. Read the tool result for the exact path."""
+        if not isinstance(name, str) or len(name) > 110 or not isinstance(content, str) or len(content) > 4000:
+            raise ValueError('Invalid file')
+        return {"type": "create_file", "name": name, "content": content}
+
+    @action
+    def reveal_file(self, name: str):
+        """Reveal a file created in this task in Finder, Explorer or the system file manager. Prefer attachment picker plus open_location for uploads."""
+        if not isinstance(name, str) or len(name) > 110:
+            raise ValueError('Invalid filename')
+        return {"type": "reveal_file", "name": name}
+
+    @action
+    def drag(self, x: float, y: float, toX: float, toY: float):
+        """Drag a verified visible file to a verified visible drop target, both in the same screenshot. Normalized 0..1 coordinates. Never drag an unknown file or repeat an uncertain upload."""
+        if any(type(v) not in (float, int) or not math.isfinite(v) or not 0 <= v <= 1 for v in (x,y,toX,toY)):
+            raise ValueError('Invalid drag')
+        return {"type":"drag", "x":x, "y":y, "toX":toX, "toY":toY}
+
+    @action
     def click(self, x: float, y: float):
         """Click a visible target. x and y are normalized screenshot coordinates from 0 to 1."""
         if any(type(v) not in (float, int) or not math.isfinite(v) or not 0 <= v <= 1 for v in (x, y)):
@@ -36,8 +57,8 @@ class SafeACI:
 
     @action
     def key(self, key: str):
-        """Press one of enter, tab, escape, backspace, up, down, left, right, select_all, copy, paste, find."""
-        if key not in ("enter", "tab", "escape", "backspace", "up", "down", "left", "right", "select_all", "copy", "paste", "find"):
+        """Press enter, tab, escape, backspace, arrows, select_all, copy, paste, find, or open_location (file picker location: Cmd+Shift+G on Mac, Ctrl+L elsewhere)."""
+        if key not in ("enter", "tab", "escape", "backspace", "up", "down", "left", "right", "select_all", "copy", "paste", "find", "open_location"):
             raise ValueError("Unsupported key")
         return {"type": "key", "key": key}
 

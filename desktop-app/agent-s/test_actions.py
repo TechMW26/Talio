@@ -7,6 +7,9 @@ class ActionsTest(unittest.TestCase):
         self.assertEqual(parse_action(SafeACI(), 'agent.click(0.2, 0.7)', {}), {"type": "click", "x": 0.2, "y": 0.7})
         self.assertEqual(parse_action(SafeACI(), 'agent.type("hello")', {}), {"type": "type", "text": "hello"})
         self.assertEqual(parse_action(SafeACI(), 'agent.open_app("WhatsApp")', {}), {"type": "open_app", "name": "WhatsApp"})
+        self.assertEqual(parse_action(SafeACI(), 'agent.create_file("note.txt", "Hello")', {}), {"type": "create_file", "name": "note.txt", "content": "Hello"})
+        self.assertEqual(parse_action(SafeACI(), 'agent.key("open_location")', {}), {"type": "key", "key": "open_location"})
+        self.assertEqual(parse_action(SafeACI(), 'agent.drag(0.1, 0.2, 0.8, 0.9)', {})['type'], 'drag')
 
     def test_reject_code(self):
         for code in ['__import__("os").system("id")', 'agent.click(0,0); agent.lock()',

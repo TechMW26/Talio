@@ -11,3 +11,7 @@ test('only pure launch requests use the deterministic launch shortcut', () => {
   expect(miraOpenAppIntent('text Mansi hi on whatsapp')).toBeNull()
   expect(miraOpenAppIntent('Open WhatsApp and send hello')).toBeNull()
 })
+test('cancelled external app commands never restart desktop automation', () => {
+  expect(miraDesktopIntent('Skip sending the WhatsApp message; check Priyanka instead.')).toBeNull()
+  expect(miraDesktopIntent('Mira, cancel the WhatsApp task')).toBeNull()
+})

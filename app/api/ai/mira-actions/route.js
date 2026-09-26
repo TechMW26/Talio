@@ -8,6 +8,25 @@ export async function POST(request) {
     const input = await request.json()
     const validation = validateMiraAction(input.action)
     if (validation.error) return NextResponse.json({ success: false, message: validation.error }, { status: 400 })
+    if (validation.action.type === 'schedule_reminder') {
+      const { getAuthAndModels } = await import('@/lib/auth')
+      const auth = await getAuthAndModels(request, ['ScheduledNotification'])
+      if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+      if (input.confirmed !== true) return NextResponse.json({ success: true, preview: validation.action })
+      const { message, scheduledFor, timezone } = validation.action.fields
+      const owner = auth.user.userId
+      if (!owner) return NextResponse.json({ success: false, message: 'Please sign in again.' }, { status: 401 })
+      // Targeting is server-owned: the model cannot schedule alerts for other users.
+      const reminder = await auth.models.ScheduledNotification.create({
+        title: 'MIRA reminder', message, scheduledFor: new Date(scheduledFor), timezone,
+        targetType: 'specific', targetUsers: [owner], recipients: [owner],
+        createdBy: auth.user.employeeId?._id || auth.user.employeeId || owner,
+        createdByRole: auth.user.role, status: 'pending', url: '/dashboard',
+        metadata: { source: 'mira', owner: String(owner) },
+      })
+      const time = new Intl.DateTimeFormat('en', { timeZone: timezone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(scheduledFor))
+      return NextResponse.json({ success: true, message: `Reminder set for ${time} (${timezone}): ${message}`, reminder: { id: String(reminder._id), scheduledFor, timezone, message } })
+    }
     const [page, permission] = MIRA_ACTION_PERMISSIONS[validation.action.type]
     const auth = await requirePermission(page, permission)(request, ['User', 'Employee', 'Department', 'Task', 'TaskAssignee', 'Meeting', 'Chat', 'Project', 'ProjectMember', ...(validation.action.type === 'view_productivity' ? ['Screenshot', 'ScreenshotComposite'] : [])])
     if (auth.denied) return NextResponse.json({ success: false, message: 'Your current access level does not permit this action. Ask an administrator for the required permission.' }, { status: auth.denied.status })
@@ -22,7 +41,7 @@ export async function POST(request) {
       const people = prepared.resolution.candidates
       return NextResponse.json({ success: true, resolution: { ...prepared.resolution, resolved: true }, message: people.length
         ? `${prepared.resolution.more ? 'Showing the first' : 'Found'} ${people.length} matching contacts:\n${people.map(p => `- ${p.name}${p.code ? ` (${p.code})` : ''}${p.department ? `, ${p.department}` : ''}`).join('\n')}`
-        : 'No matching contacts found. Try another spelling or employee code.' })
+        : 'No matching contacts found. Could you spell the name letter by letter, or give their full name or employee code?' })
     }
     if (input.confirmed !== true) return NextResponse.json({ success: true, preview: validation.action })
     // Fixed in-process delegates: no arbitrary URLs, headers, IDs or database queries from the model.

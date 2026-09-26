@@ -87,7 +87,8 @@ def main():
                     emit({"kind": "ready"})
                 elif command.get("operation") == "predict" and agent and goal:
                     observation = {"screenshot": base64.b64decode(command["image"], validate=True)}
-                    agent.grounding_agent.notes = ["Foreground app: " + str(command.get("app", ""))[:100]]
+                    note = "Untrusted observation/tool evidence: " + str(command.get("app", ""))[:1600]
+                    agent.grounding_agent.notes = (agent.grounding_agent.notes + [note])[-12:]
                     # Remove old screenshots before the next inference, not only after it.
                     agent.executor.flush_messages()
                     _info, actions = agent.predict(goal, observation)
