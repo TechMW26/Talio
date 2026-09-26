@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { syncReportingManager } from '@/lib/employeeReporting'
+import { assetReturnUpdate } from '@/lib/assetHistory'
 import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
 import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
@@ -782,7 +783,7 @@ export async function DELETE(request, { params }) {
       try {
         const freedAssets = await Asset.updateMany(
           { assignedTo: id },
-          { $set: { status: 'available', returnDate: new Date() }, $unset: { assignedTo: 1, assignedDate: 1 } }
+          assetReturnUpdate(auth.user, {}, new Date(), employee)
         )
         if (freedAssets.modifiedCount > 0) {
           console.log(`[Employee Delete] Freed ${freedAssets.modifiedCount} asset(s) for employee: ${id}`)
@@ -1007,7 +1008,7 @@ export async function PATCH(request, { params }) {
         try {
           const freedAssets = await Asset.updateMany(
             { assignedTo: id },
-            { $set: { status: 'available', returnDate: new Date() }, $unset: { assignedTo: 1, assignedDate: 1 } }
+            assetReturnUpdate(auth.user, {}, new Date(), employee)
           )
           if (freedAssets.modifiedCount > 0) {
             console.log(`[Employee Status] Freed ${freedAssets.modifiedCount} asset(s) for employee ${id} (status: ${updateData.status})`)

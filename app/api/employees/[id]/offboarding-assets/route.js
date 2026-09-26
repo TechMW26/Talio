@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { assetReturnUpdate } from '@/lib/assetHistory'
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
@@ -143,10 +144,7 @@ export async function PATCH(request, { params }) {
       if (!RETURN_CONDITIONS.has(returnCondition)) return jsonError('Select a valid return condition', 400, 'INVALID_RETURN_CONDITION')
       returnedAsset = await auth.models.Asset.findOneAndUpdate(
         { _id: assetId, assignedTo: id },
-        {
-          $set: { status: 'available', returnDate: now, condition: returnCondition, returnNotes: notes },
-          $unset: { assignedTo: 1, assignedAt: 1, assignedDate: 1 },
-        },
+        assetReturnUpdate(auth.user, { condition: returnCondition, remarks: notes }, now, state.employee),
         { new: true, runValidators: true },
       ).lean()
       if (!returnedAsset) {

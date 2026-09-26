@@ -4,6 +4,7 @@ import { notifyAssetAssignment, assetNotificationRecipients } from '@/lib/assetN
 import mongoose from 'mongoose'
 import { normalizeAssetInput } from '@/utils/assetData'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
+import { assetHistoryEvent, prepareAssetTransition } from '@/lib/assetHistory'
 
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
@@ -17,7 +18,7 @@ export async function PUT(request, { params }) {
     // Get authenticated user and tenant-specific models
     const auth = await requirePermission('assets', 'edit')(request, ['Asset', 'Employee', 'Department', 'Team', 'Notification'])
     if (auth.denied) return auth.denied
-    const { models } = auth
+    const { models, user } = auth
     const { Asset, Employee } = models
 
 
@@ -61,25 +62,28 @@ export async function PUT(request, { params }) {
       )
     }
 
-    const previous = await Asset.findById(id).select('assignedTo').lean()
+    const previous = await Asset.findById(id).populate('assignedTo', 'firstName lastName employeeCode').lean()
     if (!previous) return NextResponse.json({ success: false, message: 'Asset not found' }, { status: 404 })
-    if (data.assignedTo) data.assignedDate = new Date()
-    else if (Object.hasOwn(data, 'assignedTo')) data.assignedDate = null
+    const transitionError = prepareAssetTransition(previous, data)
+    if (transitionError) return NextResponse.json({ success: false, message: transitionError }, { status: 400 })
+    const historyData = { ...data }
+    if (data.assignedTo) historyData.assignedTo = await Employee.findById(data.assignedTo).select('firstName lastName employeeCode').lean()
+    const event = assetHistoryEvent(previous, historyData, user)
 
-    const asset = await Asset.findByIdAndUpdate(
-      id,
-      data,
+    const asset = await Asset.findOneAndUpdate(
+      { _id: id, updatedAt: previous.updatedAt || { $exists: false } },
+      { $set: data, ...(event.changes.length ? { $push: { history: event } } : {}) },
       { new: true, runValidators: true }
     ).populate('assignedTo', 'firstName lastName employeeCode')
 
     if (!asset) {
       return NextResponse.json(
-        { success: false, message: 'Asset not found' },
-        { status: 404 }
+        { success: false, message: 'This asset changed while you were editing. Refresh and try again.' },
+        { status: 409 }
       )
     }
 
-    after(() => notifyAssetAssignment({ models, asset, previousAssignee: previous.assignedTo }).catch(error => console.error('[Asset] Notification failed:', error)))
+    after(() => notifyAssetAssignment({ models, asset, previousAssignee: previous.assignedTo?._id || previous.assignedTo }).catch(error => console.error('[Asset] Notification failed:', error)))
 
     const recipients = await assetNotificationRecipients(models, asset)
     if (recipients.length) emitAssetUpdate(asset, recipients.map(user => user.id), { action: 'update', broadcast: false })

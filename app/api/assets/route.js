@@ -4,6 +4,7 @@ import { requirePermission, checkPermission } from '@/lib/permissions'
 import { notifyAssetAssignment, assetNotificationRecipients } from '@/lib/assetNotifications.server'
 import mongoose from 'mongoose'
 import { normalizeAssetInput, normalizeAssetStatus } from '@/utils/assetData'
+import { assetHistoryEvent, prepareAssetTransition } from '@/lib/assetHistory'
 
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
@@ -51,6 +52,7 @@ export async function GET(request) {
     }
 
     const assets = await Asset.find(query)
+      .select(managesInventory ? '' : '-history')
       .populate('assignedTo', 'firstName lastName employeeCode')
       .sort({ createdAt: -1 })
 
@@ -101,7 +103,10 @@ export async function POST(request) {
       )
     }
 
-    if (data.assignedTo) data.assignedDate = new Date()
+    prepareAssetTransition(null, data)
+    const historyData = { ...data }
+    if (data.assignedTo) historyData.assignedTo = await Employee.findById(data.assignedTo).select('firstName lastName employeeCode').lean()
+    data.history = [assetHistoryEvent(null, historyData, user, 'created')]
 
     const asset = await Asset.create(data)
 

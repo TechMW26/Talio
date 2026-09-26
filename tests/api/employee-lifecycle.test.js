@@ -378,7 +378,7 @@ describe('employee lifecycle', () => {
     const modal = fs.readFileSync(path.join(process.cwd(), 'components/employees/OffboardingAssetChecklistModal.js'), 'utf8')
 
     expect(route).toContain("{ _id: assetId, assignedTo: id }")
-    expect(route).toContain("$unset: { assignedTo: 1, assignedAt: 1, assignedDate: 1 }")
+    expect(route).toContain('assetReturnUpdate(auth.user,')
     expect(route).toContain("'lifecycle.offboarding.assetsReturned': clearance.summary.complete")
     expect(panel).toContain('<OffboardingAssetChecklistModal')
     expect(panel).not.toContain("runAction('update_offboarding', { field: 'assetsReturned'")

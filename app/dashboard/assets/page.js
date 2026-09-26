@@ -19,8 +19,14 @@ import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/r
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { getAssetAssigneeLabel } from '@/utils/assetAssigneeSearch'
 import { formatAssetStatus, getAssetDisplayDetails, normalizeAssetInput, normalizeAssetStatus } from '@/utils/assetData'
+import { ASSET_TRACKER_FIELDS, ASSET_STATUSES, assetTrackerValue } from '@/utils/assetData'
+import AssetTrackingFields from '@/components/assets/AssetTrackingFields'
+
+const extraTrackerFields = ASSET_TRACKER_FIELDS.filter(([key]) => !['name', 'assignedTo', 'status'].includes(key))
+const historyValue = value => value == null || value === '' ? 'Not recorded' : typeof value === 'object' ? `${value.name || value.id || ''}${value.employeeCode ? ` (${value.employeeCode})` : ''}` : typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value)
 
 const EMPTY_ASSET_FORM = {
+  ...Object.fromEntries(extraTrackerFields.map(([key, , type]) => [key, type === 'boolean' ? null : ''])),
   name: '',
   assetCode: '',
   uin: '',
@@ -42,6 +48,7 @@ const toDateInputValue = (value) => {
 const assetToFormData = (asset = {}) => {
   const details = getAssetDisplayDetails(asset)
   return {
+    ...Object.fromEntries(extraTrackerFields.map(([key, , type]) => [key, type === 'date' ? toDateInputValue(asset[key]) : asset[key] ?? (type === 'boolean' ? null : '')])),
     name: details.name === 'Unnamed asset' ? '' : details.name,
     assetCode: details.code === 'Not provided' ? '' : details.code,
     uin: asset.uin || '',
@@ -122,7 +129,7 @@ export default function AssetsPage() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData(prev => ({ ...prev, [name]: value, ...(name === 'status' && ['returned', 'available'].includes(value) ? { assignedTo: '', assignedDate: '', returnDate: prev.assignedTo || value === 'returned' ? new Date().toISOString().slice(0, 10) : prev.returnDate } : {}) }))
   }
 
   // Mutations
@@ -166,7 +173,7 @@ export default function AssetsPage() {
 
   const handleEditChange = (e) => {
     const { name, value } = e.target
-    setEditFormData((previous) => ({ ...previous, [name]: value }))
+    setEditFormData((previous) => ({ ...previous, [name]: value, ...(name === 'status' && ['returned', 'available'].includes(value) ? { assignedTo: '', assignedDate: '', returnDate: previous.assignedTo || value === 'returned' ? new Date().toISOString().slice(0, 10) : previous.returnDate } : {}) }))
   }
 
   const handleAssetUpdate = async (event) => {
@@ -387,7 +394,7 @@ export default function AssetsPage() {
                   </th>
                   {isAdmin && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Assigned To
+                      Assigned Name
                     </th>
                   )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -396,6 +403,7 @@ export default function AssetsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
+                  {extraTrackerFields.map(([key, label]) => <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 whitespace-nowrap">{label}</th>)}
                   {isAdmin && (
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -456,6 +464,7 @@ export default function AssetsPage() {
                         {formatAssetStatus(details.status)}
                       </span>
                     </td>
+                    {extraTrackerFields.map(([key, , type]) => <td key={key} className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap max-w-xs truncate" title={assetTrackerValue(asset, key, type)}>{assetTrackerValue(asset, key, type)}</td>)}
                     {isAdmin && (
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <button
@@ -519,7 +528,7 @@ export default function AssetsPage() {
                     <SelectItem key="other">Other</SelectItem>
                   </Select>
                   <SearchableSelect
-                    label="Assigned To"
+                    label="Assigned Name"
                     onSearchChange={setAssigneeSearch}
                     isLoading={searchingAssignees}
                     description={assigneeSearchError ? 'Search failed. Please retry.' : undefined}
@@ -531,6 +540,7 @@ export default function AssetsPage() {
                       setEditFormData((previous) => ({
                         ...previous,
                         assignedTo,
+                        ...(assignedTo !== previous.assignedTo ? { assignedDate: '', returnDate: '' } : {}),
                         status: assignedTo ? 'assigned' : (previous.status === 'assigned' ? 'available' : previous.status),
                       }))
                     }}
@@ -543,20 +553,16 @@ export default function AssetsPage() {
                     label="Status"
                     selectedKeys={[editFormData.status]}
                     onSelectionChange={(keys) => handleEditChange({ target: { name: 'status', value: Array.from(keys)[0] || 'available' } })}
-                    isDisabled={Boolean(editFormData.assignedTo)}
-                    disabledKeys={['assigned']}
-                    description={editFormData.assignedTo ? 'Assigned automatically when an employee is selected' : undefined}
+                    disabledKeys={editFormData.assignedTo ? [] : ['assigned']}
+                    description="Return or In Stock clears the current assignment."
                   >
-                    <SelectItem key="available">Available</SelectItem>
-                    <SelectItem key="assigned">Assigned</SelectItem>
-                    <SelectItem key="under-maintenance">Under Maintenance</SelectItem>
-                    <SelectItem key="damaged">Damaged</SelectItem>
-                    <SelectItem key="disposed">Disposed</SelectItem>
+                    {ASSET_STATUSES.map(status => <SelectItem key={status}>{formatAssetStatus(status)}</SelectItem>)}
                   </Select>
                   <Input label="Purchase Date" type="date" name="purchaseDate" value={editFormData.purchaseDate} onChange={handleEditChange} />
                   <Input label="Purchase Price" type="number" min="0" name="purchasePrice" value={String(editFormData.purchasePrice)} onChange={handleEditChange} />
                   <Textarea className="md:col-span-2" label="Description" name="description" value={editFormData.description} onChange={handleEditChange} />
                   <Textarea className="md:col-span-2" label="Specifications" name="specs" value={editFormData.specs} onChange={handleEditChange} />
+                  <AssetTrackingFields values={editFormData} onChange={handleEditChange} />
                 </div>
                 <div className="flex justify-end gap-3">
                   <Button type="button" variant="flat" onPress={() => setIsEditingAsset(false)}>Cancel</Button>
@@ -582,6 +588,7 @@ export default function AssetsPage() {
                       ['Purchase price', selectedAsset.purchasePrice !== undefined && selectedAsset.purchasePrice !== null ? `₹${Number(selectedAsset.purchasePrice).toLocaleString('en-IN')}` : 'Not provided'],
                       ['UIN', selectedAsset.uin || 'Not provided'],
                       ['Manufacturer', details.manufacturer || 'Not provided'],
+                      ...extraTrackerFields.map(([key, label, type]) => [label, assetTrackerValue(selectedAsset, key, type)]),
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
@@ -595,6 +602,14 @@ export default function AssetsPage() {
                       {selectedAsset.specs && <div><p className="text-xs font-medium uppercase tracking-wide text-gray-500">Specifications</p><p className="mt-1 text-sm text-gray-700">{selectedAsset.specs}</p></div>}
                     </div>
                   )}
+                  {isAdmin && <section className="mt-6 space-y-3" aria-label="Asset history">
+                    <h3 className="font-semibold">Asset history</h3>
+                    <p className="text-xs text-gray-500">Changes recorded from this update onward. Earlier unrecorded events are not reconstructed.</p>
+                    {!selectedAsset.history?.length ? <p className="text-sm text-gray-500">No recorded changes yet.</p> : [...selectedAsset.history].reverse().map((event, index) => <details key={event._id || index} className="rounded-xl border border-gray-200 p-3">
+                      <summary className="cursor-pointer text-sm">{new Date(event.at).toLocaleString()} · {event.action} · {event.actorName || 'Authorized user'}</summary>
+                      <ul className="mt-2 space-y-2 text-sm">{event.changes?.map((change, i) => <li key={i} className="break-words"><span className="font-medium">{ASSET_TRACKER_FIELDS.find(([key]) => key === change.field)?.[1] || change.field}</span>: {historyValue(change.before)} → {historyValue(change.after)}</li>)}</ul>
+                    </details>)}
+                  </section>}
                   {canEditAsset && (
                     <div className="mt-6 flex justify-end">
                       <Button color="primary" startContent={<FaPen />} onPress={() => setIsEditingAsset(true)}>
@@ -726,7 +741,7 @@ export default function AssetsPage() {
                 </div>
                 <div>
                   <SearchableSelect
-                    label="Assigned To"
+                    label="Assigned Name"
                     onSearchChange={setAssigneeSearch}
                     isLoading={searchingAssignees}
                     description={assigneeSearchError ? 'Search failed. Please retry.' : undefined}
@@ -738,6 +753,7 @@ export default function AssetsPage() {
                       setFormData((previous) => ({
                         ...previous,
                         assignedTo,
+                        ...(assignedTo !== previous.assignedTo ? { assignedDate: '', returnDate: '' } : {}),
                         status: assignedTo ? 'assigned' : (previous.status === 'assigned' ? 'available' : previous.status),
                       }))
                     }}
@@ -752,15 +768,10 @@ export default function AssetsPage() {
                     label="Status"
                     selectedKeys={[formData.status]}
                     onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'available' } })}
-                    isDisabled={Boolean(formData.assignedTo)}
-                    disabledKeys={['assigned']}
-                    description={formData.assignedTo ? 'Assigned automatically when an employee is selected' : undefined}
+                    disabledKeys={formData.assignedTo ? [] : ['assigned']}
+                    description="Return or In Stock clears the current assignment."
                   >
-                    <SelectItem key="available">Available</SelectItem>
-                    <SelectItem key="assigned">Assigned</SelectItem>
-                    <SelectItem key="under-maintenance">Under Maintenance</SelectItem>
-                    <SelectItem key="damaged">Damaged</SelectItem>
-                    <SelectItem key="disposed">Disposed</SelectItem>
+                    {ASSET_STATUSES.map(status => <SelectItem key={status}>{formatAssetStatus(status)}</SelectItem>)}
                   </Select>
                 </div>
                 <div>
@@ -784,6 +795,7 @@ export default function AssetsPage() {
                   />
                 </div>
               </div>
+              <AssetTrackingFields values={formData} onChange={handleInputChange} />
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"

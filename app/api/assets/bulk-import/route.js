@@ -4,9 +4,11 @@ import { notifyAssetAssignment, assetNotificationRecipients } from '@/lib/assetN
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
 import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
 import { generateContent } from '@/lib/gemini'
+import { ASSET_TRACKER_FIELDS, ASSET_STATUSES, normalizeAssetStatus, normalizeAssetInput } from '@/utils/assetData'
+import { assetHistoryEvent, prepareAssetTransition } from '@/lib/assetHistory'
 
 const VALID_CATEGORIES = ['laptop', 'desktop', 'mobile', 'tablet', 'monitor', 'keyboard', 'mouse', 'furniture', 'vehicle', 'other']
-const VALID_STATUSES = ['available', 'assigned', 'under-maintenance', 'damaged', 'disposed']
+const VALID_STATUSES = ASSET_STATUSES
 const VALID_CONDITIONS = ['excellent', 'good', 'fair', 'poor']
 
 const ASSET_FIELDS = [
@@ -27,6 +29,8 @@ const ASSET_FIELDS = [
   { key: 'location', label: 'Location', description: 'Location, office, branch, site' },
   { key: 'assignedToEmail', label: 'Assigned To (Email)', description: 'Employee email for assignment' },
   { key: 'assignedToCode', label: 'Assigned To (Emp Code)', description: 'Employee code for assignment' },
+  { key: 'assignedToName', label: 'Assigned Name', description: 'Exact employee full name; ambiguous matches require employee code or email' },
+  ...ASSET_TRACKER_FIELDS.filter(([key]) => !['name', 'manufacturer', 'serialNumber', 'model', 'status', 'assignedTo'].includes(key)).map(([key, label]) => ({ key, label, description: label })),
 ]
 
 /**
@@ -34,11 +38,11 @@ const ASSET_FIELDS = [
  */
 function excelSerialToDate(serial) {
   if (typeof serial !== 'number' || isNaN(serial) || serial < 1) return null
-  const excelEpoch = new Date(1899, 11, 30)
+  const excelEpoch = new Date(Date.UTC(1899, 11, 30))
   const msPerDay = 24 * 60 * 60 * 1000
-  const adjusted = serial > 60 ? serial - 1 : serial
+  const adjusted = serial < 60 ? serial + 1 : serial
   const date = new Date(excelEpoch.getTime() + adjusted * msPerDay)
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  return date
 }
 
 /**
@@ -53,14 +57,16 @@ function parseDate(value) {
     // DD/MM/YYYY
     const dmy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
     if (dmy) {
-      const d = new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]))
-      return isNaN(d.getTime()) ? null : d
+      const iso = `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
+      const d = new Date(iso)
+      return isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? null : d
     }
     // YYYY-MM-DD
     const ymd = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
     if (ymd) {
-      const d = new Date(parseInt(ymd[1]), parseInt(ymd[2]) - 1, parseInt(ymd[3]))
-      return isNaN(d.getTime()) ? null : d
+      const iso = `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`
+      const d = new Date(iso)
+      return isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? null : d
     }
     const parsed = new Date(trimmed)
     return isNaN(parsed.getTime()) ? null : parsed
@@ -105,6 +111,7 @@ function normalizeCategory(value) {
 function normalizeStatus(value) {
   if (!value) return 'available'
   const lower = String(value).toLowerCase().trim()
+  if (['in stock', 'return', 'returned', 'not working', 'not match'].includes(lower)) return normalizeAssetStatus(lower)
   if (VALID_STATUSES.includes(lower)) return lower
   if (/assign/i.test(lower)) return 'assigned'
   if (/maint/i.test(lower)) return 'under-maintenance'
@@ -185,7 +192,7 @@ export async function POST(request) {
   try {
     const auth = await requirePermission('assets', 'create')(request, ['Asset', 'Employee', 'Department', 'Team', 'Notification'])
     if (auth.denied) return auth.denied
-    const { models } = auth
+    const { models, user } = auth
     const { Asset, Employee } = models
 
 
@@ -222,6 +229,18 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Could not determine column mapping' }, { status: 400 })
     }
 
+    // Exact tracker headers win over AI guesses (serial/model IDs are not asset codes).
+    if (!mappingJson) for (let index = 0; index < headers.length; index++) {
+      const match = ASSET_TRACKER_FIELDS.find(([, label]) => label.toLowerCase() === headers[index].toLowerCase())
+      if (match) mapping[index] = match[0] === 'assignedTo' ? 'assignedToName' : match[0]
+      else {
+        const field = ASSET_FIELDS.find(field => field.label.toLowerCase() === headers[index].toLowerCase())
+        if (field) mapping[index] = field.key
+      }
+    }
+    const allowed = new Set(ASSET_FIELDS.map(field => field.key))
+    mapping = Object.fromEntries(Object.entries(mapping).filter(([index, field]) => /^\d+$/.test(index) && Number(index) < headers.length && allowed.has(field)))
+
     // Preview mode — return parsed data for user review
     if (mode === 'preview') {
       const previewRows = dataRows.slice(0, 50).map((row, idx) => {
@@ -252,10 +271,15 @@ export async function POST(request) {
     // Build employee lookup for assignment
     let employeeByEmail = {}
     let employeeByCode = {}
-    const needsEmployeeLookup = Object.values(mapping).some(f => f === 'assignedToEmail' || f === 'assignedToCode')
+    const employeeByName = {}
+    const employeeById = {}
+    const needsEmployeeLookup = Object.values(mapping).some(f => ['assignedToEmail', 'assignedToCode', 'assignedToName'].includes(f))
     if (needsEmployeeLookup && Employee) {
-      const employees = await Employee.find({ status: 'active' }).select('_id email employeeCode').lean()
+      const employees = await Employee.find({ status: 'active' }).select('_id email employeeCode firstName lastName').lean()
       for (const emp of employees) {
+        employeeById[String(emp._id)] = emp
+        const fullName = [emp.firstName, emp.lastName].filter(Boolean).join(' ').trim().toLowerCase().replace(/\s+/g, ' ')
+        if (fullName) (employeeByName[fullName] ||= []).push(emp._id)
         if (emp.email) employeeByEmail[emp.email.toLowerCase()] = emp._id
         if (emp.employeeCode) employeeByCode[emp.employeeCode.toLowerCase()] = emp._id
       }
@@ -318,6 +342,14 @@ export async function POST(request) {
         if (mapped.specs) assetData.specs = String(mapped.specs).trim()
         if (mapped.uin) assetData.uin = String(mapped.uin).trim()
         if (mapped.location) assetData.location = String(mapped.location).trim()
+        for (const [key, , type] of ASSET_TRACKER_FIELDS) {
+          if (['name', 'assignedTo', 'status'].includes(key) || mapped[key] === undefined || mapped[key] === '') continue
+          if (type === 'date') {
+            const date = parseDate(mapped[key])
+            if (!date) throw new Error(`Invalid ${key}`)
+            assetData[key] = date
+          } else assetData[key] = mapped[key]
+        }
 
         const purchaseDate = parseDate(mapped.purchaseDate)
         if (purchaseDate) assetData.purchaseDate = purchaseDate
@@ -338,14 +370,25 @@ export async function POST(request) {
           const code = String(mapped.assignedToCode).toLowerCase().trim()
           assignedEmployee = employeeByCode[code]
         }
+        if (!assignedEmployee && mapped.assignedToName) {
+          const matches = employeeByName[String(mapped.assignedToName).trim().toLowerCase().replace(/\s+/g, ' ')] || []
+          if (matches.length !== 1) throw new Error('Assigned Name is missing or ambiguous. Use a matching employee code or email.')
+          assignedEmployee = matches[0]
+        }
+        if (!assignedEmployee && (mapped.assignedToEmail || mapped.assignedToCode)) throw new Error('Assigned employee was not found')
 
         if (assignedEmployee) {
           assetData.assignedTo = assignedEmployee
-          assetData.assignedDate = new Date()
-          assetData.status = 'assigned'
+          assetData.assignedDate = assetData.assignedDate || new Date()
+          if (assetData.status === 'available') assetData.status = 'assigned'
         }
 
-        const asset = await Asset.create(assetData)
+        const { data: validated, errors } = normalizeAssetInput(assetData)
+        if (errors.length) throw new Error(errors[0])
+        prepareAssetTransition(null, validated)
+        const historyData = { ...validated }
+        if (validated.assignedTo) historyData.assignedTo = employeeById[String(validated.assignedTo)]
+        const asset = await Asset.create({ ...validated, history: [assetHistoryEvent(null, historyData, user, 'imported')] })
         if (asset.assignedTo) assignedAssets.push(asset)
         existingCodes.add(assetCode.toLowerCase())
         results.created++

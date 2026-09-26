@@ -1,6 +1,23 @@
 import mongoose from 'mongoose';
 
 const AssetSchema = new mongoose.Schema({
+  billDate: Date,
+  billNumber: String,
+  billFrom: String,
+  billPayFromLOB: String,
+  vertical: String,
+  center: String,
+  warrantyStatus: String,
+  replacementDate: Date,
+  box: { type: Boolean, default: null },
+  charger: { type: Boolean, default: null },
+  history: [{
+    at: { type: Date, required: true },
+    actor: String,
+    actorName: String,
+    action: String,
+    changes: [{ field: String, before: mongoose.Schema.Types.Mixed, after: mongoose.Schema.Types.Mixed }],
+  }],
   assetCode: {
     type: String,
     required: true,
@@ -46,7 +63,7 @@ const AssetSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['available', 'assigned', 'under-maintenance', 'damaged', 'disposed'],
+    enum: ['available', 'assigned', 'returned', 'not-working', 'not-match', 'under-maintenance', 'damaged', 'disposed'],
     default: 'available',
   },
   assignedTo: {
