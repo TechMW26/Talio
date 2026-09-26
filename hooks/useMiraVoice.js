@@ -28,6 +28,7 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
     const run = session.current
     session.current = null
     clearTimeout(run?.startupTimer)
+    clearTimeout(run?.silenceTimer)
     run?.rejectStartup?.(new DOMException('Voice cancelled', 'AbortError'))
     run?.abort.abort()
     run?.engine?.stop()
@@ -36,17 +37,30 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
   }, [])
   useEffect(() => { if (!open) stop() }, [open, stop])
   useEffect(() => stop, [stop])
+  useEffect(() => {
+    const run = session.current
+    if (busy) clearTimeout(run?.silenceTimer)
+    else run?.armSilence?.()
+  }, [busy])
   const start = useCallback(async () => {
     if (session.current || !current.current.open) return
     setError(''); setState('loading')
     const run = { abort: new AbortController(), locked: false, turn: 0, speaking: false, reply: '', echoUntil: 0 }
     session.current = run
     const live = () => session.current === run && current.current.open
+    run.armSilence = () => {
+      clearTimeout(run.silenceTimer)
+      if (!live() || !run.engine || run.locked || run.speaking || current.current.busy) return
+      run.silenceTimer = setTimeout(() => {
+        if (live() && !run.locked && !run.speaking && !current.current.busy) stop()
+      }, 4000)
+    }
     const listen = () => { if (live()) {
       // Keep the post-playback guard short enough for a natural follow-up while
       // still covering audio-buffer tail/OS speaker latency.
       if (run.speaking) run.echoUntil = Date.now() + 1800
       run.locked = false; run.speaking = false; setState('listening')
+      run.armSilence()
     } }
     const isEcho = text => (run.speaking || Date.now() < run.echoUntil) && isMiraPlaybackEcho(text, run.reply.slice(-1800))
     const interrupt = text => {
@@ -64,7 +78,7 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
       const engineReady = startMiraConversationRecognition({
         signal: run.abort.signal,
         onError: err => { if (live()) { stop(); setError(err.message) } },
-        onPartial: text => { if (live() && !isEcho(text)) { interrupt(text); if (!run.locked) setTranscript(text) } },
+        onPartial: text => { if (live() && text?.trim() && !isEcho(text)) { interrupt(text); if (!run.locked) { setTranscript(text); run.armSilence() } } },
         onResult: async result => {
           const text = result?.text?.trim()
           if (!live() || !text || isEcho(text)) return
@@ -82,6 +96,7 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
           if (run.locked || current.current.busy) return
           const turn = ++run.turn
           run.locked = true
+          clearTimeout(run.silenceTimer)
           setError('')
           setTranscript(text); setState('thinking')
           try {
@@ -120,7 +135,7 @@ export default function useMiraVoice({ open, busy, sendMessage, onDismiss }) {
       clearTimeout(run.startupTimer)
       run.rejectStartup = null
       if (!live()) return
-      setStream(run.engine.stream); setState('listening')
+      setStream(run.engine.stream); listen()
     } catch (err) { if (session.current === run) { stop(); if (err.name !== 'AbortError') setError(err.message) } }
   }, [stop])
   return { state, stream, transcript, error, start, stop, active: state !== 'idle' }

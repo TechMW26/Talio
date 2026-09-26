@@ -41,6 +41,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [isMiraHovered, setIsMiraHovered] = useState(false)
   const { openChat, isOpen: isMiraOpen, isThinking } = useMiraChat()
   const searchRef = useRef(null)
+  const searchOverlayRef = useRef(null)
+  const mobileSearchRef = useRef(null)
   const searchTimeoutRef = useRef(null)
 
   // Check if desktop for header left positioning
@@ -74,8 +76,14 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   }, [])
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
+      const target = event.target
+      const insidePill = searchRef.current && searchRef.current.contains(target)
+      const insideOverlay = searchOverlayRef.current && searchOverlayRef.current.contains(target)
+      const insideMobile = mobileSearchRef.current && mobileSearchRef.current.contains(target)
+      if (!insidePill && !insideOverlay && !insideMobile) {
         setShowSearchResults(false)
+        setShowMobileSearch(false)
+        setSearchQuery('')
       }
     }
 
@@ -332,7 +340,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     setShowSearchResults(false)
                   }}
                 />
-                <motion.div key="desktop-search" {...searchMotion} style={{ x: '-50%', transformOrigin: 'top center' }} className="ai-glass-panel fixed left-1/2 top-20 w-[90%] max-w-xl overflow-hidden z-[101] search-overlay-input">
+                <motion.div key="desktop-search" ref={searchOverlayRef} {...searchMotion} style={{ x: '-50%', transformOrigin: 'top center' }} className="ai-glass-panel fixed left-1/2 top-20 w-[90%] max-w-xl overflow-hidden z-[101] search-overlay-input">
                   <AIActivityBeam active={searching} />
                   <Input
                     size="lg"
@@ -341,20 +349,18 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     placeholder="Search everything..."
                     startContent={<FaSearch className="text-default-400 w-5 h-5" />}
                     endContent={
-                      searching ? <Loader size="xs" /> :
-                        searchQuery ? (
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="light"
-                            onPress={() => {
-                              setSearchQuery('')
-                              setShowSearchResults(false)
-                            }}
-                          >
-                            <FaTimes className="w-4 h-4" />
-                          </Button>
-                        ) : null
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        aria-label="Close search"
+                        onPress={() => {
+                          setSearchQuery('')
+                          setShowSearchResults(false)
+                        }}
+                      >
+                        <FaTimes className="w-4 h-4" />
+                      </Button>
                     }
                     classNames={{
                       inputWrapper: 'bg-transparent shadow-none rounded-none border-none',
@@ -442,7 +448,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       {/* Mobile Search Fullscreen Modal */}
       <AnimatePresence>
       {showMobileSearch && (
-        <motion.div key="mobile-search" {...searchMotion} style={{ transformOrigin: 'top center' }} className="ai-glass-panel fixed inset-x-3 top-20 bottom-4 z-[100] lg:!hidden overflow-hidden">
+        <motion.div key="mobile-search" ref={mobileSearchRef} {...searchMotion} style={{ transformOrigin: 'top center' }} className="ai-glass-panel fixed inset-x-3 top-20 bottom-4 z-[100] lg:!hidden overflow-hidden">
           <AIActivityBeam active={searching} />
           <div className="flex flex-col h-full">
             {/* Search Header - Match header height */}

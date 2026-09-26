@@ -29,7 +29,7 @@ export default function MiraPermissionChecklist() {
   }, [pathname])
   const missing = Object.keys(labels).filter(key => permissions && ['denied', 'restricted', 'not-determined'].includes(permissions[key]))
   if (!pathname?.startsWith('/dashboard')) return null
-  if (!missing.length && !error) return permissions?.desktopControl === 'granted' ? <button className="fixed bottom-2 right-4 z-[100100] rounded-lg bg-content1 px-3 py-1 text-xs text-default-500" onClick={() => refresh('revokeDesktopControl')}>Disable MIRA desktop control</button> : null
+  if (!missing.length && !error) return null
   return <aside aria-label="Talio permissions required" className="fixed bottom-4 right-4 z-[100100] w-[min(360px,calc(100vw-32px))] rounded-2xl border border-default-200 bg-content1 p-4 shadow-xl">
     <h2 className="font-semibold">Finish setting up Talio</h2>
     <p className="mt-1 text-xs text-default-500">These features need your permission. This checklist stays until access is enabled. macOS may require restarting Talio after Screen Recording is allowed.</p>
