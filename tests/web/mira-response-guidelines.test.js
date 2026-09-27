@@ -1,4 +1,11 @@
 import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
+
+test('keeps routine voice and chat replies targeted without truncating requested detail', () => {
+  expect(MIRA_RESPONSE_GUIDELINES).toContain('under 40 words by default')
+  expect(MIRA_RESPONSE_GUIDELINES).toContain('do not restate the user\'s request')
+  expect(MIRA_RESPONSE_GUIDELINES).toContain('Longer requested explanations, deliverables and necessary safety information are exceptions')
+  expect(MIRA_RESPONSE_GUIDELINES).toContain('same concise intent to voice and visible text')
+})
 import fs from 'fs'
 import path from 'path'
 import { MIRA_LANGUAGE_POLICY, buildMiraConversationPrompt } from '@/lib/miraLanguage'

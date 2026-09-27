@@ -56,6 +56,7 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
+      currentEmployeeId: String(auth.user.employeeId?._id || auth.user.employeeId || ''),
       birthdays,
       anniversaries,
     })

@@ -82,21 +82,21 @@ jobs:
           pattern: desktop-*
           path: release-assets
           merge-multiple: true
-      - name: Publish v6.0.18
+      - name: Publish v6.0.19
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.18
+          tag_name: v6.0.19
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.18 — MIRA recovery and stable PiP
+          name: Talio Desktop 6.0.19 — Compact MIRA and working wishes
           draft: false
           prerelease: false
           generate_release_notes: false
           body: |
-            Restores minimized applications, brings Talio's main window forward from desktop PiP, aligns the pointer indicator with native input, and reduces redundant activation/observation delays.
+            MIRA uses a 16:8 compact PiP layout with scrollable content. Native live windows open bottom-right without restoring stale positions. Browser-owned PiP placement remains browser-controlled.
 
-            Invalid desktop plans recover with fresh observations and alternative methods within five attempts. Desktop MIRA PiP uses a stable compact layout with content scrolling inside the container. New projects and tasks default to the creator as head/assignee. Includes the updated ElevenLabs voice default.
+            MIRA replies are short and targeted by default, with longer explanations only when needed or requested. Send Wishes now sends birthday and anniversary greetings through private Talio chat, with sending, success, error and partial-retry handling.
 
-            Validation: focused JavaScript regression tests, Agent S Python tests, Swift type checking, and production web build. Interactive acceptance on every OS has not been performed.
+            Validation: focused JavaScript regression tests and syntax checks. Real employee greetings were not sent during tests. Interactive acceptance on every OS has not been performed.
 
             Signing: CI packages are not Developer ID signed or Apple notarized; Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
           files: |

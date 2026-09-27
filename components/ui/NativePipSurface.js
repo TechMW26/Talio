@@ -37,6 +37,10 @@ function registerAutomaticSurface(surface) {
 
 function panelSize(host) {
   const panel = host?.querySelector('[data-meeting-pip], .mira-workspace') || host
+  if (panel?.matches('.mira-workspace')) {
+    const width = Math.min(400, host.ownerDocument.defaultView?.innerWidth || 400)
+    return { width, height: width / 2 }
+  }
   const rect = panel?.getBoundingClientRect()
   // Layout dimensions exclude the panel's entrance/exit transform.
   return { width: Math.ceil(panel?.offsetWidth || rect?.width || 340), height: Math.ceil(panel?.offsetHeight || rect?.height || 180) }
@@ -44,10 +48,11 @@ function panelSize(host) {
 
 function fitWindow(target) {
   if (!target || target.closed) return
-  const sizes = [...target.document.querySelectorAll('[data-native-pip-surface]')].map(panelSize)
+  const surfaces = [...target.document.querySelectorAll('[data-native-pip-surface]')]
+  const sizes = surfaces.map(panelSize)
   if (!sizes.length) return
   const width = Math.max(...sizes.map(size => size.width))
-  const height = sizes.reduce((sum, size) => sum + size.height, 0) + Math.max(0, sizes.length - 1) * 12
+  const height = sizes.reduce((sum, size, index) => sum + (surfaces[index].querySelector('.mira-workspace') ? width / 2 : size.height), 0) + Math.max(0, sizes.length - 1) * 12
   // Browser-owned title bars and minimum dimensions cannot be removed.
   const desktop = target.document.documentElement.dataset.desktopPip === 'true'
   const chromeWidth = desktop ? 0 : Math.max(0, (target.outerWidth || width) - (target.innerWidth || width))
@@ -101,7 +106,7 @@ async function getPipWindow(size) {
       [data-meeting-pip] button svg{width:20px!important;height:20px!important;min-width:20px;flex-shrink:0}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
-      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;transform:none!important}
+      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:2/1!important;min-height:0!important;box-sizing:border-box;transform:none!important}
       [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0!important;width:100%!important}
       [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none}
       [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}
@@ -122,7 +127,7 @@ async function getPipWindow(size) {
       sizing.textContent = `
         html,body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
         [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal}
-        [data-native-pip-surface] .mira-workspace{height:240px!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
+        [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:2/1!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
         [data-native-pip-surface] [data-mira-pip-content]{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
       `
       target.document.head.append(sizing)
@@ -130,6 +135,7 @@ async function getPipWindow(size) {
     if (desktop && window.electronAPI?.moveLivePip) {
       let drag = null, moved = false, frame = null
       target.document.addEventListener('pointerdown', event => {
+        if (target.document.querySelector('.mira-workspace')) return
         if (event.button !== 0 || event.target.closest('button,input,textarea,a,select,[role="button"],[role="slider"]')) return
         moved = false
         drag = { x: event.screenX, y: event.screenY, left: target.screenX, top: target.screenY }
@@ -208,7 +214,7 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
       setError('')
       try {
         const size = window.electronAPI?.nativePip === true && host?.querySelector('.mira-workspace')
-          ? { width: 340, height: 240 } : panelSize(host)
+          ? { width: 400, height: 200 } : panelSize(host)
         const target = await getPipWindow(size)
         if (!mounted.current || !enabledRef.current || !host || (automaticRef.current && !isAppAway())) {
           if (!target.document.querySelector('[data-native-pip-surface]')) target.close()

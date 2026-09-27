@@ -1152,9 +1152,8 @@ function setupWindowEvents() {
     if (details.frameName === 'talio-live-pip') livePipWindow = child;
     if (details.frameName !== 'talio-live-pip') return;
     child.setAlwaysOnTop(true, 'screen-saver');
-    // Version the preference to discard positions accidentally saved while the
-    // old window was first loading/resizing at the top of the display.
-    let savedPipPosition = store.get('livePipPositionV2', null);
+    // Every new live window starts bottom-right; do not revive stale positions.
+    let savedPipPosition = null;
     let positioning = false;
     let applyingBounds = false;
     const positionPip = () => {

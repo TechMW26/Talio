@@ -705,8 +705,9 @@ export default function MiraChatSidebar() {
           top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? 'max(24px, env(safe-area-inset-bottom))' : 'auto',
           height: pip ? 'auto' : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
+          aspectRatio: pip ? '2 / 1' : undefined,
           transitionProperty: sidebarDrag.dragging ? 'none' : pip ? 'opacity, transform' : 'opacity, transform, left, top, width',
-          width: pip ? 'min(340px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
+          width: pip ? 'min(400px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode
             ? 'rgba(18, 18, 18, 0.72)'
             : `linear-gradient(135deg, rgba(255,255,255,0.78), rgba(250,252,255,0.85))`,
@@ -720,7 +721,7 @@ export default function MiraChatSidebar() {
         }}
       >
         {isOpen && (isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={16} />}
-        {pip && <div data-mira-pip-content className="p-3 text-foreground relative cursor-pointer" onClick={restoreMira}>
+        {pip && <div data-mira-pip-content className="p-3 text-foreground relative cursor-pointer flex-1 min-h-0 overflow-y-auto" onClick={restoreMira}>
           <button aria-label="Dismiss MIRA" onClick={event => { event.stopPropagation(); closeChat() }} className="absolute right-2 top-2 z-10 p-2 rounded-full hover:bg-default-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><FaTimes className="w-4 h-4" /></button>
           <button aria-label="Restore MIRA chat" className="w-full flex items-center gap-3 pr-10 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
             <MiraSphere size={28} isThinking={isThinking} />

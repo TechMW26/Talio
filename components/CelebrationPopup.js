@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import MemberAvatar from '@/components/chat/MemberAvatar'
+import { sendCelebrationWishes } from '@/lib/client/celebrationWishes'
 
 // ── Confetti Launchers ──
 
@@ -196,6 +197,10 @@ export default function CelebrationPopup() {
   const [dismissed, setDismissed] = useState(false)
   const [celebrations, setCelebrations] = useState([])
   const confettiFired = useRef(false)
+  const sendingRef = useRef(false)
+  const sentRecipients = useRef(new Set())
+  const [wishStatus, setWishStatus] = useState('idle')
+  const [wishError, setWishError] = useState('')
 
   const { data } = useAuthedSWR('/api/celebrations/today')
 
@@ -235,12 +240,15 @@ export default function CelebrationPopup() {
   }, [celebrations, dismissed])
 
   const handleDismiss = useCallback(() => {
+    if (sendingRef.current) return
     const dismissKey = `celebrations-dismissed-${new Date().toDateString()}`
     sessionStorage.setItem(dismissKey, 'true')
     setDismissed(true)
   }, [])
 
   const handleNext = useCallback(() => {
+    setWishStatus('idle')
+    setWishError('')
     if (currentIndex < celebrations.length - 1) {
       setCurrentIndex(prev => prev + 1)
       confettiFired.current = false
@@ -262,6 +270,30 @@ export default function CelebrationPopup() {
 
   const isVisible = celebrations.length > 0 && !dismissed
   const current = celebrations[currentIndex]
+  const hasRecipients = current?.people.some(person => String(person._id) !== data?.currentEmployeeId)
+
+  const handleSendWishes = async () => {
+    if (sendingRef.current) return
+    if (wishStatus === 'sent' || !hasRecipients) return handleNext()
+    sendingRef.current = true
+    setWishStatus('sending')
+    setWishError('')
+    try {
+      await sendCelebrationWishes({
+        people: current.people,
+        type: current.type,
+        employeeId: data?.currentEmployeeId,
+        token: localStorage.getItem('token'),
+        sent: sentRecipients.current,
+      })
+      setWishStatus('sent')
+    } catch (error) {
+      setWishStatus('error')
+      setWishError(error.message || 'Could not send wishes. Please try again.')
+    } finally {
+      sendingRef.current = false
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -433,7 +465,9 @@ export default function CelebrationPopup() {
                     transition={{ delay: 0.4 }}
                   >
                     <motion.button
-                      onClick={handleNext}
+                      onClick={handleSendWishes}
+                      disabled={wishStatus === 'sending'}
+                      aria-busy={wishStatus === 'sending'}
                       whileHover={{ scale: 1.04 }}
                       whileTap={{ scale: 0.96 }}
                       className={`relative px-8 py-3 rounded-full text-white font-semibold text-sm tracking-wide overflow-hidden transition-shadow ${
@@ -449,13 +483,18 @@ export default function CelebrationPopup() {
                         transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.5 }}
                       />
                       <span className="relative">
-                        {currentIndex < celebrations.length - 1
-                          ? '🎉 Send Wishes & Next'
-                          : '🎉 Send Wishes'
-                        }
+                        {wishStatus === 'sending' ? 'Sending wishes…'
+                          : wishStatus === 'sent' || !hasRecipients
+                            ? (currentIndex < celebrations.length - 1 ? 'Next celebration' : 'Done')
+                            : wishStatus === 'error' ? 'Retry remaining wishes' : '🎉 Send Wishes'}
                       </span>
                     </motion.button>
                   </motion.div>
+                  <p className="mt-3 text-center text-sm text-slate-300" role={wishError ? 'alert' : 'status'} aria-live="polite">
+                    {wishError || (wishStatus === 'sent'
+                      ? 'Wishes sent in private chat!'
+                      : hasRecipients ? 'Sends a personal greeting to each person in Talio chat.' : '')}
+                  </p>
 
                   {/* Page indicator */}
                   {celebrations.length > 1 && (
