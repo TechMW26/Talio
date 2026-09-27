@@ -3,7 +3,8 @@
 // Non-interactive, local-only overlay. It cannot focus or intercept other apps.
 function createMiraPointer({ BrowserWindow }) {
   let window = null, timer = null, position = null, ready = false;
-  const offset = 48;
+  // SVG tip is (128, 64) in a 512 viewBox, placed at (42, 45).
+  const offsetX = 48, offsetY = 48;
   function hide() {
     clearInterval(timer); timer = null;
     if (window && !window.isDestroyed()) window.close();
@@ -32,21 +33,14 @@ function createMiraPointer({ BrowserWindow }) {
   }
   function draw() {
     if (!ready || !position || !window || window.isDestroyed()) return;
-    window.setPosition(Math.round(position.x - offset), Math.round(position.y - offset), false);
+    window.setPosition(Math.round(position.x - offsetX), Math.round(position.y - offsetY), false);
     window.showInactive();
   }
   function moveTo(point) {
     if (!window || window.isDestroyed() || !Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return;
     clearInterval(timer); timer = null;
-    if (!position) { position = { x: point.x, y: point.y }; draw(); return; }
-    const start = { ...position }, target = { x: point.x, y: point.y }, began = Date.now();
-    timer = setInterval(() => {
-      const t = Math.min(1, (Date.now() - began) / 180);
-      const eased = t * t * (3 - 2 * t);
-      position = { x: start.x + (target.x - start.x) * eased, y: start.y + (target.y - start.y) * eased };
-      draw();
-      if (t === 1) { clearInterval(timer); timer = null; }
-    }, 16);
+    // Native input is immediate: display its actual target immediately too.
+    position = { x: point.x, y: point.y }; draw();
   }
   return { show, hide, moveTo };
 }

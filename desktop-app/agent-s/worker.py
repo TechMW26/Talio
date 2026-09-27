@@ -102,6 +102,11 @@ def main():
                     raise ValueError("Unsupported operation")
         except EOFError:
             return
+        except (ValueError, SyntaxError, TypeError):
+            if agent:
+                agent.grounding_agent.notes.append('No input was executed: invalid plan. Choose a different supported action with literal arguments, normalized coordinates, or a documented keyboard shortcut.')
+            emit({"kind": "result", "retryable": True, "retryAfterMs": 200,
+                  "message": "Rechecking the screen and choosing another input method."})
         except Exception:
             emit({"kind": "error", "message": "The local desktop planner stopped. Please retry or update Talio."})
 

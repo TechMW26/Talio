@@ -1,5 +1,21 @@
 import { executeMiraComputerTask, fetchMiraDesktopPlan } from '@/lib/miraComputerClient'
 afterEach(() => { delete window.electronAPI })
+test('a rejected model request rebuilds the planner and continues from a fresh observation', async () => {
+  const originalFetch = global.fetch
+  let plans = 0
+  global.fetch = jest.fn(async () => ({ ok: false, status: 400, json: async () => ({ success: false }) }))
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+    if (input.operation === 'observe') return { success: true, observationId: 'o' }
+    if (input.operation === 'plan') return ++plans === 1 ? { success: true, kind: 'model_request', messages: [] } : { success: true, done: true, message: 'Verified.' }
+    return { success: true }
+  }) }
+  try {
+    expect(await executeMiraComputerTask('Read Notes', { token: 't' })).toMatchObject({ success: true, message: 'Verified.' })
+    expect(window.electronAPI.computerTask).toHaveBeenCalledWith({ operation: 'recover', sessionId: 's', resetPlanner: true })
+    expect(plans).toBe(2)
+  } finally { global.fetch = originalFetch }
+})
 test('new native FAST route completes without screenshots or model calls', async () => {
   window.electronAPI = { computerTask: jest.fn(async input => {
     if (input.operation === 'begin') return { success: true, sessionId: 's', decision: { route: 'FAST' } }
@@ -32,7 +48,7 @@ test('repeated invalid plans are bounded and never emit native input', async () 
     const pending = executeMiraComputerTask('Read the note', { token: 't' })
     await jest.runAllTimersAsync()
     expect(await pending).toMatchObject({ success: false, message: expect.stringContaining('several fresh observations') })
-    expect(window.electronAPI.computerTask.mock.calls.filter(([i]) => i.operation === 'plan')).toHaveLength(7)
+    expect(window.electronAPI.computerTask.mock.calls.filter(([i]) => i.operation === 'plan')).toHaveLength(5)
     expect(window.electronAPI.computerTask.mock.calls.some(([i]) => i.operation === 'act')).toBe(false)
   } finally { jest.useRealTimers() }
 })

@@ -19,6 +19,19 @@ import { POST as sendChatMessage } from '@/app/api/chat/[chatId]/messages/route'
 const action = { type: 'create_task', fields: { title: 'Review draft', assignees: ['me'] } }
 const run = body => POST(new Request('https://talio.test/api/ai/mira-actions', { method: 'POST', body: JSON.stringify(body) }))
 beforeEach(() => jest.clearAllMocks())
+test.each([undefined, []])('new tasks and projects default missing ownership to the authenticated creator: %s', async owners => {
+  const user = { employeeId: { _id: 'creator' } }
+  const task = await prepareMiraAction({ type: 'create_task', fields: { title: 'Draft', ...(owners ? { assignees: owners } : {}) } }, user, {})
+  expect(task.body.assigneeIds).toEqual(['creator'])
+  const project = await prepareMiraAction({ type: 'create_project', fields: { name: 'Launch', startDate: '2026-09-27', endDate: '2026-10-01', ...(owners ? { heads: owners } : {}) } }, user, {})
+  expect(project.body.projectHeadIds).toEqual(['creator'])
+})
+test('explicit owners survive validation; malformed ownership and reassignment never default silently', () => {
+  expect(validateMiraAction({ type: 'create_task', fields: { title: 'Draft', assignees: ['Priya'] } }).action.fields.assignees).toEqual(['Priya'])
+  expect(validateMiraAction({ type: 'create_project', fields: { name: 'Launch', startDate: '2026-09-27', endDate: '2026-10-01', heads: ['Priya'] } }).action.fields.heads).toEqual(['Priya'])
+  expect(validateMiraAction({ type: 'create_task', fields: { title: 'Draft', assignees: 'Priya' } }).error).toBeTruthy()
+  expect(validateMiraAction({ type: 'assign_task', fields: { taskTitle: 'Draft' } }).error).toContain('assignees')
+})
 test('personal reminder targets only the authenticated user and persists its due time', async () => {
   const create = jest.fn(async () => ({ _id: 'reminder' }))
   getAuthAndModels.mockResolvedValue({ success: true, user: { userId: 'self', employeeId: 'employee', role: 'employee' }, models: { ScheduledNotification: { create } } })
@@ -41,7 +54,7 @@ test('project creation preserves the new record identity for opening and follow-
   expect(result.resource).toEqual({ page: 'projects', id })
 })
 test('rejects incomplete actions, unknown operations and invalid meeting dates', () => {
-  expect(validateMiraAction({ type: 'create_task', fields: { title: 'Draft' } }).error).toContain('assignees')
+  expect(validateMiraAction({ type: 'create_task', fields: {} }).error).toContain('title')
   expect(validateMiraAction({ type: 'delete_database', fields: {} }).error).toBeTruthy()
   expect(validateMiraAction({ type: 'create_meeting', fields: { title: 'Review', agenda: 'Plan', invitees: ['me'], type: 'online', scheduledStart: '2026-01-01T10:00:00Z', scheduledEnd: '2026-01-01T09:00:00Z' } }).error).toBeTruthy()
 })

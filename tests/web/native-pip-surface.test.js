@@ -14,6 +14,23 @@ function fakeWindow() {
 }
 
 beforeEach(() => { jest.spyOn(document, 'hasFocus').mockReturnValue(true) })
+test('desktop MIRA starts at stable dimensions and fits without phantom browser chrome', async () => {
+  const target = fakeWindow()
+  Object.assign(target, { innerWidth: 340, innerHeight: 300, outerWidth: 360, outerHeight: 350, resizeTo: jest.fn() })
+  window.electronAPI = { nativePip: true }
+  const open = jest.spyOn(window, 'open').mockReturnValue(target)
+  const ref = createRef()
+  render(<NativePipSurface ref={ref}><div className="mira-workspace">Captions</div></NativePipSurface>)
+  const panel = screen.getByText('Captions')
+  Object.defineProperties(panel, { offsetWidth: { value: 340 }, offsetHeight: { value: 240 } })
+  panel.getBoundingClientRect = () => ({ width: 310, height: 200 })
+  await act(async () => { await ref.current.open() })
+  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=340,height=240')
+  expect(target.resizeTo).toHaveBeenCalledWith(340, 240)
+  expect(target.document.head.textContent).toContain('height:240px!important')
+  expect(target.document.head.textContent).toContain('min-height:0!important;height:auto!important;overflow:hidden!important')
+  act(() => target.close())
+})
 afterEach(() => { delete window.documentPictureInPicture; delete window.electronAPI; delete document.visibilityState; delete navigator.mediaSession; jest.restoreAllMocks(); jest.useRealTimers() })
 
 test('a background browser wake attempts PiP and explains blocked activation without losing the panel', async () => {

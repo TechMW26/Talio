@@ -7,6 +7,10 @@ import { createPortal } from 'react-dom'
 // ongoing meeting when the user also pops out MIRA.
 let nativeWindow = null
 let openingWindow = null
+export function getMiraNativePipMode() {
+  if (!nativeWindow || nativeWindow.closed || !nativeWindow.document.querySelector('.mira-workspace')) return 'in-app'
+  return window.electronAPI?.nativePip === true ? 'desktop-pip' : 'browser-pip'
+}
 function isAppAway() {
   return document.visibilityState === 'hidden' || !document.hasFocus()
 }
@@ -34,7 +38,8 @@ function registerAutomaticSurface(surface) {
 function panelSize(host) {
   const panel = host?.querySelector('[data-meeting-pip], .mira-workspace') || host
   const rect = panel?.getBoundingClientRect()
-  return { width: Math.ceil(rect?.width || 340), height: Math.ceil(rect?.height || 180) }
+  // Layout dimensions exclude the panel's entrance/exit transform.
+  return { width: Math.ceil(panel?.offsetWidth || rect?.width || 340), height: Math.ceil(panel?.offsetHeight || rect?.height || 180) }
 }
 
 function fitWindow(target) {
@@ -44,8 +49,9 @@ function fitWindow(target) {
   const width = Math.max(...sizes.map(size => size.width))
   const height = sizes.reduce((sum, size) => sum + size.height, 0) + Math.max(0, sizes.length - 1) * 12
   // Browser-owned title bars and minimum dimensions cannot be removed.
-  const chromeWidth = Math.max(0, (target.outerWidth || width) - (target.innerWidth || width))
-  const chromeHeight = Math.max(0, (target.outerHeight || height) - (target.innerHeight || height))
+  const desktop = target.document.documentElement.dataset.desktopPip === 'true'
+  const chromeWidth = desktop ? 0 : Math.max(0, (target.outerWidth || width) - (target.innerWidth || width))
+  const chromeHeight = desktop ? 0 : Math.max(0, (target.outerHeight || height) - (target.innerHeight || height))
   if (Math.abs((target.innerWidth || 0) - width) > 1 || Math.abs((target.innerHeight || 0) - height) > 1) {
     try { target.resizeTo?.(width + chromeWidth, height + chromeHeight) } catch {}
   }
@@ -65,6 +71,7 @@ async function getPipWindow(size) {
     const target = await openingWindow
     if (!target) throw new Error('Talio could not open the live window.')
     nativeWindow = target
+    target.document.documentElement.dataset.desktopPip = String(desktop)
     target.document.title = 'Talio · Live windows'
     const base = target.document.createElement('base')
     base.href = document.baseURI
@@ -110,6 +117,16 @@ async function getPipWindow(size) {
       [data-native-pip-surface] .mira-workspace [data-ai-activity-beam],
       [data-native-pip-surface] .mira-workspace [data-ai-activity-beam] *{border-radius:0!important}`}`
     target.document.head.append(style)
+    if (desktop) {
+      const sizing = target.document.createElement('style')
+      sizing.textContent = `
+        html,body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
+        [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal}
+        [data-native-pip-surface] .mira-workspace{height:240px!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
+        [data-native-pip-surface] [data-mira-pip-content]{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+      `
+      target.document.head.append(sizing)
+    }
     if (desktop && window.electronAPI?.moveLivePip) {
       let drag = null, moved = false, frame = null
       target.document.addEventListener('pointerdown', event => {
@@ -190,7 +207,8 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
       if (automaticRef.current && !isAppAway()) return
       setError('')
       try {
-        const size = panelSize(host)
+        const size = window.electronAPI?.nativePip === true && host?.querySelector('.mira-workspace')
+          ? { width: 340, height: 240 } : panelSize(host)
         const target = await getPipWindow(size)
         if (!mounted.current || !enabledRef.current || !host || (automaticRef.current && !isAppAway())) {
           if (!target.document.querySelector('[data-native-pip-surface]')) target.close()

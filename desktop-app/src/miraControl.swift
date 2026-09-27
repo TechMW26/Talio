@@ -160,6 +160,13 @@ case "open_app":
     guard let name = action["name"] as? String else { exit(1) }
     if let running = NSWorkspace.shared.runningApplications.first(where: { appKey($0.localizedName ?? "") == appKey(name) && $0.activationPolicy == .regular }) {
         running.unhide()
+        let application = AXUIElementCreateApplication(running.processIdentifier)
+        var windowsValue: CFTypeRef?
+        AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &windowsValue)
+        for window in (windowsValue as? [AXUIElement]) ?? [] {
+            AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        }
         let activated = running.activate(options: [.activateAllWindows])
         output(["success": activated, "message": activated ? "Existing application brought to front; verify the screen." : "Application could not be focused."])
         exit(0)

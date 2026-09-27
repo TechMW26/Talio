@@ -4,7 +4,7 @@
 // Buttons, recipients, file selection and compound-task completion need Agent S.
 function decideDesktopRoute(goal) {
   const text = String(goal || '').trim();
-  const match = text.match(/^(?:(?:please|mira|hey mira)[,\s]+)*(?:open|launch|focus|bring up|switch to)\s+(?:the\s+)?(whats\s*app|telegram|signal|slack|outlook|gmail|discord|spotify|notes|calculator|finder|textedit|chrome|safari|notepad)(?:\s+(?:app|application))?(?=$|[\s.!?,])/iu);
+  const match = text.match(/^(?:(?:please|mira|hey mira)[,\s]+)*(?:open|launch|focus|restore|bring up|switch to)\s+(?:the\s+)?(talio|whats\s*app|telegram|signal|slack|outlook|gmail|discord|spotify|notes|calculator|finder|textedit|chrome|safari|notepad)(?:\s+(?:app|application))?(?=$|[\s.!?,])/iu);
   if (!match) return { route: 'COGNITIVE', needsScreen: true, reason: 'The requested target requires current desktop context.' };
   const name = /^whats\s*app$/i.test(match[1]) ? 'WhatsApp' : match[1];
   const remainder = text.slice(match[0].length).trim();

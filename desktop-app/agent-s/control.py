@@ -69,7 +69,7 @@ def open_app(name):
         raise ValueError("Invalid app name")
     if sys.platform == "win32":
         # Name is passed as environment data, never interpolated into PowerShell.
-        script = r'''$n=$env:TALIO_TARGET_APP; $p=Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and ($_.ProcessName -ieq $n -or $_.MainWindowTitle -ieq $n) } | Select-Object -First 1; if($p){$s=New-Object -ComObject WScript.Shell; if($s.AppActivate($p.Id)){exit 0}; exit 3}; $a=Get-StartApps | Where-Object {$_.Name -ieq $n} | Select-Object -First 1; if($a){Start-Process explorer.exe -ArgumentList ('shell:AppsFolder\'+$a.AppID);exit 0};exit 2'''
+        script = r'''$n=$env:TALIO_TARGET_APP; $p=Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and ($_.ProcessName -ieq $n -or $_.MainWindowTitle -ieq $n) } | Select-Object -First 1; if($p){Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class MiraWindow { [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int n); }'; [MiraWindow]::ShowWindowAsync($p.MainWindowHandle,9) | Out-Null; $s=New-Object -ComObject WScript.Shell; if($s.AppActivate($p.Id)){exit 0}; exit 3}; $a=Get-StartApps | Where-Object {$_.Name -ieq $n} | Select-Object -First 1; if($a){Start-Process explorer.exe -ArgumentList ('shell:AppsFolder\'+$a.AppID);exit 0};exit 2'''
         result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script], env={**os.environ, "TALIO_TARGET_APP": name}, capture_output=True, timeout=10)
         return {"success": result.returncode == 0, "notInstalled": result.returncode == 2}
     windows = run(["wmctrl", "-lx"])
@@ -157,7 +157,7 @@ def control(value):
         x, y = value["x"], value["y"]
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)) or not pyautogui.onScreen(x, y):
             raise ValueError("Invalid click")
-        pyautogui.moveTo(x, y, duration=0.2)
+        pyautogui.moveTo(x, y, duration=0)
         pyautogui.click()
     elif kind == 'drag':
         points = [(value['x'], value['y']), (value['toX'], value['toY'])]

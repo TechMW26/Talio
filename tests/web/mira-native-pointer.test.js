@@ -56,16 +56,11 @@ describe('native MIRA pointer transparency', () => {
     expect(jest.getTimerCount()).toBe(0)
   })
 
-  test('animates only between agent targets and stops all animation on hide', () => {
+  test('places the indicator at the input target immediately without animation lag', () => {
     pointer.show()
     windows[0].callbacks['ready-to-show']()
     pointer.moveTo({ x: 100, y: 100 })
     pointer.moveTo({ x: 300, y: 200 })
-    jest.advanceTimersByTime(80)
-    const midway = windows[0].setPosition.mock.calls.at(-1)
-    expect(midway[0]).toBeGreaterThan(52)
-    expect(midway[0]).toBeLessThan(252)
-    jest.advanceTimersByTime(160)
     expect(windows[0].setPosition).toHaveBeenLastCalledWith(252, 152, false)
     pointer.hide()
     expect(jest.getTimerCount()).toBe(0)

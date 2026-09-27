@@ -2,6 +2,26 @@ const { createMiraComputer, validateComputerAction } = require('../../desktop-ap
 const { createMiraPermissions, trustedMiraSender } = require('../../desktop-app/src/miraPermissions')
 const { decideDesktopRoute, sameWindowFrame } = require('../../desktop-app/src/miraDecision')
 
+test('opening Talio restores its main window even when PiP owns the foreground', async () => {
+  const revealMainWindow = jest.fn()
+  const { call, deps } = harness({ revealMainWindow, runControl: jest.fn(async () => ({ success: true, app: 'Talio' })) })
+  const start = await call({ operation: 'begin', goal: 'Open Talio' })
+  expect(await call({ operation: 'fast', sessionId: start.sessionId })).toMatchObject({ success: true, done: true })
+  expect(revealMainWindow).toHaveBeenCalledTimes(1)
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'open_app' }))
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('invalid coordinates request a fresh plan without terminating the task or clicking', async () => {
+  const { call, deps } = harness()
+  const start = await call({ operation: 'begin', goal: 'Read Notes' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'click', x: 900, y: 500 } })).toMatchObject({ success: false, retryable: true })
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }))
+  expect((await call({ operation: 'observe', sessionId: start.sessionId })).success).toBe(true)
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
 test('frame comparison ignores native JSON key order but not real geometry changes', () => {
   const frame = { x: 0, y: 39, width: 2056, height: 1203 }
   expect(sameWindowFrame(frame, { height: 1203, width: 2056, y: 39, x: 0 })).toBe(true)
@@ -11,6 +31,8 @@ test('frame comparison ignores native JSON key order but not real geometry chang
 })
 
 test('decision router activates apps first but keeps dynamic tasks cognitive', () => {
+  expect(decideDesktopRoute('Open Talio')).toMatchObject({ route: 'FAST', needsScreen: false })
+  expect(decideDesktopRoute('Restore WhatsApp')).toMatchObject({ route: 'FAST', needsScreen: false })
   expect(decideDesktopRoute('Open WhatsApp')).toMatchObject({ route: 'FAST', needsScreen: false, continueCognitive: false })
   expect(decideDesktopRoute('Open WhatsApp and text Mansi Hi')).toMatchObject({ route: 'FAST', needsScreen: true, continueCognitive: true })
   for (const goal of ['Do not open WhatsApp', 'Find the red folder', 'Click Sign In', 'Open Terminal', 'Explain how to open WhatsApp']) expect(decideDesktopRoute(goal).route).toBe('COGNITIVE')

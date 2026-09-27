@@ -82,21 +82,23 @@ jobs:
           pattern: desktop-*
           path: release-assets
           merge-multiple: true
-      - name: Publish v6.0.17
+      - name: Publish v6.0.18
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.17
+          tag_name: v6.0.18
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.17 — MIRA desktop control fixes
+          name: Talio Desktop 6.0.18 — MIRA recovery and stable PiP
           draft: false
           prerelease: false
           generate_release_notes: false
           body: |
-            MIRA decision-first desktop control, macOS frame comparison fix, native accessibility grounding, and permission prompts.
+            Restores minimized applications, brings Talio's main window forward from desktop PiP, aligns the pointer indicator with native input, and reduces redundant activation/observation delays.
 
-            Validation: 505 automated tests passed. Live macOS testing verified Calculator activation and WhatsApp contact search through the native executor and local Python/Agent S worker. No messages were sent.
+            Invalid desktop plans recover with fresh observations and alternative methods within five attempts. Desktop MIRA PiP uses a stable compact layout with content scrolling inside the container. New projects and tasks default to the creator as head/assignee. Includes the updated ElevenLabs voice default.
 
-            Signing: macOS Developer ID signed but not notarized. Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval.
+            Validation: focused JavaScript regression tests, Agent S Python tests, Swift type checking, and production web build. Interactive acceptance on every OS has not been performed.
+
+            Signing: CI packages are not Developer ID signed or Apple notarized; Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
           files: |
             release-assets/**/*.dmg
             release-assets/**/*.zip
