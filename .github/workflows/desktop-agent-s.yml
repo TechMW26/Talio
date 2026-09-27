@@ -82,21 +82,25 @@ jobs:
           pattern: desktop-*
           path: release-assets
           merge-multiple: true
-      - name: Publish v6.0.19
+      - name: Publish v6.0.20
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.19
+          tag_name: v6.0.20
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.19 — Compact MIRA and working wishes
+          name: Talio Desktop 6.0.20 — MIRA voice and personalization
           draft: false
           prerelease: false
           generate_release_notes: false
           body: |
             MIRA uses a 16:8 compact PiP layout with scrollable content. Native live windows open bottom-right without restoring stale positions. Browser-owned PiP placement remains browser-controlled.
 
+            Closing the external MIRA PiP does not intentionally foreground Talio on macOS. The draggable PiP position persists locally. MIRA's separate cursor overlay reasserts the highest supported desktop window level when it moves.
+
             MIRA replies are short and targeted by default, with longer explanations only when needed or requested. Send Wishes now sends birthday and anniversary greetings through private Talio chat, with sending, success, error and partial-retry handling.
 
-            Validation: focused JavaScript regression tests and syntax checks. Real employee greetings were not sent during tests. Interactive acceptance on every OS has not been performed.
+            Settings now include a personal MIRA tab with six ElevenLabs voice choices, audio previews, saved per-user voice selection, and bounded personal instructions/knowledge. The default voice is jJ0Hr51MaPgsgfPtFdR4; voice previews and spoken replies use the saved user choice.
+
+            Validation: CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 desktop installers. Interactive acceptance on every OS has not been performed. ElevenLabs voice previews require the selected voice to be available to the configured provider account.
 
             Signing: CI packages are not Developer ID signed or Apple notarized; Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
           files: |

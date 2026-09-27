@@ -62,9 +62,10 @@ authenticated MIRA chat API. Only text, not microphone audio, is sent to that AP
 Reply text goes through the authenticated, rate-limited `/api/ai/mira-voice` route
 to ElevenLabs v3 by default. `MIRA_TTS_MODEL` can select `eleven_flash_v2_5`
 for lower latency or `eleven_multilingual_v2`. Hindi responses specify `hi`
-and text normalization is enabled. Only server-side `ELEVENLABS_API_KEY` and
-`ELEVENLABS_VOICE_ID` are used; when the override is absent, MIRA uses the default
-voice `komDQG4wp0wC5IDFwetv`. Never use public-prefixed keys. PCM audio is played
+and text normalization is enabled. Only server-side `ELEVENLABS_API_KEY` is used;
+MIRA's authenticated speech route reads the voice saved in the signed-in user's
+MIRA preferences and defaults to `jJ0Hr51MaPgsgfPtFdR4`. Never use public-prefixed
+keys. PCM audio is played
 as chunks arrive, not after downloading the whole file. The first text chunk is
 at most 120 characters, subsequent chunks at most 280, with sentence-aware splits
 and one-chunk lookahead. Cancellation aborts queued provider work. Speech requests start

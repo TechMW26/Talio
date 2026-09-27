@@ -705,7 +705,7 @@ export default function MiraChatSidebar() {
           top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? 'max(24px, env(safe-area-inset-bottom))' : 'auto',
           height: pip ? 'auto' : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
-          aspectRatio: pip ? '2 / 1' : undefined,
+          aspectRatio: pip ? '10 / 3' : undefined,
           transitionProperty: sidebarDrag.dragging ? 'none' : pip ? 'opacity, transform' : 'opacity, transform, left, top, width',
           width: pip ? 'min(400px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode

@@ -39,7 +39,7 @@ function panelSize(host) {
   const panel = host?.querySelector('[data-meeting-pip], .mira-workspace') || host
   if (panel?.matches('.mira-workspace')) {
     const width = Math.min(400, host.ownerDocument.defaultView?.innerWidth || 400)
-    return { width, height: width / 2 }
+    return { width, height: Math.round(width * 0.3) }
   }
   const rect = panel?.getBoundingClientRect()
   // Layout dimensions exclude the panel's entrance/exit transform.
@@ -52,7 +52,7 @@ function fitWindow(target) {
   const sizes = surfaces.map(panelSize)
   if (!sizes.length) return
   const width = Math.max(...sizes.map(size => size.width))
-  const height = sizes.reduce((sum, size, index) => sum + (surfaces[index].querySelector('.mira-workspace') ? width / 2 : size.height), 0) + Math.max(0, sizes.length - 1) * 12
+  const height = sizes.reduce((sum, size, index) => sum + (surfaces[index].querySelector('.mira-workspace') ? Math.round(width * 0.3) : size.height), 0) + Math.max(0, sizes.length - 1) * 12
   // Browser-owned title bars and minimum dimensions cannot be removed.
   const desktop = target.document.documentElement.dataset.desktopPip === 'true'
   const chromeWidth = desktop ? 0 : Math.max(0, (target.outerWidth || width) - (target.innerWidth || width))
@@ -106,7 +106,7 @@ async function getPipWindow(size) {
       [data-meeting-pip] button svg{width:20px!important;height:20px!important;min-width:20px;flex-shrink:0}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
-      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:2/1!important;min-height:0!important;box-sizing:border-box;transform:none!important}
+      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:10/3!important;min-height:0!important;box-sizing:border-box;transform:none!important}
       [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0!important;width:100%!important}
       [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none}
       [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}
@@ -127,15 +127,20 @@ async function getPipWindow(size) {
       sizing.textContent = `
         html,body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
         [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal}
-        [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:2/1!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
+        [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:10/3!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
         [data-native-pip-surface] [data-mira-pip-content]{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
       `
       target.document.head.append(sizing)
     }
     if (desktop && window.electronAPI?.moveLivePip) {
-      let drag = null, moved = false, frame = null
+      let drag = null, moved = false, frame = null, pendingPoint = null
+      const flushDrag = () => {
+        if (frame) target.cancelAnimationFrame(frame)
+        frame = null
+        if (pendingPoint) window.electronAPI.moveLivePip(pendingPoint).catch(() => {})
+        pendingPoint = null
+      }
       target.document.addEventListener('pointerdown', event => {
-        if (target.document.querySelector('.mira-workspace')) return
         if (event.button !== 0 || event.target.closest('button,input,textarea,a,select,[role="button"],[role="slider"]')) return
         moved = false
         drag = { x: event.screenX, y: event.screenY, left: target.screenX, top: target.screenY }
@@ -146,13 +151,12 @@ async function getPipWindow(size) {
         const dx = event.screenX - drag.x, dy = event.screenY - drag.y
         if (!moved && Math.hypot(dx, dy) < 5) return
         moved = true
+        pendingPoint = { x: drag.left + dx, y: drag.top + dy }
         if (frame) target.cancelAnimationFrame(frame)
-        frame = target.requestAnimationFrame(() => {
-          if (drag) window.electronAPI.moveLivePip({ x: drag.left + dx, y: drag.top + dy }).catch(() => {})
-        })
+        frame = target.requestAnimationFrame(flushDrag)
       })
-      target.document.addEventListener('pointerup', () => { drag = null })
-      target.document.addEventListener('pointercancel', () => { drag = null })
+      target.document.addEventListener('pointerup', () => { flushDrag(); drag = null })
+      target.document.addEventListener('pointercancel', () => { flushDrag(); drag = null })
       target.document.addEventListener('click', event => { if (moved) { event.preventDefault(); event.stopPropagation(); moved = false } }, true)
     }
     target.addEventListener('pagehide', () => { if (nativeWindow === target) nativeWindow = null }, { once: true })
@@ -214,7 +218,7 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
       setError('')
       try {
         const size = window.electronAPI?.nativePip === true && host?.querySelector('.mira-workspace')
-          ? { width: 400, height: 200 } : panelSize(host)
+          ? { width: 400, height: 120 } : panelSize(host)
         const target = await getPipWindow(size)
         if (!mounted.current || !enabledRef.current || !host || (automaticRef.current && !isAppAway())) {
           if (!target.document.querySelector('[data-native-pip-surface]')) target.close()

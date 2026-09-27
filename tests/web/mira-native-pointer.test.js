@@ -12,7 +12,7 @@ describe('native MIRA pointer transparency', () => {
         setBackgroundColor: jest.fn(), setIgnoreMouseEvents: jest.fn(),
         setAlwaysOnTop: jest.fn(), setVisibleOnAllWorkspaces: jest.fn(),
         setContentProtection: jest.fn(), setPosition: jest.fn(),
-        showInactive: jest.fn(), loadURL: jest.fn(),
+        showInactive: jest.fn(), moveTop: jest.fn(), loadURL: jest.fn(),
         once: jest.fn((event, cb) => { instance.callbacks[event] = cb }),
       }
       windows.push(instance)
@@ -38,6 +38,8 @@ describe('native MIRA pointer transparency', () => {
     pointer.moveTo({ x: 100, y: 200 })
     expect(win.setBackgroundColor).toHaveBeenNthCalledWith(2, '#00000000')
     expect(win.showInactive).toHaveBeenCalledTimes(1)
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'screen-saver')
+    expect(win.moveTop).toHaveBeenCalledTimes(1)
     expect(win.setPosition).toHaveBeenCalledWith(52, 152, false)
     jest.advanceTimersByTime(1000)
     expect(win.setPosition).toHaveBeenCalledTimes(1)

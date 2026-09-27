@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Select, SelectItem, Button, Skeleton } from '@heroui/react'
-import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch } from 'react-icons/fa'
+import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch, FaMicrophone } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
@@ -13,6 +13,7 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
+import MiraSettings from '@/components/settings/MiraSettings'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 
 // Dynamically import map component (client-side only)
@@ -141,6 +142,9 @@ export default function SettingsPage() {
         { id: 'notifications', name: 'Notifications', description: 'Delivery channels and alerts', group: 'Communication', icon: FaBell }
       )
     }
+
+    // MIRA preferences are personal and available to every signed-in user.
+    baseTabs.push({ id: 'mira', name: 'MIRA', description: 'Voice, personal instructions and knowledge', group: 'Personalisation', icon: FaMicrophone })
 
     return baseTabs
   }, [userRole, isDepartmentHead, isFeatureEnabled])
@@ -322,6 +326,7 @@ export default function SettingsPage() {
           {activeTab === 'attendance-machines' && <AttendanceMachinesSettings />}
           {activeTab === 'payroll' && <PayrollSettingsTab />}
           {activeTab === 'notifications' && <NotificationsTab />}
+          {activeTab === 'mira' && <MiraSettings />}
         </section>
       </div>
     </div>

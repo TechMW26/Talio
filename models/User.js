@@ -159,7 +159,10 @@ const UserSchema = new mongoose.Schema({
   miraPreferences: {
     lastGreetingDate: { type: String }, // YYYY-MM-DD format to track daily greeting
     autoGreetingEnabled: { type: Boolean, default: true },
-    voiceEnabled: { type: Boolean, default: true }
+    voiceEnabled: { type: Boolean, default: true },
+    voiceId: { type: String, default: 'jJ0Hr51MaPgsgfPtFdR4' },
+    customInstructions: { type: String, default: '', maxlength: 1600 },
+    knowledge: { type: String, default: '', maxlength: 8000 },
   },
   lastMiraGreeting: { type: Date }, // Track last greeting timestamp
   // General settings

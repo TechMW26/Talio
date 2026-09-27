@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { splitMiraSpeech } from '@/lib/miraSpeechChunks'
-import { getMiraElevenLabsVoiceId } from '@/lib/audio'
+import { DEFAULT_MIRA_VOICE_ID, isMiraVoiceId, sanitizeMiraPreferences } from '@/lib/miraVoices'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -10,16 +10,24 @@ export const maxDuration = 60
 // A fixed provider/voice prevents clients from turning this into an open proxy.
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request)
+    const auth = await getAuthAndModels(request, ['User'])
     if (!auth.success) return NextResponse.json({ message: 'Authentication required' }, { status: auth.status || 401 })
-    const { text } = await request.json()
+    const payload = await request.json()
+    const { text, voiceId: requestedVoiceId } = payload || {}
     if (typeof text !== 'string' || !text.trim() || text.length > 5000) {
       return NextResponse.json({ message: 'Speech must contain 1–5000 characters.' }, { status: 400 })
+    }
+    if (requestedVoiceId !== undefined && !isMiraVoiceId(requestedVoiceId)) {
+      return NextResponse.json({ message: 'Choose a voice from MIRA settings.' }, { status: 400 })
     }
     const bucket = await rateLimit('MIRA_VOICE', `${auth.tenant.databaseName}:${auth.user._id}`)
     if (!bucket.allowed) return NextResponse.json({ message: 'Please wait before requesting more speech.' }, { status: 429, headers: { 'Retry-After': String(bucket.retryAfterSeconds) } })
     const key = process.env.ELEVENLABS_API_KEY
-    const voice = getMiraElevenLabsVoiceId()
+    const profile = await auth.models.User.findById(auth.user._id).select('miraPreferences').lean()
+    const preferences = sanitizeMiraPreferences(profile?.miraPreferences)
+    // User choice takes precedence; the new MIRA ID is the fallback even when
+    // a deployment still has a legacy ELEVENLABS_VOICE_ID environment value.
+    const voice = requestedVoiceId || preferences.voiceId || DEFAULT_MIRA_VOICE_ID
     if (!key || !voice) return NextResponse.json({ message: 'MIRA voice is not configured.' }, { status: 503 })
     const controller = new AbortController()
     const signal = AbortSignal.any([request.signal, controller.signal, AbortSignal.timeout(55000)])

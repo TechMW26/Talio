@@ -1144,16 +1144,29 @@ function setupWindowEvents() {
   // Handle new window requests (open in browser)
   mainWindow.webContents.setWindowOpenHandler(function (details) {
     const pip = pipWindowOptions(details, mainWindow.webContents.getURL(), APP_ORIGIN);
-    if (pip) return pip;
+    if (pip) {
+      const features = Object.fromEntries(String(details.features || '').split(',').map(part => part.trim().split('=')));
+      const width = Math.max(180, Math.min(1200, Number(features.width) || 400));
+      const height = Math.max(80, Math.min(1200, Number(features.height) || 120));
+      const saved = store.get('livePipPositionV3', null);
+      const position = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? saved : null;
+      const display = position ? screen.getDisplayNearestPoint({ x: Math.round(position.x), y: Math.round(position.y) }) : screen.getDisplayMatching(mainWindow.getBounds());
+      Object.assign(pip.overrideBrowserWindowOptions, pipBounds(display.workArea, { width, height }, 16, position));
+      return pip;
+    }
     if (/^https?:\/\//i.test(details.url)) shell.openExternal(details.url);
     return { action: 'deny' };
   });
   mainWindow.webContents.on('did-create-window', function (child, details) {
     if (details.frameName === 'talio-live-pip') livePipWindow = child;
     if (details.frameName !== 'talio-live-pip') return;
+    // The live MIRA PiP is an independent desktop surface. Disowning it keeps
+    // closing that child from activating/revealing the main Talio window.
+    child.setParentWindow(null);
     child.setAlwaysOnTop(true, 'screen-saver');
-    // Every new live window starts bottom-right; do not revive stale positions.
-    let savedPipPosition = null;
+    // Only explicit user drags write V3; old startup positions are not migrated.
+    const saved = store.get('livePipPositionV3', null);
+    let savedPipPosition = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? saved : null;
     let positioning = false;
     let applyingBounds = false;
     const positionPip = () => {
@@ -1177,7 +1190,19 @@ function setupWindowEvents() {
     positionPip();
     const rememberDrag = point => { savedPipPosition = point; };
     child.on('mira-user-moved', rememberDrag);
+    let hideAppAfterPipClose = false;
+    child.on('close', () => {
+      // On macOS, closing the last visible child can activate the owning app.
+      // If Talio's main window was not focused before close, return to the app
+      // the user was using instead of surfacing the dashboard.
+      hideAppAfterPipClose = process.platform === 'darwin' && !mainWindow.isFocused();
+    });
     child.on('resize', positionPip);
+    // Window managers may apply an initial position after did-create-window.
+    // Re-anchor at visibility and after unsolicited moves as well as resizing.
+    child.on('show', positionPip);
+    child.on('move', positionPip);
+    child.on('moved', positionPip);
     mainWindow.on('move', positionPip);
     screen.on('display-metrics-changed', positionPip);
     screen.on('display-removed', positionPip);
@@ -1186,9 +1211,10 @@ function setupWindowEvents() {
       parent.removeListener('move', positionPip);
       screen.removeListener('display-metrics-changed', positionPip);
       screen.removeListener('display-removed', positionPip);
+      if (hideAppAfterPipClose) setImmediate(() => app.hide());
     });
     // Do not steal focus from the application the user just switched to.
-    child.once('ready-to-show', () => { if (!child.isDestroyed()) child.showInactive(); });
+    child.once('ready-to-show', () => { if (!child.isDestroyed()) { positionPip(); child.showInactive(); positionPip(); } });
     if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     child.webContents.on('will-navigate', event => event.preventDefault());
     child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -1517,9 +1543,10 @@ function setupIPCHandlers() {
     if (!trustedMiraSender(event, mainWindow, APP_ORIGIN) || !livePipWindow || livePipWindow.isDestroyed() || !Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return { success: false };
     const point = { x: Math.round(Math.max(-100000, Math.min(100000, position.x))), y: Math.round(Math.max(-100000, Math.min(100000, position.y))) };
     const display = screen.getDisplayNearestPoint(point);
+    livePipWindow.emit('mira-user-moved', point);
     livePipWindow.setBounds(pipBounds(display.workArea, livePipWindow.getBounds(), 0, point));
     const { x, y } = livePipWindow.getBounds();
-    store.set('livePipPositionV2', { x, y });
+    store.set('livePipPositionV3', { x, y });
     livePipWindow.emit('mira-user-moved', { x, y });
     return { success: true };
   });

@@ -35,6 +35,10 @@ function createMiraPointer({ BrowserWindow }) {
     if (!ready || !position || !window || window.isDestroyed()) return;
     window.setPosition(Math.round(position.x - offsetX), Math.round(position.y - offsetY), false);
     window.showInactive();
+    // Re-assert the highest supported app window level after other topmost
+    // windows move or appear. The OS-owned hardware cursor remains compositor-owned.
+    window.setAlwaysOnTop(true, 'screen-saver');
+    window.moveTop();
   }
   function moveTo(point) {
     if (!window || window.isDestroyed() || !Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return;

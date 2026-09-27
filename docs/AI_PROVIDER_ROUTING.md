@@ -17,7 +17,10 @@ An explicit image request produces a validated `generate_image` action. The brow
 
 The chat displays the lazy-loaded `img-fx` pixel mosaic while generating and reveals the image with a download link. Reduced-motion/no-WebGL clients use a static placeholder. Reopening history retrieves saved images without regenerating them. Image editing and reference uploads are not part of this flow. Stored images are retained independently of chat deletion; operators should include generated images in their tenant storage retention policy.
 Audio requires `ELEVENLABS_API_KEY`. TTS uses MIRA's default ElevenLabs voice
-`komDQG4wp0wC5IDFwetv`; set `ELEVENLABS_VOICE_ID` to override it per deployment.
+`jJ0Hr51MaPgsgfPtFdR4` unless the signed-in user's MIRA settings select another
+voice. MIRA Settings validates choices against its curated voice list and stores
+them on that user's profile; legacy `ELEVENLABS_VOICE_ID` does not override MIRA's
+per-user selection. The selected voice must be available to the configured API key.
 Optional `ELEVENLABS_STT_MODEL` defaults to `scribe_v2`.
 Never put provider keys in `NEXT_PUBLIC_*` variables or tracked templates.
 
