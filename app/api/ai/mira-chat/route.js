@@ -24,7 +24,7 @@ import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
 import { MIRA_IMAGE_INSTRUCTIONS, validateMiraImageAction } from '@/lib/miraImageGeneration'
 import { compactMiraHistory, miraChatUseCase } from '@/lib/miraChatBudget'
 import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
-import { miraDesktopIntent } from '@/lib/miraDesktopIntent'
+import { miraDesktopIntent, miraAppNameFollowup } from '@/lib/miraDesktopIntent'
 import { miraOutputModeInstructions, miraSpeechSummary } from '@/lib/miraSpokenReply'
 
 // Get current month key in "YYYY-MM" format
@@ -787,12 +787,13 @@ export async function POST(request) {
     }
 
     // External-app commands precede Talio lookup and stale workplace queues.
-    if (!attachments.length && miraDesktopIntent(userMessage)) {
+    const desktopIntent = miraDesktopIntent(userMessage) || miraDesktopIntent(miraAppNameFollowup(userMessage, suppliedHistory))
+    if (!attachments.length && desktopIntent) {
       const available = sanitizeMiraClientContext(body.clientContext).desktopComputerAvailable === true
       return NextResponse.json({ success: true, response: {
         message: available ? '' : 'Please use an updated Talio desktop app for computer controls.',
-        action: available ? { type: 'desktop_task' } : null,
-        taskBank: available ? { tasks: [{ id: `desktop-${Date.now()}`, request: userMessage.slice(0, 2000), action: { type: 'desktop_task', fields: {} }, status: 'pending' }] } : taskBank,
+        action: available ? { type: 'desktop_task', goal: desktopIntent.goal } : null,
+        taskBank: available ? { tasks: [{ id: `desktop-${Date.now()}`, request: desktopIntent.goal.slice(0, 2000), action: { type: 'desktop_task', fields: {} }, status: 'pending' }] } : taskBank,
         cards: [], suggestedQuestions: [],
       }, tokens: tokenResult })
     }

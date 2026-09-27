@@ -30,6 +30,17 @@ test('misspelled names use fuzzy candidates but require a choice', async () => {
   db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([person])
   await expect(resolveMiraPerson('Sahl', user, db, { type: 'send_message' })).rejects.toMatchObject({ resolution: { candidates: [expect.objectContaining({ name: 'Sahil Sahu' })] } })
 })
+test('first-letter typos use scoped fuzzy suggestions, not automatic recipients', async () => {
+  const db = models([person])
+  db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([person])
+  await expect(resolveMiraPerson('Zahil Sahu', user, db, { type: 'create_task' })).rejects.toMatchObject({ resolution: { candidates: [expect.objectContaining({ name: 'Sahil Sahu' })] } })
+  const fallback = db.Employee.find.mock.calls.at(-1)[0]
+  expect(fallback.$and).toHaveLength(2)
+  expect(JSON.stringify(fallback)).toContain('reportingManager')
+})
+test('explicitly spelled exact first name resolves without another spelling question', async () => {
+  expect(await resolveMiraPerson('S A H I L', user, models([person]), { type: 'send_message' })).toBe(person._id)
+})
 test('selected identifiers are looked up again within the current scope', async () => {
   const db = models([])
   await expect(resolveMiraPerson(`employee:${person._id}`, user, db, { type: 'create_task' })).rejects.toThrow('No matching person')
