@@ -92,7 +92,7 @@ jobs:
           prerelease: false
           generate_release_notes: false
           body: |
-            MIRA uses a 16:8 compact PiP layout with scrollable content. Native live windows open bottom-right without restoring stale positions. Browser-owned PiP placement remains browser-controlled.
+            MIRA uses a compact 400 × 120 external PiP with scrollable content. Native live windows open at bottom-right on first use, then remember the user's dragged position locally and clamp it to the current display.
 
             Closing the external MIRA PiP does not intentionally foreground Talio on macOS. The draggable PiP position persists locally. MIRA's separate cursor overlay reasserts the highest supported desktop window level when it moves.
 
