@@ -33,6 +33,7 @@ const rolePermissions = {
     '/dashboard/payroll/payslips',
     '/dashboard/performance/ratings',
     '/dashboard/performance/create',
+    '/dashboard/performance/appraisals',
     '/dashboard/recruitment',
     '/dashboard/documents',
     '/dashboard/policies',
@@ -56,6 +57,7 @@ const rolePermissions = {
     '/dashboard/performance/ratings',
     '/dashboard/performance/create',
     '/dashboard/performance/goals',
+    '/dashboard/performance/appraisals',
     '/dashboard/profile',
     '/dashboard/documents',
     '/dashboard/expenses',
@@ -69,6 +71,7 @@ const rolePermissions = {
   team_leader: [
     '/dashboard',
     '/dashboard/productivity',
+    '/dashboard/employees',
     '/dashboard/profile',
     '/dashboard/attendance',
     '/dashboard/attendance/report',
@@ -83,6 +86,7 @@ const rolePermissions = {
     '/dashboard/leave/balance',
     '/dashboard/performance/ratings',
     '/dashboard/performance/goals',
+    '/dashboard/performance/appraisals',
     '/dashboard/performance/reports',
     '/dashboard/performance/my-performance',
     '/dashboard/payroll/payslips',
@@ -93,6 +97,18 @@ const rolePermissions = {
     '/dashboard/learning/certificates',
     '/dashboard/announcements',
     '/dashboard/helpdesk',
+  ],
+
+  // Department heads review recommendations escalated from team leaders/managers.
+  department_head: [
+    '/dashboard',
+    '/dashboard/employees',
+    '/dashboard/team/members',
+    '/dashboard/performance/ratings',
+    '/dashboard/performance/goals',
+    '/dashboard/performance/reports',
+    '/dashboard/performance/appraisals',
+    '/dashboard/profile',
   ],
 
   // Employee has access to personal functions only
@@ -117,8 +133,10 @@ const rolePermissions = {
   ],
 }
 
+const EMPTY_REQUIRED_ROLES = Object.freeze([])
+
 // Helper function to check if user has access to a route
-const hasAccess = (userRole, pathname, rbacPermissions) => {
+const hasAccess = (userRole, pathname, rbacPermissions, userRecord = null) => {
   if (!userRole || !rolePermissions[userRole]) {
     return false
   }
@@ -129,6 +147,17 @@ const hasAccess = (userRole, pathname, rbacPermissions) => {
   if (permissions.includes('*')) {
     return true
   }
+
+  const orgReviewer = Boolean(
+    userRecord?.isDepartmentHead
+    || userRecord?.isDepartmentManager
+    || userRecord?.teamLeaderOf?.length
+    || userRole === 'department_head'
+  )
+  if (orgReviewer && (
+    pathname === '/dashboard/performance/appraisals'
+    || pathname.startsWith('/dashboard/employees/')
+  )) return true
 
   // RBAC permissions check (if available, grants access alongside legacy)
   if (rbacPermissions) {
@@ -156,37 +185,62 @@ const hasAccess = (userRole, pathname, rbacPermissions) => {
   })
 }
 
-export default function RoleBasedAccess({ children, requiredRoles = [], pathname }) {
+export default function RoleBasedAccess({ children, requiredRoles = EMPTY_REQUIRED_ROLES, pathname }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [hasPermission, setHasPermission] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    const resolveAccess = async () => {
     const userData = localStorage.getItem('user')
     if (userData) {
       const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
+      if (!cancelled) setUser(parsedUser)
 
       // Check if user has access to current route
       const currentPath = pathname || window.location.pathname
       const rbacPerms = parsedUser.permissions || parsedUser.permissionsCache || null
-      const permission = hasAccess(parsedUser.role, currentPath, rbacPerms)
-      setHasPermission(permission)
+      let permission = hasAccess(parsedUser.role, currentPath, rbacPerms, parsedUser)
 
       // If specific roles are required, check against them
       if (requiredRoles.length > 0) {
         const rolePermission = requiredRoles.includes(parsedUser.role)
-        setHasPermission(permission && rolePermission)
+        permission = permission && rolePermission
       }
+
+      // Leadership flags can be assigned independently of the base employee role.
+      // Resolve those flags from the tenant API when they are not in local session data.
+      const hierarchyRoute = currentPath === '/dashboard/performance/appraisals'
+        || currentPath.startsWith('/dashboard/employees/')
+      if (!permission && hierarchyRoute && requiredRoles.length === 0) {
+        try {
+          const response = await fetch('/api/team/check-head', {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+          })
+          const authority = response.ok ? await response.json() : null
+          const isReviewer = Boolean(authority?.success && (
+            authority.isDepartmentHead || authority.isDepartmentManager || authority.isTeamLeader
+          ))
+          if (isReviewer) permission = true
+        } catch (error) {
+          console.error('Could not verify hierarchy access:', error)
+        }
+      }
+      if (!cancelled) setHasPermission(permission)
     } else {
       // No user data, redirect to login
       router.push('/login')
       return
     }
 
-    setLoading(false)
-  }, [pathname])
+    if (!cancelled) setLoading(false)
+    }
+    resolveAccess()
+    return () => { cancelled = true }
+  }, [pathname, requiredRoles, router])
 
   if (loading) {
     return (

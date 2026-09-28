@@ -42,3 +42,14 @@ test('keeps ambiguous contact selection a question rather than a click', async (
   const result = await POST(request({ goal: 'text Mansi hi on WhatsApp', app: 'WhatsApp', image, history: [] }))
   expect(await result.json()).toEqual({ success: true, question: 'Which Mansi do you mean?' })
 })
+
+test('provides host context and platform shortcut guidance to the legacy planner', async () => {
+  const image = (await sharp({ create: { width: 8, height: 8, channels: 3, background: '#fff' } }).jpeg().toBuffer()).toString('base64')
+  generateVisionContent.mockResolvedValueOnce('{"done":true,"message":"Verified."}')
+  await POST(request({ goal: 'Find the document in Notes', app: 'Notes', image, history: [], deviceContext: { operatingSystem: 'macOS', architecture: 'arm64', processor: 'Apple M3', keyboardGuidance: 'Use Command shortcuts.', hostname: 'private-workstation' } }))
+  const prompt = generateVisionContent.mock.calls[0][0]
+  expect(prompt).toContain('"operatingSystem":"macOS"')
+  expect(prompt).not.toContain('private-workstation')
+  expect(prompt).toContain('try an OS-appropriate documented keyboard shortcut')
+  expect(prompt).toContain('app_switch|app_search|browser_address')
+})

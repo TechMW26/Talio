@@ -25,18 +25,30 @@ test('unmatched names ask for spelling without selecting or writing to a person'
   await expect(resolveMiraPerson('Unknown', user, models([]), { type: 'send_message' }))
     .rejects.toThrow('Could you spell the name letter by letter')
 })
-test('misspelled names use fuzzy candidates but require a choice', async () => {
+test('a unique one-character typo is corrected within access scope', async () => {
   const db = models([person])
   db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([person])
-  await expect(resolveMiraPerson('Sahl', user, db, { type: 'send_message' })).rejects.toMatchObject({ resolution: { candidates: [expect.objectContaining({ name: 'Sahil Sahu' })] } })
+  await expect(resolveMiraPerson('Sahl', user, db, { type: 'send_message' })).resolves.toBe(person._id)
 })
-test('first-letter typos use scoped fuzzy suggestions, not automatic recipients', async () => {
+test('first-letter typos are retried as a unique exact directory candidate', async () => {
   const db = models([person])
   db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([person])
-  await expect(resolveMiraPerson('Zahil Sahu', user, db, { type: 'create_task' })).rejects.toMatchObject({ resolution: { candidates: [expect.objectContaining({ name: 'Sahil Sahu' })] } })
+  await expect(resolveMiraPerson('Zahil Sahu', user, db, { type: 'create_task' })).resolves.toBe(person._id)
   const fallback = db.Employee.find.mock.calls.at(-1)[0]
   expect(fallback.$and).toHaveLength(2)
   expect(JSON.stringify(fallback)).toContain('reportingManager')
+})
+test('Pinki retries to one exact Pinky match, while ambiguous Pinky records still require a choice', async () => {
+  const pinky = { ...person, firstName: 'Pinky', lastName: 'Sharma' }
+  const db = models([pinky])
+  db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([pinky])
+  await expect(resolveMiraPerson('Pinki', user, db, { type: 'send_message' })).resolves.toBe(pinky._id)
+
+  const second = { ...pinky, _id: 'cccccccccccccccccccccccc', lastName: 'Patil' }
+  const ambiguous = models([])
+  ambiguous.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([pinky, second])
+  await expect(resolveMiraPerson('Pinki', user, ambiguous, { type: 'send_message' }))
+    .rejects.toMatchObject({ resolution: { candidates: expect.arrayContaining([expect.objectContaining({ name: 'Pinky Sharma' }), expect.objectContaining({ name: 'Pinky Patil' })]) } })
 })
 test('explicitly spelled exact first name resolves without another spelling question', async () => {
   expect(await resolveMiraPerson('S A H I L', user, models([person]), { type: 'send_message' })).toBe(person._id)

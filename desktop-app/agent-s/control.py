@@ -198,7 +198,17 @@ def control(value):
         if pyperclip.paste() == value["text"]:
             pyperclip.copy(previous)
     elif kind == "key":
-        keys = {"select_all": ["ctrl", "a"], "find": ["ctrl", "f"], "copy": ["ctrl", "c"], "paste": ["ctrl", "v"], "open_location": ["ctrl", "l"]}
+        modifier = "command" if sys.platform == "darwin" else "ctrl"
+        keys = {
+            "select_all": [modifier, "a"], "find": [modifier, "f"], "copy": [modifier, "c"],
+            "paste": [modifier, "v"], "open_location": [modifier, "l"],
+            "app_switch": ["command", "tab"] if sys.platform == "darwin" else ["alt", "tab"],
+            "app_search": ["command", "space"] if sys.platform == "darwin" else ["win"],
+            "browser_address": [modifier, "l"], "new_tab": [modifier, "t"],
+            "close_tab": [modifier, "w"], "refresh": [modifier, "r"],
+            "save": [modifier, "s"], "undo": [modifier, "z"],
+            "redo": [modifier, "shift", "z"],
+        }
         if value.get("key") in keys:
             pyautogui.hotkey(*keys[value["key"]])
         elif value.get("key") in ("enter", "tab", "escape", "backspace", "up", "down", "left", "right"):

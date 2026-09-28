@@ -54,6 +54,7 @@
   "/dashboard/payroll",
   "/dashboard/payroll/payslips/[id]",
   "/dashboard/payroll/payslips",
+  "/dashboard/performance/appraisals",
   "/dashboard/performance/create",
   "/dashboard/performance/goals/[id]",
   "/dashboard/performance/goals/create",

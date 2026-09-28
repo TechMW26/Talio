@@ -21,7 +21,7 @@ const mockParticipant = (identity) => {
 jest.mock('livekit-client', () => {
   const events = ['ParticipantConnected', 'ParticipantDisconnected', 'TrackSubscribed', 'TrackUnsubscribed',
     'TrackPublished', 'TrackUnpublished', 'TrackSubscriptionFailed', 'TrackMuted', 'TrackUnmuted',
-    'LocalTrackPublished', 'LocalTrackUnpublished', 'DataReceived', 'Reconnecting', 'Reconnected',
+    'LocalTrackPublished', 'LocalTrackUnpublished', 'ActiveSpeakersChanged', 'DataReceived', 'Reconnecting', 'Reconnected',
     'AudioPlaybackStatusChanged', 'VideoPlaybackStatusChanged', 'Disconnected']
   return {
     RoomEvent: Object.fromEntries(events.map((event) => [event, event])),
@@ -78,6 +78,32 @@ test('remote hand raises chime and reactions render PNGs without enabling device
   expect(screen.getByRole('img', { name: 'Thumbs up' })).toHaveAttribute('src', '/emojis/twemoji/1f44d.png')
   expect(room.localParticipant.setCameraEnabled).not.toHaveBeenCalled()
   expect(room.localParticipant.setMicrophoneEnabled).not.toHaveBeenCalled()
+})
+
+test('incoming chat messages play a notification sound and remain easy to open', async () => {
+  const { room } = await join()
+  const remote = mockParticipant('Colleague')
+  act(() => {
+    room.remoteParticipants.set(remote.identity, remote)
+    room.emit('ParticipantConnected', remote)
+    room.emit('DataReceived', new TextEncoder().encode(JSON.stringify({ id: 'chat-1', message: 'Starting now' })), remote, null, 'talio-chat')
+  })
+  expect(playNotificationSound).toHaveBeenCalledWith('pop')
+  expect(screen.getByRole('button', { name: 'Open message from Colleague' })).toHaveTextContent('Starting now')
+  expect(screen.getByRole('button', { name: 'Open chat' })).toHaveTextContent('1')
+})
+
+test('active speaker updates highlight that participant tile', async () => {
+  const { room } = await join()
+  const remote = mockParticipant('Colleague')
+  act(() => {
+    room.remoteParticipants.set(remote.identity, remote)
+    room.emit('ParticipantConnected', remote)
+    remote.isSpeaking = true
+    room.emit('ActiveSpeakersChanged', [remote])
+  })
+  expect(screen.getByLabelText('Colleague is speaking')).toBeInTheDocument()
+  expect(screen.getByLabelText('Colleague camera').closest('[data-participant-tile]')).toHaveAttribute('data-speaking', 'true')
 })
 
 beforeEach(() => {

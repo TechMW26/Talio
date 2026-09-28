@@ -150,7 +150,16 @@ case "type":
 case "key":
     if action["key"] as? String == "open_location" { key(5, [.maskCommand, .maskShift]); break }
     let keys: [String: CGKeyCode] = ["enter":36,"tab":48,"escape":53,"backspace":51,"up":126,"down":125,"left":123,"right":124,"select_all":0,"copy":8,"paste":9,"find":3]
-    guard let name = action["key"] as? String, let code = keys[name] else { exit(1) }
+    let shortcuts: [String: (CGKeyCode, CGEventFlags)] = [
+        "app_switch": (48, .maskCommand), "app_search": (49, .maskCommand),
+        "browser_address": (37, .maskCommand), "new_tab": (17, .maskCommand),
+        "close_tab": (13, .maskCommand), "refresh": (15, .maskCommand),
+        "save": (1, .maskCommand), "undo": (6, .maskCommand),
+        "redo": (6, [.maskCommand, .maskShift])
+    ]
+    guard let name = action["key"] as? String else { exit(1) }
+    if let (code, flags) = shortcuts[name] { key(code, flags); break }
+    guard let code = keys[name] else { exit(1) }
     key(code, ["select_all","copy","paste","find"].contains(name) ? .maskCommand : [])
 case "scroll":
     guard let amount = action["amount"] as? Int, abs(amount) <= 10 else { exit(1) }

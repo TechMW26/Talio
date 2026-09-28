@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { getMiraClientContext } from '@/lib/miraClientContext'
 import { executeMiraUiAction, waitForMiraPage } from '@/lib/miraUiAction'
@@ -17,6 +17,7 @@ import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
 import { readMiraDesktopScreen } from '@/lib/miraDesktopScreen'
 import { executeMiraFocusTimer, executeMiraQuickNote } from '@/lib/miraLocalActions'
 import { executeMiraComputerTask } from '@/lib/miraComputerClient'
+import { isMiraHinglishReply } from '@/lib/miraLanguage'
 
 const MiraChatContext = createContext()
 
@@ -38,6 +39,7 @@ export function MiraChatProvider({ children }) {
   const [showHistory, setShowHistory] = useState(false)
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const abortControllerRef = useRef(null)
+  const remoteCommandRef = useRef(null)
   const sendingRef = useRef(false)
   const saveQueueRef = useRef(Promise.resolve())
   const sessionTargetRef = useRef({ id: null })
@@ -177,9 +179,20 @@ export function MiraChatProvider({ children }) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
+    remoteCommandRef.current = null
     sendingRef.current = false
     setIsThinking(false)
     window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false, source: 'chat' } }))
+  }, [])
+
+  useEffect(() => {
+    const stopRemoteSession = event => {
+      if (remoteCommandRef.current?.sessionId !== event.detail?.sessionId) return
+      remoteCommandRef.current.controller.abort()
+      remoteCommandRef.current = null
+    }
+    window.addEventListener('mira:remote-session-stop', stopRemoteSession)
+    return () => window.removeEventListener('mira:remote-session-stop', stopRemoteSession)
   }, [])
 
   const toggleChat = useCallback(() => { setViewModeState('chat'); setIsOpen(prev => !prev) }, [])
@@ -191,7 +204,11 @@ export function MiraChatProvider({ children }) {
   }, [fetchSessions])
 
   const sendMessage = useCallback(async (text, options = {}) => {
-    const dismissal = !options.attachments?.length && buildMiraDismissalResponse(text)
+    const remoteSessionId = options.remoteSessionId ? String(options.remoteSessionId) : null
+    // Relayed requests must never interrupt an employee's own in-progress MIRA work.
+    if (remoteSessionId && sendingRef.current) return null
+    if (!remoteSessionId && remoteCommandRef.current) remoteCommandRef.current = null
+    const dismissal = !remoteSessionId && !options.attachments?.length && buildMiraDismissalResponse(text)
     if (dismissal) {
       setMessages(previous => {
         const id = Math.max(Date.now(), ...previous.map(message => (Number(message.id) || 0) + 1))
@@ -203,11 +220,11 @@ export function MiraChatProvider({ children }) {
       if (dismissal.action.type === 'dismiss') closeChat()
       return dismissal.message
     }
-    const requestedView = !options.attachments?.length && matchMiraViewMode(text)
+    const requestedView = !remoteSessionId && !options.attachments?.length && matchMiraViewMode(text)
     if (requestedView) {
       setViewMode(requestedView)
       setIsOpen(true)
-      const reply = /[\u0900-\u097f]/u.test(text) ? 'Theek hai.' : 'Done.'
+      const reply = isMiraHinglishReply(text, messages) ? 'Theek hai.' : 'Done.'
       options.onResponse?.(reply)
       return reply
     }
@@ -232,20 +249,22 @@ export function MiraChatProvider({ children }) {
     sendingRef.current = true
 
     const branchIndex = options.replaceFromId !== undefined ? messages.findIndex(m => m.id === options.replaceFromId && m.role === 'user') : -1
-    const history = (branchIndex >= 0 ? messages.slice(0, branchIndex) : messages).map(m => m.id === options.resolvePerson?.messageId
+    const visibleHistory = (branchIndex >= 0 ? messages.slice(0, branchIndex) : messages).map(m => m.id === options.resolvePerson?.messageId
       ? { ...m, data: { ...m.data, actionResult: { ...m.data.actionResult, resolved: true } } } : m)
+    const history = remoteSessionId ? [] : visibleHistory
 
     const nextId = Math.max(Date.now(), messages.reduce((max, message) => Math.max(max, Number(message.id) || 0), 0) + 1)
     const userMsg = { id: nextId, role: 'user', content: text, ...(options.attachments?.length ? { data: { attachments: options.attachments } } : {}), timestamp: new Date() }
     let nextReplyId = userMsg.id + 1
     const saveTarget = sessionTargetRef.current
-    setMessages([...history, userMsg])
+    setMessages([...visibleHistory, userMsg])
     setIsThinking(true)
     const agentState = active => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active, source: 'chat' } }))
     if (isMiraDecisionRequest(text, history)) agentState(true)
 
     const requestController = new AbortController()
     abortControllerRef.current = requestController
+    if (remoteSessionId) remoteCommandRef.current = { sessionId: remoteSessionId, controller: requestController }
     try {
       const token = getAuthToken()
 
@@ -267,7 +286,7 @@ export function MiraChatProvider({ children }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: queueMessage, attachments: screenAttachment ? [...(options.attachments || []), screenAttachment] : options.attachments || [], screenContextAttempted: screenAttempted, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
+        body: JSON.stringify({ message: queueMessage, originalUserMessage: text, attachments: screenAttachment ? [...(options.attachments || []), screenAttachment] : options.attachments || [], screenContextAttempted: screenAttempted, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
         signal: requestController.signal
       })
 
@@ -325,7 +344,7 @@ export function MiraChatProvider({ children }) {
           }
           data.response.image = outcome.success ? outcome.image : { status: 'failed' }
           data.response.message = outcome.success
-            ? (/[\u0900-\u097f]/u.test(text) ? 'Aapki image taiyaar hai.' : 'Your image is ready.')
+            ? (isMiraHinglishReply(text, history) ? 'Aapki image taiyaar hai.' : 'Your image is ready.')
             : (outcome.message || 'Image generation failed. Please try again.')
           data.response.actionResult = { success: Boolean(outcome.success), uncertain: outcome.uncertain === true, message: data.response.message }
           data.response.suggestedQuestions = []
@@ -491,6 +510,7 @@ export function MiraChatProvider({ children }) {
         setIsThinking(false)
         abortControllerRef.current = null
       }
+      if (remoteCommandRef.current?.controller === requestController) remoteCommandRef.current = null
     }
   }, [messages, isThinking, saveToSession, closeChat, setViewMode])
 

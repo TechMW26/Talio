@@ -1,6 +1,9 @@
 name: Desktop local Agent S builds
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v6.0.21'
 permissions:
   contents: write
 jobs:
@@ -82,25 +85,21 @@ jobs:
           pattern: desktop-*
           path: release-assets
           merge-multiple: true
-      - name: Publish v6.0.20
+      - name: Publish v6.0.21
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.20
+          tag_name: v6.0.21
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.20 — MIRA voice and personalization
+          name: Talio Desktop 6.0.21 — MIRA and remote support
           draft: false
           prerelease: false
           generate_release_notes: false
           body: |
-            MIRA uses a compact 400 × 120 external PiP with scrollable content. Native live windows open at bottom-right on first use, then remember the user's dragged position locally and clamp it to the current display.
+            Adds transparent, tenant-scoped remote support: an organization admin requests a session with a reason, the employee explicitly approves or declines, and the employee must separately choose and start screen sharing. A persistent indicator and stop control remain visible throughout the session. Admins are receive-only in LiveKit and may relay commands to the employee's MIRA only during an approved session. Multi-display selection is supported in the desktop app.
 
-            Closing the external MIRA PiP does not intentionally foreground Talio on macOS. The draggable PiP position persists locally. MIRA's separate cursor overlay reasserts the highest supported desktop window level when it moves.
+            Adds the employee performance-appraisal request and approval workflow, plus MIRA desktop recovery, device context, and improved name matching. Existing MIRA voice preferences, concise responses, and PiP behavior are retained.
 
-            MIRA replies are short and targeted by default, with longer explanations only when needed or requested. Send Wishes now sends birthday and anniversary greetings through private Talio chat, with sending, success, error and partial-retry handling.
-
-            Settings now include a personal MIRA tab with six ElevenLabs voice choices, audio previews, saved per-user voice selection, and bounded personal instructions/knowledge. The default voice is jJ0Hr51MaPgsgfPtFdR4; voice previews and spoken replies use the saved user choice.
-
-            Validation: CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 desktop installers. Interactive acceptance on every OS has not been performed. ElevenLabs voice previews require the selected voice to be available to the configured provider account.
+            Validation: 33 focused remote-support/meeting tests passed and the production web build completed. CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 desktop installers. Interactive acceptance on every OS and a live two-account LiveKit session have not been performed; the service requires configured LiveKit credentials.
 
             Signing: CI packages are not Developer ID signed or Apple notarized; Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
           files: |

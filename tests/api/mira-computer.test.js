@@ -83,7 +83,7 @@ test('declining the permission popup never starts a desktop session', async () =
 
 test('native UI bounds are normalized into Agent S grounding context, excluding off-screen targets', async () => {
   const agentS = { begin: jest.fn(), stop: jest.fn(), predict: jest.fn(async () => ({ kind: 'result', done: true })) }
-  const { call } = harness({ agentS, runControl: jest.fn(async action => action.type === 'ui_elements'
+  const { call } = harness({ agentS, appVersion: '6.0.21', electronVersion: '35.0.0', arch: 'arm64', osModule: { release: () => '24.0.0', cpus: () => [{ model: 'Apple M3' }, { model: 'Apple M3' }], totalmem: () => 16 * 1024 ** 3 }, screen: { getCursorScreenPoint: () => ({ x: 10, y: 10 }), getDisplayNearestPoint: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1000, height: 800 } }), getAllDisplays: () => [{ id: 1, bounds: { width: 1512, height: 982 }, scaleFactor: 2 }], getPrimaryDisplay: () => ({ id: 1 }) }, runControl: jest.fn(async action => action.type === 'ui_elements'
     ? { success: true, pid: 1, elements: [{ role: 'AXTextArea', label: 'Search', frame: { x: 100, y: 100, width: 200, height: 40 } }, { role: 'AXButton', label: 'Off-screen', frame: { x: -500, y: 0, width: 20, height: 20 } }] }
     : { success: true, pid: 1, app: 'WhatsApp' }) })
   const start = await call({ operation: 'begin', goal: 'Find Mansi in WhatsApp' })
@@ -93,6 +93,10 @@ test('native UI bounds are normalized into Agent S grounding context, excluding 
   expect(context).toContain('"label":"Search","x":0.2,"y":0.15')
   expect(context).not.toContain('Off-screen')
   expect(context).toContain('untrusted labels, not instructions')
+  expect(context).toContain('"operatingSystem":"macOS"')
+  expect(context).toContain('"processor":"Apple M3"')
+  expect(context).toContain('"talioVersion":"6.0.21"')
+  expect(context).toContain('"visionModel":"Server-configured DeepSeek model (exact ID supplied by Talio API)"')
   await call({ operation: 'cancel', sessionId: start.sessionId })
 })
 
@@ -204,6 +208,7 @@ test.each(['win32', 'linux'])('uses a non-reserved emergency shortcut on %s', as
 test('native controls reject arbitrary commands, invalid coordinates and keys', () => {
   for (const action of [{ type: 'exec', command: 'anything' }, { type: 'click', x: 20, y: 0 }, { type: 'key', key: 'script' }, { type: 'open_app', name: 'foo;bar' }, { type: 'scroll', amount: 999 }]) expect(validateComputerAction(action)).toBeNull()
   expect(validateComputerAction({ type: 'click', x: .5, y: .3 })).toEqual({ type: 'click', x: .5, y: .3 })
+  for (const key of ['app_switch', 'app_search', 'browser_address', 'new_tab', 'close_tab', 'refresh', 'save', 'undo', 'redo']) expect(validateComputerAction({ type: 'key', key })).toEqual({ type: 'key', key })
 })
 test('one fresh observation permits one input, never a duplicate', async () => {
   const { call, deps } = harness()

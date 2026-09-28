@@ -57,8 +57,8 @@ class SafeACI:
 
     @action
     def key(self, key: str):
-        """Press enter, tab, escape, backspace, arrows, select_all, copy, paste, find, or open_location (file picker location: Cmd+Shift+G on Mac, Ctrl+L elsewhere)."""
-        if key not in ("enter", "tab", "escape", "backspace", "up", "down", "left", "right", "select_all", "copy", "paste", "find", "open_location"):
+        """Press a basic key or a documented cross-platform shortcut: app_switch, app_search, browser_address, new_tab, close_tab, refresh, save, undo, redo, select_all, copy, paste, find, open_location. Choose shortcuts using the supplied OS context."""
+        if key not in ("enter", "tab", "escape", "backspace", "up", "down", "left", "right", "select_all", "copy", "paste", "find", "open_location", "app_switch", "app_search", "browser_address", "new_tab", "close_tab", "refresh", "save", "undo", "redo"):
             raise ValueError("Unsupported key")
         return {"type": "key", "key": key}
 

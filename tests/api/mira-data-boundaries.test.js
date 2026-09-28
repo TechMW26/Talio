@@ -99,6 +99,18 @@ test('small talk avoids dashboard database queries and prioritizes latest langua
   expect(models.Meeting.find).not.toHaveBeenCalled()
   expect(generateContent.mock.calls[0][1]).toContain("latest user message's language")
 })
+test('English language lock is included even when older conversation turns are Hindi', async () => {
+  await run({
+    message: 'Please explain my attendance summary.',
+    originalUserMessage: 'Please explain my attendance summary.',
+    conversationHistory: [
+      { role: 'user', content: 'Mujhe Hindi mein jawab do.' },
+      { role: 'assistant', content: 'Theek hai, main bata deti hoon.' },
+    ],
+  })
+  expect(generateContent.mock.calls[0][1]).toContain('English is the selected reply language for this turn')
+  expect(generateContent.mock.calls[0][1]).toContain('This turn-level instruction overrides any Hindi/Hinglish in older user turns')
+})
 test.each(['Write three next steps for my pending tasks', 'Draft a white paper for this task', 'What is the due date of my task?'])('task work reaches the model instead of returning a task list: %s', async message => {
   models.TaskAssignee = { find: jest.fn(() => ({ select: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([]) })) }
   models.Task = { find: jest.fn(() => chain([])), countDocuments: jest.fn().mockResolvedValue(0) }
@@ -118,14 +130,13 @@ test('supports semantic dismissal without treating it as a database action', asy
   const result = await (await run({ message: 'I would like some quiet now, you can leave.' })).json()
   expect(result.response.action).toEqual({ type: 'dismiss' })
 })
-test('preserves validated navigation and asks for missing write fields instead of executing', async () => {
+test('preserves validated navigation and defaults new task ownership to the creator', async () => {
   const navigation = await (await run({ message: 'Open meetings' })).json()
   expect(navigation.response.action).toEqual({ type: 'navigate', page: 'meetings' })
   expect(generateContent).not.toHaveBeenCalled()
   generateContent.mockResolvedValueOnce(JSON.stringify({ message: 'Creating it.', action: { type: 'create_task', fields: { title: 'Review' } } }))
-  const missing = await (await run({ message: 'Create a task' })).json()
-  expect(missing.response.action).toBeUndefined()
-  expect(missing.response.message).toContain('assignees')
+  const created = await (await run({ message: 'Create a task' })).json()
+  expect(created.response.action).toEqual({ type: 'create_task', fields: { title: 'Review', assignees: ['me'] } })
 })
 test.each([true, false])('personal task replies return inline cards only when tasks exist (%s)', async hasTasks => {
   models.TaskAssignee = { find: jest.fn(() => ({ select: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([{ task: 'taskA' }]) })) }

@@ -9,6 +9,9 @@ class ActionsTest(unittest.TestCase):
         self.assertEqual(parse_action(SafeACI(), 'agent.open_app("WhatsApp")', {}), {"type": "open_app", "name": "WhatsApp"})
         self.assertEqual(parse_action(SafeACI(), 'agent.create_file("note.txt", "Hello")', {}), {"type": "create_file", "name": "note.txt", "content": "Hello"})
         self.assertEqual(parse_action(SafeACI(), 'agent.key("open_location")', {}), {"type": "key", "key": "open_location"})
+        for shortcut in ("app_switch", "app_search", "browser_address", "new_tab", "close_tab", "refresh", "save", "undo", "redo"):
+            with self.subTest(shortcut=shortcut):
+                self.assertEqual(parse_action(SafeACI(), f'agent.key("{shortcut}")', {}), {"type": "key", "key": shortcut})
         self.assertEqual(parse_action(SafeACI(), 'agent.drag(0.1, 0.2, 0.8, 0.9)', {})['type'], 'drag')
 
     def test_reject_code(self):
@@ -19,6 +22,24 @@ class ActionsTest(unittest.TestCase):
                      'agent.assign_screenshot({})', 'agent.click(x=0,y=0,x=1)']:
             with self.subTest(code=code), self.assertRaises(Exception):
                 parse_action(SafeACI(), code, {})
+
+    def test_keyboard_shortcuts_follow_host_platform(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import control
+        pyautogui = SimpleNamespace(hotkey=lambda *keys: calls.append(keys), press=lambda key: calls.append((key,)))
+        for platform, action, expected in (
+            ("win32", "app_switch", ("alt", "tab")),
+            ("win32", "browser_address", ("ctrl", "l")),
+            ("linux", "app_search", ("win",)),
+            ("linux", "redo", ("ctrl", "shift", "z")),
+        ):
+            calls = []
+            with self.subTest(platform=platform, action=action), patch.object(control, "status", return_value={"success": True}), patch.object(sys, "platform", platform), patch.dict(sys.modules, {"pyautogui": pyautogui}):
+                result = control.control({"type": "key", "key": action})
+            self.assertTrue(result["success"])
+            self.assertEqual(calls, [expected])
 
     def test_wait_is_recoverable_without_input(self):
         result = parse_action(SafeACI(), 'agent.wait(1)', {})

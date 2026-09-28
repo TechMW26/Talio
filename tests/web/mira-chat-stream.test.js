@@ -88,6 +88,7 @@ test('navigation prerequisites continue with executor evidence and the original 
     await act(async () => { await result.current.sendMessage('Open Assets and show me where to add one') })
     expect(chats).toBe(2)
     expect(requests[1].message).toBe(requests[0].message)
+    expect(requests[1].originalUserMessage).toBe('Open Assets and show me where to add one')
     expect(requests[1].conversationHistory.some(m => m.content.includes('Requested page opened.'))).toBe(true)
     expect(result.current.isThinking).toBe(false)
   } finally {

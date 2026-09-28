@@ -30,6 +30,8 @@ import { formatDesignation, formatDepartments } from '@/lib/formatters'
 import { formatEmployeeAddress } from '@/lib/employeeAddress'
 import { Button, Chip, Skeleton, Tooltip } from '@heroui/react'
 import EmployeeLifecyclePanel from '@/components/employees/EmployeeLifecyclePanel'
+import PerformanceAppraisalPanel from '@/components/performance/PerformanceAppraisalPanel'
+import RemoteSupportAdminPanel from '@/components/remoteSupport/RemoteSupportAdminPanel'
 
 function StatTile({ icon: Icon, label, value, accent = 'sky' }) {
   const accents = {
@@ -87,6 +89,7 @@ export default function EmployeeDetailPage() {
   const router = useRouter()
   const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/employees/${params.id}` : null)
   const { data: kriKpiRes, mutate: refreshKriKpi } = useAuthedSWR(params.id ? `/api/employees/${params.id}/kri-kpi` : null)
+  const { data: hierarchyAuthority } = useAuthedSWR('/api/team/check-head')
   const employee = res?.data || null
 
   const [activeTab, setActiveTab] = useState('overview')
@@ -96,12 +99,25 @@ export default function EmployeeDetailPage() {
   const [newKri, setNewKri] = useState('')
   const [newKpi, setNewKpi] = useState({ name: '', target: '', unit: '', notes: '' })
   const [savingKriKpi, setSavingKriKpi] = useState(false)
+  const [showAppraisalsTab, setShowAppraisalsTab] = useState(false)
+  const [showRemoteSupport, setShowRemoteSupport] = useState(false)
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
     const role = storedUser?.role
+    setShowRemoteSupport(['admin', 'super_admin'].includes(String(role || '').toLowerCase()))
     setCanManageKriKpi(['admin', 'hr', 'manager', 'department_head'].includes(role))
+    setShowAppraisalsTab(
+      ['admin', 'super_admin', 'hr', 'manager', 'team_leader', 'department_head'].includes(role)
+      || Boolean(storedUser?.isDepartmentHead || storedUser?.isDepartmentManager || storedUser?.teamLeaderOf?.length)
+    )
   }, [])
+
+  useEffect(() => {
+    if (hierarchyAuthority?.success && (
+      hierarchyAuthority.isDepartmentHead || hierarchyAuthority.isDepartmentManager || hierarchyAuthority.isTeamLeader
+    )) setShowAppraisalsTab(true)
+  }, [hierarchyAuthority])
 
   useEffect(() => {
     if (kriKpiRes?.data) {
@@ -291,6 +307,8 @@ export default function EmployeeDetailPage() {
         <StatTile icon={FaUserFriends} label="Reports To" value={employee.reportingManager?.firstName ? `${employee.reportingManager.firstName} ${employee.reportingManager.lastName || ''}`.trim() : '—'} accent="amber" />
       </div>
 
+      {showRemoteSupport && <RemoteSupportAdminPanel employeeId={employee._id} employeeName={`${employee.firstName} ${employee.lastName || ''}`.trim()} />}
+
       {/* Tabs */}
       <div className="mt-6 flex items-center gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-zinc-900 w-fit">
         <button
@@ -308,6 +326,15 @@ export default function EmployeeDetailPage() {
           <HiOutlineSparkles className="w-4 h-4" />
           KRI · KPI
         </button>
+        {showAppraisalsTab && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('appraisals')}
+            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'appraisals' ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow' : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'}`}
+          >
+            Appraisals
+          </button>
+        )}
       </div>
 
       {activeTab === 'overview' ? (
@@ -361,6 +388,8 @@ export default function EmployeeDetailPage() {
             </div>
           )}
         </div>
+      ) : activeTab === 'appraisals' && showAppraisalsTab ? (
+        <PerformanceAppraisalPanel employeeId={employee._id} employeeName={`${employee.firstName} ${employee.lastName || ''}`.trim()} />
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
           {/* Manual KRIs */}

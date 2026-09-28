@@ -1536,7 +1536,7 @@ function setupIPCHandlers() {
   powerMonitor.on('lock-screen', () => { miraScreenLocked = true; agentS.stop(); pointer.hide(); });
   powerMonitor.on('unlock-screen', () => { miraScreenLocked = false; });
   app.once('before-quit', () => agentS.stop());
-  const computer = createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform: process.platform, resourcesPath: process.resourcesPath, packaged: app.isPackaged, agentS, revealMainWindow, ensurePermissions: () => miraPermissions.ensureDesktopAccess(), isLocked: () => miraScreenLocked });
+  const computer = createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform: process.platform, arch: process.arch, appVersion: app.getVersion(), electronVersion: process.versions.electron, resourcesPath: process.resourcesPath, packaged: app.isPackaged, agentS, revealMainWindow, ensurePermissions: () => miraPermissions.ensureDesktopAccess(), isLocked: () => miraScreenLocked });
   ipcMain.handle('mira-computer', (event, input) => computer(event, mainWindow, APP_ORIGIN, input));
   const { trustedMiraSender, createMiraPermissions } = require('./miraPermissions');
   ipcMain.handle('mira-move-pip', (event, position) => {

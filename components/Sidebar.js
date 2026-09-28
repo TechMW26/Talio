@@ -97,6 +97,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     if (userData) {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
+      if (parsedUser?.role === 'team_leader') setIsTeamLeader(true)
       checkDepartmentHead()
     }
 
@@ -217,12 +218,30 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     })
     let baseMenuItems = getMenuItemsForRole(menuTemplateRole)
 
+    // Keep the appraisal inbox available from the existing performance section.
+    // Department heads and team leaders receive it in their Team submenu below.
+    if (!isDepartmentHead && !isTeamLeader) {
+      const performanceIndex = baseMenuItems.findIndex((item) => item.name === 'Performance')
+      if (performanceIndex >= 0) {
+        const performanceItem = baseMenuItems[performanceIndex]
+        const submenu = performanceItem.submenu || []
+        if (!submenu.some((item) => item.path === '/dashboard/performance/appraisals')) {
+          baseMenuItems = [...baseMenuItems]
+          baseMenuItems[performanceIndex] = {
+            ...performanceItem,
+            submenu: [...submenu, { name: 'Appraisal Requests', path: '/dashboard/performance/appraisals' }],
+          }
+        }
+      }
+    }
+
     if (isDepartmentHead) {
       const teamSubmenu = [
         { name: 'Team Members', path: '/dashboard/team/members' },
         { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
         { name: 'Team Goals', path: '/dashboard/performance/goals' },
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+        { name: 'Appraisal Requests', path: '/dashboard/performance/appraisals' },
         { name: 'Geofencing', path: '/dashboard/team/geofencing' }
       ]
       // If also a team leader, add My Teams
@@ -268,9 +287,11 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       const teamSubmenu = [
         { name: 'My Teams', path: '/dashboard/team/my-teams' },
         { name: 'Team Members', path: '/dashboard/team/members' },
+        { name: 'Employee Directory', path: '/dashboard/employees' },
         { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
         { name: 'Team Goals', path: '/dashboard/performance/goals' },
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+        { name: 'Appraisal Requests', path: '/dashboard/performance/appraisals' },
       ]
       const teamMenuItem = {
         name: 'Team',

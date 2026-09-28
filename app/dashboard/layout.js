@@ -47,6 +47,7 @@ const WebPushPrompt = dynamic(
 )
 const DesktopNotificationPrompt = dynamic(() => import('@/components/DesktopNotificationPrompt'), { ssr: false })
 const MiraChatSidebar = dynamic(() => import('@/components/MiraChatSidebar'), { ssr: false })
+const RemoteSupportOverlay = dynamic(() => import('@/components/remoteSupport/RemoteSupportOverlay'), { ssr: false })
 const CelebrationPopup = dynamic(() => import('@/components/CelebrationPopup'), { ssr: false })
 
 // Component to sync sidebar state with chat widget context
@@ -483,6 +484,9 @@ export default function DashboardLayout({ children }) {
 
                       {/* Desktop Notification Permission Prompt (Electron only) */}
                       <DesktopNotificationPrompt />
+
+                      {/* Employee-visible remote-support consent and active-session controls */}
+                      <RemoteSupportOverlay />
 
                       {/* MIRA AI Chat Sidebar */}
                       <MiraChatSidebar />

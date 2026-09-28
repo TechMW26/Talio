@@ -36,6 +36,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { mergeTranscriptSegments } from '@/lib/meetingLanguage'
 import { getSupportedAudioMimeType, isMeetingAudioUploadSupported } from '@/lib/meetingTranscriber'
 import { getManagedMeetingJoinError } from '@/lib/meetings/transport'
+import { playNotificationSound } from '@/lib/notificationSounds'
 import toast from '@/utils/toast'
 
 const encoder = new TextEncoder()
@@ -65,6 +66,7 @@ function participantSnapshot(participant) {
     isMuted: !microphone || microphone.isMuted,
     isVideoOff: !camera || camera.isMuted,
     isScreenSharing: Boolean(screen && !screen.isMuted),
+    isSpeaking: Boolean(participant.isSpeaking),
   }
 }
 
@@ -111,6 +113,7 @@ export default function ManagedMeetingRoomSession({
     }
   }, [])
   const chatNotificationTimerRef = useRef(null)
+  const lastChatSoundAtRef = useRef(0)
   const seenChatMessageIdsRef = useRef(new Set())
   const showChatRef = useRef(false)
   const screenConflictResolutionRef = useRef(false)
@@ -385,6 +388,14 @@ export default function ManagedMeetingRoomSession({
 
         const isRemoteMessage = sender !== roomRef.current?.localParticipant.identity
         if (isRemoteMessage && !showChatRef.current) {
+          const now = Date.now()
+          // Keep bursts readable without producing a sound for every rapid message.
+          if (now - lastChatSoundAtRef.current >= 500) {
+            lastChatSoundAtRef.current = now
+            try { playNotificationSound('pop') } catch { /* The visual notification remains available. */ }
+          }
+        }
+        if (isRemoteMessage && !showChatRef.current) {
           setUnreadChatCount((current) => current + 1)
           setChatNotification(incomingMessage)
           clearTimeout(chatNotificationTimerRef.current)
@@ -457,6 +468,7 @@ export default function ManagedMeetingRoomSession({
         })
         .on(RoomEvent.TrackMuted, () => refreshParticipants(liveRoom))
         .on(RoomEvent.TrackUnmuted, () => refreshParticipants(liveRoom))
+        .on(RoomEvent.ActiveSpeakersChanged, () => refreshParticipants(liveRoom))
         .on(RoomEvent.LocalTrackPublished, () => refreshParticipants(liveRoom))
         .on(RoomEvent.LocalTrackUnpublished, () => refreshParticipants(liveRoom))
         .on(RoomEvent.DataReceived, handleData)
@@ -1165,19 +1177,19 @@ export default function ManagedMeetingRoomSession({
         {presenter ? (
           <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden" data-meeting-layout="presentation">
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
-              <ParticipantTile item={presenter} local={presenter.identity === localIdentity} reaction={reactions[presenter.identity]} handRaised={raisedHands[presenter.identity]} featured />
+              <ParticipantTile item={presenter} local={presenter.identity === localIdentity} reaction={reactions[presenter.identity]} handRaised={raisedHands[presenter.identity]} isSpeaking={presenter.isSpeaking} featured />
             </div>
             {railParticipants.length > 0 && (
               <div className="flex h-24 shrink-0 gap-2 overflow-x-auto overflow-y-hidden px-0.5 py-0.5 sm:h-28" data-meeting-participant-rail>
                 {railParticipants.map((item) => (
-                  <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} compact />
+                  <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} compact />
                 ))}
               </div>
             )}
           </div>
         ) : (
           <div className={`grid min-w-0 flex-1 gap-3 overflow-y-auto ${orderedParticipants.length <= 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`} data-meeting-layout="grid">
-            {orderedParticipants.map((item) => <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} />)}
+            {orderedParticipants.map((item) => <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} />)}
           </div>
         )}
         {(showChat || showParticipants) && !isPip && <aside className="w-80 shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">

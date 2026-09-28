@@ -4,7 +4,17 @@ afterEach(() => jest.restoreAllMocks())
 test('model relay keeps only supported content and adds desktop policy', () => {
   const messages = validateAgentSMessages(valid())
   expect(messages[0].content).toContain('never Talio')
+  expect(messages[0].content).toContain('English is the selected reply language for this turn')
   expect(messages[1].content[1].image_url.detail).toBe('original')
+})
+test('Agent S uses the current English request instead of Hindi conversation history', () => {
+  const messages = validateAgentSMessages([
+    { role: 'user', content: [{ type: 'text', text: 'Mujhe Hindi mein jawab do.' }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'Theek hai, main bata deti hoon.' }] },
+    { role: 'user', content: [{ type: 'text', text: 'Please open WhatsApp and find Mansi.' }, { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,aGVsbG8=' } }] },
+  ])
+  expect(messages[0].content).toContain('English is the selected reply language for this turn')
+  expect(messages[0].content).toContain('overrides any Hindi/Hinglish in older user turns')
 })
 test.each([
   [{ role: 'tool', content: [] }],

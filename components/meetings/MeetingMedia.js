@@ -18,7 +18,7 @@ export function RemoteAudio({ participant, source = Track.Source.Microphone }) {
   return <audio ref={ref} autoPlay data-meeting-audio={source} />
 }
 
-export function ParticipantTile({ item, local = false, reaction, handRaised = false, featured = false, compact = false }) {
+export function ParticipantTile({ item, local = false, reaction, handRaised = false, isSpeaking = false, featured = false, compact = false }) {
   const videoRef = useRef(null)
   const screenPublication = item.participant.getTrackPublication(Track.Source.ScreenShare)
   const cameraPublication = item.participant.getTrackPublication(Track.Source.Camera)
@@ -40,8 +40,9 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
 
   return (
     <div
-      className={`relative flex overflow-hidden bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${compact ? 'rounded-xl' : 'rounded-2xl'} ${tileSize}`}
+      className={`relative flex overflow-hidden bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${isSpeaking ? 'ring-[3px] ring-emerald-400 shadow-[0_0_0_3px_rgba(52,211,153,0.2),0_0_24px_rgba(52,211,153,0.28)]' : ''} ${compact ? 'rounded-xl' : 'rounded-2xl'} ${tileSize}`}
       data-participant-tile={featured ? 'presenter' : compact ? 'rail' : 'grid'}
+      data-speaking={isSpeaking ? 'true' : undefined}
     >
       {/* Keep this element mounted while muted: the publication can retain the
           same track across unmute, so a newly mounted node would never attach. */}
@@ -65,6 +66,7 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
         {item.isMuted && <CutLineIcon isOff><HiOutlineMicrophone className="h-4 w-4" /></CutLineIcon>}
       </div>
       {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
+      {isSpeaking && <span className={`absolute left-3 ${item.isScreenSharing ? 'top-10' : 'top-3'} flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white shadow-lg`} aria-label={`${item.name} is speaking`}><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />Speaking</span>}
       {handRaised && <span className="absolute right-3 top-3 rounded-full bg-amber-500 p-2 text-white" aria-label={`${item.name} raised their hand`}><HiOutlineHandRaised className="h-5 w-5" /></span>}
       {reaction && (
         <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 motion-safe:animate-bounce drop-shadow-lg">
