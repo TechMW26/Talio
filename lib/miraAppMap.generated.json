@@ -3071,6 +3071,7 @@
       "Departments",
       "Description",
       "Designations",
+      "Disable connection",
       "Discard changes",
       "Done",
       "ESI (Employee State Insurance)",
@@ -3148,6 +3149,7 @@
       "Required .env Keys",
       "Required GPS accuracy",
       "Reset",
+      "Retry",
       "Rotate token",
       "Sales",
       "Save Changes",
@@ -3172,6 +3174,7 @@
       "United States",
       "Value",
       "Website",
+      "WordPress careers sync",
       "Work locations",
       "Working Days *",
       "Working Days Per Month",
@@ -3190,6 +3193,7 @@
       "app/dashboard/settings/page.js",
       "components/settings/AttendanceMachinesSettings.js",
       "components/settings/MiraSettings.js",
+      "components/settings/WordPressRecruitmentSettings.js",
       "components/ui/LoadingButton.js",
       "components/ui/heroui/SearchableSelect.js"
     ]

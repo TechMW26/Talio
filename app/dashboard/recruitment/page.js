@@ -54,7 +54,7 @@ export default function RecruitmentPage() {
     if (filters.employmentType) params.set('employmentType', filters.employmentType);
     return params.toString();
   }, [filters]);
-  const { data: jobsRes, error: jobsError, isLoading: jobsLoading, isValidating, mutate: refreshJobs } = useAuthedSWR(`/api/recruitment?${jobsParams}`);
+  const { data: jobsRes, error: jobsError, isLoading: jobsLoading, isValidating, mutate: refreshJobs } = useAuthedSWR(`/api/recruitment?${jobsParams}`, { refreshInterval: 30000 });
   const jobs = jobsRes?.data || [];
   const pagination = jobsRes?.pagination || { total: 0, pages: 1 };
 

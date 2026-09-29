@@ -14,6 +14,7 @@ import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
 import MiraSettings from '@/components/settings/MiraSettings'
+import WordPressRecruitmentSettings from '@/components/settings/WordPressRecruitmentSettings'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 
 // Dynamically import map component (client-side only)
@@ -321,7 +322,7 @@ export default function SettingsPage() {
             <p className="mt-1 text-sm text-default-500">{tabs.find((tab) => tab.id === activeTab)?.description}</p>
           </div>
           {activeTab === 'company' && <CompanySettingsTab />}
-          {activeTab === 'recruitment' && <RecruitmentSettingsTab />}
+          {activeTab === 'recruitment' && <div className="space-y-6"><WordPressRecruitmentSettings /><RecruitmentSettingsTab /></div>}
           {activeTab === 'geofencing' && <GeofencingTab />}
           {activeTab === 'attendance-machines' && <AttendanceMachinesSettings />}
           {activeTab === 'payroll' && <PayrollSettingsTab />}

@@ -82,6 +82,7 @@ export async function middleware(request) {
     '/api/auth/google/callback',
     '/api/recruitment/linkedin/callback',
     '/api/recruitment/webhooks/linkedin',
+    '/api/integrations/wordpress/', // Dedicated per-tenant revocable recruitment token, validated in the route.
     '/api/assetlinks',
     '/api/meetings/guest/', // Guest meeting access (public)
     '/api/attendance-machines/ingest/', // Machine webhooks authenticate with a per-device token
