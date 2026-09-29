@@ -14,7 +14,10 @@ import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
 import MiraSettings from '@/components/settings/MiraSettings'
+<<<<<<< HEAD
 import InductionSettings from '@/components/settings/InductionSettings'
+=======
+>>>>>>> ade9b175ad71c0a71dca2c3fdcfaa72978353008
 import WordPressRecruitmentSettings from '@/components/settings/WordPressRecruitmentSettings'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 
