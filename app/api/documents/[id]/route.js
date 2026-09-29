@@ -71,7 +71,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid document id' }, { status: 400 })
     }
 
-    const existingDocument = await Document.findById(id).select('employee').lean()
+    const existingDocument = await Document.findById(id).select('employee generatedLetter onboardingItemKey').lean()
     if (!existingDocument) {
       return NextResponse.json({ success: false, message: 'Document not found' }, { status: 404 })
     }
@@ -79,7 +79,13 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: 'You do not have access to this document' }, { status: 403 })
     }
 
-    const data = await request.json()
+    const input = await request.json()
+    if (existingDocument.generatedLetter) return NextResponse.json({ success: false, message: 'Issued letters cannot be edited. Issue a revised letter from the employee profile.' }, { status: 409 })
+    if (input.status && (!DOCUMENT_MANAGER_ROLES.includes(user.role) || existingDocument.onboardingItemKey)) {
+      return NextResponse.json({ success: false, message: existingDocument.onboardingItemKey ? 'Review onboarding submissions from the employee lifecycle checklist' : 'Only HR can review documents' }, { status: 403 })
+    }
+    const data = Object.fromEntries(['name', 'description', 'category', 'expiryDate', ...(DOCUMENT_MANAGER_ROLES.includes(user.role) ? ['status'] : [])].filter(key => input[key] !== undefined).map(key => [key, input[key]]))
+    if (data.status && !['approved', 'rejected'].includes(data.status)) return NextResponse.json({ success: false, message: 'Invalid document status' }, { status: 400 })
 
     const document = await Document.findByIdAndUpdate(
       id,
@@ -176,13 +182,14 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    const existingDocument = await Document.findById(id).select('employee').lean()
+    const existingDocument = await Document.findById(id).select('employee generatedLetter').lean()
     if (!existingDocument) {
       return NextResponse.json({ success: false, message: 'Document not found' }, { status: 404 })
     }
     if (!(await canAccessDocument(auth.user, User, existingDocument))) {
       return NextResponse.json({ success: false, message: 'You do not have access to this document' }, { status: 403 })
     }
+    if (existingDocument.generatedLetter && !DOCUMENT_MANAGER_ROLES.includes(auth.user.role)) return NextResponse.json({ success: false, message: 'Contact HR to remove an issued employment letter' }, { status: 403 })
 
     const document = await Document.findByIdAndDelete(id)
 

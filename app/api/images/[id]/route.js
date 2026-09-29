@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getImageStream, getImageInfo } from '@/lib/gridfs'
 import sharp from 'sharp'
-import { verifyTokenFromRequest } from '@/lib/auth'
+import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
+import { canReadDocumentUpload } from '@/lib/documentAccess.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,14 @@ export async function GET(request, { params }) {
             return new NextResponse('Not found', { status: 404 })
         }
         const isAadhaar = fileInfo.metadata?.category === 'aadhaar'
+        const isDocument = fileInfo.metadata?.category === 'documents'
+        const privateFile = isAadhaar || isDocument
+        if (isDocument) {
+            const auth = await getAuthAndModels(request, ['Document', 'User'])
+            if (!await canReadDocumentUpload(auth, { fileId: id, ownerId: fileInfo.metadata?.userId })) {
+                return new NextResponse('Forbidden', { status: 403 })
+            }
+        }
         if (isAadhaar) {
             const auth = await verifyTokenFromRequest(request)
             const requesterId = String(auth?.user?._id || auth?.user?.userId || '')
@@ -61,7 +70,8 @@ export async function GET(request, { params }) {
             return new NextResponse(readableStream, {
                 headers: {
                     'Content-Type': contentType,
-                    'Cache-Control': isAadhaar ? 'private, no-store' : 'public, max-age=31536000, immutable',
+                    'Cache-Control': privateFile ? 'private, no-store' : 'public, max-age=31536000, immutable',
+                    'X-Content-Type-Options': 'nosniff',
                     'Content-Length': String(fileInfo.length),
                 }
             })
@@ -95,7 +105,7 @@ export async function GET(request, { params }) {
         return new NextResponse(resizedBuffer, {
             headers: {
                 'Content-Type': contentType,
-                'Cache-Control': isAadhaar ? 'private, no-store' : 'public, max-age=31536000, immutable',
+                'Cache-Control': privateFile ? 'private, no-store' : 'public, max-age=31536000, immutable',
                 'Content-Length': String(resizedBuffer.length),
             }
         })

@@ -16,6 +16,7 @@ import LoadingButton from '@/components/ui/LoadingButton';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile';
+import { downloadDocumentFile } from '@/lib/client/documentFile';
 import { createOfferLetterFile } from '@/lib/client/offerLetter';
 import {
   FaArrowLeft, FaEdit, FaTrash, FaUser, FaEnvelope, FaPhone,
@@ -504,19 +505,18 @@ export default function CandidateDetailPage() {
                   <h3 className="text-sm font-semibold text-default-700">Resume</h3>
                 </CardHeader>
                 <CardBody className="p-4">
-                  <a
-                    href={candidate.resume.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  {/^https?:\/\//i.test(candidate.resume.url) ? <a href={candidate.resume.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline"><FaFileAlt className="w-4 h-4" />{candidate.resume.name || 'View Resume'}</a> : <button
+                    onClick={() => downloadDocumentFile({ fileUrl: candidate.resume.url, fileName: candidate.resume.name || 'resume' }).catch(error => toast.error(error.message))}
                     className="flex items-center gap-2 text-sm text-primary hover:underline"
                   >
                     <FaFileAlt className="w-4 h-4" />
                     {candidate.resume.name || 'View Resume'}
-                  </a>
+                  </button>}
                 </CardBody>
               </Card>
             )}
 
+            {candidate.wordpress?.resumePending && <p className="text-sm text-warning">Resume transfer from WordPress is pending. It will appear after the connector completes its retry.</p>}
             {/* Offer Details */}
             {candidate.offer?.offeredDate && (
               <Card shadow="sm">

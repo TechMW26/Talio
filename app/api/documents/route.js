@@ -116,7 +116,8 @@ export async function POST(request) {
     const { user, models } = auth
     const { Document, User, Employee } = models
 
-    let data = await request.json()
+    const input = await request.json()
+    let data = Object.fromEntries(['name', 'type', 'url', 'fileUrl', 'fileName', 'fileType', 'fileId', 'fileSize', 'category', 'employee', 'expiryDate'].filter(key => input[key] !== undefined).map(key => [key, input[key]]))
 
     // Map new format fields to required schema fields
     // Support both new format (fileUrl/fileType/fileName) and legacy format (url/type/name)
@@ -153,6 +154,7 @@ export async function POST(request) {
     }
     data.uploadedBy = actorEmployee?._id
     data.isCompanyDocument = canManageDocuments && !data.employee
+    data.status = canManageDocuments ? 'approved' : 'pending'
 
     const document = await Document.create(data)
 

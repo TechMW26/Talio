@@ -13,6 +13,7 @@ import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import { fetchDocumentFile, downloadDocumentFile } from '@/lib/client/documentFile'
+import EmployeeOnboardingDocuments from '@/components/employees/EmployeeOnboardingDocuments'
 
 export default function DocumentsPage() {
   const { user, employeeId } = useMemo(() => {
@@ -226,6 +227,7 @@ export default function DocumentsPage() {
       </div>
 
       {/* Document Categories */}
+      <EmployeeOnboardingDocuments onSubmitted={refreshDocuments} />
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {['Identity', 'Personal', 'Employment', 'Tax', 'Other'].map((category) => (
           <div key={category} className="bg-white rounded-lg shadow-md p-6">
@@ -304,6 +306,9 @@ export default function DocumentsPage() {
                           <div>
                             <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                               {doc.fileName || doc.name}
+                              {doc.status && <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${['pending', 'changes_requested', 'rejected'].includes(doc.status) ? 'bg-warning-100 text-warning-800' : 'bg-success-100 text-success-800'}`}>
+                                {doc.status === 'pending' ? 'Pending HR review' : doc.status === 'changes_requested' ? 'Changes requested' : doc.status === 'issued' ? 'Issued letter' : doc.status === 'approved' ? 'Verified' : doc.status}
+                              </span>}
                               {doc.isAadhaarDocument && (
                                 <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
                                   Verified
@@ -352,7 +357,7 @@ export default function DocumentsPage() {
                           >
                             <FaDownload />
                           </button>
-                          {!doc.isAadhaarDocument && (
+                          {!doc.isAadhaarDocument && (!doc.generatedLetter || canManageDocuments) && (
                             <button
                               onClick={() => handleDelete(doc._id)}
                               className="text-red-600 hover:text-red-900"

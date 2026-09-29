@@ -57,9 +57,9 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
     window.addEventListener("resize", handleResize);
 
     // PHYSICS PARAMETERS - adjust rest position for elegant card, positioned higher
-    const restPosY = isMobile ? 320 : isTablet ? 360 : 420;
+    const restPosY = isMobile ? 280 : isTablet ? 320 : 380;
     const restPos = { x: 0, y: restPosY };
-    let pos = { x: 0, y: isMobile ? 200 : isTablet ? 220 : 260 };
+    let pos = { x: 0, y: isMobile ? 160 : isTablet ? 180 : 220 };
     let vel = { x: 0, y: 0 };
 
     const kSpring = 200.35;

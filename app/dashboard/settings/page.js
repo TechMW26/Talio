@@ -14,6 +14,8 @@ import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
 import MiraSettings from '@/components/settings/MiraSettings'
+import InductionSettings from '@/components/settings/InductionSettings'
+import WordPressRecruitmentSettings from '@/components/settings/WordPressRecruitmentSettings'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 
 // Dynamically import map component (client-side only)
@@ -124,10 +126,11 @@ export default function SettingsPage() {
     const baseTabs = []
 
     // Admin and HR get company settings
-    if (userRole === 'admin' || userRole === 'hr') {
+    if (['admin', 'hr', 'super_admin', 'superadmin'].includes(userRole)) {
       baseTabs.push(
         { id: 'company', name: 'Organisation', description: 'Companies, identity and workplace defaults', group: 'Organisation', icon: FaBuilding },
         { id: 'recruitment', name: 'Recruitment', description: 'Hiring channels and candidate workflows', group: 'People & lifecycle', icon: FaBriefcase },
+        { id: 'induction', name: 'Induction & orientation', description: 'Mandatory presentation and employee acknowledgement', group: 'People & lifecycle', icon: FaBriefcase },
         { id: 'geofencing', name: 'Work locations', description: 'Geofences and attendance boundaries', group: 'Attendance & workplace', icon: FaMapMarkerAlt },
         ...(isFeatureEnabled('attendanceMachines')
           ? [{ id: 'attendance-machines', name: 'Attendance machines', description: 'Organisation and company biometric devices', group: 'Attendance & workplace', icon: FaFingerprint }]
@@ -321,12 +324,13 @@ export default function SettingsPage() {
             <p className="mt-1 text-sm text-default-500">{tabs.find((tab) => tab.id === activeTab)?.description}</p>
           </div>
           {activeTab === 'company' && <CompanySettingsTab />}
-          {activeTab === 'recruitment' && <RecruitmentSettingsTab />}
+          {activeTab === 'recruitment' && <div className="space-y-6"><WordPressRecruitmentSettings /><RecruitmentSettingsTab /></div>}
           {activeTab === 'geofencing' && <GeofencingTab />}
           {activeTab === 'attendance-machines' && <AttendanceMachinesSettings />}
           {activeTab === 'payroll' && <PayrollSettingsTab />}
           {activeTab === 'notifications' && <NotificationsTab />}
           {activeTab === 'mira' && <MiraSettings />}
+          {activeTab === 'induction' && <InductionSettings />}
         </section>
       </div>
     </div>

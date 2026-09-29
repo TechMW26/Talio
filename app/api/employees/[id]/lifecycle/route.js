@@ -8,11 +8,13 @@ import { applyLifecycleAction, getLifecycleProgress, hydrateEmployeeLifecycle, r
 import { getOnboardingCompletionSignals } from '@/lib/hrms/onboardingProgress.server'
 import { loadOffboardingAssetClearance } from '@/lib/hrms/offboardingAssets.server'
 import { createWorkflow } from '@/lib/hrms/workflowService.server'
+import { buildDirectReportsFilter } from '@/lib/teamScope'
+import { resolveInductionProgram, progressId } from '@/lib/hrms/induction.server'
 
 export const dynamic = 'force-dynamic'
 
-const MANAGER_ROLES = new Set(['admin', 'hr', 'manager', 'department_head', 'superadmin'])
-const HR_ROLES = new Set(['admin', 'hr', 'superadmin'])
+const MANAGER_ROLES = new Set(['admin', 'hr', 'manager', 'department_head', 'superadmin', 'super_admin'])
+const HR_ROLES = new Set(['admin', 'hr', 'superadmin', 'super_admin'])
 
 function moduleForAction(action) {
   if (action.includes('onboarding')) return 'onboarding'
@@ -53,6 +55,7 @@ async function persistOnboardingEvidenceDocuments({ Document, employee, actor, i
   return Promise.all(documents.map((document) => Document.findOneAndUpdate(
     { employee: employee._id, fileId: document.fileId },
     {
+      $set: { status: 'approved' },
       $setOnInsert: {
         name: document.fileName,
         type: document.fileType,
@@ -76,9 +79,18 @@ async function authorize(request, id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return { response: NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 }) }
   }
-  const auth = await getAuthAndModels(request, ['Employee', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'Document', 'Asset', 'Payroll', 'Policy', 'ProbationApproval'])
+  const auth = await getAuthAndModels(request, ['Employee', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'Document', 'Asset', 'Payroll', 'Policy', 'ProbationApproval', 'InductionProgram', 'InductionProgress'])
   if (!auth.success) {
     return { response: NextResponse.json({ success: false, message: auth.message || 'Unauthorized' }, { status: 401 }) }
+  }
+  if (!HR_ROLES.has(auth.user.role)) {
+    const own = String(auth.user.employeeId?._id || auth.user.employeeId || '')
+    if (own !== id) {
+      const scope = buildDirectReportsFilter(own, { _id: id })
+      if (!MANAGER_ROLES.has(auth.user.role) || !scope || !(await auth.models.Employee.exists(scope))) {
+        return { response: NextResponse.json({ success: false, message: 'You do not have access to this employee lifecycle' }, { status: 403 }) }
+      }
+    }
   }
   return { auth }
 }
@@ -89,11 +101,15 @@ async function getLifecycle(request, { params }) {
   if (response) return response
 
   const employee = await auth.models.Employee.findById(id)
-    .select('firstName lastName email phone dateOfJoining employmentType lifecycle status dateOfLeaving createdAt emergencyContact bankDetails salary pfEnrollment esiEnrollment professionalTax tdsConfiguration healthInsurance documents department company')
+    .select('firstName lastName email phone dateOfJoining employmentType lifecycle status dateOfLeaving createdAt emergencyContact bankDetails salary pfEnrollment esiEnrollment professionalTax tdsConfiguration healthInsurance documents department company inductionCompletion')
     .lean()
   if (!employee) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
 
   const hydratedLifecycle = hydrateEmployeeLifecycle(employee)
+  const inductionProgram = await resolveInductionProgram(auth.models, employee.company)
+  const currentAcknowledgement = inductionProgram ? await auth.models.InductionProgress.findById(progressId(employee._id, inductionProgram.version)).select('acknowledgedAt').lean() : null
+  const inductionAcknowledgedAt = currentAcknowledgement?.acknowledgedAt || ((!inductionProgram?.active || inductionProgram.version === employee.inductionCompletion?.version) ? employee.inductionCompletion?.acknowledgedAt : null)
+  const inductionComplete = Boolean(inductionAcknowledgedAt)
   const onboardingEnabled = isFeatureEnabled(auth.companyFeatures, 'onboarding')
   const signals = onboardingEnabled
     ? await getOnboardingCompletionSignals({ models: auth.models, employee })
@@ -113,6 +129,11 @@ async function getLifecycle(request, { params }) {
   if (lifecycleChanged) {
     await auth.models.Employee.updateOne({ _id: employee._id }, { $set: { lifecycle } })
   }
+  if (!HR_ROLES.has(auth.user.role)) {
+    for (const item of lifecycle.onboarding?.checklist || []) {
+      if (item.submission?.verification?.details?.accountNumber) delete item.submission.verification.details.accountNumber
+    }
+  }
   const workflows = await auth.models.HrmsWorkflow.find({ subjectEmployee: employee._id })
     .select('caseNumber module status dueAt completedAt')
     .sort({ createdAt: -1 })
@@ -128,6 +149,7 @@ async function getLifecycle(request, { params }) {
     success: true,
     data: {
       lifecycle,
+      induction: { complete: inductionComplete, required: Boolean(inductionProgram?.active && !inductionComplete), acknowledgedAt: inductionAcknowledgedAt || null },
       employeeName: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
       progress: getLifecycleProgress(lifecycle),
       automation: { enabled: true, signals },
@@ -187,6 +209,9 @@ async function patchLifecycle(request, { params }) {
   if (!employee) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
 
   const currentLifecycle = hydrateEmployeeLifecycle(employee)
+  if ((action === 'request_onboarding_changes' || (action === 'complete_onboarding_item' && currentLifecycle.onboarding?.checklist?.find(item => item.key === body.itemKey)?.submission)) && !HR_ROLES.has(auth.user.role)) {
+    return NextResponse.json({ success: false, message: 'HR must review employee onboarding submissions' }, { status: 403 })
+  }
   const onboardingEnabled = isFeatureEnabled(auth.companyFeatures, 'onboarding')
   const signals = onboardingEnabled
     ? await getOnboardingCompletionSignals({ models: auth.models, employee })
@@ -254,6 +279,13 @@ async function patchLifecycle(request, { params }) {
       { success: false, message: 'Employee changed while this action was being saved. Refresh and try again.', code: 'LIFECYCLE_CONFLICT' },
       { status: 409 },
     )
+  }
+
+  if (action === 'request_onboarding_changes') {
+    const item = result.lifecycle.onboarding.checklist.find(entry => entry.key === body.itemKey)
+    await auth.models.Document.updateMany({ employee: employee._id, fileId: { $in: (item.submission?.verification?.documents || []).map(file => file.fileId) } }, {
+      $set: { status: 'changes_requested', reviewReason: item.submission.reviewReason },
+    })
   }
 
   let workflowWarning = null

@@ -1,4 +1,5 @@
 'use client'
+import InductionGate from '@/components/induction/InductionGate'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
@@ -373,7 +374,7 @@ export default function DashboardLayout({ children }) {
   // For meeting room pages, render children directly without any layout chrome
   if (isMeetingRoomPage) {
     return (
-      <>
+      <InductionGate>
         <SocketProvider>
           <CompanyFeaturesProvider>
             <CompanyFeatureRouteGuard />
@@ -391,12 +392,12 @@ export default function DashboardLayout({ children }) {
             </TicTacToeProvider>
           </CompanyFeaturesProvider>
         </SocketProvider>
-      </>
+      </InductionGate>
     )
   }
 
   return (
-    <>
+    <InductionGate>
       <SocketProvider>
         <CompanyFeaturesProvider>
         <CompanyFeatureRouteGuard />
@@ -502,6 +503,6 @@ export default function DashboardLayout({ children }) {
         </TicTacToeProvider>
         </CompanyFeaturesProvider>
       </SocketProvider>
-    </>
+    </InductionGate>
   )
 }

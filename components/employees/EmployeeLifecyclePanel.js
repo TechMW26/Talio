@@ -123,6 +123,8 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
             <h2 id="employee-lifecycle-heading" className="text-lg font-bold text-slate-900 dark:text-zinc-100">Employee lifecycle</h2>
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">Onboarding, probation and offboarding stay attached to this employee.</p>
+          {details.induction?.complete && <Chip className="mt-2" color="success" variant="flat">Induction complete · {formatIstDate(details.induction.acknowledgedAt)}</Chip>}
+          {details.induction?.required && <Chip className="mt-2" color="warning" variant="flat">Induction acknowledgement pending</Chip>}
         </div>
         <Chip color="primary" variant="flat" startContent={<FaClock className="h-3 w-3" />}>
           {STAGE_LABELS[lifecycle.stage] || lifecycle.stage}
@@ -161,6 +163,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className={`block text-sm ${item.completed ? 'text-slate-400 line-through dark:text-zinc-500' : 'text-slate-700 dark:text-zinc-200'}`}>{item.label}</span>
+                    {!item.completed && item.submission && <span className="mt-1 block text-xs text-warning-600 dark:text-warning-400">{item.submission.status === 'pending' ? 'Employee submission · Pending HR review' : item.submission.status === 'changes_requested' ? 'Changes requested from employee' : ''}</span>}
                     {isAutomatic && (
                       <span className="mt-0.5 block text-[10px] text-slate-400 dark:text-zinc-500">
                         {item.completionSource === 'system'
@@ -178,7 +181,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
         </div>
       )}
 
-      {details.enabled?.onboarding && canOffboard && <EmploymentLetterEditor name={details.employeeName} value={lifecycle.letterDraft} busy={processing === 'save_onboarding_letter'} onSave={payload => runAction('save_onboarding_letter', payload)} />}
+      {details.enabled?.onboarding && canOffboard && <EmploymentLetterEditor employeeId={employeeId} />}
       {details.enabled?.probation && probation.applicable && (
         <div className="mt-4 rounded-2xl border border-slate-200 p-5 dark:border-zinc-800">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -326,7 +329,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
       <OnboardingVerificationModal
         isOpen={Boolean(verificationItem)}
         item={verificationItem}
-        isProcessing={processing === `complete_onboarding_item${verificationItem?.key || ''}`}
+        isProcessing={processing === `complete_onboarding_item${verificationItem?.key || ''}` || processing === `request_onboarding_changes${verificationItem?.key || ''}`}
         onClose={() => setVerificationItem(null)}
         onVerify={(verification) => runAction('complete_onboarding_item', {
           itemKey: verificationItem?.key,
@@ -338,6 +341,7 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
           completed: false,
           reason,
         })}
+        onRequestChanges={(reason) => runAction('request_onboarding_changes', { itemKey: verificationItem?.key, reason })}
       />
     </section>
   )

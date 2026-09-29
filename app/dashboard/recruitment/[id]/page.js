@@ -57,7 +57,7 @@ export default function JobDetailPage() {
     try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
   }, []);
 
-  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/recruitment/${params.id}` : null);
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/recruitment/${params.id}` : null, { refreshInterval: 30000 });
   const job = res?.data || null;
 
   useEffect(() => {

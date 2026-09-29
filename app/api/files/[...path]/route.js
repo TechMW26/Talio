@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { verifyTokenFromRequest } from '@/lib/auth'
+import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
+import { canReadDocumentUpload } from '@/lib/documentAccess.server'
 import {
   buildTenantRootPrefix,
   getBlobAccessMode,
@@ -21,6 +22,11 @@ export async function GET(request, { params }) {
 
   if (!pathname.startsWith(tenantPrefix) || pathname.includes('..')) {
     return new NextResponse('Forbidden', { status: 403 })
+  }
+  const [category, ownerId] = pathname.slice(tenantPrefix.length).split('/')
+  if (category === 'documents') {
+    const documentAuth = await getAuthAndModels(request, ['Document', 'User'])
+    if (!await canReadDocumentUpload(documentAuth, { fileId: pathname, ownerId })) return new NextResponse('Forbidden', { status: 403 })
   }
 
   try {

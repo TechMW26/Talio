@@ -112,6 +112,11 @@ const EmployeeSchema = new mongoose.Schema({
   dateOfLeaving: {
     type: Date,
   },
+  inductionCompletion: {
+    version: String,
+    title: String,
+    acknowledgedAt: Date,
+  },
   lifecycle: {
     letterDraft: { kind: String, content: String, savedAt: Date },
     stage: {
@@ -133,6 +138,7 @@ const EmployeeSchema = new mongoose.Schema({
         completedAt: Date,
         completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
         completionSource: { type: String, enum: ['manual', 'system'], default: null },
+        submission: mongoose.Schema.Types.Mixed,
         verification: {
           status: { type: String, enum: ['verified', 'reopened'] },
           method: { type: String, enum: ['manual', 'linked_record'] },
