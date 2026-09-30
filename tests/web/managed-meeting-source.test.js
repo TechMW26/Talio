@@ -67,7 +67,7 @@ describe('managed meeting implementation', () => {
     expect(mediaSource).toContain('item.isScreenSharing')
     expect(mediaSource).toContain('bg-black object-contain')
     expect(mediaSource).not.toContain('object-cover')
-    expect(mediaSource).toContain('<AIActivityBeam active strength={1}')
+    expect(mediaSource).toContain('<AIActivityBeam active instant theme="dark" strength={1}')
     expect(source).toContain('<ParticipantGrid count={orderedParticipants.length} pip={isPip}>')
     expect(source).toContain('!isPip && railParticipants.length > 0')
     expect(source).toContain('data-meeting-stage')

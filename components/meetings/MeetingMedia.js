@@ -5,6 +5,7 @@ import { Track } from 'livekit-client'
 import { HiOutlineMicrophone, HiOutlineHandRaised } from 'react-icons/hi2'
 import { CutLineIcon, MeetingReactionIcon } from './MeetingVisualIcons'
 import AIActivityBeam from '@/components/ui/AIActivityBeam'
+import useMeetingSpeaking from '@/hooks/useMeetingSpeaking'
 
 export function RemoteAudio({ participant, source = Track.Source.Microphone }) {
   const ref = useRef(null)
@@ -19,11 +20,13 @@ export function RemoteAudio({ participant, source = Track.Source.Microphone }) {
   return <audio ref={ref} autoPlay data-meeting-audio={source} />
 }
 
-export function ParticipantTile({ item, local = false, reaction, handRaised = false, isSpeaking = false, featured = false, compact = false }) {
+export function ParticipantTile({ item, local = false, reaction, handRaised = false, isSpeaking: reportedSpeaking = false, featured = false, compact = false }) {
   const videoRef = useRef(null)
   const screenPublication = item.participant.getTrackPublication(Track.Source.ScreenShare)
   const cameraPublication = item.participant.getTrackPublication(Track.Source.Camera)
   const publication = screenPublication && !screenPublication.isMuted ? screenPublication : cameraPublication
+  const microphone = item.participant.getTrackPublication(Track.Source.Microphone)
+  const isSpeaking = useMeetingSpeaking(microphone?.track, Boolean(item.isMuted || microphone?.isMuted), reportedSpeaking)
 
   useEffect(() => {
     const track = publication?.track
@@ -41,7 +44,7 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
 
   return (
     <div
-      className={`relative flex overflow-hidden bg-slate-200 dark:bg-slate-900 ${isSpeaking ? '' : 'ring-1 ring-slate-300 dark:ring-white/10'} ${compact ? 'rounded-xl' : 'rounded-2xl'} ${tileSize}`}
+      className={`relative flex overflow-hidden !bg-black ${isSpeaking ? '' : 'ring-1 ring-white/15'} ${compact ? 'rounded-xl' : 'rounded-2xl'} ${tileSize}`}
       data-participant-tile={featured ? 'presenter' : compact ? 'rail' : 'grid'}
       data-speaking={isSpeaking ? 'true' : undefined}
       aria-label={isSpeaking ? `${item.name} is speaking` : undefined}
@@ -57,7 +60,7 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
         className={`absolute inset-0 h-full w-full bg-black object-contain ${local && !item.isScreenSharing ? '-scale-x-100' : ''} ${publication?.track && !publication.isMuted ? '' : 'invisible'}`}
       />
       {(!publication?.track || publication.isMuted) && (
-        <div className="flex h-full w-full flex-1 items-center justify-center">
+        <div className="flex h-full w-full flex-1 items-center justify-center !bg-black">
           <span className={`flex items-center justify-center rounded-full bg-indigo-600 font-semibold text-white ${compact ? 'h-10 w-10 text-sm' : 'h-16 w-16 text-xl'}`}>
             {item.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
           </span>
@@ -70,7 +73,7 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
       {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
       {handRaised && <span className="absolute right-3 top-3 rounded-full bg-amber-500 p-2 text-white" aria-label={`${item.name} raised their hand`}><HiOutlineHandRaised className="h-5 w-5" /></span>}
       {isSpeaking && item.isScreenSharing && <span className="absolute left-3 top-10 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white">Speaking</span>}
-      {isSpeaking && <AIActivityBeam active strength={1} borderRadius={compact ? 12 : 16} />}
+      {isSpeaking && <AIActivityBeam active instant theme="dark" strength={1} borderRadius={compact ? 12 : 16} />}
       {reaction && (
         <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 motion-safe:animate-bounce drop-shadow-lg">
           <MeetingReactionIcon value={reaction} className={compact ? 'h-12 w-12' : 'h-20 w-20 sm:h-24 sm:w-24'} />

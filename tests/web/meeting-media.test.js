@@ -16,6 +16,7 @@ test('speaker border has no green ring and the badge is reserved for screen shar
   const item = makeItem({})
   const view = render(<ParticipantTile item={item} isSpeaking compact />)
   const tile = screen.getByLabelText('Remote Person is speaking')
+  expect(tile.className).toContain('!bg-black')
   expect(tile.className).not.toMatch(/ring-|emerald|shadow-/)
   expect(screen.queryByText('Speaking')).not.toBeInTheDocument()
   expect(screen.getByTestId('speaker-beam')).toHaveAttribute('data-radius', '12')
