@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { ParticipantTile, RemoteAudio } from '@/components/meetings/MeetingMedia'
-jest.mock('@/components/ui/AIActivityBeam', () => ({ borderRadius }) => <div data-testid="speaker-beam" data-radius={borderRadius} />)
+jest.mock('@/components/ui/AIActivityBeam', () => ({ active, borderRadius }) => active ? <div data-testid="speaker-beam" data-radius={borderRadius} /> : null)
 
 jest.mock('livekit-client', () => ({ Track: { Source: {
   Camera: 'camera', Microphone: 'microphone', ScreenShare: 'screen', ScreenShareAudio: 'screen-audio',

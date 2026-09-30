@@ -73,7 +73,7 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
       {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
       {handRaised && <span className="absolute right-3 top-3 rounded-full bg-amber-500 p-2 text-white" aria-label={`${item.name} raised their hand`}><HiOutlineHandRaised className="h-5 w-5" /></span>}
       {isSpeaking && item.isScreenSharing && <span className="absolute left-3 top-10 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white">Speaking</span>}
-      {isSpeaking && <AIActivityBeam active instant theme="dark" strength={1} borderRadius={compact ? 12 : 16} />}
+      <AIActivityBeam active={isSpeaking} fadeMs={100} scaleWithSize theme="dark" strength={1} borderRadius={compact ? 12 : 16} />
       {reaction && (
         <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 motion-safe:animate-bounce drop-shadow-lg">
           <MeetingReactionIcon value={reaction} className={compact ? 'h-12 w-12' : 'h-20 w-20 sm:h-24 sm:w-24'} />
