@@ -63,7 +63,7 @@ test('switches between camera and uncropped screen share on the same element', (
   view.rerender(<ParticipantTile item={item} local />)
   expect(camera.attach).toHaveBeenCalledWith(video)
   expect(screenTrack.detach).toHaveBeenCalledWith(video)
-  expect(video).toHaveClass('object-cover', '-scale-x-100')
+  expect(video).toHaveClass('object-contain', '-scale-x-100')
 })
 
 test('attaches microphone and presentation audio separately and detaches without stopping remote tracks', () => {

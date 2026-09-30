@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { Track } from 'livekit-client'
 import { HiOutlineMicrophone, HiOutlineHandRaised } from 'react-icons/hi2'
 import { CutLineIcon, MeetingReactionIcon } from './MeetingVisualIcons'
+import AIActivityBeam from '@/components/ui/AIActivityBeam'
 
 export function RemoteAudio({ participant, source = Track.Source.Microphone }) {
   const ref = useRef(null)
@@ -35,8 +36,8 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
   const tileSize = featured
     ? 'h-full min-h-0 w-full'
     : compact
-      ? 'h-24 w-36 shrink-0 sm:h-28 sm:w-44'
-      : 'min-h-44'
+      ? 'aspect-video w-36 shrink-0 self-start sm:w-44'
+      : 'aspect-video w-[var(--meeting-tile-width,100%)] shrink-0'
 
   return (
     <div
@@ -52,7 +53,7 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
         playsInline
         muted
         aria-label={`${item.name} ${item.isScreenSharing ? 'screen share' : 'camera'}`}
-        className={`absolute inset-0 h-full w-full ${item.isScreenSharing ? 'bg-black object-contain' : 'object-cover'} ${local && !item.isScreenSharing ? '-scale-x-100' : ''} ${publication?.track && !publication.isMuted ? '' : 'invisible'}`}
+        className={`absolute inset-0 h-full w-full bg-black object-contain ${local && !item.isScreenSharing ? '-scale-x-100' : ''} ${publication?.track && !publication.isMuted ? '' : 'invisible'}`}
       />
       {(!publication?.track || publication.isMuted) && (
         <div className="flex h-full w-full flex-1 items-center justify-center">
@@ -68,6 +69,7 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
       {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
       {isSpeaking && <span className={`absolute left-3 ${item.isScreenSharing ? 'top-10' : 'top-3'} flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white shadow-lg`} aria-label={`${item.name} is speaking`}><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />Speaking</span>}
       {handRaised && <span className="absolute right-3 top-3 rounded-full bg-amber-500 p-2 text-white" aria-label={`${item.name} raised their hand`}><HiOutlineHandRaised className="h-5 w-5" /></span>}
+      {isSpeaking && <AIActivityBeam active strength={1} borderRadius={compact ? 12 : 16} />}
       {reaction && (
         <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 motion-safe:animate-bounce drop-shadow-lg">
           <MeetingReactionIcon value={reaction} className={compact ? 'h-12 w-12' : 'h-20 w-20 sm:h-24 sm:w-24'} />

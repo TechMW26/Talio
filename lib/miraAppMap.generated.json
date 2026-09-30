@@ -3828,6 +3828,8 @@
       "components/meetings/MeetingMedia.js",
       "components/meetings/MeetingReactionPicker.js",
       "components/meetings/MeetingVisualIcons.js",
+      "components/meetings/ParticipantGrid.js",
+      "components/ui/AIActivityBeam.js",
       "components/ui/Loader.js"
     ]
   },

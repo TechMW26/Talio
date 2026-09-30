@@ -29,6 +29,7 @@ import {
 import { CutLineIcon, MEETING_REACTIONS } from '@/components/meetings/MeetingVisualIcons'
 import { createMeetingFeedback, unlockMeetingSounds } from '@/lib/meetings/feedback'
 import { ParticipantTile, RemoteAudio } from '@/components/meetings/MeetingMedia'
+import ParticipantGrid from '@/components/meetings/ParticipantGrid'
 import MeetingReactionPicker from '@/components/meetings/MeetingReactionPicker'
 import AddMeetingParticipantsModal from '@/app/dashboard/meetings/components/AddMeetingParticipantsModal'
 import MeetingNotetakerPanel from '@/app/dashboard/meetings/components/MeetingNotetakerPanel'
@@ -1015,7 +1016,7 @@ export default function ManagedMeetingRoomSession({
               playsInline
               muted
               aria-label="Camera preview"
-              className={`absolute inset-0 h-full w-full -scale-x-100 object-cover transition-opacity duration-200 ${previewStatus === 'ready' && !videoOff ? 'opacity-100' : 'opacity-0'}`}
+              className={`absolute inset-0 h-full w-full -scale-x-100 object-contain transition-opacity duration-200 ${previewStatus === 'ready' && !videoOff ? 'opacity-100' : 'opacity-0'}`}
             />
 
             {previewStatus === 'loading' && (
@@ -1232,9 +1233,9 @@ export default function ManagedMeetingRoomSession({
             )}
           </div>
         ) : (
-          <div className={`grid min-w-0 flex-1 gap-3 overflow-y-auto ${orderedParticipants.length <= 1 ? 'grid-cols-1' : isPip ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`} data-meeting-layout="grid">
+          <ParticipantGrid count={orderedParticipants.length}>
             {orderedParticipants.map((item) => <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} />)}
-          </div>
+          </ParticipantGrid>
         )}
         {(showChat || showParticipants) && !isPip && <aside className="w-80 shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
           <div className="flex items-center justify-between"><h2 className="font-semibold">{showChat ? 'In-meeting chat' : 'Participants'}</h2><button onClick={() => { setShowChat(false); setShowParticipants(false) }} aria-label="Close panel"><HiOutlineXMark className="h-5 w-5" /></button></div>

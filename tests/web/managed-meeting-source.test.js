@@ -65,7 +65,10 @@ describe('managed meeting implementation', () => {
   test('renders remote audio and uses an uncropped presentation layout with a thumbnail rail', () => {
     expect(source).toContain('<RemoteAudio')
     expect(mediaSource).toContain('item.isScreenSharing')
-    expect(mediaSource).toContain("item.isScreenSharing ? 'bg-black object-contain' : 'object-cover'")
+    expect(mediaSource).toContain('bg-black object-contain')
+    expect(mediaSource).not.toContain('object-cover')
+    expect(mediaSource).toContain('<AIActivityBeam active strength={1}')
+    expect(source).toContain('<ParticipantGrid count={orderedParticipants.length}>')
     expect(source).toContain('data-meeting-layout="presentation"')
     expect(source).toContain('data-meeting-participant-rail')
     expect(source).toContain('railParticipants.map')
