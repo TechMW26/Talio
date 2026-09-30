@@ -53,6 +53,28 @@ describe('menu information architecture', () => {
     ]))
   })
 
+  test('keeps resignations last even when tenant-specific tools are enabled', () => {
+    const sections = buildNavigationSections([
+      { name: 'Resignations & Exits', path: '/dashboard/resignations', icon },
+      ...menuItems,
+      { name: 'Role Management', path: '/dashboard/roles', icon },
+    ])
+    expect(sections.map((section) => section.name)).toEqual([
+      'Home', 'People', 'Communication', 'Administration', 'More', 'Resignations & Exits',
+    ])
+    expect(sections.at(-1).submenu[0].path).toBe('/dashboard/resignations')
+  })
+
+  test.each(Object.keys(roleBasedMenus))('keeps exits last for the %s role without adding access', (role) => {
+    const menu = roleBasedMenus[role]
+    const sections = buildNavigationSections(menu)
+    if (menu.some((item) => item.name === 'Resignations & Exits')) {
+      expect(sections.at(-1).id).toBe('resignations')
+    } else {
+      expect(sections.some((section) => section.id === 'resignations')).toBe(false)
+    }
+  })
+
   test('uses a unique icon for every top-level destination and sidebar action', () => {
     const completeMenu = [
       { name: 'Dashboard', path: '/dashboard', icon },

@@ -23,6 +23,18 @@ test('submission requires explicit acknowledgement and posts the entered reason'
   await waitFor(() => expect(execute).toHaveBeenCalledWith('/api/resignations', { action: 'submit', reason: 'Personal relocation' }))
   expect(await screen.findByRole('status')).toHaveTextContent('Saved')
 })
+test('dashboard keeps summary cards visible on every view and separates the primary action from navigation', () => {
+  render(<ResignationPanel dashboard initialView="reviews" />)
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Resignations & Exits')
+  expect(screen.getByRole('button', { name: 'View completed exits' })).toBeInTheDocument()
+  const navigation = screen.getByRole('navigation', { name: 'Resignation views' })
+  const submit = screen.getByRole('button', { name: 'Submit resignation' })
+  expect(navigation).not.toContainElement(submit)
+  expect(submit).toHaveClass('bg-primary')
+  fireEvent.click(submit)
+  expect(screen.getByLabelText('Reason for resignation')).toBeInTheDocument()
+  expect(execute).not.toHaveBeenCalled()
+})
 test('employee can negotiate with a reason and current version', async () => {
   data.data = [record()]
   render(<ResignationPanel />)

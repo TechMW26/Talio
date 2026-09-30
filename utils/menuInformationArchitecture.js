@@ -153,7 +153,11 @@ export function buildNavigationSections(menuItems = []) {
     })
   }
 
-  return sections
+  // Keep exits last, including after any tenant-specific "More" tools.
+  return [
+    ...sections.filter((section) => section.id !== 'resignations'),
+    ...sections.filter((section) => section.id === 'resignations'),
+  ]
 }
 
 export function filterNavigationSections(items = [], query = '') {

@@ -2929,16 +2929,16 @@
       "Full & final settlement",
       "Full-and-final settlement &amp; exit",
       "I understand this submits a formal resignation request to HR.",
-      "Needs your action",
+      "New resignation request",
       "Notice period (calendar days)",
       "Notice start date",
       "Payment / recovery reference (or zero-balance explanation)",
-      "Reason for resignation",
       "Refresh requests",
       "Refresh status",
       "Remove",
       "Resignation dashboard",
       "Resignation requests",
+      "Resignation views",
       "Resignations &amp; Exits",
       "Retry",
       "Return condition",
@@ -2948,8 +2948,7 @@
       "Settlement date",
       "Settlement notes",
       "Start F&amp;F / offboarding",
-      "Submit resignation",
-      "Submit to HR"
+      "Submit resignation"
     ],
     "sources": [
       "app/dashboard/resignations/page.js",
