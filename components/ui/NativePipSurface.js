@@ -149,6 +149,11 @@ async function getPipWindow(size) {
         [data-native-pip-surface]:has([data-meeting-pip="bubble"]){--meeting-pip-radius:9999px}
         [data-native-pip-surface] [data-meeting-pip]{border-radius:var(--meeting-pip-radius,24px)!important;box-shadow:none!important;overflow:hidden!important}
         [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:10/3!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
+        /* The mono VoiceBeam paints a second bright stroke at its corners.
+           Keep its interior glow, but use one clipped native panel silhouette. */
+        html[data-desktop-pip="true"] [data-native-pip-surface]:has(.mira-workspace){border-radius:16px!important;overflow:hidden!important;clip-path:inset(0 round 16px)}
+        html[data-desktop-pip="true"] [data-native-pip-surface] .mira-workspace{border-radius:16px!important;box-shadow:none!important;outline:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+        html[data-desktop-pip="true"] [data-native-pip-surface] .mira-workspace::after{content:none!important;display:none!important}
         [data-native-pip-surface] [data-mira-pip-content]{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
       `
       target.document.head.append(sizing)
