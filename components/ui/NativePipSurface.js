@@ -131,7 +131,7 @@ async function getPipWindow(size) {
     if (desktop) {
       const sizing = target.document.createElement('style')
       sizing.textContent = `
-        html,body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
+        html[data-desktop-pip="true"],html[data-desktop-pip="true"] body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
         [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal}
         /* One silhouette: clip the host to the same radius as its meeting panel.
            Rings and shadows outside that silhouette produce a second dark rim. */

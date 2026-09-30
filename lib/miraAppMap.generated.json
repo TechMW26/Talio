@@ -3804,8 +3804,11 @@
       "Minimise picture in picture",
       "Minimise picture in picture to bubble",
       "Minimise to bubble",
+      "Next participants",
       "Open participants",
+      "Participant pages",
       "Preview camera &amp; microphone",
+      "Previous participants",
       "Reactions",
       "Restore meeting",
       "Return to",
@@ -3818,7 +3821,9 @@
       "Thumbs up",
       "Transcript History",
       "Try camera again",
-      "← Back to home"
+      "←",
+      "← Back to home",
+      "→"
     ],
     "sources": [
       "app/dashboard/meetings/components/AddMeetingParticipantsModal.js",

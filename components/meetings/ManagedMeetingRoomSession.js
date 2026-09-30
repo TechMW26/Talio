@@ -1218,13 +1218,13 @@ export default function ManagedMeetingRoomSession({
         </div>
       </header>
 
-      {!isCompact && <main className="relative flex min-h-0 flex-1 gap-3 overflow-auto p-3">
+      {!isCompact && <div className="relative flex min-h-0 flex-1 gap-3 overflow-auto p-3" data-meeting-stage>
         {presenter ? (
           <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden" data-meeting-layout="presentation">
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
               <ParticipantTile item={presenter} local={presenter.identity === localIdentity} reaction={reactions[presenter.identity]} handRaised={raisedHands[presenter.identity]} isSpeaking={presenter.isSpeaking} featured />
             </div>
-            {railParticipants.length > 0 && (
+            {!isPip && railParticipants.length > 0 && (
               <div className={`flex ${isPip ? 'h-28' : 'h-24 sm:h-28'} shrink-0 gap-2 overflow-x-auto overflow-y-hidden px-0.5 py-0.5`} data-meeting-participant-rail>
                 {railParticipants.map((item) => (
                   <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} compact />
@@ -1233,7 +1233,7 @@ export default function ManagedMeetingRoomSession({
             )}
           </div>
         ) : (
-          <ParticipantGrid count={orderedParticipants.length}>
+          <ParticipantGrid count={orderedParticipants.length} pip={isPip}>
             {orderedParticipants.map((item) => <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} />)}
           </ParticipantGrid>
         )}
@@ -1249,7 +1249,7 @@ export default function ManagedMeetingRoomSession({
             onClose={() => setShowNotetaker(false)}
           />
         )}
-      </main>}
+      </div>}
 
       {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
           <span key={`audio-${participant.identity}`}>
