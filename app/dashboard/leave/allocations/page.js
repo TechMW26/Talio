@@ -24,6 +24,7 @@ export default function LeaveAllocationsPage() {
   const fileInputRef = useRef(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [employeeSearch, setEmployeeSearch] = useState('')
+  const [employeePage, setEmployeePage] = useState(1)
   const [bulkMode, setBulkMode] = useState(false)
   const hierarchyLevels = ['Entry Level', 'Mid Level', 'Senior', 'Team Lead', 'Assistant Manager', 'Manager', 'C-Suite', 'Assistant Director', 'Director']
   const [halfDayPolicy, setHalfDayPolicy] = useState({
@@ -73,6 +74,18 @@ export default function LeaveAllocationsPage() {
       return terms.every(term => text.includes(term))
     })
   }, [employeesRes, employeeSearch])
+  const employeePageCount = Math.max(1, Math.ceil(filteredEmployees.length / 25))
+  const currentEmployeePage = Math.min(employeePage, employeePageCount)
+  const visibleEmployees = filteredEmployees.slice((currentEmployeePage - 1) * 25, currentEmployeePage * 25)
+  useEffect(() => { setEmployeePage(1) }, [employeeSearch, selectedYear])
+  const balanceIndex = useMemo(() => {
+    const index = new Map()
+    for (const balance of balancesRes?.data || []) {
+      const key = `${balance.employee?._id || balance.employee}:${balance.leaveType?._id || balance.leaveType}`
+      if (!index.has(key)) index.set(key, balance)
+    }
+    return index
+  }, [balancesRes])
   const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
   const leaveBalances = balancesRes?.data || []
   const loading = employeesLoading || leaveTypesLoading || balancesLoading
@@ -141,9 +154,7 @@ export default function LeaveAllocationsPage() {
   }
 
   const getEmployeeBalance = (employeeId, leaveTypeId) => {
-    return leaveBalances.find(balance =>
-      balance.employee?._id === employeeId && balance.leaveType?._id === leaveTypeId
-    )
+    return balanceIndex.get(`${employeeId}:${leaveTypeId}`)
   }
 
   const exportBalances = () => {
@@ -480,7 +491,7 @@ export default function LeaveAllocationsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-content1 divide-y divide-default-200">
-                  {filteredEmployees.map((employee) => (
+                  {visibleEmployees.map((employee) => (
                     <tr key={employee._id} className="hover:bg-default-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -536,6 +547,13 @@ export default function LeaveAllocationsPage() {
                   ))}
                 </tbody>
               </table>
+              <nav aria-label="Employee balance pages" className="flex items-center justify-between gap-3 border-t border-default-200 p-4">
+                <span className="text-sm text-default-500">Page {currentEmployeePage} of {employeePageCount} · {filteredEmployees.length} results</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="bordered" isDisabled={currentEmployeePage === 1} onPress={() => setEmployeePage(currentEmployeePage - 1)}>Previous</Button>
+                  <Button size="sm" variant="bordered" isDisabled={currentEmployeePage === employeePageCount} onPress={() => setEmployeePage(currentEmployeePage + 1)}>Next</Button>
+                </div>
+              </nav>
             </div>
           )}
         </CardBody>

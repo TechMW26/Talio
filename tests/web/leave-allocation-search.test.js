@@ -50,3 +50,16 @@ test('handles no matches and clearing without changing underlying employee total
   expect(screen.getByText('Aman Tiwari')).toBeInTheDocument()
   expect(screen.getAllByRole('button', { name: 'Allocate' })).toHaveLength(3)
 })
+
+test('bounds rendered rows while keeping search across the complete employee list', () => {
+  useAuthedSWR.mockImplementation(url => ({ data: { data: url.startsWith('/api/employees') ?
+    Array.from({ length: 177 }, (_, i) => ({ _id: String(i), firstName: `Employee${i}`, employeeCode: `E${i}` })) : [] }, mutate: jest.fn() }))
+  render(<LeaveAllocationsPage />)
+  expect(screen.getAllByRole('button', { name: 'Allocate' })).toHaveLength(25)
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  expect(screen.getByText('Employee25')).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('textbox', { name: 'Search employee leave balances' }), { target: { value: 'Employee176' } })
+  expect(screen.getByText('Employee176')).toBeInTheDocument()
+  expect(screen.getAllByRole('button', { name: 'Allocate' })).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+})

@@ -52,3 +52,19 @@ test('unchanged responses retain the cached data reference while mutations refre
   await act(async () => { await result.current.mutate() })
   expect(result.current.data.items[0].name).toBe('Changed')
 })
+
+test('data-only consumers do not rerender for unchanged background validation', async () => {
+  fetch.mockResolvedValue(response({ count: 1 }))
+  const cache = new Map()
+  const wrapper = ({ children }) => <SWRConfig value={{ provider: () => cache }}>{children}</SWRConfig>
+  let renders = 0
+  const { result } = renderHook(() => {
+    renders++
+    const { data, mutate } = useAuthedSWR('/api/test-stable')
+    return { data, mutate }
+  }, { wrapper })
+  await waitFor(() => expect(result.current.data?.count).toBe(1))
+  const before = renders
+  await act(async () => { await result.current.mutate() })
+  expect(renders).toBe(before)
+})

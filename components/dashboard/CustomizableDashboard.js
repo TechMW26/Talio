@@ -250,8 +250,8 @@ export default function CustomizableDashboard({
                           colorIndex={index}
                           onRemove={isEditMode && widget.id !== 'check-in-out' ? handleRemoveWidget : null}
                           removable={isEditMode && widget.id !== 'check-in-out'}
-                          frameless={widget.id === 'check-in-out'}
-                          className={`min-w-0 ${isWideDashboardWidget(widget.id) ? 'md:col-span-2' : ''} ${widget.id === 'check-in-out' ? '' : 'rounded-[18px] overflow-hidden'}`}
+                          frameless
+                          className={`min-w-0 ${isWideDashboardWidget(widget.id) ? 'md:col-span-2' : ''}`}
                         >
                           <DeferredWidgetContent eager={section.id === 'attendance' || isEditMode} scrollableList={WIDGET_REGISTRY[widget.id]?.scrollableList === true}>
                             {widgetComponents[widget.id]}
