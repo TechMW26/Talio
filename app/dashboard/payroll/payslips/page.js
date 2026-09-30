@@ -203,7 +203,7 @@ Generated on: ${new Date().toLocaleDateString()}
               <p>No payslips found for {selectedYear}</p>
             </div>
           ) : (
-            <HRMSTable aria-label="Payslips table">
+            <HRMSTable embedded aria-label="Payslips table">
               <HRMSTableHeader>
                 <HRMSTableColumn>Month</HRMSTableColumn>
                 <HRMSTableColumn>Gross Salary</HRMSTableColumn>

@@ -201,62 +201,38 @@ html.dark .bg-primary.text-white,
 html.dark .bg-primary-500.text-white,
 html.dark .bg-primary-600.text-white { color:#111111; }
 
-/* ============================================
-   FORCED INPUT BORDERS - Light & Dark Mode
-   ============================================ */
+/* Form surfaces: one boundary, no extra grey layer behind the field.
+   Scope triggers to selects so accordion/dialog triggers retain their design. */
+:root { --talio-field-border: #d4d4d8; }
+html.dark { --talio-field-border: #3f3f46; }
 
-/* Light mode: dark border for contrast on native inputs */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="tel"],
-input[type="number"],
-input[type="date"],
-input[type="time"],
-input[type="datetime-local"],
-input[type="month"],
-input[type="week"],
-input[type="url"],
-input[type="search"],
-select,
-textarea {
-  border: 1px solid #d4d4d8 !important;
-  border-radius: 0.5rem;
+@layer base {
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]), select, textarea) {
+    border: 1px solid var(--talio-field-border);
+    border-radius: 0.5rem;
+    background-color: transparent;
+  }
 }
 
-/* Dark mode: lighter border for contrast on native inputs */
-html.dark input[type="text"],
-html.dark input[type="email"],
-html.dark input[type="password"],
-html.dark input[type="tel"],
-html.dark input[type="number"],
-html.dark input[type="date"],
-html.dark input[type="time"],
-html.dark input[type="datetime-local"],
-html.dark input[type="month"],
-html.dark input[type="week"],
-html.dark input[type="url"],
-html.dark input[type="search"],
-html.dark select,
-html.dark textarea {
-  border: 1px solid #3f3f46 !important;
+html body :is([data-slot="input-wrapper"], button[data-slot="trigger"][aria-haspopup="listbox"]) {
+  background-color: transparent !important;
+  border: 1px solid var(--talio-field-border);
+  box-shadow: none;
 }
 
-/* HeroUI component wrappers - Light mode (high specificity to override .border-default-200) */
-div[data-slot="input-wrapper"],
-button[data-slot="trigger"],
-div[data-slot="input-wrapper"].border-default-200,
-button[data-slot="trigger"].border-default-200 {
-  border: 1px solid #d4d4d8 !important;
+html body [data-slot="input-wrapper"] :is(input, textarea, [data-slot="inner-wrapper"]) {
+  background-color: transparent !important;
 }
 
-/* HeroUI component wrappers - Dark mode (high specificity) */
-html.dark div[data-slot="input-wrapper"],
-html.dark button[data-slot="trigger"],
-html.dark div[data-slot="input-wrapper"].border-default-200,
-html.dark button[data-slot="trigger"].border-default-200 {
-  border: 1px solid #3f3f46 !important;
+html body [data-slot="input-wrapper"]:focus-within,
+html body button[data-slot="trigger"][aria-haspopup="listbox"]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
+
+/* Native option popups must stay opaque and readable in either theme. */
+select option { background-color: #fff; color: #1f2937; }
+html.dark select option { background-color: #18181b; color: #e4e4e7; }
 
 /*
  * Keep selected values readable in every HeroUI Select. Some page-level color
@@ -294,7 +270,6 @@ button[data-slot="trigger"] [data-slot="innerWrapper"] {
 .talio-searchable-select [data-slot="input-wrapper"][data-focus="true"],
 .talio-searchable-select [data-slot="input-wrapper"][data-focus-visible="true"] {
   border-color: hsl(var(--heroui-primary)) !important;
-  box-shadow: 0 0 0 2px hsl(var(--heroui-primary) / 0.18);
 }
 
 .talio-searchable-select [data-slot="helper-wrapper"] {
@@ -309,10 +284,29 @@ button[data-slot="trigger"] [data-slot="innerWrapper"] {
   border-radius: 0.75rem;
 }
 
-/* HeroUI inner input elements should NOT have their own border (wrapper handles it) */
+/* The field wrapper owns the boundary; layout shells and native children do not.
+   Limit this to field bases, not cards, popovers, checkboxes or nested sections. */
+[data-slot="base"]:has(> [data-slot="input-wrapper"]),
+[data-slot="base"]:has(> [data-slot="main-wrapper"] > [data-slot="input-wrapper"]),
+[data-slot="base"]:has(> button[data-slot="trigger"][aria-haspopup="listbox"]) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
 [data-slot="input-wrapper"] input,
-[data-slot="input-wrapper"] textarea {
+[data-slot="input-wrapper"] textarea,
+[data-slot="input-wrapper"] [data-slot="inner-wrapper"] {
   border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Focus stays on the single wrapper boundary, rather than a second inner ring. */
+[data-slot="input-wrapper"] input:focus,
+[data-slot="input-wrapper"] textarea:focus {
+  outline: none !important;
 }
 
 /* Ensure HeroUI input wrappers forward clicks to the actual input */
@@ -1471,7 +1465,6 @@ html.dark input[type="search"],
 html.dark select,
 html.dark textarea {
   color: #e4e4e7 !important;
-  background-color: #18181b !important;
 }
 
 html.dark input::placeholder,
@@ -1544,11 +1537,8 @@ html.dark header.talio-navigation-header {
   background-color: var(--color-bg-sidebar, #111111) !important;
 }
 
-html.dark header,
-html.dark header.bg-white {
-  background-color: #18181b !important;
-  border-color: #27272a !important;
-}
+/* Page headers inherit their containing surface. Only the navigation header
+   above owns a background; semantic <header> is not a card. */
 
 /* ---- Bottom Nav ---- */
 html.dark .bottom-nav,
@@ -1583,16 +1573,8 @@ html.dark table:not(.no-mobile-scroll) thead {
   background: #18181b;
 }
 
-/* ---- HeroUI overrides ---- */
-html.dark [data-slot="base"] {
-  --heroui-content1: #18181b;
-  --heroui-content2: #27272a;
-  --heroui-content3: #27272a;
-  --heroui-content4: #3f3f46;
-  --heroui-default-50: #18181b;
-  --heroui-default-100: #27272a;
-  --heroui-default-200: #27272a;
-}
+/* HeroUI theme tokens come from the configured theme. Do not replace its HSL
+   channels with hex values on every component base. */
 
 /* Modal overrides in dark mode */
 html.dark .modal-container,
@@ -2179,8 +2161,7 @@ div[class*="backdrop-blur"] + div[role="dialog"],
 }
 
 [data-slot="base"][role="dialog"],
-section[role="dialog"],
-div[role="dialog"] > section {
+section[role="dialog"] {
   border-radius: 30px !important;
   overflow: hidden !important;
   background-clip: padding-box;
