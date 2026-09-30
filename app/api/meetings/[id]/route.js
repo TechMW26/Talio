@@ -5,6 +5,7 @@ import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import { sortMeetingTranscript } from '@/lib/meetingLanguage'
 import { parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
 import { emitMeetingUpdate } from '@/lib/realtimeEvents'
+import { refreshMeetingAvailability } from '@/lib/meetings/meetingAvailability.server'
 import {
   buildMeetingDetailsUpdate,
   MeetingUpdateValidationError,
@@ -26,7 +27,7 @@ export async function GET(request, { params }) {
     const { user, models } = auth
     const { Meeting, Employee, User } = models
 
-    const meeting = await Meeting.findById(id)
+    let meeting = await Meeting.findById(id)
       .populate('organizer', 'firstName lastName email profilePicture')
       .populate('invitees.employee', 'firstName lastName email profilePicture department')
       .populate('invitedDepartments', 'name code')
@@ -67,6 +68,9 @@ export async function GET(request, { params }) {
       }, { status: 403 })
     }
 
+    if (meeting.type === 'online' && (!meeting.roomPresenceCheckedAt || Date.now() - new Date(meeting.roomPresenceCheckedAt) > 15000)) {
+      try { meeting = await refreshMeetingAvailability(Meeting, meeting, auth.tenant.databaseName) } catch { /* Keep the last verified state during an outage. */ }
+    }
     return NextResponse.json({
       success: true,
       data: {
@@ -119,6 +123,10 @@ export async function PUT(request, { params }) {
     }
 
     const meetingDetailsUpdate = buildMeetingDetailsUpdate(data, meeting)
+    if (meeting.type === 'online' && data.status === 'completed') {
+      const available = await refreshMeetingAvailability(Meeting, meeting, auth.tenant.databaseName)
+      if (available.status !== 'completed') return NextResponse.json({ success: false, message: 'The meeting is occupied or still within its 10-minute rejoin window.' }, { status: 409 })
+    }
     Object.assign(meeting, meetingDetailsUpdate)
 
     // Operational meeting fields are also written here by the room and note-maker flows.

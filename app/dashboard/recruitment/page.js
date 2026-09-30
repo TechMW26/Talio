@@ -114,6 +114,7 @@ export default function RecruitmentPage() {
             <p className="text-sm sm:text-base text-default-500 mt-1">Manage job postings and candidates {' '}<BackgroundRefreshIndicator isValidating={isValidating} /></p>
           </div>
           <div className="flex items-center flex-wrap gap-2 mt-4 md:mt-0">
+            {['hr', 'admin', 'super_admin', 'superadmin'].includes(user?.role) && <Button size="sm" variant="flat" onPress={() => router.push('/dashboard/recruitment/requisitions')}>Manpower Requests</Button>}
             <Button size="sm" variant="flat" onPress={() => router.push('/dashboard/recruitment/candidates')} startContent={<FaUsers className="w-3.5 h-3.5" />}>
               Candidates
             </Button>

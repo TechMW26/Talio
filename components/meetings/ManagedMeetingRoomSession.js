@@ -124,9 +124,8 @@ export default function ManagedMeetingRoomSession({
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
   const [joinConflict, setJoinConflict] = useState(null)
-  // Privacy boundary: joining or restoring a room never implies permission to
-  // capture. Media starts disabled and can only be acquired through the
-  // explicit preview action in this browser document.
+  // Fresh waiting rooms acquire a local-only preview. Restored calls stay
+  // media-off; preview tracks are never published until Join is pressed.
   const [muted, setMuted] = useState(true)
   const [videoOff, setVideoOff] = useState(true)
   const [previewStatus, setPreviewStatus] = useState('idle')
@@ -228,6 +227,14 @@ export default function ManagedMeetingRoomSession({
       })
     } catch (error) {
       initialError = error
+      if (previewAttemptRef.current !== attempt) return
+      if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(error?.name)) {
+        setMuted(true)
+        setVideoOff(true)
+        setPreviewStatus('unavailable')
+        setPreviewMessage(getPreviewFailureMessage(error))
+        return
+      }
       const videoResult = await Promise.allSettled([
         createLocalVideoTrack({
           facingMode: 'user',
@@ -236,7 +243,7 @@ export default function ManagedMeetingRoomSession({
       ])
       if (videoResult[0].status === 'fulfilled') tracks.push(videoResult[0].value)
 
-      if (!tracks.length) {
+      if (!tracks.length && previewAttemptRef.current === attempt) {
         const audioResult = await Promise.allSettled([
           createLocalAudioTrack({
             autoGainControl: true,
@@ -274,6 +281,29 @@ export default function ManagedMeetingRoomSession({
       ? 'Microphone ready. Camera is unavailable, so you will join with video off.'
       : getPreviewFailureMessage(initialError))
   }, [attachPreviewVideo, stopPreviewTracks])
+
+  useEffect(() => {
+    // Do not re-enable devices when restoring a call or after a disconnect.
+    if (autoJoin || connectedRef.current || previewStartedRef.current) return
+    previewStartedRef.current = true
+    void startMediaPreview()
+    return () => {
+      previewStartedRef.current = false
+      previewAttemptRef.current += 1
+      stopPreviewTracks()
+    }
+  }, [autoJoin, roomId, startMediaPreview, stopPreviewTracks])
+
+  const backToHome = () => {
+    leavingRef.current = true
+    previewAttemptRef.current += 1
+    joinAttemptRef.current += 1
+    stopPreviewTracks()
+    roomRef.current?.disconnect()
+    onJoinedChange?.(false)
+    onSessionEnded?.()
+    router.push(guestToken ? '/' : '/dashboard')
+  }
 
   const skipMediaPreview = useCallback(() => {
     previewAttemptRef.current += 1
@@ -531,7 +561,7 @@ export default function ManagedMeetingRoomSession({
 
       // Never call set*Enabled(true) for a missing preview track: LiveKit would
       // acquire a device as a side effect. Only tracks obtained after the
-      // person's explicit preview action may be published.
+      // person's waiting-room preview may be published after they press Join.
       await Promise.allSettled([
         publishedKinds.has(Track.Kind.Audio)
           ? (muted ? previewAudioTrackRef.current?.mute() : previewAudioTrackRef.current?.unmute())
@@ -767,6 +797,15 @@ export default function ManagedMeetingRoomSession({
     setRaisedHands((current) => ({ ...current, [room.localParticipant.identity]: next }))
     await publishData('talio-hand', { id: crypto.randomUUID(), raised: next, senderId: room.localParticipant.identity })
   }
+  useEffect(() => {
+    if (!joined) return
+    const controller = new AbortController()
+    const pulse = () => fetch('/api/meetings/livekit/token', { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json', Authorization: guestToken ? `Guest ${guestToken}` : `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ roomId, presenceOnly: true }) }).catch(() => {})
+    pulse()
+    const timer = setInterval(pulse, 15000)
+    return () => { clearInterval(timer); controller.abort() }
+  }, [joined, roomId, guestToken])
+
   const leave = async () => {
     if (leavingRef.current) return
     leavingRef.current = true
@@ -788,8 +827,9 @@ export default function ManagedMeetingRoomSession({
           || meeting.actualStart
           || meeting.scheduledStart
           || actualEnd
-        const completed = !meeting.scheduledEnd || new Date(actualEnd) >= new Date(meeting.scheduledEnd)
-        const nextStatus = completed ? 'completed' : 'in-progress'
+        // Leaving is not ending for everyone. Server presence owns completion.
+        const completed = false
+        const nextStatus = 'in-progress'
 
         setEndingMeetingStatus('Saving meeting status...')
         const meetingUpdateResponse = await fetch(`/api/meetings/${meeting._id}`, {
@@ -837,7 +877,10 @@ export default function ManagedMeetingRoomSession({
     } finally {
       setEndingMeetingStatus('Closing meeting room...')
       meetingSessionStartedAtRef.current = null
-      roomRef.current?.disconnect()
+      await roomRef.current?.disconnect()
+      try {
+        await fetch('/api/meetings/livekit/token', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: guestToken ? `Guest ${guestToken}` : `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ roomId, presenceOnly: true }) })
+      } catch { /* Background finalizer also reconciles disconnected rooms. */ }
       onJoinedChange?.(false)
       onSessionEnded?.()
       if (guestToken) router.push('/')
@@ -957,12 +1000,13 @@ export default function ManagedMeetingRoomSession({
       .slice(0, 2)
       .toUpperCase() || 'YO'
     return (
-      <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-100 p-4 text-slate-900 dark:bg-slate-950 dark:text-white">
+      <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-slate-100 p-4 text-slate-900 dark:bg-slate-950 dark:text-white">
         <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-2xl dark:border-white/10 dark:bg-slate-900 sm:p-6">
+          <button type="button" onClick={backToHome} className="mb-3 flex min-h-10 items-center rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-slate-300 dark:hover:bg-white/10">← Back to home</button>
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"><HiOutlineVideoCamera className="h-7 w-7" /></div>
           <h1 className="mt-3 text-xl font-semibold">{meeting?.title || 'Talio Meet'}</h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {isRestoring ? 'Restoring your secure meeting connection…' : 'Managed, adaptive video with automatic low-network optimisation.'}
+            {isRestoring ? 'Restoring your secure meeting connection…' : 'Camera and microphone preview starts automatically. Nothing is shared until you join.'}
           </p>
           <div className={`relative mt-5 aspect-video overflow-hidden rounded-2xl bg-slate-950 ring-1 ring-black/10 dark:ring-white/10 ${isRestoring ? 'hidden' : 'block'}`} data-meeting-camera-preview>
             <video
@@ -985,7 +1029,7 @@ export default function ManagedMeetingRoomSession({
             {(videoOff || previewStatus === 'audio-only') && previewStatus !== 'loading' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-indigo-950 text-white">
                 <span className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600 text-2xl font-semibold ring-4 ring-white/10">{previewInitials}</span>
-                <span className="mt-3 text-sm text-slate-300">Camera and microphone off</span>
+                <span className="mt-3 text-sm text-slate-300">{muted ? 'Camera and microphone off' : 'Camera off · Microphone ready'}</span>
                 {previewStatus === 'idle' && !isRestoring && (
                   <button
                     type="button"
@@ -1030,7 +1074,7 @@ export default function ManagedMeetingRoomSession({
               Return to {joinConflict.title || 'current meeting'}
             </button>
           ) : (
-            <button onClick={join} disabled={joining || isRestoring || previewStatus === 'loading'} className="relative mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"><span className={joining || isRestoring ? 'invisible' : ''}>{joinError ? 'Try again' : previewStatus === 'loading' ? 'Preparing camera…' : previewStatus === 'idle' ? 'Join with camera & mic off' : 'Join meeting'}</span>{(joining || isRestoring) && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
+            <button onClick={join} disabled={joining || isRestoring || previewStatus === 'loading'} className="relative mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"><span className={joining || isRestoring ? 'invisible' : ''}>{joinError ? 'Try again' : previewStatus === 'loading' ? 'Preparing camera…' : muted && videoOff ? 'Join with camera & mic off' : 'Join meeting'}</span>{(joining || isRestoring) && <span className="absolute h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}</button>
           )}
         </div>
       </div>
@@ -1180,7 +1224,7 @@ export default function ManagedMeetingRoomSession({
               <ParticipantTile item={presenter} local={presenter.identity === localIdentity} reaction={reactions[presenter.identity]} handRaised={raisedHands[presenter.identity]} isSpeaking={presenter.isSpeaking} featured />
             </div>
             {railParticipants.length > 0 && (
-              <div className="flex h-24 shrink-0 gap-2 overflow-x-auto overflow-y-hidden px-0.5 py-0.5 sm:h-28" data-meeting-participant-rail>
+              <div className={`flex ${isPip ? 'h-28' : 'h-24 sm:h-28'} shrink-0 gap-2 overflow-x-auto overflow-y-hidden px-0.5 py-0.5`} data-meeting-participant-rail>
                 {railParticipants.map((item) => (
                   <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} compact />
                 ))}
@@ -1188,7 +1232,7 @@ export default function ManagedMeetingRoomSession({
             )}
           </div>
         ) : (
-          <div className={`grid min-w-0 flex-1 gap-3 overflow-y-auto ${orderedParticipants.length <= 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`} data-meeting-layout="grid">
+          <div className={`grid min-w-0 flex-1 gap-3 overflow-y-auto ${orderedParticipants.length <= 1 ? 'grid-cols-1' : isPip ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`} data-meeting-layout="grid">
             {orderedParticipants.map((item) => <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} />)}
           </div>
         )}

@@ -1,11 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { TextEncoder, TextDecoder } from 'util'
+import { StrictMode } from 'react'
 
 Object.assign(global, { TextEncoder, TextDecoder })
 
 const mockRooms = []
 const mockConnect = jest.fn()
 const mockPublish = jest.fn()
+const mockPush = jest.fn()
 const mockPublications = () => new Map()
 const mockParticipant = (identity) => {
   const publications = mockPublications()
@@ -46,7 +48,7 @@ jest.mock('livekit-client', () => {
     },
   }
 })
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }))
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }))
 jest.mock('@/hooks/useAuthedSWR', () => ({ __esModule: true, default: () => ({}) }))
 jest.mock('@/components/meetings/MeetingReactionPicker', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/app/dashboard/meetings/components/AddMeetingParticipantsModal', () => ({ __esModule: true, default: () => null }))
@@ -59,7 +61,7 @@ jest.mock('@/lib/notificationSounds', () => ({
 }))
 
 const ManagedMeetingRoomSession = require('@/components/meetings/ManagedMeetingRoomSession').default
-const { createLocalTracks } = require('livekit-client')
+const { createLocalTracks, createLocalAudioTrack, createLocalVideoTrack } = require('livekit-client')
 const { playNotificationSound } = require('@/lib/notificationSounds')
 
 test('remote hand raises chime and reactions render PNGs without enabling devices', async () => {
@@ -109,6 +111,10 @@ test('active speaker updates highlight that participant tile', async () => {
 beforeEach(() => {
   mockRooms.length = 0
   jest.clearAllMocks()
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: undefined })
+  createLocalTracks.mockReset()
+  createLocalAudioTrack.mockReset()
+  createLocalVideoTrack.mockReset()
   mockConnect.mockReset().mockResolvedValue(undefined)
   mockPublish.mockReset().mockResolvedValue(undefined)
   global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { serverUrl: 'wss://meeting.test', token: 'synthetic' } }) })
@@ -120,6 +126,98 @@ async function join(props = {}) {
   await screen.findByRole('button', { name: 'Turn camera on' })
   return { view, room: mockRooms[0] }
 }
+
+function enablePreviewDevices() {
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: jest.fn() } })
+  jest.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+  return ['audio', 'video'].map(kind => ({
+    kind, mediaStreamTrack: { readyState: 'live' },
+    attach: jest.fn(), detach: jest.fn(), stop: jest.fn(),
+    mute: jest.fn(), unmute: jest.fn(),
+  }))
+}
+
+afterEach(() => jest.restoreAllMocks())
+
+test('fresh waiting rooms preview camera and microphone automatically without joining', async () => {
+  const tracks = enablePreviewDevices()
+  createLocalTracks.mockResolvedValue(tracks)
+  const view = render(<ManagedMeetingRoomSession roomId="test-room" meetingData={{ title: 'Test' }} />)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Join meeting' })).toBeEnabled())
+  expect(createLocalTracks).toHaveBeenCalledTimes(1)
+  expect(createLocalTracks).toHaveBeenCalledWith(expect.objectContaining({ audio: expect.any(Object), video: expect.any(Object) }))
+  expect(mockConnect).not.toHaveBeenCalled()
+  expect(mockPublish).not.toHaveBeenCalled()
+  expect(global.fetch).not.toHaveBeenCalled()
+  view.unmount()
+  tracks.forEach(track => expect(track.stop).toHaveBeenCalled())
+})
+
+test('Strict Mode cleanup cancels stale preview tracks and keeps the current preview usable', async () => {
+  const staleTracks = enablePreviewDevices()
+  const tracks = enablePreviewDevices()
+  createLocalTracks.mockResolvedValueOnce(staleTracks).mockResolvedValueOnce(tracks)
+  render(<StrictMode><ManagedMeetingRoomSession roomId="test-room" /></StrictMode>)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Join meeting' })).toBeEnabled())
+  staleTracks.forEach(track => expect(track.stop).toHaveBeenCalled())
+  tracks.forEach(track => expect(track.stop).not.toHaveBeenCalled())
+  expect(mockPublish).not.toHaveBeenCalled()
+})
+
+test.each([[null, '/dashboard'], ['guest-token', '/']])('back to home stops devices and clears the session for %s', async (guestToken, destination) => {
+  const tracks = enablePreviewDevices()
+  createLocalTracks.mockResolvedValue(tracks)
+  const onSessionEnded = jest.fn()
+  render(<ManagedMeetingRoomSession roomId="test-room" guestToken={guestToken} onSessionEnded={onSessionEnded} />)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Join meeting' })).toBeEnabled())
+  fireEvent.click(screen.getByRole('button', { name: /Back to home/ }))
+  tracks.forEach(track => expect(track.stop).toHaveBeenCalled())
+  expect(onSessionEnded).toHaveBeenCalledTimes(1)
+  expect(mockPush).toHaveBeenCalledWith(destination)
+  expect(mockPublish).not.toHaveBeenCalled()
+})
+
+test('back to home discards tracks arriving after a pending permission request', async () => {
+  const tracks = enablePreviewDevices()
+  let finish
+  createLocalTracks.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  render(<ManagedMeetingRoomSession roomId="test-room" />)
+  fireEvent.click(screen.getByRole('button', { name: /Back to home/ }))
+  await act(async () => finish(tracks))
+  tracks.forEach(track => expect(track.stop).toHaveBeenCalled())
+  expect(mockPublish).not.toHaveBeenCalled()
+})
+
+test('a late preview rejection after leaving cannot request fallback devices', async () => {
+  enablePreviewDevices()
+  let reject
+  createLocalTracks.mockImplementation(() => new Promise((resolve, fail) => { reject = fail }))
+  render(<ManagedMeetingRoomSession roomId="test-room" />)
+  fireEvent.click(screen.getByRole('button', { name: /Back to home/ }))
+  await act(async () => reject(new Error('Device unavailable')))
+  expect(createLocalVideoTrack).not.toHaveBeenCalled()
+  expect(createLocalAudioTrack).not.toHaveBeenCalled()
+})
+
+test('permission denial offers listen-only joining without repeated permission requests', async () => {
+  enablePreviewDevices()
+  createLocalTracks.mockRejectedValue(Object.assign(new Error('Denied'), { name: 'NotAllowedError' }))
+  render(<ManagedMeetingRoomSession roomId="test-room" />)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Join with camera & mic off' })).toBeEnabled())
+  expect(createLocalTracks).toHaveBeenCalledTimes(1)
+  expect(createLocalVideoTrack).not.toHaveBeenCalled()
+  expect(createLocalAudioTrack).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Try camera again' })).toBeInTheDocument()
+})
+
+test('restored calls do not automatically acquire preview devices', async () => {
+  enablePreviewDevices()
+  const view = render(<ManagedMeetingRoomSession roomId="test-room" autoJoin />)
+  await screen.findByRole('button', { name: 'Turn camera on' })
+  view.rerender(<ManagedMeetingRoomSession roomId="test-room" autoJoin={false} />)
+  expect(createLocalTracks).not.toHaveBeenCalled()
+  expect(mockPublish).not.toHaveBeenCalled()
+})
 
 test('joining and reconnecting never acquires devices and refreshes remote membership', async () => {
   const { room } = await join()
@@ -220,7 +318,6 @@ test('failed publication stops the preview device and does not pretend the camer
   createLocalTracks.mockResolvedValue([video])
   mockPublish.mockRejectedValue(new Error('Publication failed'))
   render(<ManagedMeetingRoomSession roomId="test-room" meetingData={{ title: 'Test' }} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Preview camera & microphone' }))
   await waitFor(() => expect(screen.getByRole('button', { name: 'Join meeting' })).toBeEnabled())
   fireEvent.click(screen.getByRole('button', { name: 'Join meeting' }))
   await screen.findByText(/Your camera or microphone could not be shared/)

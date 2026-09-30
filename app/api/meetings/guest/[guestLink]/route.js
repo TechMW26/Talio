@@ -4,20 +4,14 @@ import { SignJWT } from 'jose'
 import { getTenantModel } from '@/lib/tenantModels'
 import { connectSuperadminDB } from '@/lib/superadminDb'
 import getTenantCompanyModel from '@/models/TenantCompany'
+import { refreshMeetingAvailability } from '@/lib/meetings/meetingAvailability.server'
 
 const MAX_GUEST_NAME_LENGTH = 80
 const GUEST_SESSION_TTL_SECONDS = 4 * 60 * 60
 
 function getGuestSessionExpiry(meeting) {
-  const nowSeconds = Math.floor(Date.now() / 1000)
-  const meetingEndSeconds = Math.floor(new Date(meeting.scheduledEnd).getTime() / 1000)
-  const maximumExpiry = nowSeconds + GUEST_SESSION_TTL_SECONDS
-
-  if (!Number.isFinite(meetingEndSeconds)) {
-    return maximumExpiry
-  }
-
-  return Math.max(nowSeconds + 5 * 60, Math.min(maximumExpiry, meetingEndSeconds + 30 * 60))
+  // Actual room availability is checked on every media-token request.
+  return Math.floor(Date.now() / 1000) + GUEST_SESSION_TTL_SECONDS
 }
 
 async function createGuestSessionToken({ meeting, tenantDatabase, guestName }) {
@@ -103,7 +97,7 @@ async function findMeetingAcrossTenants(guestLink) {
         const meeting = await Meeting.findOne({
           'guestAccess.guestLink': guestLink,
           'guestAccess.enabled': true
-        }).select('title description scheduledStart scheduledEnd roomId isLinkActive type status guestAccess.requireApproval')
+        }).select('title description scheduledStart scheduledEnd roomId isLinkActive type status guestAccess.requireApproval roomEmptySince roomPresenceCheckedAt')
         
         if (meeting) {
           return { meeting, tenantDatabase: tenant.databaseName }
@@ -146,7 +140,7 @@ export async function GET(request, { params }) {
         meeting = await Meeting.findOne({
           'guestAccess.guestLink': guestLink,
           'guestAccess.enabled': true
-        }).select('title description scheduledStart scheduledEnd roomId isLinkActive type status guestAccess.requireApproval')
+        }).select('title description scheduledStart scheduledEnd roomId isLinkActive type status guestAccess.requireApproval roomEmptySince roomPresenceCheckedAt')
       } catch (err) {
         console.error('Error finding meeting in tenant:', err.message)
       }
@@ -185,9 +179,10 @@ export async function GET(request, { params }) {
     }
 
     // Check if meeting has ended
-    const now = new Date()
-    const endTime = new Date(meeting.scheduledEnd)
-    if (now > endTime && meeting.status !== 'in-progress') {
+    try { meeting = await refreshMeetingAvailability(await getTenantModel(tenantDatabase, 'Meeting'), meeting, tenantDatabase) } catch {
+      return NextResponse.json({ success: false, message: 'Meeting presence could not be checked. Please retry.' }, { status: 503 })
+    }
+    if (meeting.isLinkActive === false || ['completed', 'cancelled'].includes(meeting.status)) {
       return NextResponse.json(
         { success: false, message: 'This meeting has ended' },
         { status: 410 }
@@ -280,8 +275,11 @@ export async function POST(request, { params }) {
       )
     }
 
+    try { meeting = await refreshMeetingAvailability(Meeting, meeting, tenantDatabase) } catch {
+      return NextResponse.json({ success: false, message: 'Meeting presence could not be checked. Please retry.' }, { status: 503 })
+    }
     // Validate meeting is active
-    if (!meeting.isLinkActive) {
+    if (!meeting.isLinkActive || ['completed', 'cancelled'].includes(meeting.status)) {
       return NextResponse.json(
         { success: false, message: 'This meeting has ended' },
         { status: 410 }

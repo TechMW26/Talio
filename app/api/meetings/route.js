@@ -8,6 +8,7 @@ import { getEndOfDayInTimezone, getStartOfDayInTimezone, parseDateTimeInTimezone
 import crypto from 'crypto'
 import { generateRecurringStarts } from '@/lib/meetingRecurrence'
 import { buildMeetingReminders } from '@/lib/meetings/meetingUpdate'
+import { refreshMeetingAvailability } from '@/lib/meetings/meetingAvailability.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -117,7 +118,11 @@ export async function GET(request) {
     ])
 
     // Add user's invitation status to each meeting
-    const meetingsWithStatus = meetings.map(meeting => {
+    const refreshedMeetings = await Promise.all(meetings.map(async meeting => {
+      if (meeting.type !== 'online' || (meeting.roomPresenceCheckedAt && Date.now() - new Date(meeting.roomPresenceCheckedAt) < 15000)) return meeting
+      try { return await refreshMeetingAvailability(Meeting, meeting, auth.tenant.databaseName) } catch { return meeting }
+    }))
+    const meetingsWithStatus = refreshedMeetings.map(meeting => {
       const userInvite = meeting.invitees?.find(
         inv => inv.employee?._id?.toString() === employee._id.toString()
       )

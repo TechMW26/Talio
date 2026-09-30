@@ -14,6 +14,28 @@ function fakeWindow() {
 }
 
 beforeEach(() => { jest.spyOn(document, 'hasFocus').mockReturnValue(true) })
+test('meeting preserves inline dimensions instead of shrinking with the child viewport', async () => {
+  const target = fakeWindow()
+  Object.assign(target, { innerWidth: 200, innerHeight: 100, resizeTo: jest.fn() })
+  window.electronAPI = { nativePip: true }
+  const open = jest.spyOn(window, 'open').mockReturnValue(target)
+  const ref = createRef()
+  render(<NativePipSurface ref={ref}><section data-meeting-pip="expanded">Meeting video<button>Mute</button></section></NativePipSurface>)
+  const panel = screen.getByText('Meeting video')
+  panel.getBoundingClientRect = () => panel.ownerDocument === document ? { width: 448, height: 416 } : { width: 188, height: 68 }
+  await act(async () => { await ref.current.open() })
+  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=448,height=416')
+  expect(target.resizeTo).toHaveBeenLastCalledWith(448, 416)
+  expect(target.document.body.contains(panel)).toBe(true)
+  expect(target.document.head.textContent).not.toContain('[data-meeting-pip] footer{')
+  expect(target.document.head.textContent).not.toContain('[data-meeting-pip] button svg{')
+  expect(target.document.head.textContent).toContain('max-height:none!important')
+  await act(async () => { panel.setAttribute('data-meeting-pip', 'compact') })
+  expect(target.resizeTo).toHaveBeenLastCalledWith(352, 84)
+  await act(async () => { panel.setAttribute('data-meeting-pip', 'expanded') })
+  expect(target.resizeTo).toHaveBeenLastCalledWith(448, 416)
+  act(() => target.close())
+})
 test('MIRA supports dragging, flushes the final position, and leaves buttons clickable', async () => {
   const target = fakeWindow()
   Object.assign(target, { screenX: 100, screenY: 200, requestAnimationFrame: jest.fn(() => 1), cancelAnimationFrame: jest.fn() })

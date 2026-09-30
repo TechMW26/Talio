@@ -306,7 +306,7 @@ export default function MeetingDetailPage({ params }) {
   }
 
   const isUpcoming = new Date(meeting.scheduledStart) > new Date()
-  const isNow = new Date() >= new Date(meeting.scheduledStart) && new Date() <= new Date(meeting.scheduledEnd)
+  const isNow = meeting.isLinkActive !== false && !['completed', 'cancelled'].includes(meeting.status) && (meeting.status === 'in-progress' || (new Date() >= new Date(meeting.scheduledStart) && new Date() <= new Date(meeting.scheduledEnd)))
   const acceptedInvitees = meeting.invitees?.filter(i => i.status === 'accepted') || []
   const pendingInvitees = meeting.invitees?.filter(i => i.status === 'pending') || []
   const rejectedInvitees = meeting.invitees?.filter(i => i.status === 'rejected') || []
@@ -417,7 +417,7 @@ export default function MeetingDetailPage({ params }) {
                       {meeting.title}
                     </h1>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusColor(meeting.status)}`}>
-                      {meeting.status}
+                      {meeting.continuing ? 'Continuing' : meeting.status}
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-600">

@@ -10,7 +10,7 @@ import {
   HiOutlineMagnifyingGlass,
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import { getMenuItemsForRole, withManpowerRequests } from '@/utils/roleBasedMenus'
 import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
 import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
 import { filterMenuByPermissions } from '@/utils/permissionFilters'
@@ -216,7 +216,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       isDepartmentHead,
       permissions: rbacPermissions,
     })
-    let baseMenuItems = getMenuItemsForRole(menuTemplateRole)
+    let baseMenuItems = withManpowerRequests(getMenuItemsForRole(menuTemplateRole), user, { isDepartmentHead, isTeamLeader })
 
     // Keep the appraisal inbox available from the existing performance section.
     // Department heads and team leaders receive it in their Team submenu below.

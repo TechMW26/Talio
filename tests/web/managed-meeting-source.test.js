@@ -101,12 +101,15 @@ describe('managed meeting implementation', () => {
     expect(source).toContain('stopPreviewTracks()')
   })
 
-  test('requires explicit media consent and restores meetings listen-only', () => {
+  test('starts a local preview automatically but restores meetings listen-only', () => {
     expect(source).toContain("const [muted, setMuted] = useState(true)")
     expect(source).toContain("const [videoOff, setVideoOff] = useState(true)")
     expect(source).toContain("const [previewStatus, setPreviewStatus] = useState('idle')")
     expect(source).toContain('Preview camera &amp; microphone')
     expect(source).toContain('Join with camera & mic off')
+    expect(source).toContain('if (autoJoin || connectedRef.current || previewStartedRef.current) return')
+    expect(source).toContain('Nothing is shared until you join.')
+    expect(source).toContain('Back to home')
     expect(source).not.toContain('!publishedKinds.has(Track.Kind.Audio)')
     expect(source).not.toContain('!publishedKinds.has(Track.Kind.Video)')
 

@@ -209,6 +209,9 @@ async function patchLifecycle(request, { params }) {
   if (!employee) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
 
   const currentLifecycle = hydrateEmployeeLifecycle(employee)
+  if (currentLifecycle.offboarding?.resignationRequest && ['start_offboarding', 'complete_offboarding'].includes(action)) {
+    return NextResponse.json({ success: false, message: 'Manage this linked resignation in Resignations & Exits to keep approvals, settlement and documents in sync.' }, { status: 409 })
+  }
   if ((action === 'request_onboarding_changes' || (action === 'complete_onboarding_item' && currentLifecycle.onboarding?.checklist?.find(item => item.key === body.itemKey)?.submission)) && !HR_ROLES.has(auth.user.role)) {
     return NextResponse.json({ success: false, message: 'HR must review employee onboarding submissions' }, { status: 403 })
   }

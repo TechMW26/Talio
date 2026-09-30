@@ -7,7 +7,7 @@ import {
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { getMenuItemsForRole, NEW_MENU_PATHS } from '@/utils/roleBasedMenus'
+import { getMenuItemsForRole, withManpowerRequests, NEW_MENU_PATHS } from '@/utils/roleBasedMenus'
 import { getMenuTemplateRole, getUserMenuPermissions } from '@/utils/rbacMenu'
 import { filterMenuItemsByFeatures } from '@/lib/planFeatures'
 import { filterMenuByPermissions } from '@/utils/permissionFilters'
@@ -87,7 +87,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
       isDepartmentHead,
       permissions: rbacPermissions,
     })
-    let baseMenuItems = getMenuItemsForRole(menuTemplateRole)
+    let baseMenuItems = withManpowerRequests(getMenuItemsForRole(menuTemplateRole), user, { isDepartmentHead, isTeamLeader })
 
     if (isDepartmentHead) {
       const teamSubmenu = [

@@ -120,7 +120,7 @@ export default function MeetingCard({ meeting, onRespond, onEdit, showResponseAc
   }
 
   const isUpcoming = new Date(meeting.scheduledStart) > new Date()
-  const isNow = new Date() >= new Date(meeting.scheduledStart) && new Date() <= new Date(meeting.scheduledEnd)
+  const isNow = meeting.isLinkActive !== false && !['completed', 'cancelled'].includes(meeting.status) && (meeting.status === 'in-progress' || (new Date() >= new Date(meeting.scheduledStart) && new Date() <= new Date(meeting.scheduledEnd)))
 
   const acceptedCount = meeting.invitees?.filter(i => i.status === 'accepted').length || 0
   const totalInvitees = meeting.invitees?.length || 0
@@ -142,7 +142,7 @@ export default function MeetingCard({ meeting, onRespond, onEdit, showResponseAc
               </span>
             </div>
             <span className={`text-xs px-2 py-1 rounded-full capitalize ${getStatusColor(meeting.status)}`}>
-              {meeting.status}
+              {meeting.continuing ? 'Continuing' : meeting.status}
             </span>
           </div>
         </div>

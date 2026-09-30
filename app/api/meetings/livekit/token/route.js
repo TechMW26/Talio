@@ -3,6 +3,7 @@ import { jwtVerify } from 'jose'
 import { getAuthAndModels } from '@/lib/auth'
 import { getTenantModel } from '@/lib/tenantModels'
 import { checkTenantFeatureAccess } from '@/lib/companyFeatures.server'
+import { refreshMeetingAvailability } from '@/lib/meetings/meetingAvailability.server'
 import {
   createLiveKitParticipantToken,
   findParticipantActiveMeeting,
@@ -69,16 +70,18 @@ async function issueGuestToken(request, body, guest) {
     return error('Guest session does not match this meeting', 403, 'GUEST_SESSION_MISMATCH')
   }
   const Meeting = await getTenantModel(guest.tenantDatabaseName, 'Meeting')
-  const meeting = await Meeting.findOne({
+  let meeting = await Meeting.findOne({
     roomId: body.roomId,
     type: 'online',
     isLinkActive: true,
     'guestAccess.enabled': true,
-  }).select('_id roomId scheduledEnd status').lean()
+  }).select('_id type isLinkActive roomId scheduledEnd status roomEmptySince roomPresenceCheckedAt').lean()
   if (!meeting) return error('Meeting guest access is unavailable', 404, 'MEETING_NOT_FOUND')
-  if (new Date(meeting.scheduledEnd) < new Date() && meeting.status !== 'in-progress') {
+  try { meeting = await refreshMeetingAvailability(Meeting, meeting, guest.tenantDatabaseName) } catch { return error('Meeting presence could not be checked. Please retry.', 503, 'PRESENCE_UNAVAILABLE') }
+  if (meeting.isLinkActive === false || ['completed', 'cancelled'].includes(meeting.status)) {
     return error('This meeting has ended', 410, 'MEETING_ENDED')
   }
+  if (body.presenceOnly === true) return NextResponse.json({ success: true, data: { status: meeting.status, continuing: meeting.continuing } })
   const activeMeetingResponse = await checkActiveMeeting({
     Meeting,
     databaseName: guest.tenantDatabaseName,
@@ -114,20 +117,21 @@ export async function POST(request) {
     const featureAccess = await checkTenantFeatureAccess(auth, { allOf: ['meetings'] })
     if (!featureAccess.success) return error(featureAccess.message, featureAccess.status, featureAccess.code)
 
-    const meeting = await auth.models.Meeting.findOne({ roomId, type: 'online', isLinkActive: true })
-      .select('_id roomId organizer invitees scheduledEnd status')
+    let meeting = await auth.models.Meeting.findOne({ roomId, type: 'online', isLinkActive: true })
+      .select('_id type isLinkActive roomId organizer invitees scheduledEnd status roomEmptySince roomPresenceCheckedAt')
       .lean()
     if (!meeting) return error('Meeting not found', 404, 'MEETING_NOT_FOUND')
-    if (new Date(meeting.scheduledEnd) < new Date() && meeting.status !== 'in-progress') {
-      return error('This meeting has ended', 410, 'MEETING_ENDED')
-    }
-
     const employeeId = String(auth.user.employeeId || '')
     const invited = meeting.invitees?.some((invitee) => String(invitee.employee) === employeeId)
     const organizer = String(meeting.organizer) === employeeId
     if (!organizer && !invited && !['admin', 'hr'].includes(auth.user.role)) {
       return error('You are not invited to this meeting', 403, 'NOT_INVITED')
     }
+    try { meeting = await refreshMeetingAvailability(auth.models.Meeting, meeting, auth.tenant.databaseName) } catch { return error('Meeting presence could not be checked. Please retry.', 503, 'PRESENCE_UNAVAILABLE') }
+    if (meeting.isLinkActive === false || ['completed', 'cancelled'].includes(meeting.status)) {
+      return error('This meeting has ended', 410, 'MEETING_ENDED')
+    }
+    if (body.presenceOnly === true) return NextResponse.json({ success: true, data: { status: meeting.status, continuing: meeting.continuing } })
 
     const identity = `user_${auth.user.id || auth.user._id}`
     const activeMeetingResponse = await checkActiveMeeting({

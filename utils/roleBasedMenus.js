@@ -531,8 +531,29 @@ const annotateIsNew = (items) => items.map(item => {
   }
 })
 
+export function withManpowerRequests(items, user, { isDepartmentHead = false, isTeamLeader = false } = {}) {
+  if (['admin', 'hr', 'super_admin', 'superadmin'].includes(user?.role)) {
+    return items.map(item => item.name === 'Recruitment' ? {
+      ...item, submenu: [...(item.submenu || []).filter(sub => sub.path !== '/dashboard/recruitment/requisitions'), { name: 'Manpower Requests', path: '/dashboard/recruitment/requisitions' }],
+    } : item)
+  }
+  if (isDepartmentHead || isTeamLeader || user?.isDepartmentManager || ['manager', 'team_leader', 'department_head'].includes(user?.role)) {
+    return [...items, { name: 'Manpower Requests', icon: HiOutlineUserGroup, path: '/dashboard/manpower-requests', group: 'People' }]
+  }
+  return items
+}
+
 export const getMenuItemsForRole = (role) => {
-  const base = roleBasedMenus[role] || roleBasedMenus.employee
+  const base = [...(roleBasedMenus[role] || roleBasedMenus.employee), {
+    name: 'Resignations & Exits', icon: HiOutlineUserGroup, path: '/dashboard/resignations', group: 'People',
+    submenu: [
+      { name: 'Overview', path: '/dashboard/resignations' },
+      { name: 'My requests', path: '/dashboard/resignations?view=mine' },
+      { name: 'Approvals', path: '/dashboard/resignations?view=reviews' },
+      { name: 'F&F / Offboarding', path: '/dashboard/resignations?view=offboarding' },
+      { name: 'Completed exits', path: '/dashboard/resignations?view=completed' },
+    ],
+  }]
 
   const hasHierarchy = base.some((item) => item.path === '/dashboard/hierarchy')
   if (hasHierarchy) return annotateIsNew(base)

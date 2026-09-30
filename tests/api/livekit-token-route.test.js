@@ -16,12 +16,14 @@ jest.mock('@/lib/meetings/livekit.server', () => ({
   createLiveKitParticipantToken: jest.fn(),
   findParticipantActiveMeeting: jest.fn(),
   getLiveKitConfig: jest.fn(() => ({ configured: true })),
+  getMeetingParticipantCount: jest.fn().mockResolvedValue(0),
 }))
 
 import { getAuthAndModels } from '@/lib/auth'
 import {
   createLiveKitParticipantToken,
   findParticipantActiveMeeting,
+  getMeetingParticipantCount,
 } from '@/lib/meetings/livekit.server'
 import { POST } from '@/app/api/meetings/livekit/token/route'
 
@@ -54,8 +56,37 @@ function setAuthenticatedMeeting() {
     user: { _id: 'user-1', employeeId: 'employee-1', email: 'test@example.com' },
     models: { Meeting, Employee },
   })
-  return { Meeting }
+  return { Meeting, meeting }
 }
+
+test('overdue occupied room issues a rejoin token', async () => {
+  const { Meeting, meeting } = setAuthenticatedMeeting()
+  Object.assign(meeting, { type: 'online', isLinkActive: true, scheduledEnd: new Date(Date.now() - 3600000) })
+  Meeting.updateOne = jest.fn().mockResolvedValue({ matchedCount: 1 })
+  getMeetingParticipantCount.mockResolvedValue(1)
+  findParticipantActiveMeeting.mockResolvedValue(null)
+  createLiveKitParticipantToken.mockResolvedValue({ token: 'media-token' })
+  const response = await POST(new Request('http://localhost/api/meetings/livekit/token', { method: 'POST', body: JSON.stringify({ roomId: 'room-1' }) }))
+  expect(response.status).toBe(200)
+  expect(Meeting.updateOne.mock.calls[0][1].$set.continuing).toBe(true)
+})
+test('expired empty-room grace refuses a fresh media token', async () => {
+  const { Meeting, meeting } = setAuthenticatedMeeting()
+  Object.assign(meeting, { type: 'online', isLinkActive: true, status: 'in-progress', roomEmptySince: new Date(Date.now() - 600001) })
+  Meeting.updateOne = jest.fn().mockResolvedValue({ matchedCount: 1 })
+  getMeetingParticipantCount.mockResolvedValue(0)
+  const response = await POST(new Request('http://localhost/api/meetings/livekit/token', { method: 'POST', body: JSON.stringify({ roomId: 'room-1' }) }))
+  expect(response.status).toBe(410)
+})
+test('presence outage gives a retryable error instead of expiring the meeting', async () => {
+  const { Meeting, meeting } = setAuthenticatedMeeting()
+  Object.assign(meeting, { type: 'online', isLinkActive: true })
+  Meeting.updateOne = jest.fn()
+  getMeetingParticipantCount.mockRejectedValueOnce(new Error('network unavailable'))
+  const response = await POST(new Request('http://localhost/api/meetings/livekit/token', { method: 'POST', body: JSON.stringify({ roomId: 'room-1' }) }))
+  expect(response.status).toBe(503)
+  expect(Meeting.updateOne).not.toHaveBeenCalled()
+})
 
 describe('managed meeting token route safety gate', () => {
   beforeEach(() => {

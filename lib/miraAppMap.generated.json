@@ -1437,6 +1437,28 @@
     ]
   },
   {
+    "route": "/dashboard/manpower-requests",
+    "name": "Manpower Requests",
+    "controls": [
+      "Approve & publish",
+      "Cancel",
+      "Manpower Requests",
+      "New manpower request",
+      "New request",
+      "Next",
+      "Previous",
+      "Refresh",
+      "Reject",
+      "Rejection reason",
+      "Request pages",
+      "· position(s)"
+    ],
+    "sources": [
+      "app/dashboard/manpower-requests/page.js",
+      "components/recruitment/ManpowerRequests.js"
+    ]
+  },
+  {
     "route": "/dashboard/meetings/[id]",
     "name": "meetings / [id]",
     "controls": [
@@ -2831,6 +2853,7 @@
       "Employment Type",
       "Hired",
       "Interviews",
+      "Manpower Requests",
       "No job postings found",
       "Open Positions",
       "Recruitment",
@@ -2845,6 +2868,28 @@
       "app/dashboard/recruitment/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
+    ]
+  },
+  {
+    "route": "/dashboard/recruitment/requisitions",
+    "name": "Manpower Requests",
+    "controls": [
+      "Approve & publish",
+      "Cancel",
+      "Manpower Requests",
+      "New manpower request",
+      "New request",
+      "Next",
+      "Previous",
+      "Refresh",
+      "Reject",
+      "Rejection reason",
+      "Request pages",
+      "· position(s)"
+    ],
+    "sources": [
+      "app/dashboard/recruitment/requisitions/page.js",
+      "components/recruitment/ManpowerRequests.js"
     ]
   },
   {
@@ -2868,6 +2913,50 @@
       "app/dashboard/reports/page.js",
       "components/mobile/MobileComponents.js",
       "components/ui/Loader.js"
+    ]
+  },
+  {
+    "route": "/dashboard/resignations",
+    "name": "Resignations & Exits",
+    "controls": [
+      "Add component",
+      "Asset clearance progress",
+      "Calculation basis and approval notes",
+      "Cancel",
+      "Currency",
+      "Done",
+      "Download relieving &amp; F&amp;F PDF",
+      "Full & final settlement",
+      "Full-and-final settlement &amp; exit",
+      "I understand this submits a formal resignation request to HR.",
+      "Needs your action",
+      "Notice period (calendar days)",
+      "Notice start date",
+      "Payment / recovery reference (or zero-balance explanation)",
+      "Reason for resignation",
+      "Refresh requests",
+      "Refresh status",
+      "Remove",
+      "Resignation dashboard",
+      "Resignation requests",
+      "Resignations &amp; Exits",
+      "Retry",
+      "Return condition",
+      "Review asset returns",
+      "Save settlement",
+      "Send documents by email",
+      "Settlement date",
+      "Settlement notes",
+      "Start F&amp;F / offboarding",
+      "Submit resignation",
+      "Submit to HR"
+    ],
+    "sources": [
+      "app/dashboard/resignations/page.js",
+      "components/employees/OffboardingAssetChecklistModal.js",
+      "components/employees/ResignationExitPanel.js",
+      "components/employees/ResignationPanel.js",
+      "components/employees/SettlementEditor.js"
     ]
   },
   {
@@ -3717,7 +3806,8 @@
       "Talio Meet compact picture in picture",
       "Thumbs up",
       "Transcript History",
-      "Try camera again"
+      "Try camera again",
+      "← Back to home"
     ],
     "sources": [
       "app/dashboard/meetings/components/AddMeetingParticipantsModal.js",

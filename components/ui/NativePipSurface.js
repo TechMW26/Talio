@@ -37,6 +37,19 @@ function registerAutomaticSurface(surface) {
 
 function panelSize(host) {
   const panel = host?.querySelector('[data-meeting-pip], .mira-workspace') || host
+  const mode = panel?.getAttribute('data-meeting-pip')
+  if (mode && host.ownerDocument !== document) {
+    // Never feed the child viewport's responsive dimensions back into resizeTo.
+    // Keep the actual inline dimensions, or use the equivalent inline mode size
+    // when the user expands/minimises the meeting while it is outside the app.
+    const defaults = { expanded: { width: 448, height: 416 }, compact: { width: 352, height: 84 }, bubble: { width: 56, height: 56 } }
+    const size = host.dataset.meetingMode === mode
+      ? { width: Number(host.dataset.meetingWidth), height: Number(host.dataset.meetingHeight) }
+      : defaults[mode] || defaults.expanded
+    host.style.setProperty('--native-panel-width', `${size.width}px`)
+    host.style.setProperty('--native-panel-height', `${size.height}px`)
+    return size
+  }
   if (panel?.matches('.mira-workspace')) {
     const width = Math.min(400, host.ownerDocument.defaultView?.innerWidth || 400)
     return { width, height: Math.round(width * 0.3) }
@@ -96,19 +109,12 @@ async function getPipWindow(size) {
     style.textContent = `html,body{margin:0;padding:0;${desktop ? 'background:transparent!important;' : ''}}body{display:flex;flex-direction:column;gap:12px;overflow:auto;background:${desktop ? 'transparent' : '#151518'};color:#f4f4f5}
       [data-native-pip-surface]:has(.mira-workspace){order:2;z-index:2147483647}
       [data-native-pip-surface]:has([data-meeting-pip]){order:1}
-      [data-meeting-pip]{color:#f4f4f5!important;background:#18181b!important}
-      [data-meeting-pip] main,[data-meeting-pip] header,[data-meeting-pip] footer{background:#18181b!important;color:inherit}
-      [data-meeting-pip] button{flex-shrink:0}
-      [data-meeting-pip] footer{display:flex;flex-wrap:wrap;overflow:visible;gap:8px;padding:12px;box-sizing:border-box}
-      [data-meeting-pip] main{min-height:120px;overflow:auto}
-      [data-meeting-pip] [data-participant-tile="grid"]{min-height:120px}
       ${desktop ? '[data-native-pip-surface]{user-select:none;-webkit-app-region:no-drag;app-region:no-drag}input,textarea{user-select:text}' : ''}
-      [data-meeting-pip] button svg{width:20px!important;height:20px!important;min-width:20px;flex-shrink:0}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
       [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:10/3!important;min-height:0!important;box-sizing:border-box;transform:none!important}
-      [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0!important;width:100%!important}
-      [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none}
+      [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0 0 0 auto!important;width:var(--native-panel-width,448px)!important;max-width:100%;box-sizing:border-box}
+      [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none!important}
       [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}
       ${desktop ? '' : `
       [data-native-pip-surface] .mira-workspace,
@@ -226,6 +232,13 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
         }
         cleanupRef.current?.()
         targetRef.current = target
+        const meeting = host.querySelector('[data-meeting-pip]')
+        if (meeting && host.ownerDocument === document) {
+          host.dataset.meetingMode = meeting.getAttribute('data-meeting-pip')
+          host.dataset.meetingWidth = String(size.width)
+          host.dataset.meetingHeight = String(size.height)
+        }
+        host.style.setProperty('--native-panel-width', `${size.width}px`)
         host.style.setProperty('--native-panel-height', `${size.height}px`)
         target.document.body.append(host)
         const onClose = () => {
@@ -237,8 +250,12 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
         target.addEventListener('pagehide', onClose, { once: true })
         const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => fitWindow(target))
         observer?.observe(host)
+        // Mode changes can replace a fixed-size panel without changing its host
+        // until sizing is applied. Observe those changes as well as actual sizes.
+        const modeObserver = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => fitWindow(target))
+        modeObserver?.observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-meeting-pip'] })
         fitWindow(target)
-        cleanupRef.current = () => { observer?.disconnect(); target.removeEventListener('pagehide', onClose) }
+        cleanupRef.current = () => { observer?.disconnect(); modeObserver?.disconnect(); target.removeEventListener('pagehide', onClose) }
       } catch (cause) {
         if (mounted.current && !fromBrowser) setError(cause?.name === 'NotAllowedError'
           ? 'MIRA is active in mini mode. Your browser blocked the external window. Allow automatic picture-in-picture for Talio, or use the desktop app for background wake.'

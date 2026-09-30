@@ -142,6 +142,11 @@ const hasAccess = (userRole, pathname, rbacPermissions, userRecord = null) => {
   }
 
   const permissions = rolePermissions[userRole]
+  if (pathname === '/dashboard/resignations') return true
+  if (pathname === '/dashboard/manpower-requests' && (
+    ['admin', 'hr', 'super_admin', 'manager', 'team_leader', 'department_head'].includes(userRole)
+    || userRecord?.isDepartmentHead || userRecord?.isDepartmentManager || userRecord?.teamLeaderOf?.length
+  )) return true
 
   // Admin has access to everything
   if (permissions.includes('*')) {
@@ -214,6 +219,7 @@ export default function RoleBasedAccess({ children, requiredRoles = EMPTY_REQUIR
       // Leadership flags can be assigned independently of the base employee role.
       // Resolve those flags from the tenant API when they are not in local session data.
       const hierarchyRoute = currentPath === '/dashboard/performance/appraisals'
+        || currentPath === '/dashboard/manpower-requests'
         || currentPath.startsWith('/dashboard/employees/')
       if (!permission && hierarchyRoute && requiredRoles.length === 0) {
         try {

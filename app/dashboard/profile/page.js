@@ -917,6 +917,7 @@ export default function ProfilePage() {
             >
               Key Responsibilities
             </button>
+            <a href="/dashboard/resignations?view=mine" className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800">Resignations & exits</a>
           </div>
         </div>
 
@@ -1496,6 +1497,7 @@ export default function ProfilePage() {
 
             {/* Active Sessions Section - always visible */}
             <ActiveSessionsSection />
+            <a id="resignations" href={`/dashboard/resignations${searchParams.get('resignation') ? `?resignation=${encodeURIComponent(searchParams.get('resignation'))}` : '?view=mine'}`} className="mt-6 block rounded-2xl border border-default-200 p-5 text-sm">Manage resignation requests, approvals and exit settlement in Resignations &amp; Exits →</a>
 
             {/* Mobile only: Status and Edit buttons at bottom */}
             <div className="lg:hidden mt-8 mb-4">

@@ -23,6 +23,10 @@ export const SIDEBAR_ACTION_ICONS = Object.freeze({
 
 const CATEGORY_DEFINITIONS = [
   {
+    id: 'resignations', name: 'Resignations & Exits', description: 'Approvals, notice periods and full-and-final settlements',
+    icon: HiOutlineArrowRightOnRectangle, members: ['Resignations & Exits'],
+  },
+  {
     id: 'work',
     name: 'Work',
     description: 'Tasks, projects, boards and productivity',
@@ -41,7 +45,7 @@ const CATEGORY_DEFINITIONS = [
     name: 'People',
     description: 'Employees, teams, hiring and growth',
     icon: HiOutlineUsers,
-    members: ['Employees', 'Organogram', 'Team', 'My Teams', 'Live Users', 'Performance', 'Recruitment', 'Learning', 'Learning (LMS)'],
+    members: ['Employees', 'Organogram', 'Team', 'My Teams', 'Live Users', 'Performance', 'Recruitment', 'Manpower Requests', 'Learning', 'Learning (LMS)'],
   },
   {
     id: 'communication',
