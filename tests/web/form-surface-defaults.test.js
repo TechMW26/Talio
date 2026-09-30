@@ -8,7 +8,16 @@ const rules = []
 root.walkRules(rule => rules.push(rule))
 
 test('semantic headers no longer receive a forced dark surface', () => {
-  expect(rules.filter(rule => rule.selectors?.includes('html.dark header'))).toHaveLength(0)
+  const sheets = ['app/globals.css', ...fs.readdirSync(path.join(process.cwd(), 'styles')).filter(name => name.endsWith('.css')).map(name => `styles/${name}`)]
+  for (const sheet of sheets) {
+    postcss.parse(fs.readFileSync(path.join(process.cwd(), sheet), 'utf8')).walkRules(rule => {
+      for (const selector of rule.selectors || []) {
+        if (['header', 'header.bg-white', 'html.dark header', 'html.dark header.bg-white'].includes(selector)) {
+          expect(rule.nodes.filter(node => node.prop?.startsWith('background'))).toEqual([])
+        }
+      }
+    })
+  }
   expect(css).toContain('header.talio-navigation-header')
 })
 

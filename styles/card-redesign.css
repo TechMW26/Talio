@@ -15,9 +15,8 @@ div.bg-white.rounded,
   box-shadow: none !important;
 }
 
-/* Keep header and bottom bar white */
-header,
-header.bg-white,
+/* Only navigation chrome owns a background; page headings stay transparent. */
+header.talio-navigation-header,
 .bottom-nav,
 .bottom-nav.bg-white {
   background-color: #FFFFFF !important;
@@ -119,9 +118,8 @@ button.shadow-lg,
    DARK MODE - Card Redesign Overrides
    ============================================ */
 
-/* Keep header and bottom bar dark in dark mode */
-html.dark header,
-html.dark header.bg-white,
+/* Keep navigation chrome dark without painting every page heading. */
+html.dark header.talio-navigation-header,
 html.dark .bottom-nav,
 html.dark .bottom-nav.bg-white {
   background-color: #18181b !important;
