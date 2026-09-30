@@ -1171,6 +1171,7 @@
       "Bulk Allocate",
       "Bulk Import",
       "Cancel",
+      "Clear search",
       "Connection Error",
       "Employee Leave Balances -",
       "Enter number of days",
@@ -1180,6 +1181,8 @@
       "Leave Types",
       "Pending Allocations",
       "Retry",
+      "Search employee leave balances",
+      "Search name or employee code…",
       "Select Employee",
       "Select Leave Type",
       "Select Year",
@@ -1441,8 +1444,10 @@
     "name": "Manpower Requests",
     "controls": [
       "Approve & publish",
+      "Business case &amp; job requirements",
       "Cancel",
       "Manpower Requests",
+      "Manpower request list",
       "New manpower request",
       "New request",
       "Next",
@@ -1451,7 +1456,8 @@
       "Reject",
       "Rejection reason",
       "Request pages",
-      "· position(s)"
+      "Request status",
+      "Role, headcount &amp; budget"
     ],
     "sources": [
       "app/dashboard/manpower-requests/page.js",
@@ -2875,8 +2881,10 @@
     "name": "Manpower Requests",
     "controls": [
       "Approve & publish",
+      "Business case &amp; job requirements",
       "Cancel",
       "Manpower Requests",
+      "Manpower request list",
       "New manpower request",
       "New request",
       "Next",
@@ -2885,7 +2893,8 @@
       "Reject",
       "Rejection reason",
       "Request pages",
-      "· position(s)"
+      "Request status",
+      "Role, headcount &amp; budget"
     ],
     "sources": [
       "app/dashboard/recruitment/requisitions/page.js",

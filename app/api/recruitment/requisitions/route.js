@@ -25,13 +25,19 @@ export async function GET(request) {
     const { actor, models } = await context(request)
     const url = new URL(request.url)
     const page = Math.floor(Math.max(1, Math.min(10000, Number(url.searchParams.get('page')) || 1)))
-    const filter = isManpowerHr(actor) ? {} : { requestedBy: actor._id }
-    const [data, total, departments] = await Promise.all([
+    const scope = isManpowerHr(actor) ? {} : { requestedBy: actor._id }
+    const status = url.searchParams.get('status') || 'all'
+    if (!['all', 'pending', 'approved', 'rejected'].includes(status)) throw manpowerError('Invalid request status')
+    const filter = status === 'all' ? scope : { ...scope, status }
+    const [data, total, departments, pending, approved, rejected] = await Promise.all([
       models.ManpowerRequest.find(filter).sort({ createdAt: -1 }).skip((page - 1) * 20).limit(20).populate('employee', 'firstName lastName employeeCode').populate('department', 'name').lean(),
       models.ManpowerRequest.countDocuments(filter),
       models.Department.find({ isActive: { $ne: false } }).select('_id name').sort({ name: 1 }).lean(),
+      models.ManpowerRequest.countDocuments({ ...scope, status: 'pending' }),
+      models.ManpowerRequest.countDocuments({ ...scope, status: 'approved' }),
+      models.ManpowerRequest.countDocuments({ ...scope, status: 'rejected' }),
     ])
-    return json({ success: true, data: data.map(record => ({ ...record, canReview: isManpowerHr(actor) && String(record.requestedBy) !== String(actor._id) && record.status === 'pending' })), departments, total, page, isHr: isManpowerHr(actor), canSubmit: Boolean(actor.employeeId) })
+    return json({ success: true, data: data.map(record => ({ ...record, canReview: isManpowerHr(actor) && String(record.requestedBy) !== String(actor._id) && record.status === 'pending' })), departments, total, page, stats: { all: pending + approved + rejected, pending, approved, rejected }, isHr: isManpowerHr(actor), canSubmit: Boolean(actor.employeeId) })
   } catch (error) { return failed(error) }
 }
 export async function POST(request) {

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Card, CardBody, CardHeader, Button, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
-import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload, FaFileUpload, FaCheckCircle, FaTimesCircle, FaRobot, FaClock } from 'react-icons/fa'
+import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload, FaFileUpload, FaCheckCircle, FaTimesCircle, FaRobot, FaClock, FaSearch } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -23,6 +23,7 @@ export default function LeaveAllocationsPage() {
   const [importApplying, setImportApplying] = useState(false)
   const fileInputRef = useRef(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [employeeSearch, setEmployeeSearch] = useState('')
   const [bulkMode, setBulkMode] = useState(false)
   const hierarchyLevels = ['Entry Level', 'Mid Level', 'Senior', 'Team Lead', 'Assistant Manager', 'Manager', 'C-Suite', 'Assistant Director', 'Director']
   const [halfDayPolicy, setHalfDayPolicy] = useState({
@@ -65,6 +66,13 @@ export default function LeaveAllocationsPage() {
   }, [halfDayPolicyRes])
 
   const employees = employeesRes?.data || []
+  const filteredEmployees = useMemo(() => {
+    const terms = employeeSearch.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
+    return (employeesRes?.data || []).filter(employee => {
+      const text = `${employee.firstName || ''} ${employee.lastName || ''} ${employee.employeeCode || ''}`.toLocaleLowerCase()
+      return terms.every(term => text.includes(term))
+    })
+  }, [employeesRes, employeeSearch])
   const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
   const leaveBalances = balancesRes?.data || []
   const loading = employeesLoading || leaveTypesLoading || balancesLoading
@@ -430,14 +438,26 @@ export default function LeaveAllocationsPage() {
 
       {/* Leave Balances Table */}
       <Card shadow="sm">
-        <CardHeader className="px-6 py-4 border-b border-default-200">
-          <h2 className="text-lg font-semibold text-default-800">Employee Leave Balances - {selectedYear}</h2>
+        <CardHeader className="flex flex-col items-start justify-between gap-4 px-6 py-4 border-b border-default-200 sm:flex-row sm:items-center">
+          <div><h2 className="text-lg font-semibold text-default-800">Employee Leave Balances - {selectedYear}</h2>
+          <p className="mt-1 text-sm text-default-500" role="status">Showing {filteredEmployees.length} of {employees.length} employees</p></div>
+          <Input
+            aria-label="Search employee leave balances"
+            placeholder="Search name or employee code…"
+            value={employeeSearch}
+            onValueChange={setEmployeeSearch}
+            isClearable
+            onClear={() => setEmployeeSearch('')}
+            startContent={<FaSearch className="text-default-400" aria-hidden="true" />}
+            className="w-full sm:max-w-sm"
+          />
         </CardHeader>
         <CardBody className="p-0">
-          {employees.length === 0 ? (
+          {filteredEmployees.length === 0 ? (
             <div className="p-8 text-center text-default-500">
               <FaUsers className="w-12 h-12 mx-auto mb-4 text-default-300" />
-              <p>No employees found</p>
+              <p>{employees.length ? 'No employees match your search.' : 'No employees found'}</p>
+              {employeeSearch && <Button variant="light" className="mt-3" onPress={() => setEmployeeSearch('')}>Clear search</Button>}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -460,7 +480,7 @@ export default function LeaveAllocationsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-content1 divide-y divide-default-200">
-                  {employees.map((employee) => (
+                  {filteredEmployees.map((employee) => (
                     <tr key={employee._id} className="hover:bg-default-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">

@@ -43,6 +43,7 @@ export default function SidebarSubmenu({
   return (
     <nav aria-label={`${item.name} pages`} className="talio-sidebar-subnav space-y-0.5">
       {groups.map((group) => {
+        const repeatsParent = groups.length === 1 && group.name === item.name
         const isSingleDestination = group.items.length === 1
         const isOpen = Boolean(openSections[group.name])
         const hasActiveChild = group.items.some((child) => child.path === activeChildPath)
@@ -59,7 +60,7 @@ export default function SidebarSubmenu({
               data-active={hasActiveChild}
               className="talio-sidebar-leaf"
             >
-              <span className="min-w-0 truncate font-medium">{group.name}</span>
+              <span className="min-w-0 truncate font-medium">{repeatsParent ? child.name : group.name}</span>
               <span className="flex flex-shrink-0 items-center gap-2">
                 {child.isNew && <span className="talio-sidebar-new">New</span>}
                 {groupBadge > 0 && <span className="talio-sidebar-badge talio-sidebar-badge--danger">{groupBadge > 99 ? '99+' : groupBadge}</span>}
@@ -71,7 +72,7 @@ export default function SidebarSubmenu({
         const regionId = `sidebar-${item.id || item.name}-${group.name}`.toLowerCase().replace(/[^a-z0-9-]+/g, '-')
         return (
           <div key={group.name}>
-            <button
+            {!repeatsParent && <button
               type="button"
               onClick={() => toggleSection(group.name)}
               aria-expanded={isOpen}
@@ -85,10 +86,10 @@ export default function SidebarSubmenu({
                 {!isOpen && groupBadge > 0 && <span className="talio-sidebar-badge talio-sidebar-badge--danger">{groupBadge > 99 ? '99+' : groupBadge}</span>}
                 <HiOutlineChevronRight className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
               </span>
-            </button>
+            </button>}
 
-            {isOpen && (
-              <div id={regionId} className="talio-sidebar-module-items space-y-0.5">
+            {(repeatsParent || isOpen) && (
+              <div id={regionId} className={repeatsParent ? 'space-y-0.5' : 'talio-sidebar-module-items space-y-0.5'}>
                 {group.items.map((child) => {
                   const active = child.path === activeChildPath
                   const badge = getBadgeCount(child)
