@@ -705,7 +705,7 @@ export default function MiraChatSidebar() {
           top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? 'max(24px, env(safe-area-inset-bottom))' : 'auto',
           height: pip ? 'auto' : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
-          aspectRatio: pip ? '10 / 3' : undefined,
+          minHeight: pip ? 180 : undefined,
           transitionProperty: sidebarDrag.dragging ? 'none' : pip ? 'opacity, transform' : 'opacity, transform, left, top, width',
           width: pip ? 'min(400px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode
@@ -727,7 +727,7 @@ export default function MiraChatSidebar() {
             <MiraSphere size={28} isThinking={isThinking} />
             <span className="flex-1 text-xs font-medium">MIRA · {isThinking ? 'Thinking' : voice.state === 'speaking' ? 'Speaking' : voice.active ? 'Listening' : 'Ready'}</span>
           </button>
-          <div role="status" aria-live="polite" aria-label="MIRA live captions" className="mt-3 max-h-36 overflow-y-auto text-sm leading-relaxed break-words whitespace-pre-wrap">
+          <div role="status" aria-live="polite" aria-label="MIRA live captions" className="mt-3 max-h-36 overflow-y-auto text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ minHeight: 'calc(3.25em + 24px)' }}>
             {pipCaption ? <><span className="block text-[11px] text-default-500 mb-1">{pipSpeaker}</span>{miraPlainCaption(pipCaption)}</> : <span className="text-default-500">{voice.active ? 'Speak naturally. Your words appear here.' : 'Your conversation captions appear here.'}</span>}
           </div>
           {latestReply?.data?.image && <div className="max-h-64 overflow-y-auto" onClick={event => event.stopPropagation()}><MiraGeneratedImage image={latestReply.data.image} compact /></div>}

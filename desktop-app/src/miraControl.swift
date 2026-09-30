@@ -149,7 +149,7 @@ case "type":
     }
 case "key":
     if action["key"] as? String == "open_location" { key(5, [.maskCommand, .maskShift]); break }
-    let keys: [String: CGKeyCode] = ["enter":36,"tab":48,"escape":53,"backspace":51,"up":126,"down":125,"left":123,"right":124,"select_all":0,"copy":8,"paste":9,"find":3]
+    let keys: [String: CGKeyCode] = ["space":49,"enter":36,"tab":48,"escape":53,"backspace":51,"up":126,"down":125,"left":123,"right":124,"select_all":0,"copy":8,"paste":9,"find":3]
     let shortcuts: [String: (CGKeyCode, CGEventFlags)] = [
         "app_switch": (48, .maskCommand), "app_search": (49, .maskCommand),
         "browser_address": (37, .maskCommand), "new_tab": (17, .maskCommand),

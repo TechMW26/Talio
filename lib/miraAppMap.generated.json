@@ -482,6 +482,8 @@
       "components/employees/DocumentGrid.js",
       "components/employees/DocumentThumbnail.js",
       "components/employees/EmployeeOnboardingDocuments.js",
+      "components/employees/FolderDocumentSurface.js",
+      "components/employees/FolderDocumentSurface.module.css",
       "components/employees/OnboardingVerificationModal.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",

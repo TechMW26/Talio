@@ -19,7 +19,9 @@ test('100ms fade applies in both directions and glow scales with tile area', () 
   act(() => resize([{ contentRect: { width: 1280, height: 720 } }]))
   expect(Number(beam.dataset.spread)).toBeGreaterThan(small)
   expect(Number(beam.dataset.brightness)).toBeGreaterThan(low)
-  expect(Number(beam.dataset.spread)).toBeLessThanOrEqual(2.5)
+  expect(Number(beam.dataset.spread)).toBeGreaterThan(2.5)
+  expect(Number(beam.style.getPropertyValue('--pulse-glow-boost'))).toBeGreaterThan(2)
+  expect(Number(beam.style.getPropertyValue('--beam-inner-opacity'))).toBeGreaterThan(1)
   view.rerender(<AIActivityBeam active={false} fadeMs={100} scaleWithSize />)
   expect(screen.getByTestId('beam')).toBe(beam)
   expect(beam.dataset.active).toBe('false')
@@ -33,6 +35,31 @@ test('other AI surfaces keep library fade and glow defaults', () => {
   render(<AIActivityBeam active />)
   expect(screen.getByTestId('beam').style.animationDuration).toBe('')
   expect(screen.getByTestId('beam')).not.toHaveAttribute('data-spread')
+})
+
+test('small cards retain exact previous styling and large boosts reset after shrinking', () => {
+  let resize
+  const original = global.ResizeObserver
+  global.ResizeObserver = class { constructor(callback) { resize = callback } observe() {} disconnect() {} }
+  const view = render(<AIActivityBeam active scaleWithSize strength={1} />)
+  const beam = screen.getByTestId('beam')
+  for (const [width, height] of [[176, 99], [320, 180], [480, 270]]) {
+    act(() => resize([{ contentRect: { width, height } }]))
+    const previousScale = Math.round(Math.max(0, Math.min(1, (Math.sqrt(width * height) - 140) / 660)) * 100) / 100
+    expect(Number(beam.dataset.spread)).toBeCloseTo(.9 + previousScale * 1.6)
+    expect(Number(beam.dataset.brightness)).toBeCloseTo(1.2 + previousScale * .8)
+    expect(Number(beam.dataset.strength)).toBeCloseTo(.85 + previousScale * .15)
+    expect(beam.style.getPropertyValue('--pulse-glow-boost')).toBe('1')
+  }
+  act(() => resize([{ contentRect: { width: 1920, height: 1080 } }]))
+  expect(Number(beam.style.getPropertyValue('--pulse-glow-boost'))).toBe(3)
+  expect(Number(beam.dataset.spread)).toBeLessThanOrEqual(3.25)
+  expect(Number(beam.dataset.brightness)).toBeLessThanOrEqual(3.2)
+  act(() => resize([{ contentRect: { width: 320, height: 180 } }]))
+  expect(beam.style.getPropertyValue('--pulse-glow-boost')).toBe('1')
+  expect(screen.getByTestId('beam')).toBe(beam)
+  view.unmount()
+  global.ResizeObserver = original
 })
 
 test('voice volume smoothly controls strength and flow speed without remounting', () => {

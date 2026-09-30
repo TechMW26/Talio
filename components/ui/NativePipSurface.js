@@ -52,7 +52,7 @@ function panelSize(host) {
   }
   if (panel?.matches('.mira-workspace')) {
     const width = Math.min(400, host.ownerDocument.defaultView?.innerWidth || 400)
-    return { width, height: Math.round(width * 0.3) }
+    return { width, height: Math.max(180, Math.ceil(panel.offsetHeight || panel.getBoundingClientRect().height || 0)) }
   }
   const rect = panel?.getBoundingClientRect()
   // Layout dimensions exclude the panel's entrance/exit transform.
@@ -65,7 +65,7 @@ function fitWindow(target) {
   const sizes = surfaces.map(panelSize)
   if (!sizes.length) return
   const width = Math.max(...sizes.map(size => size.width))
-  const height = sizes.reduce((sum, size, index) => sum + (surfaces[index].querySelector('.mira-workspace') ? Math.round(width * 0.3) : size.height), 0) + Math.max(0, sizes.length - 1) * 12
+  const height = sizes.reduce((sum, size) => sum + size.height, 0) + Math.max(0, sizes.length - 1) * 12
   // Browser-owned title bars and minimum dimensions cannot be removed.
   const desktop = target.document.documentElement.dataset.desktopPip === 'true'
   const chromeWidth = desktop ? 0 : Math.max(0, (target.outerWidth || width) - (target.innerWidth || width))
@@ -120,7 +120,7 @@ async function getPipWindow(size) {
       ${desktop ? '[data-native-pip-surface]{user-select:none;-webkit-app-region:no-drag;app-region:no-drag}input,textarea{user-select:text}' : ''}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
-      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:10/3!important;min-height:0!important;box-sizing:border-box;transform:none!important}
+      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:auto!important;min-height:180px!important;box-sizing:border-box;transform:none!important}
       [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0 0 0 auto!important;width:var(--native-panel-width,512px)!important;max-width:100%;box-sizing:border-box}
       [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none!important}
       [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}
@@ -148,7 +148,7 @@ async function getPipWindow(size) {
         [data-native-pip-surface]:has([data-meeting-pip="compact"]){--meeting-pip-radius:16px}
         [data-native-pip-surface]:has([data-meeting-pip="bubble"]){--meeting-pip-radius:9999px}
         [data-native-pip-surface] [data-meeting-pip]{border-radius:var(--meeting-pip-radius,24px)!important;box-shadow:none!important;overflow:hidden!important}
-        [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:10/3!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
+        [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:auto!important;min-height:180px!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
         /* The mono VoiceBeam paints a second bright stroke at its corners.
            Keep its interior glow, but use one clipped native panel silhouette. */
         html[data-desktop-pip="true"] [data-native-pip-surface]:has(.mira-workspace){border-radius:16px!important;overflow:hidden!important;clip-path:inset(0 round 16px)}
@@ -243,8 +243,7 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
       if (automaticRef.current && !isAppAway()) return
       setError('')
       try {
-        const size = window.electronAPI?.nativePip === true && host?.querySelector('.mira-workspace')
-          ? { width: 400, height: 120 } : panelSize(host)
+        const size = panelSize(host)
         const target = await getPipWindow(size)
         if (!mounted.current || !enabledRef.current || !host || (automaticRef.current && !isAppAway())) {
           if (!target.document.querySelector('[data-native-pip-surface]')) target.close()
