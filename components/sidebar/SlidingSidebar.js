@@ -26,7 +26,8 @@ import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import SidebarSubmenu from '@/components/sidebar/SidebarSubmenu'
-import { Button, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Avatar } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { Button, ScrollShadow, ModalContent, ModalHeader, ModalBody, ModalFooter, Avatar } from '@heroui/react'
 
 // Inline badge component for expanded menu items
 function InlineBadge({ count }) {

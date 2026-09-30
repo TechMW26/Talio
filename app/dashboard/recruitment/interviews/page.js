@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Modal from '@/components/ui/HeroModal'
 import {
-  Button, Chip, Input, Select, SelectItem, Pagination,
-  Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
+  Button, Chip, Input, Select, SelectItem, Pagination, ModalContent, ModalHeader, ModalBody, ModalFooter,
   useDisclosure, Textarea, Card, CardBody, CardHeader, Skeleton, Tooltip
-} from '@heroui/react';
+} from '@heroui/react'
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';

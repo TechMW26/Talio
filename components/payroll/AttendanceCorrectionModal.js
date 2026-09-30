@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import Modal from '@/components/ui/HeroModal'
 import {
-    Modal,
     ModalContent,
     ModalHeader,
     ModalBody,

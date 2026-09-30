@@ -25,7 +25,8 @@ import {
   FaBrain,
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Skeleton } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Skeleton } from '@heroui/react'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 import TiltWrapper from "@/components/TiltWrapper";
 import dynamic from 'next/dynamic'

@@ -7,7 +7,8 @@ import {
   FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle,
   FaUser, FaArrowRight, FaComment, FaTimes, FaChevronDown
 } from 'react-icons/fa'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Skeleton } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'

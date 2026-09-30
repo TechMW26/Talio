@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Card, CardBody, CardHeader, Button, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { Card, CardBody, CardHeader, Button, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload, FaFileUpload, FaCheckCircle, FaTimesCircle, FaRobot, FaClock, FaSearch } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'

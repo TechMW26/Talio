@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import Modal from '@/components/ui/HeroModal'
 import {
   Button,
   Tabs,
   Tab,
   Skeleton,
-  Modal,
   ModalContent,
   ModalBody,
 } from '@heroui/react'

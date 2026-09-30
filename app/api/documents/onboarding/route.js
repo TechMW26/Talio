@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { hydrateEmployeeLifecycle, getLifecycleProgress } from '@/lib/hrms/employeeLifecycle.server'
 import { normalizeOnboardingVerification } from '@/lib/hrms/onboardingVerification'
 import { validateOnboardingFiles } from '@/lib/hrms/onboardingSubmission.server'
+import { getOnboardingKycEvidence } from '@/lib/hrms/onboardingKyc.server'
 import { isFeatureEnabled } from '@/lib/planFeatures'
 import { clearCachePattern, buildCachePattern } from '@/lib/cache'
 
@@ -22,7 +23,8 @@ export async function GET(request) {
     if (response) return response
     if (!employee || !isFeatureEnabled(auth.companyFeatures, 'onboarding')) return NextResponse.json({ success: true, data: { enabled: false, checklist: [] } })
     const lifecycle = hydrateEmployeeLifecycle(employee)
-    return NextResponse.json({ success: true, data: { enabled: true, checklist: lifecycle.onboarding.checklist, progress: getLifecycleProgress(lifecycle) } })
+    const linkedEvidence = await getOnboardingKycEvidence(auth.models, employee._id)
+    return NextResponse.json({ success: true, data: { enabled: true, linkedEvidence, profilePhone: employee.phone || '', checklist: lifecycle.onboarding.checklist, progress: getLifecycleProgress(lifecycle) } })
   } catch (error) {
     return NextResponse.json({ success: false, message: 'Unable to load your onboarding documents' }, { status: 500 })
   }
@@ -38,7 +40,8 @@ export async function POST(request) {
     const lifecycle = hydrateEmployeeLifecycle(employee)
     const item = lifecycle.onboarding.checklist.find(entry => entry.key === body.itemKey)
     if (!item || item.completed) return NextResponse.json({ success: false, message: 'This onboarding item is already verified or is not available' }, { status: 409 })
-    const { verification } = normalizeOnboardingVerification(item.key, body.verification, { submission: true })
+    const linkedEvidence = item.key === 'documents' ? await getOnboardingKycEvidence(auth.models, employee._id) : {}
+    const { verification } = normalizeOnboardingVerification(item.key, body.verification, { submission: true, employee, linkedEvidence })
     if (!verification.documents.length && !Object.values(verification.details).some(value => value !== false && String(value).trim())) throw new Error('Add a file or complete your details before submitting')
     verification.documents = await validateOnboardingFiles(auth, employee._id, verification.documents)
     item.submission = { status: 'pending', verification, submittedAt: new Date(), submittedBy: auth.user._id || auth.user.userId, reviewReason: '' }

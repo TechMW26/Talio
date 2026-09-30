@@ -15,6 +15,26 @@ beforeEach(() => {
   global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
 })
 
+test('profile phone is autofilled and refreshes without erasing emergency contact input', async () => {
+  const profile = { key: 'profile', label: 'Employee profile', completed: false }
+  const submit = jest.fn().mockResolvedValue(false)
+  const view = render(<OnboardingVerificationModal isOpen item={profile} profilePhone="9000000001" mode="submit" onVerify={submit} />)
+  const phone = await screen.findByLabelText(/Employee phone number/)
+  expect(phone).toHaveValue('9000000001')
+  expect(phone).toHaveAttribute('readonly')
+  fireEvent.change(screen.getByLabelText(/Emergency contact name/), { target: { value: 'Test Contact' } })
+  view.rerender(<OnboardingVerificationModal isOpen item={profile} profilePhone="9000000002" mode="submit" onVerify={submit} />)
+  expect(phone).toHaveValue('9000000002')
+  expect(screen.getByLabelText(/Emergency contact name/)).toHaveValue('Test Contact')
+  fireEvent.click(screen.getByRole('button', { name: 'Submit to HR' }))
+  await waitFor(() => expect(submit).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ phone: '9000000002', emergencyContactName: 'Test Contact' }) })))
+})
+
+test('phone can be entered when employee account has none', async () => {
+  render(<OnboardingVerificationModal isOpen item={{ key: 'profile', label: 'Employee profile' }} mode="submit" />)
+  expect(await screen.findByLabelText(/Employee phone number/)).not.toHaveAttribute('readonly')
+})
+
 test('documents page displays pending state and opens the shared onboarding upload form', async () => {
   useAuthedSWR.mockReturnValue({ data: { data: { enabled: true, checklist: [{ ...item, submission: { status: 'pending', verification: { documents: [file] } } }] } }, mutate: jest.fn() })
   render(<EmployeeOnboardingDocuments />)
@@ -25,6 +45,18 @@ test('documents page displays pending state and opens the shared onboarding uplo
   expect(screen.getByText('Passport')).toBeInTheDocument()
   expect(screen.getByText('Other onboarding document')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Verify and complete' })).not.toBeInTheDocument()
+})
+
+test('profile KYC Aadhaar shows a submitted check and no duplicate file picker', async () => {
+  const linkedEvidence = { aadhaar: [{ fileName: 'Aadhaar Card (Front)', fileUrl: '/api/images/front' }, { fileName: 'Aadhaar Card (Back)', fileUrl: '/api/images/back' }] }
+  useAuthedSWR.mockReturnValue({ data: { data: { enabled: true, linkedEvidence, checklist: [item] } } })
+  render(<EmployeeOnboardingDocuments />)
+  fireEvent.click(screen.getByRole('button', { name: /Joining documents/ }))
+  expect(await screen.findByText('Submitted through profile KYC')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'View Aadhaar Card (Front)' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'View Aadhaar Card (Back)' })).toBeInTheDocument()
+  expect(screen.getByText('Aadhaar card').closest('label')).toBeNull()
+  expect(screen.getByText('PAN card').closest('label').querySelector('input[type="file"]')).toBeInTheDocument()
 })
 
 test('partial evidence can be submitted from the employee form but not approved', async () => {

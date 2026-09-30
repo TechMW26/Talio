@@ -10,7 +10,8 @@ import {
   FaLayerGroup, FaSave, FaUndo
 } from 'react-icons/fa'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
-import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Select, SelectItem, Input, Checkbox } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { Card, CardBody, CardHeader, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Select, SelectItem, Input, Checkbox } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'

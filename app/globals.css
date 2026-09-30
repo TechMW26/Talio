@@ -2171,6 +2171,43 @@ section[role="dialog"] {
   animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
 }
 
+/* Keep close controls inside rounded modal corners and above header content. */
+[role="dialog"] > button[aria-label="Close"] {
+  top: 14px !important;
+  right: 14px !important;
+  width: 44px;
+  height: 44px;
+  z-index: 30;
+  pointer-events: auto !important;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  touch-action: manipulation;
+}
+[role="dialog"] > button[aria-label="Close"] svg { pointer-events: none; }
+[role="dialog"]:has(> button[aria-label="Close"]) > header { padding-right: 72px !important; }
+
+/* Consistent, readable crosses for shared modals and labelled popup controls. */
+button[aria-label^="Close"],
+button[title="Close"],
+.modal-close-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+button[aria-label^="Close"] svg,
+button[title="Close"] svg,
+.modal-close-btn svg {
+  width: 24px !important;
+  height: 24px !important;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 /* ============================================
    MODAL OVERLAY - Performance Optimized
    Uses tinted background instead of backdrop-blur

@@ -1,7 +1,7 @@
 'use client'
 
+import HeroModal from '@/components/ui/HeroModal'
 import {
-  Modal as HeroModal,
   ModalContent as HeroModalContent,
   ModalHeader as HeroModalHeader,
   ModalBody as HeroModalBody,

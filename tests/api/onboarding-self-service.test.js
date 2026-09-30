@@ -51,6 +51,49 @@ test('partial employee upload is persisted as pending in both checklist and docu
   expect(loaded.data.checklist.find(item => item.key === 'documents').submission.status).toBe('pending')
 })
 
+test('existing profile Aadhaar is linked without duplicate uploads and other evidence remains required', async () => {
+  await models.User.updateOne({ _id: auth.user._id }, { $set: { 'profileCompletion.aadhaarFront': { url: '/api/images/kyc-front', fileId: 'kyc-front' }, 'profileCompletion.aadhaarBack': { url: '/api/images/kyc-back', fileId: 'kyc-back' } } })
+  const loaded = await (await GET(new Request('https://talio.test'))).json()
+  expect(loaded.data.linkedEvidence.aadhaar).toHaveLength(2)
+  const response = await POST(request({ itemKey: 'documents', verification: { documents: [] } }))
+  expect(response.status).toBe(200)
+  const employee = await models.Employee.findById(employeeId).lean()
+  const item = employee.lifecycle.onboarding.checklist.find(item => item.key === 'documents')
+  expect(item.completed).toBe(false)
+  expect(item.submission.verification.details.aadhaarSource).toBe('Submitted through profile KYC')
+  expect(await models.Document.countDocuments({ employee: employeeId })).toBe(0)
+  const context = { employee, linkedEvidence: loaded.data.linkedEvidence }
+  expect(() => normalizeOnboardingVerification('documents', {}, context)).toThrow('PAN card must be uploaded')
+  const documents = getOnboardingVerificationRequirement('documents').uploads.filter(upload => upload.required && upload.key !== 'aadhaar').map(upload => evidence(upload.key))
+  expect(() => applyLifecycleAction(hydrateEmployeeLifecycle(employee), 'complete_onboarding_item', { itemKey: 'documents', verification: { documents } }, context)).not.toThrow()
+})
+
+test('another employee KYC and client-supplied linked evidence cannot satisfy own Aadhaar', async () => {
+  await models.User.collection.insertOne({ email: 'other-kyc@example.test', employeeId: new mongoose.Types.ObjectId(), profileCompletion: { aadhaarFront: { url: '/api/images/foreign' } } })
+  const loaded = await (await GET(new Request('https://talio.test'))).json()
+  expect(loaded.data.linkedEvidence).toEqual({})
+  expect((await POST(request({ itemKey: 'documents', verification: { details: { aadhaarSource: 'Forged' }, linkedEvidence: { aadhaar: [{ fileUrl: '/foreign' }] } } }))).status).toBe(400)
+})
+
+test('profile phone comes from own account and remains current through submission and HR approval', async () => {
+  await models.Employee.updateOne({ _id: employeeId }, { $set: { phone: '9000000001' } })
+  const loaded = await (await GET(new Request('https://talio.test'))).json()
+  expect(loaded.data.profilePhone).toBe('9000000001')
+  const details = { phone: 'stale-client-number', emergencyContactName: 'Test Contact', emergencyContactRelationship: 'Sibling', emergencyContactPhone: '9000000003' }
+  expect((await POST(request({ itemKey: 'profile', verification: { details } }))).status).toBe(200)
+  let employee = await models.Employee.findById(employeeId).lean()
+  const pending = employee.lifecycle.onboarding.checklist.find(item => item.key === 'profile')
+  expect(pending.submission.verification.details.phone).toBe('9000000001')
+  expect(pending.submission.status).toBe('pending')
+  expect(employee.emergencyContact?.name).toBeFalsy()
+  await models.Employee.updateOne({ _id: employeeId }, { $set: { phone: '9000000002' } })
+  employee = await models.Employee.findById(employeeId).lean()
+  const result = normalizeOnboardingVerification('profile', pending.submission.verification, { employee })
+  expect(result.employeeUpdates.phone).toBe('9000000002')
+  expect(result.employeeUpdates.emergencyContact.name).toBe('Test Contact')
+  expect(() => normalizeOnboardingVerification('profile', { details: {} }, { employee })).toThrow('Emergency contact name is required')
+})
+
 test('pending uploads never auto-complete and HR still requires all mandatory evidence', async () => {
   await POST(request({ itemKey: 'documents', verification: { documents: [evidence()] } }))
   const employee = await models.Employee.findById(employeeId).lean()

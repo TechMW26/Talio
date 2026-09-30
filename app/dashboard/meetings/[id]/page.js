@@ -25,7 +25,8 @@ import {
   HiOutlinePencilSquare
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea, Skeleton } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'

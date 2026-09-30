@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
 import {
   HiOutlineArrowLeft,
   HiOutlinePlus,

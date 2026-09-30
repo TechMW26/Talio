@@ -149,7 +149,6 @@ export {
   Skeleton,
   
   // Overlays
-  Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
@@ -202,3 +201,4 @@ export {
   AutocompleteItem,
   AutocompleteSection,
 } from '@heroui/react'
+export { default as Modal } from '@/components/ui/HeroModal'

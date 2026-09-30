@@ -16,7 +16,8 @@ import {
   HiOutlineDocumentText,
   HiOutlinePencilSquare
 } from 'react-icons/hi2'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@heroui/react'
 import { IST_TIMEZONE } from '@/lib/timezone'
 import MeetingJoinLink from './MeetingJoinLink'
 

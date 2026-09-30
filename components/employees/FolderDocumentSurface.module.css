@@ -1,0 +1,29 @@
+html .surface[role='dialog'] {
+  width: 100vw !important;
+  max-width: none !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html .surface[role='dialog'] > header,
+html .surface[role='dialog'] > [data-slot='body'],
+html .backdrop {
+  background: transparent !important;
+}
+
+/* This surface owns blur timing; do not run the global popup entrance effect. */
+html .backdrop {
+  animation: none !important;
+  opacity: 0;
+  -webkit-backdrop-filter: blur(24px) !important;
+  backdrop-filter: blur(24px) !important;
+}
+
+.surface[role='dialog'] > button[aria-label='Close'] {
+  top: 24px !important;
+  right: 24px !important;
+}

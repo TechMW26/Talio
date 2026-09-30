@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { Button, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react'
 import { HiOutlineCalendarDays, HiOutlineClock, HiOutlinePencilSquare } from 'react-icons/hi2'
 import { getDateTimePartsInTimezone, IST_TIMEZONE, parseDateTimeInTimezone } from '@/lib/timezone'
 import useApiMutation from '@/hooks/useApiMutation'
