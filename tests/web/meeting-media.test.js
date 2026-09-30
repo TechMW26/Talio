@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { ParticipantTile, RemoteAudio } from '@/components/meetings/MeetingMedia'
+jest.mock('@/components/ui/AIActivityBeam', () => ({ borderRadius }) => <div data-testid="speaker-beam" data-radius={borderRadius} />)
 
 jest.mock('livekit-client', () => ({ Track: { Source: {
   Camera: 'camera', Microphone: 'microphone', ScreenShare: 'screen', ScreenShareAudio: 'screen-audio',
@@ -9,6 +10,21 @@ const makeTrack = () => ({ attach: jest.fn(), detach: jest.fn(), stop: jest.fn()
 const makeItem = (publications) => ({
   name: 'Remote Person', identity: 'remote', isMuted: false, isScreenSharing: false,
   participant: { getTrackPublication: (source) => publications[source] },
+})
+
+test('speaker border has no green ring and the badge is reserved for screen sharing', () => {
+  const item = makeItem({})
+  const view = render(<ParticipantTile item={item} isSpeaking compact />)
+  const tile = screen.getByLabelText('Remote Person is speaking')
+  expect(tile.className).not.toMatch(/ring-|emerald|shadow-/)
+  expect(screen.queryByText('Speaking')).not.toBeInTheDocument()
+  expect(screen.getByTestId('speaker-beam')).toHaveAttribute('data-radius', '12')
+  view.rerender(<ParticipantTile item={{ ...item, isScreenSharing: true }} isSpeaking featured />)
+  expect(screen.getByText('Speaking')).toBeInTheDocument()
+  expect(screen.getByTestId('speaker-beam')).toHaveAttribute('data-radius', '16')
+  view.rerender(<ParticipantTile item={{ ...item, isScreenSharing: true }} featured />)
+  expect(screen.queryByText('Speaking')).not.toBeInTheDocument()
+  expect(screen.queryByTestId('speaker-beam')).not.toBeInTheDocument()
 })
 
 test.each([false, true])('keeps the attached video mounted across mute/unmute (initial muted=%s)', (initialMuted) => {

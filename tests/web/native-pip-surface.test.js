@@ -14,6 +14,22 @@ function fakeWindow() {
 }
 
 beforeEach(() => { jest.spyOn(document, 'hasFocus').mockReturnValue(true) })
+test('desktop meeting host and panel share one clipped outline', async () => {
+  const target = fakeWindow()
+  target.resizeTo = jest.fn()
+  window.electronAPI = { nativePip: true }
+  jest.spyOn(window, 'open').mockReturnValue(target)
+  const ref = createRef()
+  render(<NativePipSurface ref={ref}><section data-meeting-pip="expanded">Radius test</section></NativePipSurface>)
+  await act(async () => { await ref.current.open() })
+  const css = target.document.head.textContent
+  expect(css).toContain('overflow:hidden;border-radius:var(--meeting-pip-radius,24px)')
+  expect(css).toContain('border-radius:var(--meeting-pip-radius,24px)!important;box-shadow:none!important')
+  expect(css).toContain('--meeting-pip-radius:16px')
+  expect(css).toContain('--meeting-pip-radius:9999px')
+  act(() => target.close())
+  delete window.electronAPI
+})
 test('meeting preserves inline dimensions instead of shrinking with the child viewport', async () => {
   const target = fakeWindow()
   Object.assign(target, { innerWidth: 200, innerHeight: 100, resizeTo: jest.fn() })
@@ -22,10 +38,10 @@ test('meeting preserves inline dimensions instead of shrinking with the child vi
   const ref = createRef()
   render(<NativePipSurface ref={ref}><section data-meeting-pip="expanded">Meeting video<button>Mute</button></section></NativePipSurface>)
   const panel = screen.getByText('Meeting video')
-  panel.getBoundingClientRect = () => panel.ownerDocument === document ? { width: 448, height: 416 } : { width: 188, height: 68 }
+  panel.getBoundingClientRect = () => panel.ownerDocument === document ? { width: 512, height: 416 } : { width: 188, height: 68 }
   await act(async () => { await ref.current.open() })
-  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=448,height=416')
-  expect(target.resizeTo).toHaveBeenLastCalledWith(448, 416)
+  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=512,height=416')
+  expect(target.resizeTo).toHaveBeenLastCalledWith(512, 416)
   expect(target.document.body.contains(panel)).toBe(true)
   expect(target.document.head.textContent).not.toContain('[data-meeting-pip] footer{')
   expect(target.document.head.textContent).not.toContain('[data-meeting-pip] button svg{')
@@ -33,7 +49,7 @@ test('meeting preserves inline dimensions instead of shrinking with the child vi
   await act(async () => { panel.setAttribute('data-meeting-pip', 'compact') })
   expect(target.resizeTo).toHaveBeenLastCalledWith(352, 84)
   await act(async () => { panel.setAttribute('data-meeting-pip', 'expanded') })
-  expect(target.resizeTo).toHaveBeenLastCalledWith(448, 416)
+  expect(target.resizeTo).toHaveBeenLastCalledWith(512, 416)
   act(() => target.close())
 })
 test('MIRA supports dragging, flushes the final position, and leaves buttons clickable', async () => {

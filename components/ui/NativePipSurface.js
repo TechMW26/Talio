@@ -42,7 +42,7 @@ function panelSize(host) {
     // Never feed the child viewport's responsive dimensions back into resizeTo.
     // Keep the actual inline dimensions, or use the equivalent inline mode size
     // when the user expands/minimises the meeting while it is outside the app.
-    const defaults = { expanded: { width: 448, height: 416 }, compact: { width: 352, height: 84 }, bubble: { width: 56, height: 56 } }
+    const defaults = { expanded: { width: 512, height: 416 }, compact: { width: 352, height: 84 }, bubble: { width: 56, height: 56 } }
     const size = host.dataset.meetingMode === mode
       ? { width: Number(host.dataset.meetingWidth), height: Number(host.dataset.meetingHeight) }
       : defaults[mode] || defaults.expanded
@@ -113,7 +113,7 @@ async function getPipWindow(size) {
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
       [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:10/3!important;min-height:0!important;box-sizing:border-box;transform:none!important}
-      [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0 0 0 auto!important;width:var(--native-panel-width,448px)!important;max-width:100%;box-sizing:border-box}
+      [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0 0 0 auto!important;width:var(--native-panel-width,512px)!important;max-width:100%;box-sizing:border-box}
       [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none!important}
       [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}
       ${desktop ? '' : `
@@ -133,6 +133,12 @@ async function getPipWindow(size) {
       sizing.textContent = `
         html,body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
         [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal}
+        /* One silhouette: clip the host to the same radius as its meeting panel.
+           Rings and shadows outside that silhouette produce a second dark rim. */
+        [data-native-pip-surface]:has([data-meeting-pip]){background:transparent!important;overflow:hidden;border-radius:var(--meeting-pip-radius,24px)}
+        [data-native-pip-surface]:has([data-meeting-pip="compact"]){--meeting-pip-radius:16px}
+        [data-native-pip-surface]:has([data-meeting-pip="bubble"]){--meeting-pip-radius:9999px}
+        [data-native-pip-surface] [data-meeting-pip]{border-radius:var(--meeting-pip-radius,24px)!important;box-shadow:none!important;overflow:hidden!important}
         [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:10/3!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
         [data-native-pip-surface] [data-mira-pip-content]{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
       `

@@ -1195,7 +1195,7 @@ export default function ManagedMeetingRoomSession({
   return (
     <div
       className={isPip
-        ? 'fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex h-[min(26rem,calc(100dvh-2rem))] w-[min(94vw,28rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-100 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0'
+        ? 'fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex h-[min(26rem,calc(100dvh-2rem))] w-[min(calc(100vw-48px),32rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-100 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0'
         : 'fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white'}
       data-meeting-pip={isPip ? 'expanded' : undefined}
       style={isPip ? { left: 'auto', right: 24, margin: 0, bottom: 'calc(max(24px, env(safe-area-inset-bottom)) + var(--mira-pip-stack-height, 0px))', maxHeight: 'calc(100dvh - 48px - var(--mira-pip-stack-height, 0px))' } : undefined}
