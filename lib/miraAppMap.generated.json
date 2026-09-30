@@ -3838,6 +3838,7 @@
       "app/join/[guestLink]/room/page.js",
       "components/meetings/ManagedMeetingRoomSession.js",
       "components/meetings/MeetingMedia.js",
+      "components/meetings/MeetingReactionOverlay.js",
       "components/meetings/MeetingReactionPicker.js",
       "components/meetings/MeetingVisualIcons.js",
       "components/meetings/ParticipantGrid.js",

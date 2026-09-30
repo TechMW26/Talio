@@ -7,11 +7,33 @@ import { useTheme } from '@/contexts/ThemeContext'
 
 
 // Overlay instead of reparenting the form: focus and draft text survive state changes.
-export default function AIActivityBeam({ active, strength, theme, borderRadius = 24, fadeMs, scaleWithSize = false }) {
+export default function AIActivityBeam({ active, strength, theme, borderRadius = 24, fadeMs, scaleWithSize = false, voiceLevelRef }) {
   const reducedMotion = useReducedMotion()
   const { isDarkMode } = useTheme()
   const ref = useRef(null)
   const [scale, setScale] = useState(0)
+  const phase = useRef(0)
+  useEffect(() => {
+    if (!voiceLevelRef || !active || reducedMotion) return
+    let frame
+    let previousTime
+    const update = time => {
+      const dt = previousTime === undefined ? 0 : Math.min(64, Math.max(0, time - previousTime))
+      previousTime = time
+      const level = Math.max(0, Math.min(1, voiceLevelRef.current || 0))
+      const beam = ref.current?.querySelector('[data-beam]')
+      if (beam) {
+        // Advance a continuous colour-flow phase, never restart the border animation.
+        phase.current = (phase.current + dt / 1000 * (12 + 108 * level)) % 360
+        beam.style.setProperty('--beam-hue-base', `${phase.current}deg`)
+        beam.style.setProperty('--beam-strength', String((strength ?? 1) * (scaleWithSize ? 0.85 + scale * 0.15 : 1) * (0.45 + 0.55 * level)))
+        ref.current.style.filter = `brightness(${0.9 + 0.5 * level})`
+      }
+      frame = requestAnimationFrame(update)
+    }
+    frame = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(frame)
+  }, [voiceLevelRef, active, reducedMotion, scale, scaleWithSize, strength])
   useEffect(() => {
     if (!scaleWithSize || !ref.current) return
     const measure = ({ width, height }) => {

@@ -140,7 +140,7 @@ describe('managed meeting implementation', () => {
     expect(reactionPickerSource).toContain('Popover')
     expect(reactionPickerSource).toContain("base: 'z-[220]'")
     expect(reactionPickerSource).toContain('data-meeting-reaction-picker')
-    expect(mediaSource).toContain('bottom-10 left-1/2 z-30')
+    expect(mediaSource).toContain('<MeetingReactionOverlay anchorRef={tileRef}')
     expect(source).not.toContain('absolute bottom-14 left-1/2 z-40')
   })
 })

@@ -12,6 +12,17 @@ const makeItem = (publications) => ({
   participant: { getTrackPublication: (source) => publications[source] },
 })
 
+test('reactions render above the tile in the document overlay, not inside its clipped card', () => {
+  const view = render(<ParticipantTile item={makeItem({})} reaction="👍" />)
+  const emoji = screen.getByAltText('Thumbs up')
+  expect(emoji.closest('[data-participant-tile]')).toBeNull()
+  expect(emoji.parentElement.parentElement).toBe(document.body)
+  expect(emoji.parentElement).toHaveAttribute('data-meeting-reaction-overlay')
+  expect(emoji.parentElement.style.top).toBe('8px')
+  view.rerender(<ParticipantTile item={makeItem({})} />)
+  expect(screen.queryByAltText('Thumbs up')).not.toBeInTheDocument()
+})
+
 test('speaker border has no green ring and the badge is reserved for screen sharing', () => {
   const item = makeItem({})
   const view = render(<ParticipantTile item={item} isSpeaking compact />)

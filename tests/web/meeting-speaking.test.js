@@ -11,8 +11,14 @@ test('quiet speech activates on the first sample and releases without a timer', 
   const cancel = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
   createAudioAnalyser.mockReturnValue({ analyser: { fftSize: 512, getFloatTimeDomainData: data => data.fill(level) }, cleanup })
   const track = { mediaStreamTrack: {} }
-  const { result, rerender, unmount } = renderHook(({ muted }) => useMeetingSpeaking(track, muted, false), { initialProps: { muted: false } })
+  const voiceLevelRef = { current: 0 }
+  const { result, rerender, unmount } = renderHook(({ muted }) => useMeetingSpeaking(track, muted, false, voiceLevelRef), { initialProps: { muted: false } })
   expect(result.current).toBe(true)
+  expect(voiceLevelRef.current).toBeGreaterThan(0)
+  const quietLevel = voiceLevelRef.current
+  level = 0.15
+  act(() => frame(performance.now() + 50))
+  expect(voiceLevelRef.current).toBeGreaterThan(quietLevel)
   level = 0.005
   act(() => frame())
   expect(result.current).toBe(true)
@@ -20,6 +26,7 @@ test('quiet speech activates on the first sample and releases without a timer', 
   act(() => frame())
   expect(result.current).toBe(false)
   rerender({ muted: true })
+  expect(voiceLevelRef.current).toBe(0)
   expect(cleanup).toHaveBeenCalledTimes(1)
   expect(cancel).toHaveBeenCalled()
   unmount()

@@ -97,6 +97,14 @@ async function getPipWindow(size) {
     document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => target.document.head.append(node.cloneNode(true)))
     target.document.documentElement.className = document.documentElement.className
     target.document.body.className = document.body.className
+    if (desktop) {
+      // Inline important beats inherited theme styles, including asynchronously loaded CSS.
+      for (const element of [target.document.documentElement, target.document.body]) {
+        element.style.setProperty('background', 'transparent', 'important')
+        element.style.setProperty('background-image', 'none', 'important')
+        element.style.setProperty('box-shadow', 'none', 'important')
+      }
+    }
     // Native children have no overlaid app title bar. Do not inherit its safe area.
     target.document.documentElement.removeAttribute('data-desktop-platform')
     for (let i = 0; i < document.documentElement.style.length; i++) {
@@ -132,7 +140,8 @@ async function getPipWindow(size) {
       const sizing = target.document.createElement('style')
       sizing.textContent = `
         html[data-desktop-pip="true"],html[data-desktop-pip="true"] body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
-        [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal}
+        html[data-desktop-pip="true"]::before,html[data-desktop-pip="true"]::after,html[data-desktop-pip="true"] body::before,html[data-desktop-pip="true"] body::after{content:none!important;display:none!important}
+        html[data-desktop-pip="true"] [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal;background:transparent!important;box-shadow:none!important}
         /* One silhouette: clip the host to the same radius as its meeting panel.
            Rings and shadows outside that silhouette produce a second dark rim. */
         [data-native-pip-surface]:has([data-meeting-pip]){background:transparent!important;overflow:hidden;border-radius:var(--meeting-pip-radius,24px)}
