@@ -47,7 +47,7 @@ export async function GET(request) {
     }
 
     const documents = await Document.find(query)
-      .populate('employee', 'firstName lastName employeeCode')
+      .populate('employee', 'firstName lastName employeeCode profilePicture')
       .populate('uploadedBy', 'firstName lastName')
       .sort({ createdAt: -1 })
 
@@ -68,7 +68,7 @@ export async function GET(request) {
         .lean()
       const employees = profiles.length
         ? await Employee.find({ _id: { $in: profiles.map(profile => profile.employeeId) } })
-          .select('firstName lastName employeeCode').lean()
+          .select('firstName lastName employeeCode profilePicture').lean()
         : []
       const employeeMap = new Map(employees.map(employee => [String(employee._id), employee]))
       for (const profile of profiles) {

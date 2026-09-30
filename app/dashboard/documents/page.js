@@ -14,6 +14,7 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import { fetchDocumentFile, downloadDocumentFile } from '@/lib/client/documentFile'
 import EmployeeOnboardingDocuments from '@/components/employees/EmployeeOnboardingDocuments'
+import DocumentFolders, { buildDocumentFolders } from '@/components/employees/DocumentFolders'
 
 export default function DocumentsPage() {
   const { user, employeeId } = useMemo(() => {
@@ -25,11 +26,14 @@ export default function DocumentsPage() {
   }, [])
 
   const canManageDocuments = Boolean(user && ['admin', 'super_admin', 'hr'].includes(user.role))
+  const [documentScope, setDocumentScope] = useState('personal')
+  const [selectedFolderId, setSelectedFolderId] = useState(null)
+  const organisationView = canManageDocuments && documentScope === 'public'
 
   // SWR data fetching
   const swrKey = canManageDocuments ? '/api/documents' : employeeId ? `/api/documents?employeeId=${employeeId}` : null
   const { data: docsRes, error, isLoading, isValidating, mutate: refreshDocuments } = useAuthedSWR(swrKey)
-  const documents = docsRes?.data || []
+  const documents = (docsRes?.data || []).filter(document => organisationView || (employeeId && String(document.employee?._id || document.employee || '') === String(employeeId)))
 
   const [showModal, setShowModal] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -40,12 +44,16 @@ export default function DocumentsPage() {
   })
   const [selectedFile, setSelectedFile] = useState(null)
   const fileInputRef = useRef(null)
-  const { data: employeeOptionsRes } = useAuthedSWR(
-    canManageDocuments && showModal
+  const { data: employeeOptionsRes, error: employeeOptionsError, isLoading: employeesLoading, mutate: refreshEmployees } = useAuthedSWR(
+    organisationView
       ? '/api/employees?all=true&status=active,probation,on_leave&limit=1000&sortBy=firstName&sortOrder=asc'
       : null
   )
   const employeeOptions = employeeOptionsRes?.data || []
+  const folderEmployees = organisationView ? employeeOptions : employeeId ? [{ ...user, ...(typeof user.employeeId === 'object' ? user.employeeId : {}), _id: employeeId }] : []
+  const folders = buildDocumentFolders(documents, folderEmployees)
+  const selectedFolder = folders.find(folder => folder.id === selectedFolderId)
+  const folderDocuments = selectedFolder?.documents || []
 
   // Preview modal state
   const [previewDoc, setPreviewDoc] = useState(null)
@@ -129,6 +137,11 @@ export default function DocumentsPage() {
       return
     }
 
+    if (!organisationView && !employeeId) {
+      toast.error('An employee profile is required to upload personal documents')
+      return
+    }
+
     if (!uploadForm.fileName.trim()) {
       toast.error('Please enter a document name')
       return
@@ -163,7 +176,7 @@ export default function DocumentsPage() {
           fileId: uploadData.data.fileId,
           fileType: uploadData.data.fileType || selectedFile.type,
           fileSize: uploadData.data.fileSize || selectedFile.size,
-          employee: canManageDocuments ? uploadForm.employee || undefined : employeeId,
+          employee: organisationView ? uploadForm.employee || undefined : employeeId,
         }),
       })
 
@@ -227,7 +240,10 @@ export default function DocumentsPage() {
       </div>
 
       {/* Document Categories */}
-      <EmployeeOnboardingDocuments onSubmitted={refreshDocuments} />
+      {canManageDocuments && <div role="tablist" aria-label="Document scope" className="flex gap-2 mb-6">
+        {[['personal', 'Personal'], ['public', 'Public']].map(([value, label]) => <Button key={value} role="tab" aria-selected={documentScope === value} color={documentScope === value ? 'primary' : 'default'} variant={documentScope === value ? 'solid' : 'bordered'} onPress={() => { setDocumentScope(value); setSelectedFolderId(null); resetUploadForm() }}>{label}</Button>)}
+      </div>}
+      {organisationView ? <p className="text-sm text-default-500 mb-6">Organisation documents · Employee files remain restricted to authorised Admin and HR users.</p> : <EmployeeOnboardingDocuments onSubmitted={refreshDocuments} />}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {['Identity', 'Personal', 'Employment', 'Tax', 'Other'].map((category) => (
           <div key={category} className="bg-white rounded-lg shadow-md p-6">
@@ -243,6 +259,12 @@ export default function DocumentsPage() {
       </div>
 
       {/* Documents Table */}
+      {organisationView && employeeOptionsError && <DataErrorState message="Could not load the employee directory" onRetry={() => refreshEmployees()} />}
+      <DocumentFolders folders={folders} loading={isLoading || (organisationView && employeesLoading)} onOpen={setSelectedFolderId} />
+      <Modal isOpen={Boolean(selectedFolder)} onClose={() => setSelectedFolderId(null)} size="5xl" scrollBehavior="inside">
+      <ModalContent>
+      <ModalHeader>{selectedFolder?.name} — Documents</ModalHeader>
+      <ModalBody className="pb-6">
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-800">All Documents</h2>
@@ -291,14 +313,14 @@ export default function DocumentsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {documents.length === 0 ? (
+                {folderDocuments.length === 0 ? (
                   <tr>
                     <td colSpan={canManageDocuments ? 6 : 5} className="px-6 py-4 text-center text-gray-500">
                       No documents found
                     </td>
                   </tr>
                 ) : (
-                  documents.map((doc) => (
+                  folderDocuments.map((doc) => (
                     <tr key={doc._id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -377,6 +399,10 @@ export default function DocumentsPage() {
         )}
       </div>
 
+      </ModalBody>
+      </ModalContent>
+      </Modal>
+
       {/* Upload Modal */}
       <Modal isOpen={showModal} onOpenChange={(open) => { if (!open && !uploading) { setShowModal(false); resetUploadForm(); } }} size="lg">
         <ModalContent>
@@ -410,7 +436,7 @@ export default function DocumentsPage() {
                     <SelectItem key="other">Other</SelectItem>
                   </Select>
 
-                  {canManageDocuments && (
+                  {organisationView && (
                     <Select
                       label="Employee (optional)"
                       description="Leave blank for a company-wide HR document"

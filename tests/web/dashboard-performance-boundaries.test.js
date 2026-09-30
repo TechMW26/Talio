@@ -4,12 +4,17 @@ const fs = require('fs')
 const path = require('path')
 
 describe('dashboard performance boundaries', () => {
-  test('punch cards have equal top, bottom and right outer spacing', () => {
+  test('punch cards align with the profile without outer insets', () => {
     const css = fs.readFileSync(path.join(process.cwd(), 'components/widgets/CheckInOutWidget.module.css'), 'utf8')
     const punches = css.match(/\.punches\s*\{([^}]+)\}/)[1]
-    expect(punches).toContain('padding-block: 16px')
-    expect(punches).toContain('padding-right: 16px')
+    expect(punches).toContain('padding: 0')
+    expect(punches).toContain('align-items: stretch')
     expect(punches).toContain('repeat(2,minmax(0,1fr))')
+    const punch = css.match(/\.punch\s*\{([^}]+)\}/)[1]
+    expect(punch).toContain('justify-content: space-between')
+    expect(punch).toContain('padding: 22px')
+    expect(css).not.toContain('padding-left: 16px')
+    expect(css).toContain('@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }')
   })
   const layoutSource = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/layout.js'), 'utf8')
   const transitionCss = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')

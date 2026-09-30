@@ -5,7 +5,6 @@ test('list widgets have a bounded viewport to trigger internal overflow', () => 
   const css = fs.readFileSync('app/globals.css', 'utf8')
   expect(css).toContain('height: 320px; min-height: 320px; max-height: 320px; overflow: hidden;')
   expect(css).toContain('height: 400px; min-height: 400px; max-height: 400px;')
-  expect(fs.readFileSync('components/widgets/CheckInOutWidget.module.css', 'utf8')).toContain('.punches { padding-left: 16px; }')
 })
 
 test('all scroll-shadow widget lists fill available height instead of using old caps', () => {
