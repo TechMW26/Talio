@@ -161,6 +161,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       }
 
       const data = await response.json()
+      console.log('[DEBUG] sidebar counts from server:', data.data)
+
       if (data.success) {
         setSidebarCounts(data.data)
       }

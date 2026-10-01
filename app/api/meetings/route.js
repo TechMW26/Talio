@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { sendMeetingInviteEmail } from '@/lib/mailer'
 import { emitMeetingUpdate } from '@/lib/realtimeEvents'
+import { emitSidebarCountsUpdated } from '@/lib/eventBus'
 import { createMeetingInvitationNotification } from '@/lib/actionableNotifications'
 import { getEndOfDayInTimezone, getStartOfDayInTimezone, parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
 import crypto from 'crypto'
@@ -490,9 +491,18 @@ export async function POST(request) {
     }
 
     // Emit standardized real-time event for dashboard updates
+        // Emit standardized real-time event for dashboard updates
     await emitMeetingUpdate(meeting.toObject(), recipients.map(emp => emp.userId?._id).filter(Boolean), {
       isNew: true, tenantId: auth.tenant.databaseName,
     })
+
+    // Push updated meeting count to organizer + invitees' sidebar bubble in real-time
+    const sidebarNotifyUserIds = [
+      String(organizer.userId),
+      ...recipients.map(emp => emp.userId?._id).filter(Boolean).map(String)
+    ]
+    emitSidebarCountsUpdated({}, sidebarNotifyUserIds, auth.tenant?.databaseName)
+      .catch(err => console.error('[Meeting] Failed to push sidebar count update:', err.message))
     } catch (error) {
       console.error('[Meetings] Post-response invitation delivery failed:', error)
     }

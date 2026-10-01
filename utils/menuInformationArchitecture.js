@@ -206,6 +206,9 @@ const BADGE_COUNT_KEY_BY_PATH = Object.freeze({
   '/dashboard/leave/approvals': 'leaves',
   '/dashboard/expenses/approvals': 'expenses',
   '/dashboard/helpdesk': 'helpdesk',
+  '/dashboard/chat': 'messages',
+  '/dashboard/mail': 'mail',
+  '/dashboard/meetings': 'meetings',
 })
 
 function toBadgeCount(value) {

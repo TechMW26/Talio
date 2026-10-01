@@ -806,6 +806,17 @@ export default function ManagedMeetingRoomSession({
     return () => { clearInterval(timer); controller.abort() }
   }, [joined, roomId, guestToken])
 
+    useEffect(() => {
+    if (!joined || !screenSharing) return undefined
+    const handleBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+      return ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [joined, screenSharing])
+
   const leave = async () => {
     if (leavingRef.current) return
     leavingRef.current = true
