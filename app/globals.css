@@ -2197,8 +2197,8 @@ section[role="dialog"] {
 [role="dialog"] > button[aria-label="Close"] {
   top: 14px !important;
   right: 14px !important;
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   z-index: 30;
   pointer-events: auto !important;
   -webkit-app-region: no-drag;
@@ -2208,26 +2208,35 @@ section[role="dialog"] {
 [role="dialog"] > button[aria-label="Close"] svg { pointer-events: none; }
 [role="dialog"]:has(> button[aria-label="Close"]) > header { padding-right: 72px !important; }
 
-/* Consistent, readable crosses for shared modals and labelled popup controls. */
+/* Standard compact close controls; retain larger targets on touch devices. */
 button[aria-label^="Close"],
 button[title="Close"],
 .modal-close-btn {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 32px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 18px;
   line-height: 1;
   flex-shrink: 0;
 }
 button[aria-label^="Close"] svg,
 button[title="Close"] svg,
 .modal-close-btn svg {
-  width: 24px !important;
-  height: 24px !important;
+  width: 18px !important;
+  height: 18px !important;
   flex-shrink: 0;
   pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  button[aria-label^="Close"],
+  button[title="Close"],
+  .modal-close-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* ============================================
