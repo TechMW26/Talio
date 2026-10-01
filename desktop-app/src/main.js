@@ -678,18 +678,16 @@ function injectTitleBarAdaptations() {
   } else {
     // Windows / Linux: push header right side left of window controls
     platformCSS = '\n' +
-      'header { padding-right: 140px !important; }\n';
+      'header.talio-navigation-header { padding-right: 140px !important; }\n';
   }
 
   var css =
     '/* Electron: Seamless title bar */\n' +
     'body { -webkit-app-region: no-drag; }\n' +
-    'header { position: relative !important; -webkit-app-region: drag; }\n' +
-    'header * { -webkit-app-region: drag; }\n' +
-    'header button, header button *, header input, header input *, header textarea, header textarea *,\n' +
-    'header select, header select *, header a, header a *, header [role="button"], header [role="button"] *,\n' +
-    'header [data-slot], header [data-slot] *, header .cursor-pointer, header .cursor-pointer *,\n' +
-    'header .relative, header .relative *, header [onclick], header [onclick] * { -webkit-app-region: no-drag; }\n' +
+    'header.talio-navigation-header { position: relative !important; -webkit-app-region: drag; }\n' +
+    ':is(button, a, input, textarea, select, label, summary, [role="button"], [tabindex], [contenteditable="true"], .cursor-pointer),\n' +
+    ':is(button, a, label, summary, [role="button"], [tabindex], [contenteditable="true"], .cursor-pointer) *,\n' +
+    '[role="dialog"], [role="dialog"] *, [role="alertdialog"], [role="alertdialog"] * { -webkit-app-region: no-drag !important; }\n' +
     platformCSS;
 
   mainWindow.webContents.insertCSS(css).catch(function () { });
@@ -702,7 +700,7 @@ function injectTitleBarAdaptations() {
     '  window.__TALIO_TITLEBAR_INJECTED__ = true;\n' +
     '  var _lastColor = "";\n' +
     '  function syncTitleBar() {\n' +
-    '    var header = document.querySelector("header");\n' +
+    '    var header = document.querySelector("header.talio-navigation-header");\n' +
     '    var bgColor = "#ffffff";\n' +
     '    if (header) {\n' +
     '      bgColor = getComputedStyle(header).backgroundColor;\n' +

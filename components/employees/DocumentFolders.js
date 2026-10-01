@@ -1,11 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Avatar, Input, Skeleton } from '@heroui/react'
+import { Avatar, Button, Input, Skeleton } from '@heroui/react'
 import { FaSearch } from 'react-icons/fa'
 import DocumentThumbnail from './DocumentThumbnail'
 import styles from './DocumentFolders.module.css'
 import { preloadDocumentFiles } from '@/lib/client/documentFile'
+
+const FOLDER_PAGE_SIZE = 12
 
 // Stable pseudo-random palette: colours do not jump on search, sorting or refresh.
 export function folderHue(id) {
@@ -39,11 +41,17 @@ export function buildDocumentFolders(documents, employees = []) {
 
 export default function DocumentFolders({ folders, loading, onOpen }) {
   const [search, setSearch] = useState('')
-  const visible = useMemo(() => folders.filter(folder => `${folder.name} ${folder.code || ''}`.toLowerCase().includes(search.trim().toLowerCase())), [folders, search])
+  const [visibleCount, setVisibleCount] = useState(FOLDER_PAGE_SIZE)
+  const matches = useMemo(() => folders.filter(folder => `${folder.name} ${folder.code || ''}`.toLowerCase().includes(search.trim().toLowerCase())), [folders, search])
+  const visible = matches.slice(0, visibleCount)
+  const updateSearch = value => {
+    setSearch(value)
+    setVisibleCount(FOLDER_PAGE_SIZE)
+  }
   return <section aria-label="Document folders" className="space-y-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h2 className="text-xl font-semibold">Document folders</h2>
-      <Input aria-label="Search document folders" placeholder="Search by name or employee code…" value={search} onValueChange={setSearch} startContent={<FaSearch aria-hidden="true" />} isClearable onClear={() => setSearch('')} className="sm:max-w-xs" />
+      <Input aria-label="Search document folders" placeholder="Search by name or employee code…" value={search} onValueChange={updateSearch} startContent={<FaSearch aria-hidden="true" />} isClearable onClear={() => updateSearch('')} className="sm:max-w-xs" />
     </div>
     {loading ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(id => <Skeleton key={id} className="h-40 rounded-2xl" />)}</div>
       : visible.length ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -57,5 +65,9 @@ export default function DocumentFolders({ folders, loading, onOpen }) {
           </span>
         </button>)}
       </div> : <div className="rounded-2xl border border-dashed border-default-200 p-10 text-center text-default-500">{search ? 'No matching folders.' : 'No document folders available.'}</div>}
+    {!loading && matches.length > 0 && <div className="flex flex-col items-center gap-3 pt-4">
+      <p role="status" className="text-sm text-default-500">Showing {visible.length} of {matches.length} folders</p>
+      {visible.length < matches.length && <Button variant="bordered" onPress={() => setVisibleCount(count => count + FOLDER_PAGE_SIZE)}>Load more</Button>}
+    </div>}
   </section>
 }

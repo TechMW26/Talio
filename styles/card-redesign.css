@@ -15,8 +15,8 @@ div.bg-white.rounded,
   box-shadow: none !important;
 }
 
-/* Only navigation chrome owns a background; page headings stay transparent. */
-header.talio-navigation-header,
+/* Bottom navigation retains its surface; the dashboard header uses the shared
+   sidebar token in globals.css and must not be overridden here. */
 .bottom-nav,
 .bottom-nav.bg-white {
   background-color: #FFFFFF !important;
@@ -118,8 +118,7 @@ button.shadow-lg,
    DARK MODE - Card Redesign Overrides
    ============================================ */
 
-/* Keep navigation chrome dark without painting every page heading. */
-html.dark header.talio-navigation-header,
+/* Keep bottom navigation dark without overriding the shared header surface. */
 html.dark .bottom-nav,
 html.dark .bottom-nav.bg-white {
   background-color: #18181b !important;

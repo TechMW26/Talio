@@ -1,12 +1,13 @@
 import { Inter, Montserrat } from 'next/font/google'
 import './globals.css'
+import '../styles/notifications.css'
 import '../styles/mobile-responsive.css'
 import '../styles/mobile-fix.css'
 import '../styles/card-redesign.css'
 import '../styles/theme.css'
 import '../styles/ui-components.css'
 import '../styles/dark-mode.css'
-import { Toaster } from 'react-hot-toast'
+import NotificationToaster from '@/components/ui/NotificationToaster'
 import { Providers } from '@/components/Providers'
 import ErrorPageCache from '@/components/ErrorPageCache'
 import SplashVideo from '@/components/SplashVideo'
@@ -142,17 +143,7 @@ export default function RootLayout({ children }) {
             <ImageRecovery />
             <ErrorPageCache />
             {children}
-            <Toaster
-              position="top-right"
-              containerStyle={{
-                zIndex: 999999,
-              }}
-              toastOptions={{
-                style: {
-                  fontSize: '14px',
-                },
-              }}
-            />
+            <NotificationToaster />
           </SplashVideo>
         </Providers>
       </body>

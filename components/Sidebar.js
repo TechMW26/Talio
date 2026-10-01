@@ -507,7 +507,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
 
             {/* Scrollable Menu Section */}
             <ScrollShadow className="flex-1 space-y-0.5 px-3 pb-6 pt-3 scrollbar-hide">
-              <label className="talio-sidebar-search mb-5 flex items-center gap-2 px-3 py-2">
+              <label data-search-container className="talio-sidebar-search mb-5 flex items-center gap-2 px-3 py-2">
                 <HiOutlineMagnifyingGlass className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
                 <input
                   value={menuQuery}

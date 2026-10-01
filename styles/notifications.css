@@ -1,0 +1,45 @@
+/* One quiet, elevated surface for delivered notifications and their history. */
+html body .talio-notification-card,
+html body .talio-feedback-toast {
+  --notice-ink: #18181b;
+  --notice-muted: #62626c;
+  --notice-line: #e4e4e7;
+  color: var(--notice-ink);
+  background: #fff !important;
+  border: 1px solid var(--notice-line) !important;
+  border-radius: 18px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 12%), 0 2px 6px rgb(0 0 0 / 6%) !important;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+}
+html.dark body .talio-notification-card,
+html.dark body .talio-feedback-toast {
+  --notice-ink: #f4f4f5;
+  --notice-muted: #b1b1ba;
+  --notice-line: #414146;
+  background: #242426 !important;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 38%), 0 2px 8px rgb(0 0 0 / 20%) !important;
+}
+.talio-notification-card { width: 100%; overflow: hidden; }
+.notice-header { display: flex; align-items: flex-start; gap: 12px; padding: 18px 18px 10px; }
+.notice-icon { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 11px; background: rgb(128 128 128 / 12%); color: var(--notice-muted); }
+.notice-content { flex: 1; min-width: 0; }
+.notice-meta { font-size: 11px; line-height: 18px; color: var(--notice-muted); margin-bottom: 4px; }
+html body .notice-title { color: var(--notice-ink) !important; font-size: 14px; line-height: 21px; font-weight: 650; margin: 0; }
+html body .notice-message { color: var(--notice-muted) !important; font-size: 13px; line-height: 21px; white-space: pre-wrap; padding: 0 18px 16px; max-height: 168px; overflow-y: auto; }
+.notice-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; border-top: 1px solid var(--notice-line); padding: 12px 18px; }
+html body .notice-button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 36px; padding: 8px 13px; border: 1px solid var(--notice-line) !important; border-radius: 10px; background: transparent !important; color: var(--notice-ink) !important; font-size: 12px; line-height: 18px; font-weight: 600; cursor: pointer; transition: opacity 150ms, background-color 150ms; }
+html body .notice-button-primary { background: var(--notice-ink) !important; color: #fff !important; border-color: transparent !important; }
+html.dark body .notice-button-primary { color: #18181b !important; }
+html body .notice-button-danger { color: #dc2626 !important; }
+html.dark body .notice-button-danger { color: #fda4af !important; }
+html body .notice-close { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px; color: var(--notice-muted); background: transparent; border: 0; cursor: pointer; }
+.notice-button:hover, .notice-close:hover { opacity: .78; }
+.notice-button:disabled, .notice-close:disabled { opacity: .45; cursor: not-allowed; }
+html body .talio-notification-card button:focus-visible,
+html body .talio-feedback-toast button:focus-visible { outline: 2px solid var(--notice-ink) !important; outline-offset: 2px; }
+.notice-reminder { padding: 0 18px 12px; display: flex; justify-content: flex-end; }
+.notice-enter { transition: transform 220ms ease-out, opacity 220ms ease-out; }
+.notice-enter[data-visible="false"] { transform: translateY(-8px); opacity: 0; }
+.notice-enter[data-visible="true"] { transform: translateY(0); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .notice-enter, .notice-button { transition: none !important; transform: none !important; } }

@@ -16,6 +16,38 @@ const employee = { _id: 'one', firstName: 'Asha', lastName: 'Singh', employeeCod
 const other = { _id: 'two', firstName: 'Meera', employeeCode: 'E2' }
 const documents = [{ _id: 'doc', employee, fileName: 'Appointment letter', category: 'employment', createdAt: '2026-09-01' }]
 
+const manyFolders = Array.from({ length: 25 }, (_, index) => ({ id: String(index), name: `Employee ${index}`, code: `CODE${index}`, documents: [] }))
+
+test('public folders load in batches and hide Load more at the end', () => {
+  render(<DocumentFolders folders={manyFolders} onOpen={jest.fn()} />)
+  expect(screen.getAllByRole('button', { name: /^Open Employee/ })).toHaveLength(12)
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 12 of 25 folders')
+  fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(screen.getAllByRole('button', { name: /^Open Employee/ })).toHaveLength(24)
+  fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(screen.getAllByRole('button', { name: /^Open Employee/ })).toHaveLength(25)
+  expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+})
+
+test('search covers unloaded folders and resets the batch when cleared', () => {
+  render(<DocumentFolders folders={manyFolders} onOpen={jest.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  fireEvent.change(screen.getByLabelText('Search document folders'), { target: { value: 'CODE24' } })
+  expect(screen.getByRole('button', { name: 'Open Employee 24 documents' })).toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 1 folders')
+  fireEvent.change(screen.getByLabelText('Search document folders'), { target: { value: '' } })
+  expect(screen.getAllByRole('button', { name: /^Open Employee/ })).toHaveLength(12)
+})
+
+test('loading and empty folders do not show pagination controls', () => {
+  const view = render(<DocumentFolders folders={manyFolders} loading onOpen={jest.fn()} />)
+  expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  view.rerender(<DocumentFolders folders={[]} onOpen={jest.fn()} />)
+  expect(screen.getByText('No document folders available.')).toBeInTheDocument()
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
+})
+
 beforeEach(() => {
   localStorage.clear()
   global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }

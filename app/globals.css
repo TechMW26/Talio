@@ -46,6 +46,19 @@ html[data-desktop-platform] .talioboard-window-header button,
 html[data-desktop-platform] .talioboard-window-header button * {
   -webkit-app-region: no-drag;
 }
+
+/* Older desktop builds marked every header descendant as draggable. Override
+   that injected rule for page/dialog headers and interactive hit targets.
+   Keep only the navigation and board title bars available for window dragging. */
+html[data-desktop-platform] header:not(.talio-navigation-header):not(.talioboard-window-header),
+html[data-desktop-platform] header:not(.talio-navigation-header):not(.talioboard-window-header) *,
+html[data-desktop-platform] :is([role="dialog"], [role="alertdialog"]),
+html[data-desktop-platform] :is([role="dialog"], [role="alertdialog"]) *,
+html[data-desktop-platform] :is(button, a, input, textarea, select, label, summary, [role="button"], [tabindex], [contenteditable="true"], .cursor-pointer),
+html[data-desktop-platform] :is(button, a, label, summary, [role="button"], [tabindex], [contenteditable="true"], .cursor-pointer) * {
+  -webkit-app-region: no-drag !important;
+  app-region: no-drag !important;
+}
 html[data-desktop-platform] .talioboard-window-error {
   padding-top: calc(var(--desktop-safe-top, 0px) + 24px);
 }
@@ -159,6 +172,15 @@ html:is(:root, .dark, .light) body [data-slot="input-wrapper"] input {
 html:is(:root, .dark, .light) body [data-search-container] input {
   background: transparent !important;
   border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Keyboard focus belongs to the same outer boundary as the field surface. */
+html:is(:root, .dark, .light) body [data-search-container]:has(input:focus-visible) {
+  outline: 2px solid var(--color-primary-500, #737373);
+  outline-offset: 2px;
 }
 
 /* Floating AI surfaces share MIRA's glass treatment without changing canvas colors. */
@@ -295,9 +317,9 @@ button[data-slot="trigger"] [data-slot="innerWrapper"] {
   background-color: transparent !important;
 }
 
-[data-slot="input-wrapper"] input,
-[data-slot="input-wrapper"] textarea,
-[data-slot="input-wrapper"] [data-slot="inner-wrapper"] {
+html body [data-slot="input-wrapper"] input,
+html body [data-slot="input-wrapper"] textarea,
+html body [data-slot="input-wrapper"] [data-slot="inner-wrapper"] {
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
