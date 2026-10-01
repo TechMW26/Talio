@@ -48,9 +48,10 @@ const fetchWithRetry = async (url, options, maxRetries = 1, timeout = 15000) => 
   let lastError
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    let timeoutId
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), timeout)
+      timeoutId = setTimeout(() => controller.abort(), timeout)
 
       const response = await fetch(url, {
         ...options,
@@ -60,6 +61,7 @@ const fetchWithRetry = async (url, options, maxRetries = 1, timeout = 15000) => 
       clearTimeout(timeoutId)
       return response
     } catch (error) {
+      clearTimeout(timeoutId)
       lastError = error
 
       // Don't retry on abort or on final attempt
@@ -128,7 +130,15 @@ export default function useAuthedSWR(key, options = {}) {
   })
   // SWR marks fallback/previous data as loading. Keep that data visible while
   // isValidating reports the background request instead of showing a skeleton.
-  return { ...result, isLoading: result.isLoading && result.data === undefined }
+  // Preserve SWR's lazy dependency tracking. Spreading result reads every
+  // getter, subscribing even data-only consumers to each validation transition.
+  return {
+    get data() { return result.data },
+    get error() { return result.error },
+    get isValidating() { return result.isValidating },
+    get isLoading() { return result.isLoading && result.data === undefined },
+    mutate: result.mutate,
+  }
 }
 
 /**

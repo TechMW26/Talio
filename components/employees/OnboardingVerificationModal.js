@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Modal from '@/components/ui/HeroModal'
 import {
   Button,
   Chip,
   Input,
-  Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
@@ -37,7 +37,7 @@ function initialDetails(requirement, verification) {
   return details
 }
 
-export default function OnboardingVerificationModal({ isOpen, item, onClose, onVerify, onReopen, onRequestChanges, isProcessing, mode = 'review' }) {
+export default function OnboardingVerificationModal({ isOpen, item, profilePhone, linkedEvidence, onClose, onVerify, onReopen, onRequestChanges, isProcessing, mode = 'review' }) {
   const requirement = useMemo(() => getOnboardingVerificationRequirement(item?.key), [item?.key])
   const [details, setDetails] = useState({})
   const [remarks, setRemarks] = useState('')
@@ -45,6 +45,7 @@ export default function OnboardingVerificationModal({ isOpen, item, onClose, onV
   const [documents, setDocuments] = useState([])
   const [reopenReason, setReopenReason] = useState('')
   const [uploadingKey, setUploadingKey] = useState('')
+  const syncedPhone = item?.key === 'profile' ? String(profilePhone || '').trim() : ''
 
   useEffect(() => {
     if (!isOpen || !requirement) return
@@ -88,8 +89,8 @@ export default function OnboardingVerificationModal({ isOpen, item, onClose, onV
       setUploadingKey('')
       setDocuments(nextDocuments)
 
-      const verification = { details, remarks, documents: nextDocuments }
-      normalizeOnboardingVerification(item.key, verification, { submission: mode === 'submit' })
+      const verification = { details: syncedPhone ? { ...details, phone: syncedPhone } : details, remarks, documents: nextDocuments }
+      normalizeOnboardingVerification(item.key, verification, { submission: mode === 'submit', linkedEvidence })
       const completed = await onVerify?.(verification)
       if (completed) onClose?.()
     } catch (error) {
@@ -206,7 +207,9 @@ export default function OnboardingVerificationModal({ isOpen, item, onClose, onV
                       key={field.key}
                       label={field.label}
                       type={field.type || 'text'}
-                      value={details[field.key] || ''}
+                      value={field.key === 'phone' && syncedPhone ? syncedPhone : details[field.key] || ''}
+                      isReadOnly={field.key === 'phone' && Boolean(syncedPhone)}
+                      description={field.key === 'phone' && syncedPhone ? 'Synced from the employee profile. Update the profile to change this number.' : undefined}
                       onValueChange={(value) => setDetail(field.key, value)}
                       isRequired={field.required}
                     />
@@ -221,6 +224,17 @@ export default function OnboardingVerificationModal({ isOpen, item, onClose, onV
                     <p className="text-xs text-default-500">PDF, image, or office document; maximum 25 MB per file.</p>
                   </div>
                   {requirement.uploads.map((upload) => {
+                    const linkedFiles = item.key === 'documents' && upload.key === 'aadhaar' ? linkedEvidence?.aadhaar : null
+                    if (linkedFiles?.length) return (
+                      <div key={upload.key} className="flex items-center gap-3 rounded-xl border border-success-300 bg-success-50/60 p-4 dark:bg-success-500/10">
+                        <FaCheck className="shrink-0 text-success" aria-hidden="true" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{upload.label}</p>
+                          <p className="text-xs text-success-700 dark:text-success-300">Submitted through profile KYC</p>
+                          <div className="mt-2 flex flex-wrap gap-3">{linkedFiles.map(file => <button key={file.fileUrl} type="button" className="text-xs text-primary underline" onClick={() => downloadDocumentFile(file).catch(error => toast.error(error.message))}>View {file.fileName}</button>)}</div>
+                        </div>
+                      </div>
+                    )
                     const existing = documents.find((document) => document.requirementKey === upload.key)
                     const selected = files[upload.key]
                     return (

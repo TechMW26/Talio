@@ -1,6 +1,16 @@
 import { miraDesktopIntent, miraOpenAppIntent, miraAppNameFollowup } from '@/lib/miraDesktopIntent'
 import { advanceMiraTaskBank } from '@/lib/miraTaskBank'
 
+test.each(['Reduce my laptop brightness', 'Set volume to 30%', 'Mute the sound', 'Turn on my camera and take a selfie', 'मेरे laptop पर camera on करो और मेरी एक selfie ले लो।', 'उसकी brightness कम कर दे।', 'volume kam kar do'])('routes an explicit local control without a named app: %s', text => {
+  expect(miraDesktopIntent(text)).toEqual({ goal: text })
+})
+test.each(['How can I reduce brightness?', 'What is camera capture?', 'Please do not turn on the camera', 'camera on मत करो', 'Cancel brightness adjustment'])('does not execute informational or negative device requests: %s', text => {
+  expect(miraDesktopIntent(text)).toBeNull()
+})
+test.each(['System Settings', 'Photo Booth', 'Camera'])('recognizes native control apps: %s', app => {
+  expect(miraOpenAppIntent(`Open ${app}`)).toBe(app)
+})
+
 test.each(['OpenTaleo', 'Open Teleo', 'Teleo app open करो', 'Talio खोलो', 'Open T A L I O', 'please open T-A-L-I-O', 'Can you open Talio?'])('normalizes Talio launch: %s', text => {
   expect(miraOpenAppIntent(text)).toBe('Talio')
 })

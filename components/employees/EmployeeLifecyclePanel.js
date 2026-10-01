@@ -329,6 +329,8 @@ export default function EmployeeLifecyclePanel({ employeeId, onEmployeeRefresh }
       <OnboardingVerificationModal
         isOpen={Boolean(verificationItem)}
         item={verificationItem}
+        profilePhone={details?.profilePhone}
+        linkedEvidence={details?.linkedEvidence}
         isProcessing={processing === `complete_onboarding_item${verificationItem?.key || ''}` || processing === `request_onboarding_changes${verificationItem?.key || ''}`}
         onClose={() => setVerificationItem(null)}
         onVerify={(verification) => runAction('complete_onboarding_item', {

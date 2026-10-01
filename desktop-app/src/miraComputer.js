@@ -10,7 +10,7 @@ const { createMiraDesktopContext } = require('./miraDesktopContext');
 const os = require('os');
 const run = promisify(execFile);
 const protectedApp = /terminal|iterm|powershell|command prompt|^(cmd|pwsh|regedit|mmc)(\.exe)?$|system settings|keychain|password|keepass|lastpass|bitwarden/i;
-const KEY_ACTIONS = ['enter', 'tab', 'escape', 'backspace', 'up', 'down', 'left', 'right', 'select_all', 'copy', 'paste', 'find', 'open_location', 'app_switch', 'app_search', 'browser_address', 'new_tab', 'close_tab', 'refresh', 'save', 'undo', 'redo'];
+const KEY_ACTIONS = ['space', 'enter', 'tab', 'escape', 'backspace', 'up', 'down', 'left', 'right', 'select_all', 'copy', 'paste', 'find', 'open_location', 'app_switch', 'app_search', 'browser_address', 'new_tab', 'close_tab', 'refresh', 'save', 'undo', 'redo'];
 
 function validateComputerAction(value) {
   if (!value || typeof value !== 'object') return null;

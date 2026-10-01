@@ -29,6 +29,7 @@ import {
 import { CutLineIcon, MEETING_REACTIONS } from '@/components/meetings/MeetingVisualIcons'
 import { createMeetingFeedback, unlockMeetingSounds } from '@/lib/meetings/feedback'
 import { ParticipantTile, RemoteAudio } from '@/components/meetings/MeetingMedia'
+import ParticipantGrid from '@/components/meetings/ParticipantGrid'
 import MeetingReactionPicker from '@/components/meetings/MeetingReactionPicker'
 import AddMeetingParticipantsModal from '@/app/dashboard/meetings/components/AddMeetingParticipantsModal'
 import MeetingNotetakerPanel from '@/app/dashboard/meetings/components/MeetingNotetakerPanel'
@@ -1026,7 +1027,7 @@ export default function ManagedMeetingRoomSession({
               playsInline
               muted
               aria-label="Camera preview"
-              className={`absolute inset-0 h-full w-full -scale-x-100 object-cover transition-opacity duration-200 ${previewStatus === 'ready' && !videoOff ? 'opacity-100' : 'opacity-0'}`}
+              className={`absolute inset-0 h-full w-full -scale-x-100 object-contain transition-opacity duration-200 ${previewStatus === 'ready' && !videoOff ? 'opacity-100' : 'opacity-0'}`}
             />
 
             {previewStatus === 'loading' && (
@@ -1205,7 +1206,7 @@ export default function ManagedMeetingRoomSession({
   return (
     <div
       className={isPip
-        ? 'fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex h-[min(26rem,calc(100dvh-2rem))] w-[min(94vw,28rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-100 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0'
+        ? 'fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[130] mx-auto flex h-[min(26rem,calc(100dvh-2rem))] w-[min(calc(100vw-48px),32rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-100 text-slate-900 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-950 dark:text-white dark:ring-white/10 sm:inset-x-auto sm:right-4 sm:mx-0'
         : 'fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white'}
       data-meeting-pip={isPip ? 'expanded' : undefined}
       style={isPip ? { left: 'auto', right: 24, margin: 0, bottom: 'calc(max(24px, env(safe-area-inset-bottom)) + var(--mira-pip-stack-height, 0px))', maxHeight: 'calc(100dvh - 48px - var(--mira-pip-stack-height, 0px))' } : undefined}
@@ -1228,13 +1229,13 @@ export default function ManagedMeetingRoomSession({
         </div>
       </header>
 
-      {!isCompact && <main className="relative flex min-h-0 flex-1 gap-3 overflow-auto p-3">
+      {!isCompact && <div className="relative flex min-h-0 flex-1 gap-3 overflow-auto p-3" data-meeting-stage>
         {presenter ? (
           <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden" data-meeting-layout="presentation">
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
               <ParticipantTile item={presenter} local={presenter.identity === localIdentity} reaction={reactions[presenter.identity]} handRaised={raisedHands[presenter.identity]} isSpeaking={presenter.isSpeaking} featured />
             </div>
-            {railParticipants.length > 0 && (
+            {!isPip && railParticipants.length > 0 && (
               <div className={`flex ${isPip ? 'h-28' : 'h-24 sm:h-28'} shrink-0 gap-2 overflow-x-auto overflow-y-hidden px-0.5 py-0.5`} data-meeting-participant-rail>
                 {railParticipants.map((item) => (
                   <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} compact />
@@ -1243,9 +1244,9 @@ export default function ManagedMeetingRoomSession({
             )}
           </div>
         ) : (
-          <div className={`grid min-w-0 flex-1 gap-3 overflow-y-auto ${orderedParticipants.length <= 1 ? 'grid-cols-1' : isPip ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`} data-meeting-layout="grid">
+          <ParticipantGrid count={orderedParticipants.length} pip={isPip}>
             {orderedParticipants.map((item) => <ParticipantTile key={item.identity} item={item} local={item.identity === localIdentity} reaction={reactions[item.identity]} handRaised={raisedHands[item.identity]} isSpeaking={item.isSpeaking} />)}
-          </div>
+          </ParticipantGrid>
         )}
         {(showChat || showParticipants) && !isPip && <aside className="w-80 shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
           <div className="flex items-center justify-between"><h2 className="font-semibold">{showChat ? 'In-meeting chat' : 'Participants'}</h2><button onClick={() => { setShowChat(false); setShowParticipants(false) }} aria-label="Close panel"><HiOutlineXMark className="h-5 w-5" /></button></div>
@@ -1259,7 +1260,7 @@ export default function ManagedMeetingRoomSession({
             onClose={() => setShowNotetaker(false)}
           />
         )}
-      </main>}
+      </div>}
 
       {participants.filter((participant) => participant.identity !== localIdentity).map((participant) => (
           <span key={`audio-${participant.identity}`}>

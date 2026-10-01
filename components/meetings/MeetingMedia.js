@@ -3,7 +3,10 @@
 import { useEffect, useRef } from 'react'
 import { Track } from 'livekit-client'
 import { HiOutlineMicrophone, HiOutlineHandRaised } from 'react-icons/hi2'
-import { CutLineIcon, MeetingReactionIcon } from './MeetingVisualIcons'
+import { CutLineIcon } from './MeetingVisualIcons'
+import MeetingReactionOverlay from './MeetingReactionOverlay'
+import AIActivityBeam from '@/components/ui/AIActivityBeam'
+import useMeetingSpeaking from '@/hooks/useMeetingSpeaking'
 
 export function RemoteAudio({ participant, source = Track.Source.Microphone }) {
   const ref = useRef(null)
@@ -18,11 +21,15 @@ export function RemoteAudio({ participant, source = Track.Source.Microphone }) {
   return <audio ref={ref} autoPlay data-meeting-audio={source} />
 }
 
-export function ParticipantTile({ item, local = false, reaction, handRaised = false, isSpeaking = false, featured = false, compact = false }) {
+export function ParticipantTile({ item, local = false, reaction, handRaised = false, isSpeaking: reportedSpeaking = false, featured = false, compact = false }) {
   const videoRef = useRef(null)
+  const tileRef = useRef(null)
   const screenPublication = item.participant.getTrackPublication(Track.Source.ScreenShare)
   const cameraPublication = item.participant.getTrackPublication(Track.Source.Camera)
   const publication = screenPublication && !screenPublication.isMuted ? screenPublication : cameraPublication
+  const microphone = item.participant.getTrackPublication(Track.Source.Microphone)
+  const voiceLevelRef = useRef(0)
+  const isSpeaking = useMeetingSpeaking(microphone?.track, Boolean(item.isMuted || microphone?.isMuted), reportedSpeaking, voiceLevelRef)
 
   useEffect(() => {
     const track = publication?.track
@@ -35,14 +42,16 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
   const tileSize = featured
     ? 'h-full min-h-0 w-full'
     : compact
-      ? 'h-24 w-36 shrink-0 sm:h-28 sm:w-44'
-      : 'min-h-44'
+      ? 'aspect-video w-36 shrink-0 self-start sm:w-44'
+      : 'aspect-video w-[var(--meeting-tile-width,100%)] shrink-0'
 
   return (
     <div
-      className={`relative flex overflow-hidden bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-900 dark:ring-white/10 ${isSpeaking ? 'ring-[3px] ring-emerald-400 shadow-[0_0_0_3px_rgba(52,211,153,0.2),0_0_24px_rgba(52,211,153,0.28)]' : ''} ${compact ? 'rounded-xl' : 'rounded-2xl'} ${tileSize}`}
+      ref={tileRef}
+      className={`relative flex overflow-hidden !bg-black ${isSpeaking ? '' : 'ring-1 ring-white/15'} ${compact ? 'rounded-xl' : 'rounded-2xl'} ${tileSize}`}
       data-participant-tile={featured ? 'presenter' : compact ? 'rail' : 'grid'}
       data-speaking={isSpeaking ? 'true' : undefined}
+      aria-label={isSpeaking ? `${item.name} is speaking` : undefined}
     >
       {/* Keep this element mounted while muted: the publication can retain the
           same track across unmute, so a newly mounted node would never attach. */}
@@ -52,10 +61,10 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
         playsInline
         muted
         aria-label={`${item.name} ${item.isScreenSharing ? 'screen share' : 'camera'}`}
-        className={`absolute inset-0 h-full w-full ${item.isScreenSharing ? 'bg-black object-contain' : 'object-cover'} ${local && !item.isScreenSharing ? '-scale-x-100' : ''} ${publication?.track && !publication.isMuted ? '' : 'invisible'}`}
+        className={`absolute inset-0 h-full w-full bg-black object-contain ${local && !item.isScreenSharing ? '-scale-x-100' : ''} ${publication?.track && !publication.isMuted ? '' : 'invisible'}`}
       />
       {(!publication?.track || publication.isMuted) && (
-        <div className="flex h-full w-full flex-1 items-center justify-center">
+        <div className="flex h-full w-full flex-1 items-center justify-center !bg-black">
           <span className={`flex items-center justify-center rounded-full bg-indigo-600 font-semibold text-white ${compact ? 'h-10 w-10 text-sm' : 'h-16 w-16 text-xl'}`}>
             {item.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
           </span>
@@ -66,13 +75,10 @@ export function ParticipantTile({ item, local = false, reaction, handRaised = fa
         {item.isMuted && <CutLineIcon isOff><HiOutlineMicrophone className="h-4 w-4" /></CutLineIcon>}
       </div>
       {item.isScreenSharing && <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white">Presenting</span>}
-      {isSpeaking && <span className={`absolute left-3 ${item.isScreenSharing ? 'top-10' : 'top-3'} flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white shadow-lg`} aria-label={`${item.name} is speaking`}><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />Speaking</span>}
       {handRaised && <span className="absolute right-3 top-3 rounded-full bg-amber-500 p-2 text-white" aria-label={`${item.name} raised their hand`}><HiOutlineHandRaised className="h-5 w-5" /></span>}
-      {reaction && (
-        <span className="pointer-events-none absolute bottom-10 left-1/2 z-30 -translate-x-1/2 motion-safe:animate-bounce drop-shadow-lg">
-          <MeetingReactionIcon value={reaction} className={compact ? 'h-12 w-12' : 'h-20 w-20 sm:h-24 sm:w-24'} />
-        </span>
-      )}
+      {isSpeaking && item.isScreenSharing && <span className="absolute left-3 top-10 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white">Speaking</span>}
+      <AIActivityBeam active={isSpeaking} fadeMs={100} scaleWithSize voiceLevelRef={voiceLevelRef} theme="dark" strength={1} borderRadius={compact ? 12 : 16} />
+      {reaction && <MeetingReactionOverlay anchorRef={tileRef} reaction={reaction} compact={compact} />}
     </div>
   )
 }

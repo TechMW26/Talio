@@ -106,7 +106,7 @@ export default function SearchableSelect({
         ...providedInputProps,
         classNames: {
           ...providedInputProps.classNames,
-          inputWrapper: `min-h-12 bg-default-50 hover:bg-default-100 group-data-[focus=true]:bg-default-50 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${providedInputProps.classNames?.inputWrapper || ''}`.trim(),
+          inputWrapper: `min-h-12 border bg-transparent shadow-none ${providedInputProps.classNames?.inputWrapper || ''}`.trim(),
           input: `text-default-900 placeholder:text-default-400 ${providedInputProps.classNames?.input || ''}`.trim(),
           label: `text-default-600 ${providedInputProps.classNames?.label || ''}`.trim(),
           helperWrapper: `px-1 pt-1 ${providedInputProps.classNames?.helperWrapper || ''}`.trim(),

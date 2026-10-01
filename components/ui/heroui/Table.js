@@ -70,6 +70,8 @@ export function HRMSTable({
   onSortChange,
   className,
   classNames,
+  // A surrounding card owns the surface when embedded.
+  embedded = false,
   stickyActions = /^(actions?|operations)$/i.test(String(columns?.at(-1)?.key || '')),
   ...props
 }) {
@@ -86,7 +88,7 @@ export function HRMSTable({
         sortDescriptor={sortDescriptor}
         onSortChange={onSortChange}
         classNames={{
-          wrapper: 'shadow-none border-0 rounded-xl',
+          wrapper: embedded ? 'shadow-none border-0 rounded-none bg-transparent' : 'shadow-none border-0 rounded-xl',
           th: [
             'bg-default-50',
             'text-default-600',
@@ -121,7 +123,7 @@ export function HRMSTable({
       sortDescriptor={sortDescriptor}
       onSortChange={onSortChange}
       classNames={{
-        wrapper: 'shadow-none border border-default-200 rounded-xl',
+        wrapper: embedded ? 'shadow-none border-0 rounded-none bg-transparent' : 'shadow-none border border-default-200 rounded-xl',
         th: [
           'bg-default-50',
           'text-default-600',

@@ -1,6 +1,20 @@
 import { collectEmployeePages, isCompleteEmployeeList } from '@/lib/client/employeePages'
 
 describe('complete employee lists', () => {
+  test('fetches numbered pages concurrently with a ceiling of three and stable ordering', async () => {
+    let active = 0
+    let peak = 0
+    const result = await collectEmployeePages('/api/employees?all=true', async url => {
+      const page = Number(new URL(url, 'http://test').searchParams.get('page'))
+      active++
+      peak = Math.max(peak, active)
+      await new Promise(resolve => setTimeout(resolve, page % 2 ? 2 : 8))
+      active--
+      return { data: [{ _id: String(page) }], pagination: { pages: 8 } }
+    })
+    expect(peak).toBe(3)
+    expect(result.data.map(e => e._id)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8'])
+  })
   test('loads employees beyond both the first 100 and 1000 records', async () => {
     const fetchPage = jest.fn(async url => {
       const page = Number(new URL(url, 'http://test').searchParams.get('page'))

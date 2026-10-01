@@ -8,7 +8,8 @@ import {
   FaExclamationTriangle, FaCheckCircle, FaPlay, FaClock,
   FaEye, FaCheck, FaTimes
 } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Textarea } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow, ModalContent, ModalHeader, ModalBody, ModalFooter, Textarea } from '@heroui/react'
 
 const priorityColors = {
   low: 'default',

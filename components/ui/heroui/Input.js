@@ -33,9 +33,8 @@ export function HRMSInput({
         label: 'text-default-600 font-medium text-sm',
         input: 'text-default-900',
         inputWrapper: [
-          'bg-default-50',
-          'hover:bg-default-100',
-          'group-data-[focused=true]:bg-default-50',
+          'bg-transparent',
+          'border shadow-none',
           'border-default-200',
           'hover:border-primary-300',
         ],
@@ -67,8 +66,8 @@ export function HRMSTextarea({
         label: 'text-default-600 font-medium text-sm',
         input: 'text-default-900',
         inputWrapper: [
-          'bg-default-50',
-          'hover:bg-default-100',
+          'bg-transparent',
+          'border shadow-none',
           'border-default-200',
         ],
       }}
@@ -95,8 +94,8 @@ export function HRMSSelect({
       classNames={{
         label: 'text-default-600 font-medium text-sm',
         trigger: [
-          'bg-default-50',
-          'hover:bg-default-100',
+          'bg-transparent',
+          'border shadow-none',
           'border-default-200',
         ],
         value: 'text-default-900',

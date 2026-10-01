@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import InductionGate from '@/components/induction/InductionGate'
 import { inductionRequest } from '@/lib/client/induction'
 import { fetchDocumentFile } from '@/lib/client/documentFile'
@@ -14,6 +14,20 @@ jest.mock('@/components/induction/PresentationReader', () => ({ __esModule: true
 </div> }))
 
 const pending = { required: true, canManage: false, viewedThrough: 0, program: { version: 'v1', title: 'Welcome to Talio', pageCount: 2, format: 'pdf' } }
+test('completed induction does not flash a dialog while status loads or revalidates', async () => {
+  let resolve
+  inductionRequest.mockReturnValue(new Promise(done => { resolve = done }))
+  const view = render(<InductionGate><p>Private dashboard</p></InductionGate>)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.queryByText('Private dashboard')).not.toBeInTheDocument()
+  await act(async () => resolve({ required: false }))
+  expect(screen.getByText('Private dashboard')).toBeInTheDocument()
+  usePathname.mockReturnValue('/dashboard/documents')
+  view.rerender(<InductionGate><p>Documents</p></InductionGate>)
+  fireEvent.focus(window)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByText('Documents')).toBeInTheDocument()
+})
 beforeEach(() => {
   jest.clearAllMocks()
   usePathname.mockReturnValue('/dashboard')

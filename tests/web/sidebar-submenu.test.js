@@ -20,6 +20,28 @@ const workMenu = {
 }
 
 describe('SidebarSubmenu', () => {
+  test('shows resignation destinations directly without a repeated module heading', () => {
+    const onNavigate = jest.fn()
+    const name = 'Resignations & Exits'
+    const destinations = [
+      ['Overview', '/dashboard/resignations'],
+      ['My requests', '/dashboard/resignations?view=mine'],
+      ['Approvals', '/dashboard/resignations?view=reviews'],
+      ['F&F / Offboarding', '/dashboard/resignations?view=offboarding'],
+      ['Completed exits', '/dashboard/resignations?view=completed'],
+    ]
+    const item = { id: 'resignations', name, submenu: destinations.map(([label, route]) => ({ name: label, path: route, section: name })) }
+    const { rerender } = render(<SidebarSubmenu item={item} effectivePath="/dashboard" onNavigate={onNavigate} />)
+    expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    destinations.forEach(([label, route]) => expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', route))
+    expect(screen.getByRole('link', { name: 'Overview' }).closest('.talio-sidebar-module-items')).toBeNull()
+    fireEvent.click(screen.getByRole('link', { name: 'Approvals' }))
+    expect(onNavigate).toHaveBeenCalledWith('/dashboard/resignations?view=reviews', expect.any(Object))
+    rerender(<SidebarSubmenu item={{ ...item, submenu: [item.submenu[1]] }} effectivePath="/dashboard/resignations?view=mine" onNavigate={onNavigate} />)
+    expect(screen.getByRole('link', { name: 'My requests' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByText(name)).not.toBeInTheDocument()
+  })
+
   test('renders singular modules as direct links without duplicate headings', () => {
     render(
       <SidebarSubmenu

@@ -10,6 +10,7 @@ import { loadOffboardingAssetClearance } from '@/lib/hrms/offboardingAssets.serv
 import { createWorkflow } from '@/lib/hrms/workflowService.server'
 import { buildDirectReportsFilter } from '@/lib/teamScope'
 import { resolveInductionProgram, progressId } from '@/lib/hrms/induction.server'
+import { getOnboardingKycEvidence } from '@/lib/hrms/onboardingKyc.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,7 +80,7 @@ async function authorize(request, id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return { response: NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 }) }
   }
-  const auth = await getAuthAndModels(request, ['Employee', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'Document', 'Asset', 'Payroll', 'Policy', 'ProbationApproval', 'InductionProgram', 'InductionProgress'])
+  const auth = await getAuthAndModels(request, ['Employee', 'User', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'Document', 'Asset', 'Payroll', 'Policy', 'ProbationApproval', 'InductionProgram', 'InductionProgress'])
   if (!auth.success) {
     return { response: NextResponse.json({ success: false, message: auth.message || 'Unauthorized' }, { status: 401 }) }
   }
@@ -151,6 +152,8 @@ async function getLifecycle(request, { params }) {
       lifecycle,
       induction: { complete: inductionComplete, required: Boolean(inductionProgram?.active && !inductionComplete), acknowledgedAt: inductionAcknowledgedAt || null },
       employeeName: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
+      profilePhone: employee.phone || '',
+      linkedEvidence: onboardingEnabled ? await getOnboardingKycEvidence(auth.models, employee._id) : {},
       progress: getLifecycleProgress(lifecycle),
       automation: { enabled: true, signals },
       workflows,
@@ -233,6 +236,7 @@ async function patchLifecycle(request, { params }) {
     result = applyLifecycleAction(reconciledLifecycle, action, body, {
       actorId: actorId(auth.user),
       employee,
+      linkedEvidence: action === 'complete_onboarding_item' && body.itemKey === 'documents' ? await getOnboardingKycEvidence(auth.models, employee._id) : {},
     })
     if (action === 'start_offboarding') {
       const clearance = await loadOffboardingAssetClearance({

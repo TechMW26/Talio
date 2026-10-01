@@ -5,7 +5,8 @@ import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes, FaUpload } from 'react-icons/fa'
 import { getEmployeeId } from '@/utils/userHelper'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Skeleton } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -14,6 +15,9 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import { fetchDocumentFile, downloadDocumentFile } from '@/lib/client/documentFile'
 import EmployeeOnboardingDocuments from '@/components/employees/EmployeeOnboardingDocuments'
+import DocumentFolders, { buildDocumentFolders } from '@/components/employees/DocumentFolders'
+import DocumentGrid from '@/components/employees/DocumentGrid'
+import FolderDocumentSurface from '@/components/employees/FolderDocumentSurface'
 
 export default function DocumentsPage() {
   const { user, employeeId } = useMemo(() => {
@@ -25,11 +29,15 @@ export default function DocumentsPage() {
   }, [])
 
   const canManageDocuments = Boolean(user && ['admin', 'super_admin', 'hr'].includes(user.role))
+  const [documentScope, setDocumentScope] = useState('personal')
+  const [selectedFolderId, setSelectedFolderId] = useState(null)
+  const folderSource = useRef(null)
+  const organisationView = canManageDocuments && documentScope === 'public'
 
   // SWR data fetching
   const swrKey = canManageDocuments ? '/api/documents' : employeeId ? `/api/documents?employeeId=${employeeId}` : null
   const { data: docsRes, error, isLoading, isValidating, mutate: refreshDocuments } = useAuthedSWR(swrKey)
-  const documents = docsRes?.data || []
+  const documents = (docsRes?.data || []).filter(document => organisationView || (employeeId && String(document.employee?._id || document.employee || '') === String(employeeId)))
 
   const [showModal, setShowModal] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -40,12 +48,14 @@ export default function DocumentsPage() {
   })
   const [selectedFile, setSelectedFile] = useState(null)
   const fileInputRef = useRef(null)
-  const { data: employeeOptionsRes } = useAuthedSWR(
-    canManageDocuments && showModal
+  const { data: employeeOptionsRes, error: employeeOptionsError, isLoading: employeesLoading, mutate: refreshEmployees } = useAuthedSWR(
+    organisationView
       ? '/api/employees?all=true&status=active,probation,on_leave&limit=1000&sortBy=firstName&sortOrder=asc'
       : null
   )
   const employeeOptions = employeeOptionsRes?.data || []
+  const folders = organisationView ? buildDocumentFolders(documents, employeeOptions) : []
+  const selectedFolder = folders.find(folder => folder.id === selectedFolderId)
 
   // Preview modal state
   const [previewDoc, setPreviewDoc] = useState(null)
@@ -129,6 +139,11 @@ export default function DocumentsPage() {
       return
     }
 
+    if (!organisationView && !employeeId) {
+      toast.error('An employee profile is required to upload personal documents')
+      return
+    }
+
     if (!uploadForm.fileName.trim()) {
       toast.error('Please enter a document name')
       return
@@ -163,7 +178,7 @@ export default function DocumentsPage() {
           fileId: uploadData.data.fileId,
           fileType: uploadData.data.fileType || selectedFile.type,
           fileSize: uploadData.data.fileSize || selectedFile.size,
-          employee: canManageDocuments ? uploadForm.employee || undefined : employeeId,
+          employee: organisationView ? uploadForm.employee || undefined : employeeId,
         }),
       })
 
@@ -227,13 +242,15 @@ export default function DocumentsPage() {
       </div>
 
       {/* Document Categories */}
-      <EmployeeOnboardingDocuments onSubmitted={refreshDocuments} />
+      {canManageDocuments && <div role="tablist" aria-label="Document scope" className="flex gap-2 mb-6">
+        {[['personal', 'Personal'], ['public', 'Public']].map(([value, label]) => <Button key={value} role="tab" aria-selected={documentScope === value} color={documentScope === value ? 'primary' : 'default'} variant={documentScope === value ? 'solid' : 'bordered'} onPress={() => { setDocumentScope(value); setSelectedFolderId(null); resetUploadForm() }}>{label}</Button>)}
+      </div>}
+      {organisationView ? <p className="text-sm text-default-500 mb-6">Organisation documents · Employee files remain restricted to authorised Admin and HR users.</p> : <EmployeeOnboardingDocuments onSubmitted={refreshDocuments} />}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {['Identity', 'Personal', 'Employment', 'Tax', 'Other'].map((category) => (
           <div key={category} className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
               <h3 className="text-sm font-medium text-gray-600">{category}</h3>
-              <FaFile className={`ml-2 ${category === 'Identity' ? 'text-green-500' : 'text-primary-500'}`} />
             </div>
             <div className="text-3xl font-bold text-gray-800">
               {documents.filter(d => d.category === category.toLowerCase()).length}
@@ -242,140 +259,13 @@ export default function DocumentsPage() {
         ))}
       </div>
 
-      {/* Documents Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">All Documents</h2>
-        </div>
-
-        {isLoading ? (
-          <div className="p-4">
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="flex items-center gap-4 py-3">
-                  <Skeleton className="w-8 h-8 rounded" />
-                  <Skeleton className="h-4 w-1/4 rounded" />
-                  <Skeleton className="h-4 w-20 rounded" />
-                  <Skeleton className="h-4 w-16 rounded" />
-                  <Skeleton className="h-4 w-24 rounded" />
-                  <Skeleton className="h-4 w-20 rounded" />
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Document Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  {canManageDocuments && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee
-                    </th>
-                  )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Size
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Upload Date
-                  </th>
-<th data-sticky-actions="true" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {documents.length === 0 ? (
-                  <tr>
-                    <td colSpan={canManageDocuments ? 6 : 5} className="px-6 py-4 text-center text-gray-500">
-                      No documents found
-                    </td>
-                  </tr>
-                ) : (
-                  documents.map((doc) => (
-                    <tr key={doc._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <FaFile className={`mr-3 ${doc.isAadhaarDocument ? 'text-green-500' : 'text-primary-500'}`} />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                              {doc.fileName || doc.name}
-                              {doc.status && <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${['pending', 'changes_requested', 'rejected'].includes(doc.status) ? 'bg-warning-100 text-warning-800' : 'bg-success-100 text-success-800'}`}>
-                                {doc.status === 'pending' ? 'Pending HR review' : doc.status === 'changes_requested' ? 'Changes requested' : doc.status === 'issued' ? 'Issued letter' : doc.status === 'approved' ? 'Verified' : doc.status}
-                              </span>}
-                              {doc.isAadhaarDocument && (
-                                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
-                                  Verified
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-sm text-gray-500">{doc.fileType || doc.type}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${doc.category === 'identity' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
-                          {doc.category}
-                        </span>
-                      </td>
-                      {canManageDocuments && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {doc.employee
-                            ? `${doc.employee.firstName || ''} ${doc.employee.lastName || ''}`.trim() || doc.employee.employeeCode
-                            : 'Company-wide'}
-                        </td>
-                      )}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {doc.isAadhaarDocument ? '-' : formatFileSize(doc.fileSize || 0)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(doc.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => {
-                              setPreviewDoc(doc)
-                              setShowPreview(true)
-                            }}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View"
-                          >
-                            <FaEye />
-                          </button>
-                          <button
-                            onClick={() => downloadDocument(doc)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Download"
-                          >
-                            <FaDownload />
-                          </button>
-                          {!doc.isAadhaarDocument && (!doc.generatedLetter || canManageDocuments) && (
-                            <button
-                              onClick={() => handleDelete(doc._id)}
-                              className="text-red-600 hover:text-red-900"
-                              title="Delete"
-                            >
-                              <FaTrash />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Employee folders and document cards */}
+      {organisationView && employeeOptionsError && <DataErrorState message="Could not load the employee directory" onRetry={() => refreshEmployees()} />}
+      {organisationView ? <DocumentFolders folders={folders} loading={isLoading || employeesLoading} onOpen={(id, element) => { folderSource.current = element; setSelectedFolderId(id) }} /> : <section aria-label="My documents" className="space-y-4">
+        <h2 className="text-xl font-semibold">My documents</h2>
+        {isLoading ? <div aria-label="Loading documents" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(id => <Skeleton key={id} className="h-64 rounded-2xl" />)}</div> : <DocumentGrid documents={documents} canManage={canManageDocuments} onPreview={doc => { setPreviewDoc(doc); setShowPreview(true) }} onDownload={downloadDocument} onDelete={handleDelete} />}
+      </section>}
+      {selectedFolder && <FolderDocumentSurface key={selectedFolder.id} folder={selectedFolder} sourceElement={folderSource.current} onClose={() => setSelectedFolderId(null)} canManage={canManageDocuments} onPreview={doc => { setPreviewDoc(doc); setShowPreview(true) }} onDownload={downloadDocument} onDelete={handleDelete} />}
 
       {/* Upload Modal */}
       <Modal isOpen={showModal} onOpenChange={(open) => { if (!open && !uploading) { setShowModal(false); resetUploadForm(); } }} size="lg">
@@ -410,7 +300,7 @@ export default function DocumentsPage() {
                     <SelectItem key="other">Other</SelectItem>
                   </Select>
 
-                  {canManageDocuments && (
+                  {organisationView && (
                     <Select
                       label="Employee (optional)"
                       description="Leave blank for a company-wide HR document"

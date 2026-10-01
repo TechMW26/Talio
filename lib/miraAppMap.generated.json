@@ -130,6 +130,7 @@
       "app/dashboard/announcements/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/heroui/Button.js",
       "components/ui/heroui/Modal.js"
     ]
@@ -260,6 +261,7 @@
       "app/dashboard/attendance/page.js",
       "components/OvertimePrompt.js",
       "components/attendance/LocationAccessStatus.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js"
@@ -358,7 +360,8 @@
     "sources": [
       "app/dashboard/chat/page.js",
       "components/UnreadBadge.js",
-      "components/chat/MemberAvatar.js"
+      "components/chat/MemberAvatar.js",
+      "components/ui/HeroModal.js"
     ]
   },
   {
@@ -403,6 +406,7 @@
       "app/dashboard/departments/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
       "components/ui/heroui/Button.js",
@@ -440,36 +444,50 @@
     "route": "/dashboard/documents",
     "name": "Documents",
     "controls": [
-      "All Documents",
       "Cancel",
       "Close",
+      "Company documents",
       "Company-wide document",
       "Connection Error",
-      "Delete",
+      "Document folders",
+      "Document scope",
       "Documents",
+      "Documents grid",
       "Download",
       "Download original file",
       "Enter document name",
       "Explain why this verification must be reviewed again",
       "File *",
+      "Loading documents",
+      "My documents",
       "My onboarding documents",
       "Reopen verification",
       "Request changes",
       "Retry",
       "Retry preview",
+      "Search by name or employee code…",
+      "Search document folders",
       "Select Category",
       "Something went wrong",
       "Try Again",
       "Upload Document",
       "View",
-      "View file"
+      "View file",
+      "— Documents"
     ],
     "sources": [
       "app/dashboard/documents/page.js",
+      "components/employees/DocumentFolders.js",
+      "components/employees/DocumentFolders.module.css",
+      "components/employees/DocumentGrid.js",
+      "components/employees/DocumentThumbnail.js",
       "components/employees/EmployeeOnboardingDocuments.js",
+      "components/employees/FolderDocumentSurface.js",
+      "components/employees/FolderDocumentSurface.module.css",
       "components/employees/OnboardingVerificationModal.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -567,6 +585,7 @@
       "Try Again",
       "Unit",
       "Use employee details",
+      "View",
       "View file",
       "e.g. 8"
     ],
@@ -581,7 +600,8 @@
       "components/remoteSupport/RemoteSupportAdminPanel.js",
       "components/remoteSupport/RemoteSupportSessionView.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js"
     ]
   },
   {
@@ -776,6 +796,7 @@
       "app/dashboard/employees/onboarding-emails/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -832,6 +853,7 @@
       "app/dashboard/employees/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -904,6 +926,7 @@
       "app/dashboard/expenses/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js"
     ]
@@ -972,6 +995,7 @@
       "app/dashboard/helpdesk/manage/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1000,6 +1024,7 @@
       "app/dashboard/helpdesk/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1040,6 +1065,7 @@
       "app/dashboard/holidays/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1156,6 +1182,7 @@
       "app/dashboard/leave-types/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1171,15 +1198,21 @@
       "Bulk Allocate",
       "Bulk Import",
       "Cancel",
+      "Clear search",
       "Connection Error",
       "Employee Leave Balances -",
+      "Employee balance pages",
       "Enter number of days",
       "Export",
       "Half-Day Limits by Hierarchy",
       "Leave Allocations",
       "Leave Types",
+      "Next",
       "Pending Allocations",
+      "Previous",
       "Retry",
+      "Search employee leave balances",
+      "Search name or employee code…",
       "Select Employee",
       "Select Leave Type",
       "Select Year",
@@ -1192,6 +1225,7 @@
       "app/dashboard/leave/allocations/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1240,6 +1274,7 @@
       "app/dashboard/leave/approvals/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1310,6 +1345,7 @@
       "app/dashboard/leave/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1344,7 +1380,8 @@
     "sources": [
       "app/dashboard/leave/requests/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js"
     ]
   },
   {
@@ -1441,8 +1478,10 @@
     "name": "Manpower Requests",
     "controls": [
       "Approve & publish",
+      "Business case &amp; job requirements",
       "Cancel",
       "Manpower Requests",
+      "Manpower request list",
       "New manpower request",
       "New request",
       "Next",
@@ -1451,7 +1490,8 @@
       "Reject",
       "Rejection reason",
       "Request pages",
-      "· position(s)"
+      "Request status",
+      "Role, headcount &amp; budget"
     ],
     "sources": [
       "app/dashboard/manpower-requests/page.js",
@@ -1505,6 +1545,7 @@
       "app/dashboard/meetings/components/MeetingJoinLink.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1573,6 +1614,7 @@
       "app/dashboard/meetings/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js"
     ]
   },
@@ -1637,6 +1679,7 @@
     "sources": [
       "app/dashboard/payroll/generate/page.js",
       "components/payroll/AttendanceCorrectionModal.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/heroui/index.js"
     ]
@@ -1753,6 +1796,7 @@
       "app/dashboard/payroll/payslips/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/heroui/Button.js",
       "components/ui/heroui/Card.js",
       "components/ui/heroui/Input.js",
@@ -2103,6 +2147,7 @@
       "app/dashboard/policies/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -2133,7 +2178,8 @@
     ],
     "sources": [
       "app/dashboard/productivity/page.js",
-      "components/productivity/AnalyzedComposite.js"
+      "components/productivity/AnalyzedComposite.js",
+      "components/ui/HeroModal.js"
     ]
   },
   {
@@ -2176,6 +2222,7 @@
       "components/ActiveSessionsSection.js",
       "components/ModalPortal.js",
       "components/TiltWrapper.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js"
     ]
@@ -2349,6 +2396,7 @@
     ],
     "sources": [
       "app/dashboard/projects/approvals/page.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
       "components/ui/Portal.js"
@@ -2432,6 +2480,7 @@
       "components/tasks/CreateTaskModal.js",
       "components/tasks/KanbanBoard.js",
       "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
@@ -2468,6 +2517,7 @@
     ],
     "sources": [
       "app/dashboard/projects/create/page.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
       "components/ui/Portal.js"
@@ -2536,6 +2586,7 @@
       "components/tasks/CreateTaskModal.js",
       "components/tasks/KanbanBoard.js",
       "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
@@ -2648,6 +2699,7 @@
       "app/dashboard/recruitment/[id]/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -2723,6 +2775,7 @@
       "app/dashboard/recruitment/candidates/[id]/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -2837,6 +2890,7 @@
       "app/dashboard/recruitment/interviews/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -2875,8 +2929,10 @@
     "name": "Manpower Requests",
     "controls": [
       "Approve & publish",
+      "Business case &amp; job requirements",
       "Cancel",
       "Manpower Requests",
+      "Manpower request list",
       "New manpower request",
       "New request",
       "Next",
@@ -2885,7 +2941,8 @@
       "Reject",
       "Rejection reason",
       "Request pages",
-      "· position(s)"
+      "Request status",
+      "Role, headcount &amp; budget"
     ],
     "sources": [
       "app/dashboard/recruitment/requisitions/page.js",
@@ -2955,7 +3012,8 @@
       "components/employees/OffboardingAssetChecklistModal.js",
       "components/employees/ResignationExitPanel.js",
       "components/employees/ResignationPanel.js",
-      "components/employees/SettlementEditor.js"
+      "components/employees/SettlementEditor.js",
+      "components/ui/HeroModal.js"
     ]
   },
   {
@@ -3301,6 +3359,7 @@
       "components/settings/InductionSettings.js",
       "components/settings/MiraSettings.js",
       "components/settings/WordPressRecruitmentSettings.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/heroui/SearchableSelect.js"
     ]
@@ -3697,6 +3756,7 @@
       "app/dashboard/todo/page.js",
       "components/tasks/SubtaskCompletionButton.js",
       "components/ui/BackgroundRefreshIndicator.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js"
     ]
   },
@@ -3792,8 +3852,11 @@
       "Minimise picture in picture",
       "Minimise picture in picture to bubble",
       "Minimise to bubble",
+      "Next participants",
       "Open participants",
+      "Participant pages",
       "Preview camera &amp; microphone",
+      "Previous participants",
       "Reactions",
       "Restore meeting",
       "Return to",
@@ -3806,7 +3869,9 @@
       "Thumbs up",
       "Transcript History",
       "Try camera again",
-      "← Back to home"
+      "←",
+      "← Back to home",
+      "→"
     ],
     "sources": [
       "app/dashboard/meetings/components/AddMeetingParticipantsModal.js",
@@ -3814,8 +3879,12 @@
       "app/join/[guestLink]/room/page.js",
       "components/meetings/ManagedMeetingRoomSession.js",
       "components/meetings/MeetingMedia.js",
+      "components/meetings/MeetingReactionOverlay.js",
       "components/meetings/MeetingReactionPicker.js",
       "components/meetings/MeetingVisualIcons.js",
+      "components/meetings/ParticipantGrid.js",
+      "components/ui/AIActivityBeam.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js"
     ]
   },
@@ -3835,7 +3904,8 @@
       "text-default-600 text-sm"
     ],
     "sources": [
-      "app/login/page.js"
+      "app/login/page.js",
+      "components/ui/HeroModal.js"
     ]
   },
   {

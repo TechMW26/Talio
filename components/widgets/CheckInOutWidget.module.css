@@ -17,8 +17,8 @@
 .detailIcon svg { width: 14px; height: 14px; }
 .detail dt { font-size: 10px; color: #98a6bb; margin-bottom: 4px; }
 .detail dd { margin: 0; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.punches { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; min-width: 0; padding-block: 16px; padding-right: 16px; }
-.punch { display: flex; flex-direction: column; gap: 24px; min-width: 0; padding: 24px 20px; border-radius: 18px; border: 1px solid; }
+.punches { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; min-width: 0; align-items: stretch; padding: 0; }
+.punch { display: flex; flex-direction: column; justify-content: space-between; gap: 24px; min-width: 0; padding: 22px; border-radius: 18px; border: 1px solid; }
 .arrival { background: #132c26; border-color: #265e4f; }
 .departure { background: #2a2028; border-color: #513340; }
 .punchHeading { display: flex; align-items: center; gap: 12px; }
@@ -27,13 +27,13 @@
 .punchHeading h3 { color: #edf1f8; font-size: 16px; font-weight: 600; }
 .punchHeading p { color: #a9b8cd; font-size: 11px; margin-top: 4px; }
 .time { font-size: clamp(24px, 2.8vw, 36px); font-weight: 650; color: #f3f5fa; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-.punch button { margin-top: auto; min-width: 0; width: 100%; min-height: 48px; border-radius: 999px; font-size: 14px; font-weight: 600; box-shadow: none; }
+.punch button { flex-shrink: 0; min-width: 0; width: 100%; min-height: 48px; border-radius: 999px; font-size: 14px; font-weight: 600; box-shadow: none; }
 .checkIn { background: #20bd8c !important; color: #052b1f !important; }
 .checkOut { background: #744354 !important; color: #ffe7ee !important; }
 .punch button:disabled, .punch button[data-disabled="true"] { opacity: .45; cursor: not-allowed; }
 .punch button:focus-visible { outline: 2px solid #e2e8f0; outline-offset: 3px; }
 .location { grid-column: 1 / -1; }
 .location:empty { display: none; }
-@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } .punches { padding-left: 16px; } }
+@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .punches { gap: 10px; } .punch { padding: 18px 12px; gap: 20px; } .punchHeading { gap: 8px; } .punchHeading > span { width: 30px; height: 30px; } .punchHeading h3 { font-size: 14px; } .body { padding: 18px !important; } }
 @container (max-width: 400px) { .details { grid-template-columns: repeat(2,minmax(0,1fr)); } .detail:first-child { grid-column: 1 / -1; } }

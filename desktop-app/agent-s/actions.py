@@ -57,8 +57,8 @@ class SafeACI:
 
     @action
     def key(self, key: str):
-        """Press a basic key or a documented cross-platform shortcut: app_switch, app_search, browser_address, new_tab, close_tab, refresh, save, undo, redo, select_all, copy, paste, find, open_location. Choose shortcuts using the supplied OS context."""
-        if key not in ("enter", "tab", "escape", "backspace", "up", "down", "left", "right", "select_all", "copy", "paste", "find", "open_location", "app_switch", "app_search", "browser_address", "new_tab", "close_tab", "refresh", "save", "undo", "redo"):
+        """Press a basic key (including space to activate a focused control) or a documented cross-platform shortcut: app_switch, app_search, browser_address, new_tab, close_tab, refresh, save, undo, redo, select_all, copy, paste, find, open_location. Choose shortcuts using the supplied OS context."""
+        if key not in ("space", "enter", "tab", "escape", "backspace", "up", "down", "left", "right", "select_all", "copy", "paste", "find", "open_location", "app_switch", "app_search", "browser_address", "new_tab", "close_tab", "refresh", "save", "undo", "redo"):
             raise ValueError("Unsupported key")
         return {"type": "key", "key": key}
 

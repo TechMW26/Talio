@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Card, CardBody, CardHeader, Button, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@heroui/react'
+import Modal from '@/components/ui/HeroModal'
+import { Card, CardBody, CardHeader, Button, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload, FaFileUpload, FaCheckCircle, FaTimesCircle, FaRobot, FaClock, FaSearch } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -23,6 +24,8 @@ export default function LeaveAllocationsPage() {
   const [importApplying, setImportApplying] = useState(false)
   const fileInputRef = useRef(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [employeeSearch, setEmployeeSearch] = useState('')
+  const [employeePage, setEmployeePage] = useState(1)
   const [bulkMode, setBulkMode] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
   const hierarchyLevels = ['Entry Level', 'Mid Level', 'Senior', 'Team Lead', 'Assistant Manager', 'Manager', 'C-Suite', 'Assistant Director', 'Director']
@@ -67,15 +70,24 @@ export default function LeaveAllocationsPage() {
 
   const employees = employeesRes?.data || []
   const filteredEmployees = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    if (!query) return employees
-    return employees.filter((employee) => {
-      const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.toLowerCase()
-      const code = (employee.employeeCode || '').toLowerCase()
-      const email = (employee.email || '').toLowerCase()
-      return fullName.includes(query) || code.includes(query) || email.includes(query)
+    const terms = employeeSearch.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
+    return (employeesRes?.data || []).filter(employee => {
+      const text = `${employee.firstName || ''} ${employee.lastName || ''} ${employee.employeeCode || ''}`.toLocaleLowerCase()
+      return terms.every(term => text.includes(term))
     })
-  }, [employees, searchQuery])
+  }, [employeesRes, employeeSearch])
+  const employeePageCount = Math.max(1, Math.ceil(filteredEmployees.length / 25))
+  const currentEmployeePage = Math.min(employeePage, employeePageCount)
+  const visibleEmployees = filteredEmployees.slice((currentEmployeePage - 1) * 25, currentEmployeePage * 25)
+  useEffect(() => { setEmployeePage(1) }, [employeeSearch, selectedYear])
+  const balanceIndex = useMemo(() => {
+    const index = new Map()
+    for (const balance of balancesRes?.data || []) {
+      const key = `${balance.employee?._id || balance.employee}:${balance.leaveType?._id || balance.leaveType}`
+      if (!index.has(key)) index.set(key, balance)
+    }
+    return index
+  }, [balancesRes])
   const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
   const leaveBalances = balancesRes?.data || []
   const loading = employeesLoading || leaveTypesLoading || balancesLoading
@@ -144,9 +156,7 @@ export default function LeaveAllocationsPage() {
   }
 
   const getEmployeeBalance = (employeeId, leaveTypeId) => {
-    return leaveBalances.find(balance =>
-      balance.employee?._id === employeeId && balance.leaveType?._id === leaveTypeId
-    )
+    return balanceIndex.get(`${employeeId}:${leaveTypeId}`)
   }
 
   const exportBalances = () => {
@@ -440,26 +450,27 @@ export default function LeaveAllocationsPage() {
       </div>
 
       {/* Leave Balances Table */}
-            <Card shadow="sm">
-        <CardHeader className="px-6 py-4 border-b border-default-200 flex md:flex-row flex-col md:items-center md:justify-between gap-3">
-          <h2 className="text-lg font-semibold text-default-800">Employee Leave Balances - {selectedYear}</h2>
+      <Card shadow="sm">
+        <CardHeader className="flex flex-col items-start justify-between gap-4 px-6 py-4 border-b border-default-200 sm:flex-row sm:items-center">
+          <div><h2 className="text-lg font-semibold text-default-800">Employee Leave Balances - {selectedYear}</h2>
+          <p className="mt-1 text-sm text-default-500" role="status">Showing {filteredEmployees.length} of {employees.length} employees</p></div>
           <Input
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            placeholder="Search by name, employee code, or email"
-            startContent={<FaSearch className="text-default-400 w-4 h-4" />}
+            aria-label="Search employee leave balances"
+            placeholder="Search name or employee code…"
+            value={employeeSearch}
+            onValueChange={setEmployeeSearch}
             isClearable
-            onClear={() => setSearchQuery('')}
-            size="sm"
-            className="w-full md:w-80"
-            aria-label="Search employees"
+            onClear={() => setEmployeeSearch('')}
+            startContent={<FaSearch className="text-default-400" aria-hidden="true" />}
+            className="w-full sm:max-w-sm"
           />
         </CardHeader>
         <CardBody className="p-0">
-          {employees.length === 0 ? (
+          {filteredEmployees.length === 0 ? (
             <div className="p-8 text-center text-default-500">
               <FaUsers className="w-12 h-12 mx-auto mb-4 text-default-300" />
-              <p>No employees found</p>
+              <p>{employees.length ? 'No employees match your search.' : 'No employees found'}</p>
+              {employeeSearch && <Button variant="light" className="mt-3" onPress={() => setEmployeeSearch('')}>Clear search</Button>}
             </div>
           ) : filteredEmployees.length === 0 ? (
             <div className="p-8 text-center text-default-500">
@@ -487,8 +498,8 @@ export default function LeaveAllocationsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-content1 divide-y divide-default-200">
-                  {filteredEmployees.map((employee) => (
-                      <tr key={employee._id} className="hover:bg-default-50">
+                  {visibleEmployees.map((employee) => (
+                    <tr key={employee._id} className="hover:bg-default-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm">
@@ -543,6 +554,13 @@ export default function LeaveAllocationsPage() {
                   ))}
                 </tbody>
               </table>
+              <nav aria-label="Employee balance pages" className="flex items-center justify-between gap-3 border-t border-default-200 p-4">
+                <span className="text-sm text-default-500">Page {currentEmployeePage} of {employeePageCount} · {filteredEmployees.length} results</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="bordered" isDisabled={currentEmployeePage === 1} onPress={() => setEmployeePage(currentEmployeePage - 1)}>Previous</Button>
+                  <Button size="sm" variant="bordered" isDisabled={currentEmployeePage === employeePageCount} onPress={() => setEmployeePage(currentEmployeePage + 1)}>Next</Button>
+                </div>
+              </nav>
             </div>
           )}
         </CardBody>

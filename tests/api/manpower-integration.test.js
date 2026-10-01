@@ -3,7 +3,7 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server'
 import { getTenantConnection } from '@/lib/tenantDb'
 import { getTenantModels } from '@/lib/tenantModels'
 import { getAuthAndModels } from '@/lib/auth'
-import { POST } from '@/app/api/recruitment/requisitions/route'
+import { GET, POST } from '@/app/api/recruitment/requisitions/route'
 import { reviewManpower } from '@/lib/recruitment/manpower.server'
 import { serializeJob } from '@/lib/recruitment/wordpress.server'
 jest.mock('@/lib/tenantDb', () => ({ getTenantConnection: jest.fn() }))
@@ -31,6 +31,21 @@ beforeEach(async () => {
   body = { action: 'submit', submissionKey: 'unique-request-key-1234', department: String(department), jobTitle: 'Engineer', jobDescription: 'Build software and collaborate with the product team.', justification: 'Additional capacity for new projects', numberOfPositions: 2, location: 'Bhopal', employmentType: 'full-time', workMode: 'hybrid', experienceMin: 1, experienceMax: 4, salaryMin: 400000, salaryMax: 800000, currency: 'INR', requirements: ['Experience'], responsibilities: ['Build software'], skills: ['JavaScript'], benefits: ['Learning budget'] }
 })
 const submit = () => POST(new Request('https://test/api/recruitment/requisitions', { method: 'POST', body: JSON.stringify(body) }))
+test('dashboard statistics and status filters share the requester access scope across pages', async () => {
+  const own = Array.from({ length: 23 }, (_, index) => ({ requestedBy: manager._id, submissionKey: `dashboard-fixture-${index}`, employee: manager.employeeId, department, status: index < 21 ? 'pending' : 'approved', job: { jobTitle: `Role ${index}` }, createdAt: new Date() }))
+  await models.ManpowerRequest.collection.insertMany([...own, { requestedBy: hr._id, employee: hr.employeeId, department, status: 'rejected', job: { jobTitle: 'Private HR request' } }])
+  const request = query => GET(new Request(`https://test/api/recruitment/requisitions?${query}`))
+  const result = await (await request('status=pending&page=2')).json()
+  expect(result.stats).toEqual({ all: 23, pending: 21, approved: 2, rejected: 0 })
+  expect(result.total).toBe(21)
+  expect(result.data).toHaveLength(1)
+  expect(result.data[0].status).toBe('pending')
+  expect((await request('status=unknown')).status).toBe(400)
+  getAuthAndModels.mockResolvedValue({ success: true, user: hr, models })
+  const reviewed = await (await request('status=rejected')).json()
+  expect(reviewed.stats).toEqual({ all: 24, pending: 21, approved: 2, rejected: 1 })
+  expect(reviewed.total).toBe(1)
+})
 test('concurrent HTTP retries create one request and one HR notification', async () => {
   const responses = await Promise.all([submit(), submit()])
   expect(responses.map(response => response.status)).toEqual([200, 200])

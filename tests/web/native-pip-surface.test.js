@@ -14,6 +14,22 @@ function fakeWindow() {
 }
 
 beforeEach(() => { jest.spyOn(document, 'hasFocus').mockReturnValue(true) })
+test('desktop meeting host and panel share one clipped outline', async () => {
+  const target = fakeWindow()
+  target.resizeTo = jest.fn()
+  window.electronAPI = { nativePip: true }
+  jest.spyOn(window, 'open').mockReturnValue(target)
+  const ref = createRef()
+  render(<NativePipSurface ref={ref}><section data-meeting-pip="expanded">Radius test</section></NativePipSurface>)
+  await act(async () => { await ref.current.open() })
+  const css = target.document.head.textContent
+  expect(css).toContain('overflow:hidden;border-radius:var(--meeting-pip-radius,24px)')
+  expect(css).toContain('border-radius:var(--meeting-pip-radius,24px)!important;box-shadow:none!important')
+  expect(css).toContain('--meeting-pip-radius:16px')
+  expect(css).toContain('--meeting-pip-radius:9999px')
+  act(() => target.close())
+  delete window.electronAPI
+})
 test('meeting preserves inline dimensions instead of shrinking with the child viewport', async () => {
   const target = fakeWindow()
   Object.assign(target, { innerWidth: 200, innerHeight: 100, resizeTo: jest.fn() })
@@ -22,10 +38,10 @@ test('meeting preserves inline dimensions instead of shrinking with the child vi
   const ref = createRef()
   render(<NativePipSurface ref={ref}><section data-meeting-pip="expanded">Meeting video<button>Mute</button></section></NativePipSurface>)
   const panel = screen.getByText('Meeting video')
-  panel.getBoundingClientRect = () => panel.ownerDocument === document ? { width: 448, height: 416 } : { width: 188, height: 68 }
+  panel.getBoundingClientRect = () => panel.ownerDocument === document ? { width: 512, height: 416 } : { width: 188, height: 68 }
   await act(async () => { await ref.current.open() })
-  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=448,height=416')
-  expect(target.resizeTo).toHaveBeenLastCalledWith(448, 416)
+  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=512,height=416')
+  expect(target.resizeTo).toHaveBeenLastCalledWith(512, 416)
   expect(target.document.body.contains(panel)).toBe(true)
   expect(target.document.head.textContent).not.toContain('[data-meeting-pip] footer{')
   expect(target.document.head.textContent).not.toContain('[data-meeting-pip] button svg{')
@@ -33,7 +49,7 @@ test('meeting preserves inline dimensions instead of shrinking with the child vi
   await act(async () => { panel.setAttribute('data-meeting-pip', 'compact') })
   expect(target.resizeTo).toHaveBeenLastCalledWith(352, 84)
   await act(async () => { panel.setAttribute('data-meeting-pip', 'expanded') })
-  expect(target.resizeTo).toHaveBeenLastCalledWith(448, 416)
+  expect(target.resizeTo).toHaveBeenLastCalledWith(512, 416)
   act(() => target.close())
 })
 test('MIRA supports dragging, flushes the final position, and leaves buttons clickable', async () => {
@@ -73,9 +89,9 @@ test('desktop MIRA starts at stable dimensions and fits without phantom browser 
   Object.defineProperties(panel, { offsetWidth: { value: 340 }, offsetHeight: { value: 240 } })
   panel.getBoundingClientRect = () => ({ width: 310, height: 200 })
   await act(async () => { await ref.current.open() })
-  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=400,height=120')
-  expect(target.resizeTo).toHaveBeenCalledWith(400, 120)
-  expect(target.document.head.textContent).toContain('aspect-ratio:10/3!important')
+  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=400,height=240')
+  expect(target.resizeTo).toHaveBeenCalledWith(400, 240)
+  expect(target.document.head.textContent).toContain('aspect-ratio:auto!important;min-height:180px!important')
   expect(target.document.head.textContent).toContain('min-height:0!important;height:auto!important;overflow:hidden!important')
   act(() => target.close())
 })
@@ -107,7 +123,13 @@ test('desktop blur opens a transparent external panel and focus restores the sam
   expect(onBackgroundChange).toHaveBeenLastCalledWith(true)
   expect(target.document.body.contains(element)).toBe(true)
   expect(target.document.head.textContent).toContain('background:transparent!important')
+  expect(target.document.body.style.getPropertyValue('background')).toBe('transparent')
+  expect(target.document.body.style.getPropertyPriority('background')).toBe('important')
+  expect(target.document.documentElement.style.backgroundImage).toBe('none')
   expect(target.document.head.textContent).not.toContain('border-radius:0!important')
+  expect(target.document.head.textContent).toContain(':has(.mira-workspace){border-radius:16px!important;overflow:hidden!important;clip-path:inset(0 round 16px)}')
+  expect(target.document.head.textContent).toContain('.mira-workspace::after{content:none!important;display:none!important}')
+  expect(target.document.head.textContent).toContain('box-shadow:none!important;outline:none!important;backdrop-filter:none!important')
   focus.mockReturnValue(true)
   act(() => window.dispatchEvent(new Event('focus')))
   expect(document.body.contains(element)).toBe(true)
@@ -232,8 +254,8 @@ test('initial native dimensions match the element rather than a fixed 480x640 wi
   render(<NativePipSurface ref={ref}><div className="mira-workspace">Sized panel</div></NativePipSurface>)
   screen.getByText('Sized panel').getBoundingClientRect = () => ({ width: 340, height: 164 })
   await act(async () => { await ref.current.open() })
-  expect(window.documentPictureInPicture.requestWindow).toHaveBeenCalledWith({ width: 400, height: 120 })
-  expect(target.document.head.textContent).toContain('aspect-ratio:10/3!important')
+  expect(window.documentPictureInPicture.requestWindow).toHaveBeenCalledWith({ width: 400, height: 180 })
+  expect(target.document.head.textContent).toContain('aspect-ratio:auto!important;min-height:180px!important')
   expect(target.document.head.textContent).toContain('margin:0;padding:0')
   expect(target.document.head.textContent).toContain('border-radius:0!important')
   expect(target.document.head.textContent).toContain('.mira-workspace [data-ai-activity-beam]')

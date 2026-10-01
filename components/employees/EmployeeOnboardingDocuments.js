@@ -35,6 +35,6 @@ export default function EmployeeOnboardingDocuments({ onSubmitted }) {
         {item.submission?.reviewReason && <p className="mt-2 text-xs text-default-500">{item.submission.reviewReason}</p>}
       </button>)}
     </div>
-    <OnboardingVerificationModal isOpen={Boolean(selected)} item={selected} mode="submit" onClose={() => setSelected(null)} isProcessing={busy} onVerify={submit} />
+    <OnboardingVerificationModal isOpen={Boolean(selected)} item={selected} linkedEvidence={data.data.linkedEvidence} profilePhone={data.data.profilePhone} mode="submit" onClose={() => setSelected(null)} isProcessing={busy} onVerify={submit} />
   </section>
 }

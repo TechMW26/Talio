@@ -211,7 +211,7 @@ def control(value):
         }
         if value.get("key") in keys:
             pyautogui.hotkey(*keys[value["key"]])
-        elif value.get("key") in ("enter", "tab", "escape", "backspace", "up", "down", "left", "right"):
+        elif value.get("key") in ("space", "enter", "tab", "escape", "backspace", "up", "down", "left", "right"):
             pyautogui.press(value["key"])
         else:
             raise ValueError("Unsupported key")

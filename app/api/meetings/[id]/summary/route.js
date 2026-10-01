@@ -113,7 +113,6 @@ export async function POST(request, { params }) {
     const { user, models } = auth
     const { Meeting } = models
     const body = await request.json().catch(() => ({}))
-    const requestedLanguage = normalizeMeetingLanguage(body?.language || 'auto')
     const allowNoContent = body?.allowNoContent === true
     const shouldSendMomEmails = body?.sendMomEmails === true
     const sessionStartedAt = toOptionalDate(body?.sessionStartedAt)
@@ -168,7 +167,7 @@ export async function POST(request, { params }) {
 
     const latestSourceUpdatedAt = getLatestSourceUpdatedAt(meeting, transcriptForSummary)
 
-    const insights = await generateMeetingInsights(meetingForSummary, { language: requestedLanguage })
+    const insights = await generateMeetingInsights(meetingForSummary)
 
     const persistedInsights = await persistMeetingInsights(Meeting, meeting, insights, {
       sourceUpdatedAt: latestSourceUpdatedAt,

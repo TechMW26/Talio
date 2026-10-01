@@ -13,10 +13,13 @@ export default function InductionGate({ children }) {
   const [rendered, setRendered] = useState(0), [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0)
   const working = useRef(false), live = useRef(true), marking = useRef(new Set())
+  const refreshing = useRef(false)
   const refresh = useCallback(async () => {
-    if (working.current) return
-    try { const data = await inductionRequest(); if (live.current) setStatus(data) }
+    if (working.current || refreshing.current) return
+    refreshing.current = true
+    try { const data = await inductionRequest(); if (live.current) { setStatus(data); setError('') } }
     catch (error) { if (live.current) setError(error.message) }
+    finally { refreshing.current = false }
   }, [])
   useEffect(() => {
     live.current = true; refresh()
@@ -57,6 +60,10 @@ export default function InductionGate({ children }) {
     finally { setBusy(false); working.current = false }
   }
   if (status && !required) return children
+  // Wait for the authoritative status without presenting an incomplete induction.
+  if (!status) return <div className="min-h-32 p-6" role="status" aria-label="Checking induction status">
+    {error && <div role="alert" className="text-danger">{error}<Button className="ml-3" size="sm" onPress={refresh}>Retry</Button></div>}
+  </div>
   return <div className="fixed inset-0 z-[2147483000] flex items-center justify-center bg-black/90 p-2 sm:p-6">
     <section role="dialog" aria-modal="true" aria-labelledby="induction-title" className="flex max-h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-default-200 bg-content1 shadow-2xl">
       <header className="border-b border-default-200 px-4 py-3 sm:px-6"><h1 id="induction-title" className="text-xl font-semibold">{status?.program?.title || 'Induction & orientation'}</h1><p className="text-sm text-default-500">Read every page and acknowledge to complete your induction. Your progress is saved automatically.</p></header>

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { ParticipantTile, RemoteAudio } from '@/components/meetings/MeetingMedia'
+jest.mock('@/components/ui/AIActivityBeam', () => ({ active, borderRadius }) => active ? <div data-testid="speaker-beam" data-radius={borderRadius} /> : null)
 
 jest.mock('livekit-client', () => ({ Track: { Source: {
   Camera: 'camera', Microphone: 'microphone', ScreenShare: 'screen', ScreenShareAudio: 'screen-audio',
@@ -9,6 +10,33 @@ const makeTrack = () => ({ attach: jest.fn(), detach: jest.fn(), stop: jest.fn()
 const makeItem = (publications) => ({
   name: 'Remote Person', identity: 'remote', isMuted: false, isScreenSharing: false,
   participant: { getTrackPublication: (source) => publications[source] },
+})
+
+test('reactions render above the tile in the document overlay, not inside its clipped card', () => {
+  const view = render(<ParticipantTile item={makeItem({})} reaction="👍" />)
+  const emoji = screen.getByAltText('Thumbs up')
+  expect(emoji.closest('[data-participant-tile]')).toBeNull()
+  expect(emoji.parentElement.parentElement).toBe(document.body)
+  expect(emoji.parentElement).toHaveAttribute('data-meeting-reaction-overlay')
+  expect(emoji.parentElement.style.top).toBe('8px')
+  view.rerender(<ParticipantTile item={makeItem({})} />)
+  expect(screen.queryByAltText('Thumbs up')).not.toBeInTheDocument()
+})
+
+test('speaker border has no green ring and the badge is reserved for screen sharing', () => {
+  const item = makeItem({})
+  const view = render(<ParticipantTile item={item} isSpeaking compact />)
+  const tile = screen.getByLabelText('Remote Person is speaking')
+  expect(tile.className).toContain('!bg-black')
+  expect(tile.className).not.toMatch(/ring-|emerald|shadow-/)
+  expect(screen.queryByText('Speaking')).not.toBeInTheDocument()
+  expect(screen.getByTestId('speaker-beam')).toHaveAttribute('data-radius', '12')
+  view.rerender(<ParticipantTile item={{ ...item, isScreenSharing: true }} isSpeaking featured />)
+  expect(screen.getByText('Speaking')).toBeInTheDocument()
+  expect(screen.getByTestId('speaker-beam')).toHaveAttribute('data-radius', '16')
+  view.rerender(<ParticipantTile item={{ ...item, isScreenSharing: true }} featured />)
+  expect(screen.queryByText('Speaking')).not.toBeInTheDocument()
+  expect(screen.queryByTestId('speaker-beam')).not.toBeInTheDocument()
 })
 
 test.each([false, true])('keeps the attached video mounted across mute/unmute (initial muted=%s)', (initialMuted) => {
@@ -63,7 +91,7 @@ test('switches between camera and uncropped screen share on the same element', (
   view.rerender(<ParticipantTile item={item} local />)
   expect(camera.attach).toHaveBeenCalledWith(video)
   expect(screenTrack.detach).toHaveBeenCalledWith(video)
-  expect(video).toHaveClass('object-cover', '-scale-x-100')
+  expect(video).toHaveClass('object-contain', '-scale-x-100')
 })
 
 test('attaches microphone and presentation audio separately and detaches without stopping remote tracks', () => {

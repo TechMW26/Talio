@@ -58,6 +58,8 @@ export default function DesktopPermissionGate({ children }) {
   }, [active])
   if (!active || desktop === false) return children
   if (desktop && hasRequiredDesktopPermissions(permissions)) return children
+  // Unknown is not denied: do not flash the setup dialog during the first check.
+  if (!permissions && !error) return <div role="status" aria-label="Checking device access" className="min-h-32" />
   return <main className="fixed inset-0 z-[100200] overflow-y-auto bg-background text-foreground flex items-center justify-center p-6" aria-label="Required desktop permissions">
     <section className="w-full max-w-lg rounded-2xl border border-default-200 bg-content1 p-6 shadow-xl">
       <h1 className="text-xl font-semibold">Set up Talio permissions</h1>

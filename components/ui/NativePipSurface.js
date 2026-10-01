@@ -42,7 +42,7 @@ function panelSize(host) {
     // Never feed the child viewport's responsive dimensions back into resizeTo.
     // Keep the actual inline dimensions, or use the equivalent inline mode size
     // when the user expands/minimises the meeting while it is outside the app.
-    const defaults = { expanded: { width: 448, height: 416 }, compact: { width: 352, height: 84 }, bubble: { width: 56, height: 56 } }
+    const defaults = { expanded: { width: 512, height: 416 }, compact: { width: 352, height: 84 }, bubble: { width: 56, height: 56 } }
     const size = host.dataset.meetingMode === mode
       ? { width: Number(host.dataset.meetingWidth), height: Number(host.dataset.meetingHeight) }
       : defaults[mode] || defaults.expanded
@@ -52,7 +52,7 @@ function panelSize(host) {
   }
   if (panel?.matches('.mira-workspace')) {
     const width = Math.min(400, host.ownerDocument.defaultView?.innerWidth || 400)
-    return { width, height: Math.round(width * 0.3) }
+    return { width, height: Math.max(180, Math.ceil(panel.offsetHeight || panel.getBoundingClientRect().height || 0)) }
   }
   const rect = panel?.getBoundingClientRect()
   // Layout dimensions exclude the panel's entrance/exit transform.
@@ -65,7 +65,7 @@ function fitWindow(target) {
   const sizes = surfaces.map(panelSize)
   if (!sizes.length) return
   const width = Math.max(...sizes.map(size => size.width))
-  const height = sizes.reduce((sum, size, index) => sum + (surfaces[index].querySelector('.mira-workspace') ? Math.round(width * 0.3) : size.height), 0) + Math.max(0, sizes.length - 1) * 12
+  const height = sizes.reduce((sum, size) => sum + size.height, 0) + Math.max(0, sizes.length - 1) * 12
   // Browser-owned title bars and minimum dimensions cannot be removed.
   const desktop = target.document.documentElement.dataset.desktopPip === 'true'
   const chromeWidth = desktop ? 0 : Math.max(0, (target.outerWidth || width) - (target.innerWidth || width))
@@ -97,6 +97,14 @@ async function getPipWindow(size) {
     document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => target.document.head.append(node.cloneNode(true)))
     target.document.documentElement.className = document.documentElement.className
     target.document.body.className = document.body.className
+    if (desktop) {
+      // Inline important beats inherited theme styles, including asynchronously loaded CSS.
+      for (const element of [target.document.documentElement, target.document.body]) {
+        element.style.setProperty('background', 'transparent', 'important')
+        element.style.setProperty('background-image', 'none', 'important')
+        element.style.setProperty('box-shadow', 'none', 'important')
+      }
+    }
     // Native children have no overlaid app title bar. Do not inherit its safe area.
     target.document.documentElement.removeAttribute('data-desktop-platform')
     for (let i = 0; i < document.documentElement.style.length; i++) {
@@ -112,8 +120,8 @@ async function getPipWindow(size) {
       ${desktop ? '[data-native-pip-surface]{user-select:none;-webkit-app-region:no-drag;app-region:no-drag}input,textarea{user-select:text}' : ''}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
-      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:10/3!important;min-height:0!important;box-sizing:border-box;transform:none!important}
-      [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0 0 0 auto!important;width:var(--native-panel-width,448px)!important;max-width:100%;box-sizing:border-box}
+      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:auto!important;min-height:180px!important;box-sizing:border-box;transform:none!important}
+      [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0 0 0 auto!important;width:var(--native-panel-width,512px)!important;max-width:100%;box-sizing:border-box}
       [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none!important}
       [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}
       ${desktop ? '' : `
@@ -131,9 +139,21 @@ async function getPipWindow(size) {
     if (desktop) {
       const sizing = target.document.createElement('style')
       sizing.textContent = `
-        html,body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
-        [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal}
-        [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:10/3!important;min-height:0!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
+        html[data-desktop-pip="true"],html[data-desktop-pip="true"] body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important}
+        html[data-desktop-pip="true"]::before,html[data-desktop-pip="true"]::after,html[data-desktop-pip="true"] body::before,html[data-desktop-pip="true"] body::after{content:none!important;display:none!important}
+        html[data-desktop-pip="true"] [data-native-pip-surface]{margin:0!important;padding:0!important;min-height:0!important;line-height:normal;background:transparent!important;box-shadow:none!important}
+        /* One silhouette: clip the host to the same radius as its meeting panel.
+           Rings and shadows outside that silhouette produce a second dark rim. */
+        [data-native-pip-surface]:has([data-meeting-pip]){background:transparent!important;overflow:hidden;border-radius:var(--meeting-pip-radius,24px)}
+        [data-native-pip-surface]:has([data-meeting-pip="compact"]){--meeting-pip-radius:16px}
+        [data-native-pip-surface]:has([data-meeting-pip="bubble"]){--meeting-pip-radius:9999px}
+        [data-native-pip-surface] [data-meeting-pip]{border-radius:var(--meeting-pip-radius,24px)!important;box-shadow:none!important;overflow:hidden!important}
+        [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:auto!important;min-height:180px!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
+        /* The mono VoiceBeam paints a second bright stroke at its corners.
+           Keep its interior glow, but use one clipped native panel silhouette. */
+        html[data-desktop-pip="true"] [data-native-pip-surface]:has(.mira-workspace){border-radius:16px!important;overflow:hidden!important;clip-path:inset(0 round 16px)}
+        html[data-desktop-pip="true"] [data-native-pip-surface] .mira-workspace{border-radius:16px!important;box-shadow:none!important;outline:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+        html[data-desktop-pip="true"] [data-native-pip-surface] .mira-workspace::after{content:none!important;display:none!important}
         [data-native-pip-surface] [data-mira-pip-content]{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
       `
       target.document.head.append(sizing)
@@ -223,8 +243,7 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
       if (automaticRef.current && !isAppAway()) return
       setError('')
       try {
-        const size = window.electronAPI?.nativePip === true && host?.querySelector('.mira-workspace')
-          ? { width: 400, height: 120 } : panelSize(host)
+        const size = panelSize(host)
         const target = await getPipWindow(size)
         if (!mounted.current || !enabledRef.current || !host || (automaticRef.current && !isAppAway())) {
           if (!target.document.querySelector('[data-native-pip-surface]')) target.close()

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react'
 import DesktopPermissionGate, { hasRequiredDesktopPermissions } from '@/components/ui/DesktopPermissionGate'
 import { readTalioDevicePermissions, requestTalioDevicePermission } from '@/lib/talioDevicePermissions'
 jest.mock('next/navigation', () => ({ usePathname: () => '/dashboard' }))
@@ -10,6 +10,16 @@ beforeEach(() => {
   window.electronAPI = { miraPermissions: jest.fn(async () => ({ success: true, permissions: { platform: 'darwin', camera: 'granted', microphone: 'granted', screenRecording: 'granted', location: 'runtime' } })) }
 })
 afterEach(() => { delete window.electronAPI })
+test('does not flash setup while the initial permission read is pending', async () => {
+  let resolve
+  window.electronAPI.miraPermissions.mockReturnValue(new Promise(done => { resolve = done }))
+  render(<DesktopPermissionGate><div>Private dashboard</div></DesktopPermissionGate>)
+  expect(screen.queryByText('Set up Talio permissions')).not.toBeInTheDocument()
+  expect(screen.queryByText('Private dashboard')).not.toBeInTheDocument()
+  await act(async () => resolve({ success: true, permissions: { camera: 'granted', microphone: 'granted', screenRecording: 'granted' } }))
+  expect(screen.getByText('Private dashboard')).toBeInTheDocument()
+  expect(screen.queryByText('Set up Talio permissions')).not.toBeInTheDocument()
+})
 test('does not mount dashboard before required permissions are verified', async () => {
   window.electronAPI.miraPermissions.mockImplementation(async kind => ({ success: true, permissions: { platform: 'darwin', camera: kind === 'camera' ? 'granted' : 'not-determined', microphone: 'granted', screenRecording: 'granted', location: 'denied' } }))
   render(<DesktopPermissionGate><div>Private dashboard</div></DesktopPermissionGate>)

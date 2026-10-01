@@ -43,6 +43,29 @@ test('mutation failure is visible and retains form for retry', () => {
   render(<ManpowerRequests />)
   expect(screen.getByRole('alert')).toHaveTextContent('Budget range is invalid')
 })
+test('dashboard cards show server counts and filtering resets pagination', () => {
+  data.total = 42
+  data.stats = { all: 42, pending: 30, approved: 10, rejected: 2 }
+  render(<ManpowerRequests />)
+  expect(screen.getByRole('button', { name: 'View pending hr' })).toHaveTextContent('30')
+  expect(screen.getByRole('button', { name: 'New request' })).toHaveClass('bg-primary')
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  expect(useAuthedSWR).toHaveBeenLastCalledWith('/api/recruitment/requisitions?page=2&status=all', expect.any(Object))
+  fireEvent.click(screen.getByRole('button', { name: 'View approved' }))
+  expect(useAuthedSWR).toHaveBeenLastCalledWith('/api/recruitment/requisitions?page=1&status=approved', expect.any(Object))
+  expect(screen.getByRole('button', { name: 'Approved', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByText('No approved requests.')).toBeInTheDocument()
+})
+test('loading and failed requests do not display misleading zero counts or enable creation', () => {
+  useAuthedSWR.mockReturnValue({ isLoading: true, mutate })
+  const { rerender } = render(<ManpowerRequests />)
+  expect(screen.getByRole('button', { name: 'View all requests' })).toHaveTextContent('—')
+  expect(screen.queryByRole('button', { name: 'New request' })).not.toBeInTheDocument()
+  useAuthedSWR.mockReturnValue({ error: new Error('Offline'), mutate })
+  rerender(<ManpowerRequests />)
+  expect(screen.getByRole('alert')).toHaveTextContent('Offline')
+  expect(screen.queryByText('No manpower requests yet.')).not.toBeInTheDocument()
+})
 test('request menu is categorised under People', () => {
   expect(buildNavigationSections([{ name: 'Manpower Requests', path: '/dashboard/manpower-requests' }])[0]).toMatchObject({ name: 'People', submenu: [expect.objectContaining({ path: '/dashboard/manpower-requests' })] })
 })

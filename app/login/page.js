@@ -7,16 +7,16 @@ import toast from '@/utils/toast'
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaExclamationTriangle, FaRedoAlt } from 'react-icons/fa'
 import { resetRedirectFlag } from '@/utils/userHelper'
 import { resetAuthRedirectFlag } from '@/hooks/useAuthedSWR'
-import { 
-  Card, 
-  CardBody, 
+import Modal from '@/components/ui/HeroModal'
+import {
+  Card,
+  CardBody,
   CardFooter,
-  Button, 
+  Button,
   Checkbox,
   Spinner,
   Divider,
   Link as HeroLink,
-  Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
