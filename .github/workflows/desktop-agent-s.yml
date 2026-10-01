@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v6.0.22'
+      - 'v6.0.23'
 permissions:
   contents: write
 jobs:
@@ -85,21 +85,21 @@ jobs:
           pattern: desktop-*
           path: release-assets
           merge-multiple: true
-      - name: Publish v6.0.22
+      - name: Publish v6.0.23
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.22
+          tag_name: v6.0.23
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.22 — Desktop controls and UI refinements
+          name: Talio Desktop 6.0.23 — Refined notifications and desktop interaction fixes
           draft: false
           prerelease: false
           generate_release_notes: false
           body: |
-            MIRA now routes explicit brightness, volume, camera and selfie requests to the current laptop's desktop-control session. Both planners know to use supported keyboard shortcuts and visible native controls, with Space-key activation support. Saved consent, OS permissions, emergency stop and verified outcomes remain required. Camera captures are not shared unless requested.
+            Redesigned in-app notifications with elevated charcoal cards, clear actions, dismiss controls and consistent notification-list styling. Incoming notifications pause auto-dismiss while hovered or keyboard-focused; approval, reason, confirmation and reminder flows are preserved.
 
-            Includes outgoing document-folder and preview refinements, modal fixes, professional English meeting summaries, permission-dialog startup fixes, external PiP transparency, stronger size-responsive meeting edge lighting and room for at least two lines in MIRA PiP.
+            Fixes desktop drag regions that could intercept close buttons and other controls. Header and sidebar now share one colour, wrapped search fields have a single border, and public document folders offer Load more in batches of 12 with full-list search.
 
-            CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 installers, including tested local Agent S runtimes. Interactive hardware-control and camera acceptance on every OS has not been performed; controls depend on device capabilities and user-approved permissions.
+            Validated with focused automated UI tests and a production web build. CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 installers, including tested local Agent S runtimes. Hands-on acceptance on every operating system has not been performed.
 
             Signing: CI packages are not Developer ID signed or Apple notarized; Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
           files: |
