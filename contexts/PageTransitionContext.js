@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 const PageTransitionContext = createContext()
 
@@ -14,8 +14,33 @@ export function PageTransitionProvider({ children }) {
   const [isNavigating, setIsNavigating] = useState(false)
   const [targetPath, setTargetPath] = useState(null)
   const pathname = usePathname()
+  const router = useRouter()
   const prevPathnameRef = useRef(pathname)
   const pathnameRef = useRef(pathname)
+
+  // Warm route modules on intent without downloading every dashboard route.
+  // Next's router cache stays in memory; hashed UI assets use the browser disk cache.
+  useEffect(() => {
+    const prefetched = new Set()
+    const warm = event => {
+      if (!(event.target instanceof Element)) return
+      const anchor = event.target.closest('a[href]')
+      if (!anchor || anchor.hasAttribute('download') || anchor.target === '_blank') return
+      const url = new URL(anchor.href, window.location.origin)
+      if (url.origin !== window.location.origin || !url.pathname.startsWith('/dashboard') || url.pathname === '/dashboard/chat' || url.pathname === pathnameRef.current) return
+      const href = url.pathname + url.search
+      if (prefetched.has(href) || navigator.connection?.saveData) return
+      if (prefetched.size >= 24) prefetched.delete(prefetched.values().next().value)
+      prefetched.add(href)
+      router.prefetch(href, { onInvalidate: () => prefetched.delete(href) })
+    }
+    document.addEventListener('pointerover', warm)
+    document.addEventListener('focusin', warm)
+    return () => {
+      document.removeEventListener('pointerover', warm)
+      document.removeEventListener('focusin', warm)
+    }
+  }, [router])
 
   // Keep pathnameRef in sync
   useEffect(() => {
