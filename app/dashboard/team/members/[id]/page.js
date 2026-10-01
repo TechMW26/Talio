@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useMemo, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -11,7 +13,7 @@ import Loader from '@/components/ui/Loader'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import {
-  FaArrowLeft, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
+  FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
   FaBriefcase, FaStar, FaTasks, FaChartLine, FaComments,
   FaPaperPlane, FaExclamationCircle, FaCheckCircle, FaClock,
   FaChevronLeft, FaChevronRight, FaFilter, FaProjectDiagram
@@ -188,7 +190,7 @@ export default function TeamMemberDetailsPage() {
           onClick={() => router.back()}
           className="flex items-center text-blue-600 hover:text-blue-700 mb-4"
         >
-          <FaArrowLeft className="mr-2" />
+          <BackIcon className="mr-2" />
           Go Back
         </button>
         <p className="text-gray-600">Employee data not available</p>
@@ -204,7 +206,7 @@ export default function TeamMemberDetailsPage() {
           onClick={() => router.back()}
           className="flex items-center text-blue-600 hover:text-blue-700 mb-4"
         >
-          <FaArrowLeft className="mr-2" />
+          <BackIcon className="mr-2" />
           Back to Team Members
         </button>
         <div className="flex items-center">

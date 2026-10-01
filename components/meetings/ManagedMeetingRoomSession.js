@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -1003,7 +1005,7 @@ export default function ManagedMeetingRoomSession({
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-slate-100 p-4 text-slate-900 dark:bg-slate-950 dark:text-white">
         <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-2xl dark:border-white/10 dark:bg-slate-900 sm:p-6">
-          <button type="button" onClick={backToHome} className="mb-3 flex min-h-10 items-center rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-slate-300 dark:hover:bg-white/10">← Back to home</button>
+          <button type="button" onClick={backToHome} className="mb-3 flex min-h-10 items-center rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-slate-300 dark:hover:bg-white/10"><BackIcon className="mr-2 h-4 w-4" /> Back to home</button>
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"><HiOutlineVideoCamera className="h-7 w-7" /></div>
           <h1 className="mt-3 text-xl font-semibold">{meeting?.title || 'Talio Meet'}</h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">

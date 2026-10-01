@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -10,7 +12,6 @@ import {
   FaEnvelope,
   FaPhone,
   FaMapMarkerAlt,
-  FaArrowLeft,
   FaBriefcase,
   FaCalendarAlt,
   FaBullseye,
@@ -193,7 +194,7 @@ export default function EmployeeDetailPage() {
           variant="light"
           size="sm"
           onPress={() => router.push('/dashboard/employees')}
-          startContent={<FaArrowLeft />}
+          startContent={<BackIcon />}
         >
           Back
         </Button>

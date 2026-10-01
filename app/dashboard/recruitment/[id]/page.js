@@ -1,5 +1,7 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Modal from '@/components/ui/HeroModal'
@@ -18,7 +20,7 @@ import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile';
 import {
-  FaArrowLeft, FaEdit, FaTrash, FaBriefcase, FaMapMarkerAlt, FaClock,
+  FaEdit, FaTrash, FaBriefcase, FaMapMarkerAlt, FaClock,
   FaDollarSign, FaUsers, FaUserPlus, FaGraduationCap, FaCalendarAlt,
   FaCheckCircle, FaChartBar, FaStar, FaBuilding, FaLaptop
 } from 'react-icons/fa';
@@ -181,7 +183,7 @@ export default function JobDetailPage() {
         <div className="flex md:justify-between md:items-start md:flex-row flex-col gap-4">
           <div className="flex items-start gap-3">
             <Button isIconOnly variant="light" size="sm" onPress={() => router.push('/dashboard/recruitment')} className="mt-0.5">
-              <FaArrowLeft className="w-4 h-4" />
+              <BackIcon className="w-4 h-4" />
             </Button>
             <div>
               <div className="flex items-center flex-wrap gap-2">

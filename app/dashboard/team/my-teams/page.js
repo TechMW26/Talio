@@ -1,11 +1,13 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Skeleton, Avatar, Chip } from '@heroui/react'
 import {
   FaUsers, FaSearch, FaEnvelope, FaPhone, FaCalendarAlt,
-  FaBriefcase, FaChartLine, FaArrowLeft, FaUserFriends, FaCrown, FaBuilding
+  FaBriefcase, FaChartLine, FaUserFriends, FaCrown, FaBuilding
 } from 'react-icons/fa'
 import { HiOutlineUserGroup } from 'react-icons/hi2'
 import { formatDesignation } from '@/lib/formatters'
@@ -143,7 +145,7 @@ export default function MyTeamsPage() {
             onClick={handleBackToTeams}
             className="flex items-center text-primary-600 hover:text-primary-700 mb-3 transition-colors"
           >
-            <FaArrowLeft className="mr-2" />
+            <BackIcon className="mr-2" />
             <span className="font-medium">Back to My Teams</span>
           </button>
           <div className="flex items-center gap-3">

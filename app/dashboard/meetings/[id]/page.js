@@ -1,10 +1,11 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, use, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  HiOutlineArrowLeft,
   HiOutlineVideoCamera,
   HiOutlineMapPin,
   HiOutlineCalendarDays,
@@ -371,7 +372,7 @@ export default function MeetingDetailPage({ params }) {
             href="/dashboard/meetings"
             className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800"
           >
-            <HiOutlineArrowLeft className="w-4 h-4" />
+            <BackIcon className="w-4 h-4" />
             Back to Meetings
           </Link>
 

@@ -1,9 +1,11 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
-import { FaCalendarAlt, FaPlus, FaArrowLeft, FaCheck } from 'react-icons/fa'
+import { FaCalendarAlt, FaPlus, FaCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -215,7 +217,7 @@ export default function ApplyLeavePage() {
           onPress={() => router.back()}
           className="flex-shrink-0"
         >
-          <FaArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+          <BackIcon className="w-4 h-4 sm:w-5 sm:h-5" />
         </Button>
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold text-default-800 truncate">Apply for Leave</h1>

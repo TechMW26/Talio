@@ -1,9 +1,11 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaStar, FaArrowLeft, FaSave } from 'react-icons/fa'
+import { FaStar, FaSave } from 'react-icons/fa'
 import { Select, SelectItem, Input, Button, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -104,7 +106,7 @@ export default function CreatePerformanceReviewPage() {
           onClick={() => router.push('/dashboard/performance')}
           className="btn-secondary flex items-center space-x-2"
         >
-          <FaArrowLeft />
+          <BackIcon />
           <span>Back</span>
         </button>
       </div>

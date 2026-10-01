@@ -2208,6 +2208,14 @@ section[role="dialog"] {
 [role="dialog"] > button[aria-label="Close"] svg { pointer-events: none; }
 [role="dialog"]:has(> button[aria-label="Close"]) > header { padding-right: 72px !important; }
 
+.talio-back-icon {
+  display: inline-block;
+  object-fit: contain;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+html.dark .talio-back-icon { filter: invert(1); }
+
 /* Standard compact close controls; retain larger targets on touch devices. */
 button[aria-label^="Close"],
 button[title="Close"],

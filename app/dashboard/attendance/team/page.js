@@ -1,11 +1,13 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import toast from '@/utils/toast'
-import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter, FaUserFriends } from 'react-icons/fa'
+import { FaUsers, FaBuilding, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter, FaUserFriends } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
 
 // Department color palette
@@ -363,7 +365,7 @@ export default function TeamAttendancePage() {
               variant="flat"
               onPress={handleBack}
             >
-              <FaArrowLeft className="w-5 h-5" />
+              <BackIcon className="w-5 h-5" />
             </Button>
           ) : null}
           <div>

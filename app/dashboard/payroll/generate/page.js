@@ -1,11 +1,13 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { fetchCompleteEmployeeResponse } from '@/lib/client/employeePages'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import {
-  FaMoneyBillWave, FaArrowLeft, FaCalculator, FaEye, FaDownload,
+  FaMoneyBillWave, FaCalculator, FaEye, FaDownload,
   FaFilter, FaSync, FaExclamationTriangle, FaCheckCircle, FaClock,
   FaUserClock, FaCalendarCheck, FaInfoCircle, FaToggleOn, FaToggleOff,
   FaExclamationCircle, FaSearch, FaChevronDown, FaChevronUp, FaTimes, FaEdit
@@ -805,7 +807,7 @@ export default function GeneratePayrollPage() {
         </div>
         <SecondaryButton
           onPress={() => router.push('/dashboard/payroll')}
-          startContent={<FaArrowLeft />}
+          startContent={<BackIcon />}
         >
           Back
         </SecondaryButton>
@@ -1193,7 +1195,7 @@ export default function GeneratePayrollPage() {
             <h2 className="text-xl font-semibold text-foreground">
               Payroll Preview - {new Date(formData.year, formData.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
             </h2>
-            <Button variant="light" onPress={() => setShowPreview(false)}>← Back to Selection</Button>
+            <Button variant="light" onPress={() => setShowPreview(false)}><BackIcon className="mr-2 h-4 w-4" /> Back to Selection</Button>
           </HRMSCardHeader>
           <Divider />
           <HRMSCardBody className="p-0">

@@ -1,8 +1,10 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState } from 'react'
 import Link from 'next/link'
-import { FaEnvelope, FaArrowLeft, FaCheckCircle } from 'react-icons/fa'
+import { FaEnvelope, FaCheckCircle } from 'react-icons/fa'
 import { 
   Card, 
   CardBody, 
@@ -182,7 +184,7 @@ export default function ForgotPasswordPage() {
                 href="/login" 
                 className="inline-flex items-center gap-2 text-default-500 hover:text-primary-600 text-sm font-medium transition-colors"
               >
-                <FaArrowLeft className="text-xs" />
+                <BackIcon className="text-xs" />
                 Back to Login
               </Link>
             </CardFooter>

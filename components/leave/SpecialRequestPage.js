@@ -1,8 +1,10 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useMemo, useState } from 'react'
 import { Button, Card, CardBody, Chip, Input, Skeleton, Textarea } from '@heroui/react'
-import { FaArrowLeft, FaCalendarCheck } from 'react-icons/fa'
+import { FaCalendarCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -78,7 +80,7 @@ export default function SpecialRequestPage({ requestType, title, description }) 
     <div className="page-container space-y-6 pb-24 md:pb-6">
       <div className="flex items-center gap-4">
         <Button isIconOnly variant="flat" onPress={() => router.back()}>
-          <FaArrowLeft />
+          <BackIcon />
         </Button>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-default-800">{title}</h1>

@@ -1,5 +1,7 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/ui/HeroModal'
@@ -16,8 +18,7 @@ import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
   FaSearch, FaCalendarAlt, FaPlus, FaClock, FaUser, FaVideo,
-  FaPhone, FaMapMarkerAlt, FaLink, FaFilter, FaStar, FaArrowLeft
-} from 'react-icons/fa';
+  FaPhone, FaMapMarkerAlt, FaLink, FaFilter, FaStar, } from 'react-icons/fa';
 
 const STATUS_COLOR = {
   scheduled: 'primary', 'in-progress': 'warning',
@@ -198,7 +199,7 @@ export default function InterviewsPage() {
         <div className="flex md:justify-between md:items-center md:flex-row flex-col gap-4">
           <div className="flex items-center gap-3">
             <Button isIconOnly variant="light" size="sm" onPress={() => router.push('/dashboard/recruitment')}>
-              <FaArrowLeft className="w-4 h-4" />
+              <BackIcon className="w-4 h-4" />
             </Button>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Interviews</h1>

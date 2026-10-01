@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -7,7 +9,7 @@ import { useSocket } from '@/contexts/SocketContext'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import {
-  HiOutlineArrowLeft, HiOutlinePencil, HiOutlinePlus, HiOutlineUsers,
+  HiOutlinePencil, HiOutlinePlus, HiOutlineUsers,
   HiOutlineClipboardDocumentList, HiOutlineCalendarDays, HiOutlineCheckCircle,
   HiOutlineClock, HiOutlineExclamationTriangle, HiOutlineChatBubbleLeftRight,
   HiOutlineChartBar, HiOutlineCheck, HiOutlineXMark,
@@ -19,7 +21,7 @@ import {
   HiOutlineMagnifyingGlass
 } from 'react-icons/hi2'
 import {
-  FaArrowLeft, FaEdit, FaPlus, FaUsers, FaTasks, FaCalendarAlt,
+  FaEdit, FaPlus, FaUsers, FaTasks, FaCalendarAlt,
   FaCheckCircle, FaClock, FaExclamationTriangle, FaComments,
   FaChartLine, FaEllipsisV, FaCheck, FaTimes, FaTrash,
   FaUserPlus, FaArchive, FaComment, FaHistory, FaChevronDown,
@@ -1343,7 +1345,7 @@ export default function ProjectDetailPage() {
             onClick={() => router.push('/dashboard/projects')}
             className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors mt-1"
           >
-            <FaArrowLeft className="text-gray-600" />
+            <BackIcon className="text-gray-600" />
           </button>
           <div>
             <div className="flex items-center gap-3 mb-2 flex-wrap">

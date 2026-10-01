@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardBody, Button, Skeleton, Input, Chip } from '@heroui/react'
 import { getRoleDisplayLabel } from '@/hooks/useRoles'
@@ -12,7 +14,6 @@ import {
   HiOutlineXCircle,
   HiOutlineClipboard,
   HiOutlineFunnel,
-  HiOutlineArrowLeft,
   HiOutlineShieldCheck,
   HiOutlineEye,
   HiOutlineEyeSlash,
@@ -175,7 +176,7 @@ export default function UserPasswordsPage() {
             variant="light"
             onPress={() => router.push('/dashboard/employees')}
           >
-            <HiOutlineArrowLeft className="w-5 h-5" />
+            <BackIcon className="w-5 h-5" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-2">

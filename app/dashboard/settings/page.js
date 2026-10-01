@@ -1,10 +1,12 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Select, SelectItem, Button, Skeleton } from '@heroui/react'
-import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch, FaMicrophone } from 'react-icons/fa'
-import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
+import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch, FaMicrophone } from 'react-icons/fa'
+import { HiOutlineOfficeBuilding, HiOutlineCog, } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -40,7 +42,7 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
           onClick={onBack}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
         >
-          <HiOutlineArrowLeft className="w-5 h-5" />
+          <BackIcon className="w-5 h-5" />
           <span>Back to Companies</span>
         </button>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">

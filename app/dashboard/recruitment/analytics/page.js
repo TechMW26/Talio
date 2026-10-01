@@ -1,5 +1,7 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useRouter } from 'next/navigation';
 import { Button, Chip, Card, CardBody, CardHeader, Skeleton } from '@heroui/react';
 import toast from '@/utils/toast';
@@ -7,7 +9,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
-  FaArrowLeft, FaBriefcase, FaUsers, FaCheckCircle, FaChartBar,
+  FaBriefcase, FaUsers, FaCheckCircle, FaChartBar,
   FaClock, FaPercentage, FaTrophy, FaCalendarAlt
 } from 'react-icons/fa';
 
@@ -70,7 +72,7 @@ export default function RecruitmentAnalyticsPage() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <Button isIconOnly variant="light" size="sm" onPress={() => router.push('/dashboard/recruitment')}>
-            <FaArrowLeft className="w-4 h-4" />
+            <BackIcon className="w-4 h-4" />
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment Analytics</h1>

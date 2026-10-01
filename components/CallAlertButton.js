@@ -1,5 +1,7 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Select, SelectItem } from '@heroui/react';
@@ -21,8 +23,7 @@ import {
   HiOutlineBuildingOffice2,
   HiOutlineUsers,
   HiOutlineArrowRight,
-  HiOutlineArrowLeft
-} from 'react-icons/hi2';
+  } from 'react-icons/hi2';
 import toast from '@/utils/toast';
 import ModalPortal from '@/components/ModalPortal';
 import { filterDepartmentGroupEmployees, hasActiveGroupSearch, isDepartmentGroupExpanded } from '@/lib/departmentGroupSearch';
@@ -704,7 +705,7 @@ export default function CallAlertButton({ user, floating = false }) {
                     onClick={() => setStep(1)}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-default-300 text-default-700 font-medium hover:bg-default-100 transition-colors"
                   >
-                    <HiOutlineArrowLeft className="w-4 h-4" />
+                    <BackIcon className="w-4 h-4" />
                     Back
                   </button>
                   <button

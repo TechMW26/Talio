@@ -1,11 +1,13 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useParams } from 'next/navigation';
 import WhiteboardCanvas from '@/components/whiteboard/WhiteboardCanvas';
 import { Skeleton } from '@heroui/react';
-import { FiArrowLeft, FiShare2, FiX, FiUsers, FiMaximize, FiMinimize } from 'react-icons/fi';
+import { FiShare2, FiX, FiUsers, FiMaximize, FiMinimize } from 'react-icons/fi';
 import ModalPortal from '@/components/ui/ModalPortal';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
@@ -287,7 +289,7 @@ export default function WhiteboardEditorPage() {
     return editorPortal(
       <div className="fixed inset-0 z-[80] h-[100dvh] flex flex-col bg-gray-50 whiteboard-light-override">
         <div className="talioboard-window-header flex shrink-0 items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
-          <button onClick={handleClose} className="p-2 text-gray-700" aria-label="Back to boards"><FiArrowLeft size={20} /></button>
+          <button onClick={handleClose} className="p-2 text-gray-700" aria-label="Back to boards"><BackIcon size={20} /></button>
           <span role="status" className="text-gray-700">Opening board…</span>
         </div>
       </div>
@@ -324,7 +326,7 @@ export default function WhiteboardEditorPage() {
           className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           title="Exit (Esc)"
         >
-          <FiArrowLeft size={20} />
+          <BackIcon size={20} />
         </button>
 
         <div className="h-6 w-px bg-gray-200" />

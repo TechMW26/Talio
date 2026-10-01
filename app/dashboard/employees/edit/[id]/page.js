@@ -1,9 +1,11 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaSave, FaArrowLeft, FaChevronDown, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
+import { FaSave, FaChevronDown, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
 import { Card, CardBody, Button, Skeleton, Select, SelectItem } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -366,7 +368,7 @@ export default function EditEmployeePage() {
         <Button
           variant="bordered"
           onPress={() => router.push('/dashboard/employees')}
-          startContent={<FaArrowLeft />}
+          startContent={<BackIcon />}
         >
           Back
         </Button>

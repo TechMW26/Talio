@@ -1,10 +1,12 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import {
-  FaArrowLeft, FaEdit, FaTrash, FaBullseye, FaCalendar, FaUser,
+  FaEdit, FaTrash, FaBullseye, FaCalendar, FaUser,
   FaCheckCircle, FaClock, FaChartLine, FaFlag, FaTasks, FaSync,
   FaExclamationTriangle, FaBuilding
 } from 'react-icons/fa'
@@ -186,7 +188,7 @@ export default function GoalDetailsPage() {
             onClick={() => router.back()}
             className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors shadow-sm"
           >
-            <FaArrowLeft className="w-5 h-5" />
+            <BackIcon className="w-5 h-5" />
           </button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Goal Details</h1>

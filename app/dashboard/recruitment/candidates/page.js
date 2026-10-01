@@ -1,5 +1,7 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -14,8 +16,7 @@ import { DataErrorState } from '@/components/ui/ErrorBoundary';
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
   FaSearch, FaUsers, FaFilter, FaUserPlus, FaChevronRight,
-  FaStar, FaEnvelope, FaPhone, FaBriefcase, FaArrowLeft
-} from 'react-icons/fa';
+  FaStar, FaEnvelope, FaPhone, FaBriefcase, } from 'react-icons/fa';
 
 const STAGES = [
   'applied', 'screening', 'shortlisted', 'interview',
@@ -109,7 +110,7 @@ export default function CandidatesPage() {
         <div className="flex md:justify-between md:items-center md:flex-row flex-col gap-4">
           <div className="flex items-center gap-3">
             <Button isIconOnly variant="light" size="sm" onPress={() => router.push('/dashboard/recruitment')}>
-              <FaArrowLeft className="w-4 h-4" />
+              <BackIcon className="w-4 h-4" />
             </Button>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Candidates</h1>

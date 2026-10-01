@@ -1,18 +1,19 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import Modal from '@/components/ui/HeroModal'
 import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
 import {
-  HiOutlineArrowLeft,
   HiOutlinePlus,
   HiOutlineMagnifyingGlass,
   HiOutlineSparkles
 } from 'react-icons/hi2'
 import {
-  FaArrowLeft, FaSave, FaCalendarAlt, FaUsers, FaTimes,
+  FaSave, FaCalendarAlt, FaUsers, FaTimes,
   FaPlus, FaSearch, FaChevronDown, FaChevronRight, FaCheckSquare
 } from 'react-icons/fa'
 import { formatDepartments } from '@/lib/formatters'
@@ -267,7 +268,7 @@ export default function CreateProjectPage() {
           variant="light"
           onPress={() => router.back()}
         >
-          <HiOutlineArrowLeft className="w-5 h-5 text-default-600" />
+          <BackIcon className="w-5 h-5 text-default-600" />
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-default-800">Create New Project</h1>
