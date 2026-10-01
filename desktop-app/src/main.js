@@ -1213,7 +1213,8 @@ function setupWindowEvents() {
     });
     // Do not steal focus from the application the user just switched to.
     child.once('ready-to-show', () => { if (!child.isDestroyed()) { positionPip(); child.showInactive(); positionPip(); } });
-    if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Keep the main app visible while making PiP available across Spaces.
+    if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     child.webContents.on('will-navigate', event => event.preventDefault());
     child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   });

@@ -7,7 +7,7 @@ import { miraTaskLink } from '@/lib/miraTaskLink'
 import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
 import { MIRA_LANGUAGE_POLICY, buildMiraConversationPrompt, buildMiraOutputLanguageDirective } from '@/lib/miraLanguage'
 import { validMiraAttachments, miraAttachmentContext } from '@/lib/miraAttachments'
-import { MIRA_SCREEN_INSTRUCTIONS } from '@/lib/miraDesktopScreen'
+import { MIRA_SCREEN_INSTRUCTIONS, isExplicitMiraScreenRequest } from '@/lib/miraDesktopScreen'
 import { miraAppKnowledge } from '@/lib/miraAppMap'
 import { MIRA_COMPUTER_INSTRUCTIONS } from '@/lib/miraComputerClient'
 import { MIRA_DESKTOP_CAPABILITIES } from '@/lib/miraDesktopCapabilities'
@@ -825,6 +825,11 @@ export async function POST(request) {
     const contextQuery = isFollowUp ? `${recentUserContext} ${userMessage}` : userMessage
     const useCase = decisionFirst ? 'mira' : miraChatUseCase(contextQuery)
     const screen = sanitizeMiraClientContext(body.clientContext)
+    if (screen.desktopScreenAvailable && body.screenContextAttempted !== true && isExplicitMiraScreenRequest(userMessage) && !body.attachments?.length) {
+      return NextResponse.json({ success: true, response: {
+        message: '', cards: [], suggestedQuestions: [], action: { type: 'read_screen' },
+      }, tokens: tokenResult })
+    }
     const contextStarted = performance.now()
     let databaseContextMs = 0
     const timedContext = async () => {

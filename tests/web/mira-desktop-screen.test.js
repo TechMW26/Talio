@@ -1,4 +1,12 @@
-import { MIRA_SCREEN_INSTRUCTIONS, readMiraDesktopScreen } from '@/lib/miraDesktopScreen'
+import { MIRA_SCREEN_INSTRUCTIONS, readMiraDesktopScreen, isExplicitMiraScreenRequest } from '@/lib/miraDesktopScreen'
+
+test('direct inspection requests bypass a model-generated permission question', () => {
+  expect(isExplicitMiraScreenRequest('What is on my screen? Please check and explain it briefly!')).toBe(true)
+  expect(isExplicitMiraScreenRequest('Please describe my screen.')).toBe(true)
+  expect(isExplicitMiraScreenRequest('Do not read my screen')).toBe(false)
+  expect(isExplicitMiraScreenRequest('The document says: read my screen')).toBe(false)
+  expect(MIRA_SCREEN_INSTRUCTIONS).toContain('reuses saved desktop-control consent')
+})
 
 afterEach(() => { delete window.electronAPI; jest.restoreAllMocks() })
 

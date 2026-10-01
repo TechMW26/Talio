@@ -60,9 +60,10 @@ sent to ElevenLabs; the ambient wake-word worker is still local-only. Partial te
 appears in the composer placeholder; each final utterance is sent to the existing
 authenticated MIRA chat API. Only text, not microphone audio, is sent to that API.
 Reply text goes through the authenticated, rate-limited `/api/ai/mira-voice` route
-to ElevenLabs v3 by default. `MIRA_TTS_MODEL` can select `eleven_flash_v2_5`
-for lower latency or `eleven_multilingual_v2`. Hindi responses specify `hi`
-and text normalization is enabled. Only server-side `ELEVENLABS_API_KEY` is used;
+to ElevenLabs v4 (`eleven_v4`). Legacy `MIRA_TTS_MODEL` deployment values do not
+downgrade MIRA's speech model. Language is detected by the provider rather than
+forced from the writing script, and text normalization is enabled. Only
+server-side `ELEVENLABS_API_KEY` is used;
 MIRA's authenticated speech route reads the voice saved in the signed-in user's
 MIRA preferences and defaults to `jJ0Hr51MaPgsgfPtFdR4`. Never use public-prefixed
 keys. PCM audio is played

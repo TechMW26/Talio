@@ -32,6 +32,7 @@ describe('native MIRA pointer transparency', () => {
     expect(html).toContain('background:transparent!important')
     expect(html).not.toContain('drop-shadow')
     expect(win.setIgnoreMouseEvents).toHaveBeenCalledWith(true)
+    expect(win.setVisibleOnAllWorkspaces).toHaveBeenCalledWith(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
     expect(win.showInactive).not.toHaveBeenCalled()
     win.callbacks['ready-to-show']()
     expect(win.showInactive).not.toHaveBeenCalled()

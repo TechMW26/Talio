@@ -2,5 +2,5 @@
 export default function BackIcon({ className = '', size, white = false, style, ...props }) {
   return <img {...props} src="/icons/back.png" alt="" aria-hidden="true" draggable={false}
     className={`talio-back-icon ${className}`} width={size || 20} height={size || 20}
-    style={{ ...(size ? { width: size, height: size } : {}), ...style, ...(white ? { filter: 'invert(1)' } : {}) }} />
+    style={{ ...(size ? { width: size, height: size } : {}), ...style, transform: 'scaleX(-1)', ...(white ? { filter: 'invert(1)' } : {}) }} />
 }

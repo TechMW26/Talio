@@ -11,10 +11,11 @@ test('back icon uses the supplied decorative PNG without intercepting navigation
   expect(icon).toHaveAttribute('aria-hidden', 'true')
   expect(icon).toHaveAttribute('draggable', 'false')
   expect(icon).toHaveClass('talio-back-icon', 'w-4', 'h-4')
+  expect(icon).toHaveStyle({ transform: 'scaleX(-1)' })
   expect(fs.existsSync(path.join(process.cwd(), 'public/icons/back.png'))).toBe(true)
 })
 
 test('back icon supports explicit white inversion and existing size props', () => {
   const { container } = render(<BackIcon white size={16} />)
-  expect(container.querySelector('img')).toHaveStyle({ filter: 'invert(1)', width: '16px', height: '16px' })
+  expect(container.querySelector('img')).toHaveStyle({ filter: 'invert(1)', width: '16px', height: '16px', transform: 'scaleX(-1)' })
 })

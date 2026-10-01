@@ -27,7 +27,7 @@ test('streams the configured default voice with server-only credentials and igno
   expect(await response.arrayBuffer()).toHaveProperty('byteLength', 4)
   expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/jJ0Hr51MaPgsgfPtFdR4/stream?output_format=pcm_24000', expect.objectContaining({ headers: expect.objectContaining({ 'xi-api-key': 'test-key' }) }))
   expect(rateLimit).toHaveBeenCalledWith('MIRA_VOICE', 'tenantA:u')
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ model_id: 'eleven_v3_conversational', apply_text_normalization: 'on' })
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ model_id: 'eleven_v4', apply_text_normalization: 'on' })
 })
 test('uses a saved per-user MIRA voice', async () => {
   voicePreferences = { voiceId: 'komDQG4wp0wC5IDFwetv' }
