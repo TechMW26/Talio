@@ -1,6 +1,16 @@
 import { getSecurityHeaders } from '@/lib/security/securityHeaders'
 
 describe('location widget security policy', () => {
+  test('both CSP implementations permit the managed upload endpoints', async () => {
+    const rules = await require('../../next.config').headers()
+    const nextCsp = rules.find(rule => rule.source === '/:path*').headers.find(header => header.key === 'Content-Security-Policy').value
+    for (const policy of [getSecurityHeaders()['Content-Security-Policy'], nextCsp]) {
+      const connect = policy.split('; ').find(value => value.startsWith('connect-src '))
+      expect(connect).toContain('https://vercel.com/api/blob')
+      expect(connect).toContain('https://*.blob.vercel-storage.com')
+      expect(connect.split(' ')).not.toContain('*')
+    }
+  })
   test('allows only the OpenStreetMap services used by the dashboard widget', () => {
     const csp = getSecurityHeaders()['Content-Security-Policy']
 

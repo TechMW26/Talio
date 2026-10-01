@@ -46,3 +46,16 @@ test('settings-only saves preserve the existing logo', async () => {
   expect(uploadAuthenticatedFile).not.toHaveBeenCalled()
   expect(JSON.parse(global.fetch.mock.calls[0][1].body).logo).toBe('/old.png')
 })
+
+test('times out even when the upload SDK ignores abort and never saves a late upload', async () => {
+  let finishUpload
+  uploadAuthenticatedFile.mockImplementation(() => new Promise(resolve => { finishUpload = resolve }))
+  const onLogoUploaded = jest.fn()
+  const result = expect(saveCompanySettings({ ...options, onLogoUploaded })).rejects.toThrow('Logo upload timed out')
+  await jest.advanceTimersByTimeAsync(60000)
+  await result
+  finishUpload({ success: true, fileUrl: '/late-logo.png' })
+  await Promise.resolve()
+  expect(onLogoUploaded).not.toHaveBeenCalled()
+  expect(global.fetch).not.toHaveBeenCalled()
+})
