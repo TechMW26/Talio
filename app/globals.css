@@ -246,6 +246,11 @@ html body [data-slot="input-wrapper"] :is(input, textarea, [data-slot="inner-wra
   background-color: transparent !important;
 }
 
+/* Round the visible Select control, not its borderless layout shell. */
+html body button[data-slot="trigger"][aria-haspopup="listbox"] {
+  border-radius: 0.75rem !important;
+}
+
 html body [data-slot="input-wrapper"]:focus-within,
 html body button[data-slot="trigger"][aria-haspopup="listbox"]:focus-visible {
   outline: 2px solid currentColor;
