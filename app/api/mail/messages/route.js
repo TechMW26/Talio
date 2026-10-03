@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 import { google } from 'googleapis';
+import { emitSidebarCountsUpdated } from '@/lib/eventBus';
 
 // Production URL and redirect URI - must match Google Cloud Console
 const PRODUCTION_URL = 'https://app.talio.in';
@@ -89,7 +90,7 @@ export async function GET(request) {
         unreadCount: 0
       });
     }
-    const { user, models } = auth
+    const { user, models, tenant} = auth
     const { EmailAccount } = models
 
     const { searchParams } = new URL(request.url);
@@ -282,7 +283,15 @@ export async function GET(request) {
     }
 
     // Sort all emails by date (newest first)
+       // Sort all emails by date (newest first)
     allEmails.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Push updated mail count to the sidebar bubble in real-time
+    emitSidebarCountsUpdated(
+      { mail: totalUnreadCount },
+      [String(user._id || user.userId)],
+      tenant?.databaseName
+    ).catch(err => console.error('[Mail] Failed to push sidebar count update:', err.message))
 
     return NextResponse.json({
       emails: allEmails,
