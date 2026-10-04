@@ -17,6 +17,7 @@ const { applicationValue } = require('./materialize.cjs')
 const { applicationRecordKey, decodeApplicationRecord, partIds, recordDigest } = require('../../lib/platform/firestoreCodec.cjs')
 const { projectNativeRecord } = require('../../lib/platform/searchProjection.cjs')
 const { datasetPolicy, loadCredentials, assertIsolated } = require('./dataset-policy.cjs')
+const EXCLUDED_SCREENSHOT_COLLECTIONS = new Set(['screenshots', 'screenshots.files', 'screenshots.chunks', 'screenshotanalyses', 'screenshotcomposites'])
 
 async function* sourceRecords(directory, item) {
   const stream = fs.createReadStream(path.join(directory, item.file)).pipe(createGunzip())
@@ -90,7 +91,7 @@ async function run() {
   if (!manifest.complete || manifest.run !== runId || manifest.targetProject !== 'talio-hrms' || !sourceVerification.complete) throw new Error('Verified immutable source is required')
   const app = initializeApp({ projectId: 'talio-hrms', credential: cert(loadCredentials()) }, `native-audit-${Date.now()}`)
   const firestore = getFirestore(app)
-  const report = { version: 2, mode: reportDifferences ? 'report-differences' : 'strict', dataset, sourceRun: runId, complete: false, passed: false, recordsCompared: 0, recordsVerified: 0, projectedRecords: 0, extractedMedia: 0, blobBytesVerified: 0, routedHistoriesCompared: 0, routedHistories: 0, differences: [], countDifferences: [], collections: [] }
+    const report = { version: 2, mode: reportDifferences ? 'report-differences' : 'strict', dataset, sourceRun: runId, complete: false, passed: false, excludedCollections: [...EXCLUDED_SCREENSHOT_COLLECTIONS], recordsCompared: 0, recordsVerified: 0, projectedRecords: 0, extractedMedia: 0, blobBytesVerified: 0, routedHistoriesCompared: 0, routedHistories: 0, differences: [], countDifferences: [], collections: [] }
   try {
     const root = firestore.collection('talioDatasets').doc(dataset), catalog = (await root.get()).data()
     assertIsolated(catalog, policy, true)
@@ -117,7 +118,7 @@ async function run() {
       }
     }
     const expectedCounts = new Map(), histories = []
-    for (const item of manifest.collections.filter(item => !item.collection.endsWith('.chunks'))) {
+    for (const item of manifest.collections.filter(item => !item.collection.endsWith('.chunks') && !EXCLUDED_SCREENSHOT_COLLECTIONS.has(item.collection))) {
       const key = `${item.database}/${item.collection}`
       expectedCounts.set(key, item.count)
       const hash = createHash('sha256')

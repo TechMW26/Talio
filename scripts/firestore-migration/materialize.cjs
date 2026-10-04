@@ -12,6 +12,11 @@ const { createHash } = require('node:crypto')
 const { BSON } = require('bson')
 const admin = require('firebase-admin')
 const { datasetPolicy, loadCredentials, assertIsolated } = require('./dataset-policy.cjs')
+
+// Productivity screenshots are intentionally excluded from the live cutover.
+// Their immutable Mongo snapshot remains in the protected migration archive;
+// application-native records and Blob media are not materialized.
+const EXCLUDED_SCREENSHOT_COLLECTIONS = new Set(['screenshots', 'screenshots.files', 'screenshots.chunks', 'screenshotanalyses', 'screenshotcomposites'])
 const { randomUUID } = require('node:crypto')
 const { readBson, segment, sha256, recordIdentity, mapLimit } = require('./core.cjs')
 const { encodeApplicationRecord, decodeApplicationRecord, recordDigest, applicationRecordKey } = require('../../lib/platform/firestoreCodec.cjs')
@@ -63,7 +68,7 @@ async function main() {
       }
       await target.update({ nativeVerificationRevision: randomUUID(), nativeAcceptance: null })
     }
-    for (const item of manifest.collections.filter(c => !c.collection.endsWith('.chunks'))) {
+    for (const item of manifest.collections.filter(c => !c.collection.endsWith('.chunks') && !EXCLUDED_SCREENSHOT_COLLECTIONS.has(c.collection))) {
       const result = { database: item.database, collection: item.collection, records: 0, fragmentedRecords: 0, fragments: 0, mediaDescriptors: 0 }
       const sourceHash = createHash('sha256'), ids = new Set()
       const base = target?.collection('databases').doc(item.database).collection('collections').doc(item.collection)
