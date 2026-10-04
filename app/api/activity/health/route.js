@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndDatabase } from '@/lib/auth';
 import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
+import { getProductivitySettings } from '@/lib/productivitySettings.server';
 
 /**
  * GET /api/activity/health
@@ -38,7 +39,7 @@ export async function GET(request) {
       timestamp: new Date().toISOString(),
       userId,
       role: userRole,
-      captureEnabled: !isScreenCaptureProtectedRole(userRole),
+      captureEnabled: !isScreenCaptureProtectedRole(userRole) && (await getProductivitySettings(auth.database)).screenshotsEnabled,
       database: 'connected',
       storage: { provider: 'vercel-blob', access: 'private', persistentFilesystemRequired: false },
       server: {

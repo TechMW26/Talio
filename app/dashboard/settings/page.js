@@ -17,6 +17,7 @@ import { saveCompanySettings, validateCompanyLogo } from '@/lib/client/companySe
 import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
 import MiraSettings from '@/components/settings/MiraSettings'
 import InductionSettings from '@/components/settings/InductionSettings'
+import ProductivitySettings from '@/components/settings/ProductivitySettings'
 import WordPressRecruitmentSettings from '@/components/settings/WordPressRecruitmentSettings'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 
@@ -148,6 +149,7 @@ export default function SettingsPage() {
       )
     }
 
+    if (userRole === 'admin') baseTabs.push({ id: 'productivity', name: 'Productivity', description: 'Screenshot capture and storage controls', group: 'Attendance & workplace', icon: FaDesktop })
     // MIRA preferences are personal and available to every signed-in user.
     baseTabs.push({ id: 'mira', name: 'MIRA', description: 'Voice, personal instructions and knowledge', group: 'Personalisation', icon: FaMicrophone })
 
@@ -333,6 +335,7 @@ export default function SettingsPage() {
           {activeTab === 'notifications' && <NotificationsTab />}
           {activeTab === 'mira' && <MiraSettings />}
           {activeTab === 'induction' && <InductionSettings />}
+          {activeTab === 'productivity' && userRole === 'admin' && <ProductivitySettings />}
         </section>
       </div>
     </div>

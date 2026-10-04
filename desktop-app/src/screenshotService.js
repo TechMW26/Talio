@@ -1,6 +1,6 @@
 /**
  * Screenshot Service v6.0.3
- * Handles automatic screen capture with ImageKit uploads
+ * Handles automatic screen capture with tenant-controlled Vercel Blob uploads
  * Uses main-process desktopCapturer via IPC (Electron 35+ compatibility)
  */
 
@@ -100,8 +100,8 @@ class ScreenshotService {
   }
 
   shouldCapture() {
-    // CRITICAL: Admin users should NEVER be captured
-    if (this.userRole === 'admin') {
+    // Privileged screens must never be captured.
+    if (this.userRole === 'admin' || this.userRole === 'hr') {
       logger.log('info', 'ScreenshotService', 'Admin user - capture disabled');
       return false;
     }
@@ -191,11 +191,29 @@ class ScreenshotService {
       return null;
     }
 
-    // Double check admin restriction
-    if (this.userRole === 'admin') {
+    // Double check protected-role restriction.
+    if (this.userRole === 'admin' || this.userRole === 'hr') {
       logger.log('warn', 'ScreenshotService', 'Blocked capture attempt for admin');
       return null;
     }
+
+    // Avoid network reads while clocked out.
+    if (!this.isClockedIn) {
+      this.stop();
+      return null;
+    }
+    if ((captureType === 'automatic' || captureType === 'session_start') && this.lastScheduledCaptureAt !== null && Date.now() - this.lastScheduledCaptureAt < CAPTURE_INTERVAL_MS) return null;
+
+    // Check the organisation policy before asking the OS to capture any pixels.
+    // Fail closed on network errors; the regular timer can try again later.
+    try {
+      const response = await fetch(API_BASE_URL + '/api/settings/productivity', {
+        headers: { Authorization: 'Bearer ' + this.token },
+        signal: AbortSignal.timeout(10000),
+      });
+      const policy = await response.json();
+      if (!response.ok || !policy.success || policy.data?.screenshotsEnabled !== true) return null;
+    } catch { return null; }
 
     // Block captures if user is not clocked in
     if (!this.isClockedIn) {

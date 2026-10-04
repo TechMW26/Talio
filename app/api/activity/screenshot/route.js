@@ -8,6 +8,7 @@ import { processImage, ImagePipelineError } from '@/lib/imagePipeline';
 import { getDateKeyInTimezone } from '@/lib/timezone';
 import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
 import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
+import { getProductivitySettings } from '@/lib/productivitySettings.server';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -37,6 +38,10 @@ export async function POST(request) {
       }, { status: 403 });
     }
 
+    // Enforce policy before reading image bytes or writing to Blob.
+    if (!(await getProductivitySettings(store)).screenshotsEnabled) {
+      return NextResponse.json({ success: true, dropped: true, captureEnabled: false, reason: 'screenshots_disabled', message: 'Screenshot capture is disabled by your administrator' });
+    }
     // Get form data
     const formData = await request.formData();
     const file = formData.get('screenshot');

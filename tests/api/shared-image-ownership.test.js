@@ -13,9 +13,9 @@ beforeEach(() => {
   getFirestoreApplicationContext.mockImplementation(async databaseName => ({ databaseName, dataset: 'isolated-dataset' }))
   getFirestoreTenantDatabase.mockResolvedValue(tenant)
   createFirestoreMediaRepository.mockImplementation(context => ({
-    info: async () => context.sourceDatabase === 'test'
+    info: jest.fn(async () => context.sourceDatabase === 'test'
       ? await context.authorizeLegacyImage(sharedFile) ? { file: sharedFile } : null
-      : localFile ? { file: localFile } : null,
+      : localFile ? { file: localFile } : null),
   }))
 })
 test('shared-source image metadata cannot leak through a foreign tenant', async () => {
@@ -39,4 +39,5 @@ test('tenant-local image IDs are resolved before shared-source lookup', async ()
   expect(await getImageInfo(id, { databaseName: 'talio_company_owner' })).toEqual(localFile)
   expect(getFirestoreTenantDatabase).not.toHaveBeenCalled()
   expect(createFirestoreMediaRepository).toHaveBeenCalledTimes(1)
+  expect(createFirestoreMediaRepository.mock.results[0].value.info).toHaveBeenCalledTimes(1)
 })

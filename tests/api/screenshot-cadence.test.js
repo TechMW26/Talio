@@ -4,10 +4,11 @@ import { getAuthAndDatabase } from '@/lib/auth'
 jest.mock('next/server', () => ({ NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) } }))
 jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('electron', () => ({ screen: {} }), { virtual: true })
-jest.mock('node-fetch', () => jest.fn())
+jest.mock(require.resolve('node-fetch', { paths: [require('path').resolve(__dirname, '../../desktop-app/src')] }), () => jest.fn())
 jest.mock('../../desktop-app/src/logger', () => ({ log: jest.fn() }))
 jest.mock('../../desktop-app/src/offlineQueue', () => ({ initialize: jest.fn(), reset: jest.fn() }))
 const service = require('../../desktop-app/src/screenshotService')
+const desktopFetch = require(require.resolve('node-fetch', { paths: [require('path').resolve(__dirname, '../../desktop-app/src')] }))
 
 test('server policy requires exactly four minutes between scheduled captures', () => {
   const date = new Date('2026-09-26T08:00:00Z')
@@ -44,6 +45,7 @@ test('desktop timer fires every four minutes, not three', () => {
 })
 
 test('restarts cannot capture early and existing clock-in and permission guards remain active', async () => {
+  desktopFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true, data: { screenshotsEnabled: true } }) })
   jest.useFakeTimers()
   service.userRole = 'employee'; service.isClockedIn = true; service.isCapturing = true
   service.lastScheduledCaptureAt = null
@@ -64,4 +66,16 @@ test('restarts cannot capture early and existing clock-in and permission guards 
     await service.captureScreen('session_start')
     expect(service.getDesktopSources).toHaveBeenCalledTimes(2)
   } finally { service.stop(); size.mockRestore(); jest.useRealTimers() }
+})
+
+test('disabled policy and network failures never capture pixels', async () => {
+  service.userRole = 'employee'; service.isClockedIn = true; service.isCapturing = true
+  service.getDesktopSources = jest.fn()
+  const fetch = desktopFetch
+  fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: { screenshotsEnabled: false } }) })
+  await service.captureScreen('automatic')
+  fetch.mockRejectedValueOnce(new Error('offline'))
+  await service.captureScreen('automatic')
+  expect(service.getDesktopSources).not.toHaveBeenCalled()
+  service.stop()
 })

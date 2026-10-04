@@ -17743,5 +17743,9 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "records", "fieldPath": "overflow", "indexes": [] },
+    { "collectionGroup": "records", "fieldPath": "version", "indexes": [] },
+    { "collectionGroup": "parts", "fieldPath": "bytes", "indexes": [] }
+  ]
 }
