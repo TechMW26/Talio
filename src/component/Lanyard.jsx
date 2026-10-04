@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { FaCamera } from 'react-icons/fa';
+import { LOGO_BACKGROUND_FALLBACK, sampleLogoBackground } from '@/lib/client/logoContrast';
 import './Lanyard.css';
 
 export default function Lanyard({ employee, onImageClick, uploadingImage }) {
@@ -23,6 +24,11 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
     });
     return { companyLogo: logo, companyName: name, hasCompanyLogo: !!logo };
   }, [employee?.company, employee?.companyLogo, employee?.companyName]);
+
+  const [logoAppearance, setLogoAppearance] = useState(null);
+  const currentLogoAppearance = logoAppearance?.src === companyLogo ? logoAppearance : null;
+  const showCompanyLogo = hasCompanyLogo && !currentLogoAppearance?.failed;
+  const logoBackground = showCompanyLogo ? currentLogoAppearance?.background || LOGO_BACKGROUND_FALLBACK : '#f8fafc';
 
   useEffect(() => {
     if (!containerRef.current || !cardOuterRef.current) return;
@@ -435,12 +441,15 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
 
             <div className="back-content">
               {/* Company Logo or Company Name */}
-              <div className="back-logo-container">
-                {hasCompanyLogo ? (
+              <div className="back-logo-container" style={{ background: logoBackground }}>
+                {showCompanyLogo ? (
                   <img
+                    key={companyLogo}
                     src={companyLogo}
                     alt={companyName}
                     className="company-logo-img"
+                    onLoad={event => setLogoAppearance({ src: companyLogo, background: sampleLogoBackground(event.currentTarget) })}
+                    onError={() => setLogoAppearance({ src: companyLogo, failed: true })}
                   />
                 ) : (
                   <div className="company-name-fallback">
