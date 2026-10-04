@@ -1019,12 +1019,12 @@ function CompanySettingsTab() {
                     <div className="flex-1">
                       <input
                         type="file"
-                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        accept=".svg,.webp,.png,.jpg,.jpeg,.gif,image/svg+xml,image/png,image/jpeg,image/webp,image/gif"
                         disabled={saving}
                         onChange={handleLogoChange}
                         className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
                       />
-                      <p className="text-xs text-gray-500 mt-2">Recommended: Square image, max 10MB</p>
+                      <p className="text-xs text-gray-500 mt-2">SVG, WebP, PNG, JPG/JPEG or GIF · Max 10 MB. Logos are optimized for display.</p>
                     </div>
                   </div>
                 </div>

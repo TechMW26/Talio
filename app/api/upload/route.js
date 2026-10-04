@@ -32,17 +32,9 @@ function uploadResponse(data) {
   })
 }
 
-async function getEmployee(auth) {
-  const userId = String(auth.user._id || auth.user.userId), currentUser = await auth.database.get('users', userId)
-  if (currentUser?.employeeId) return auth.database.get('employees', String(currentUser.employeeId?._id || currentUser.employeeId))
-  const result = await auth.database.list('employees', { filters: [{ field: 'userId', operator: '==', value: userId }], limit: 2 })
-  if (result.records.length > 1) throw new Error('Ambiguous employee account')
-  return result.records[0] || null
-}
-
 export async function POST(request) {
   try {
-    const auth = await getAuthAndDatabase(request, { queryFields: { employees: ['userId'] } })
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -66,7 +58,6 @@ export async function POST(request) {
       return NextResponse.json({ success: false, ...validation }, { status: 400 })
     }
 
-    const employee = await getEmployee(auth)
     const userId = String(auth.user._id || auth.user.userId)
     let buffer = Buffer.from(await file.arrayBuffer())
     let contentType = validation.contentType
@@ -96,6 +87,7 @@ export async function POST(request) {
         body: buffer,
         contentType,
         access,
+        abortSignal: AbortSignal.timeout(20000),
         cacheControlMaxAge: access === 'private' ? 300 : 31_536_000,
       })
       const fileUrl = blob.access === 'private'
