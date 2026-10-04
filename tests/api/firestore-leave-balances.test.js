@@ -50,10 +50,13 @@ emulator('native leave allocation and adjustments', () => {
   })
   test('HR listing preserves balances across membership component-boundary batches', async () => {
     const ids = Array.from({ length: 27 }, (_, index) => (1000 + index).toString(16).padStart(24, '0'))
-    await Promise.all(ids.map(async id => {
+    // This is query-boundary fixture setup, not a contention test. Concurrent
+    // uniqueness transactions lock the same collections in the emulator and
+    // can outlive the test after Promise.all rejects on the first timeout.
+    for (const id of ids) {
       await database.create('employees', { _id: id, status: 'active' })
       await database.create('leavebalances', { _id: id, employee: id, leaveType, year: 2027, totalDays: 12 })
-    }))
+    }
     const result = await listLeaveBalances(database, { role: 'hr' }, { year: 2027 })
     expect(result.map(row => row.employee._id).sort()).toEqual(ids.sort())
   })

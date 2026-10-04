@@ -13,12 +13,17 @@ const live = dataset ? describe : describe.skip
 live('native Firestore application dataset acceptance', () => {
   let firestore, catalog
   beforeAll(async () => {
-    if (!/^local-[a-z0-9-]{6,70}$/.test(dataset)) throw new Error('Local acceptance dataset required')
+    const productionRead = process.env.TALIO_FIRESTORE_PRODUCTION_READ_ONLY === '1'
+    if (!(productionRead ? /^live-[a-z0-9-]{6,70}$/ : /^local-[a-z0-9-]{6,70}$/).test(dataset)) throw new Error('Explicit acceptance dataset required')
+    if (process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Cloud read acceptance cannot inherit emulator settings')
     const env = dotenv.parse(fs.readFileSync('.env'))
-    firestore = getTalioFirestore({ FIRESTORE_PROJECT_ID: 'talio-hrms', FIRESTORE_SERVICE_ACCOUNT_JSON: env.FIREBASE_SERVICE_ACCOUNT_KEY })
+    const local = dotenv.parse(fs.readFileSync('.env.local'))
+    firestore = getTalioFirestore({ FIRESTORE_PROJECT_ID: 'talio-hrms', FIRESTORE_SERVICE_ACCOUNT_JSON: local.FIRESTORE_SERVICE_ACCOUNT_JSON || env.FIREBASE_SERVICE_ACCOUNT_KEY })
     const snapshot = await firestore.collection('talioDatasets').doc(dataset).get()
     catalog = snapshot.data()
-    if (catalog.status !== 'verified-local-dataset' || catalog.applicationCutover !== false) throw new Error('Dataset is not a verified isolated copy')
+    const verifiedCandidate = catalog.status === 'verified-production-candidate' && catalog.purpose === 'production-candidate' && catalog.applicationCutover === false
+    const readyProduction = catalog.status === 'ready' && catalog.purpose === 'production' && catalog.applicationCutover === true
+    if (productionRead ? !(verifiedCandidate || readyProduction) : (catalog.status !== 'verified-local-dataset' || catalog.applicationCutover !== false)) throw new Error('Dataset is not verified for this read-only acceptance mode')
   }, 30000)
   afterAll(async () => {
     await firestore?.terminate()

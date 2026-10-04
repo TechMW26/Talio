@@ -12,7 +12,7 @@ const { BSON } = require('bson')
 const { initializeApp, cert, deleteApp } = require('firebase-admin/app')
 const { getFirestore } = require('firebase-admin/firestore')
 const { get: getBlob } = require('@vercel/blob')
-const { readBson, sha256 } = require('./core.cjs')
+const { readBson, sha256, mapLimit } = require('./core.cjs')
 const { applicationValue } = require('./materialize.cjs')
 const { applicationRecordKey, decodeApplicationRecord, partIds, recordDigest } = require('../../lib/platform/firestoreCodec.cjs')
 const { projectNativeRecord } = require('../../lib/platform/searchProjection.cjs')
@@ -21,6 +21,21 @@ const { datasetPolicy, loadCredentials, assertIsolated } = require('./dataset-po
 async function* sourceRecords(directory, item) {
   const stream = fs.createReadStream(path.join(directory, item.file)).pipe(createGunzip())
   try { yield* readBson(stream) } finally { stream.destroy() }
+}
+
+// Enumerate every collection as before, but bound independent metadata RPCs.
+// Return results in source order so audit reports remain deterministic.
+async function readActualCollectionCounts(root) {
+  const databases = await root.collection('databases').listDocuments()
+  const groups = await mapLimit(databases, 4, async database => {
+    const parents = await database.collection('collections').listDocuments()
+    return parents.map(parent => ({ database: database.id, parent }))
+  })
+  return mapLimit(groups.flat(), 16, async ({ database, parent }) => ({
+    database,
+    collection: parent.id,
+    count: (await parent.collection('records').count().get()).data().count,
+  }))
 }
 
 // Only top-level field names are reported. Nested keys can themselves contain
@@ -164,28 +179,28 @@ async function run() {
       report.collections.push(result)
       console.log(JSON.stringify({ event: 'native-acceptance-collection', ...result }))
     }
-    for (const history of histories) {
+    const routedHistoryResults = await mapLimit(histories, 16, async history => {
       const owners = sourceUserOwners.get(String(history.userId)) || []
       if (owners.length !== 1) throw new Error('Shared AI history ownership is unresolved')
       const snapshot = await collection(owners[0], 'aicontexts').doc(applicationRecordKey(history._id)).get()
       const actual = snapshot.exists ? await decode(snapshot) : null
-      recordComparison(report, recordDifference({ database: owners[0], collection: 'aicontexts', recordId: history._id, expected: history, actual, checkSource: false, issues: snapshot.exists ? [] : ['record_missing'] }), reportDifferences, true)
-      const key = `${owners[0]}/aicontexts`
+      return { database: owners[0], difference: recordDifference({ database: owners[0], collection: 'aicontexts', recordId: history._id, expected: history, actual, checkSource: false, issues: snapshot.exists ? [] : ['record_missing'] }) }
+    })
+    for (const result of routedHistoryResults) {
+      recordComparison(report, result.difference, reportDifferences, true)
+      const key = `${result.database}/aicontexts`
       expectedCounts.set(key, (expectedCounts.get(key) || 0) + 1)
     }
     // Count every actual collection, including new owner-routed collections,
     // so duplicate/unexpected records are not silently hidden by source checks.
     const actualKeys = new Set()
-    for (const database of await root.collection('databases').listDocuments()) {
-      for (const parent of await database.collection('collections').listDocuments()) {
-        const key = `${database.id}/${parent.id}`
-        const count = (await parent.collection('records').count().get()).data().count
-        if (count !== (expectedCounts.get(key) || 0)) {
-          if (!reportDifferences) throw new Error(`Unexpected native count in ${key}`)
-          report.countDifferences.push({ database: database.id, collection: parent.id, expectedCount: expectedCounts.get(key) || 0, actualCount: count, delta: count - (expectedCounts.get(key) || 0) })
-        }
-        actualKeys.add(key)
+    for (const { database, collection: name, count } of await readActualCollectionCounts(root)) {
+      const key = `${database}/${name}`
+      if (count !== (expectedCounts.get(key) || 0)) {
+        if (!reportDifferences) throw new Error(`Unexpected native count in ${key}`)
+        report.countDifferences.push({ database, collection: name, expectedCount: expectedCounts.get(key) || 0, actualCount: count, delta: count - (expectedCounts.get(key) || 0) })
       }
+      actualKeys.add(key)
     }
     for (const [key, count] of expectedCounts) if (count && !actualKeys.has(key)) {
       if (!reportDifferences) throw new Error(`Missing native collection ${key}`)
@@ -201,4 +216,4 @@ async function run() {
   } finally { await firestore.terminate(); await deleteApp(app) }
 }
 if (require.main === module) run().then(report => { if (!report.passed) process.exitCode = 1 }).catch(error => { console.error(JSON.stringify({ event: 'native-acceptance-failed', code: error.code || null, message: String(error.message).replace(/https?:\/\/\S+/g, '[URL]') })); process.exitCode = 1 })
-module.exports = { run, changedFieldNames, recordDifference, recordComparison, writeReport }
+module.exports = { run, changedFieldNames, recordDifference, recordComparison, writeReport, readActualCollectionCounts }
