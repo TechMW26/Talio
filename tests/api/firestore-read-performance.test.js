@@ -28,7 +28,7 @@ test('reference reads overlap at most three 100-record batches and preserve orde
   pending[2].resolve(pending[2].records)
   pending[1].resolve(pending[1].records)
   await Promise.resolve()
-  expect(database.getMany).toHaveBeenCalledTimes(3)
+  expect(database.getMany).toHaveBeenCalledTimes(5)
   pending[0].resolve(pending[0].records)
   await new Promise(resolve => setImmediate(resolve))
   expect(database.getMany).toHaveBeenCalledTimes(5)

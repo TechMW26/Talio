@@ -164,7 +164,7 @@ export default function TeamAttendancePage() {
     return `/api/attendance?employeeId=${selectedEmployee._id}&month=${month}&year=${year}`
   }, [selectedEmployee, currentMonth])
 
-  const { data: attendanceRes, isLoading: attLoading, isValidating: attValidating } = useAuthedSWR(
+  const { data: attendanceRes, error: attError, mutate: retryAttendance, isLoading: attLoading, isValidating: attValidating } = useAuthedSWR(
     attendanceKey, { keepPreviousData: false }
   )
   const attendance = useMemo(() => attendanceRes?.data || [], [attendanceRes?.data])
@@ -676,7 +676,12 @@ export default function TeamAttendancePage() {
             </div>
 
             {/* Calendar Grid */}
-            {attLoading ? (
+            {attError ? (
+              <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger">
+                <p>Unable to load attendance. Please retry.</p>
+                <Button className="mt-3" size="sm" onPress={() => retryAttendance()}>Retry</Button>
+              </div>
+            ) : attLoading ? (
               <div className="grid grid-cols-7 gap-2">
                 {[...Array(35)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
               </div>

@@ -1260,13 +1260,13 @@ html.dark .footer-row {
 
 /* BACK FACE */
 html.dark .back-logo-container {
-  background: linear-gradient(135deg, #09090b 0%, #162032 100%) !important;
+  /* Lanyard chooses the surface from the logo pixels, independent of theme.
+     Do not override its inline background, including loading/error fallbacks. */
   border-color: rgba(63, 63, 70, 0.4) !important;
 }
 
-html.dark .company-name-fallback {
-  color: #fafafa !important;
-}
+/* The company-name fallback uses a light panel in both themes; retain its
+   dark text from Lanyard.css rather than applying the dark-theme white ink. */
 
 html.dark .back-company-name {
   color: #d4d4d8 !important;

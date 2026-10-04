@@ -1,5 +1,25 @@
 import { chooseLogoBackground, sampleLogoBackground, LOGO_BACKGROUND_FALLBACK } from '@/lib/client/logoContrast'
+import fs from 'node:fs'
+import path from 'node:path'
+import postcss from 'postcss'
 const pixel = (v, alpha = 255) => [v, v, v, alpha]
+test('dark theme cannot override the adaptive logo surface or fallback text', () => {
+  const css = postcss.parse(fs.readFileSync(path.join(process.cwd(), 'styles/dark-mode.css'), 'utf8'))
+  css.walkRules(rule => {
+    if (rule.selector.includes('.back-logo-container')) {
+      rule.walkDecls(/^background(?:-.*)?$/, declaration => {
+        expect(declaration.important).not.toBe(true)
+      })
+    }
+    if (rule.selector.includes('.company-name-fallback')) {
+      rule.walkDecls('color', declaration => expect(declaration.value).toBe('#1e293b'))
+    }
+  })
+  const base = postcss.parse(fs.readFileSync(path.join(process.cwd(), 'src/component/Lanyard.css'), 'utf8'))
+  const fallbackColors = []
+  base.walkRules('.company-name-fallback', rule => rule.walkDecls('color', declaration => fallbackColors.push(declaration.value)))
+  expect(fallbackColors).toContain('#1e293b')
+})
 test('dark and light logos get opposite backgrounds', () => {
   expect(chooseLogoBackground(pixel(0))).toBe('#f8fafc')
   expect(chooseLogoBackground(pixel(255))).toBe('#18202b')

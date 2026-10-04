@@ -58,14 +58,17 @@ const fetchWithRetry = async (url, options, maxRetries = 1, timeout = 15000) => 
         signal: controller.signal,
       })
 
+      // Keep the deadline active through body download, not just headers.
+      // A 401 must still redirect immediately even if its error body stalls.
+      const data = response.status === 401 ? null : await response.json()
       clearTimeout(timeoutId)
-      return response
+      return { response, data }
     } catch (error) {
       clearTimeout(timeoutId)
       lastError = error
 
       // Don't retry on abort or on final attempt
-      if (error.name === 'AbortError' || attempt === maxRetries) {
+      if (error.name === 'AbortError' || error instanceof SyntaxError || attempt === maxRetries) {
         throw error
       }
 
@@ -83,19 +86,17 @@ const authedFetcher = async (url) => {
   const headers = token ? { Authorization: `Bearer ${token}` } : undefined
 
   try {
-    const response = await fetchWithRetry(url, { headers })
+    const { response, data } = await fetchWithRetry(url, { headers })
     
     // Handle 401 Unauthorized - session expired
     if (response.status === 401) {
       handle401()
-      throw new Error('Session expired')
+      throw Object.assign(new Error('Session expired'), { status: 401 })
     }
     
-    const data = await response.json()
-
     if (!response.ok || data?.success === false) {
       const message = data?.message || 'Failed to fetch data'
-      throw new Error(message)
+      throw Object.assign(new Error(message), { status: response.status })
     }
 
     return data
@@ -169,7 +170,8 @@ export function useAuthedSWRRealtime(key, options = {}) {
     // protocols that require a liveness check (for example meeting sessions).
     refreshInterval: options.refreshInterval ?? 0,
     dedupingInterval: 5000,
-    shouldRetryOnError: true,
+    // Retrying authorization/validation/not-found responses cannot repair them.
+    shouldRetryOnError: error => !error.status || error.status >= 500 || [408, 429].includes(error.status),
     keepPreviousData: true,
     ...options,
   })

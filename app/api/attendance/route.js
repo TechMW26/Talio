@@ -46,12 +46,21 @@ export async function GET(request) {
     const date = params.get('date'), month = params.get('month'), year = params.get('year'), department = params.get('department')
     const startParam = params.get('startDate'), endParam = params.get('endDate')
     let employeeId = params.get('employeeId')
-    if ((month && !year) || (year && !month) || (month && (!/^\\d+$/.test(month) || +month < 1 || +month > 12)) || (year && (!/^\\d{4}$/.test(year) || +year < 1970 || +year > 2100))) return NextResponse.json({ success: false, message: 'Invalid month or year' }, { status: 400 })
+    if ((month && !year) || (year && !month) || (month && (!/^\d+$/.test(month) || +month < 1 || +month > 12)) || (year && (!/^\d{4}$/.test(year) || +year < 1970 || +year > 2100))) return NextResponse.json({ success: false, message: 'Invalid month or year' }, { status: 400 })
     if ([date, startParam, endParam].some(value => value && !isValidDateString(value)) || (startParam && !endParam) || (!startParam && endParam)) return NextResponse.json({ success: false, message: 'Invalid date range' }, { status: 400 })
     if (employeeId && !isValidObjectId(employeeId) || department && !isValidObjectId(department)) return NextResponse.json({ success: false, message: 'Invalid employee or department ID' }, { status: 400 })
-    const scope = await getProductivityVisibility(database, user, { includeSelf: true })
-    if (employeeId && !await database.get('employees', employeeId)) employeeId = attendanceId((await database.get('users', employeeId))?.employeeId) || '__missing__'
-    const employees = scope.employees.filter(e => (!employeeId || e._id === employeeId) && (!department || attendanceId(e.department) === department))
+    let requestedEmployee = employeeId ? await database.get('employees', employeeId) : null
+    if (employeeId && !requestedEmployee) {
+      employeeId = attendanceId((await database.get('users', employeeId))?.employeeId) || '__missing__'
+      requestedEmployee = employeeId === '__missing__' ? null : await database.get('employees', employeeId)
+    }
+    const ownEmployeeId = attendanceId(user.employeeId)
+    const canReadDirectly = employeeId && (employeeId === ownEmployeeId || ['admin', 'hr', 'owner', 'superadmin', 'super_admin'].includes(user.role))
+    // Auth and database are tenant-bound. Self/admin lookups do not need the org chart.
+    const visibleEmployees = canReadDirectly
+      ? [requestedEmployee].filter(Boolean)
+      : (await getProductivityVisibility(database, user, { includeSelf: true })).employees
+    const employees = visibleEmployees.filter(e => (!employeeId || e._id === employeeId) && (!department || attendanceId(e.department) === department))
     if (!employees.length) return NextResponse.json({ success: true, data: [] })
     let start, end
     if (startParam) { start = getStartOfDayInTimezone(startParam, DEFAULT_TIMEZONE); end = getEndOfDayInTimezone(endParam, DEFAULT_TIMEZONE) }
@@ -62,8 +71,11 @@ export async function GET(request) {
     } else { end = getEndOfDayInTimezone(new Date(), DEFAULT_TIMEZONE); start = new Date(end.getTime() - 31 * 86400000) }
     if (start > end || end - start > 366 * 86400000) return NextResponse.json({ success: false, message: 'Select a date range of at most one year' }, { status: 400 })
     const records = await queryProductivityByIds(database, 'attendances', 'employee', employees.map(e => e._id), [{ field: 'date', operator: '>=', value: start }, { field: 'date', operator: '<=', value: end }])
+    const companies = new Map()
     const employeeMap = new Map(await Promise.all(employees.map(async e => {
-      const company = e.company ? await database.get('companies', attendanceId(e.company)) : null
+      const companyId = attendanceId(e.company)
+      if (companyId && !companies.has(companyId)) companies.set(companyId, database.get('companies', companyId))
+      const company = companyId ? await companies.get(companyId) : null
       return [e._id, { _id: e._id, firstName: e.firstName, lastName: e.lastName, employeeCode: e.employeeCode, company: company ? { timezone: company.timezone, workingHours: company.workingHours } : null }]
     })))
     const fields = 'date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks autoCheckedOut autoCheckoutReason autoCheckoutAt correctedAt correctedBy'.split(' ')

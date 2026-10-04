@@ -9,7 +9,7 @@ import { downloadDocumentFile } from '@/lib/client/documentFile'
 const button = 'rounded-xl border border-default-300 px-4 py-2 text-sm disabled:opacity-50'
 export default function ResignationExitPanel({ record, onUpdated }) {
   const endpoint = `/api/resignations/${record._id}/exit`
-  const { data, error, isLoading, mutate } = useAuthedSWR(endpoint, { refreshInterval: 15000 })
+  const { data, error, isLoading, mutate } = useAuthedSWR(endpoint, { refreshInterval: 60000, revalidateOnFocus: true })
   const mutation = useApiMutation({ invalidateKeys: [endpoint, '/api/resignations', '/api/employees'], timeout: 60000 })
   const [assetsOpen, setAssetsOpen] = useState(false)
   const [confirmations, setConfirmations] = useState({})

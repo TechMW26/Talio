@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getImageStream, getImageInfo } from '@/lib/mediaStorage'
+import { resolveImage } from '@/lib/mediaStorage'
+import { getOrCreateImageVariant, standardImageVariant } from '@/lib/platform/imageVariants.server'
 import sharp from 'sharp'
 import { verifyTokenFromRequest } from '@/lib/auth'
 import { canReadDocumentUpload } from '@/lib/documentAccess.server'
@@ -19,14 +20,15 @@ export async function GET(request, { params }) {
     try {
         const { id } = await params
 
-        if (!id || id.length !== 24) {
+        if (!/^[a-f0-9]{24}$/.test(id || '')) {
             return new NextResponse('Not found', { status: 404 })
         }
 
         const auth = await verifyTokenFromRequest(request)
         if (!auth.success) return new NextResponse('Unauthorized', { status: 401 })
         const mediaOptions = { databaseName: auth.tenant.databaseName }
-        const fileInfo = await getImageInfo(id, mediaOptions)
+        const resolved = await resolveImage(id, mediaOptions)
+        const fileInfo = resolved?.file
         if (!fileInfo) {
             return new NextResponse('Not found', { status: 404 })
         }
@@ -47,8 +49,8 @@ export async function GET(request, { params }) {
         }
 
         const { searchParams } = new URL(request.url)
-        const width = Math.min(parseInt(searchParams.get('w')) || 0, 2048) || null
-        const height = Math.min(parseInt(searchParams.get('h')) || 0, 2048) || null
+        const width = Math.min(Math.max(parseInt(searchParams.get('w')) || 0, 0), 2048) || null
+        const height = Math.min(Math.max(parseInt(searchParams.get('h')) || 0, 0), 2048) || null
         const quality = Math.min(Math.max(parseInt(searchParams.get('q')) || 80, 1), 100)
         const needsResize = width || height
 
@@ -56,15 +58,7 @@ export async function GET(request, { params }) {
 
         if (!needsResize) {
             // Stream directly without processing
-            const stream = await getImageStream(id, mediaOptions)
-
-            const readableStream = new ReadableStream({
-                start(controller) {
-                    stream.on('data', (chunk) => controller.enqueue(chunk))
-                    stream.on('end', () => controller.close())
-                    stream.on('error', (err) => controller.error(err))
-                }
-            })
+            const { stream: readableStream } = await resolved.open(() => true)
 
             return new NextResponse(readableStream, {
                 headers: {
@@ -76,13 +70,19 @@ export async function GET(request, { params }) {
             })
         }
 
-        // On-the-fly resize using sharp
-        const stream = await getImageStream(id, mediaOptions)
-        const chunks = []
-        for await (const chunk of stream) {
-            chunks.push(chunk)
+        const variant = standardImageVariant(width, height, quality)
+        if (variant && resolved.variantIdentity) {
+            const stream = await getOrCreateImageVariant(resolved.variantIdentity, variant, async () => {
+                const original = await resolved.open(() => true)
+                const buffer = Buffer.from(await new Response(original.stream).arrayBuffer())
+                return sharp(buffer, { failOnError: false }).resize(variant, variant, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer()
+            }, resolved.validateVariant)
+            return new NextResponse(stream, { headers: { 'Content-Type': 'image/webp', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } })
         }
-        const buffer = Buffer.concat(chunks)
+
+        // Custom transforms remain bounded and uncached to avoid unbounded variants.
+        const original = await resolved.open(() => true)
+        const buffer = Buffer.from(await new Response(original.stream).arrayBuffer())
 
         let pipeline = sharp(buffer, { failOnError: false })
         pipeline = pipeline.resize(width, height, {
@@ -103,8 +103,9 @@ export async function GET(request, { params }) {
 
         return new NextResponse(resizedBuffer, {
             headers: {
-                'Content-Type': contentType,
+                'Content-Type': contentType.includes('png') ? 'image/png' : /jpeg|jpg/.test(contentType) ? 'image/jpeg' : 'image/webp',
                 'Cache-Control': 'private, no-store',
+                'X-Content-Type-Options': 'nosniff',
                 'Content-Length': String(resizedBuffer.length),
             }
         })

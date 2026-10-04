@@ -20,7 +20,7 @@ async function run(authorized, input={}, includeBacklog=false) {
     try {
       const database=await getAttendanceStore(tenant.databaseName),{company,settings}=await getAttendanceSettings(database)
       const timezone=getTimezone(company.timezone||settings.timezone),today=getDateKeyInTimezone(new Date(),timezone),date=input.date||previousDateKey(today)
-      if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||Number.isNaN(+new Date(date))||date>=today) throw attendanceError('Select a valid past calendar date')
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(+new Date(date))||new Date(date).toISOString().slice(0,10)!==date||date>=today) throw attendanceError('Select a valid past calendar date')
       const output=await recoverAttendanceDay(database,date,{includeBacklog,dryRun:input.dryRun===true,skipRectification:input.skipRectification===true})
       result.tenantsProcessed++;result.totalAutoCheckouts+=output.processed;result.totalRectified+=output.rectified;result.totalAlreadyCorrect+=output.alreadyCorrect;result.totalNotificationsSent+=output.notified
       result.tenantResults.push({tenantName:tenant.name,tenantSlug:tenant.slug,success:output.errors.length===0,autoCheckouts:output.processed,notificationsSent:output.notified,errors:output.errors,dryRun:output.dryRun})

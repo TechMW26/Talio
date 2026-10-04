@@ -47,7 +47,11 @@ emulator('Firestore metadata with private Blob media', () => {
     const { envelope } = encodeApplicationRecord({ _id: id, length: bytes.length, contentType: 'image/png', metadata: {} })
     await reference.create({ ...envelope, media: { database: databaseName, bucket, provider: 'vercel-blob', access: 'private', pathname, length: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') } })
     expect(await repository.remove(bucket, id)).toBe(true)
-    expect(deleteBlob).not.toHaveBeenCalled()
+    expect(deleteBlob).toHaveBeenCalledTimes(1)
+    const derivativePaths = deleteBlob.mock.calls[0][0]
+    expect(derivativePaths).toHaveLength(4)
+    expect(derivativePaths.every(path => path.startsWith(`tenants/${databaseName}/images/`))).toBe(true)
+    expect(derivativePaths).not.toContain(pathname)
     expect((await reference.get()).get('mediaState')).toBe('deleted')
     expect(await repository.open(bucket, id, () => true)).toBeNull()
   })

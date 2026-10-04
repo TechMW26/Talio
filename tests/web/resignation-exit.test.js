@@ -16,6 +16,7 @@ beforeEach(() => {
 })
 test('finalisation passes explicit confirmations and version', async () => {
   render(<ResignationExitPanel record={{ _id: 'request' }} />)
+  expect(useAuthedSWR).toHaveBeenCalledWith('/api/resignations/request/exit', { refreshInterval: 60000, revalidateOnFocus: true })
   fireEvent.change(screen.getByLabelText(/Payment \/ recovery reference/), { target: { value: 'BANK-123' } })
   screen.getAllByRole('checkbox').forEach(checkbox => fireEvent.click(checkbox))
   fireEvent.click(screen.getByText('Finalise exit & send documents'))

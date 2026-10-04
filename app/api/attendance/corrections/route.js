@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { ATTENDANCE_DATABASE_OPTIONS, attendanceId, attendanceError } from '@/lib/platform/firestoreAttendance.server'
 import { submitAttendanceCorrection, reviewAttendanceCorrection } from '@/lib/platform/firestoreAttendanceCorrections.server'
-import { getProductivityVisibility, queryProductivityByIds } from '@/lib/platform/firestoreProductivityView.server'
+import { getProductivityVisibility, queryProductivityByIds, getManyProductivityRecords } from '@/lib/platform/firestoreProductivityView.server'
 import { emitEvent, EVENTS } from '@/lib/eventBus'
 import queryCache from '@/lib/queryCache'
 export const dynamic = 'force-dynamic'
@@ -18,8 +18,11 @@ export async function GET(request) {
     const type=params.get('type'), status=params.get('status'), employeeId=params.get('employeeId'), department=params.get('department'), teamId=params.get('team')
     if(employeeId&&!/^[a-f0-9]{24}$/.test(employeeId)) throw attendanceError('Invalid employee ID')
     if(status&&!['all','pending','approved','rejected'].includes(status)) throw attendanceError('Invalid status')
-    const scope=await getProductivityVisibility(database,user,{includeSelf:true})
-    let employees=scope.employees.filter(e=>(type!=='my'||e._id===attendanceId(user.employeeId))&&(!employeeId||e._id===employeeId)&&(!department||department==='all'||attendanceId(e.department)===department))
+    const ownId=attendanceId(user.employeeId)
+    const visible=type==='my'
+      ? (ownId?[await database.get('employees',ownId)].filter(Boolean):[])
+      : (await getProductivityVisibility(database,user,{includeSelf:true})).employees
+    let employees=visible.filter(e=>(type!=='my'||e._id===ownId)&&(!employeeId||e._id===employeeId)&&(!department||department==='all'||attendanceId(e.department)===department))
     if(teamId&&teamId!=='all') {
       const team=await database.get('teams',teamId),ids=new Set([...(team?.members||[]),...(team?.teamLeaders||[])].map(attendanceId))
       employees=employees.filter(e=>ids.has(e._id))
@@ -27,11 +30,16 @@ export async function GET(request) {
     const employeeMap=new Map(employees.map(e=>[e._id,e]))
     const state=status&&status!=='all'?status:type==='pending'?'pending':null
     const records=await queryProductivityByIds(database,'attendancecorrections','employee',employees.map(e=>e._id),state?[{field:'status',operator:'==',value:state}]:[])
-    const data=await Promise.all(records.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(async r=>{
-      const e=employeeMap.get(r.employee),reviewer=r.reviewedBy?await database.get('employees',attendanceId(r.reviewedBy)):null
-      const attendance=r.attendance?await database.get('attendances',attendanceId(r.attendance)):null
+    const [reviewers,attendances]=await Promise.all([
+      getManyProductivityRecords(database,'employees',records.map(r=>attendanceId(r.reviewedBy))),
+      getManyProductivityRecords(database,'attendances',records.map(r=>attendanceId(r.attendance))),
+    ])
+    const reviewerMap=new Map(reviewers.map(r=>[r._id,r])),attendanceMap=new Map(attendances.map(r=>[r._id,r]))
+    const data=records.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(r=>{
+      const e=employeeMap.get(r.employee),reviewer=reviewerMap.get(attendanceId(r.reviewedBy))
+      const attendance=attendanceMap.get(attendanceId(r.attendance))
       return {...r,employee:e?{_id:e._id,firstName:e.firstName,lastName:e.lastName,employeeCode:e.employeeCode,profilePicture:e.profilePicture,department:e.department}:null,attendance:attendance?{_id:attendance._id,date:attendance.date,checkIn:attendance.checkIn,checkOut:attendance.checkOut,status:attendance.status,workHours:attendance.workHours}:null,reviewedBy:reviewer?{_id:reviewer._id,firstName:reviewer.firstName,lastName:reviewer.lastName}:null}
-    }))
+    })
     return NextResponse.json({success:true,data})
   } catch(error){return failure(error)}
 }
