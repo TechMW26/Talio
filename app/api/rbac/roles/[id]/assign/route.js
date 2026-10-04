@@ -1,88 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels, hasRole } from '@/lib/auth'
-import { logRBACEvent, extractRequestMeta } from '@/lib/rbacAudit'
+import { getAuthAndDatabase, hasRole } from '@/lib/auth'
+import { ROLE_STORE_OPTIONS, getNativeRole, assignNativeRole } from '@/lib/platform/firestoreRoles.server'
 import { refreshAffectedUsers } from '@/lib/rbacSessionRefresh'
-
-// PUT /api/rbac/roles/[id]/assign — assign role to users
-// Body: { userIds: string[] }
+import { logRBACEvent, extractRequestMeta } from '@/lib/rbacAudit'
 export async function PUT(request, { params }) {
-    try {
-        const { id } = await params
-        const auth = await getAuthAndModels(request, ['Role', 'User', 'ForceRefresh'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models, tenant } = auth
-
-        if (!hasRole(user, ['admin', 'super_admin'])) {
-            return NextResponse.json(
-                { success: false, message: 'Only admins can assign roles' },
-                { status: 403 }
-            )
-        }
-
-        const role = await models.Role.findById(id).lean()
-        if (!role) {
-            return NextResponse.json(
-                { success: false, message: 'Role not found' },
-                { status: 404 }
-            )
-        }
-
-        const data = await request.json()
-        const { userIds } = data
-
-        if (!Array.isArray(userIds) || userIds.length === 0) {
-            return NextResponse.json(
-                { success: false, message: 'userIds must be a non-empty array' },
-                { status: 400 }
-            )
-        }
-
-        // Assign role to users
-        const result = await models.User.updateMany(
-            { _id: { $in: userIds }, isActive: true },
-            { $set: { roleId: role._id, permissionsCache: null, cacheUpdatedAt: null } }
-        )
-
-        await refreshAffectedUsers({
-            databaseName: tenant.databaseName,
-            userIds,
-            forceRefreshModel: models.ForceRefresh,
-            initiatedBy: {
-                userId: user._id?.toString?.() || user.userId,
-                email: user.email,
-                role: user.role,
-            },
-            message: `Your access role was updated to ${role.displayLabel}. Talio is applying the new permissions in the background.`,
-        })
-
-        // Audit log
-        const meta = extractRequestMeta(request)
-        logRBACEvent(tenant.databaseName, {
-            eventType: 'user_role_changed',
-            actorId: user._id,
-            targetId: role._id,
-            targetType: 'Role',
-            metadata: {
-                roleName: role.name,
-                displayLabel: role.displayLabel,
-                assignedUserIds: userIds,
-                modifiedCount: result.modifiedCount,
-            },
-            ...meta,
-        }).catch(() => { })
-
-        return NextResponse.json({
-            success: true,
-            message: `Role "${role.displayLabel}" assigned to ${result.modifiedCount} user(s)`,
-            data: { modifiedCount: result.modifiedCount },
-        })
-    } catch (error) {
-        console.error('[RBAC] Assign role error:', error)
-        return NextResponse.json(
-            { success: false, message: error.message || 'Failed to assign role' },
-            { status: 500 }
-        )
-    }
+  try {
+    const { id } = await params
+    const auth = await getAuthAndDatabase(request, ROLE_STORE_OPTIONS)
+    if (!auth.success) return NextResponse.json({ message: auth.message }, { status: auth.status || 401 })
+    if (!hasRole(auth.user, ['admin', 'super_admin'])) return NextResponse.json({ success: false, message: 'Only admins can assign roles' }, { status: 403 })
+    const role = await getNativeRole(auth.database, id)
+    if (!role) return NextResponse.json({ success: false, message: 'Role not found' }, { status: 404 })
+    const { userIds } = await request.json()
+    const assigned = await assignNativeRole(auth.database, id, userIds)
+    await refreshAffectedUsers({ databaseName: auth.tenant.databaseName, database: auth.database, userIds: assigned, initiatedBy: { userId: auth.user._id, email: auth.user.email, role: auth.user.role }, message: 'Your access role was updated. Talio is applying the new permissions.' })
+    await logRBACEvent(auth.tenant.databaseName, { eventType: 'user_role_changed', actorId: auth.user._id, targetId: role._id, targetType: 'Role', metadata: { roleName: role.name, assignedUserIds: assigned, modifiedCount: assigned.length }, ...extractRequestMeta(request) })
+    return NextResponse.json({ success: true, message: 'Role assigned to ' + assigned.length + ' user(s)', data: { modifiedCount: assigned.length } })
+  } catch (error) { return NextResponse.json({ success: false, message: error.status ? error.message : 'Failed to assign role' }, { status: error.status || 500 }) }
 }

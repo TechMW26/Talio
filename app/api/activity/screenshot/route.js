@@ -1,32 +1,30 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import path from 'path';
-import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
-import mongoose from 'mongoose';
+import { verifyTokenFromRequest } from '@/lib/auth'
+import { randomBytes } from 'node:crypto';
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server';
+import { uploadScreenshot, getScreenshot, deleteScreenshot } from '@/lib/mediaStorage';
 import { isWithinOfficeHours } from '@/lib/officeHours';
 import { processImage, ImagePipelineError } from '@/lib/imagePipeline';
 import { getDateKeyInTimezone } from '@/lib/timezone';
 import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
-import { canViewUserScreenshots } from '@/lib/productivityPermissions';
+import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 /**
  * POST /api/activity/screenshot
- * Upload a screenshot - saves to BOTH filesystem and GridFS
- * Filesystem: For dashboard display (existing flow)
- * GridFS: For long-term storage and AI analysis
+ * Upload a screenshot to private Vercel Blob with tenant-scoped Firestore metadata.
  */
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Screenshot', 'Company']);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models, tenant } = auth;
-    const { User, Employee, Screenshot, Company } = models;
+    const { user, tenant } = auth;
+    const store = await getFirestoreTenantDatabase(tenant.databaseName, { queryFields: { employees: ['email'], screenshots: ['user', 'capturedAt', 'captureType'] } });
 
     const userId = user._id || user.userId;
     const userRole = user.role;
@@ -97,16 +95,16 @@ export async function POST(request) {
     }
 
     // Get employee info with full details for folder structure
-    const userRecord = await User.findById(userId).select('employeeId name email');
+    const userRecord = await store.get('users', String(userId));
     let employee = null;
     let employeeId = userRecord?.employeeId;
 
     if (employeeId) {
-      employee = await Employee.findById(employeeId).select('firstName lastName employeeCode');
+      employee = await store.get('employees', String(employeeId));
     }
 
     if (!employee && userRecord?.email) {
-      employee = await Employee.findOne({ email: userRecord.email.toLowerCase() }).select('firstName lastName employeeCode');
+      employee = (await store.list('employees', { filters: [{ field: 'email', operator: '==', value: userRecord.email.toLowerCase() }], limit: 1 })).records[0];
       if (employee) {
         employeeId = employee._id;
       }
@@ -128,7 +126,7 @@ export async function POST(request) {
     let company = null;
     if (captureType !== 'manual') {
       try {
-        company = Company ? await Company.findOne({}).select('workingHours timezone').lean() : null;
+        company = (await store.list('companies', { limit: 1 })).records[0] || null;
         const officeCheck = isWithinOfficeHours(safeCapturedAt, company);
         if (!officeCheck.allowed) {
           console.log(
@@ -151,15 +149,12 @@ export async function POST(request) {
     const duplicateWindowMs = 15 * 1000
     const duplicateWindowStart = new Date(safeCapturedAt.getTime() - duplicateWindowMs)
     const duplicateWindowEnd = new Date(safeCapturedAt.getTime() + duplicateWindowMs)
-    const duplicateQuery = {
-      user: userId,
-      capturedAt: { $gte: duplicateWindowStart, $lte: duplicateWindowEnd },
-      captureType,
-    }
-
-    const existingDuplicate = await Screenshot.findOne(duplicateQuery)
-      .select('_id capturedAt')
-      .lean();
+    const existingDuplicate = (await store.list('screenshots', { filters: [
+      { field: 'user', operator: '==', value: String(userId) },
+      { field: 'capturedAt', operator: '>=', value: duplicateWindowStart },
+      { field: 'capturedAt', operator: '<=', value: duplicateWindowEnd },
+      { field: 'captureType', operator: '==', value: captureType },
+    ], limit: 1 })).records[0];
 
     if (existingDuplicate) {
       console.log(
@@ -175,11 +170,11 @@ export async function POST(request) {
     }
 
     const publicPath = '';
-    let gridfsResult = null;
+    let storedMedia = null;
 
-    // === GRIDFS STORAGE (primary - for long-term storage & AI analysis) ===
+    // === PRIVATE BLOB STORAGE (primary - for long-term storage & AI analysis) ===
     try {
-      gridfsResult = await uploadScreenshot(buffer, {
+      storedMedia = await uploadScreenshot(buffer, {
         databaseName: tenant.databaseName,
         userId,
         employeeId: employeeId?.toString(),
@@ -191,20 +186,21 @@ export async function POST(request) {
         height: processedHeight,
         activity
       });
-      console.log(`[Screenshot] ✅ Uploaded to GridFS: ${gridfsResult._id}`);
-    } catch (gridfsError) {
-      console.error('[Screenshot] ❌ GridFS upload failed:', gridfsError.message);
+      console.log(`[Screenshot] ✅ Uploaded to private Blob: ${storedMedia._id}`);
+    } catch (storageError) {
+      console.error('[Screenshot] ❌ Private Blob upload failed:', storageError.message);
     }
 
-    if (!gridfsResult) {
+    if (!storedMedia) {
       return NextResponse.json({ success: false, message: 'Screenshot storage is unavailable. Please retry.' }, { status: 503 });
     }
 
     // === DATABASE RECORD ===
-    const screenshot = new Screenshot({
-      user: userId,
-      employee: employeeId,
-      gridfsFileId: gridfsResult?._id || null,
+    const screenshot = {
+      _id: randomBytes(12).toString('hex'),
+      user: String(userId),
+      employee: employeeId ? String(employeeId) : null,
+      gridfsFileId: storedMedia?._id || null,
       capturedAt: safeCapturedAt,
       dateString,
       path: publicPath || null,
@@ -215,7 +211,7 @@ export async function POST(request) {
         height: 1080,
         fileSize: buffer.length,
         format,
-        storage: gridfsResult ? 'gridfs' : 'filesystem'
+        storage: 'vercel-blob'
       },
       captureType,
       activity: {
@@ -226,21 +222,24 @@ export async function POST(request) {
         mouseMovements: activity.mouseMovements || 0,
         isIdle: activity.isIdle || false
       },
-      sessionId
-    });
+      sessionId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-    await screenshot.save();
+    try { await store.create('screenshots', screenshot); }
+    catch (error) { await deleteScreenshot(storedMedia._id, { databaseName: tenant.databaseName }).catch(() => {}); throw error; }
 
-    console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${gridfsResult ? ` (GridFS: ${gridfsResult._id})` : ''}`);
+    console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${storedMedia ? ` (Blob: ${storedMedia._id})` : ''}`);
 
     return NextResponse.json({
       success: true,
       screenshotId: screenshot._id.toString(),
-      gridfsId: gridfsResult?._id?.toString() || null,
+      gridfsId: storedMedia?._id?.toString() || null,
       path: publicPath,
       timestamp: safeCapturedAt.toISOString(),
       fileSize: buffer.length,
-      storage: gridfsResult ? 'gridfs' : 'filesystem'
+      storage: 'vercel-blob'
     });
 
   } catch (error) {
@@ -254,17 +253,17 @@ export async function POST(request) {
 
 /**
  * GET /api/activity/screenshot?id=xxx
- * Retrieve a screenshot image by ID (from GridFS or filesystem)
+ * Retrieve a private Blob screenshot by its tenant-scoped media ID
  */
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Screenshot']);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth;
-    const { User, Employee, Department, Screenshot } = models;
+    const { user } = auth;
+    const store = await getFirestoreTenantDatabase(auth.tenant.databaseName, { queryFields: { screenshots: ['gridfsFileId'] } });
 
     const userId = user._id || user.userId;
     const userRole = user.role;
@@ -280,14 +279,14 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    if (screenshotId && !mongoose.Types.ObjectId.isValid(screenshotId)) {
+    if (screenshotId && !/^[a-f0-9]{24}$/i.test(screenshotId)) {
       return NextResponse.json({
         success: false,
         error: 'Invalid screenshot ID format'
       }, { status: 400 });
     }
 
-    if (fileId && !mongoose.Types.ObjectId.isValid(fileId)) {
+    if (fileId && !/^[a-f0-9]{24}$/i.test(fileId)) {
       return NextResponse.json({
         success: false,
         error: 'Invalid file ID format'
@@ -296,8 +295,8 @@ export async function GET(request) {
 
     // Get screenshot metadata
     const screenshot = screenshotId
-      ? await Screenshot.findById(screenshotId)
-      : await Screenshot.findOne({ gridfsFileId: new mongoose.Types.ObjectId(fileId) });
+      ? await store.get('screenshots', screenshotId)
+      : (await store.list('screenshots', { filters: [{ field: 'gridfsFileId', operator: '==', value: fileId }], limit: 1 })).records[0];
 
     if (!screenshot) {
       return NextResponse.json({
@@ -307,7 +306,7 @@ export async function GET(request) {
     }
 
     // Access control - check if user can view this screenshot
-    const hasAccess = await canViewUserScreenshots(userId, screenshot.user, userRole, models);
+    const hasAccess = await canViewTenantScreenshots(userId, screenshot.user, userRole, auth.tenant.databaseName);
 
     if (!hasAccess) {
       return NextResponse.json({
@@ -316,7 +315,7 @@ export async function GET(request) {
       }, { status: 403 });
     }
 
-    // Try GridFS first
+    // The historical field stores a native media descriptor ID; no legacy database is consulted.
     if (!screenshot.gridfsFileId) {
       return NextResponse.json({
         success: false,

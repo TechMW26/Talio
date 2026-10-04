@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
-import { uploadImage } from '@/lib/gridfs'
 import {
   buildAuthenticatedBlobUrl,
-  getBlobAccessMode,
   isBlobStorageConfigured,
   uploadTenantBlob,
 } from '@/lib/platform/blobStorage.server'
@@ -12,7 +10,6 @@ import {
   normalizeUploadCategory,
   validateUploadMetadata,
 } from '@/lib/platform/uploadPolicy'
-import { getRuntimeCapabilities } from '@/lib/platform/runtime'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -36,18 +33,16 @@ function uploadResponse(data) {
 }
 
 async function getEmployee(auth) {
-  const { User, Employee } = auth.models
-  const userId = auth.user._id || auth.user.userId
-  const currentUser = await User.findById(userId).select('employeeId').lean()
-
-  return currentUser?.employeeId
-    ? Employee.findById(currentUser.employeeId).select('_id').lean()
-    : Employee.findOne({ userId }).select('_id').lean()
+  const userId = String(auth.user._id || auth.user.userId), currentUser = await auth.database.get('users', userId)
+  if (currentUser?.employeeId) return auth.database.get('employees', String(currentUser.employeeId?._id || currentUser.employeeId))
+  const result = await auth.database.list('employees', { filters: [{ field: 'userId', operator: '==', value: userId }], limit: 2 })
+  if (result.records.length > 1) throw new Error('Ambiguous employee account')
+  return result.records[0] || null
 }
 
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    const auth = await getAuthAndDatabase(request, { queryFields: { employees: ['userId'] } })
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -92,7 +87,7 @@ export async function POST(request) {
     const finalFilename = optimizationInfo ? `${basename}.webp` : file.name
 
     if (isBlobStorageConfigured()) {
-      const access = getBlobAccessMode()
+      const access = 'private'
       const blob = await uploadTenantBlob({
         tenantId: auth.tenant.databaseName,
         category,
@@ -122,37 +117,11 @@ export async function POST(request) {
       })
     }
 
-    if (getRuntimeCapabilities().isVercel) {
-      return NextResponse.json({
-        success: false,
-        code: 'BLOB_NOT_CONFIGURED',
-        message: 'BLOB_READ_WRITE_TOKEN is required for uploads on Vercel',
-      }, { status: 503 })
-    }
-
-    // GridFS remains the non-Vercel compatibility backend; no runtime path writes
-    // to public/uploads, because those files disappear on serverless instances.
-    const gridfs = await uploadImage(buffer, {
-      category,
-      contentType,
-      originalName: finalFilename,
-      userId,
-      employeeId: employee?._id ? String(employee._id) : undefined,
-    })
-
-    return uploadResponse({
-      fileUrl: gridfs.url,
-      fileId: String(gridfs._id),
-      fileName: file.name,
-      fileType: contentType,
-      fileSize: gridfs.length || buffer.length,
-      originalSize: file.size,
-      optimized: Boolean(optimizationInfo),
-      width: optimizationInfo?.width,
-      height: optimizationInfo?.height,
-      storage: 'gridfs',
-      ...(optimizationInfo && { compressionRatio: optimizationInfo.compressionRatio }),
-    })
+    return NextResponse.json({
+      success: false,
+      code: 'BLOB_NOT_CONFIGURED',
+      message: 'Private Vercel Blob storage must be configured before uploading',
+    }, { status: 503 })
   } catch (error) {
     console.error('[Upload] Failed:', error)
     return NextResponse.json({ success: false, message: error.message }, { status: 500 })

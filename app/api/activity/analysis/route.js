@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { getAuthAndModels } from '@/lib/auth';
-import { canViewUserScreenshots } from '@/lib/productivityPermissions';
+import { getProductivityViewStore } from '@/lib/platform/firestoreProductivityView.server';
+import { verifyTokenFromRequest } from '@/lib/auth';
+import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
 import {
   runDailyAnalysis,
-  DAILY_ANALYSIS_REQUIRED_MODELS,
 } from '@/lib/dailyAnalysisRunner';
 import { getDateKeyInTimezone, getStartOfDayInTimezone, IST_TIMEZONE } from '@/lib/timezone';
 
@@ -59,18 +58,13 @@ function mapAnalysisDoc(doc) {
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, [
-      'User',
-      'Employee',
-      'Department',
-      'ScreenshotAnalysis',
-    ]);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    const { user, models } = auth;
-    const { User, ScreenshotAnalysis } = models;
+    const { user, tenant } = auth;
+    const store = await getProductivityViewStore(tenant.databaseName);
 
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
@@ -84,18 +78,18 @@ export async function GET(request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    if (targetUserId !== viewerId.toString() && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (targetUserId !== viewerId.toString() && !/^[a-f\d]{24}$/i.test(String(targetUserId))) {
       return NextResponse.json({ success: false, error: 'Invalid user ID format' }, { status: 400 });
     }
 
     if (targetUserId !== viewerId.toString()) {
-      const exists = await User.findById(targetUserId).select('_id');
+      const exists = await store.get('users', String(targetUserId));
       if (!exists) {
         return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
       }
     }
 
-    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
+    const canView = await canViewTenantScreenshots(viewerId, targetUserId, viewerRole, tenant.databaseName);
     if (!canView) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
@@ -120,12 +114,14 @@ export async function GET(request) {
       query.dateString = getDateKeyInTimezone(new Date(todayStart.getTime() - 1), IST_TIMEZONE);
     }
 
-    const analyses = await ScreenshotAnalysis.find(query)
-      .sort({ date: -1 })
-      .limit(30)
-      .lean();
+    const filters = [{ field: 'user', operator: '==', value: targetUserId }];
+    if (query.dateString) filters.push({ field: 'dateString', operator: '==', value: query.dateString });
+    for (const [operator, value] of [['>=', query.date?.$gte], ['<=', query.date?.$lte]]) {
+      if (value) { if (!Number.isFinite(value.getTime())) return NextResponse.json({ error: 'Invalid date range' }, { status: 400 }); filters.push({ field: 'date', operator, value }); }
+    }
+    const analyses = (await store.list('screenshotanalyses', { filters, orderBy: [{ field: 'date', direction: 'desc' }], limit: 30 })).records;
 
-    const targetUser = await User.findById(targetUserId).select('name email');
+    const targetUser = await store.get('users', String(targetUserId));
 
     return NextResponse.json({
       success: true,
@@ -152,12 +148,12 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, DAILY_ANALYSIS_REQUIRED_MODELS);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    const { user, models, tenant } = auth;
+    const { user, tenant } = auth;
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
     if (!viewerId) {
@@ -171,11 +167,11 @@ export async function POST(request) {
     if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
       return NextResponse.json({ success: false, error: 'Date is required (YYYY-MM-DD)' }, { status: 400 });
     }
-    if (targetUserId !== viewerId.toString() && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (targetUserId !== viewerId.toString() && !/^[a-f\d]{24}$/i.test(String(targetUserId))) {
       return NextResponse.json({ success: false, error: 'Invalid userId' }, { status: 400 });
     }
 
-    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
+    const canView = await canViewTenantScreenshots(viewerId, targetUserId, viewerRole, tenant.databaseName);
     if (!canView) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
@@ -183,7 +179,6 @@ export async function POST(request) {
     const result = await runDailyAnalysis({
       userId: targetUserId,
       dateString,
-      models,
       tenant,
       trigger: 'manual-legacy',
       forceReanalyze: true,

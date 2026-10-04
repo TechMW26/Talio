@@ -1,24 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { retryPageError } from '@/lib/client/retryPageError'
 import { FaExclamationTriangle, FaHome, FaRedo } from 'react-icons/fa'
 
 export default function Error({ error, reset }) {
-  const [useCachedPage, setUseCachedPage] = useState(false)
 
   useEffect(() => {
     // Log the error to an error reporting service
     console.error('Application Error:', error)
 
-    // Try to use cached error page if available
-    const cachedErrorPage = localStorage.getItem('talio_error_page')
-    if (cachedErrorPage) {
-      setUseCachedPage(true)
-      // Replace the current page with the cached error page
-      document.open()
-      document.write(cachedErrorPage)
-      document.close()
-    }
   }, [error])
 
   return (
@@ -33,7 +24,7 @@ export default function Error({ error, reset }) {
             Oops! Something went wrong
           </h1>
           <p className="text-gray-600">
-            We encountered an unexpected error. Don't worry, we're on it!
+            We encountered an unexpected error. Don&apos;t worry, we&apos;re on it!
           </p>
         </div>
 
@@ -52,7 +43,7 @@ export default function Error({ error, reset }) {
         {/* Action Buttons */}
         <div className="space-y-3">
           <button
-            onClick={() => reset()}
+            onClick={() => retryPageError(error, reset)}
             className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
           >
             <FaRedo className="w-4 h-4" />

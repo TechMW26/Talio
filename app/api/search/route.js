@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { APPLICATION_SEARCH_OPTIONS, searchApplicationRecords } from '@/lib/applicationSearch.server'
 import Fuse from 'fuse.js'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
 import { getMenuTemplateRole } from '@/utils/rbacMenu'
@@ -213,45 +214,23 @@ function canAccessPath(path, companyFeatures, permissions, userRole) {
 
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Leave', 'Attendance', 'Department', 'Designation', 'Document', 'Asset', 'Announcement', 'Policy'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user: authUser, models, tenant } = auth
-    const { User, Employee, Leave, Attendance, Department, Designation, Document, Asset, Announcement, Policy } = models
-
-    const user = await User.findById(authUser._id || authUser.userId).populate('employeeId')
-    if (!user || !user.employeeId) {
-      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
-    }
+    const auth = await getAuthAndDatabase(request, APPLICATION_SEARCH_OPTIONS)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    const { user: authUser, database, tenant } = auth
+    const employee = authUser.employeeId ? await database.get('employees', String(authUser.employeeId?._id || authUser.employeeId)) : null
+    if (!employee) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    const user = { ...authUser, employeeId: employee }
 
     const { searchParams } = new URL(request.url)
-    const query = searchParams.get('q')
+    const query = (searchParams.get('q') || '').trim().slice(0, 100)
 
     if (!query || query.trim().length < 2) {
       return NextResponse.json({ success: false, message: 'Search query too short' }, { status: 400 })
     }
 
-    let permissions = null
-    try {
-      permissions = await resolveUserPermissions(user, tenant?.databaseName)
-    } catch (permissionError) {
-      console.error('Search permission resolution error:', permissionError)
-    }
+    const permissions = await resolveUserPermissions(user, tenant.databaseName)
+    const companyFeatures = (await getTenantCompanyFeaturePayload({ companySlug: tenant.companySlug, databaseName: tenant.databaseName }))?.features || null
 
-    let companyFeatures = null
-    try {
-      const featurePayload = await getTenantCompanyFeaturePayload({
-        companySlug: tenant?.companySlug,
-        databaseName: tenant?.databaseName,
-      })
-      companyFeatures = featurePayload?.features || null
-    } catch (featureError) {
-      console.error('Search feature resolution error:', featureError)
-    }
-
-    const searchRegex = new RegExp(query, 'i')
     const results = {
       pages: [],
       leaves: [],
@@ -314,211 +293,15 @@ export async function GET(request) {
       score: result.score
     }))
 
-    // Search Leaves (only user's leaves)
-    if (canAccessPath('/dashboard/leave', companyFeatures, permissions, user.role)) {
-      const leaves = await Leave.find({
-        employee: user.employeeId._id,
-        $or: [
-          { reason: searchRegex },
-          { status: searchRegex },
-          { applicationNumber: searchRegex }
-        ]
-      })
-        .select('reason status startDate endDate numberOfDays applicationNumber')
-        .populate('leaveType', 'name')
-        .limit(10)
-
-      results.leaves = leaves.map(leave => ({
-        _id: leave._id,
-        type: 'leave',
-        title: leave.leaveType?.name || 'Leave',
-        subtitle: `${leave.numberOfDays} days`,
-        description: leave.reason,
-        meta: `${leave.status} • ${new Date(leave.startDate).toLocaleDateString()}`,
-        link: `/dashboard/leave`
-      }))
-    }
-
-    // Search Attendance (only user's attendance)
-    if (canAccessPath('/dashboard/attendance', companyFeatures, permissions, user.role)) {
-      const attendance = await Attendance.find({
-        employee: user.employeeId._id,
-        $or: [
-          { status: searchRegex },
-          { remarks: searchRegex }
-        ]
-      })
-        .select('date status checkIn checkOut workHours')
-        .sort({ date: -1 })
-        .limit(10)
-
-      results.attendance = attendance.map(att => ({
-        _id: att._id,
-        type: 'attendance',
-        title: `Attendance - ${new Date(att.date).toLocaleDateString()}`,
-        subtitle: att.status,
-        description: `Work Hours: ${att.workHours || 0}`,
-        meta: att.checkIn ? new Date(att.checkIn).toLocaleTimeString() : 'N/A',
-        link: `/dashboard/attendance`
-      }))
-    }
-
-    // Search Departments (all departments)
-    if (canAccessPath('/dashboard/departments', companyFeatures, permissions, user.role)) {
-      const departments = await Department.find({
-        $or: [
-          { name: searchRegex },
-          { code: searchRegex },
-          { description: searchRegex }
-        ]
-      })
-        .select('name code description')
-        .limit(10)
-
-      results.departments = departments.map(dept => ({
-        _id: dept._id,
-        type: 'department',
-        title: dept.name,
-        subtitle: dept.code,
-        description: dept.description,
-        link: `/dashboard/departments`
-      }))
-    }
-
-    // Search Designations (all designations)
-    if (canAccessPath('/dashboard/designations', companyFeatures, permissions, user.role)) {
-      const designations = await Designation.find({
-        title: searchRegex
-      })
-        .select('title level')
-        .populate('department', 'name')
-        .limit(10)
-
-      results.designations = designations.map(des => ({
-        _id: des._id,
-        type: 'designation',
-        title: des.title,
-        subtitle: des.level || 'Designation',
-        description: des.department?.name,
-        link: `/dashboard/designations`
-      }))
-    }
-
-    // Search Documents (accessible to user)
-    if (canAccessPath('/dashboard/documents', companyFeatures, permissions, user.role)) {
-      const documents = await Document.find({
-        $and: [
-          {
-            $or: [
-              { accessLevel: 'public' },
-              { uploadedBy: user.employeeId._id },
-              { sharedWith: user.employeeId._id },
-              { department: user.employeeId.department }
-            ]
-          },
-          {
-            $or: [
-              { title: searchRegex },
-              { description: searchRegex },
-              { fileName: searchRegex },
-              { category: searchRegex }
-            ]
-          }
-        ]
-      })
-        .select('title description category fileName fileType')
-        .limit(10)
-
-      results.documents = documents.map(doc => ({
-        _id: doc._id,
-        type: 'document',
-        title: doc.title,
-        subtitle: doc.category,
-        description: doc.description,
-        meta: doc.fileType,
-        link: `/dashboard/documents`
-      }))
-    }
-
-    // Search Assets (assigned to user or available)
-    if (canAccessPath('/dashboard/assets', companyFeatures, permissions, user.role)) {
-      const assets = await Asset.find({
-        $and: [
-          {
-            $or: [
-              { assignedTo: user.employeeId._id },
-              { status: 'available' }
-            ]
-          },
-          {
-            $or: [
-              { name: searchRegex },
-              { assetCode: searchRegex },
-              { category: searchRegex },
-              { serialNumber: searchRegex }
-            ]
-          }
-        ]
-      })
-        .select('name assetCode category status serialNumber')
-        .limit(10)
-
-      results.assets = assets.map(asset => ({
-        _id: asset._id,
-        type: 'asset',
-        title: asset.name,
-        subtitle: asset.assetCode,
-        description: asset.category,
-        meta: asset.status,
-        link: `/dashboard/assets`
-      }))
-    }
-
-    // Search Announcements (all active announcements)
-    if (canAccessPath('/dashboard/announcements', companyFeatures, permissions, user.role)) {
-      const announcements = await Announcement.find({
-        $or: [
-          { title: searchRegex },
-          { content: searchRegex }
-        ]
-      })
-        .select('title content priority publishedAt')
-        .sort({ publishedAt: -1 })
-        .limit(10)
-
-      results.announcements = announcements.map(ann => ({
-        _id: ann._id,
-        type: 'announcement',
-        title: ann.title,
-        subtitle: 'Announcement',
-        description: ann.content?.substring(0, 100),
-        meta: ann.priority,
-        link: `/dashboard/announcements`
-      }))
-    }
-
-    // Search Policies (all active policies)
-    if (canAccessPath('/dashboard/policies', companyFeatures, permissions, user.role)) {
-      const policies = await Policy.find({
-        $or: [
-          { title: searchRegex },
-          { description: searchRegex },
-          { category: searchRegex }
-        ]
-      })
-        .select('title description category version')
-        .limit(10)
-
-      results.policies = policies.map(policy => ({
-        _id: policy._id,
-        type: 'policy',
-        title: policy.title,
-        subtitle: `Policy v${policy.version}`,
-        description: policy.description,
-        meta: policy.category,
-        link: `/dashboard/policies`
-      }))
-    }
+    const found = await searchApplicationRecords(database, user, employee, query, path => canAccessPath(path, companyFeatures, permissions, user.role))
+    results.leaves = found.leaves.map(row => ({ _id: row._id, type: 'leave', title: row.leaveType?.name || 'Leave', subtitle: String(row.numberOfDays) + ' days', description: row.reason, meta: row.status + ' • ' + new Date(row.startDate).toLocaleDateString(), link: '/dashboard/leave' }))
+    results.attendance = found.attendance.map(row => ({ _id: row._id, type: 'attendance', title: 'Attendance - ' + new Date(row.date).toLocaleDateString(), subtitle: row.status, description: 'Work Hours: ' + (row.workHours || 0), meta: row.checkIn ? new Date(row.checkIn).toLocaleTimeString() : 'N/A', link: '/dashboard/attendance' }))
+    results.departments = found.departments.map(row => ({ _id: row._id, type: 'department', title: row.name, subtitle: row.code, description: row.description, link: '/dashboard/departments' }))
+    results.designations = found.designations.map(row => ({ _id: row._id, type: 'designation', title: row.title, subtitle: row.level || 'Designation', description: row.department?.name, link: '/dashboard/designations' }))
+    results.documents = found.documents.map(row => ({ _id: row._id, type: 'document', title: row.title || row.name || row.fileName, subtitle: row.category, description: row.description, meta: row.fileType, link: '/dashboard/documents' }))
+    results.assets = found.assets.map(row => ({ _id: row._id, type: 'asset', title: row.name, subtitle: row.assetCode, description: row.category, meta: row.status, link: '/dashboard/assets' }))
+    results.announcements = found.announcements.map(row => ({ _id: row._id, type: 'announcement', title: row.title, subtitle: 'Announcement', description: row.content?.substring(0, 100), meta: row.priority, link: '/dashboard/announcements' }))
+    results.policies = found.policies.map(row => ({ _id: row._id, type: 'policy', title: row.title, subtitle: 'Policy v' + row.version, description: row.description, meta: row.category, link: '/dashboard/policies' }))
 
     // Count total results
     const totalResults = Object.values(results).reduce((sum, arr) => sum + arr.length, 0)
@@ -532,7 +315,7 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('Search error:', error)
-    return NextResponse.json({ success: false, message: 'Search failed', error: error.message }, { status: 500 })
+    return NextResponse.json({ success: false, message: 'Search failed', error: error.message }, { status: error.status || 500 })
   }
 }
 

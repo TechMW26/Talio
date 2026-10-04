@@ -1,17 +1,17 @@
-import mongoose from 'mongoose'
+import { ATTENDANCE_DATABASE_OPTIONS } from '@/lib/platform/firestoreAttendance.server'
 import { apiError, apiSuccess, withTenantApi } from '@/lib/api/route'
 
 export const dynamic = 'force-dynamic'
 
 export const POST = withTenantApi({
-  models: ['AttendanceMachine'],
+  firestore: ATTENDANCE_DATABASE_OPTIONS,
   roles: ['admin', 'hr'],
   features: { allOf: ['attendanceMachines'] },
   errorMessage: 'Machine readiness check failed',
-}, async ({ context, models }) => {
+}, async ({ context, database }) => {
   const { id } = await Promise.resolve(context.params)
-  if (!mongoose.Types.ObjectId.isValid(id || '')) return apiError('Invalid machine ID', { status: 400 })
-  const machine = await models.AttendanceMachine.findById(id).lean()
+  if (!/^[a-f\d]{24}$/i.test(id || '')) return apiError('Invalid machine ID', { status: 400 })
+  const machine = await database.get('attendancemachines', id)
   if (!machine) return apiError('Attendance machine not found', { status: 404 })
   if (machine.status === 'disabled') return apiError('Enable the machine before testing it', { status: 409 })
 
@@ -41,4 +41,3 @@ export const POST = withTenantApi({
     message: 'Webhook is ready. Send a signed test punch from the machine or vendor cloud.',
   })
 })
-

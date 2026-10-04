@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getImageStream, getImageInfo } from '@/lib/gridfs'
+import { getImageStream, getImageInfo } from '@/lib/mediaStorage'
 import sharp from 'sharp'
-import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
+import { verifyTokenFromRequest } from '@/lib/auth'
 import { canReadDocumentUpload } from '@/lib/documentAccess.server'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/images/[id]
- * Serve an image from GridFS with optional on-the-fly resizing.
+ * Serve private tenant media from Vercel Blob with optional resizing.
  * 
  * Query params:
  *   w - width (max 2048)
@@ -23,22 +23,21 @@ export async function GET(request, { params }) {
             return new NextResponse('Not found', { status: 404 })
         }
 
-        // Get file info first for content-type
-        const fileInfo = await getImageInfo(id)
+        const auth = await verifyTokenFromRequest(request)
+        if (!auth.success) return new NextResponse('Unauthorized', { status: 401 })
+        const mediaOptions = { databaseName: auth.tenant.databaseName }
+        const fileInfo = await getImageInfo(id, mediaOptions)
         if (!fileInfo) {
             return new NextResponse('Not found', { status: 404 })
         }
         const isAadhaar = fileInfo.metadata?.category === 'aadhaar'
         const isDocument = fileInfo.metadata?.category === 'documents'
-        const privateFile = isAadhaar || isDocument
         if (isDocument) {
-            const auth = await getAuthAndModels(request, ['Document', 'User'])
             if (!await canReadDocumentUpload(auth, { fileId: id, ownerId: fileInfo.metadata?.userId })) {
                 return new NextResponse('Forbidden', { status: 403 })
             }
         }
         if (isAadhaar) {
-            const auth = await verifyTokenFromRequest(request)
             const requesterId = String(auth?.user?._id || auth?.user?.userId || '')
             const ownerId = String(fileInfo.metadata?.userId || '')
             const privileged = ['admin', 'hr'].includes(auth?.user?.role)
@@ -57,7 +56,7 @@ export async function GET(request, { params }) {
 
         if (!needsResize) {
             // Stream directly without processing
-            const stream = await getImageStream(id)
+            const stream = await getImageStream(id, mediaOptions)
 
             const readableStream = new ReadableStream({
                 start(controller) {
@@ -70,7 +69,7 @@ export async function GET(request, { params }) {
             return new NextResponse(readableStream, {
                 headers: {
                     'Content-Type': contentType,
-                    'Cache-Control': privateFile ? 'private, no-store' : 'public, max-age=31536000, immutable',
+                    'Cache-Control': 'private, no-store',
                     'X-Content-Type-Options': 'nosniff',
                     'Content-Length': String(fileInfo.length),
                 }
@@ -78,7 +77,7 @@ export async function GET(request, { params }) {
         }
 
         // On-the-fly resize using sharp
-        const stream = await getImageStream(id)
+        const stream = await getImageStream(id, mediaOptions)
         const chunks = []
         for await (const chunk of stream) {
             chunks.push(chunk)
@@ -105,7 +104,7 @@ export async function GET(request, { params }) {
         return new NextResponse(resizedBuffer, {
             headers: {
                 'Content-Type': contentType,
-                'Cache-Control': privateFile ? 'private, no-store' : 'public, max-age=31536000, immutable',
+                'Cache-Control': 'private, no-store',
                 'Content-Length': String(resizedBuffer.length),
             }
         })

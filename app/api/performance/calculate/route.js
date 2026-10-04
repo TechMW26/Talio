@@ -1,7 +1,8 @@
+import { performanceDatabase, performanceEmployees, joinPerformanceEmployees, scopedPerformanceRecords, performanceDates, assertTeamStatisticsAccess, performanceLinkedRecords, filter } from '@/lib/performanceStore.server'
+import { collectFirestorePages, readFirestoreReferences } from '@/lib/platform/firestoreQueries.server'
 import { NextResponse } from 'next/server'
 import { getDateKeyInTimezone } from '@/lib/timezone'
-import { getAuthAndModels } from '@/lib/auth'
-import { buildDirectReportsFilter } from '@/lib/teamScope'
+import { getAuthAndDatabase } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 // Helper: Count working days between two dates, respecting company working days and holidays
@@ -10,17 +11,17 @@ function countWorkingDays(startDate, endDate, workingDays, holidayDates) {
   let count = 0
   const current = new Date(startDate)
   const end = new Date(endDate)
-  
+
   while (current <= end) {
     const dayName = dayNameMap[current.getUTCDay()]
     const dateStr = getDateKeyInTimezone(current)
-    
+
     if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
       count++
     }
     current.setDate(current.getDate() + 1)
   }
-  
+
   return count
 }
 
@@ -29,15 +30,15 @@ function getEmployeeWorkingDays(employeeJoiningDate, periodStart, periodEnd, wor
   const joiningDate = employeeJoiningDate ? new Date(employeeJoiningDate) : null
   const start = new Date(periodStart)
   const end = new Date(periodEnd)
-  
+
   // If employee hasn't joined yet, return 0
   if (joiningDate && joiningDate > end) {
     return 0
   }
-  
+
   // Effective start is the later of period start or joining date
   const effectiveStart = joiningDate && joiningDate > start ? joiningDate : start
-  
+
   return countWorkingDays(effectiveStart, end, workingDays, holidayDates)
 }
 
@@ -45,12 +46,12 @@ function getEmployeeWorkingDays(employeeJoiningDate, periodStart, periodEnd, wor
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'ProjectMember', 'TaskAssignee', 'Attendance', 'PerformanceGoal', 'DailyGoal', 'CompanySettings', 'Holiday', 'User', 'Team'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Employee, ProjectMember, TaskAssignee, Attendance, PerformanceGoal, DailyGoal, CompanySettings, Holiday, User, Team } = models
+    const { user } = auth
+    const database = await performanceDatabase(auth)
 
     const { searchParams } = new URL(request.url)
     const employeeIdParam = searchParams.get('employeeId')
@@ -60,82 +61,22 @@ export async function GET(request) {
     const departmentsParam = searchParams.get('departments') // Comma-separated list of department IDs
 
     // Date range for filtering
-    const startDate = startDateStr ? new Date(startDateStr) : new Date(new Date().setDate(new Date().getDate() - 30)) // Default last 30 days
-    const endDate = endDateStr ? new Date(endDateStr) : new Date()
+    const { start: startDate, end: endDate } = performanceDates(searchParams)
 
     // Fetch company settings for working days
-    const companySettings = await CompanySettings.findOne().lean()
+    const companySettings = (await database.list('companysettings', { limit: 1 })).records[0]
     const workingDays = companySettings?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-    
+
     // Fetch holidays in the date range
-    const holidays = await Holiday.find({
-      date: { $gte: startDate, $lte: endDate }
-    }).lean()
+    const holidays = await collectFirestorePages(database, 'holidays', { filters: [filter('date', startDate, '>='), filter('date', endDate, '<=')] })
     const holidayDates = new Set(holidays.map(h => getDateKeyInTimezone(h.date)))
 
-    // Get employeeId - could be object or string
-    const currentEmployeeId = user.employeeId?._id || user.employeeId
-
-    // Build query based on role
-    let employeeQuery = { status: 'active' }
-    
-    if (user.role === 'employee' || user.role === 'team_leader') {
-      // Check if this employee is a team leader
-      const tlUser = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
-      if (tlUser?.teamLeaderOf?.length > 0) {
-        const ledTeams = await Team.find({ _id: { $in: tlUser.teamLeaderOf }, isActive: true }).select('members teamLeaders').lean()
-        const teamMemberIds = new Set()
-        for (const team of ledTeams) {
-          for (const m of (team.members || [])) teamMemberIds.add(m.toString())
-          for (const l of (team.teamLeaders || [])) teamMemberIds.add(l.toString())
-        }
-        employeeQuery._id = { $in: [...teamMemberIds] }
-      } else {
-        employeeQuery._id = currentEmployeeId
-      }
-    } else if (user.role === 'manager') {
-      const teamMembers = await Employee.find(
-        buildDirectReportsFilter(currentEmployeeId, { status: 'active' })
-      ).select('_id')
-
-      const teamMemberIds = teamMembers.map(member => member._id)
-      employeeQuery._id = { $in: [...teamMemberIds, currentEmployeeId] }
-    }
-    // Admin and HR can see all employees
-
-    // Apply department filter
-    if (departmentsParam) {
-      const deptIds = departmentsParam.split(',').filter(id => id.trim())
-      if (deptIds.length > 0) {
-        employeeQuery.department = { $in: deptIds }
-      }
-    } else if (departmentParam && departmentParam !== 'all') {
-      employeeQuery.department = departmentParam
-    }
-
-    if (employeeIdParam) {
-      employeeQuery._id = employeeIdParam
-    }
-
-    // Fetch employees (include dateOfJoining for proper calculations)
-    const employees = await Employee.find(employeeQuery)
-      .populate({
-        path: 'reviews.reviewedBy',
-        select: 'firstName lastName',
-        options: { strictPopulate: false }
-      })
-      .populate({
-        path: 'department',
-        select: 'name',
-        options: { strictPopulate: false }
-      })
-      .select('firstName lastName employeeCode department reviews designation profilePicture dateOfJoining')
-      .lean()
+    const employees = await joinPerformanceEmployees(database, await performanceEmployees(database, user, searchParams))
 
     // Calculate performance metrics for each employee
     const performanceMetrics = await Promise.all(employees.map(async (employee) => {
       const empId = employee._id
-      
+
       // Calculate this employee's expected working days (respects joining date)
       const employeeWorkingDays = getEmployeeWorkingDays(
         employee.dateOfJoining,
@@ -153,26 +94,23 @@ export async function GET(request) {
           return reviewDate >= startDate && reviewDate <= endDate
         })
       }
-      
+
       const reviewsWithRating = reviews.filter(r => r.rating)
       const avgRating = reviewsWithRating.length > 0
         ? (reviewsWithRating.reduce((sum, r) => sum + r.rating, 0) / reviewsWithRating.length)
         : 0
 
       // 2. Projects
-      const projectMemberships = await ProjectMember.find({ user: empId }).populate('project', 'status completionPercentage')
+      const projectMemberships = await performanceLinkedRecords(database, 'projectmembers', 'user', empId, [], 'projects', 'project')
       const activeProjects = projectMemberships.filter(pm => ['ongoing', 'planned'].includes(pm.project?.status)).length
       const completedProjects = projectMemberships.filter(pm => pm.project?.status === 'completed').length
-      const projectCompletionRate = projectMemberships.length > 0 
-        ? (completedProjects / projectMemberships.length) * 100 
+      const projectCompletionRate = projectMemberships.length > 0
+        ? (completedProjects / projectMemberships.length) * 100
         : 0
 
       // 3. Tasks
-      const taskAssignments = await TaskAssignee.find({ 
-        user: empId,
-        assignedAt: { $gte: startDate, $lte: endDate }
-      }).populate('task', 'status dueDate')
-      
+      const taskAssignments = await performanceLinkedRecords(database, 'taskassignees', 'user', empId, [filter('assignedAt', startDate, '>='), filter('assignedAt', endDate, '<=')], 'tasks', 'task')
+
       const totalTasks = taskAssignments.length
       const completedTasks = taskAssignments.filter(ta => ta.task?.status === 'completed').length
       const overdueTasks = taskAssignments.filter(ta => {
@@ -181,14 +119,11 @@ export async function GET(request) {
       const taskCompletionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
 
       // 4. Attendance
-      const attendanceRecords = await Attendance.find({
-        employee: empId,
-        date: { $gte: startDate, $lte: endDate }
-      })
-      
+      const attendanceRecords = await collectFirestorePages(database, 'attendances', { filters: [filter('employee', empId), filter('date', startDate, '>='), filter('date', endDate, '<=')] })
+
       const presentDays = attendanceRecords.filter(a => ['present', 'half-day', 'late'].includes(a.status)).length
       const lateDays = attendanceRecords.filter(a => a.checkInStatus === 'late').length
-      
+
       // Attendance Score: (Present Days / Employee's Expected Working Days) * 100
       // Penalize late days slightly (0.25 day penalty)
       // Uses employeeWorkingDays which respects their joining date, company working days, and holidays
@@ -196,20 +131,14 @@ export async function GET(request) {
       const attendanceScore = Math.min(100, Math.round((adjustedPresentDays / employeeWorkingDays) * 100));
 
       // 5. Goals (Performance Goals + Daily Goals)
-      const perfGoals = await PerformanceGoal.find({
-        employee: empId,
-        createdAt: { $gte: startDate, $lte: endDate }
-      })
-      
-      const dailyGoals = await DailyGoal.find({
-        employee: empId,
-        date: { $gte: startDate, $lte: endDate }
-      })
+      const perfGoals = await collectFirestorePages(database, 'performancegoals', { filters: [filter('employee', empId), filter('createdAt', startDate, '>='), filter('createdAt', endDate, '<=')] })
+
+      const dailyGoals = await collectFirestorePages(database, 'dailygoals', { filters: [filter('employee', empId), filter('date', startDate, '>='), filter('date', endDate, '<=')] })
 
       // Flatten daily goals (each DailyGoal doc has an array of goals)
       let totalDailyGoals = 0
       let completedDailyGoals = 0
-      
+
       dailyGoals.forEach(dg => {
         if (dg.goals && dg.goals.length > 0) {
           totalDailyGoals += dg.goals.length
@@ -219,7 +148,7 @@ export async function GET(request) {
 
       const totalPerfGoals = perfGoals.length
       const completedPerfGoals = perfGoals.filter(g => g.status === 'completed' || g.progress === 100).length
-      
+
       const totalGoals = totalPerfGoals + totalDailyGoals
       const completedGoals = completedPerfGoals + completedDailyGoals
       const goalCompletionRate = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0
@@ -305,7 +234,7 @@ export async function GET(request) {
           performanceScore,
           performanceLevel,
           avgRating: parseFloat(avgRating.toFixed(1)),
-          
+
           // Detailed Scores
           productivityScore,
           qualityScore,
@@ -317,7 +246,7 @@ export async function GET(request) {
           quality: qualityScore,
           innovation: innovationScore,
           engagement: engagementScore,
-          
+
           // Raw Data
           goals: {
             total: totalGoals,
@@ -367,7 +296,7 @@ export async function GET(request) {
       }
       departmentPerformance[deptName].totalScore += p.metrics.performanceScore
       departmentPerformance[deptName].totalRating += parseFloat(p.metrics.avgRating)
-      departmentPerformance[deptName].totalGoalCompletion += p.metrics.goalCompletion
+      departmentPerformance[deptName].totalGoalCompletion += p.metrics.goals.completionRate
       departmentPerformance[deptName].totalProductivity += p.metrics.productivity
       departmentPerformance[deptName].count += 1
     })
@@ -392,10 +321,10 @@ export async function GET(request) {
           ? parseFloat((performanceMetrics.reduce((sum, p) => sum + parseFloat(p.metrics.avgRating), 0) / performanceMetrics.length).toFixed(1))
           : 0,
         goalCompletionRate: performanceMetrics.length > 0
-          ? Math.round(performanceMetrics.reduce((sum, p) => sum + p.metrics.goalCompletion, 0) / performanceMetrics.length)
+          ? Math.round(performanceMetrics.reduce((sum, p) => sum + p.metrics.goals.completionRate, 0) / performanceMetrics.length)
           : 0,
         projectCompletionRate: performanceMetrics.length > 0
-          ? Math.round(performanceMetrics.reduce((sum, p) => sum + p.metrics.projectCompletion, 0) / performanceMetrics.length)
+          ? Math.round(performanceMetrics.reduce((sum, p) => sum + p.metrics.projects.completionRate, 0) / performanceMetrics.length)
           : 0,
         productivityIndex: performanceMetrics.length > 0
           ? Math.round(performanceMetrics.reduce((sum, p) => sum + p.metrics.productivity, 0) / performanceMetrics.length)
@@ -418,8 +347,8 @@ export async function GET(request) {
 
     console.error('Calculate performance error:', error)
     return NextResponse.json(
-      { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { success: false, message: error.status ? error.message : 'Internal server error' },
+      { status: error.status || 500 }
     )
   }
 }

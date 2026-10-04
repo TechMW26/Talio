@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import mongoose from 'mongoose';
-import { canViewUserScreenshots } from '@/lib/productivityPermissions';
+import { verifyTokenFromRequest } from '@/lib/auth'
+import { getScreenshotStore, findScreenshotComposite, listScreenshotMaintenanceRecords } from '@/lib/platform/firestoreScreenshots.server';
+import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
 
 /**
  * GET /api/activity/screenshots
@@ -18,12 +18,12 @@ import { canViewUserScreenshots } from '@/lib/productivityPermissions';
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Screenshot'])
+    const auth = await verifyTokenFromRequest(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { User, Employee, Department, Screenshot } = models
+    const { user, tenant } = auth;
+    const store = await getScreenshotStore(tenant.databaseName);
 
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
@@ -37,24 +37,24 @@ export async function GET(request) {
   const date = searchParams.get('date');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
-    const limit = Math.min(parseInt(searchParams.get('limit')) || 100, 500);
+    const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit')) || 100, 500));
     const skip = parseInt(searchParams.get('skip')) || 0;
 
     // Validate targetUserId format if different from current user
-    if (targetUserId !== viewerId && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (targetUserId !== viewerId && !/^[a-f\d]{24}$/i.test(String(targetUserId))) {
       return NextResponse.json({ success: false, error: 'Invalid user ID format' }, { status: 400 });
     }
 
     // Ensure target user exists when viewing someone else
     if (targetUserId.toString() !== viewerId.toString()) {
-      const targetUserExists = await User.findById(targetUserId).select('_id');
+      const targetUserExists = await store.get('users', String(targetUserId));
       if (!targetUserExists) {
         return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
       }
     }
 
     // Check access permission
-    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
+    const canView = await canViewTenantScreenshots(viewerId, targetUserId, viewerRole, tenant.databaseName);
     if (!canView) {
       return NextResponse.json({ 
         success: false, 
@@ -95,18 +95,22 @@ export async function GET(request) {
       query.capturedAt = { $lte: endParsed };
     }
 
-    // Get screenshots
-    const screenshots = await Screenshot.find(query)
-      .sort({ capturedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .select('-gridfsFileId') // Don't expose GridFS ID directly
-      .lean();
-
-    const total = await Screenshot.countDocuments(query);
+    const filters = [{ field: 'user', operator: '==', value: String(targetUserId) }];
+    if (query.dateString) filters.push({ field: 'dateString', operator: '==', value: query.dateString });
+    if (query.capturedAt?.$gte) filters.push({ field: 'capturedAt', operator: '>=', value: query.capturedAt.$gte });
+    if (query.capturedAt?.$lte) filters.push({ field: 'capturedAt', operator: '<=', value: query.capturedAt.$lte });
+    if (skip < 0 || skip > 10000) return NextResponse.json({ error: 'Invalid pagination offset' }, { status: 400 });
+    let cursor = searchParams.get('cursor') || undefined, visited = 0;
+    const screenshots = [];
+    do {
+      const page = await store.list('screenshots', { filters, orderBy: [{ field: 'capturedAt', direction: 'desc' }], limit: Math.min(100, skip + limit - visited), cursor });
+      for (const record of page.records) { if (visited++ >= skip) screenshots.push(record); }
+      cursor = page.nextCursor;
+    } while (cursor && screenshots.length < limit);
+    const total = await store.count('screenshots', filters);
 
     // Get user info for context
-    const targetUser = await User.findById(targetUserId).select('name email');
+    const targetUser = await store.get('users', String(targetUserId));
 
     return NextResponse.json({
       success: true,
@@ -134,6 +138,7 @@ export async function GET(request) {
       })),
       pagination: {
         total,
+        nextCursor: cursor || null,
         limit,
         skip,
         hasMore: skip + screenshots.length < total

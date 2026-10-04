@@ -1,9 +1,9 @@
 import { scheduleDailyAnalysisAfterScreenshot, runQueuedDailyAnalysis } from '@/lib/autoAnalysisTrigger'
-import { enqueueBackgroundJob } from '@/lib/platform/backgroundJobs.server'
-import { getTenantModels } from '@/lib/tenantModels'
+import { enqueueBackgroundJob } from '@/lib/platform/firestoreBackgroundJobs.server'
+import { getScreenshotStore, listScreenshotMaintenanceRecords } from '@/lib/platform/firestoreScreenshots.server'
 import { runDailyAnalysis } from '@/lib/dailyAnalysisRunner'
-jest.mock('@/lib/platform/backgroundJobs.server', () => ({ enqueueBackgroundJob: jest.fn() }))
-jest.mock('@/lib/tenantModels', () => ({ getTenantModels: jest.fn() }))
+jest.mock('@/lib/platform/firestoreBackgroundJobs.server', () => ({ enqueueBackgroundJob: jest.fn() }))
+jest.mock('@/lib/platform/firestoreScreenshots.server', () => ({ getScreenshotStore: jest.fn(), listScreenshotMaintenanceRecords: jest.fn() }))
 jest.mock('@/lib/dailyAnalysisRunner', () => ({ DAILY_ANALYSIS_REQUIRED_MODELS: ['Screenshot'], runDailyAnalysis: jest.fn() }))
 const payload = { userId: 'user-1', databaseName: 'tenant_a', dateString: '2026-09-13', trigger: 'auto-upload' }
 beforeEach(() => jest.clearAllMocks())
@@ -16,13 +16,13 @@ test('refuses missing scope', async () => {
   expect(enqueueBackgroundJob).not.toHaveBeenCalled()
 })
 test('does not run analysis below the pending threshold', async () => {
-  getTenantModels.mockResolvedValue({ Screenshot: { countDocuments: async () => 0 } })
+  listScreenshotMaintenanceRecords.mockResolvedValue([])
   expect(await runQueuedDailyAnalysis(payload)).toEqual({ status: 'waiting' })
   expect(runDailyAnalysis).not.toHaveBeenCalled()
 })
 test('uses tenant records and throws failed jobs for queue retry', async () => {
-  getTenantModels.mockResolvedValue({ Screenshot: { countDocuments: async () => 1000 } })
+  listScreenshotMaintenanceRecords.mockResolvedValue(Array.from({ length: 1000 }, () => ({ analyzed: false })))
   runDailyAnalysis.mockResolvedValue({ status: 'failed', error: 'provider timeout' })
   await expect(runQueuedDailyAnalysis(payload)).rejects.toThrow('provider timeout')
-  expect(getTenantModels).toHaveBeenCalledWith('tenant_a', ['Screenshot'])
+  expect(getScreenshotStore).toHaveBeenCalledWith('tenant_a')
 })

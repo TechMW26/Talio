@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { retryOnboardingEmail } from '@/lib/mailer'
 
 /**
@@ -8,12 +8,11 @@ import { retryOnboardingEmail } from '@/lib/mailer'
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['OnboardingEmail'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { OnboardingEmail } = models
+    const { user, database } = auth
     
     // Only admin and HR can retry emails
     if (!['admin', 'hr'].includes(user.role)) {
@@ -43,7 +42,7 @@ export async function POST(request) {
     for (const emailId of emailIds) {
       try {
         // Pass tenant models for multi-tenant support
-        const result = await retryOnboardingEmail(emailId, user._id || user.userId, models)
+        const result = await retryOnboardingEmail(emailId, user._id || user.userId, database)
         
         if (result.success) {
           results.successful.push(emailId)

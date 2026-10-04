@@ -9,13 +9,13 @@ import {
     LINKEDIN_OAUTH_STATE_COOKIE,
     normalizeLinkedInReturnTo,
 } from '@/lib/linkedinIntegration';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 
 const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 export async function GET(request) {
     try {
-        const auth = await getAuthAndModels(request, []);
+        const auth = await getAuthAndDatabase(request);
         if (!auth.success) {
             return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
         }

@@ -1,5 +1,7 @@
+import { performanceDatabase, performanceEmployees, joinPerformanceEmployees, scopedPerformanceRecords, performanceDates, assertTeamStatisticsAccess, performanceLinkedRecords, filter } from '@/lib/performanceStore.server'
+import { collectFirestorePages, readFirestoreReferences } from '@/lib/platform/firestoreQueries.server'
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { getDateKeyInTimezone, getDateTimePartsInTimezone, getTodayDateString } from '@/lib/timezone';
 
 /**
@@ -16,13 +18,13 @@ import { getDateKeyInTimezone, getDateTimePartsInTimezone, getTodayDateString } 
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'Company', 'Holiday', 'User', 'Department']);
+    const auth = await getAuthAndDatabase(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    const { user, models } = auth;
-    const { Attendance, Employee, Company, Holiday, User, Department } = models;
+    const { user } = auth
+    const database = await performanceDatabase(auth)
     const { searchParams } = new URL(request.url);
 
     // Parse date range
@@ -32,81 +34,11 @@ export async function GET(request) {
     const departmentFilter = searchParams.get('department');
     const departmentsFilter = searchParams.get('departments'); // Comma-separated list of department IDs
 
-    // Permission check
-    const isAdminOrHR = ['admin', 'hr'].includes(user.role);
-    const currentUser = await User.findById(user._id).populate('employeeId');
-
-    // Check if user is department head
-    let isDeptHead = false;
-    let userDepartmentIds = [];
-
-    if (!isAdminOrHR) {
-      if (currentUser?.isDepartmentHead && currentUser?.headOfDepartments?.length > 0) {
-        isDeptHead = true;
-        userDepartmentIds = currentUser.headOfDepartments.map(d => d.toString());
-      } else if (currentUser?.employeeId?.department) {
-        const userDept = await Department.findById(currentUser.employeeId.department);
-        const currentEmployeeId = currentUser?.employeeId?._id?.toString();
-        if (userDept) {
-          const isLegacyHead = userDept.head?.toString() === currentEmployeeId;
-          const isInHeadsArray = userDept.heads?.some(h => h?.toString() === currentEmployeeId);
-          if (isLegacyHead || isInHeadsArray) {
-            isDeptHead = true;
-            userDepartmentIds = [userDept._id.toString()];
-          }
-        }
-      }
-
-      if (!isDeptHead) {
-        return NextResponse.json({
-          success: true,
-          data: null,
-          message: 'No permission to view team attendance stats'
-        });
-      }
-    }
-
-    // Build employee filter
-    let employeeQuery = { status: 'active' };
-    
-    // Handle multiple departments filter (comma-separated)
-    if (departmentsFilter) {
-      const deptIds = departmentsFilter.split(',').filter(id => id.trim());
-      if (!isAdminOrHR && isDeptHead) {
-        // Validate department head can only see their departments
-        const validDeptIds = deptIds.filter(id => userDepartmentIds.includes(id));
-        if (validDeptIds.length === 0) {
-          return NextResponse.json({
-            success: false,
-            message: 'Not authorized to view these departments'
-          }, { status: 403 });
-        }
-        employeeQuery.department = { $in: validDeptIds };
-      } else if (isAdminOrHR) {
-        employeeQuery.department = { $in: deptIds };
-      }
-    } else if (departmentFilter && departmentFilter !== 'all') {
-      if (!isAdminOrHR && isDeptHead && !userDepartmentIds.includes(departmentFilter)) {
-        return NextResponse.json({
-          success: false,
-          message: 'Not authorized to view this department'
-        }, { status: 403 });
-      }
-      employeeQuery.department = departmentFilter;
-    } else if (isDeptHead && !isAdminOrHR) {
-      // Default: show only departments the user heads
-      employeeQuery.department = { $in: userDepartmentIds };
-    }
-    // For admin/HR with no filter, show all employees (no department filter added)
-
-    // Get employees and company settings
-    const [employees, company, holidays] = await Promise.all([
-      Employee.find(employeeQuery).select('_id firstName lastName department dateOfJoining').lean(),
-      Company.findOne().lean(),
-      Holiday.find({
-        date: { $gte: new Date(startDate), $lte: new Date(endDate) }
-      }).lean()
-    ]);
+    await assertTeamStatisticsAccess(database, user)
+    const { start: rangeStart, end: rangeEnd } = performanceDates(searchParams, new Date(startDate), new Date(endDate))
+    const employees = await performanceEmployees(database, user, searchParams)
+    const company = (await database.list('companies', { limit: 1 })).records[0]
+    const holidays = await collectFirestorePages(database, 'holidays', { filters: [filter('date', rangeStart, '>='), filter('date', rangeEnd, '<=')] })
 
     const employeeIds = employees.map(e => e._id);
     const holidayDates = new Set(holidays.map(h => getDateKeyInTimezone(h.date)));
@@ -141,10 +73,7 @@ export async function GET(request) {
     };
 
     // Get all attendance records in date range
-    const attendanceRecords = await Attendance.find({
-      employee: { $in: employeeIds },
-      date: { $gte: new Date(startDate), $lte: new Date(endDate) }
-    }).lean();
+    const attendanceRecords = await scopedPerformanceRecords(database, 'attendances', employees, [filter('date', rangeStart, '>='), filter('date', rangeEnd, '<=')]);
 
     // Calculate working days for each employee (respecting joining date)
     const dayNameMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -416,6 +345,6 @@ export async function GET(request) {
       success: false,
       message: 'Failed to fetch attendance stats',
       error: error.message
-    }, { status: 500 });
+    }, { status: error.status || 500 });
   }
 }

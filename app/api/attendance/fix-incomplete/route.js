@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { ATTENDANCE_DATABASE_OPTIONS } from '@/lib/platform/firestoreAttendance.server'
 import { processPastDayIncompleteAttendance } from '@/lib/attendanceNotificationScheduler'
 
 export const dynamic = 'force-dynamic'
@@ -11,12 +12,11 @@ export const dynamic = 'force-dynamic'
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndDatabase(request, ATTENDANCE_DATABASE_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { User } = models
+    const { user, database } = auth
 
     // Check if user has admin/hr role
     if (!user || !['admin', 'hr'].includes(user.role)) {
@@ -27,7 +27,7 @@ export async function POST(request) {
     }
 
     // Process incomplete attendance records
-    const result = await processPastDayIncompleteAttendance()
+    const result = await processPastDayIncompleteAttendance(database)
 
     return NextResponse.json({
       success: true,

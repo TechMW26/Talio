@@ -1,4 +1,5 @@
-import mongoose from 'mongoose'
+import { randomBytes } from 'node:crypto'
+import { ATTENDANCE_DATABASE_OPTIONS, listAttendanceRecords } from '@/lib/platform/firestoreAttendance.server'
 import { apiError, apiSuccess, withTenantApi } from '@/lib/api/route'
 import { encryptSecret } from '@/lib/secretEncryption'
 import {
@@ -17,27 +18,29 @@ import {
 export const dynamic = 'force-dynamic'
 
 const routeConfig = {
-  models: ['AttendanceMachine', 'Company'],
+  firestore: ATTENDANCE_DATABASE_OPTIONS,
   roles: ['admin', 'hr'],
   features: { allOf: ['attendanceMachines'] },
   errorMessage: 'Attendance machine request failed',
 }
 
-export const GET = withTenantApi(routeConfig, async ({ request, auth, models }) => {
+export const GET = withTenantApi(routeConfig, async ({ request, auth, database }) => {
   const { searchParams } = new URL(request.url)
   const scope = searchParams.get('scope')
   const companyId = searchParams.get('companyId')
-  const query = {}
-  if (['organisation', 'company'].includes(scope)) query.scope = scope
+  const filters = []
+  if (['organisation', 'company'].includes(scope)) filters.push({ field: 'scope', operator: '==', value: scope })
   if (companyId) {
-    if (!mongoose.Types.ObjectId.isValid(companyId)) return apiError('Invalid company ID', { status: 400 })
-    query.company = companyId
+    if (!/^[a-f\d]{24}$/i.test(companyId)) return apiError('Invalid company ID', { status: 400 })
+    filters.push({ field: 'company', operator: '==', value: companyId })
   }
 
-  const machines = await models.AttendanceMachine.find(query)
-    .populate('company', 'name code')
-    .sort({ scope: 1, name: 1 })
-    .lean()
+  const records = await listAttendanceRecords(database, 'attendancemachines', filters, 2000)
+  const machines = await Promise.all(records.map(async machine => {
+    const company = machine.company ? await database.get('companies', String(machine.company)) : null
+    return { ...machine, company: company ? { _id: company._id, name: company.name, code: company.code } : null }
+  }))
+  machines.sort((a, b) => String(a.scope).localeCompare(String(b.scope)) || String(a.name).localeCompare(String(b.name)))
 
   const origin = new URL(request.url).origin
   return apiSuccess({
@@ -50,9 +53,9 @@ export const GET = withTenantApi(routeConfig, async ({ request, auth, models }) 
   })
 })
 
-export const POST = withTenantApi(routeConfig, async ({ request, auth, models }) => {
+export const POST = withTenantApi(routeConfig, async ({ request, auth, database }) => {
   const input = await request.json()
-  const validation = await validateMachineInput(input, { Company: models.Company })
+  const validation = await validateMachineInput(input, { database })
   if (!validation.valid) {
     return apiError('Please correct the machine configuration', {
       status: 400,
@@ -70,7 +73,8 @@ export const POST = withTenantApi(routeConfig, async ({ request, auth, models })
   }
 
   try {
-    const machine = await models.AttendanceMachine.create({
+    const machine = await database.create('attendancemachines', {
+      _id: randomBytes(12).toString('hex'), status: 'active', punchDirectionMode: 'first_last', employeeCodeField: 'employeeCode',
       ...validation.data,
       credentials: encryptedCredentials,
       credentialsConfigured: Object.keys(encryptedCredentials).length > 0,
@@ -78,8 +82,9 @@ export const POST = withTenantApi(routeConfig, async ({ request, auth, models })
       webhookTokenLastFour: token.slice(-4),
       createdBy: auth.user._id,
       updatedBy: auth.user._id,
+      createdAt: new Date(), updatedAt: new Date(),
     })
-    await machine.populate('company', 'name code')
+    machine.company = validation.company ? { _id: validation.company._id, name: validation.company.name, code: validation.company.code } : null
 
     return apiSuccess({
       machine: serializeMachine(machine, {
@@ -92,7 +97,7 @@ export const POST = withTenantApi(routeConfig, async ({ request, auth, models })
       message: 'Attendance machine added. Copy the setup token now; it will not be shown again.',
     })
   } catch (error) {
-    if (error?.code === 11000) {
+    if (error?.code === 'ALREADY_EXISTS' || error?.code === 6 || error?.code === 'UNIQUE_CONSTRAINT') {
       return apiError('A machine with this provider and serial number already exists', {
         status: 409,
         code: 'DUPLICATE_MACHINE',

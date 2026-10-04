@@ -1,4 +1,4 @@
-import { backgroundQueue, processBackgroundJob } from '@/lib/platform/backgroundJobs.server'
+import { backgroundQueue, processBackgroundJob } from '@/lib/platform/firestoreBackgroundJobs.server'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300

@@ -1,22 +1,24 @@
+import { getLinkedInDatabase, readLinkedInSettings, updateLinkedInSettings } from '@/lib/recruitment/linkedinStore.server';
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { buildLinkedInStatusPayload } from '@/lib/linkedinIntegration';
 
 const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 export async function GET(request) {
     try {
-        const auth = await getAuthAndModels(request, ['CompanySettings']);
+        const auth = await getAuthAndDatabase(request);
         if (!auth.success) {
             return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
         }
 
-        const { user, models } = auth;
+        const { user, tenant } = auth;
         if (!ALLOWED_ROLES.includes(user.role)) {
             return NextResponse.json({ success: false, message: 'Only admin and HR can view LinkedIn status' }, { status: 403 });
         }
 
-        const settings = await models.CompanySettings.findOne().lean();
+        const database = await getLinkedInDatabase(tenant.databaseName);
+        const settings = await readLinkedInSettings(database);
         const linkedinSettings = settings?.integrations?.linkedin || {};
 
         return NextResponse.json({

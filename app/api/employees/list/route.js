@@ -1,21 +1,18 @@
 import { NextResponse } from 'next/server'
 import { withTenantApi } from '@/lib/api/route'
-import { listDirectory, directoryInternals } from '@/lib/services/directoryService.server'
+import { listDirectory, directoryInternals, DIRECTORY_STORE_OPTIONS } from '@/lib/services/directoryService.server'
 
 export const dynamic = 'force-dynamic'
 
 // Compatibility endpoint. New consumers should use GET /api/directory.
 export const GET = withTenantApi({
-  models: ['Employee', 'User', 'Designation', 'Department'],
+  firestore: DIRECTORY_STORE_OPTIONS,
   features: { allOf: ['employees'] },
   errorMessage: 'Failed to fetch employees',
-}, async ({ request, auth, models }) => {
+}, async ({ request, auth, database }) => {
   const { searchParams } = new URL(request.url)
   const data = await listDirectory({
-    Employee: models.Employee,
-    User: models.User,
-    Department: models.Department,
-    Designation: models.Designation,
+    database,
     tenantId: auth.tenant.databaseName,
     currentUserId: auth.user.id || auth.user._id,
     query: searchParams.get('q') || searchParams.get('search') || '',

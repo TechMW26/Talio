@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { dashboardAuth, dashboardEmployee } from '@/lib/dashboardData.server';
 import { buildCacheKey, getCache, setCache } from '@/lib/cache';
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews';
 
@@ -9,12 +9,12 @@ const ROLE_NEWS_FRESH_TTL = 10 * 60 // 10 min even for "fresh" requests
 
 export async function GET(request) {
     try {
-        const auth = await getAuthAndModels(request, ['Employee', 'Designation']);
+        const auth = await dashboardAuth(request);
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 });
         }
 
-        const { user, models, tenant } = auth;
+        const { user, database, tenant } = auth;
         const role = user.role || 'employee';
 
         // Get employee designation
@@ -23,9 +23,7 @@ export async function GET(request) {
 
         if (user.employeeId) {
             const employeeId = typeof user.employeeId === 'object' ? user.employeeId._id : user.employeeId;
-            const employee = await models.Employee.findById(employeeId)
-                .populate('department', 'name')
-                .populate('designation', 'title');
+            const employee = await dashboardEmployee(database, employeeId);
 
             if (employee) {
                 designation = employee.designation?.title || employee.designationLevelName || '';

@@ -7,7 +7,8 @@ jest.mock('next/server', () => ({
   },
 }))
 
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
+jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreTenantDatabase: jest.fn() }))
 jest.mock('jose', () => ({ jwtVerify: jest.fn() }))
 jest.mock('@/lib/companyFeatures.server', () => ({
   checkTenantFeatureAccess: jest.fn().mockResolvedValue({ success: true }),
@@ -19,19 +20,14 @@ jest.mock('@/lib/meetings/livekit.server', () => ({
   getMeetingParticipantCount: jest.fn().mockResolvedValue(0),
 }))
 
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
 import {
   createLiveKitParticipantToken,
   findParticipantActiveMeeting,
   getMeetingParticipantCount,
 } from '@/lib/meetings/livekit.server'
 import { POST } from '@/app/api/meetings/livekit/token/route'
-
-function queryResult(value) {
-  return {
-    select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(value) }),
-  }
-}
 
 function setAuthenticatedMeeting() {
   const meeting = {
@@ -40,21 +36,19 @@ function setAuthenticatedMeeting() {
     organizer: 'employee-1',
     invitees: [],
     scheduledEnd: new Date(Date.now() + 60_000),
-    status: 'scheduled',
+    status: 'scheduled', type: 'online', isLinkActive: true,
   }
-  const Meeting = { findOne: jest.fn(() => queryResult(meeting)) }
-  const Employee = {
-    findById: jest.fn().mockReturnValue({
-      select: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ firstName: 'Test', lastName: 'User' }),
-      }),
-    }),
+  const Meeting = {
+    list: jest.fn(async () => ({ records: [meeting] })),
+    get: jest.fn(async () => ({ _id: 'employee-1', firstName: 'Test', lastName: 'User' })),
+    mutate: jest.fn(async (name, id, update) => { Object.assign(meeting, update(meeting)); return meeting }),
   }
-  getAuthAndModels.mockResolvedValue({
+  getFirestoreTenantDatabase.mockResolvedValue(Meeting)
+  getAuthAndDatabase.mockResolvedValue({
     success: true,
     tenant: { databaseName: 'talio_acme' },
     user: { _id: 'user-1', employeeId: 'employee-1', email: 'test@example.com' },
-    models: { Meeting, Employee },
+    database: Meeting,
   })
   return { Meeting, meeting }
 }
@@ -62,18 +56,18 @@ function setAuthenticatedMeeting() {
 test('overdue occupied room issues a rejoin token', async () => {
   const { Meeting, meeting } = setAuthenticatedMeeting()
   Object.assign(meeting, { type: 'online', isLinkActive: true, scheduledEnd: new Date(Date.now() - 3600000) })
-  Meeting.updateOne = jest.fn().mockResolvedValue({ matchedCount: 1 })
+
   getMeetingParticipantCount.mockResolvedValue(1)
   findParticipantActiveMeeting.mockResolvedValue(null)
   createLiveKitParticipantToken.mockResolvedValue({ token: 'media-token' })
   const response = await POST(new Request('http://localhost/api/meetings/livekit/token', { method: 'POST', body: JSON.stringify({ roomId: 'room-1' }) }))
   expect(response.status).toBe(200)
-  expect(Meeting.updateOne.mock.calls[0][1].$set.continuing).toBe(true)
+  expect(meeting.continuing).toBe(true)
 })
 test('expired empty-room grace refuses a fresh media token', async () => {
   const { Meeting, meeting } = setAuthenticatedMeeting()
   Object.assign(meeting, { type: 'online', isLinkActive: true, status: 'in-progress', roomEmptySince: new Date(Date.now() - 600001) })
-  Meeting.updateOne = jest.fn().mockResolvedValue({ matchedCount: 1 })
+
   getMeetingParticipantCount.mockResolvedValue(0)
   const response = await POST(new Request('http://localhost/api/meetings/livekit/token', { method: 'POST', body: JSON.stringify({ roomId: 'room-1' }) }))
   expect(response.status).toBe(410)
@@ -81,11 +75,11 @@ test('expired empty-room grace refuses a fresh media token', async () => {
 test('presence outage gives a retryable error instead of expiring the meeting', async () => {
   const { Meeting, meeting } = setAuthenticatedMeeting()
   Object.assign(meeting, { type: 'online', isLinkActive: true })
-  Meeting.updateOne = jest.fn()
+
   getMeetingParticipantCount.mockRejectedValueOnce(new Error('network unavailable'))
   const response = await POST(new Request('http://localhost/api/meetings/livekit/token', { method: 'POST', body: JSON.stringify({ roomId: 'room-1' }) }))
   expect(response.status).toBe(503)
-  expect(Meeting.updateOne).not.toHaveBeenCalled()
+  expect(Meeting.mutate).not.toHaveBeenCalled()
 })
 
 describe('managed meeting token route safety gate', () => {
@@ -96,12 +90,12 @@ describe('managed meeting token route safety gate', () => {
   test('blocks a participant already connected to another meeting', async () => {
     const { Meeting } = setAuthenticatedMeeting()
     findParticipantActiveMeeting.mockResolvedValue({ roomId: 'room-2', roomName: 'tenant-room-2' })
-    Meeting.findOne
-      .mockImplementationOnce(() => queryResult({
-        _id: 'meeting-1', roomId: 'room-1', organizer: 'employee-1', invitees: [],
+    Meeting.list
+      .mockResolvedValueOnce({ records: [{
+        _id: 'meeting-1', roomId: 'room-1', organizer: 'employee-1', invitees: [], type: 'online', isLinkActive: true,
         scheduledEnd: new Date(Date.now() + 60_000), status: 'scheduled',
-      }))
-      .mockImplementationOnce(() => queryResult({ _id: 'meeting-2', roomId: 'room-2', title: 'Design review' }))
+      }] })
+      .mockResolvedValueOnce({ records: [{ _id: 'meeting-2', roomId: 'room-2', title: 'Design review' }] })
 
     const response = await POST(new Request('http://localhost/api/meetings/livekit/token', {
       method: 'POST',

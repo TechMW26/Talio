@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { generateContent } from '@/lib/gemini';
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 
@@ -9,7 +9,7 @@ import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
  */
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, []);
+    const auth = await getAuthAndDatabase(request);
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
     }

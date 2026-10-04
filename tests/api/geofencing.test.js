@@ -1,5 +1,5 @@
 import {
-  buildGeofenceLocationQuery,
+  getActiveGeofenceLocations,
   calculateDistanceMeters,
   evaluateEmployeeGeofence,
   isLocationEligible,
@@ -11,9 +11,9 @@ const otherEmployeeId = '66f000000000000000000002'
 const departmentId = '66f000000000000000000003'
 const companyId = '66f000000000000000000004'
 
-function modelWith(locations) {
+function databaseWith(locations) {
   return {
-    find: jest.fn(() => ({ lean: jest.fn().mockResolvedValue(locations) })),
+    list: jest.fn(async () => ({ records: locations, nextCursor: null })),
   }
 }
 
@@ -45,11 +45,9 @@ describe('geofencing domain rules', () => {
     expect(isLocationEligible({ ...restricted, allowedEmployees: [employeeId] }, employeeId, departmentId)).toBe(true)
   })
 
-  test('queries only active organisation, legacy, or employee-company locations', () => {
-    expect(buildGeofenceLocationQuery(companyId)).toEqual(expect.objectContaining({
-      isActive: true,
-      $or: expect.arrayContaining([{ company: companyId }, { scope: 'organisation' }]),
-    }))
+  test('queries active locations and excludes another company', async () => {
+    const database = databaseWith([office(), office({ company: 'another' }), office({ company: companyId })])
+    expect(await getActiveGeofenceLocations(database, companyId)).toHaveLength(2)
   })
 
   test.each([
@@ -58,7 +56,7 @@ describe('geofencing domain rules', () => {
     [{ latitude: 28.6139, longitude: 77.209, accuracy: 400, locationSource: 'gps' }, 'LOCATION_ACCURACY_LOW'],
   ])('strict mode rejects missing, approximate, and inaccurate readings', async (reading, code) => {
     const result = await evaluateEmployeeGeofence({
-      GeofenceLocation: modelWith([office()]),
+      database: databaseWith([office()]),
       settings: { geofence: { enabled: true, strictMode: true, maxAccuracyMeters: 100 } },
       employeeId,
       departmentId,
@@ -70,9 +68,9 @@ describe('geofencing domain rules', () => {
   })
 
   test('strict mode accepts a precise reading inside an eligible location', async () => {
-    const GeofenceLocation = modelWith([office()])
+    const database = databaseWith([office()])
     const result = await evaluateEmployeeGeofence({
-      GeofenceLocation,
+      database,
       settings: { geofence: { enabled: true, strictMode: true, maxAccuracyMeters: 100 } },
       latitude: 28.6139,
       longitude: 77.209,
@@ -85,12 +83,12 @@ describe('geofencing domain rules', () => {
     expect(result.allowed).toBe(true)
     expect(result.withinGeofence).toBe(true)
     expect(result.code).toBe('WITHIN_GEOFENCE')
-    expect(GeofenceLocation.find).toHaveBeenCalledWith(buildGeofenceLocationQuery(companyId))
+    expect(database.list).toHaveBeenCalledWith('geofencelocations', expect.objectContaining({ filters: [{ field: 'isActive', operator: '==', value: true }] }))
   })
 
   test('strict mode rejects outside readings and missing assignments', async () => {
     const outside = await evaluateEmployeeGeofence({
-      GeofenceLocation: modelWith([office()]),
+      database: databaseWith([office()]),
       settings: { geofence: { enabled: true, strictMode: true } },
       latitude: 28.7,
       longitude: 77.3,
@@ -104,7 +102,7 @@ describe('geofencing domain rules', () => {
     expect(outside.code).toBe('OUTSIDE_GEOFENCE')
 
     const unassigned = await evaluateEmployeeGeofence({
-      GeofenceLocation: modelWith([office({ allowedEmployees: [otherEmployeeId] })]),
+      database: databaseWith([office({ allowedEmployees: [otherEmployeeId] })]),
       settings: { geofence: { enabled: true, strictMode: true } },
       latitude: 28.6139,
       longitude: 77.209,

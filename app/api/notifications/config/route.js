@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 import fs from 'fs'
 import path from 'path'
@@ -82,8 +82,8 @@ export async function GET(request) {
       return NextResponse.json(response)
     }
 
-    // Get authenticated user using getAuthAndModels
-    const auth = await getAuthAndModels(request, [])
+    // Get authenticated user using getAuthAndDatabase
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
@@ -165,8 +165,8 @@ export async function GET(request) {
 // This endpoint is kept for compatibility but returns info message
 export async function POST(request) {
   try {
-    // Get authenticated user using getAuthAndModels
-    const auth = await getAuthAndModels(request, [])
+    // Get authenticated user using getAuthAndDatabase
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },

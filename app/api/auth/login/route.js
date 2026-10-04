@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
 import { sendLoginAlertEmail } from '@/lib/mailer'
-import { sendPushToUser } from '@/lib/pushNotification'
 import { resolveUserPermissions } from '@/lib/permissions'
-import { compareStoredPassword, needsPasswordHashUpgrade } from '@/lib/passwordAuth'
+import { compareStoredPassword } from '@/lib/passwordAuth'
 import crypto from 'crypto'
 
 // Multi-tenant imports
 import { getTenantByEmail, updateUserLoginStats, checkServiceStatus } from '@/lib/tenantContext'
-import { getTenantModels } from '@/lib/tenantModels'
+import { getNativeAuthRepository, parseSessionUserAgent } from '@/lib/platform/firestoreAuth.server'
 
 // Security
 import { rateLimit, buildRateLimitHeaders } from '@/lib/security/rateLimiter'
@@ -113,7 +112,6 @@ export async function POST(request) {
     // ============================================
     // Look up which tenant database this user belongs to
     let tenantInfo = null;
-    let TenantUser, TenantEmployee, TenantDepartment, TenantDesignation, TenantUserSession, TenantCompanySettings, TenantNotification;
 
     // Retry logic for transient network errors (e.g., DNS timeouts)
     const MAX_RETRIES = 2;
@@ -130,7 +128,7 @@ export async function POST(request) {
         // Check if it's a transient error worth retrying
         const isTransient = tenantError.message.includes('ETIMEOUT') ||
           tenantError.message.includes('ECONNREFUSED') ||
-          tenantError.message.includes('querySrv');
+          [4, 8, 10, 13, 14].includes(tenantError.code);
 
         if (isTransient && attempt < MAX_RETRIES) {
           // Wait before retry (exponential backoff)
@@ -178,31 +176,8 @@ export async function POST(request) {
 
     console.log(`[Login] User ${email} belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`);
 
-    // Load mandatory login models first and tolerate optional model failures.
-    // This keeps auth working even if a non-critical model has a tenant-specific issue.
-    let tenantModels = await getTenantModels(tenantInfo.databaseName, [
-      'User', 'Employee', 'UserSession'
-    ]);
-
-    try {
-      const optionalModels = await getTenantModels(tenantInfo.databaseName, [
-        'Department', 'Designation', 'CompanySettings', 'Notification'
-      ]);
-      tenantModels = { ...tenantModels, ...optionalModels };
-    } catch (optionalModelError) {
-      console.warn('[Login] Optional model load failed, continuing with core auth models:', optionalModelError?.message || optionalModelError);
-    }
-
-    TenantUser = tenantModels.User;
-    TenantEmployee = tenantModels.Employee;
-    TenantDepartment = tenantModels.Department || null;
-    TenantDesignation = tenantModels.Designation || null;
-    TenantUserSession = tenantModels.UserSession;
-    TenantCompanySettings = tenantModels.CompanySettings || null;
-    TenantNotification = tenantModels.Notification || null;
-
-    // Find user and include password field (forcePasswordChange and isActive are included by default)
-    const user = await TenantUser.findOne({ email }).select('+password +loginAttempts +lockUntil +lastFailedLogin')
+    const repository = await getNativeAuthRepository(tenantInfo.databaseName)
+    let user = await repository.findUser(email)
 
     if (!user) {
       recordSecurityEvent({
@@ -258,25 +233,10 @@ export async function POST(request) {
     // Compare robustly even if an ad hoc tenant model instance is returned.
     const isPasswordMatch = await compareStoredPassword(password, user.password)
 
-    if (isPasswordMatch && needsPasswordHashUpgrade(user.password)) {
-      user.password = password
-      await user.save({ validateBeforeSave: false })
-    }
-
     if (!isPasswordMatch) {
-      // Increment failed-attempt counter and possibly lock the account.
-      const newAttempts = (user.loginAttempts || 0) + 1
-      const updates = { loginAttempts: newAttempts, lastFailedLogin: new Date() }
-      let locked = false
-      if (newAttempts >= MAX_FAILED_ATTEMPTS) {
-        updates.lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MS)
-        locked = true
-      }
-      try {
-        await TenantUser.updateOne({ _id: user._id }, { $set: updates }, { timestamps: false })
-      } catch (e) {
-        console.warn('[Login] failed to record failed-attempt counter:', e?.message || e)
-      }
+      const failed = await repository.recordFailedLogin(user._id, MAX_FAILED_ATTEMPTS, LOCKOUT_DURATION_MS)
+      const newAttempts = failed?.loginAttempts || 0
+      const locked = !!failed?.lockUntil && new Date(failed.lockUntil).getTime() > Date.now()
 
       recordSecurityEvent({
         type: locked ? 'auth.login.locked' : 'auth.login.failed',
@@ -284,7 +244,7 @@ export async function POST(request) {
         message: locked ? 'Account locked after repeated failures' : 'Wrong password',
         ip: ipAddress, userAgent, method: 'POST', path: '/api/auth/login',
         email, userId: user._id?.toString(), databaseName: tenantInfo.databaseName,
-        metadata: { reason: 'wrong_password', attempts: newAttempts, lockUntil: updates.lockUntil || null },
+        metadata: { reason: 'wrong_password', attempts: newAttempts, lockUntil: failed?.lockUntil || null },
       })
 
       // Auto-block IP after several lockouts trace back to same IP.
@@ -313,15 +273,14 @@ export async function POST(request) {
       )
     }
 
-    // Successful login: reset brute-force counters.
-    if (user.loginAttempts || user.lockUntil) {
-      try {
-        await TenantUser.updateOne(
-          { _id: user._id },
-          { $set: { loginAttempts: 0, lockUntil: null } },
-          { timestamps: false }
-        )
-      } catch (_) { /* non-fatal */ }
+    user = await repository.completeLogin(user._id, password)
+
+    let rbacPermissions
+    try {
+      rbacPermissions = await resolveUserPermissions(user, tenantInfo.databaseName)
+    } catch (permError) {
+      console.error('[Login] Failed to resolve RBAC permissions:', permError.message)
+      return NextResponse.json({ message: 'Unable to verify account permissions. Please try again.' }, { status: 503 })
     }
 
     recordSecurityEvent({
@@ -332,38 +291,7 @@ export async function POST(request) {
       email, userId: user._id?.toString(), role: user.role, databaseName: tenantInfo.databaseName,
     })
 
-    // Update last login and set firstLoginAt if not set (for profile completion tracking)
-    const lastLogin = new Date()
-    try {
-      const updateData = { lastLogin }
-
-      // Set firstLoginAt and profileCompletionDeadline on first login (after password change)
-      if (!user.forcePasswordChange && !user.profileCompletion?.firstLoginAt) {
-        const deadline = new Date()
-        deadline.setDate(deadline.getDate() + 7) // 7 days from now
-
-        updateData['profileCompletion.firstLoginAt'] = lastLogin
-        updateData['profileCompletion.profileCompletionDeadline'] = deadline
-
-        console.log('[Login] Setting first login and profile completion deadline:', deadline)
-      }
-
-      await TenantUser.updateOne(
-        { _id: user._id },
-        { $set: updateData },
-        { timestamps: false }
-      )
-      user.lastLogin = lastLogin
-
-      // Update tenant login stats (fire and forget)
-      if (tenantInfo) {
-        updateUserLoginStats(email).catch(err =>
-          console.warn('[Login] Failed to update tenant login stats:', err.message)
-        );
-      }
-    } catch (error) {
-      console.error('Failed to update lastLogin:', error)
-    }
+    void updateUserLoginStats(email)
 
     // Create JWT token
     const secretValue = process.env.JWT_SECRET
@@ -384,6 +312,7 @@ export async function POST(request) {
       email: user.email,
       role: user.role,
       tokenId, // Include tokenId for session management
+      authVersion: Number(user.authVersion) || 0,
       // Multi-tenant info - included in JWT for API route authorization
       ...(tenantInfo && {
         databaseName: tenantInfo.databaseName,
@@ -402,39 +331,24 @@ export async function POST(request) {
     const forwarded = request.headers.get('x-forwarded-for')
     const sessionIpAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || ipAddress || 'Unknown'
 
-      // Create UserSession record (fire and forget)
-      ; (async () => {
-        try {
-          const deviceInfo = TenantUserSession.parseUserAgent ?
-            TenantUserSession.parseUserAgent(sessionUserAgent) :
-            { browser: 'Unknown', isMobile: false, device: 'Unknown' }
-          const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-
-          await TenantUserSession.create({
+    // Persist the session before returning its token, so immediate revocation
+    // and refresh checks never race a background insertion.
+          await repository.createSession({
             user: user._id,
+            authVersion: Number(user.authVersion) || 0,
             tokenId,
-            deviceInfo,
+            deviceInfo: parseSessionUserAgent(sessionUserAgent),
             userAgent: sessionUserAgent,
             ipAddress: sessionIpAddress,
-            expiresAt,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             lastActivityAt: new Date(),
           })
-
-          console.log(`[Login] Session created for user ${user._id} with tokenId ${tokenId}`)
-        } catch (sessionError) {
-          console.error('Failed to create user session:', sessionError)
-        }
-      })()
 
     // Fetch full employee data if employeeId exists
     let employeeData = null
     if (user.employeeId) {
       try {
-        employeeData = await TenantEmployee.findById(user.employeeId)
-          .populate('designation')
-          .populate('department')
-          .populate('reportingManager', 'firstName lastName email')
-          .lean()
+        employeeData = await repository.getEmployee(user.employeeId)
 
         if (employeeData) {
           console.log('Employee data fetched successfully:', employeeData.firstName, employeeData.lastName)
@@ -447,9 +361,7 @@ export async function POST(request) {
     // Best-effort: send login alert email to the user (controlled by admin settings) - fire and forget
     (async () => {
       try {
-        const companySettings = TenantCompanySettings
-          ? await TenantCompanySettings.findOne().lean().catch(() => null)
-          : null
+        const companySettings = await repository.getCompanySettings()
 
         const emailNotificationsEnabled =
           companySettings?.notifications?.emailNotifications !== false
@@ -502,23 +414,7 @@ export async function POST(request) {
           emoji = '🌙'
         }
 
-        await sendPushToUser(
-          user._id,
-          {
-            title: `${emoji} ${greeting}, ${name}!`,
-            body: `Welcome back to Talio! You've successfully logged in.`,
-          },
-          {
-            eventType: 'login',
-            clickAction: '/dashboard',
-            icon: '/icon-192x192.png',
-            data: {
-              loginTime: new Date().toISOString(),
-              type: 'login',
-            },
-            models: { User: TenantUser, Notification: TenantNotification }
-          }
-        )
+        await repository.sendLoginPush(user, `${emoji} ${greeting}, ${name}!`, `Welcome back to Talio! You've successfully logged in.`)
       } catch (pushError) {
         console.error('Failed to send login push notification:', pushError)
       }
@@ -532,40 +428,20 @@ export async function POST(request) {
     let headOfDepartments = user.headOfDepartments || [];
 
     // If not in user meta, check Department model (fallback for existing data)
-    if (!isDepartmentHead && user.employeeId && TenantDepartment) {
+    if (!isDepartmentHead && user.employeeId) {
       try {
-        const deptHeadCheck = await TenantDepartment.find({
-          isActive: true,
-          $or: [
-            { head: user.employeeId },
-            { heads: user.employeeId }
-          ]
-        }).select('_id name').lean();
+        const deptHeadCheck = await repository.getHeadDepartments(user.employeeId)
 
         if (deptHeadCheck.length > 0) {
           isDepartmentHead = true;
           headOfDepartments = deptHeadCheck.map(d => d._id);
 
           // Sync to user meta (fire and forget)
-          TenantUser.updateOne(
-            { _id: user._id },
-            { $set: { isDepartmentHead: true, headOfDepartments } }
-          ).catch(err => console.error('Failed to sync department head status:', err));
+          repository.syncHeadDepartments(user._id, headOfDepartments).catch(err => console.error('Failed to sync department head status:', err));
         }
       } catch (error) {
         console.error('Error checking department head status:', error);
       }
-    }
-
-    // Resolve RBAC permissions for client-side hooks (fire-and-forget safe)
-    let rbacPermissions = null
-    try {
-      if (tenantInfo?.databaseName) {
-        rbacPermissions = await resolveUserPermissions(user, tenantInfo.databaseName)
-      }
-    } catch (permError) {
-      console.error('[Login] Failed to resolve RBAC permissions:', permError.message)
-      // Non-fatal: client will fall back to legacy role-based access
     }
 
     const userData = {
@@ -679,9 +555,9 @@ export async function POST(request) {
     const isServiceError =
       message.includes('ETIMEOUT') ||
       message.includes('ECONNREFUSED') ||
-      message.includes('querySrv') ||
-      message.includes('server selection') ||
-      message.includes('MongoNetwork')
+      message.includes('UNAVAILABLE') ||
+      message.includes('DEADLINE_EXCEEDED') ||
+      [4, 8, 10, 13, 14].includes(error?.code)
 
     if (isServiceError) {
       return NextResponse.json(

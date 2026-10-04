@@ -9,12 +9,15 @@ import { sendPushToUser } from '@/lib/pushNotification'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { validateLocationData } from '@/lib/geocoding'
 import { emitAttendanceUpdate, emitDashboardRefresh, emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtimeEvents'
-import { getAuthAndModels } from '@/lib/auth'
-import { getTenantModels } from '@/lib/tenantModels'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { randomBytes } from 'node:crypto'
+import { ATTENDANCE_DATABASE_OPTIONS, listAttendanceRecords, populateAttendanceEmployee, attendanceId } from '@/lib/platform/firestoreAttendance.server'
+import { saveAttendancePunch } from '@/lib/platform/firestoreAttendancePunch.server'
+import { isHolidayApplicable } from '@/lib/holidayPolicy'
+import { getProductivityVisibility, queryProductivityByIds } from '@/lib/platform/firestoreProductivityView.server'
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
 import { createDailyMosaicOnCheckout } from '@/lib/productivityMosaic'
 import { evaluateEmployeeGeofence, toGeofenceResponse } from '@/lib/geofencing'
-import mongoose from 'mongoose'
 import { afterAttendanceResponse, enrichAttendanceAddress } from '@/lib/attendancePostResponse'
 import {
   getTimezone,
@@ -25,10 +28,7 @@ import {
   DEFAULT_TIMEZONE
 } from '@/lib/timezone'
 
-const isValidObjectId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id) &&
-    (new mongoose.Types.ObjectId(id)).toString() === id
-}
+const isValidObjectId = id => /^[a-f0-9]{24}$/.test(String(id || ''))
 
 const isValidDateString = (value) => {
   if (!value) return false
@@ -36,295 +36,40 @@ const isValidDateString = (value) => {
   return !Number.isNaN(parsed.getTime())
 }
 
-// GET - List attendance records
+// GET is read-only. Background recovery is handled by the attendance scheduler.
 export async function GET(request) {
   try {
-    // Get auth and tenant-aware models
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Company']);
-
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
-    }
-
-    // Defensive check for models
-    if (!auth.models) {
-      console.error('[Attendance GET] No models returned from auth');
-      return NextResponse.json({ success: false, message: 'Failed to load database models' }, { status: 500 });
-    }
-
-    const { Attendance: TenantAttendance, Employee: TenantEmployee, User: TenantUser, Company: TenantCompany } = auth.models;
-
-    if (!TenantAttendance || !TenantEmployee || !TenantUser) {
-      console.error('[Attendance GET] Missing required models:', {
-        hasAttendance: !!TenantAttendance,
-        hasEmployee: !!TenantEmployee,
-        hasUser: !!TenantUser,
-        hasCompany: !!TenantCompany
-      });
-      return NextResponse.json({ success: false, message: 'Failed to load required models' }, { status: 500 });
-    }
-
-    const { searchParams } = new URL(request.url)
-    const date = searchParams.get('date')
-    const employeeId = searchParams.get('employeeId')
-    const month = searchParams.get('month')
-    const year = searchParams.get('year')
-    const startDateParam = searchParams.get('startDate')
-    const endDateParam = searchParams.get('endDate')
-    const department = searchParams.get('department')
-
-    if (date && !isValidDateString(date)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid date format' },
-        { status: 400 }
-      )
-    }
-
-    if (startDateParam && !isValidDateString(startDateParam)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid startDate format' },
-        { status: 400 }
-      )
-    }
-
-    if (endDateParam && !isValidDateString(endDateParam)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid endDate format' },
-        { status: 400 }
-      )
-    }
-
-    if ((month && !year) || (year && !month)) {
-      return NextResponse.json(
-        { success: false, message: 'Both month and year are required' },
-        { status: 400 }
-      )
-    }
-
-    const monthValue = month ? Number.parseInt(month, 10) : null
-    const yearValue = year ? Number.parseInt(year, 10) : null
-
-    if (month && (!Number.isInteger(monthValue) || monthValue < 1 || monthValue > 12)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid month value' },
-        { status: 400 }
-      )
-    }
-
-    if (year && (!Number.isInteger(yearValue) || yearValue < 1970 || yearValue > 2100)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid year value' },
-        { status: 400 }
-      )
-    }
-
-    // Generate cache key
-    const cacheKey = queryCache.generateKey(
-      auth.tenant.databaseName,
-      'attendance',
-      date,
-      employeeId,
-      month,
-      year,
-      startDateParam,
-      endDateParam,
-      department
-    )
-    const cached = queryCache.get(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
-    }
-
-    // Validate employeeId if provided
-    if (employeeId && (employeeId === 'undefined' || employeeId === 'null' || !isValidObjectId(employeeId))) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid employee ID format' },
-        { status: 400 }
-      )
-    }
-
-    const query = {}
-
-    if (employeeId) {
-      // Try to find as Employee first
-      let resolvedEmployeeId = employeeId
-      const employee = await TenantEmployee.findById(employeeId).select('_id').lean()
-
-      if (!employee) {
-        // Not an Employee ID, check if it's a User ID
-        const user = await TenantUser.findById(employeeId).select('employeeId').lean()
-        if (user && user.employeeId) {
-          resolvedEmployeeId = user.employeeId
-        } else {
-          // Neither Employee nor User with employeeId found - return empty
-          const emptyResult = { success: true, data: [] }
-          queryCache.set(cacheKey, emptyResult)
-          return NextResponse.json(emptyResult)
-        }
-      }
-
-      query.employee = resolvedEmployeeId
-    }
-
-    if (startDateParam && endDateParam) {
-      // Support for date range queries (used by report page)
-      const startDate = getStartOfDayInTimezone(startDateParam, DEFAULT_TIMEZONE)
-      const endDate = getEndOfDayInTimezone(endDateParam, DEFAULT_TIMEZONE)
-      query.date = { $gte: startDate, $lte: endDate }
-    } else if (date) {
-      const startDate = getStartOfDayInTimezone(date, DEFAULT_TIMEZONE)
-      const endDate = getEndOfDayInTimezone(date, DEFAULT_TIMEZONE)
-      query.date = { $gte: startDate, $lte: endDate }
-    } else if (month && year) {
-      const startDate = getStartOfDayInTimezone(`${year}-${String(month).padStart(2, '0')}-01`, DEFAULT_TIMEZONE)
-      const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
-      const endDate = getEndOfDayInTimezone(`${year}-${String(month).padStart(2, '0')}-${lastDay}`, DEFAULT_TIMEZONE)
-      query.date = { $gte: startDate, $lte: endDate }
-    }
-
-    // Filter by department if specified
-    if (department && department !== 'all') {
-      if (!isValidObjectId(department)) {
-        return NextResponse.json(
-          { success: false, message: 'Invalid department ID' },
-          { status: 400 }
-        )
-      }
-      // Get employees in this department
-      const deptEmployees = await TenantEmployee.find({ department }).select('_id').lean()
-      const deptEmployeeIds = deptEmployees.map(e => e._id)
-      query.employee = { $in: deptEmployeeIds }
-    }
-
-    // Optimized: Use lean() and select only needed fields (including location for display)
-    const attendance = await TenantAttendance.find(query)
-      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks autoCheckedOut autoCheckoutReason autoCheckoutAt correctedAt correctedBy')
-      .populate({
-        path: 'employee',
-        select: 'firstName lastName employeeCode company',
-        populate: { path: 'company', select: 'timezone workingHours' },
-        options: { lean: true }
-      })
-      .sort({ date: -1 })
-      .lean()
-
-    // Auto-fix: Correct any records stuck in 'in-progress' that have both checkIn and checkOut
-    // Also fix past-day records that are still 'in-progress' without checkOut
-    const fixedData = attendance.map(record => {
-      const timezone = record.employee?.company?.timezone || 'Asia/Kolkata';
-
-      // Get YYYY-MM-DD in company timezone
-      const todayString = new Date().toLocaleDateString("en-CA", { timeZone: timezone });
-      const recordDateString = new Date(record.date).toLocaleDateString("en-CA", { timeZone: timezone });
-
-      const isPastDay = recordDateString < todayString;
-
-      // Case 1: Has checkOut but still showing in-progress
-      if (record.status === 'in-progress' && record.checkIn && record.checkOut && record.workHours) {
-        // Determine correct status based on work hours
-        // New thresholds: >=6.5h = present, >=5h = present (early checkout), <5h = half-day
-        let correctedStatus = 'half-day'
-        let isEarlyCheckout = false
-        if (record.workHours >= 6.5) { // 81.25% of 8 hours
-          correctedStatus = 'present'
-        } else if (record.workHours >= 5) { // 62.5% of 8 hours - early checkout
-          correctedStatus = 'present'
-          isEarlyCheckout = true
-        }
-
-        // Update the database in background (non-blocking)
-        TenantAttendance.updateOne(
-          { _id: record._id },
-          { status: correctedStatus, statusReason: 'Auto-fixed: Status was in-progress after clock-out' }
-        ).exec().catch(err => console.error('Auto-fix attendance status error:', err))
-
-        return { ...record, status: correctedStatus }
-      }
-
-      // Case 2: Past day, has checkIn but no checkOut - perform fallback auto-checkout
-      if (isPastDay && record.status === 'in-progress' && record.checkIn && !record.checkOut) {
-        // Perform fallback auto-checkout with company's checkout time
-        const companyCheckoutTime = record.employee?.company?.workingHours?.checkOutTime || '18:00'
-        const fullDayHours = record.employee?.company?.workingHours?.fullDayHours || 8
-
-        // Create checkout datetime using company's checkout time on the record's date
-        const recordDate = new Date(record.date)
-        const [checkOutHour, checkOutMin] = companyCheckoutTime.split(':').map(Number)
-        const checkoutDateTime = new Date(recordDate)
-        checkoutDateTime.setHours(checkOutHour, checkOutMin, 0, 0)
-
-        // If check-in was after checkout time, use check-in + 1 minute
-        let finalCheckoutTime = checkoutDateTime
-        const checkInTime = new Date(record.checkIn)
-        if (checkInTime > checkoutDateTime) {
-          finalCheckoutTime = new Date(checkInTime.getTime() + 60000) // 1 minute after check-in
-        }
-
-        // Calculate work hours
-        const totalMinutes = (finalCheckoutTime - checkInTime) / (1000 * 60)
-        const workHours = parseFloat((totalMinutes / 60).toFixed(2))
-
-        // Determine status
-        // New thresholds: >=6.5h = present, >=5h = present (early checkout), <5h = half-day
-        const fullDayThreshold = fullDayHours * 0.8125 // 6.5 hours for 8-hour day
-        const earlyCheckoutThreshold = fullDayHours * 0.625 // 5 hours for 8-hour day
-        let autoStatus = 'half-day'
-        let isEarlyCheckout = false
-        if (workHours >= fullDayThreshold) {
-          autoStatus = 'present'
-        } else if (workHours >= earlyCheckoutThreshold) {
-          autoStatus = 'present'
-          isEarlyCheckout = true
-        }
-
-        // Update the database in background (non-blocking)
-        TenantAttendance.updateOne(
-          { _id: record._id },
-          {
-            checkOut: finalCheckoutTime,
-            checkOutStatus: 'auto-checkout',
-            workHours: workHours,
-            status: autoStatus,
-            statusReason: `Fallback auto-checkout: ${autoStatus} (${workHours.toFixed(2)}h worked)`,
-            autoCheckedOut: true,
-            autoCheckoutReason: 'midnight_cutoff',
-            autoCheckoutAt: new Date(),
-            remarks: (record.remarks || '') + ` | Fallback auto-checkout on access. Checkout set to ${companyCheckoutTime}.`
-          }
-        ).exec().catch(err => console.error('Fallback auto-checkout error:', err))
-
-        return {
-          ...record,
-          checkOut: finalCheckoutTime,
-          checkOutStatus: 'auto-checkout',
-          workHours: workHours,
-          status: autoStatus,
-          autoCheckedOut: true,
-          _autoCheckedOutOnAccess: true
-        }
-      }
-
-      return record
-    })
-
-    const response = {
-      success: true,
-      data: fixedData,
-    }
-
-    // Cache for 30 seconds
-    queryCache.set(cacheKey, response, 30000)
-
-    return NextResponse.json(response, {
-      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
-    })
-  } catch (error) {
-    console.error('Get attendance error:', error.message, error.stack)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch attendance', error: error.message },
-      { status: 500 }
-    )
-  }
+    const auth = await getAuthAndDatabase(request, ATTENDANCE_DATABASE_OPTIONS)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    const { database, user } = auth
+    const params = new URL(request.url).searchParams
+    const date = params.get('date'), month = params.get('month'), year = params.get('year'), department = params.get('department')
+    const startParam = params.get('startDate'), endParam = params.get('endDate')
+    let employeeId = params.get('employeeId')
+    if ((month && !year) || (year && !month) || (month && (!/^\\d+$/.test(month) || +month < 1 || +month > 12)) || (year && (!/^\\d{4}$/.test(year) || +year < 1970 || +year > 2100))) return NextResponse.json({ success: false, message: 'Invalid month or year' }, { status: 400 })
+    if ([date, startParam, endParam].some(value => value && !isValidDateString(value)) || (startParam && !endParam) || (!startParam && endParam)) return NextResponse.json({ success: false, message: 'Invalid date range' }, { status: 400 })
+    if (employeeId && !isValidObjectId(employeeId) || department && !isValidObjectId(department)) return NextResponse.json({ success: false, message: 'Invalid employee or department ID' }, { status: 400 })
+    const scope = await getProductivityVisibility(database, user, { includeSelf: true })
+    if (employeeId && !await database.get('employees', employeeId)) employeeId = attendanceId((await database.get('users', employeeId))?.employeeId) || '__missing__'
+    const employees = scope.employees.filter(e => (!employeeId || e._id === employeeId) && (!department || attendanceId(e.department) === department))
+    if (!employees.length) return NextResponse.json({ success: true, data: [] })
+    let start, end
+    if (startParam) { start = getStartOfDayInTimezone(startParam, DEFAULT_TIMEZONE); end = getEndOfDayInTimezone(endParam, DEFAULT_TIMEZONE) }
+    else if (date) { start = getStartOfDayInTimezone(date, DEFAULT_TIMEZONE); end = getEndOfDayInTimezone(date, DEFAULT_TIMEZONE) }
+    else if (month) {
+      start = getStartOfDayInTimezone(year + '-' + month.padStart(2, '0') + '-01', DEFAULT_TIMEZONE)
+      end = getEndOfDayInTimezone(year + '-' + month.padStart(2, '0') + '-' + new Date(Date.UTC(+year, +month, 0)).getUTCDate(), DEFAULT_TIMEZONE)
+    } else { end = getEndOfDayInTimezone(new Date(), DEFAULT_TIMEZONE); start = new Date(end.getTime() - 31 * 86400000) }
+    if (start > end || end - start > 366 * 86400000) return NextResponse.json({ success: false, message: 'Select a date range of at most one year' }, { status: 400 })
+    const records = await queryProductivityByIds(database, 'attendances', 'employee', employees.map(e => e._id), [{ field: 'date', operator: '>=', value: start }, { field: 'date', operator: '<=', value: end }])
+    const employeeMap = new Map(await Promise.all(employees.map(async e => {
+      const company = e.company ? await database.get('companies', attendanceId(e.company)) : null
+      return [e._id, { _id: e._id, firstName: e.firstName, lastName: e.lastName, employeeCode: e.employeeCode, company: company ? { timezone: company.timezone, workingHours: company.workingHours } : null }]
+    })))
+    const fields = 'date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks autoCheckedOut autoCheckoutReason autoCheckoutAt correctedAt correctedBy'.split(' ')
+    const data = records.sort((a,b) => new Date(b.date)-new Date(a.date)).map(record => ({ _id: record._id, employee: employeeMap.get(attendanceId(record.employee)), ...Object.fromEntries(fields.filter(f => record[f] !== undefined).map(f => [f, record[f]])) }))
+    return NextResponse.json({ success: true, data }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (error) { return NextResponse.json({ success: false, message: error.message }, { status: error.status || 500 }) }
 }
 
 // POST - Mark attendance (Clock in/out)
@@ -332,17 +77,13 @@ export async function POST(request) {
   const startedAt = performance.now()
   try {
     // Get auth and tenant-aware models
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'Leave', 'Company', 'CompanySettings', 'Holiday', 'User', 'GeofenceLocation', 'GeofenceLog', 'OvertimeRequest', 'Notification']);
+    const auth = await getAuthAndDatabase(request, ATTENDANCE_DATABASE_OPTIONS)
 
     if (!auth.success) {
       return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
     }
 
-    const { user, models, tenant } = auth;
-    const TenantAttendance = models.Attendance;
-    const TenantEmployee = models.Employee;
-    const TenantLeave = models.Leave;
-    const TenantCompanySettings = models.CompanySettings;
+    const { user, database, tenant } = auth
 
     const data = await request.json()
     const { employeeId, type, latitude, longitude, address, accuracy, date, checkIn, checkOut, status, workHours, remarks, locationSource } = data // type: 'clock-in' or 'clock-out' or 'manual'
@@ -364,10 +105,7 @@ export async function POST(request) {
     }
 
     // Get employee data first to determine company
-    const employee = await TenantEmployee.findById(employeeId)
-      .populate('department')
-      .populate('designation', 'title')
-      .populate('company')
+    const employee = await populateAttendanceEmployee(database, await database.get('employees', employeeId))
 
     if (!employee) {
       return NextResponse.json(
@@ -378,7 +116,7 @@ export async function POST(request) {
 
     let actorEmployeeId = user.employeeId?._id || user.employeeId
     if (!actorEmployeeId) {
-      const actor = await models.User.findById(user._id || user.userId).select('employeeId').lean()
+      const actor = await database.get('users', String(user._id || user.userId))
       actorEmployeeId = actor?.employeeId
     }
     if (type !== 'manual' && (!actorEmployeeId || String(actorEmployeeId) !== String(employee._id))) {
@@ -396,7 +134,7 @@ export async function POST(request) {
     }
 
     // Resolve the employee's company policy before any attendance branch uses it.
-    let settings = await TenantCompanySettings.findOne().lean()
+    let settings = (await database.list('companysettings', { limit: 1 })).records[0] || {}
     if (employee.company?.workingHours) {
       const companySettings = employee.company
       settings = {
@@ -435,11 +173,10 @@ export async function POST(request) {
 
       const dayStart = getStartOfDayInTimezone(date, companyTimezone)
       const dayEnd = getEndOfDayInTimezone(date, companyTimezone)
+      if ((checkIn && !isValidDateString(checkIn)) || (checkOut && (!checkIn || !isValidDateString(checkOut) || new Date(checkOut) <= new Date(checkIn)))) return NextResponse.json({ success: false, message: 'Invalid check-in/check-out times' }, { status: 400 })
+      if (!Number.isFinite(Number(workHours || 0)) || Number(workHours || 0) < 0 || Number(workHours || 0) > 48 || (checkIn && checkOut && new Date(checkOut) - new Date(checkIn) > 48 * 3600000)) return NextResponse.json({ success: false, message: 'Work hours must be between 0 and 48' }, { status: 400 })
 
-      let attendance = await TenantAttendance.findOne({
-        employee: employeeId,
-        date: { $gte: dayStart, $lte: dayEnd }
-      })
+
 
       let calculatedWorkHours = workHours || 0
       let totalLoggedHours = 0
@@ -456,7 +193,7 @@ export async function POST(request) {
         const fullDayHours = settings?.fullDayHours || 8
         const halfDayHours = settings?.halfDayHours || 4
 
-        const workHoursCalc = calculateEffectiveWorkHours(checkInDate, checkOutDate, breakTimings)
+        const workHoursCalc = calculateEffectiveWorkHours(checkInDate, checkOutDate, breakTimings, { timezone: companyTimezone })
         calculatedWorkHours = workHoursCalc.effectiveWorkHours
         totalLoggedHours = workHoursCalc.totalLoggedHours
         breakMinutes = workHoursCalc.breakMinutes
@@ -488,15 +225,9 @@ export async function POST(request) {
         correctedBy: user?._id
       }
 
-      if (attendance) {
-        attendance = await TenantAttendance.findByIdAndUpdate(
-          attendance._id,
-          updatePayload,
-          { new: true, runValidators: true }
-        )
-      } else {
-        attendance = await TenantAttendance.create(updatePayload)
-      }
+      if ((checkIn && !isValidDateString(checkIn)) || (checkOut && (!checkIn || !isValidDateString(checkOut) || new Date(checkOut) <= new Date(checkIn)))) return NextResponse.json({ success: false, message: 'Invalid check-in/check-out times' }, { status: 400 })
+      if (!['present', 'absent', 'half-day', 'late', 'on-leave', 'holiday', 'weekend', 'in-progress'].includes(updatePayload.status)) return NextResponse.json({ success: false, message: 'Invalid attendance status' }, { status: 400 })
+      const attendance = await saveAttendancePunch(database, { employeeId, date: dayStart, timezone: companyTimezone, type: 'manual', changes: updatePayload })
 
       return NextResponse.json({
         success: true,
@@ -506,37 +237,15 @@ export async function POST(request) {
     }
 
     // Check for approved leave or work from home for today
-    const [todayLeave, todayEarlyLeave, existingAttendance] = await Promise.all([
-      TenantLeave.findOne({
-        employee: employeeId,
-        status: 'approved',
-        requestType: { $ne: 'early_leave' },
-        startDate: { $lte: new Date() },
-        endDate: { $gte: today }
-      }),
-      TenantLeave.findOne({
-        employee: employeeId,
-        status: 'approved',
-        requestType: 'early_leave',
-        startDate: { $lte: new Date() },
-        endDate: { $gte: today },
-      }).lean(),
-      TenantAttendance.findOne({
-        employee: employeeId,
-        date: { $gte: today, $lt: tomorrow },
-      }),
+    const [leaves, dayRecords] = await Promise.all([
+      listAttendanceRecords(database, 'leaves', [{ field: 'employee', operator: '==', value: employeeId }, { field: 'status', operator: '==', value: 'approved' }, { field: 'startDate', operator: '<=', value: new Date() }, { field: 'endDate', operator: '>=', value: today }]),
+      database.list('attendances', { filters: [{ field: 'employee', operator: '==', value: employeeId }, { field: 'date', operator: '>=', value: today }, { field: 'date', operator: '<', value: tomorrow }], limit: 2 }),
     ])
-    let attendance = existingAttendance
-
-    // If no attendance record exists but there's an approved leave/WFH, create one
-    if (!attendance && todayLeave) {
-      attendance = await TenantAttendance.create({
-        employee: employeeId,
-        date: today,
-        status: todayLeave.workFromHome ? 'in-progress' : 'on-leave',
-        workFromHome: todayLeave.workFromHome || false
-      })
-    }
+    if (dayRecords.records.length > 1) return NextResponse.json({ success: false, message: 'Duplicate attendance records require reconciliation' }, { status: 409 })
+    const todayLeave = leaves.find(l => l.requestType !== 'early_leave')
+    const todayEarlyLeave = leaves.find(l => l.requestType === 'early_leave')
+    let attendance = dayRecords.records[0] || null
+    const originalAttendance = attendance ? { ...attendance } : null
 
     const evaluateAttendanceLocation = async () => {
       if (todayLeave?.workFromHome) {
@@ -555,7 +264,7 @@ export async function POST(request) {
       }
 
       return evaluateEmployeeGeofence({
-        GeofenceLocation: models.GeofenceLocation,
+        database,
         settings,
         latitude,
         longitude,
@@ -570,7 +279,8 @@ export async function POST(request) {
     const writeGeofenceAudit = async (eventType, result, eventTime) => {
       if (!result?.enabled || !hasValidLocation) return
       try {
-        await models.GeofenceLog.create({
+        await database.create('geofencelogs', {
+          _id: randomBytes(12).toString('hex'), createdAt: new Date(), updatedAt: new Date(),
           employee: employee._id,
           user: user._id || user.userId,
           eventType,
@@ -593,10 +303,7 @@ export async function POST(request) {
           deviceInfo: { userAgent: request.headers.get('user-agent') },
         })
         if (eventType === 'attendance_check_in' && result.closestLocation?._id && result.withinGeofence) {
-          await models.GeofenceLocation.updateOne(
-            { _id: result.closestLocation._id },
-            { $inc: { 'stats.totalCheckIns': 1 }, $set: { 'stats.lastCheckInAt': eventTime } }
-          )
+          await database.mutate('geofencelocations', String(result.closestLocation._id), location => ({ ...location, stats: { ...location.stats, totalCheckIns: (location.stats?.totalCheckIns || 0) + 1, lastCheckInAt: eventTime } }))
         }
       } catch (auditError) {
         console.error('[Attendance] Failed to write geofence audit:', auditError)
@@ -625,14 +332,7 @@ export async function POST(request) {
       const localTodayStart = getStartOfDayInTimezone(new Date(), companyTimezone);
       const localTodayEnd = getEndOfDayInTimezone(new Date(), companyTimezone);
 
-      const TenantHoliday = models.Holiday;
-      const holiday = await TenantHoliday.findOne({
-        date: {
-          $gte: localTodayStart,
-          $lte: localTodayEnd
-        },
-        isActive: true
-      });
+      const holiday = (await listAttendanceRecords(database, 'holidays', [{ field: 'isActive', operator: '==', value: true }, { field: 'date', operator: '<=', value: localTodayEnd }])).find(h => isHolidayApplicable(h, employee) && (new Date(h.date) >= localTodayStart || (h.endDate && new Date(h.endDate) >= localTodayStart)));
 
       if (holiday && (!holiday.dayPortion || holiday.dayPortion === 'full_day')) {
         return NextResponse.json(
@@ -698,7 +398,7 @@ export async function POST(request) {
         if (isIPBasedLocation) {
           locationWarning = 'Approximate location from IP - GPS was unavailable'
         }
-        resolvedAddress = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}${isIPBasedLocation ? ' (approx.)' : ''}`
+        resolvedAddress = `${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)}${isIPBasedLocation ? ' (approx.)' : ''}`
       } else {
         // Location not captured - set warning
         locationWarning = 'Location not captured - GPS was unavailable or denied'
@@ -748,20 +448,11 @@ export async function POST(request) {
         }
       }
 
-      if (!attendance) {
-        attendance = await TenantAttendance.create({
-          employee: employeeId,
-          date: new Date(),
-          ...attendanceData
-        })
-      } else {
-        Object.assign(attendance, attendanceData)
-        await attendance.save()
-      }
+      attendance = await saveAttendancePunch(database, { employeeId, date: today, timezone: companyTimezone, type: 'clock-in', changes: attendanceData })
 
       await writeGeofenceAudit('attendance_check_in', geofenceCheck, checkInTime)
       if (hasValidLocation) afterAttendanceResponse(() => enrichAttendanceAddress({
-        Attendance: TenantAttendance, attendanceId: attendance._id, field: 'checkIn',
+        database, attendanceId: attendance._id, field: 'checkIn',
         capturedAt: checkInTime, latitude, longitude, approximate: isIPBasedLocation,
       }))
 
@@ -783,6 +474,7 @@ export async function POST(request) {
       })
 
       afterAttendanceResponse(async () => {
+        if (process.env.TALIO_LOCAL_ACCEPTANCE === '1') return
         // Best-effort: send clock-in email if enabled in settings
         try {
           const emailNotificationsEnabled =
@@ -828,7 +520,7 @@ export async function POST(request) {
           const pushEvents = settings?.notifications?.pushEvents || {}
           const clockInPushEnabled = pushEvents.attendanceClockIn !== false
 
-          if (pushNotificationsEnabled && clockInPushEnabled && employee?.user) {
+          if (pushNotificationsEnabled && clockInPushEnabled && employee?.userId) {
             const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
             const timeString = checkInTime.toLocaleTimeString('en-IN', {
               timeZone: settings?.timezone || 'Asia/Kolkata',
@@ -850,7 +542,7 @@ export async function POST(request) {
             }
 
             await sendPushToUser(
-              employee.user,
+              employee.userId,
               {
                 title: `${statusEmoji} Clock-In Recorded`,
                 body: `Hi ${employeeName}! You clocked in at ${timeString}. Status: ${statusText}`,
@@ -865,7 +557,7 @@ export async function POST(request) {
                   status: checkInStatus,
                   type: 'clock-in',
                 },
-                models: { User: models.User, Notification: models.Notification }
+                database
               }
             )
           }
@@ -878,7 +570,7 @@ export async function POST(request) {
           const pushNotificationsEnabled =
             settings?.notifications?.pushNotifications !== false
 
-          if (pushNotificationsEnabled && employee?.user) {
+          if (pushNotificationsEnabled && employee?.userId) {
             const designationTitle = employee.designation?.title || employee.designationLevelName || ''
             const departmentName = employee.department?.name || ''
             const role = user?.role || 'employee'
@@ -893,7 +585,7 @@ export async function POST(request) {
               const topNews = latestNews[0]
 
               await sendPushToUser(
-                employee.user,
+                employee.userId,
                 {
                   title: '📰 Latest News for You',
                   body: topNews.title,
@@ -909,7 +601,7 @@ export async function POST(request) {
                     newsLink: topNews.link,
                     publishedAt: topNews.publishedAt,
                   },
-                  models: { User: models.User, Notification: models.Notification }
+                  database
                 }
               )
             }
@@ -940,7 +632,7 @@ export async function POST(request) {
           emitRealtimeEvent(REALTIME_EVENTS.DASHBOARD_REFRESH, {
             dataTypes: ['attendance'],
             refreshAll: false,
-          }, { broadcast: true })
+          }, { userIds: [userId] })
         }
       } catch (socketError) {
         console.error('Failed to emit attendance socket events:', socketError)
@@ -1009,7 +701,7 @@ export async function POST(request) {
         if (isIPBasedLocation) {
           checkOutLocationWarning = 'Approximate location from IP - GPS was unavailable'
         }
-        resolvedAddress = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}${isIPBasedLocation ? ' (approx.)' : ''}`
+        resolvedAddress = `${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)}${isIPBasedLocation ? ' (approx.)' : ''}`
       } else {
         // Location not captured - set warning
         checkOutLocationWarning = 'Location not captured - GPS was unavailable or denied'
@@ -1094,7 +786,7 @@ export async function POST(request) {
       const breakTimings = Array.isArray(settings?.breakTimings) ? settings.breakTimings : []
 
       // Calculate effective work hours accounting for breaks (shrinkage)
-      const workHoursCalc = calculateEffectiveWorkHours(checkIn, checkOut, breakTimings)
+      const workHoursCalc = calculateEffectiveWorkHours(checkIn, checkOut, breakTimings, { timezone: companyTimezone })
 
       // Store both logged and effective hours
       attendance.workHours = workHoursCalc.effectiveWorkHours // Effective hours after shrinkage
@@ -1118,37 +810,10 @@ export async function POST(request) {
         attendance.statusReason = `Approved early leave at ${todayEarlyLeave.earlyLeaveTime || 'the requested time'}`
       }
 
-      // Calculate overtime if there was a confirmed overtime request
-      try {
-        const TenantOvertimeRequest = models.OvertimeRequest;
-        const overtimeRequest = await TenantOvertimeRequest.findOne({
-          attendance: attendance._id,
-          status: 'overtime-confirmed'
-        })
-
-        if (overtimeRequest) {
-          // Calculate overtime hours (time after scheduled checkout)
-          const scheduledCheckout = new Date(overtimeRequest.scheduledCheckOut)
-          const overtimeMs = checkOut - scheduledCheckout
-          const overtimeHours = overtimeMs > 0 ? overtimeMs / (1000 * 60 * 60) : 0
-
-          attendance.overtime = parseFloat(overtimeHours.toFixed(2))
-
-          // Update the overtime request
-          overtimeRequest.overtimeHours = attendance.overtime
-          overtimeRequest.status = 'manual-checkout'
-          await overtimeRequest.save()
-
-          console.log(`[Attendance] Overtime recorded: ${attendance.overtime}h for ${employeeId}`)
-        }
-      } catch (overtimeError) {
-        console.error('Failed to process overtime:', overtimeError)
-      }
-
-      await attendance.save()
+      attendance = await saveAttendancePunch(database, { employeeId, date: today, timezone: companyTimezone, type: 'clock-out', changes: attendance, expected: originalAttendance })
       await writeGeofenceAudit('attendance_check_out', geofenceCheck, checkOutTime)
       if (hasValidLocation) afterAttendanceResponse(() => enrichAttendanceAddress({
-        Attendance: TenantAttendance, attendanceId: attendance._id, field: 'checkOut',
+        database, attendanceId: attendance._id, field: 'checkOut',
         capturedAt: checkOutTime, latitude, longitude, approximate: isIPBasedLocation,
       }))
 
@@ -1170,6 +835,7 @@ export async function POST(request) {
       })
 
       afterAttendanceResponse(async () => {
+        if (process.env.TALIO_LOCAL_ACCEPTANCE === '1') return
         // Best-effort: send clock-out email if enabled in settings
         try {
           const emailNotificationsEnabled =
@@ -1228,7 +894,7 @@ export async function POST(request) {
           const pushEvents = settings?.notifications?.pushEvents || {}
           const clockOutPushEnabled = pushEvents.attendanceClockOut !== false
 
-          if (pushNotificationsEnabled && clockOutPushEnabled && employee?.user) {
+          if (pushNotificationsEnabled && clockOutPushEnabled && employee?.userId) {
             const employeeName = [employee.firstName, employee.lastName].filter(Boolean).join(' ')
             const timeString = checkOutTime.toLocaleTimeString('en-IN', {
               timeZone: settings?.timezone || 'Asia/Kolkata',
@@ -1250,7 +916,7 @@ export async function POST(request) {
             }
 
             await sendPushToUser(
-              employee.user,
+              employee.userId,
               {
                 title: `${statusEmoji} Clock-Out Recorded`,
                 body: `Hi ${employeeName}! You clocked out at ${timeString}. Status: ${statusLabel}. Hours worked: ${attendance.workHours}h`,
@@ -1266,7 +932,7 @@ export async function POST(request) {
                   workHours: attendance.workHours,
                   type: 'clock-out',
                 },
-                models: { User: models.User, Notification: models.Notification },
+                database,
               }
             )
           }
@@ -1296,7 +962,7 @@ export async function POST(request) {
           emitRealtimeEvent(REALTIME_EVENTS.DASHBOARD_REFRESH, {
             dataTypes: ['attendance'],
             refreshAll: false,
-          }, { broadcast: true })
+          }, { userIds: [userId] })
         }
       } catch (socketError) {
         console.error('Failed to emit attendance socket events:', socketError)
@@ -1360,7 +1026,7 @@ export async function POST(request) {
     console.error('Mark attendance error:', error)
     return NextResponse.json(
       { success: false, message: error.message || 'Failed to mark attendance' },
-      { status: 500 }
+      { status: error.status || 500 }
     )
   }
 }

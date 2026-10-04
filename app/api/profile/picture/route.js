@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getProfileStore, getProfileRecords, replaceProfilePicture, invalidateProfile } from '@/lib/platform/firestoreProfile.server'
 import { buildCacheKey, clearCachePattern, deleteCache } from '@/lib/cache'
-import { uploadImage, deleteImage } from '@/lib/gridfs'
+import { uploadImage, deleteImage } from '@/lib/mediaStorage'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
-import path from 'path'
-import fs from 'fs/promises'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,15 +17,15 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024
 export async function POST(request) {
     try {
         // Get authenticated user and tenant-specific models
-        const auth = await getAuthAndModels(request, ['User', 'Employee'])
+        const auth = await getAuthAndDatabase(request)
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 })
         }
-        const { user: authUser, models, tenant } = auth
-        const { User, Employee } = models
+        const { user: authUser, tenant } = auth
+        const store = await getProfileStore(tenant.databaseName)
 
         const authUserId = authUser._id || authUser.userId
-        const user = await User.findById(authUserId).populate('employeeId')
+        const { user, employee } = await getProfileRecords(store, authUserId)
         if (!user) {
             return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
         }
@@ -112,16 +111,6 @@ export async function POST(request) {
         })
 
         // Get employee info for folder structure
-        let employee = user.employeeId
-        if (employee && !employee.employeeCode) {
-            employee = await Employee.findById(getId(employee)).select('firstName lastName employeeCode profilePicture profilePictureFileId')
-        }
-        if (!employee && authUser.employeeId) {
-            employee = await Employee.findById(getId(authUser.employeeId)).select('firstName lastName employeeCode profilePicture profilePictureFileId')
-        }
-        if (!employee) {
-            employee = await Employee.findOne({ userId: authUserId }).select('firstName lastName employeeCode profilePicture profilePictureFileId')
-        }
 
         if (!employee) {
             return NextResponse.json({
@@ -140,47 +129,35 @@ export async function POST(request) {
         let fileUrl = ''
         let fileId = null
 
-        // Upload to GridFS
+        // Upload to private Blob storage
         try {
-            console.log('[Profile Picture] Uploading to GridFS...')
-            const gridfsResult = await uploadImage(optimizedBuffer, {
+            console.log('[Profile Picture] Uploading to private Blob storage...')
+            const mediaResult = await uploadImage(optimizedBuffer, {
+                databaseName: auth.tenant.databaseName,
                 category: 'profile',
                 contentType: 'image/webp',
                 originalName: filename,
                 userId: String(authUserId),
                 employeeId: String(employeeId),
             })
-            fileUrl = gridfsResult.url
-            fileId = String(gridfsResult._id)
-            console.log(`[Profile Picture] ✅ Uploaded to GridFS: ${fileUrl}`)
-        } catch (gridfsError) {
-            console.error('[Profile Picture] ❌ GridFS upload failed:', gridfsError.message)
+            fileUrl = mediaResult.url
+            fileId = String(mediaResult._id)
+            console.log(`[Profile Picture] ✅ Uploaded to private Blob storage: ${fileUrl}`)
+        } catch (mediaError) {
+            console.error('[Profile Picture] ❌ private Blob storage upload failed:', mediaError.message)
         }
 
         if (!fileUrl) {
             return NextResponse.json({ success: false, message: 'Image storage is unavailable. Please retry.' }, { status: 503 })
         }
 
-        // Get old profile picture info for cleanup
-        const oldProfilePicture = employee.profilePicture
-        const oldProfilePictureFileId = employee.profilePictureFileId
-
-        // Update Employee model with new profile picture
-        await Employee.findByIdAndUpdate(employeeId, {
-            $set: {
-                profilePicture: fileUrl,
-                ...(fileId && { profilePictureFileId: fileId }),
-            }
-        })
-
-        // Also update User model and repair the employee link if it was missing.
-        await User.findByIdAndUpdate(authUserId, {
-            $set: {
-                avatar: fileUrl,
-                employeeId,
-                ...(fileId && { avatarFileId: fileId }),
-            }
-        })
+        let previousFileIds
+        try {
+            previousFileIds = await replaceProfilePicture(store, authUserId, employeeId, { url: fileUrl, _id: fileId })
+        } catch (error) {
+            await deleteImage(fileId, { databaseName: tenant.databaseName }).catch(() => {})
+            throw error
+        }
 
         const todayKey = new Date().toISOString().slice(0, 10)
         const profileCacheKey = buildCacheKey({
@@ -204,26 +181,7 @@ export async function POST(request) {
             console.log('[Profile Picture] Cache invalidation failed:', err.message)
         })
 
-        // Delete old profile picture
-        if (oldProfilePicture) {
-            if (oldProfilePictureFileId) {
-                // Delete from GridFS
-                try {
-                    await deleteImage(oldProfilePictureFileId)
-                    console.log(`[Profile Picture] Deleted old GridFS file: ${oldProfilePictureFileId}`)
-                } catch (err) {
-                    console.log('Old GridFS file cleanup:', err.message)
-                }
-            } else if (oldProfilePicture.startsWith('/uploads/')) {
-                // Delete from local filesystem
-                const oldPath = path.join(process.cwd(), 'public', oldProfilePicture)
-                try {
-                    await fs.unlink(oldPath)
-                } catch (err) {
-                    console.log('Old local file cleanup:', err.message)
-                }
-            }
-        }
+        await Promise.all(previousFileIds.filter(id => id !== fileId).map(id => deleteImage(id, { databaseName: tenant.databaseName }).catch(() => {})))
 
         return NextResponse.json({
             success: true,
@@ -231,7 +189,7 @@ export async function POST(request) {
             data: {
                 url: fileUrl,
                 fileId: fileId,
-                storage: fileId ? 'gridfs' : 'local',
+                storage: 'vercel-blob',
             }
         })
 
@@ -251,20 +209,19 @@ export async function POST(request) {
 export async function DELETE(request) {
     try {
         // Get authenticated user and tenant-specific models
-        const auth = await getAuthAndModels(request, ['User', 'Employee'])
+        const auth = await getAuthAndDatabase(request)
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 })
         }
-        const { user: authUser, models } = auth
-        const { User, Employee } = models
-
-        const user = await User.findById(authUser._id || authUser.userId).populate('employeeId')
+        const { user: authUser, tenant } = auth
+        const store = await getProfileStore(tenant.databaseName)
+        const userId = authUser._id || authUser.userId
+        const { user, employee } = await getProfileRecords(store, userId)
         if (!user) {
             return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
         }
 
-        const profilePicture = user.employeeId?.profilePicture
-        const profilePictureFileId = user.employeeId?.profilePictureFileId
+        const profilePicture = employee?.profilePicture
 
         if (!profilePicture) {
             return NextResponse.json({
@@ -273,39 +230,9 @@ export async function DELETE(request) {
             }, { status: 400 })
         }
 
-        // Delete from storage
-        if (profilePictureFileId) {
-            try {
-                await deleteImage(profilePictureFileId)
-                console.log(`[Profile Picture] Deleted from GridFS: ${profilePictureFileId}`)
-            } catch (err) {
-                console.log('GridFS delete error:', err.message)
-            }
-        } else if (profilePicture.startsWith('/uploads/')) {
-            const filePath = path.join(process.cwd(), 'public', profilePicture)
-            try {
-                await fs.unlink(filePath)
-            } catch (err) {
-                console.log('Local file delete error:', err.message)
-            }
-        }
-
-        // Clear profile picture from database
-        if (user.employeeId) {
-            await Employee.findByIdAndUpdate(user.employeeId._id, {
-                $unset: {
-                    profilePicture: 1,
-                    profilePictureFileId: 1,
-                }
-            })
-        }
-
-        await User.findByIdAndUpdate(authUser._id || authUser.userId, {
-            $unset: {
-                avatar: 1,
-                avatarFileId: 1,
-            }
-        })
+        const previousFileIds = await replaceProfilePicture(store, userId, employee._id, null)
+        await invalidateProfile(tenant.databaseName, userId)
+        await Promise.all(previousFileIds.map(id => deleteImage(id, { databaseName: tenant.databaseName }).catch(() => {})))
 
         return NextResponse.json({
             success: true,

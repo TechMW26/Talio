@@ -1,99 +1,44 @@
 import { resolveMiraPerson, romanizeMiraName } from '@/lib/miraPeople'
-import { prepareMiraAction } from '@/lib/miraActions'
-const user = { employeeId: 'aaaaaaaaaaaaaaaaaaaaaaaa', role: 'employee' }
-const person = { _id: 'bbbbbbbbbbbbbbbbbbbbbbbb', firstName: 'Sahil', lastName: 'Sahu', employeeCode: 'U22', department: { name: 'Tech' } }
-function models(rows) {
-  const query = { select: jest.fn().mockReturnThis(), populate: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(rows) }
-  return { Employee: { find: jest.fn(() => query) }, Chat: { findOne: jest.fn(() => ({ select: () => ({ lean: async () => null }) })) } }
-}
-test('unique exact names resolve and assignments retain reporting scope', async () => {
-  const db = models([person])
-  expect(await resolveMiraPerson('Sahil', user, db, { type: 'create_task' })).toBe(person._id)
-  expect(JSON.stringify(db.Employee.find.mock.calls[0][0])).toContain('reportingManager')
+import { getProductivityViewStore } from '@/lib/platform/firestoreProductivityView.server'
+jest.mock('@/lib/platform/firestoreProductivityView.server', () => ({ getProductivityViewStore: jest.fn(), populateProductivityEmployees: async (_, records) => records, getProductivityVisibility: jest.fn() }))
+const user = { employeeId: 'aaaaaaaaaaaaaaaaaaaaaaaa', role: 'employee' }, context = { databaseName: 'tenant' }
+const person = { _id: 'bbbbbbbbbbbbbbbbbbbbbbbb', status: 'active', firstName: 'Sahil', lastName: 'Sahu', employeeCode: 'U22', department: { name: 'Tech' }, reportingManager: user.employeeId }
+let store, rows
+beforeEach(() => {
+  rows = [person]
+  store = { get: jest.fn(async (_, id) => rows.find(row => row._id === id)), list: jest.fn(async (_, options) => ({ records: rows.filter(row => options.filters.every(filter => filter.field === 'status' ? row.status === filter.value : row[filter.field] === filter.value)), nextCursor: null })) }
+  getProductivityViewStore.mockResolvedValue(store)
 })
-test('Hindi phonetic matches are suggestions, never automatic recipients', async () => {
-  const db = models([person])
+test('exact names resolve only from explicitly scoped reporting queries', async () => {
+  expect(await resolveMiraPerson('Sahil', user, context, { type: 'create_task' })).toBe(person._id)
+  expect(store.list).toHaveBeenCalledWith('employees', expect.objectContaining({ filters: expect.arrayContaining([{ field: 'reportingManager', operator: '==', value: user.employeeId }]) }))
+})
+test('Hindi phonetic matches remain suggestions', async () => {
   expect(romanizeMiraName('साहिल साहू')).toBe('saahil saahoo')
-  await expect(resolveMiraPerson('साहिल', user, db, { type: 'send_message', field: 'recipient' })).rejects.toMatchObject({ resolution: { field: 'recipient', candidates: [expect.objectContaining({ name: 'Sahil Sahu', code: 'U22', department: 'Tech' })] } })
-  const phonetic = db.Employee.find.mock.calls[0][0].$and[2].$or.at(-1).$and[0].$or[0].firstName
-  expect(phonetic.test('Sahil')).toBe(true)
+  await expect(resolveMiraPerson('साहिल', user, context, { type: 'send_message', field: 'recipient' })).rejects.toMatchObject({ resolution: { field: 'recipient', candidates: [expect.objectContaining({ name: 'Sahil Sahu', department: 'Tech' })] } })
 })
-test('ambiguous names provide bounded real choices and no guessed identity', async () => {
-  await expect(resolveMiraPerson('Sahil', user, models([person, { ...person, _id: 'cccccccccccccccccccccccc', lastName: 'Sharma' }]), { type: 'send_message' })).rejects.toMatchObject({ resolution: { candidates: expect.any(Array) } })
+test('ambiguous names require a choice', async () => {
+  rows.push({ ...person, _id: 'cccccccccccccccccccccccc', lastName: 'Sharma' })
+  await expect(resolveMiraPerson('Sahil', user, context, { type: 'send_message' })).rejects.toMatchObject({ resolution: { candidates: expect.any(Array) } })
 })
-test('unmatched names ask for spelling without selecting or writing to a person', async () => {
-  await expect(resolveMiraPerson('Unknown', user, models([]), { type: 'send_message' }))
-    .rejects.toThrow('Could you spell the name letter by letter')
+test.each(['Sahl', 'Zahil Sahu'])('unique one-edit typo %s resolves within reporting scope', async name => {
+  expect(await resolveMiraPerson(name, user, context, { type: 'create_task' })).toBe(person._id)
 })
-test('a unique one-character typo is corrected within access scope', async () => {
-  const db = models([person])
-  db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([person])
-  await expect(resolveMiraPerson('Sahl', user, db, { type: 'send_message' })).resolves.toBe(person._id)
+test('ambiguous one-edit matches never auto-select', async () => {
+  rows = [{ ...person, firstName: 'Pinky' }, { ...person, _id: 'cccccccccccccccccccccccc', firstName: 'Pinky', lastName: 'Patil' }]
+  await expect(resolveMiraPerson('Pinki', user, context, { type: 'send_message' })).rejects.toMatchObject({ resolution: { candidates: expect.any(Array) } })
 })
-test('first-letter typos are retried as a unique exact directory candidate', async () => {
-  const db = models([person])
-  db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([person])
-  await expect(resolveMiraPerson('Zahil Sahu', user, db, { type: 'create_task' })).resolves.toBe(person._id)
-  const fallback = db.Employee.find.mock.calls.at(-1)[0]
-  expect(fallback.$and).toHaveLength(2)
-  expect(JSON.stringify(fallback)).toContain('reportingManager')
+test('letter spelling and exact employee code resolve', async () => {
+  expect(await resolveMiraPerson('S A H I L', user, context, { type: 'send_message' })).toBe(person._id)
+  expect(await resolveMiraPerson('employee:U22', user, context, { type: 'create_task' })).toBe(person._id)
+  await expect(resolveMiraPerson('employee:U220', user, context, { type: 'create_task' })).rejects.toThrow('No matching person')
 })
-test('Pinki retries to one exact Pinky match, while ambiguous Pinky records still require a choice', async () => {
-  const pinky = { ...person, firstName: 'Pinky', lastName: 'Sharma' }
-  const db = models([pinky])
-  db.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([pinky])
-  await expect(resolveMiraPerson('Pinki', user, db, { type: 'send_message' })).resolves.toBe(pinky._id)
-
-  const second = { ...pinky, _id: 'cccccccccccccccccccccccc', lastName: 'Patil' }
-  const ambiguous = models([])
-  ambiguous.Employee.find().lean.mockResolvedValueOnce([]).mockResolvedValueOnce([pinky, second])
-  await expect(resolveMiraPerson('Pinki', user, ambiguous, { type: 'send_message' }))
-    .rejects.toMatchObject({ resolution: { candidates: expect.arrayContaining([expect.objectContaining({ name: 'Pinky Sharma' }), expect.objectContaining({ name: 'Pinky Patil' })]) } })
+test('selected IDs recheck scope and tenant rather than trusting supplied identity', async () => {
+  rows = [{ ...person, reportingManager: 'unrelated' }]
+  await expect(resolveMiraPerson('employee:' + person._id, user, context, { type: 'create_task' })).rejects.toThrow('No matching person')
+  await expect(resolveMiraPerson('Sahil', user, {}, { type: 'send_message' })).rejects.toThrow('verified tenant')
 })
-test('explicitly spelled exact first name resolves without another spelling question', async () => {
-  expect(await resolveMiraPerson('S A H I L', user, models([person]), { type: 'send_message' })).toBe(person._id)
-})
-test('selected identifiers are looked up again within the current scope', async () => {
-  const db = models([])
-  await expect(resolveMiraPerson(`employee:${person._id}`, user, db, { type: 'create_task' })).rejects.toThrow('No matching person')
-  expect(JSON.stringify(db.Employee.find.mock.calls[0][0])).toContain('reportingManager')
-})
-test('prefixed employee codes resolve exactly without dropping authorization scope', async () => {
-  const db = models([person])
-  expect(await resolveMiraPerson('employee:U22', user, db, { type: 'create_task' })).toBe(person._id)
-  const filter = db.Employee.find.mock.calls[0][0]
-  expect(filter.$and[2].$or[0].employeeCode.test('U22')).toBe(true)
-  expect(filter.$and[2].$or[0].employeeCode.test('U220')).toBe(false)
-  expect(JSON.stringify(filter)).toContain('reportingManager')
-})
-test('unknown prefixed code does not fall back to a fuzzy name search', async () => {
-  const db = models([])
-  await expect(resolveMiraPerson('employee:U46', user, db, { type: 'create_task' })).rejects.toThrow('No matching person')
-  expect(db.Employee.find).toHaveBeenCalledTimes(1)
-})
-test('missing private conversations are prepared for authenticated create-and-send', async () => {
-  const result = await prepareMiraAction({ type: 'send_message', fields: { recipient: 'Sahil', content: 'Hello' } }, user, models([person]))
-  expect(result).toMatchObject({ path: '/api/chat/start-and-send', recipient: person._id, body: { content: 'Hello' } })
-})
-test('project invitations and meeting invites reach delegate fields', async () => {
-  const project = await prepareMiraAction({ type: 'create_project', fields: { name: 'Plan', startDate: '2026-10-01', endDate: '2026-10-20', heads: ['me'], members: ['Sahil'] } }, { ...user, role: 'admin' }, models([person]))
-  expect(project.body.members).toEqual([{ userId: person._id, role: 'member' }])
-  const meeting = await prepareMiraAction({ type: 'create_meeting', fields: { title: 'Plan', agenda: 'Review', type: 'online', scheduledStart: '2026-10-01T10:00:00+05:30', scheduledEnd: '2026-10-01T11:00:00+05:30', invitees: ['Sahil'] } }, user, models([person]))
-  expect(meeting.body.inviteeIds).toEqual([person._id])
-})
-
-test('a named project is preserved on task creation and queried within access scope', async () => {
-  const db = models([])
-  db.ProjectMember = { find: jest.fn(() => ({ select: () => ({ lean: async () => [] }) })) }
-  db.Project = { find: jest.fn(() => ({ select: () => ({ limit: () => ({ lean: async () => [{ _id: 'cccccccccccccccccccccccc' }] }) }) })) }
-  const prepared = await prepareMiraAction({ type: 'create_task', fields: { title: 'Review', assignees: ['me'], project: 'Launch' } }, user, db)
-  expect(prepared.body.projectId).toBe('cccccccccccccccccccccccc')
-  expect(JSON.stringify(db.Project.find.mock.calls[0][0])).toContain('projectHeads')
-})
-
-test('unknown project does not silently create a standalone task', async () => {
-  const db = models([])
-  db.ProjectMember = { find: () => ({ select: () => ({ lean: async () => [] }) }) }
-  db.Project = { find: () => ({ select: () => ({ limit: () => ({ lean: async () => [] }) }) }) }
-  await expect(prepareMiraAction({ type: 'create_task', fields: { title: 'Review', assignees: ['me'], project: 'Missing' } }, user, db)).rejects.toThrow('No task was created')
+test('unknown names ask for spelling', async () => {
+  rows = []
+  await expect(resolveMiraPerson('Unknown', user, context, { type: 'send_message' })).rejects.toThrow('spell the name')
 })

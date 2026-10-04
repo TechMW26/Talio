@@ -1,12 +1,14 @@
-import mongoose from 'mongoose'
-import { MongoMemoryServer } from 'mongodb-memory-server'
+import { Firestore } from 'firebase-admin/firestore'
+import { randomBytes } from 'node:crypto'
 import sharp from 'sharp'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { getTenantConnection } from '@/lib/tenantDb'
-import { getTenantModels } from '@/lib/tenantModels'
-import { getAuthAndModels } from '@/lib/auth'
+import { createFirestoreDatabase } from '@/lib/platform/firestoreStore.server'
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
+import { workflowStore } from '../helpers/firestoreWorkflowStore'
+import { getAuthAndDatabase, getAuthAndDatabase } from '@/lib/auth'
+import { uploadTenantBlob, getTenantBlob, deleteTenantBlob } from '@/lib/platform/blobStorage.server'
 import { sendEmail } from '@/lib/mailer'
 import { employmentLetterDefaults, validateEmploymentLetter } from '@/lib/hrms/employmentLetter'
 import { issueEmploymentLetter } from '@/lib/hrms/employmentLetter.server'
@@ -14,11 +16,12 @@ import { generateEmploymentLetterPdf, loadEmploymentLetterLogo } from '@/lib/hrm
 import { GET as download } from '@/app/api/documents/[id]/file/route'
 import { GET, POST } from '@/app/api/employees/[id]/letters/route'
 
-jest.mock('@/lib/tenantDb', () => ({ getTenantConnection: jest.fn() }))
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreTenantDatabase: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn(), getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/mailer', () => ({ sendEmail: jest.fn() }))
-jest.mock('@/lib/gridfs', () => ({ getImage: jest.fn(), getImageInfo: jest.fn() }))
-jest.mock('@/lib/platform/blobStorage.server', () => ({ buildTenantRootPrefix: id => `tenants/${id}`, getTenantBlob: jest.fn() }))
+jest.mock('@/lib/mediaStorage', () => ({ getImage: jest.fn(), getImageInfo: jest.fn() }))
+jest.mock('@/lib/platform/blobStorage.server', () => ({ buildTenantRootPrefix: id => `tenants/${id}`, buildTenantBlobPrefix: ({ tenantId, category, ownerId }) => `tenants/${tenantId}/${category}/${ownerId}`, buildAuthenticatedBlobUrl: path => `/api/files/${path}`, getBlobStreamLength: () => null, getTenantBlob: jest.fn(), uploadTenantBlob: jest.fn(), deleteTenantBlob: jest.fn() }))
+jest.setTimeout(45000)
 
 export const completeFields = {
   issueDate: '2026-09-29', joiningDate: '2026-10-01', companyName: 'Acme Technologies Private Limited',
@@ -33,24 +36,29 @@ export const completeFields = {
   additionalTerms: '',
 }
 
-let server, connection, models, auth, context, logo
+let firestore, database, auth, context, logo, blobs
 beforeAll(async () => {
-  server = await MongoMemoryServer.create()
-  connection = await mongoose.createConnection(server.getUri()).asPromise()
-  getTenantConnection.mockResolvedValue(connection)
-  models = await getTenantModels('letter-test', ['Employee', 'User', 'Document', 'Company', 'CompanySettings', 'SystemPreferences', 'Policy'])
-  await models.Document.init()
+  if (process.env.TALIO_FIRESTORE_EMULATOR_TEST === '1') {
+    if (process.env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8185') throw new Error('Isolated emulator required')
+    firestore = new Firestore({ projectId: 'demo-talio-firestore' })
+  }
   const bytes = await sharp('public/fox-icon.png').resize(140, 140).png().toBuffer()
   logo = `data:image/png;base64,${bytes.toString('base64')}`
 }, 120000)
-afterAll(async () => { await connection?.close(); await server?.stop() })
+afterAll(async () => { await firestore?.terminate() })
 beforeEach(async () => {
-  await Promise.all(Object.values(models).map(model => model.deleteMany({})))
-  const employeeId = new mongoose.Types.ObjectId(), userId = new mongoose.Types.ObjectId()
-  await models.Employee.collection.insertOne({ _id: employeeId, firstName: 'Aman', lastName: 'Tiwari', employeeCode: 'TEST-001', email: 'aman@example.test' })
-  await models.User.collection.insertOne({ _id: userId, employeeId })
-  auth = { success: true, user: { _id: userId, employeeId, role: 'hr' }, models, tenant: { databaseName: 'letter-test' } }
-  getAuthAndModels.mockResolvedValue(auth)
+  database = firestore ? createFirestoreDatabase({ firestore, dataset: `test-letters-${Date.now()}-${randomBytes(5).toString('hex')}`, databaseName: 'talio_company_letter_test', queryFields: { documents: ['sourceKey', 'employee', 'generatedLetter.kind', 'createdAt'], policies: ['applicableTo', 'specificEmployees', 'department'] }, constraints: { documents: [{ fields: ['sourceKey'], sparse: true }] } }) : { ...workflowStore(), databaseName: 'talio_company_letter_test' }
+  const employeeId = randomBytes(12).toString('hex'), userId = randomBytes(12).toString('hex')
+  await database.create('employees', { _id: employeeId, firstName: 'Aman', lastName: 'Tiwari', employeeCode: 'TEST-001', email: 'aman@example.test' })
+  await database.create('users', { _id: userId, employeeId })
+  auth = { success: true, user: { _id: userId, employeeId, role: 'hr' }, database, tenant: { databaseName: 'talio_company_letter_test' } }
+  getAuthAndDatabase.mockResolvedValue(auth)
+  getAuthAndDatabase.mockResolvedValue(auth)
+  getFirestoreTenantDatabase.mockResolvedValue(database)
+  blobs = new Map()
+  uploadTenantBlob.mockImplementation(async ({ tenantId, category, ownerId, body }) => { const pathname = `tenants/${tenantId}/${category}/${ownerId}/${randomBytes(8).toString('hex')}.pdf`; blobs.set(pathname, Buffer.from(body)); return { pathname, access: 'private' } })
+  getTenantBlob.mockImplementation(async path => ({ statusCode: 200, stream: new Response(blobs.get(path)).body }))
+  deleteTenantBlob.mockImplementation(async path => { blobs.delete(path) })
   context = { employee: { _id: employeeId, email: 'aman@example.test' }, logo, actorEmployeeId: employeeId }
   sendEmail.mockReset().mockResolvedValue({ accepted: ['aman@example.test'], rejected: [], messageId: 'test-message' })
 })
@@ -71,24 +79,25 @@ test.each([
 })
 
 test('requires an uploaded, tenant-scoped company logo', async () => {
-  await expect(loadEmploymentLetterLogo('', 'letter-test')).rejects.toThrow('company logo')
-  await expect(loadEmploymentLetterLogo('https://untrusted.test/logo.png', 'letter-test')).rejects.toThrow('company settings')
-  await expect(loadEmploymentLetterLogo('/api/files/tenants/other/logo.png', 'letter-test')).rejects.toThrow('company settings')
+  await expect(loadEmploymentLetterLogo('', 'talio_company_letter_test')).rejects.toThrow('company logo')
+  await expect(loadEmploymentLetterLogo('https://untrusted.test/logo.png', 'talio_company_letter_test')).rejects.toThrow('company settings')
+  await expect(loadEmploymentLetterLogo('/api/files/tenants/other/logo.png', 'talio_company_letter_test')).rejects.toThrow('company settings')
 })
 
 test('issues one real PDF, persists it and emails those exact bytes once', async () => {
   const payload = { kind: 'appointment', fields: completeFields, sendEmail: true }
   const [first, second] = await Promise.all([issueEmploymentLetter(auth, context, payload), issueEmploymentLetter(auth, context, payload)])
   expect(String(first.document._id)).toBe(String(second.document._id))
-  expect(await models.Document.countDocuments()).toBe(1)
+  expect(await database.count('documents')).toBe(1)
   expect(sendEmail).toHaveBeenCalledTimes(1)
-  const document = await models.Document.findById(first.document._id).select('+generatedPdf')
-  expect(Buffer.from(document.generatedPdf).subarray(0, 5).toString()).toBe('%PDF-')
+  const document = await database.get('documents', first.document._id)
+  const bytes = blobs.get(document.storage.pathname)
+  expect(bytes.subarray(0, 5).toString()).toBe('%PDF-')
   expect(document.status).toBe('issued')
   expect(document.generatedLetter.fields.employeeName).toBe('Aman Tiwari')
   expect(document.emailDelivery.status).toBe('sent')
-  expect(sendEmail.mock.calls[0][0].attachments[0].content).toEqual(Buffer.from(document.generatedPdf))
-  expect((await models.Document.findById(document._id).lean()).generatedPdf).toBeUndefined()
+  expect(sendEmail.mock.calls[0][0].attachments[0].content).toEqual(bytes)
+  expect(document.generatedPdf).toBeUndefined()
   await issueEmploymentLetter(auth, context, payload)
   expect(sendEmail).toHaveBeenCalledTimes(1)
 })
@@ -101,20 +110,16 @@ test('employee can download own PDF but another employee cannot', async () => {
   expect(response.status).toBe(200)
   expect(response.headers.get('content-type')).toBe('application/pdf')
   expect(Buffer.from(await response.arrayBuffer()).subarray(0, 5).toString()).toBe('%PDF-')
-  await models.User.updateOne({ _id: auth.user._id }, { employeeId: new mongoose.Types.ObjectId() })
+  await database.mutate('users', auth.user._id, user => ({ ...user, employeeId: randomBytes(12).toString('hex') }))
   expect((await download(new Request('https://talio.test'), params)).status).toBe(403)
 })
 
-test('duplicate issuance is prevented even without the optional sourceKey index', async () => {
-  await models.Document.collection.dropIndex('sourceKey_1')
-  try {
-    const payload = { kind: 'offer', fields: completeFields, sendEmail: true }
-    await Promise.all([issueEmploymentLetter(auth, context, payload), issueEmploymentLetter(auth, context, payload)])
-    expect(await models.Document.countDocuments()).toBe(1)
-    expect(sendEmail).toHaveBeenCalledTimes(1)
-  } finally {
-    await models.Document.collection.createIndex({ sourceKey: 1 }, { unique: true, partialFilterExpression: { sourceKey: { $type: 'string' } } })
-  }
+test('duplicate issuance cleans up the redundant private Blob upload', async () => {
+  const payload = { kind: 'offer', fields: completeFields, sendEmail: true }
+  await Promise.all([issueEmploymentLetter(auth, context, payload), issueEmploymentLetter(auth, context, payload)])
+  expect(await database.count('documents')).toBe(1)
+  expect(blobs.size).toBe(1)
+  expect(sendEmail).toHaveBeenCalledTimes(1)
 })
 
 test('rejected email preserves the PDF and allows a corrected retry', async () => {
@@ -125,7 +130,7 @@ test('rejected email preserves the PDF and allows a corrected retry', async () =
   expect(failed.emailError).toContain('PDF is saved')
   const sent = await issueEmploymentLetter(auth, context, payload)
   expect(sent.document.emailDelivery.status).toBe('sent')
-  expect(await models.Document.countDocuments()).toBe(1)
+  expect(await database.count('documents')).toBe(1)
 })
 
 test('uncertain email outcome does not resend on repeated clicks', async () => {
@@ -148,12 +153,12 @@ test('letter routes require HR/admin role and valid employee identity', async ()
 })
 
 test('HTTP issuance stores the PDF in the target employee register and returns a working private download', async () => {
-  await models.CompanySettings.collection.insertOne({ companyName: completeFields.companyName, companyLogo: logo })
+  await database.create('companysettings', { _id: 'company', companyName: completeFields.companyName, companyLogo: logo })
   const response = await POST(new Request('https://talio.test', { method: 'POST', body: JSON.stringify({ kind: 'appointment', fields: completeFields, sendEmail: false }) }), { params: Promise.resolve({ id: String(context.employee._id) }) })
   expect(response.status).toBe(200)
   const body = await response.json()
   expect(body.success).toBe(true)
-  const document = await models.Document.findOne({ employee: context.employee._id, _id: body.data._id }).lean()
+  const document = await database.get('documents', body.data._id)
   expect(document).toMatchObject({ category: 'employment', status: 'issued', fileUrl: body.data.fileUrl })
   const pdf = await download(new Request('https://talio.test'), { params: Promise.resolve({ id: body.data._id }) })
   expect(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString()).toBe('%PDF-')
@@ -161,7 +166,7 @@ test('HTTP issuance stores the PDF in the target employee register and returns a
 })
 
 test('renders complete multi-page letter samples for layout QA when requested', async () => {
-  const image = await loadEmploymentLetterLogo(logo, 'letter-test')
+  const image = await loadEmploymentLetterLogo(logo, 'talio_company_letter_test')
   const fields = validateEmploymentLetter('appointment', completeFields)
   const bytes = generateEmploymentLetterPdf({ kind: 'appointment', fields, logo: image, reference: 'HR/TEST-001/20260929/ABCDEF12' })
   expect(bytes.length).toBeGreaterThan(2000)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getProfileStore, getProfileRecords, populateProfileEmployee, invalidateProfile } from '@/lib/platform/firestoreProfile.server'
 import { formatDesignation, formatDepartments } from '@/lib/formatters'
 import { generateResponsibilitiesForEmployee } from '@/lib/kriGenerator'
 
@@ -7,22 +8,15 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Employee', 'User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
 
-    const { user, models } = auth
-    const { Employee, User } = models
-
-    const userRecord = await User.findById(user._id || user.userId)
-      .populate([
-        { path: 'employeeId', populate: { path: 'designation', select: 'title level levelName' } },
-        { path: 'employeeId.department', select: 'name' },
-        { path: 'employeeId.departments', select: 'name' },
-      ])
-
-    const employee = userRecord?.employeeId
+    const { user } = auth
+    const store = await getProfileStore(auth.tenant.databaseName)
+    const records = await getProfileRecords(store, user._id || user.userId)
+    const employee = await populateProfileEmployee(store, records.employee)
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee profile not found' }, { status: 404 })
     }
@@ -42,18 +36,20 @@ export async function GET(request) {
       })
     }
 
-    const responsibilities = await generateResponsibilitiesForEmployee(employee, user._id || user.userId)
+    const responsibilities = await generateResponsibilitiesForEmployee(employee, user._id || user.userId, auth.tenant.databaseName)
 
-    await Employee.findByIdAndUpdate(employee._id, {
-      $set: {
+    await store.mutate('employees', employee._id, current => {
+      if (!current) throw new Error('Employee not found')
+      return { ...current,
         aiGeneratedKRIs: responsibilities,
         aiGeneratedKRIsMeta: {
           generatedAt: new Date(),
           generatedFromDesignation: formatDesignation(employee.designation, employee),
           generatedFromDepartment: formatDepartments(employee),
         },
-      },
+      }
     })
+    await invalidateProfile(auth.tenant.databaseName, user._id || user.userId)
 
     return NextResponse.json({
       success: true,

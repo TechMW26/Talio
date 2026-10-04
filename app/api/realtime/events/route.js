@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import mongoose from 'mongoose'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { CHAT_STORE_OPTIONS, requireChat } from '@/lib/chat.server'
 import { getPusherServer } from '@/lib/pusherServer'
 import { roomToPusherChannel } from '@/lib/platform/realtimeChannels'
 import { rateLimit, buildRateLimitHeaders } from '@/lib/security/rateLimiter'
@@ -11,12 +11,12 @@ const EVENTS = { typing: 'user-typing', 'stop-typing': 'user-stop-typing', 'mark
 // Only transient chat hints enter here. Message content is published by the
 // authenticated message API after persistence, never by an arbitrary client.
 export async function POST(request) {
-  const auth = await getAuthAndModels(request, ['Chat', 'User', 'Employee'])
+  const auth = await getAuthAndDatabase(request, CHAT_STORE_OPTIONS)
   if (!auth.success) return NextResponse.json({ message: auth.message }, { status: 401 })
   let body
   try { body = await request.json() } catch { return NextResponse.json({ message: 'Invalid JSON' }, { status: 400 }) }
   const { event, chatId, messageId } = body || {}
-  if (!Object.hasOwn(EVENTS, event) || !mongoose.isValidObjectId(chatId)) {
+  if (!Object.hasOwn(EVENTS, event) || !/^[a-f\d]{24}$/i.test(String(chatId))) {
     return NextResponse.json({ message: 'Invalid realtime event' }, { status: 400 })
   }
   const userId = String(auth.user._id || auth.user.userId)
@@ -25,21 +25,15 @@ export async function POST(request) {
     status: 429, headers: buildRateLimitHeaders(limit),
   })
   try {
-    const chat = await auth.models.Chat.findById(chatId).select('participants').lean()
-    if (!chat || !(chat.participants || []).some(member => String(member?._id || member) === userId)) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
-    }
-    const user = await auth.models.User.findById(userId).select('employeeId').lean()
-    const employee = user?.employeeId
-      ? await auth.models.Employee.findById(user.employeeId).select('firstName lastName').lean()
-      : null
-    await getPusherServer().trigger(roomToPusherChannel(`chat:${chatId}`), EVENTS[event], {
+    const { employee } = await requireChat(auth.database, auth.user, chatId)
+    if (process.env.TALIO_LOCAL_ACCEPTANCE !== '1') await getPusherServer().trigger(roomToPusherChannel(`chat:${chatId}`, auth.tenant.databaseName), EVENTS[event], {
       chatId, userId,
       userName: employee ? `${employee.firstName || ''} ${employee.lastName || ''}`.trim() : 'Team member',
-      ...(event === 'mark-read' && mongoose.isValidObjectId(messageId) ? { messageId } : {}),
+      ...(event === 'mark-read' && /^[a-f\d]{24}$/i.test(String(messageId)) ? { messageId } : {}),
     })
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error.status) return NextResponse.json({ message: error.message }, { status: error.status })
     console.error('[RealtimeEvent] Failed:', error.message)
     return NextResponse.json({ message: 'Realtime delivery unavailable' }, { status: 503 })
   }

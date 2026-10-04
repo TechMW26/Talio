@@ -8,27 +8,16 @@
  */
 
 import { NextResponse } from 'next/server';
-import { connectSuperadminDB } from '@/lib/superadminDb';
+import { companyJobDatabase, listJobCompanies, deliverCompanyJob } from '@/lib/platform/companyJobs.server';
+import { sendEmail } from '@/lib/mailer';
 import { getCronAuthErrorResponse } from '@/lib/cronAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
-import { getTenantConnection } from '@/lib/tenantDb';
-import nodemailer from 'nodemailer';
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 // Create email transporter
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: 'smtp.hostinger.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: 'info@talio.in',
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  });
-}
+function createTransporter() { return { sendMail: message => sendEmail(message) }; }
 
 /**
  * Send user limit notification to company admin
@@ -141,16 +130,10 @@ export async function POST(request) {
 
     console.log('[User Limit Check] Starting user limit check job...');
 
-    await connectSuperadminDB();
-    const TenantCompany = await getTenantCompanyModel();
-    const mongoose = await import('mongoose');
+    const system = await companyJobDatabase();
 
     // Get all active companies
-    const companies = await TenantCompany.find({
-      isActive: true,
-      serviceStatus: 'active',
-      isSetupComplete: true,
-    }).lean();
+    const companies = await listJobCompanies(system, { setupComplete: true, services: ['active'] });
 
     console.log(`[User Limit Check] Checking ${companies.length} companies`);
 
@@ -169,64 +152,22 @@ export async function POST(request) {
 
       try {
         // Get current user count from tenant database
-        const tenantConnection = await getTenantConnection(company.databaseName);
-        const currentCount = await tenantConnection.db.collection('users').countDocuments({ isActive: true });
+        const database = await getFirestoreTenantDatabase(company.databaseName, { queryFields: { users: ['isActive'] } });
+        const currentCount = await database.count('users', [{ field: 'isActive', operator: '==', value: true }]);
 
         const usagePercent = (currentCount / maxUsers) * 100;
 
-        // Update company with current count
-        await TenantCompany.updateOne(
-          { _id: company._id },
-          {
-            $set: {
-              'subscription.currentUserCount': currentCount,
-              'analytics.lastUserCountCheck': new Date(),
-            }
-          }
-        );
-
-        // Check if at limit
-        if (currentCount >= maxUsers) {
-          results.at_limit++;
-
-          // Check if we already notified today
-          const lastNotified = company.analytics?.userLimitNotifiedAt;
-          const today = new Date().toDateString();
-          const wasNotifiedToday = lastNotified && new Date(lastNotified).toDateString() === today;
-
-          if (!wasNotifiedToday) {
-            const notifResult = await sendLimitNotification(transporter, company, currentCount, maxUsers, usagePercent);
-            if (notifResult?.success) {
-              results.notifications_sent++;
-              await TenantCompany.updateOne(
-                { _id: company._id },
-                {
-                  $set: {
-                    'analytics.userLimitReachedAt': new Date(),
-                    'analytics.userLimitNotifiedAt': new Date(),
-                  }
-                }
-              );
-            }
-          }
-        } else if (usagePercent >= 80) {
-          results.near_limit++;
-
-          // Only notify once when crossing 80% threshold
-          const wasNearLimit = company.analytics?.userLimitWarningAt;
-          const lastCount = company.subscription?.currentUserCount || 0;
-          const lastPercent = (lastCount / maxUsers) * 100;
-
-          if (!wasNearLimit || lastPercent < 80) {
-            const notifResult = await sendLimitNotification(transporter, company, currentCount, maxUsers, usagePercent);
-            if (notifResult?.success) {
-              results.notifications_sent++;
-              await TenantCompany.updateOne(
-                { _id: company._id },
-                { $set: { 'analytics.userLimitWarningAt': new Date() } }
-              );
-            }
-          }
+        await system.mutate('tenantcompanies', company._id, row => ({ ...row, subscription: { ...row.subscription, currentUserCount: currentCount }, analytics: { ...row.analytics, lastUserCountCheck: new Date() } }));
+        const isAtLimit = currentCount >= maxUsers;
+        if (isAtLimit) results.at_limit++;
+        else if (usagePercent >= 80) results.near_limit++;
+        if (usagePercent >= 80) {
+          const day = new Date().toISOString().slice(0, 10);
+          const eligible = row => isAtLimit ? (!row.analytics?.userLimitNotifiedAt || new Date(row.analytics.userLimitNotifiedAt).toISOString().slice(0, 10) !== day) : (!row.analytics?.userLimitWarningAt || (company.subscription?.currentUserCount || 0) / maxUsers < 0.8);
+          const result = await deliverCompanyJob(system, company._id, isAtLimit ? 'user-limit' : 'user-warning', eligible,
+            current => sendLimitNotification(transporter, current, currentCount, maxUsers, usagePercent),
+            current => ({ ...current, analytics: { ...current.analytics, ...(isAtLimit ? { userLimitReachedAt: new Date(), userLimitNotifiedAt: new Date() } : { userLimitWarningAt: new Date() }) } }));
+          if (result?.success) results.notifications_sent++;
         }
       } catch (error) {
         console.error(`[User Limit Check] Error for ${company.name}:`, error.message);
@@ -256,13 +197,9 @@ export async function GET(request) {
     const authError = getCronAuthErrorResponse(request);
     if (authError) return authError;
 
-    await connectSuperadminDB();
-    const TenantCompany = await getTenantCompanyModel();
+    const system = await companyJobDatabase();
 
-    const companies = await TenantCompany.find({
-      isActive: true,
-      isSetupComplete: true,
-    }).select('name subscription.maxUsers subscription.currentUserCount analytics.userLimitReachedAt').lean();
+    const companies = await listJobCompanies(system, { setupComplete: true });
 
     const status = companies.map(c => ({
       name: c.name,

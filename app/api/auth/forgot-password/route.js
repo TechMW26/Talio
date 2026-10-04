@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { sendPasswordResetEmail } from '@/lib/mailer'
 import { getTenantByEmail } from '@/lib/tenantContext'
-import { getTenantModels } from '@/lib/tenantModels'
+import { getNativeAuthRepository } from '@/lib/platform/firestoreAuth.server'
+import { getNativePasswordRepository } from '@/lib/platform/firestorePassword.server'
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
 const MAX_REQUESTS_PER_WINDOW = 3
@@ -42,10 +43,8 @@ export async function POST(request) {
     console.log(`[forgot-password] User belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`)
 
     // Get tenant-specific models
-    const tenantModels = await getTenantModels(tenantInfo.databaseName, ['User', 'Employee', 'PasswordResetToken'])
-    const TenantUser = tenantModels.User
-    const TenantEmployee = tenantModels.Employee
-    const TenantPasswordResetToken = tenantModels.PasswordResetToken
+    const repository = await getNativeAuthRepository(tenantInfo.databaseName)
+    const passwords = await getNativePasswordRepository(tenantInfo.databaseName)
 
     // Get request info for security logging
     const forwarded = request.headers.get('x-forwarded-for')
@@ -53,7 +52,7 @@ export async function POST(request) {
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
     // Find user by email
-    const user = await TenantUser.findOne({ email: normalizedEmail })
+    const user = await repository.findUser(normalizedEmail)
     console.log('[forgot-password] User found:', user ? 'Yes' : 'No', user ? `(${user._id})` : '')
 
     if (!user) {
@@ -78,46 +77,19 @@ export async function POST(request) {
       message: 'Password reset link has been sent to your email address.',
     })
 
-    // Check rate limiting - count recent reset requests for this user
-    const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS)
-    const recentRequests = await TenantPasswordResetToken.countDocuments({
-      user: user._id,
-      createdAt: { $gte: windowStart },
-    })
-
-    if (recentRequests >= MAX_REQUESTS_PER_WINDOW) {
+    const issued = await passwords.issue(user._id, { ipAddress, userAgent, windowMs: RATE_LIMIT_WINDOW_MS, maxRequests: MAX_REQUESTS_PER_WINDOW })
+    if (!issued) {
       console.log(`[forgot-password] Rate limit exceeded for user: ${user._id}`)
       // Still return success to prevent enumeration, but don't send email
       return successResponse
     }
 
-    // Invalidate any existing unused tokens
-    await TenantPasswordResetToken.updateMany(
-      { user: user._id, usedAt: null },
-      { usedAt: new Date() }
-    )
-
-    // Generate new token
-    const { token, tokenHash } = TenantPasswordResetToken.generateToken()
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
-    console.log('[forgot-password] Generated token, expires at:', expiresAt)
-
-    // Save token to database
-    await TenantPasswordResetToken.create({
-      user: user._id,
-      token: tokenHash, // Store hashed version
-      tokenHash,
-      expiresAt,
-      requestedFromIp: ipAddress,
-      requestedUserAgent: userAgent,
-    })
-    console.log('[forgot-password] Token saved to database')
+    const { token } = issued
 
     // Build reset link with tenant info
     const baseUrl = process.env.NEXTAUTH_URL || 'https://app.talio.in'
     // Include tenant slug in the reset link for multi-tenant support
     const resetLink = `${baseUrl}/auth/reset-password/${token}?tenant=${encodeURIComponent(tenantInfo.companySlug)}`
-    console.log('[forgot-password] Reset link generated:', resetLink)
 
     // Get first name from user or employee
     let firstName = 'there'
@@ -125,7 +97,7 @@ export async function POST(request) {
       firstName = user.name.split(' ')[0]
     } else if (user.employeeId) {
       try {
-        const employee = await TenantEmployee.findById(user.employeeId).select('firstName').lean()
+        const employee = await repository.database.get('employees', String(user.employeeId))
         if (employee?.firstName) {
           firstName = employee.firstName
         }
@@ -175,7 +147,7 @@ export async function POST(request) {
     // Differentiate error types for internal tracking
     let errorCode = 'FORGOT_PASSWORD_ERROR'
 
-    if (error.name === 'MongoNetworkError' || error.message?.includes('ETIMEOUT')) {
+    if ([4, 14].includes(error.code) || error.message?.includes('ETIMEOUT')) {
       errorCode = 'DB_CONNECTION_ERROR'
     } else if (error.message?.includes('ECONNREFUSED') || error.message?.includes('SMTP')) {
       errorCode = 'EMAIL_SERVICE_ERROR'

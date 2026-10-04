@@ -1,7 +1,8 @@
-jest.mock('@/lib/gridfs', () => ({
+jest.mock('@/lib/mediaStorage', () => ({
     getScreenshot: jest.fn(),
     getScreenshotInfo: jest.fn()
 }));
+jest.mock('@/lib/platform/firestoreScreenshots.server', () => ({ getScreenshotStore: jest.fn() }));
 
 describe('productivity screenshot loader', () => {
     beforeEach(() => {
@@ -13,7 +14,7 @@ describe('productivity screenshot loader', () => {
     });
 
     test('loads screenshots from a direct GridFS file id', async () => {
-        const { getScreenshot, getScreenshotInfo } = require('@/lib/gridfs');
+        const { getScreenshot, getScreenshotInfo } = require('@/lib/mediaStorage');
         getScreenshotInfo.mockResolvedValue({ contentType: 'image/webp' });
         getScreenshot.mockResolvedValue(Buffer.from('gridfs-image'));
 
@@ -29,32 +30,30 @@ describe('productivity screenshot loader', () => {
         });
     });
 
-    test('resolves internal activity screenshot URLs through the Screenshot model', async () => {
-        const { getScreenshot, getScreenshotInfo } = require('@/lib/gridfs');
+    test('resolves internal activity screenshot URLs through tenant Firestore', async () => {
+        const { getScreenshot, getScreenshotInfo } = require('@/lib/mediaStorage');
         getScreenshotInfo.mockResolvedValue({ contentType: 'image/png' });
         getScreenshot.mockResolvedValue(Buffer.from('activity-image'));
 
-        const lean = jest.fn().mockResolvedValue({
+        const get = jest.fn().mockResolvedValue({
             gridfsFileId: '507f191e810c19729de860ea',
             path: null,
             metadata: { mimeType: 'image/png' }
         });
-        const select = jest.fn().mockReturnValue({ lean });
-        const ScreenshotModel = {
-            findById: jest.fn().mockReturnValue({ select })
-        };
+        const { getScreenshotStore } = require('@/lib/platform/firestoreScreenshots.server');
+        getScreenshotStore.mockResolvedValue({ get });
 
         const { loadScreenshotForAnalysis } = require('@/lib/productivityScreenshotLoader');
 
         const result = await loadScreenshotForAnalysis(
             { path: '/api/activity/screenshot?id=507f1f77bcf86cd799439012' },
-            { ScreenshotModel }
+            { databaseName: 'talio_company_test' }
         );
 
-        expect(ScreenshotModel.findById).toHaveBeenCalledWith('507f1f77bcf86cd799439012');
-        expect(select).toHaveBeenCalledWith('gridfsFileId path metadata.mimeType');
-        expect(getScreenshotInfo).toHaveBeenCalledWith('507f191e810c19729de860ea');
-        expect(getScreenshot).toHaveBeenCalledWith('507f191e810c19729de860ea');
+        expect(get).toHaveBeenCalledWith('screenshots', '507f1f77bcf86cd799439012');
+        expect(getScreenshotStore).toHaveBeenCalledWith('talio_company_test');
+        expect(getScreenshotInfo).toHaveBeenCalledWith('507f191e810c19729de860ea', { databaseName: 'talio_company_test' });
+        expect(getScreenshot).toHaveBeenCalledWith('507f191e810c19729de860ea', { databaseName: 'talio_company_test' });
         expect(result).toEqual({
             base64: Buffer.from('activity-image').toString('base64'),
             mimeType: 'image/png'

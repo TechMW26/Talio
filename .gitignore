@@ -93,7 +93,10 @@ uploads/aadhaar/
 /Pitch Docs/
 .vercel
 .env*
+# Migration snapshots contain private tenant records and must never be committed.
+.migration-data/
 .next-dev-next/
+.next-*/
 desktop-app/build/mira-control-*
 desktop-app/dist-*/
 desktop-app/build/agent-s-*/

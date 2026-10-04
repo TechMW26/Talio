@@ -1,67 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-
-export async function GET(request) {
-  try {
-    const auth = await getAuthAndModels(request, ['Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-
-    const { Employee } = auth.models
-    const today = new Date()
-    const month = today.getMonth() + 1
-    const day = today.getDate()
-
-    // Find employees whose birthday or work anniversary falls today
-    const employees = await Employee.find({ status: 'active' })
-      .select('firstName lastName dateOfBirth dateOfJoining profilePicture department')
-      .populate('department', 'name')
-      .lean()
-
-    const birthdays = []
-    const anniversaries = []
-
-    for (const emp of employees) {
-      if (emp.dateOfBirth) {
-        const dob = new Date(emp.dateOfBirth)
-        if (dob.getMonth() + 1 === month && dob.getDate() === day) {
-          birthdays.push({
-            _id: emp._id,
-            firstName: emp.firstName,
-            lastName: emp.lastName,
-            profilePicture: emp.profilePicture,
-            department: emp.department?.name || '',
-          })
-        }
-      }
-      if (emp.dateOfJoining) {
-        const doj = new Date(emp.dateOfJoining)
-        if (doj.getMonth() + 1 === month && doj.getDate() === day) {
-          const years = today.getFullYear() - doj.getFullYear()
-          // Only show anniversaries for 1+ years (not the joining day itself)
-          if (years >= 1) {
-            anniversaries.push({
-              _id: emp._id,
-              firstName: emp.firstName,
-              lastName: emp.lastName,
-              profilePicture: emp.profilePicture,
-              department: emp.department?.name || '',
-              years,
-            })
-          }
-        }
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      currentEmployeeId: String(auth.user.employeeId?._id || auth.user.employeeId || ''),
-      birthdays,
-      anniversaries,
-    })
-  } catch (error) {
-    console.error('[Celebrations API]', error)
-    return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 })
-  }
-}
+import { getAuthAndDatabase } from '@/lib/auth'
+import { listAttendanceRecords,attendanceId } from '@/lib/platform/firestoreAttendance.server'
+import { populateProductivityEmployees } from '@/lib/platform/firestoreProductivityView.server'
+import { getDateKeyInTimezone,getTimezone } from '@/lib/timezone'
+export async function GET(request){try{
+ const auth=await getAuthAndDatabase(request,{queryFields:{employees:['status','birthdayMonthDay','joiningMonthDay']}})
+ if(!auth.success)return NextResponse.json({success:false,message:auth.message},{status:401})
+ const settings=(await auth.database.list('companysettings',{limit:1})).records[0]||{},date=getDateKeyInTimezone(new Date(),getTimezone(settings.timezone)),monthDay=date.slice(5),year=Number(date.slice(0,4))
+ const lists=await Promise.all(['birthdayMonthDay','joiningMonthDay'].map(field=>listAttendanceRecords(auth.database,'employees',[{field:'status',operator:'==',value:'active'},{field,operator:'==',value:monthDay}],5000)))
+ const records=await populateProductivityEmployees(auth.database,[...new Map(lists.flat().map(e=>[e._id,e])).values()]),birthdays=[],anniversaries=[]
+ for(const e of records){const item={_id:e._id,firstName:e.firstName,lastName:e.lastName,profilePicture:e.profilePicture,department:e.department?.name||''};if(e.birthdayMonthDay===monthDay)birthdays.push(item);if(e.joiningMonthDay===monthDay){const years=year-new Date(e.dateOfJoining).getUTCFullYear();if(years>=1)anniversaries.push({...item,years})}}
+ return NextResponse.json({success:true,currentEmployeeId:attendanceId(auth.user.employeeId),birthdays,anniversaries})
+}catch(e){return NextResponse.json({success:false,message:'Unable to load celebrations'},{status:e.status||500})}}

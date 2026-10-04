@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { splitMiraSpeech } from '@/lib/miraSpeechChunks'
 import { DEFAULT_MIRA_VOICE_ID, isMiraVoiceId, sanitizeMiraPreferences } from '@/lib/miraVoices'
@@ -10,7 +10,7 @@ export const maxDuration = 60
 // A fixed provider/voice prevents clients from turning this into an open proxy.
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) return NextResponse.json({ message: 'Authentication required' }, { status: auth.status || 401 })
     const payload = await request.json()
     const { text, voiceId: requestedVoiceId } = payload || {}
@@ -23,7 +23,7 @@ export async function POST(request) {
     const bucket = await rateLimit('MIRA_VOICE', `${auth.tenant.databaseName}:${auth.user._id}`)
     if (!bucket.allowed) return NextResponse.json({ message: 'Please wait before requesting more speech.' }, { status: 429, headers: { 'Retry-After': String(bucket.retryAfterSeconds) } })
     const key = process.env.ELEVENLABS_API_KEY
-    const profile = await auth.models.User.findById(auth.user._id).select('miraPreferences').lean()
+    const profile = await auth.database.get('users', auth.user._id)
     const preferences = sanitizeMiraPreferences(profile?.miraPreferences)
     // User choice takes precedence; the new MIRA ID is the fallback even when
     // a deployment still has a legacy ELEVENLABS_VOICE_ID environment value.

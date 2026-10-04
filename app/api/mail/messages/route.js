@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
+import { MAIL_ACCOUNT_OPTIONS, listMailAccounts, getMailAccount, updateMailAccount, disconnectMailAccount, getAuthenticatedMailClient } from '@/lib/mailAccounts.server';
 import { google } from 'googleapis';
 
 // Production URL and redirect URI - must match Google Cloud Console
@@ -39,33 +40,7 @@ async function getOrCreateSnoozedLabel(gmail) {
 }
 
 // Create OAuth2 client with user's tokens
-async function getAuthenticatedClient(emailAccount) {
-  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI);
-
-  oauth2Client.setCredentials({
-    access_token: emailAccount.accessToken,
-    refresh_token: emailAccount.refreshToken,
-    expiry_date: emailAccount.tokenExpiry?.getTime()
-  });
-
-  // Check if token needs refresh
-  if (emailAccount.tokenExpiry && new Date() >= emailAccount.tokenExpiry) {
-    try {
-      const { credentials } = await oauth2Client.refreshAccessToken();
-      emailAccount.accessToken = credentials.access_token;
-      emailAccount.tokenExpiry = new Date(credentials.expiry_date);
-      await emailAccount.save();
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      throw new Error('Token refresh failed');
-    }
-  }
-
-  return oauth2Client;
-}
 
 // Parse email address from Gmail format
 function parseEmailAddress(str) {
@@ -81,7 +56,7 @@ function parseEmailAddress(str) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ 
         emails: [], 
@@ -89,8 +64,7 @@ export async function GET(request) {
         unreadCount: 0
       });
     }
-    const { user, models } = auth
-    const { EmailAccount } = models
+    const { user, database } = auth
 
     const { searchParams } = new URL(request.url);
     const folder = searchParams.get('folder') || 'inbox';
@@ -103,14 +77,14 @@ export async function GET(request) {
     let emailAccounts;
     if (accountId) {
       // Fetch specific account
-      const account = await EmailAccount.findOne({ _id: accountId, user: user._id }).select('+accessToken +refreshToken');
+      const account = await getMailAccount(database, user, accountId);
       emailAccounts = account ? [account] : [];
     } else if (allAccounts) {
       // Fetch from all connected accounts
-      emailAccounts = await EmailAccount.find({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+      emailAccounts = await listMailAccounts(database, user);
     } else {
       // Fetch from primary account or first available
-      const accounts = await EmailAccount.find({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+      const accounts = await listMailAccounts(database, user);
       const primary = accounts.find(a => a.isPrimary) || accounts[0];
       emailAccounts = primary ? [primary] : [];
     }
@@ -146,7 +120,7 @@ export async function GET(request) {
 
     for (const emailAccount of emailAccounts) {
       try {
-        const oauth2Client = await getAuthenticatedClient(emailAccount);
+        const oauth2Client = await getAuthenticatedMailClient(database, user, emailAccount);
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
         // For snoozed folder, get the custom label ID
@@ -270,7 +244,7 @@ export async function GET(request) {
         emailAccount.unreadCount = accountUnreadCount;
         emailAccount.spamCount = accountSpamCount;
         emailAccount.lastSynced = new Date();
-        await emailAccount.save();
+        await updateMailAccount(database, user, emailAccount._id, { unreadCount: accountUnreadCount, spamCount: accountSpamCount, lastSynced: new Date() });
 
         totalUnreadCount += accountUnreadCount;
         totalSpamCount += accountSpamCount;
@@ -310,12 +284,11 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { EmailAccount } = models
+    const { user, database } = auth
 
     const { to, cc, bcc, subject, body, isHtml, attachments, accountId, threadId } = await request.json();
 
@@ -326,10 +299,11 @@ export async function POST(request) {
     // Use specified accountId, fall back to primary, then first connected account
     let emailAccount;
     if (accountId) {
-      emailAccount = await EmailAccount.findOne({ _id: accountId, user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+      emailAccount = await getMailAccount(database, user, accountId);
     }
+    if (accountId && !emailAccount) return NextResponse.json({ error: 'Email account is unavailable' }, { status: 404 });
     if (!emailAccount) {
-      const accounts = await EmailAccount.find({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+      const accounts = await listMailAccounts(database, user);
       emailAccount = accounts.find(a => a.isPrimary) || accounts[0];
     }
 
@@ -337,7 +311,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
     }
 
-    const oauth2Client = await getAuthenticatedClient(emailAccount);
+    const oauth2Client = await getAuthenticatedMailClient(database, user, emailAccount);
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     // Generate boundary for multipart message
@@ -412,12 +386,11 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { EmailAccount } = models
+    const { user, database } = auth
 
     const { messageId, action, accountId } = await request.json();
 
@@ -428,10 +401,11 @@ export async function PATCH(request) {
     // Use specified accountId, fall back to primary, then first account
     let emailAccount;
     if (accountId) {
-      emailAccount = await EmailAccount.findOne({ _id: accountId, user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+      emailAccount = await getMailAccount(database, user, accountId);
     }
+    if (accountId && !emailAccount) return NextResponse.json({ error: 'Email account is unavailable' }, { status: 404 });
     if (!emailAccount) {
-      const accounts = await EmailAccount.find({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+      const accounts = await listMailAccounts(database, user);
       emailAccount = accounts.find(a => a.isPrimary) || accounts[0];
     }
 
@@ -439,7 +413,7 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
     }
 
-    const oauth2Client = await getAuthenticatedClient(emailAccount);
+    const oauth2Client = await getAuthenticatedMailClient(database, user, emailAccount);
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     let addLabelIds = [];
@@ -527,12 +501,11 @@ export async function PATCH(request) {
 export async function DELETE(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { EmailAccount } = models
+    const { user, database } = auth
 
     const { searchParams } = new URL(request.url);
     const messageId = searchParams.get('messageId');
@@ -541,13 +514,13 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'Message ID is required' }, { status: 400 });
     }
 
-    const emailAccount = await EmailAccount.findOne({ user: user._id }).select('+accessToken +refreshToken');
+    const emailAccount = await getMailAccount(database, user);
 
     if (!emailAccount || !emailAccount.isConnected) {
       return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
     }
 
-    const oauth2Client = await getAuthenticatedClient(emailAccount);
+    const oauth2Client = await getAuthenticatedMailClient(database, user, emailAccount);
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     await gmail.users.messages.delete({

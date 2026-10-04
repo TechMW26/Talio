@@ -1,232 +1,42 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { ATTENDANCE_DATABASE_OPTIONS, attendanceId, attendanceError, populateAttendanceEmployee } from '@/lib/platform/firestoreAttendance.server'
 import { sendPushToUser } from '@/lib/pushNotification'
-import { evaluateEmployeeGeofence } from '@/lib/geofencing'
-
+import { evaluateEmployeeGeofence, isValidCoordinate } from '@/lib/geofencing'
+import { getAttendanceDayRange } from '@/lib/attendanceAutoCheckout'
+import { getTimezone } from '@/lib/timezone'
+import { finishAttendance } from '@/lib/attendanceNotificationScheduler'
 export const dynamic = 'force-dynamic'
-
-/**
- * POST - Check if user is within geofence and auto-checkout if not
- * Called by the client after receiving overtime notification
- */
 export async function POST(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'CompanySettings', 'GeofenceLocation', 'OvertimeRequest', 'User', 'Notification'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Attendance, Employee, CompanySettings, GeofenceLocation, OvertimeRequest, User, Notification } = models
-
+    const auth = await getAuthAndDatabase(request, ATTENDANCE_DATABASE_OPTIONS)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    const { database, user } = auth
     const { latitude, longitude, accuracy, locationSource = 'gps' } = await request.json()
-
-    if (latitude === undefined || longitude === undefined) {
-      return NextResponse.json(
-        { success: false, message: 'Location data required' },
-        { status: 400 }
-      )
-    }
-
-    const latNum = Number(latitude)
-    const lonNum = Number(longitude)
-
-    if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid latitude or longitude' },
-        { status: 400 }
-      )
-    }
-
-    // Get the user's employee record
-    const employee = await Employee.findOne({ user: user._id }).populate({
-      path: 'department',
-      options: { strictPopulate: false }
-    }).populate({ path: 'company', options: { strictPopulate: false } })
-    if (!employee) {
-      return NextResponse.json(
-        { success: false, message: 'Employee not found' },
-        { status: 404 }
-      )
-    }
-
-    // Get today's attendance
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    const attendance = await Attendance.findOne({
-      employee: employee._id,
-      date: { $gte: today, $lt: tomorrow },
-      checkIn: { $exists: true, $ne: null },
-      checkOut: { $exists: false }
+    if (!isValidCoordinate(latitude, longitude)) throw attendanceError('Valid location coordinates required')
+    const employee = await populateAttendanceEmployee(database, await database.get('employees', attendanceId(user.employeeId)))
+    if (!employee) throw attendanceError('Employee not found', 404)
+    const global = (await database.list('companysettings', { limit: 1 })).records[0] || {}
+    const settings = { ...global, ...employee.company?.workingHours, geofence: employee.company?.geofence || global.geofence, breakTimings: employee.company?.breakTimings || global.breakTimings || [], timezone: getTimezone(employee.company?.timezone || global.timezone) }
+    const range = getAttendanceDayRange(new Date(), settings.timezone)
+    const records = (await database.list('attendances', { filters: [{ field: 'employee', operator: '==', value: employee._id }, { field: 'date', operator: '>=', value: range.start }, { field: 'date', operator: '<=', value: range.end }], limit: 2 })).records
+    if (records.length > 1) throw attendanceError('Duplicate attendance records require reconciliation', 409)
+    const attendance = records[0]
+    if (!attendance?.checkIn || attendance.checkOut) return NextResponse.json({ success: true, message: 'Not checked in or already checked out', isCheckedIn: false })
+    const result = await evaluateEmployeeGeofence({ database, settings, latitude, longitude, accuracy, locationSource, employeeId: employee._id, departmentId: employee.department?._id, companyId: employee.company?._id })
+    if (!result.enabled || result.withinGeofence) return NextResponse.json({ success: true, message: result.message, withinGeofence: true, isCheckedIn: true, location: result.closestLocation?.name })
+    if (result.code !== 'OUTSIDE_GEOFENCE') return NextResponse.json({ success: true, message: result.message, withinGeofence: null, isCheckedIn: true, geofenceEvaluated: false })
+    const now = new Date()
+    const updated = await database.transaction(async tx => {
+      const [current, overtime] = await Promise.all([tx.get('attendances', attendance._id), tx.list('overtimerequests', { filters: [{ field: 'attendance', operator: '==', value: attendance._id }], limit: 40, requireComplete: true })])
+      if (!current?.checkIn || current.checkOut) throw attendanceError('Attendance already closed', 409)
+      const next = finishAttendance(current, now, settings, { checkOutStatus: 'auto-checkout', autoCheckedOut: true, autoCheckoutReason: 'geofence_exit', autoCheckoutAt: now, source: 'auto_checkout',
+        location: { ...current.location, checkOut: { latitude: Number(latitude), longitude: Number(longitude), address: 'Auto-checkout: Outside geofence', capturedAt: now, autoCheckout: true } } })
+      await tx.replace('attendances', next)
+      for (const item of overtime.records) if (item.status === 'pending') await tx.replace('overtimerequests', { ...item, status: 'auto-checkout', autoCheckoutAt: now, autoCheckoutReason: 'User left office geofence area', updatedAt: now })
+      return next
     })
-
-    if (!attendance) {
-      return NextResponse.json({
-        success: true,
-        message: 'Not checked in or already checked out',
-        isCheckedIn: false
-      })
-    }
-
-    // Get company settings
-    const globalSettings = await CompanySettings.findOne().lean()
-    const settings = employee.company?.geofence
-      ? {
-          ...globalSettings,
-          geofence: employee.company.geofence,
-          breakTimings: employee.company.breakTimings || globalSettings?.breakTimings || [],
-          fullDayHours: employee.company.workingHours?.fullDayHours || globalSettings?.fullDayHours || 8,
-          halfDayHours: employee.company.workingHours?.halfDayHours || globalSettings?.halfDayHours || 4,
-        }
-      : globalSettings
-
-    // Check if geofence is enabled
-    if (!settings?.geofence?.enabled) {
-      return NextResponse.json({
-        success: true,
-        message: 'Geofence not enabled',
-        withinGeofence: true,
-        isCheckedIn: true
-      })
-    }
-
-    const geofenceCheck = await evaluateEmployeeGeofence({
-      GeofenceLocation,
-      settings,
-      latitude: latNum,
-      longitude: lonNum,
-      accuracy,
-      locationSource,
-      employeeId: employee._id,
-      departmentId: employee.department?._id,
-      companyId: employee.company?._id,
-    })
-    if (!['WITHIN_GEOFENCE', 'OUTSIDE_GEOFENCE'].includes(geofenceCheck.code)) {
-      return NextResponse.json({
-        success: true,
-        message: geofenceCheck.message,
-        withinGeofence: null,
-        isCheckedIn: true,
-        geofenceEvaluated: false,
-      })
-    }
-    const isWithinGeofence = geofenceCheck.withinGeofence
-    const closestLocation = geofenceCheck.closestLocation
-    const minDistance = geofenceCheck.closestDistance
-
-    // If user is within geofence, they're still in office
-    if (isWithinGeofence) {
-      return NextResponse.json({
-        success: true,
-        message: 'User is within office geofence',
-        withinGeofence: true,
-        isCheckedIn: true,
-        location: closestLocation?.name
-      })
-    }
-
-    // User is NOT in office - auto-checkout immediately!
-    const checkOutTime = new Date()
-    attendance.checkOut = checkOutTime
-
-    // Store check-out location
-    if (!attendance.location) {
-      attendance.location = {}
-    }
-    attendance.location.checkOut = {
-      latitude: latNum,
-      longitude: lonNum,
-      address: 'Auto-checkout: Outside geofence',
-      autoCheckout: true
-    }
-
-    attendance.checkOutStatus = 'auto-checkout'
-    attendance.autoCheckedOut = true
-    attendance.autoCheckoutReason = 'geofence_exit'
-    attendance.autoCheckoutAt = checkOutTime
-    attendance.source = 'auto_checkout'
-
-    // Calculate work hours using shrinkage method - ensure breakTimings is an array
-    const breakTimings = Array.isArray(settings?.breakTimings) ? settings.breakTimings : []
-    const workHoursCalc = calculateEffectiveWorkHours(
-      new Date(attendance.checkIn),
-      checkOutTime,
-      breakTimings
-    )
-
-    attendance.workHours = workHoursCalc.effectiveWorkHours
-    attendance.totalLoggedHours = workHoursCalc.totalLoggedHours
-    attendance.breakMinutes = workHoursCalc.breakMinutes
-    attendance.shrinkagePercentage = workHoursCalc.shrinkagePercentage
-
-    // Determine final status
-    const statusResult = determineAttendanceStatus(workHoursCalc.effectiveWorkHours, {
-      fullDayHours: settings?.fullDayHours || 8,
-      halfDayHours: settings?.halfDayHours || 4
-    })
-
-    attendance.status = statusResult.status
-    attendance.statusReason = statusResult.reason + ' (Auto-checkout: Left office area)'
-
-    await attendance.save()
-
-    // Update any pending overtime request
-    await OvertimeRequest.findOneAndUpdate(
-      { attendance: attendance._id, status: 'pending' },
-      {
-        status: 'auto-checkout',
-        autoCheckoutAt: checkOutTime,
-        autoCheckoutReason: 'User left office geofence area'
-      }
-    )
-
-    // Send notification to user
-    try {
-      await sendPushToUser(
-        employee.user,
-        {
-          title: '📍 Auto Clock-Out: Left Office',
-          body: `You've been automatically clocked out as you left the office area. Work hours: ${attendance.workHours}h`,
-        },
-        {
-          eventType: 'autoCheckout',
-          clickAction: '/dashboard/attendance',
-          icon: '/icons/icon-192x192.png',
-          data: {
-            type: 'geofence-auto-checkout',
-            checkoutTime: checkOutTime.toISOString(),
-            workHours: attendance.workHours,
-            status: attendance.status
-          },
-          models: { User, Notification }
-        }
-      )
-    } catch (pushError) {
-      console.error('Failed to send auto-checkout notification:', pushError)
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Auto clocked out - user left office geofence',
-      withinGeofence: false,
-      isCheckedIn: false,
-      autoCheckout: true,
-      checkOutTime: checkOutTime.toISOString(),
-      workHours: attendance.workHours,
-      status: attendance.status,
-      distance: Number.isFinite(Number(minDistance)) ? Math.round(minDistance) : null,
-      closestLocation: closestLocation?.name
-    })
-
-  } catch (error) {
-    console.error('Geolocation check error:', error)
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to check geolocation' },
-      { status: 500 }
-    )
-  }
+    if (process.env.TALIO_LOCAL_ACCEPTANCE !== '1') await sendPushToUser(attendanceId(user._id || user.userId), { title: 'Auto Clock-Out: Left Office', body: 'You have been automatically clocked out as you left the office area. Work hours: ' + updated.workHours + 'h' }, { database, eventType: 'autoCheckout', clickAction: '/dashboard/attendance', data: { type: 'geofence-auto-checkout', checkoutTime: now.toISOString(), workHours: updated.workHours, status: updated.status } }).catch(() => {})
+    return NextResponse.json({ success: true, message: 'Auto clocked out - user left office geofence', withinGeofence: false, isCheckedIn: false, autoCheckout: true, checkOutTime: now.toISOString(), workHours: updated.workHours, status: updated.status, distance: result.closestDistance, closestLocation: result.closestLocation?.name })
+  } catch (error) { return NextResponse.json({ success: false, message: error.message }, { status: error.status || 500 }) }
 }

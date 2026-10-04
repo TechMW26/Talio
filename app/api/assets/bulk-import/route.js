@@ -4,7 +4,8 @@ import { notifyAssetAssignment, assetNotificationRecipients } from '@/lib/assetN
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
 import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
 import { ASSET_TRACKER_FIELDS, ASSET_STATUSES, normalizeAssetStatus, normalizeAssetInput } from '@/utils/assetData'
-import { assetHistoryEvent, prepareAssetTransition } from '@/lib/assetHistory'
+import { assetDatabase, saveAsset } from '@/lib/assetsStore.server'
+import { collectFirestorePages } from '@/lib/platform/firestoreQueries.server'
 
 const VALID_CATEGORIES = ['laptop', 'desktop', 'mobile', 'tablet', 'monitor', 'keyboard', 'mouse', 'furniture', 'vehicle', 'other']
 const VALID_STATUSES = ASSET_STATUSES
@@ -137,10 +138,10 @@ function normalizeCondition(value) {
 // POST - Bulk import assets
 export async function POST(request) {
   try {
-    const auth = await requirePermission('assets', 'create')(request, ['Asset', 'Employee', 'Department', 'Team', 'Notification'])
+    const auth = await requirePermission('assets', 'create')(request, [])
     if (auth.denied) return auth.denied
-    const { models, user } = auth
-    const { Asset, Employee } = models
+    const { user } = auth
+    const database = await assetDatabase(auth)
 
 
     const formData = await request.formData()
@@ -237,8 +238,8 @@ export async function POST(request) {
     const employeeByName = {}
     const employeeById = {}
     const needsEmployeeLookup = Object.values(mapping).some(f => ['assignedToEmail', 'assignedToCode', 'assignedToName'].includes(f))
-    if (needsEmployeeLookup && Employee) {
-      const employees = await Employee.find({ status: 'active' }).select('_id email employeeCode firstName lastName').lean()
+    if (needsEmployeeLookup) {
+      const employees = await collectFirestorePages(database, 'employees', { filters: [{ field: 'status', operator: '==', value: 'active' }] })
       for (const emp of employees) {
         employeeById[String(emp._id)] = emp
         const fullName = [emp.firstName, emp.lastName].filter(Boolean).join(' ').trim().toLowerCase().replace(/\s+/g, ' ')
@@ -248,10 +249,8 @@ export async function POST(request) {
       }
     }
 
-    // Get existing asset codes to skip duplicates
-    const existingCodes = new Set(
-      (await Asset.find({}).select('assetCode').lean()).map(a => a.assetCode?.toLowerCase())
-    )
+    // Each write checks its exact normalized code transactionally; no inventory scan.
+    const existingCodes = new Set()
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i]
@@ -348,10 +347,7 @@ export async function POST(request) {
 
         const { data: validated, errors } = normalizeAssetInput(assetData)
         if (errors.length) throw new Error(errors[0])
-        prepareAssetTransition(null, validated)
-        const historyData = { ...validated }
-        if (validated.assignedTo) historyData.assignedTo = employeeById[String(validated.assignedTo)]
-        const asset = await Asset.create({ ...validated, history: [assetHistoryEvent(null, historyData, user, 'imported')] })
+        const { record: asset } = await saveAsset(database, user, validated, { permissionGranted: true, action: 'imported' })
         if (asset.assignedTo) assignedAssets.push(asset)
         existingCodes.add(assetCode.toLowerCase())
         results.created++
@@ -364,13 +360,13 @@ export async function POST(request) {
     // Emit real-time update
     if (results.created > 0) {
       try {
-        const recipients = await assetNotificationRecipients(models, {})
+        const recipients = await assetNotificationRecipients(database, {})
         if (recipients.length) emitAssetUpdate({ action: 'bulk-import', count: results.created }, recipients.map(user => user.id), { broadcast: false })
       } catch (error) { console.error('[Asset import] Realtime refresh failed:', error.message) }
     }
     if (assignedAssets.length) after(async () => {
       for (const asset of assignedAssets) {
-        try { await notifyAssetAssignment({ models, asset }) }
+        try { await notifyAssetAssignment({ database, asset }) }
         catch (error) { console.error('[Asset import] Notification failed:', error) }
       }
     })

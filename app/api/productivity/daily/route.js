@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
-import mongoose from 'mongoose';
-import { canViewUserScreenshots } from '@/lib/productivityPermissions';
+import { verifyTokenFromRequest } from '@/lib/auth';
+import { getScreenshotStore, findScreenshotComposite, listScreenshotMaintenanceRecords } from '@/lib/platform/firestoreScreenshots.server';
+import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
 import { getTodayDateString } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
@@ -14,20 +14,13 @@ export const runtime = 'nodejs';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, [
-      'User',
-      'Employee',
-      'Department',
-      'Screenshot',
-      'ScreenshotAnalysis',
-      'ScreenshotComposite',
-    ]);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    const { user, models } = auth;
-    const { User, Screenshot, ScreenshotAnalysis, ScreenshotComposite } = models;
+    const { user, tenant } = auth;
+    const store = await getScreenshotStore(tenant.databaseName);
 
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
@@ -43,26 +36,24 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'Invalid date format (expected YYYY-MM-DD)' }, { status: 400 });
     }
 
-    if (targetUserId.toString() !== viewerId.toString() && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (targetUserId.toString() !== viewerId.toString() && !/^[a-f\d]{24}$/i.test(String(targetUserId))) {
       return NextResponse.json({ success: false, error: 'Invalid user ID' }, { status: 400 });
     }
 
     if (targetUserId.toString() !== viewerId.toString()) {
-      const exists = await User.findById(targetUserId).select('_id');
+      const exists = await store.get('users', String(targetUserId));
       if (!exists) {
         return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
       }
     }
 
-    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
+    const canView = await canViewTenantScreenshots(viewerId, targetUserId, viewerRole, tenant.databaseName);
     if (!canView) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
 
-    const screenshots = await Screenshot.find({ user: targetUserId, dateString: date })
-      .sort({ capturedAt: 1 })
-      .select('_id capturedAt activity analyzed analyzedAt metadata.mimeType')
-      .lean();
+    const scope = [{ field: 'user', operator: '==', value: String(targetUserId) }, { field: 'dateString', operator: '==', value: date }];
+    const screenshots = (await listScreenshotMaintenanceRecords(store, 'screenshots', scope)).sort((a, b) => new Date(a.capturedAt) - new Date(b.capturedAt));
 
     const formatted = screenshots.map((s) => ({
       id: s._id.toString(),
@@ -88,10 +79,7 @@ export async function GET(request) {
     // accurate across days.
     let compositeTileCount = 0;
     try {
-      const compositeDoc = await ScreenshotComposite.findOne({
-        user: targetUserId,
-        dateString: date,
-      }).select('tileCount').lean();
+      const compositeDoc = await findScreenshotComposite(store, targetUserId, date);
       compositeTileCount = compositeDoc?.tileCount || 0;
     } catch (err) {
       console.warn('[Productivity/Daily] Failed to load composite count:', err.message);
@@ -101,15 +89,12 @@ export async function GET(request) {
 
     let analysisDoc = null;
     try {
-      analysisDoc = await ScreenshotAnalysis.findOne({
-        user: targetUserId,
-        dateString: date,
-      }).lean();
+      analysisDoc = (await store.list('screenshotanalyses', { filters: scope, limit: 1 })).records[0] || null;
     } catch (err) {
       console.warn('[Productivity/Daily] Failed to load analysis doc:', err.message);
     }
 
-    const targetUser = await User.findById(targetUserId).select('name email');
+    const targetUser = await store.get('users', String(targetUserId));
 
     return NextResponse.json({
       success: true,

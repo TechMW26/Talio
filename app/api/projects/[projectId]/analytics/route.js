@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { projectContext } from '@/lib/projectCollaboration.server'
+import { projectRows, projectFilter as f, populateProject, populateTask, employeeSummary, projectId as id } from '@/lib/projects.server'
 import { checkProjectAccess, getProjectTaskStats } from '@/lib/projectService'
 import { generateSmartContent } from '@/lib/promptEngine'
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
@@ -11,54 +12,12 @@ export const maxDuration = 60 // Allow up to 60 seconds for AI processing
 export async function GET(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
-
     const { projectId } = await params
-
-    const userDoc = await User.findById(user._id || user.userId).select('employeeId role')
-    if (!userDoc || !userDoc.employeeId) {
-      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
-    }
-
-    // Get project with relationships
-    const project = await Project.findById(projectId)
-      .populate('projectHead', 'firstName lastName profilePicture email')
-      .populate('createdBy', 'firstName lastName')
-      .populate('department', 'name')
-
-    if (!project) {
-      return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
-    }
-
-    // Check access
-    const isAdmin = ['admin', 'hr'].includes(userDoc.role)
-    if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, userDoc.employeeId, 'view', models)
-      if (!hasAccess) {
-        return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-      }
-    }
-
-    // Get all members
-    const members = await ProjectMember.find({
-      project: projectId,
-      invitationStatus: 'accepted'
-    }).populate('user', 'firstName lastName profilePicture email department')
-
-    // Get all tasks with subtasks and assignees
-    const tasks = await Task.find({ project: projectId })
-      .populate('createdBy', 'firstName lastName')
-      .sort({ createdAt: -1 })
-
-    // Get task assignees
-    const taskIds = tasks.map(t => t._id)
-    const assignees = await TaskAssignee.find({ task: { $in: taskIds } })
-      .populate('user', 'firstName lastName profilePicture email')
+    const { database, project: rawProject } = await projectContext(request, projectId, 'view')
+    const project = await populateProject(database, rawProject)
+    const members = await Promise.all((await projectRows(database, 'projectmembers', [f('project', projectId), f('invitationStatus', 'accepted')])).map(async row => ({ ...row, user: employeeSummary(await database.get('employees', id(row.user))) })))
+    const tasks = await Promise.all((await projectRows(database, 'tasks', [f('project', projectId)], { orderBy: [{ field: 'createdAt', direction: 'desc' }] })).filter(row => !row.deletedAt).map(row => populateTask(database, row)))
+    const assignees = tasks.flatMap(row => row.assignees || [])
 
     // Build task-to-assignee mapping
     const taskAssigneeMap = {}
@@ -114,34 +73,22 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Project'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { User, Project } = models
-
     const { projectId } = await params
+    const { database, project, auth } = await projectContext(request, projectId, 'view')
+    const { user } = auth
     const { analyticsData } = await request.json()
 
-    const userDoc = await User.findById(user._id).select('employeeId role')
-    if (!userDoc) {
-      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
-    }
-
     // Fetch previous insights from project metadata
-    const project = await Project.findById(projectId).select('metadata')
     const previousInsights = project?.metadata?.lastAIInsights || null
     const previousInsightsDate = project?.metadata?.lastAIInsightsDate || null
 
     // Generate AI insights using Gemini with previous context
     try {
-      const insights = await generateAIInsights(analyticsData, user._id, previousInsights)
+      const insights = await generateAIInsights(analyticsData, user._id, previousInsights, auth.tenant.databaseName)
 
       // Store the new insights in project metadata for future reference
-      await Project.findByIdAndUpdate(projectId, {
-        $set: {
-          'metadata.lastAIInsights': {
+      await database.mutate('projects', projectId, current => ({ ...current, metadata: { ...current.metadata,
+          lastAIInsights: {
             healthScore: insights.healthScore,
             healthStatus: insights.healthStatus,
             oneLineVerdict: insights.oneLineVerdict,
@@ -149,9 +96,8 @@ export async function POST(request, { params }) {
             workloadDistribution: insights.workloadDistribution,
             projectionInsight: insights.projectionInsight
           },
-          'metadata.lastAIInsightsDate': new Date()
-        }
-      })
+          lastAIInsightsDate: new Date()
+        } }))
 
       return NextResponse.json({
         success: true,
@@ -656,7 +602,7 @@ function generateRuleBasedInsights(data) {
 }
 
 // Generate AI insights using Gemini
-async function generateAIInsights(analyticsData, userId, previousInsights = null) {
+async function generateAIInsights(analyticsData, userId, previousInsights = null, databaseName) {
   try {
     const { project, taskAnalytics, memberAnalytics, completionPrediction, timelineAnalytics } = analyticsData
 
@@ -809,6 +755,7 @@ Respond with ONLY valid JSON. healthScore and healthStatus MUST be consistent (c
     const text = await generateSmartContent(prompt, {
       userId,
       feature: 'project-analytics',
+      databaseName,
       skipRefinement: true,
       skipGuardrails: true,
       skipContext: true

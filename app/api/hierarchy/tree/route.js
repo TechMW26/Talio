@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { collectFirestorePages, readFirestoreReferences } from '@/lib/platform/firestoreQueries.server'
 import { LEVEL_NAMES, inferLevelFromTitle } from '@/lib/designationLevels'
 import { getReportingParent } from '@/lib/employeeReporting'
 
@@ -31,27 +32,29 @@ function isHrText(value) {
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department'])
+    const auth = await getAuthAndDatabase(request, { queryFields: { employees: ['status'], users: ['employeeId'] } })
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
 
-    const { Employee, User } = auth.models
+    const { database } = auth
     const viewerUserId = String(auth.user?._id || auth.user?.userId || '')
 
-    const employees = await Employee.find({ status: { $in: ['active', 'probation', 'on_leave'] } })
-      .populate('designation', 'title level levelName')
-      .populate('department', 'name')
-      .select('firstName lastName profilePicture bio designation designationLevel designationLevelName reportingManager assignedManager assignedTeamLead reportsTo department status dateOfJoining dateOfBirth')
-      .lean()
+    const records = await collectFirestorePages(database, 'employees', { filters: [{ field: 'status', operator: 'in', value: ['active', 'probation', 'on_leave'] }] })
+    const [designations, departments] = await Promise.all([
+      readFirestoreReferences(database, 'designations', records.map(employee => employee.designation)),
+      readFirestoreReferences(database, 'departments', records.map(employee => employee.department)),
+    ])
+    const employees = records.map(employee => ({ ...employee, designation: designations.get(String(employee.designation)) || null, department: departments.get(String(employee.department)) || null }))
 
     if (!employees.length) {
       return NextResponse.json({ success: true, data: { roots: [], totalEmployees: 0, viewerEmployeeId: null } })
     }
 
-    const users = await User.find({ employeeId: { $in: employees.map((e) => e._id) } })
-      .select('_id employeeId isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf teamLeaderOf teamMemberOf')
-      .lean()
+    const users = []
+    for (let offset = 0; offset < employees.length; offset += 30) {
+      users.push(...await collectFirestorePages(database, 'users', { filters: [{ field: 'employeeId', operator: 'in', value: employees.slice(offset, offset + 30).map(employee => employee._id) }] }))
+    }
 
     const employeesById = new Map(employees.map((e) => [String(e._id), e]))
     const userByEmployeeId = new Map(users.map((u) => [String(u.employeeId), u]))

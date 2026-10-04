@@ -1,36 +1,26 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import mongoose from 'mongoose'
-
-// Helper to ensure user ID is ObjectId
-function getUserObjectId(user) {
-  const userId = user._id || user.userId
-  return typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId
-}
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getNativeAuthRepository } from '@/lib/platform/firestoreAuth.server'
 
 // GET - List all active sessions for current user
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['UserSession'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { UserSession } = models
+    const { user } = auth
+    const repository = await getNativeAuthRepository(auth.tenant.databaseName)
 
     // Get current session's token ID if available
     const currentTokenId = user.tokenId || null
-    const userObjectId = getUserObjectId(user)
+    const userId = String(user._id || user.userId)
 
     // Fetch all active sessions for this user
-    const sessions = await UserSession.find({
-      user: userObjectId,
-      isActive: true,
-      expiresAt: { $gt: new Date() },
-    })
-      .sort({ lastActivityAt: -1 })
-      .lean()
+    const sessions = (await repository.listUserSessions(userId))
+      .filter(session => session.isActive && new Date(session.expiresAt).getTime() > Date.now() && (Number(session.authVersion) || 0) === (Number(user.authVersion) || 0))
+      .sort((a, b) => new Date(b.lastActivityAt || 0) - new Date(a.lastActivityAt || 0))
 
     // Format sessions for response
     const formattedSessions = sessions.map((session) => ({
@@ -61,39 +51,34 @@ export async function GET(request) {
 export async function DELETE(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['UserSession'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { UserSession } = models
+    const { user } = auth
+    const repository = await getNativeAuthRepository(auth.tenant.databaseName)
 
     const currentTokenId = user.tokenId || null
-    const userObjectId = getUserObjectId(user)
-
-    // Build query to revoke all sessions except current
-    const query = {
-      user: userObjectId,
-      isActive: true,
+    const userId = String(user._id || user.userId)
+    const sessions = (await repository.listUserSessions(userId)).filter(session => session.isActive && session.tokenId !== currentTokenId)
+    let revokedCount = 0
+    for (let offset = 0; offset < sessions.length; offset += 50) {
+      revokedCount += await repository.database.transaction(async tx => {
+        let count = 0
+        for (const found of sessions.slice(offset, offset + 50)) {
+          const session = await tx.get('usersessions', found._id)
+          if (!session?.isActive || String(session.user) !== userId || session.tokenId === currentTokenId) continue
+          await tx.replace('usersessions', { ...session, isActive: false, revokedAt: new Date(), revokedReason: 'user_logout' })
+          count++
+        }
+        return count
+      })
     }
-
-    // If we have a current token ID, exclude it from revocation
-    if (currentTokenId) {
-      query.tokenId = { $ne: currentTokenId }
-    }
-
-    const result = await UserSession.updateMany(query, {
-      isActive: false,
-      revokedAt: new Date(),
-      revokedReason: 'user_logout',
-    })
-
-    console.log(`[sessions] Revoked ${result.modifiedCount} sessions for user ${userObjectId}`)
 
     return NextResponse.json({
       success: true,
-      message: `Logged out from ${result.modifiedCount} other device(s)`,
-      revokedCount: result.modifiedCount,
+      message: `Logged out from ${revokedCount} other device(s)`,
+      revokedCount,
     })
   } catch (error) {
     console.error('[sessions] Error revoking sessions:', error)

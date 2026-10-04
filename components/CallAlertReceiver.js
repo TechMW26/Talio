@@ -189,6 +189,15 @@ async function playAudioWithContext(src) {
  * Falls back to HTML5 Audio if needed
  */
 async function playAudioSimple(src) {
+  if (/^\/api\/call-alert\/[a-f0-9]{24}\/audio(?:\?|$)/.test(src)) {
+    const token = localStorage.getItem('token');
+    const response = await fetch(src, { credentials: 'same-origin', headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!response.ok) throw new Error('Alert audio is unavailable');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    try { return await playAudioWithContext(objectUrl); }
+    finally { URL.revokeObjectURL(objectUrl); }
+  }
   return playAudioWithContext(src);
 }
 
@@ -374,12 +383,13 @@ export default function CallAlertReceiver() {
 
     // Validate audioDataUrl if voice is enabled
     if (alert.voiceEnabled && alert.audioDataUrl) {
-      if (!alert.audioDataUrl.startsWith('data:audio/')) {
+      const isPrivateAudio = /^\/api\/call-alert\/[a-f0-9]{24}\/audio(?:\?|$)/.test(alert.audioDataUrl);
+      if (!isPrivateAudio && !alert.audioDataUrl.startsWith('data:audio/')) {
         console.error('[CallAlert] ❌ INVALID AUDIO FORMAT');
         console.error('[CallAlert] Expected: data:audio/...');
         console.error('[CallAlert] Got:', alert.audioDataUrl.substring(0, 50));
         alert.voiceEnabled = false;
-      } else if (alert.audioDataUrl.length < 1000) {
+      } else if (!isPrivateAudio && alert.audioDataUrl.length < 1000) {
         console.error('[CallAlert] ❌ AUDIO DATA TOO SHORT (likely truncated)');
         console.error('[CallAlert] Length:', alert.audioDataUrl.length);
         alert.voiceEnabled = false;

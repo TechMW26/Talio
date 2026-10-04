@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { taskAuth } from '@/lib/tasks.server'
 import { getEmployeeProjectSummaryForMira } from '@/lib/projectPerformance'
 import { generateSmartContent } from '@/lib/promptEngine'
 
@@ -8,14 +8,14 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee'])
+    const auth = await taskAuth(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, database } = auth
 
     const employeeId = user.employeeId?._id || user.employeeId || user._id
-    const summary = await getEmployeeProjectSummaryForMira(employeeId, models)
+    const summary = await getEmployeeProjectSummaryForMira(employeeId, database)
 
     // Use AI to generate a natural language summary
     const prompt = `
@@ -33,7 +33,8 @@ export async function GET(request) {
     `
     
     const aiSummary = await generateSmartContent(prompt, {
-      userId: user.userId,
+      userId: user._id || user.userId,
+      databaseName: auth.tenant.databaseName,
       feature: 'project-summary',
       skipRefinement: true // Data-driven prompt, no need to refine
     });

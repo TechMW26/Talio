@@ -1,68 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import { normalizeLeaveType, normalizeLeaveTypes } from '@/lib/leaveData'
-// GET - List all leave types
+import { getAuthAndDatabase } from '@/lib/auth'
+import { LEAVE_TYPE_STORE_OPTIONS, listLeaveTypes, saveLeaveType } from '@/lib/leaveTypes.server'
+const failure = error => NextResponse.json({ success: false, message: error.code === 'ALREADY_EXISTS' ? 'Leave type name or code is already in use' : error.status ? error.message : 'Unable to load or save leave types' }, { status: error.status || (error.code === 'ALREADY_EXISTS' ? 409 : 500) })
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['LeaveType'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { LeaveType } = models
-
-    const leaveTypes = await LeaveType.find({ isActive: true })
-      .sort({ name: 1 })
-      .lean()
-
-    return NextResponse.json({
-      success: true,
-      data: normalizeLeaveTypes(leaveTypes),
-    })
-  } catch (error) {
-    console.error('Get leave types error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch leave types' },
-      { status: 500 }
-    )
-  }
+    const auth = await getAuthAndDatabase(request, LEAVE_TYPE_STORE_OPTIONS)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: auth.status || 401 })
+    return NextResponse.json({ success: true, data: await listLeaveTypes(auth.database) })
+  } catch (error) { return failure(error) }
 }
-
-// POST - Create leave type
 export async function POST(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['LeaveType'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { LeaveType } = models
-
-    // Only admins and HR can create leave types
-    if (!['admin', 'hr'].includes(user.role)) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized - only admin and HR can create leave types' },
-        { status: 403 }
-      )
-    }
-
-    const data = await request.json()
-
-    const leaveType = await LeaveType.create(data)
-
-    return NextResponse.json({
-      success: true,
-      message: 'Leave type created successfully',
-      data: normalizeLeaveType(leaveType),
-    }, { status: 201 })
-  } catch (error) {
-    console.error('Create leave type error:', error)
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to create leave type' },
-      { status: 500 }
-    )
-  }
+    const auth = await getAuthAndDatabase(request, LEAVE_TYPE_STORE_OPTIONS)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: auth.status || 401 })
+    return NextResponse.json({ success: true, data: await saveLeaveType(auth.database, auth.user, await request.json()), message: 'Leave type created successfully' }, { status: 201 })
+  } catch (error) { return failure(error) }
 }
 

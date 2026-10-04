@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
+import { getSuperadminStore, getActiveCompanies } from '@/lib/platform/firestoreSuperadmin.server';
 
 export async function GET(request) {
   try {
@@ -23,15 +23,7 @@ export async function GET(request) {
     const status = searchParams.get('status') || 'pending';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    const TenantCompany = await getTenantCompanyModel();
-
-    // Get companies with pending reminders
-    const companies = await TenantCompany.find({
-      isActive: true,
-      'reminders.status': status,
-    })
-      .select('name slug reminders')
-      .lean();
+    const companies = await getActiveCompanies(await getSuperadminStore());
 
     // Flatten and sort reminders
     const allReminders = [];

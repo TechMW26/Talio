@@ -40,10 +40,14 @@ describe('HR tracker UI regressions', () => {
 
   test('HR documents provide an organisation view with employee attribution', () => {
     const source = read('app/dashboard/documents/page.js')
-    expect(source).toContain("canManageDocuments ? '/api/documents'")
+    expect(source).toContain("const organisationView = canManageDocuments && documentScope === 'public'")
+    expect(source).toContain("organisationView ? '/api/documents' : employeeId ? `/api/documents?employeeId=${encodeURIComponent(employeeId)}` : null")
     expect(source).toContain('Manage employee and company documents')
     expect(source).toContain('Company-wide document')
-    expect(source).toContain('doc.employee.firstName')
+    expect(source).toContain('organisationView ? buildDocumentFolders(documents, employeeOptions) : []')
+    const folders = read('components/employees/DocumentFolders.js')
+    expect(folders).toContain('employee.firstName')
+    expect(folders).toContain('employee.lastName')
   })
 
   test('MIRA responses can be exported as portable reports', () => {

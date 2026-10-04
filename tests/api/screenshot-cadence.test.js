@@ -1,8 +1,8 @@
 import { SCREENSHOT_CAPTURE_INTERVAL_MS, isEarlySessionCapture, getNextAllowedCaptureTime } from '@/lib/productivitySessionRules'
 import { GET, POST } from '@/app/api/settings/screenshot-interval/route'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 jest.mock('next/server', () => ({ NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) } }))
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('electron', () => ({ screen: {} }), { virtual: true })
 jest.mock('node-fetch', () => jest.fn())
 jest.mock('../../desktop-app/src/logger', () => ({ log: jest.fn() }))
@@ -18,8 +18,9 @@ test('server policy requires exactly four minutes between scheduled captures', (
 })
 
 test('old saved per-user settings cannot override the fixed policy', async () => {
-  const update = jest.fn()
-  getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'u', role: 'admin' }, models: { User: { findById: () => ({ select: async () => ({ settings: { screenshotInterval: 30 } }) }), findByIdAndUpdate: update } } })
+  const row = { _id: 'u', role: 'admin', isActive: true, settings: { screenshotInterval: 30 } }
+  const update = jest.fn(async (_collection, _id, change) => change(row))
+  getAuthAndDatabase.mockResolvedValue({ success: true, user: row, database: { get: jest.fn(async () => row), mutate: update } })
   expect((await (await GET({})).json()).interval).toBe(4)
   expect((await POST({ json: async () => ({ interval: 3 }) })).status).toBe(400)
   expect(update).not.toHaveBeenCalled()

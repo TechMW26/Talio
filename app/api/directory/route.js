@@ -1,19 +1,16 @@
 import { apiSuccess, withTenantApi } from '@/lib/api/route'
-import { listDirectory, directoryInternals } from '@/lib/services/directoryService.server'
+import { listDirectory, directoryInternals, DIRECTORY_STORE_OPTIONS } from '@/lib/services/directoryService.server'
 
 export const dynamic = 'force-dynamic'
 
 export const GET = withTenantApi({
-  models: ['Employee', 'User', 'Designation', 'Department'],
+  firestore: DIRECTORY_STORE_OPTIONS,
   features: { allOf: ['employees'] },
   errorMessage: 'Failed to load employee directory',
-}, async ({ request, auth, models }) => {
+}, async ({ request, auth, database }) => {
   const { searchParams } = new URL(request.url)
   const items = await listDirectory({
-    Employee: models.Employee,
-    User: models.User,
-    Department: models.Department,
-    Designation: models.Designation,
+    database,
     tenantId: auth.tenant.databaseName,
     currentUserId: auth.user.id || auth.user._id,
     query: searchParams.get('q') || '',

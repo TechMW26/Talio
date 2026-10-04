@@ -1,39 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-
-// GET - Get health score notifications for employee
-export async function GET(request) {
-  try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['HealthScore', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { HealthScore, Employee } = models
-
-    const { searchParams } = new URL(request.url)
-    const employeeId = searchParams.get('employeeId') || (user._id || user.userId)
-
-    // Check if user can access this employee's data
-    if (user.role === 'employee' && employeeId !== (user._id || user.userId)?.toString()) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
-    }
-
-    const healthScore = await HealthScore.findOne({ employee: employeeId })
-      .populate('employee', 'firstName lastName employeeCode')
-
-    if (!healthScore) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          notifications: [],
-          riskLevel: 'low',
-          salaryDeductionRisk: false
-        }
-      })
-    }
-
+import { healthContext, visibleHealthEmployees } from '@/lib/platform/firestoreHealthScore.server'
+import { attendanceId, attendanceError } from '@/lib/platform/firestoreAttendance.server'
+async function target(database,user,requested){
+ const id=requested||attendanceId(user.employeeId)
+ if(!id)throw attendanceError('No employee profile linked',404)
+ await visibleHealthEmployees(database,user,id)
+ const records=(await database.list('healthscores',{filters:[{field:'employee',operator:'==',value:id}],limit:2})).records
+ if(records.length>1)throw attendanceError('Duplicate health scores require reconciliation',409)
+ return records[0]||null
+}
+export async function GET(request){
+ try{
+  const {database,user}=await healthContext(request)
+  const healthScore=await target(database,user,new URL(request.url).searchParams.get('employeeId'))
+  if(!healthScore)return NextResponse.json({success:true,data:{notifications:[],riskLevel:'low',salaryDeductionRisk:false}})
     // Generate real-time notifications
     const notifications = []
 
@@ -90,7 +70,8 @@ export async function GET(request) {
 
     recentWarnings.forEach((warning, index) => {
       notifications.push({
-        id: `warning_${index}`,
+        id: warning._id || `warning_${index}`,
+        warningId: warning._id,
         type: warning.severity === 'critical' ? 'critical' : 'warning',
         title: `${warning.type.charAt(0).toUpperCase() + warning.type.slice(1)} Warning`,
         message: warning.message,
@@ -105,9 +86,9 @@ export async function GET(request) {
     })
 
     // Improvement plan notifications
-    if (healthScore.improvementPlan.isActive) {
+    if (healthScore.improvementPlan?.isActive) {
       const daysLeft = Math.ceil((new Date(healthScore.improvementPlan.endDate) - new Date()) / (1000 * 60 * 60 * 24))
-      
+
       if (daysLeft > 0) {
         notifications.push({
           id: 'improvement_plan',
@@ -149,68 +130,25 @@ export async function GET(request) {
         riskLevel: healthScore.riskLevel,
         salaryDeductionRisk: healthScore.salaryDeductionRisk,
         overallScore: healthScore.overallScore,
-        lastUpdated: healthScore.metrics.lastCalculated
+        lastUpdated: healthScore.metrics?.lastCalculated
       }
     })
 
-  } catch (error) {
-    console.error('Get health score notifications error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch notifications' },
-      { status: 500 }
-    )
-  }
+ }catch(error){return NextResponse.json({success:false,message:error.message},{status:error.status||500})}
 }
-
-// POST - Acknowledge notification/warning
-export async function POST(request) {
-  try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['HealthScore', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { HealthScore } = models
-
-    const { employeeId, warningId, acknowledgeAll = false } = await request.json()
-    const targetEmployeeId = employeeId || (user._id || user.userId)
-
-    // Check if user can access this employee's data
-    if (user.role === 'employee' && targetEmployeeId !== (user._id || user.userId)?.toString()) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
-    }
-
-    const healthScore = await HealthScore.findOne({ employee: targetEmployeeId })
-    if (!healthScore) {
-      return NextResponse.json({ success: false, message: 'Health score not found' }, { status: 404 })
-    }
-
-    if (acknowledgeAll) {
-      // Acknowledge all warnings
-      healthScore.warnings.forEach(warning => {
-        warning.acknowledged = true
-      })
-    } else if (warningId) {
-      // Acknowledge specific warning
-      const warning = healthScore.warnings.id(warningId)
-      if (warning) {
-        warning.acknowledged = true
-      }
-    }
-
-    await healthScore.save()
-
-    return NextResponse.json({
-      success: true,
-      message: 'Notification acknowledged'
-    })
-
-  } catch (error) {
-    console.error('Acknowledge notification error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to acknowledge notification' },
-      { status: 500 }
-    )
-  }
+export async function POST(request){
+ try{
+  const {database,user}=await healthContext(request)
+  const {employeeId,warningId,acknowledgeAll=false}=await request.json()
+  if(typeof acknowledgeAll!=='boolean'||!acknowledgeAll&&!warningId)throw attendanceError('Select a warning to acknowledge')
+  const score=await target(database,user,employeeId)
+  if(!score)throw attendanceError('Health score not found',404)
+  const updated=await database.mutate('healthscores',score._id,current=>{
+   const warnings=current.warnings||[]
+   if(!acknowledgeAll&&!warnings.some(w=>attendanceId(w._id)===warningId))throw attendanceError('Warning not found',404)
+   return {...current,warnings:warnings.map(w=>acknowledgeAll||attendanceId(w._id)===warningId?{...w,acknowledged:true}:w),updatedAt:new Date()}
+  })
+  if(!updated)throw attendanceError('Health score not found',404)
+  return NextResponse.json({success:true,message:'Notification acknowledged'})
+ }catch(error){return NextResponse.json({success:false,message:error.message},{status:error.status||500})}
 }

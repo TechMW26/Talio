@@ -165,7 +165,7 @@ describe('SidebarSubmenu', () => {
     const desktopSidebarSource = fs.readFileSync(path.join(process.cwd(), 'components/sidebar/SlidingSidebar.js'), 'utf8')
 
     expect(chatPageSource).not.toContain("router.push('/dashboard')")
-    expect(chatPageSource).toContain("openWidget('route')")
+    expect(chatPageSource).toContain("useAuthedSWR('/api/chat')")
     expect(desktopSidebarSource).toContain("path === '/dashboard/chat'")
     expect(desktopSidebarSource).toContain('event?.preventDefault()')
     expect(desktopSidebarSource).toContain("openWidget('sidebar')")

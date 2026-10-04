@@ -1,18 +1,18 @@
 jest.mock('next/server', () => ({ NextResponse: { json: (body, options = {}) => new Response(JSON.stringify(body), options) } }))
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn() }))
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { POST } from '@/app/api/ai/mira-voice/route'
 import { POST as createToken } from '@/app/api/ai/mira-voice/token/route'
 
 const originalFetch = global.fetch
 let voicePreferences
-const User = { findById: jest.fn(() => ({ select: () => ({ lean: async () => ({ miraPreferences: voicePreferences }) }) })) }
+const database = { get: jest.fn(async () => ({ miraPreferences: voicePreferences })) }
 beforeEach(() => {
   voicePreferences = {}
-  User.findById.mockClear()
-  getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'u' }, tenant: { databaseName: 'tenantA' }, models: { User } })
+  database.get.mockClear()
+  getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'u' }, tenant: { databaseName: 'tenantA' }, database })
   rateLimit.mockResolvedValue({ allowed: true })
   process.env.ELEVENLABS_API_KEY = 'test-key'
   process.env.ELEVENLABS_VOICE_ID = 'fixed-voice'
@@ -44,7 +44,7 @@ test('allows only curated voices for an unsaved preview and rejects arbitrary pr
   expect((await run({ text: 'Hello', voiceId: 'attacker-controlled-id' })).status).toBe(400)
 })
 test('rejects unauthenticated callers before generation', async () => {
-  getAuthAndModels.mockResolvedValue({ success: false })
+  getAuthAndDatabase.mockResolvedValue({ success: false })
   expect((await run({ text: 'Hello' })).status).toBe(401)
   expect(global.fetch).not.toHaveBeenCalled()
 })
@@ -84,6 +84,6 @@ test('recognition token is authenticated and non-cacheable', async () => {
   expect(response.status).toBe(200)
   expect(response.headers.get('cache-control')).toBe('no-store')
   expect(await response.json()).toEqual({ token: 'temporary' })
-  getAuthAndModels.mockResolvedValueOnce({ success: false })
+  getAuthAndDatabase.mockResolvedValueOnce({ success: false })
   expect((await createToken(new Request('http://localhost/api/ai/mira-voice/token', { method: 'POST' }))).status).toBe(401)
 })

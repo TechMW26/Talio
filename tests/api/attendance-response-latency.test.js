@@ -3,8 +3,9 @@ jest.mock('next/server', () => ({
   after: fn => mockAfter.push(fn),
   NextResponse: { json: (body, options = {}) => new Response(JSON.stringify(body), { status: options.status || 200, headers: options.headers }) },
 }))
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
-jest.mock('@/lib/tenantModels', () => ({ getTenantModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
+jest.mock('@/lib/platform/firestoreAttendancePunch.server', () => ({ saveAttendancePunch: jest.fn() }))
+jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreTenantDatabase: jest.fn() }))
 jest.mock('@/lib/queryCache', () => ({ __esModule: true, default: { clearPattern: jest.fn() } }))
 jest.mock('@/lib/cache', () => ({ buildCachePattern: jest.fn(x => JSON.stringify(x)), clearCachePattern: jest.fn() }))
 jest.mock('@/lib/activityLogger', () => ({ logActivity: jest.fn() }))
@@ -16,8 +17,9 @@ jest.mock('@/lib/roleNews', () => ({ buildSearchQuery: jest.fn(), fetchRoleNews:
 jest.mock('@/lib/productivityMosaic', () => ({ createDailyMosaicOnCheckout: jest.fn() }))
 jest.mock('@/lib/geofencing', () => ({ evaluateEmployeeGeofence: jest.fn(), toGeofenceResponse: x => x }))
 
+import { saveAttendancePunch } from '@/lib/platform/firestoreAttendancePunch.server'
 import { POST } from '@/app/api/attendance/route'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { evaluateEmployeeGeofence } from '@/lib/geofencing'
 import { reverseGeocode } from '@/lib/geocoding'
 import { sendEmail } from '@/lib/mailer'
@@ -28,7 +30,7 @@ import { clearCachePattern } from '@/lib/cache'
 
 const employeeId = '507f1f77bcf86cd799439011'
 const attendanceId = '507f1f77bcf86cd799439012'
-let models, record
+let database, record, employee
 const request = (type, overrides = {}) => new Request('https://talio.test/api/attendance', {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ employeeId, type, latitude: 0, longitude: 0, accuracy: 20, locationSource: 'gps', ...overrides }),
@@ -39,19 +41,19 @@ beforeEach(() => {
   mockAfter.length = 0
   jest.spyOn(console, 'log').mockImplementation(() => {})
   jest.spyOn(console, 'error').mockImplementation(() => {})
-  const employee = { _id: employeeId, user: 'user1', email: 'synthetic@example.invalid', firstName: 'Synthetic', department: {}, designation: {} }
-  const populate = { populate: jest.fn() }
-  populate.populate.mockReturnValueOnce(populate).mockReturnValueOnce(populate).mockResolvedValueOnce(employee)
-  record = { _id: attendanceId, employee: employeeId, checkIn: new Date(Date.now() - 8 * 3600000), location: {}, save: jest.fn().mockResolvedValue(undefined) }
-  models = {
-    Employee: { findById: jest.fn(() => populate) },
-    CompanySettings: { findOne: () => ({ lean: async () => ({ workingDays: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], timezone: 'Asia/Kolkata' }) }) },
-    Leave: { findOne: jest.fn().mockReturnValueOnce(Promise.resolve(null)).mockReturnValueOnce({ lean: async () => null }) },
-    Attendance: { findOne: jest.fn().mockResolvedValue(record), create: jest.fn(async data => ({ _id: attendanceId, ...data })), updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }) },
-    Holiday: { findOne: jest.fn().mockResolvedValue(null) },
-    OvertimeRequest: { findOne: jest.fn().mockResolvedValue(null) }, User: {}, Notification: {},
+  employee = { _id: employeeId, userId: 'user1', email: 'synthetic@example.invalid', firstName: 'Synthetic' }
+  record = { _id: attendanceId, employee: employeeId, checkIn: new Date(Date.now() - 8 * 3600000), location: {} }
+  database = {
+    databaseName: 'talio_company_test',
+    get: jest.fn(async (collection) => collection === 'employees' ? employee : null),
+    list: jest.fn(async (collection) => ({ records: collection === 'companysettings' ? [{ workingDays: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], timezone: 'Asia/Kolkata' }] : collection === 'attendances' ? (record ? [record] : []) : [], nextCursor: null })),
+    mutate: jest.fn(async (collection, id, change) => { record = change(record); return record }),
   }
-  getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'user1', employeeId }, models, tenant: { databaseName: 'tenant_test' } })
+  saveAttendancePunch.mockImplementation(async (db, { changes }) => {
+    record = { ...record, ...changes, _id: attendanceId, employee: employeeId }
+    return record
+  })
+  getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user1', employeeId }, database, tenant: { databaseName: database.databaseName } })
   evaluateEmployeeGeofence.mockResolvedValue({ enabled: false, allowed: true, withinGeofence: false })
   // Intentionally hung providers: the response must not await any of them.
   for (const provider of [reverseGeocode, sendEmail, sendPushToUser, fetchRoleNews, createDailyMosaicOnCheckout]) provider.mockImplementation(() => new Promise(() => {}))
@@ -60,43 +62,43 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks())
 
 test.each(['clock-in', 'clock-out'])('%s returns persisted attendance without waiting for external integrations', async type => {
-  if (type === 'clock-in') models.Attendance.findOne.mockResolvedValue(null)
+  if (type === 'clock-in') record = null
   const response = await POST(request(type))
   expect(response.status).toBe(200)
   const body = await response.json()
   expect(body.success).toBe(true)
   expect(response.headers.get('server-timing')).toMatch(/^attendance;dur=\d+\.\d$/)
   expect(body.data[type === 'clock-in' ? 'checkIn' : 'checkOut']).toBeTruthy()
-  expect(type === 'clock-in' ? models.Attendance.create : record.save).toHaveBeenCalledTimes(1)
+  expect(saveAttendancePunch).toHaveBeenCalledTimes(1)
   for (const provider of [reverseGeocode, sendEmail, sendPushToUser, fetchRoleNews, createDailyMosaicOnCheckout]) expect(provider).not.toHaveBeenCalled()
   expect(mockAfter.length).toBe(type === 'clock-in' ? 2 : 3)
   expect(clearCachePattern).toHaveBeenCalledTimes(4)
 })
 
 test('geofence rejection cannot save a punch or schedule follow-ups', async () => {
-  models.Attendance.findOne.mockResolvedValue(null)
+  record = null
   evaluateEmployeeGeofence.mockResolvedValue({ enabled: true, allowed: false, code: 'OUTSIDE_GEOFENCE', message: 'Outside' })
   expect((await POST(request('clock-in'))).status).toBe(403)
-  expect(models.Attendance.create).not.toHaveBeenCalled()
+  expect(saveAttendancePunch).not.toHaveBeenCalled()
   expect(mockAfter).toHaveLength(0)
 })
 
 test('unauthorized employee cannot be punched', async () => {
-  const auth = await getAuthAndModels()
+  const auth = await getAuthAndDatabase()
   auth.user.employeeId = '507f1f77bcf86cd799439099'
   expect((await POST(request('clock-in'))).status).toBe(403)
-  expect(models.Attendance.create).not.toHaveBeenCalled()
+  expect(saveAttendancePunch).not.toHaveBeenCalled()
   expect(mockAfter).toHaveLength(0)
 })
 
 test('duplicate check-in is rejected before side effects', async () => {
   expect((await POST(request('clock-in'))).status).toBe(400)
-  expect(models.Attendance.create).not.toHaveBeenCalled()
+  expect(saveAttendancePunch).not.toHaveBeenCalled()
   expect(mockAfter).toHaveLength(0)
 })
 
 test('failed persistence never acknowledges success or schedules integrations', async () => {
-  record.save.mockRejectedValue(new Error('Database unavailable'))
+  saveAttendancePunch.mockRejectedValue(new Error('Database unavailable'))
   expect((await POST(request('clock-out'))).status).toBe(500)
   expect(mockAfter).toHaveLength(0)
 })
@@ -106,11 +108,9 @@ test('address enrichment runs after response and only updates the captured locat
   const saved = await response.json()
   reverseGeocode.mockResolvedValue({ success: true, address: 'Resolved address', details: { city: 'Test' } })
   await mockAfter[0]()
-  expect(models.Attendance.updateOne).toHaveBeenCalledWith(expect.objectContaining({
-    _id: attendanceId, 'location.checkOut.latitude': 0, 'location.checkOut.longitude': 0,
-    'location.checkOut.capturedAt': new Date(saved.data.checkOut),
-  }), expect.objectContaining({ $set: expect.objectContaining({ 'location.checkOut.address': 'Resolved address' }) }))
-  expect(record.save).toHaveBeenCalledTimes(1)
+  expect(database.mutate).toHaveBeenCalledWith('attendances', attendanceId, expect.any(Function))
+  expect(record.location.checkOut.address).toBe('Resolved address')
+  expect(saveAttendancePunch).toHaveBeenCalledTimes(1)
 })
 
 test('cache outage after persistence is not returned as a failed punch', async () => {
@@ -123,6 +123,6 @@ test('failed background geocoding cannot undo the saved checkout', async () => {
   reverseGeocode.mockRejectedValue(new Error('Provider unavailable'))
   await expect(mockAfter[0]()).resolves.toBeUndefined()
   expect(response.status).toBe(200)
-  expect(record.save).toHaveBeenCalledTimes(1)
-  expect(models.Attendance.updateOne).not.toHaveBeenCalled()
+  expect(saveAttendancePunch).toHaveBeenCalledTimes(1)
+  expect(database.mutate).not.toHaveBeenCalled()
 })

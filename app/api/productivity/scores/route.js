@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { verifyTokenFromRequest } from '@/lib/auth';
+import { getProductivityViewStore, getProductivityVisibility, populateProductivityEmployees, queryProductivityByIds } from '@/lib/platform/firestoreProductivityView.server';
 
 /**
  * GET /api/productivity/scores
@@ -13,13 +14,13 @@ import { getAuthAndModels } from '@/lib/auth';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['ScreenshotAnalysis', 'Employee', 'User', 'Department']);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    const { user, models } = auth;
-    const { ScreenshotAnalysis, Employee, Department, User } = models;
+    const { user, tenant } = auth;
+    const store = await getProductivityViewStore(tenant.databaseName);
     const { searchParams } = new URL(request.url);
 
     // Parse date range (default to current year)
@@ -30,111 +31,18 @@ export async function GET(request) {
     const departmentsFilter = searchParams.get('departments'); // Comma-separated list of department IDs
     const employeeIdFilter = searchParams.get('employeeId');
 
-    // Permission check
-    const isAdminOrHR = ['admin', 'hr'].includes(user.role);
-    const currentUser = await User.findById(user._id).populate('employeeId');
-
-    // Check if user is department head
-    let isDeptHead = false;
-    let userDepartmentIds = [];
-
-    if (!isAdminOrHR) {
-      // Check if current user is a department head
-      if (currentUser?.isDepartmentHead && currentUser?.headOfDepartments?.length > 0) {
-        isDeptHead = true;
-        userDepartmentIds = currentUser.headOfDepartments.map(d => d.toString());
-      } else if (currentUser?.employeeId?.department) {
-        // Check department's head/heads field
-        const userDept = await Department.findById(currentUser.employeeId.department);
-        const currentEmployeeId = currentUser?.employeeId?._id?.toString();
-        if (userDept) {
-          const isLegacyHead = userDept.head?.toString() === currentEmployeeId;
-          const isInHeadsArray = userDept.heads?.some(h => h?.toString() === currentEmployeeId);
-          if (isLegacyHead || isInHeadsArray) {
-            isDeptHead = true;
-            userDepartmentIds = [userDept._id.toString()];
-          }
-        }
-      }
-
-      // If not admin/HR and not dept head, can only see own data
-      if (!isDeptHead && !employeeIdFilter) {
-        return NextResponse.json({
-          success: true,
-          data: [],
-          message: 'No permission to view team productivity scores'
-        });
-      }
-    }
-
-    // Build employee filter
-    let employeeQuery = {};
-    
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) return NextResponse.json({ message: 'Invalid date range' }, { status: 400 });
+    const visible = await getProductivityVisibility(store, user, { includeSelf: Boolean(employeeIdFilter) });
+    let employees = visible.employees;
     if (employeeIdFilter) {
-      // Specific employee requested
-      employeeQuery._id = employeeIdFilter;
-      
-      // Non-admin/HR must verify they can view this employee
-      if (!isAdminOrHR && isDeptHead) {
-        const targetEmployee = await Employee.findById(employeeIdFilter);
-        if (!targetEmployee || !userDepartmentIds.includes(targetEmployee.department?.toString())) {
-          return NextResponse.json({
-            success: false,
-            message: 'Not authorized to view this employee\'s productivity'
-          }, { status: 403 });
-        }
-      }
-    } else if (departmentsFilter) {
-      // Handle multiple departments filter (comma-separated)
-      const deptIds = departmentsFilter.split(',').filter(id => id.trim());
-      if (!isAdminOrHR && isDeptHead) {
-        // Validate department head can only see their departments
-        const validDeptIds = deptIds.filter(id => userDepartmentIds.includes(id));
-        if (validDeptIds.length === 0) {
-          return NextResponse.json({
-            success: false,
-            message: 'Not authorized to view these departments'
-          }, { status: 403 });
-        }
-        employeeQuery.department = { $in: validDeptIds };
-      } else if (isAdminOrHR) {
-        employeeQuery.department = { $in: deptIds };
-      }
-    } else if (departmentFilter && departmentFilter !== 'all') {
-      // Department filter
-      if (!isAdminOrHR && isDeptHead && !userDepartmentIds.includes(departmentFilter)) {
-        return NextResponse.json({
-          success: false,
-          message: 'Not authorized to view this department\'s productivity'
-        }, { status: 403 });
-      }
-      employeeQuery.department = departmentFilter;
-    } else if (isDeptHead && !isAdminOrHR) {
-      // Department head can only see their departments
-      employeeQuery.department = { $in: userDepartmentIds };
+      employees = employees.filter(value => String(value._id) === employeeIdFilter);
+      if (!employees.length) return NextResponse.json({ message: 'Not authorized to view this employee productivity' }, { status: 403 });
     }
-    // For admin/HR with no filter, show all employees (no department filter added)
-
-    // Get employees matching the filter
-    const employees = await Employee.find(employeeQuery).select('_id firstName lastName department').lean();
-    const employeeIds = employees.map(e => e._id);
-
-    console.log('[Productivity Scores] Query params:', { startDate, endDate, departmentFilter, employeeIdFilter });
-    console.log('[Productivity Scores] Found employees:', employeeIds.length, employeeIds.slice(0, 3).map(id => id.toString()));
-
-    // Get all daily analyses (ScreenshotAnalysis) in the date range for these employees.
-    // Each doc represents one user/day with the merged AI analysis on aiAnalysis.
-    const analyses = await ScreenshotAnalysis.find({
-      employee: { $in: employeeIds },
-      date: {
-        $gte: new Date(startDate),
-        $lte: new Date(`${endDate}T23:59:59.999Z`),
-      },
-    })
-      .select('employee date aiAnalysis')
-      .lean();
-
-    console.log('[Productivity Scores] Found analyses:', analyses.length);
+    const departmentIds = departmentsFilter ? departmentsFilter.split(',').map(value => value.trim()).filter(Boolean) : departmentFilter && departmentFilter !== 'all' ? [departmentFilter] : [];
+    if (departmentIds.length) employees = employees.filter(value => [value.department, ...(value.departments || [])].some(id => departmentIds.includes(String(id))));
+    const analyses = (await queryProductivityByIds(store, 'screenshotanalyses', 'employee', employees.map(value => value._id), [
+      { field: 'date', operator: '>=', value: new Date(startDate) }, { field: 'date', operator: '<=', value: new Date(endDate + 'T23:59:59.999Z') },
+    ])).sort((a, b) => new Date(a.date) - new Date(b.date));
 
     // Aggregate scores by employee — each ScreenshotAnalysis doc counts as 1 "session"
     const employeeScores = {};

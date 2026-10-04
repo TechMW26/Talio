@@ -29,17 +29,15 @@ describe('attendance machine provider registry', () => {
 })
 
 describe('attendance machine configuration', () => {
-  const Company = {
-    findOne: jest.fn(() => ({ select: () => ({ lean: async () => ({ _id: '507f1f77bcf86cd799439011', name: 'Acme' }) }) })),
-  }
+  const database = { get: jest.fn(async () => ({ _id: '507f1f77bcf86cd799439011', name: 'Acme', isActive: true })) }
 
-  beforeEach(() => Company.findOne.mockClear())
+  beforeEach(() => database.get.mockClear())
 
   test('requires a real tenant company for company-scoped devices', async () => {
     const invalid = await validateMachineInput({
       name: 'Gate one', providerKey: 'zkteco', model: 'K40', scope: 'company',
       companyId: '', connectionMode: 'push_http', duplicateWindowSeconds: 30,
-    }, { Company })
+    }, { database })
     expect(invalid.valid).toBe(false)
     expect(invalid.errors).toContain('Select a company for a company-scoped machine')
   })
@@ -49,7 +47,7 @@ describe('attendance machine configuration', () => {
       name: 'Factory reader', providerKey: 'zkteco', model: 'SpeedFace', scope: 'company',
       companyId: '507f1f77bcf86cd799439011', connectionMode: 'lan_bridge', host: '192.168.1.40',
       port: 4370, duplicateWindowSeconds: 30, punchDirectionMode: 'first_last',
-    }, { Company })
+    }, { database })
     expect(valid.valid).toBe(true)
     expect(valid.data.company.toString()).toBe('507f1f77bcf86cd799439011')
     expect(valid.data.timezone).toBe('Asia/Kolkata')
@@ -111,4 +109,3 @@ describe('attendance machine CSV imports', () => {
     }])
   })
 })
-

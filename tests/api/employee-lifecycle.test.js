@@ -1,3 +1,4 @@
+import { workflowStore } from '../helpers/firestoreWorkflowStore'
 import {
   addMonthsClamped,
   applyLifecycleAction,
@@ -13,7 +14,7 @@ import {
   getOnboardingVerificationRequirement,
   normalizeOnboardingVerification,
 } from '@/lib/hrms/onboardingVerification'
-import Employee from '@/models/Employee'
+import { encodeApplicationRecord, decodeApplicationRecord } from '@/lib/platform/firestoreCodec.cjs'
 import { formatEmployeeAddress, normalizeEmployeeAddress } from '@/lib/employeeAddress'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -180,19 +181,14 @@ describe('employee lifecycle', () => {
 
   test('derives automatic signals from employee records and linked module completion', async () => {
     const employeeId = '6a74712f87b6bf60ff871f97'
-    const query = (value) => ({
-      select() { return this },
-      lean() { return Promise.resolve(value) },
+    const database = workflowStore({
+      assets: [{ _id: 'asset-1', assignedTo: employeeId, status: 'assigned' }],
+      payrolls: [{ _id: 'payroll-1', employee: employeeId, status: 'paid' }],
+      hrmsworkflows: [{ _id: 'workflow-1', subjectEmployee: employeeId, status: 'completed', module: 'backgroundVerification' }, { _id: 'workflow-2', subjectEmployee: employeeId, status: 'completed', module: 'departmentInduction' }],
+      policies: [{ _id: 'policy-1', applicableTo: 'all', acknowledgments: [{ employee: employeeId }] }],
     })
-    const models = {
-      Document: { find: jest.fn(() => query([])) },
-      Asset: { exists: jest.fn(() => Promise.resolve({ _id: 'asset-1' })) },
-      Payroll: { exists: jest.fn(() => Promise.resolve({ _id: 'payroll-1' })) },
-      HrmsWorkflow: { find: jest.fn(() => query([{ module: 'backgroundVerification' }, { module: 'departmentInduction' }])) },
-      Policy: { find: jest.fn(() => query([{ acknowledgments: [{ employee: employeeId }] }])) },
-    }
     const signals = await getOnboardingCompletionSignals({
-      models,
+      database,
       employee: {
         _id: employeeId,
         firstName: 'Muskan', lastName: 'Adwani', email: 'muskan@example.com', phone: '7000000000',
@@ -221,24 +217,14 @@ describe('employee lifecycle', () => {
       induction: true,
       assets: true,
     })
-    expect(models.Document.find).toHaveBeenCalledTimes(1)
+    expect(database.list).toHaveBeenCalledWith('documents', expect.objectContaining({ filters: [{ field: 'employee', operator: '==', value: employeeId }] }))
   })
 
   test('does not auto-complete document-dependent steps from an unrelated upload', async () => {
     const employeeId = '6a74712f87b6bf60ff871f97'
-    const query = (value) => ({
-      select() { return this },
-      lean() { return Promise.resolve(value) },
-    })
-    const models = {
-      Document: { find: jest.fn(() => query([{ name: 'Profile photo', url: '/photo.jpg' }])) },
-      Asset: { exists: jest.fn(() => Promise.resolve(null)) },
-      Payroll: { exists: jest.fn(() => Promise.resolve(null)) },
-      HrmsWorkflow: { find: jest.fn(() => query([{ module: 'backgroundVerification' }])) },
-      Policy: { find: jest.fn(() => query([])) },
-    }
+    const database = workflowStore({ documents: [{ _id: 'photo', employee: employeeId, name: 'Profile photo', url: '/photo.jpg' }], hrmsworkflows: [{ _id: 'background', subjectEmployee: employeeId, status: 'completed', module: 'backgroundVerification' }] })
     const signals = await getOnboardingCompletionSignals({
-      models,
+      database,
       employee: {
         _id: employeeId,
         firstName: 'Test', lastName: 'Employee', email: 'test@example.com', phone: '7000000000',
@@ -368,8 +354,9 @@ describe('employee lifecycle', () => {
     expect(panel).toContain('evidence required for manual completion')
     expect(modal).toContain('Required evidence')
     expect(modal).toContain('Verify and complete')
-    expect(route).toContain('persistOnboardingEvidenceDocuments')
-    expect(route).toContain("category: `onboarding_${document.requirementKey}`")
+    const repository = fs.readFileSync(path.join(process.cwd(), 'lib/hrms/lifecycleStore.server.js'), 'utf8')
+    expect(route).toContain('persistLifecycleReview')
+    expect(repository).toContain("category: `onboarding_${file.requirementKey}`")
   })
 
   test('offboarding UI and API use the tenant asset register for clearance', () => {
@@ -377,9 +364,11 @@ describe('employee lifecycle', () => {
     const panel = fs.readFileSync(path.join(process.cwd(), 'components/employees/EmployeeLifecyclePanel.js'), 'utf8')
     const modal = fs.readFileSync(path.join(process.cwd(), 'components/employees/OffboardingAssetChecklistModal.js'), 'utf8')
 
-    expect(route).toContain("{ _id: assetId, assignedTo: id }")
-    expect(route).toContain('assetReturnUpdate(auth.user,')
-    expect(route).toContain("'lifecycle.offboarding.assetsReturned': clearance.summary.complete")
+    const repository = fs.readFileSync(path.join(process.cwd(), 'lib/hrms/offboardingAssets.server.js'), 'utf8')
+    expect(route).toContain('updateOffboardingAssetClearance(auth.database')
+    expect(repository).toContain('idString(asset.assignedTo) !== employeeId')
+    expect(repository).toContain('assetReturnRecord(asset, actor,')
+    expect(repository).toContain('assetsReturned: clearance.summary.complete')
     expect(panel).toContain('<OffboardingAssetChecklistModal')
     expect(panel).not.toContain("runAction('update_offboarding', { field: 'assetsReturned'")
     expect(modal).toContain('Assigned asset clearance')
@@ -389,27 +378,26 @@ describe('employee lifecycle', () => {
   test('persists lifecycle changes without saving and revalidating unrelated legacy fields', () => {
     const route = fs.readFileSync(path.join(process.cwd(), 'app/api/employees/[id]/lifecycle/route.js'), 'utf8')
 
-    expect(route).toContain('.findOneAndUpdate(')
-    expect(route).toContain("$set: { lifecycle: result.lifecycle, ...result.employeeUpdates }")
+    const repository = fs.readFileSync(path.join(process.cwd(), 'lib/hrms/lifecycleStore.server.js'), 'utf8')
+    expect(repository).toContain("tx.replace('employees', changed)")
+    expect(repository).toContain('lifecycle: result.lifecycle, ...result.employeeUpdates')
     expect(route).toContain("code: 'LIFECYCLE_CONFLICT'")
     expect(route).not.toContain('await employee.save()')
   })
 
-  test('employee schemas accept legacy string and structured address shapes', () => {
-    const tenantModels = fs.readFileSync(path.join(process.cwd(), 'lib/tenantModels.js'), 'utf8')
-    const employeeModel = fs.readFileSync(path.join(process.cwd(), 'models/Employee.js'), 'utf8')
-
-    expect(tenantModels).toMatch(/address:\s*\{ type: mongoose\.Schema\.Types\.Mixed \}/)
-    expect(employeeModel).toMatch(/address:\s*\{ type: mongoose\.Schema\.Types\.Mixed \}/)
-
+  test('native record codec preserves legacy string and structured address shapes', () => {
     const baseEmployee = {
+      _id: 'legacy-employee',
       employeeCode: 'EMP-LEGACY-1',
       firstName: 'Legacy',
       lastName: 'Employee',
       email: 'legacy.employee@example.com',
     }
-    expect(new Employee({ ...baseEmployee, address: 'A legacy formatted address' }).validateSync()).toBeUndefined()
-    expect(new Employee({ ...baseEmployee, address: { street: '1 Test Road', city: 'Bhopal' } }).validateSync()).toBeUndefined()
+    for (const address of ['A legacy formatted address', { street: '1 Test Road', city: 'Bhopal' }]) {
+      const record = { ...baseEmployee, address }
+      const { envelope } = encodeApplicationRecord(record)
+      expect(decodeApplicationRecord(envelope)).toEqual(record)
+    }
   })
 
   test('normalizes both employee address formats without allowing arbitrary payload shapes', () => {

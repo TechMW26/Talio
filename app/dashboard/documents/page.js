@@ -35,8 +35,10 @@ export default function DocumentsPage() {
   const organisationView = canManageDocuments && documentScope === 'public'
 
   // SWR data fetching
-  const swrKey = canManageDocuments ? '/api/documents' : employeeId ? `/api/documents?employeeId=${employeeId}` : null
-  const { data: docsRes, error, isLoading, isValidating, mutate: refreshDocuments } = useAuthedSWR(swrKey)
+  // Personal scope needs only this employee's documents, even for an admin.
+  // Do not download the entire tenant archive before rendering two cards.
+  const swrKey = organisationView ? '/api/documents' : employeeId ? `/api/documents?employeeId=${encodeURIComponent(employeeId)}` : null
+  const { data: docsRes, error, isLoading, isValidating, mutate: refreshDocuments } = useAuthedSWR(swrKey, { keepPreviousData: false })
   const documents = (docsRes?.data || []).filter(document => organisationView || (employeeId && String(document.employee?._id || document.employee || '') === String(employeeId)))
 
   const [showModal, setShowModal] = useState(false)
@@ -435,4 +437,3 @@ export default function DocumentsPage() {
     </div>
   )
 }
-

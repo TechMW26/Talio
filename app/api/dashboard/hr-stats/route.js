@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { dashboardAuth } from '@/lib/dashboardData.server'
+import { projectRows, projectFilter as f, projectId as id } from '@/lib/projects.server'
+import { resolveTeamViewScope, scopedEmployeeRows } from '@/lib/teamViews.server'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
@@ -8,113 +10,33 @@ export const dynamic = 'force-dynamic'
 // GET - Get HR dashboard statistics
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Recruitment', 'Performance', 'Payroll', 'User', 'Department'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+    const auth = await dashboardAuth(request), { database, user } = auth
+    if (!['admin', 'hr'].includes(user.role)) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
+    const today = new Date(), startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1), todayStart = new Date(today), todayEnd = new Date(today)
+    todayStart.setHours(0, 0, 0, 0); todayEnd.setHours(23, 59, 59, 999)
+    const active = [f('status', ['active', 'probation', 'on_leave'], 'in')], day = [f('date', todayStart, '>='), f('date', todayEnd, '<=')]
+    const activeEmployees = await projectRows(database, 'employees', active)
+    const totalEmployees = activeEmployees.length, lastMonthEmployees = activeEmployees.filter(row => new Date(row.createdAt) < startOfMonth).length
+    const counts = (rows, field) => [...rows.reduce((map, row) => map.set(String(row[field] || ''), (map.get(String(row[field] || '')) || 0) + 1), new Map())].map(([key, count]) => ({ _id: key, count }))
+    const genderStats = counts(activeEmployees, 'gender'), departmentStats = counts(activeEmployees, 'department').sort((a, b) => b.count - a.count)
+    const pendingLeavesPromise = async () => {
+      if (user.role === 'admin') return database.count('leaves', [f('status', 'pending')])
+      if (!user.isDepartmentHead) return 0
+      const scope = await resolveTeamViewScope(database, { ...user, isDepartmentManager: false, departmentManagerOf: [], teamLeaderOf: [] }, { organization: false })
+      const members = scope.members.filter(row => id(row) !== id(user.employeeId) && scope.departments.some(dep => id(dep) === id(row.department)))
+      return (await scopedEmployeeRows(database, 'leaves', members.map(id), [f('status', 'pending')])).length
     }
-    const { user, models, tenant } = auth
-    const { Employee, Leave, Attendance, Recruitment, Performance, Payroll, User } = models
-
-    // Check role authorization
-    if (!['admin', 'hr'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
-    }
-
-    const todayKey = new Date().toISOString().slice(0, 10)
-    const cacheKey = buildCacheKey({
-      tenantId: tenant?.databaseName,
-      role: user.role,
-      userId: user.role === 'admin' ? 'all' : user._id,
-      namespace: 'dashboard:hr-stats',
-      params: { date: todayKey }
-    })
-
-    const cached = await getCache(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
-    }
-
-    // Department-head scope is only needed after a cache miss. Admins never
-    // need this additional profile query.
-    const userRecord = user.role === 'hr'
-      ? await User.findById(user._id || user.userId)
-        .select('employeeId isDepartmentHead headOfDepartments')
-        .lean()
-      : null
-
-    // Date calculations
-    const today = new Date()
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-
-    const todayStart = new Date(today)
-    todayStart.setHours(0, 0, 0, 0)
-    const todayEnd = new Date(today)
-    todayEnd.setHours(23, 59, 59, 999)
-
-    // HR users who are NOT department heads should NOT see pending approvals
-    // Only admin sees all pending leaves, HR dept heads see only their department's
-    const pendingLeavesPromise = (async () => {
-      if (user.role === 'admin') {
-        return Leave.countDocuments({ status: 'pending' })
-      }
-      if (user.role !== 'hr' || !userRecord?.isDepartmentHead || !userRecord?.headOfDepartments?.length) {
-        return 0
-      }
-
-      const deptEmployeeIds = await Employee.find({
-        department: { $in: userRecord.headOfDepartments },
-        _id: { $ne: userRecord.employeeId }
-      }).distinct('_id')
-      return Leave.countDocuments({
-        status: 'pending',
-        employee: { $in: deptEmployeeIds }
-      })
-    })()
-
-    const [
-      totalEmployees,
-      lastMonthEmployees,
-      genderStats,
-      activeToday,
-      onLeaveToday,
-      departmentStats,
-      leftThisMonth,
-      lateToday,
-      pipCases,
-      pendingLeaves,
-      openPositions,
-      newHires,
-      currentMonthPayroll,
-      reviewsCompleted,
-      totalAttendanceRecords,
-    ] = await Promise.all([
-      Employee.countDocuments({ status: { $in: ['active', 'probation', 'on_leave'] } }),
-      Employee.countDocuments({ status: { $in: ['active', 'probation', 'on_leave'] }, createdAt: { $lt: startOfMonth } }),
-      Employee.aggregate([
-        { $match: { status: { $in: ['active', 'probation', 'on_leave'] } } },
-        { $group: { _id: '$gender', count: { $sum: 1 } } }
-      ]),
-      Attendance.countDocuments({
-        date: { $gte: todayStart, $lte: todayEnd },
-        status: { $in: ['present', 'late', 'half-day', 'in-progress'] }
-      }),
-      Leave.countDocuments({ status: 'approved', startDate: { $lte: today }, endDate: { $gte: today } }),
-      Employee.aggregate([
-        { $match: { status: { $in: ['active', 'probation', 'on_leave'] } } },
-        { $group: { _id: '$department', count: { $sum: 1 } } },
-        { $sort: { count: -1 } }
-      ]),
-      Employee.countDocuments({ status: { $in: ['inactive', 'resigned', 'terminated'] }, updatedAt: { $gte: startOfMonth } }),
-      Attendance.countDocuments({ date: { $gte: todayStart, $lte: todayEnd }, status: 'late' }),
-      Performance.countDocuments({ status: 'pip', isActive: true }),
-      pendingLeavesPromise,
-      Recruitment.countDocuments({ status: 'open' }),
-      Employee.countDocuments({ status: { $in: ['active', 'probation', 'on_leave'] }, createdAt: { $gte: startOfMonth } }),
-      Payroll.findOne({ month: today.getMonth() + 1, year: today.getFullYear() }).select('_id').lean(),
-      Performance.countDocuments({ createdAt: { $gte: startOfMonth }, status: { $ne: 'draft' } }),
-      Attendance.countDocuments({ date: { $gte: todayStart, $lte: todayEnd } }),
+    const [activeToday, onLeaveToday, leftThisMonth, lateToday, pipCases, pendingLeaves, openPositions, currentMonthPayroll, reviewsCompleted, totalAttendanceRecords] = await Promise.all([
+      database.count('attendances', [...day, f('status', ['present', 'late', 'half-day', 'in-progress'], 'in')]),
+      database.count('leaves', [f('status', 'approved'), f('startDate', today, '<='), f('endDate', today, '>=')]),
+      database.count('employees', [f('status', ['inactive', 'resigned', 'terminated'], 'in'), f('updatedAt', startOfMonth, '>=')]),
+      database.count('attendances', [...day, f('status', 'late')]),
+      database.count('performances', [f('status', 'pip'), f('isActive', true)]), pendingLeavesPromise(),
+      database.count('jobpostings', [f('status', 'open')]),
+      database.list('payrolls', { filters: [f('month', today.getMonth() + 1), f('year', today.getFullYear())], limit: 1 }).then(page => page.records[0] || null),
+      database.count('performances', [f('createdAt', startOfMonth, '>='), f('status', 'draft', '!=')]), database.count('attendances', day),
     ])
+    const newHires = activeEmployees.filter(row => new Date(row.createdAt) >= startOfMonth).length
 
     const maleCount = genderStats.find(g => g._id === 'male')?.count || 0
     const femaleCount = genderStats.find(g => g._id === 'female')?.count || 0
@@ -192,7 +114,7 @@ export async function GET(request) {
       data: stats
     }
 
-    void setCache(cacheKey, response, 5 * 60).catch(() => {})
+
 
     return NextResponse.json(response)
 

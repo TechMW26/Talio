@@ -1,128 +1,24 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { normalizeLeaveType } from '@/lib/leaveData'
-// GET - Get single leave type
-export async function GET(request, { params }) {
+import { LEAVE_TYPE_STORE_OPTIONS, assertLeaveTypeId, saveLeaveType, deleteLeaveType } from '@/lib/leaveTypes.server'
+const failure = error => NextResponse.json({ success: false, message: error.code === 'ALREADY_EXISTS' ? 'Leave type name or code is already in use' : error.status ? error.message : 'Unable to load or save leave type' }, { status: error.status || (error.code === 'ALREADY_EXISTS' ? 409 : 500) })
+async function handle(request, params, method) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['LeaveType'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { models } = auth
-    const { LeaveType } = models
+    const auth = await getAuthAndDatabase(request, LEAVE_TYPE_STORE_OPTIONS)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: auth.status || 401 })
     const { id } = await params
-
-    const leaveType = await LeaveType.findById(id).lean()
-
-    if (!leaveType) {
-      return NextResponse.json(
-        { success: false, message: 'Leave type not found' },
-        { status: 404 }
-      )
+    assertLeaveTypeId(id)
+    if (method === 'DELETE') {
+      await deleteLeaveType(auth.database, auth.user, id)
+      return NextResponse.json({ success: true, message: 'Leave type deleted successfully' })
     }
-
-    return NextResponse.json({
-      success: true,
-      data: normalizeLeaveType(leaveType),
-    })
-  } catch (error) {
-    console.error('Get leave type error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch leave type' },
-      { status: 500 }
-    )
-  }
+    const data = method === 'PUT' ? await saveLeaveType(auth.database, auth.user, await request.json(), id) : await auth.database.get('leavetypes', id)
+    if (!data) return NextResponse.json({ success: false, message: 'Leave type not found' }, { status: 404 })
+    return NextResponse.json({ success: true, data: normalizeLeaveType(data), ...(method === 'PUT' ? { message: 'Leave type updated successfully' } : {}) })
+  } catch (error) { return failure(error) }
 }
-
-// PUT - Update leave type
-export async function PUT(request, { params }) {
-  try {
-    const auth = await getAuthAndModels(request, ['LeaveType'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { LeaveType } = models
-    if (!['admin', 'hr'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-
-    const { id } = await params
-    const data = await request.json()
-    const mirroredData = {
-      ...data,
-      ...(data.maxDaysPerYear !== undefined
-        ? { daysPerYear: data.maxDaysPerYear }
-        : {}),
-      ...(data.maxCarryForwardDays !== undefined
-        ? { maxCarryForward: data.maxCarryForwardDays }
-        : {}),
-      ...(data.minDaysNotice !== undefined
-        ? { minNoticeDays: data.minDaysNotice }
-        : {}),
-    }
-
-    const leaveType = await LeaveType.findByIdAndUpdate(
-      id,
-      mirroredData,
-      { new: true, runValidators: true }
-    )
-
-    if (!leaveType) {
-      return NextResponse.json(
-        { success: false, message: 'Leave type not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Leave type updated successfully',
-      data: normalizeLeaveType(leaveType),
-    })
-  } catch (error) {
-    console.error('Update leave type error:', error)
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to update leave type' },
-      { status: 500 }
-    )
-  }
-}
-
-// DELETE - Delete leave type
-export async function DELETE(request, { params }) {
-  try {
-    const auth = await getAuthAndModels(request, ['LeaveType'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { LeaveType } = models
-    if (!['admin', 'hr'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-
-    const { id } = await params
-    const leaveType = await LeaveType.findByIdAndDelete(id)
-
-    if (!leaveType) {
-      return NextResponse.json(
-        { success: false, message: 'Leave type not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Leave type deleted successfully',
-    })
-  } catch (error) {
-    console.error('Delete leave type error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to delete leave type' },
-      { status: 500 }
-    )
-  }
-}
+export const GET = (request, { params }) => handle(request, params, 'GET')
+export const PUT = (request, { params }) => handle(request, params, 'PUT')
+export const DELETE = (request, { params }) => handle(request, params, 'DELETE')
 

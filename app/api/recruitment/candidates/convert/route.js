@@ -1,196 +1,56 @@
 import { NextResponse } from 'next/server'
-import crypto from 'node:crypto'
-import { getAuthAndModels } from '@/lib/auth'
-import { logActivity } from '@/lib/activityLogger'
-import { emitRecruitmentUpdate, emitEmployeeUpdate } from '@/lib/realtimeEvents'
+import { randomBytes } from 'node:crypto'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { provisionFirestoreAccount } from '@/lib/platform/firestoreProvisioning.server'
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
+import { getRecruitmentDatabase, recruitmentId, recruitmentError } from '@/lib/recruitment/store.server'
 import { buildEmployeeLifecycle, createInitialLifecycleWorkflows } from '@/lib/hrms/employeeLifecycle.server'
+import { getWorkflowStore } from '@/lib/hrms/workflowStore.server'
+import { ensureEmployeeLeaveBalances, LEAVE_BALANCE_STORE_OPTIONS } from '@/lib/leaveAllocation.server'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
-import { checkUserLimit, getTenantCompanyByDbName, registerUserTenantMapping } from '@/lib/tenantContext'
-import { ensureEmployeeLeaveBalances } from '@/lib/leaveAllocation.server'
 
-// POST - Convert hired candidate to employee
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Candidate', 'JobPosting', 'Employee', 'Department', 'Designation', 'User', 'Role', 'OnboardingEmail', 'CompanySettings', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'LeaveType', 'LeaveBalance'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-    const { user, models, tenant } = auth
-    const { Candidate, Employee, User, Role, OnboardingEmail, CompanySettings } = models
-
-    if (!['admin', 'super_admin', 'hr'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
-    }
-
-    const data = await request.json()
-    const { candidateId, employeeCode, joiningDate, designation, department, reportingManager } = data
-
-    if (!candidateId) {
-      return NextResponse.json({ success: false, message: 'Candidate ID is required' }, { status: 400 })
-    }
-    if (!reportingManager) {
-      return NextResponse.json({ success: false, message: 'Reporting manager is required before onboarding' }, { status: 400 })
-    }
-
-    const candidate = await Candidate.findById(candidateId)
-      .populate('jobPosting', 'jobTitle department designation')
-    if (!candidate) {
-      return NextResponse.json({ success: false, message: 'Candidate not found' }, { status: 404 })
-    }
-
-    if (candidate.stage !== 'hired' && candidate.offer?.status !== 'accepted') {
-      return NextResponse.json(
-        { success: false, message: 'Candidate must be in hired stage or have an accepted offer' },
-        { status: 400 }
-      )
-    }
-
-    if (candidate.convertedEmployeeId) {
-      return NextResponse.json(
-        { success: false, message: 'Candidate has already been converted to an employee' },
-        { status: 409 }
-      )
-    }
-
-    const effectiveEmployeeCode = employeeCode || `EMP-${Date.now().toString(36).toUpperCase()}`
-    const [existingEmployee, existingUser, managerRecord, limitCheck] = await Promise.all([
-      Employee.findOne({ $or: [{ email: candidate.email }, { employeeCode: effectiveEmployeeCode }] }).select('_id').lean(),
-      User.findOne({ email: candidate.email }).select('_id').lean(),
-      Employee.findOne({ _id: reportingManager, status: { $in: ['active', 'probation'] } }).select('_id').lean(),
-      tenant?.databaseName ? checkUserLimit(tenant.databaseName) : Promise.resolve({ allowed: true }),
-    ])
-    if (existingEmployee || existingUser) {
-      return NextResponse.json({ success: false, message: 'An employee or user with this email/code already exists' }, { status: 409 })
-    }
-    if (!limitCheck.allowed) {
-      return NextResponse.json({ success: false, message: limitCheck.message || 'User limit reached' }, { status: 403 })
-    }
-    if (!managerRecord) {
-      return NextResponse.json({ success: false, message: 'Selected reporting manager is unavailable' }, { status: 400 })
-    }
-
-    // Create employee record
+    const auth = await getAuthAndDatabase(request)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    if (!['admin', 'super_admin', 'hr'].includes(auth.user.role)) throw recruitmentError('Insufficient permissions', 403)
+    const data = await request.json(), candidateId = recruitmentId(data.candidateId)
+    const database = await getRecruitmentDatabase(auth)
+    const candidate = await database.get('candidates', candidateId)
+    if (!candidate) throw recruitmentError('Candidate not found', 404)
+    if (candidate.convertedEmployeeId) throw recruitmentError('Candidate has already been converted to an employee', 409)
+    const job = await database.get('jobpostings', String(candidate.jobPosting))
+    if (!job) throw recruitmentError('Job posting not found', 404)
+    const reportingManager = recruitmentId(data.reportingManager)
     const employeeData = {
-      firstName: candidate.firstName,
-      lastName: candidate.lastName,
-      email: candidate.email,
-      phone: candidate.phone,
-      employeeCode: effectiveEmployeeCode,
-      department: department || candidate.jobPosting?.department,
-      designation: designation || candidate.jobPosting?.designation,
-      reportingManager: managerRecord._id,
-      assignedManager: managerRecord._id,
-      dateOfJoining: joiningDate || candidate.offer?.joiningDate || new Date(),
-      skills: candidate.skills,
-      salary: (candidate.offer?.salary || candidate.expectedSalary)
-        ? { grossSalary: Number(candidate.offer?.salary || candidate.expectedSalary) }
-        : undefined,
+      firstName: candidate.firstName, lastName: candidate.lastName, email: candidate.email, phone: candidate.phone || '',
+      employeeCode: data.employeeCode || `EMP-${randomBytes(6).toString('hex').toUpperCase()}`,
+      department: data.department || job.department, designation: data.designation || job.designation,
+      reportingManager, assignedManager: reportingManager,
+      dateOfJoining: new Date(data.joiningDate || candidate.offer?.joiningDate || Date.now()), skills: candidate.skills || [],
+      salary: candidate.offer?.salary || candidate.expectedSalary ? { grossSalary: Number(candidate.offer?.salary || candidate.expectedSalary) } : undefined,
     }
-
-    try {
-      employeeData.lifecycle = buildEmployeeLifecycle({ ...data, dateOfJoining: employeeData.dateOfJoining })
-    } catch (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 400 })
-    }
+    if (!Number.isFinite(employeeData.dateOfJoining.getTime())) throw recruitmentError('Invalid joining date')
+    for (const [field, collection] of [['department', 'departments'], ['designation', 'designations']]) if (employeeData[field] && !await database.get(collection, recruitmentId(employeeData[field]))) throw recruitmentError(`Selected ${field} does not exist`, 400)
+    employeeData.lifecycle = buildEmployeeLifecycle({ ...data, dateOfJoining: employeeData.dateOfJoining })
     employeeData.status = employeeData.lifecycle.stage !== 'preboarding' && employeeData.lifecycle.probation.applicable ? 'probation' : 'active'
-
-    const employee = await Employee.create(employeeData)
-    const temporaryPassword = `${crypto.randomBytes(12).toString('base64url')}aA1!`
-    let employeeUser
-    try {
-      const employeeRole = await Role.findOne({ name: 'employee' }).select('_id').lean()
-      employeeUser = await User.create({
-        email: candidate.email,
-        password: temporaryPassword,
-        role: 'employee',
-        roleId: employeeRole?._id,
-        employeeId: employee._id,
-        forcePasswordChange: true,
-      })
-      employee.userId = employeeUser._id
-      await employee.save()
-    } catch (error) {
-      await Employee.deleteOne({ _id: employee._id }).catch(() => {})
-      throw error
-    }
-    await createInitialLifecycleWorkflows({
-      models,
-      actor: user,
-      employee,
-      features: auth.companyFeatures,
-    }).catch((error) => console.error('[Candidate Convert] Lifecycle workflow initialization failed:', error))
-    await ensureEmployeeLeaveBalances({
-      models,
-      employeeId: employee._id,
-      year: new Date(employee.dateOfJoining || Date.now()).getFullYear(),
-    }).catch((error) => console.error('[Candidate Convert] Leave allocation failed:', error))
-
-    const tenantCompany = tenant?.databaseName ? await getTenantCompanyByDbName(tenant.databaseName) : null
-    if (tenantCompany) {
-      await registerUserTenantMapping({
-        email: candidate.email,
-        tenantCompanyId: tenantCompany._id,
-        databaseName: tenant.databaseName,
-        companyName: tenantCompany.name,
-        companySlug: tenantCompany.slug,
-        role: 'employee',
-      }).catch((error) => console.error('[Candidate Convert] Tenant mapping failed:', error))
-    }
-
-    await sendAndLogOnboardingEmail({
-      employeeId: employee._id,
-      userId: employeeUser._id,
-      to: candidate.email,
-      firstName: candidate.firstName,
-      lastName: candidate.lastName,
-      email: candidate.email,
-      password: temporaryPassword,
-      employeeCode: employee.employeeCode,
-      designation: candidate.jobPosting?.jobTitle,
-      dateOfJoining: employee.dateOfJoining,
-      triggeredBy: 'candidate_conversion',
-      models: { OnboardingEmail, CompanySettings },
-    }).catch((error) => console.error('[Candidate Convert] Onboarding email failed:', error))
-
-    // Update candidate with employee reference
-    candidate.convertedEmployeeId = employee._id
-    candidate.stage = 'hired'
-    if (!candidate.stageHistory) candidate.stageHistory = []
-    candidate.stageHistory.push({
-      stage: 'hired',
-      movedAt: new Date(),
-      movedBy: user.employeeId?._id || user.employeeId,
-      notes: `Converted to employee: ${employee.employeeCode}`,
+    const password = `${randomBytes(12).toString('base64url')}aA1!`
+    const result = await provisionFirestoreAccount({ email: candidate.email, password, role: 'employee', employeeData }, {
+      actor: { ...auth.user, databaseName: auth.tenant.databaseName }, preparedEmployee: employeeData, candidateId,
     })
-    await candidate.save()
-
-    try {
-      await logActivity({
-        employeeId: user.employeeId?._id || user.employeeId,
-        type: 'recruitment_hire',
-        action: 'Converted candidate to employee',
-        details: `Hired ${candidate.firstName} ${candidate.lastName} as ${employee.employeeCode}`,
-        metadata: { candidateId, employeeId: employee._id },
-        relatedModel: 'Employee',
-        relatedId: employee._id,
-      })
-    } catch (e) {
-      console.error('Activity log error (non-critical):', e)
-    }
-
-    emitRecruitmentUpdate({ candidate: candidateId, employee: employee._id }, { action: 'hire' })
-    emitEmployeeUpdate({ action: 'created', employee, departmentId: employee.department })
-
-    return NextResponse.json({
-      success: true,
-      message: 'Candidate converted to employee successfully',
-      data: { candidate, employee },
-    }, { status: 201 })
+    const employee = result.employee, warnings = []
+    // These post-commit steps never roll back an already-created account.
+    // Return explicit warnings so HR can retry the respective workflow safely.
+    await createInitialLifecycleWorkflows({ database: await getWorkflowStore(auth), actor: auth.user, employee, features: auth.companyFeatures }).catch(() => warnings.push('Lifecycle checklist initialization needs retry'))
+    await ensureEmployeeLeaveBalances({ database: await getFirestoreTenantDatabase(auth.tenant.databaseName, LEAVE_BALANCE_STORE_OPTIONS), employeeId: employee._id, year: employee.dateOfJoining.getFullYear() }).catch(() => warnings.push('Leave balance allocation needs retry'))
+    await sendAndLogOnboardingEmail({
+      database, employeeId: employee._id, userId: result.user._id, to: employee.email,
+      firstName: employee.firstName, lastName: employee.lastName, email: employee.email,
+      password, employeeCode: employee.employeeCode, designation: job.jobTitle, dateOfJoining: employee.dateOfJoining,
+      triggeredBy: 'candidate_conversion',
+    }).catch(() => warnings.push('Onboarding email could not be confirmed; review the onboarding email log before retrying'))
+    return NextResponse.json({ success: true, message: 'Candidate converted to employee successfully', data: { candidate: result.candidate, employee }, ...(warnings.length ? { warnings } : {}) }, { status: 201 })
   } catch (error) {
-    console.error('Convert candidate error:', error)
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to convert candidate' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, message: error.message || 'Failed to convert candidate' }, { status: error.status || 500 })
   }
 }

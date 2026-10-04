@@ -1,18 +1,20 @@
 import { apiError, apiSuccess, withTenantApi } from '@/lib/api/route'
 import { checkTenantFeatureAccess } from '@/lib/companyFeatures.server'
-import { advanceWorkflow, buildWorkflowVisibilityFilter, transitionWorkflow } from '@/lib/hrms/workflowService.server'
+import { advanceWorkflow, transitionWorkflow } from '@/lib/hrms/workflowService.server'
+import { getWorkflowStore, canReadWorkflow } from '@/lib/hrms/workflowStore.server'
 import { getNextHrmsModule } from '@/lib/hrms/moduleRegistry'
 
 export const POST = withTenantApi({
-  models: ['HrmsWorkflow', 'HrmsWorkflowEvent', 'User', 'Employee'],
+  firestore: {},
   errorMessage: 'Failed to transition HRMS workflow',
-}, async ({ request, context, auth, models }) => {
+}, async ({ request, context, auth }) => {
   const { id } = await context.params
-  if (!models.HrmsWorkflow.db.base.Types.ObjectId.isValid(id)) {
+  if (!/^[a-f\d]{24}$/i.test(id || '')) {
     return apiError('Invalid workflow ID', { status: 400, code: 'VALIDATION_ERROR' })
   }
-  const workflow = await models.HrmsWorkflow.findOne({ _id: id, ...buildWorkflowVisibilityFilter(auth.user) })
-  if (!workflow) return apiError('Workflow not found', { status: 404, code: 'NOT_FOUND' })
+  const database = await getWorkflowStore(auth)
+  const workflow = await database.get('hrmsworkflows', id)
+  if (!workflow || !canReadWorkflow(auth.user, workflow)) return apiError('Workflow not found', { status: 404, code: 'NOT_FOUND' })
 
   const access = await checkTenantFeatureAccess(auth, { allOf: [workflow.module] })
   if (!access.success) return apiError(access.message, { status: access.status, code: access.code })
@@ -31,8 +33,7 @@ export const POST = withTenantApi({
     }
   }
   const params = {
-    Workflow: models.HrmsWorkflow,
-    Event: models.HrmsWorkflowEvent,
+    database,
     workflow,
     actor: auth.user,
     comment: body.comment,

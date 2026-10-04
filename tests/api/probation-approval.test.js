@@ -66,12 +66,11 @@ describe('probation approval workflow', () => {
 
   test('uses a durable tenant record, scoped approver authorization, and non-dismissible prompt', () => {
     const route = fs.readFileSync(path.join(process.cwd(), 'app/api/employees/[id]/probation-approval/route.js'), 'utf8')
-    const tenantModels = fs.readFileSync(path.join(process.cwd(), 'lib/tenantModels.js'), 'utf8')
-    const notifications = fs.readFileSync(path.join(process.cwd(), 'lib/actionableNotifications.js'), 'utf8')
-
-    expect(tenantModels).toContain('ProbationApproval: ProbationApprovalSchema')
-    expect(route).toContain("approverUser: userId(auth.user), status: 'pending'")
-    expect(route).toContain("status: { $in: ['pending', 'processing'] }")
+    const notifications = fs.readFileSync(path.join(process.cwd(), 'lib/hrms/probationFirestore.server.js'), 'utf8')
+    expect(route).toContain('decideProbationRequest(database')
+    expect(route).not.toContain('mongoose')
+    expect(notifications).toContain('id(approval.approverUser) !== id(actor.id || actor._id)')
+    expect(notifications).toContain("value: ['pending', 'processing']")
     expect(notifications).toContain("dismissible: false")
     expect(notifications).toContain("requiresReason: true")
   })

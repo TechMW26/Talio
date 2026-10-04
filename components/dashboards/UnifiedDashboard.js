@@ -259,7 +259,6 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Dashboard data states
     const [dashboardStats, setDashboardStats] = useState(null)
     const [departments, setDepartments] = useState([])
-    const [leaveRequests, setLeaveRequests] = useState([])
     // Unified widget data (fetched in single API call for performance)
     const [unifiedWidgetData, setUnifiedWidgetData] = useState(null)
 
@@ -331,7 +330,6 @@ export default function UnifiedDashboard({ user: userProp }) {
         featurePermissions.policies && 'policies',
         featurePermissions.checkInOut && 'attendance',
         featurePermissions.leaveBalance && 'leaveBalance',
-        featurePermissions.leaveRequests && 'leaveRequests',
         featurePermissions.departmentChart && 'departments',
     ].filter(Boolean).join(','), [featurePermissions])
 
@@ -343,8 +341,8 @@ export default function UnifiedDashboard({ user: userProp }) {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
     }, [])
 
-    // Fetch dashboard stats based on role - ONLY fetches KPI stats
-    // Other data (departments, leave requests, attendance) comes from the unified endpoint
+    // Fetch dashboard stats based on role - ONLY fetches KPI stats.
+    // Leave requests load independently so other widgets cannot delay approvals.
     const fetchDashboardData = useCallback(() => {
         if (dashboardStatsRequestRef.current) {
             return dashboardStatsRequestRef.current
@@ -410,7 +408,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     }, [employeeIdStr])
 
     // Fetch unified widget data - single API call for holidays, announcements, assets, expenses, helpdesk, policies
-    // ALSO populates: departments, leave requests, attendance summary, employee data, and today's attendance
+    // ALSO populates: departments, attendance summary, employee data, and today's attendance
     // This eliminates 5+ separate API calls that were causing browser connection queue stalling
     const fetchUnifiedWidgetData = useCallback(() => {
         if (unifiedWidgetsRequestRef.current) {
@@ -431,11 +429,6 @@ export default function UnifiedDashboard({ user: userProp }) {
                 // Populate departments from unified response (eliminates /api/departments call)
                 if (data.departments) {
                     setDepartments(data.departments)
-                }
-
-                // Populate leave requests from unified response (eliminates /api/leave?status=pending call)
-                if (data.pendingLeaveRequests) {
-                    setLeaveRequests(data.pendingLeaveRequests)
                 }
 
                 // Populate employee data from unified response (eliminates /api/employees/:id call)
@@ -556,7 +549,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Initial data load - progressive loading (don't block render)
     // OPTIMIZED: Only 2 API calls instead of 7+
     // - fetchUnifiedWidgetData() → single call that provides: holidays, announcements, assets,
-    //   expenses, helpdesk, policies, departments, leave requests, attendance summary,
+    //   expenses, helpdesk, policies, departments, attendance summary,
     //   employee data, today's attendance, and company settings
     // - fetchDashboardData() → KPI stats only (hr-stats/manager-stats/employee-stats)
     // Previously: 7+ calls including separate /api/employees/:id, /api/attendance?employeeId=...,
@@ -910,9 +903,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         // Leave Requests Widget (for approvers)
         if (featurePermissions.leaveRequests) {
             components['leave-requests'] = (
-                <LeaveRequestsWidget
-                    leaveRequests={leaveRequests}
-                />
+                <LeaveRequestsWidget />
             )
         }
 
@@ -1052,7 +1043,6 @@ export default function UnifiedDashboard({ user: userProp }) {
         attendanceLoading,
         dashboardStats,
         departments,
-        leaveRequests,
         remainingTime,
         isCountingDown,
         companySettings,

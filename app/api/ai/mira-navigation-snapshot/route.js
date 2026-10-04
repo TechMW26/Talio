@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { generateVisionContent, generateContent } from '@/lib/ai/aiProviderManager'
 import sharp from 'sharp'
@@ -9,7 +9,7 @@ export const maxDuration = 60
 const reply = (body, status = 200) => NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
 
 export async function POST(request) {
-  const auth = await getAuthAndModels(request, ['User'])
+  const auth = await getAuthAndDatabase(request)
   if (!auth.success) return reply({ success: false }, 401)
   const bucket = await rateLimit('MIRA_ATTACHMENT', `${auth.tenant.databaseName}:${auth.user._id}`)
   if (!bucket.allowed) return reply({ success: false }, 429)

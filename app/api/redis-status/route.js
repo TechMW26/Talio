@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { verifySuperAdmin } from '@/lib/superadminAuth'
 import {
     getCache,
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic'
  * Only accessible by admin users (or via internal token).
  */
 export async function GET(request) {
-    const auth = await getAuthAndModels(request, [])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) return NextResponse.json({ ok: false, message: auth.message }, { status: 401 })
     if (!['admin', 'hr'].includes(auth.user.role)) return NextResponse.json({ ok: false, message: 'Forbidden' }, { status: 403 })
     try {

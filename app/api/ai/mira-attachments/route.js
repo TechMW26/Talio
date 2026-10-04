@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { generateVisionContent } from '@/lib/ai/aiProviderManager'
 import { miraFileError, MIRA_FILE_LIMIT, MIRA_ATTACHMENT_TEXT_LIMIT } from '@/lib/miraAttachments'
 import sharp from 'sharp'
@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 export async function POST(request) {
-  const auth = await getAuthAndModels(request, ['User'])
+  const auth = await getAuthAndDatabase(request)
   if (!auth.success) return NextResponse.json({ success: false, message: 'Please sign in to attach files.' }, { status: 401 })
   const bucket = await rateLimit('MIRA_ATTACHMENT', `${auth.tenant.databaseName}:${auth.user._id}`)
   if (!bucket.allowed) return NextResponse.json({ success: false, message: 'Too many uploads. Please try again shortly.' }, { status: 429, headers: { 'Retry-After': String(bucket.retryAfterSeconds) } })

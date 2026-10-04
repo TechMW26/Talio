@@ -1,41 +1,37 @@
-import mongoose from 'mongoose'
+import { randomBytes } from 'node:crypto'
+import { workflowStore } from '../helpers/firestoreWorkflowStore'
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
 import JSZip from 'jszip'
 import { PDFDocument } from 'pdf-lib'
-import { MongoMemoryServer } from 'mongodb-memory-server'
-import { getTenantModels } from '@/lib/tenantModels'
-import { getTenantConnection } from '@/lib/tenantDb'
-import { getAuthAndModels } from '@/lib/auth'
-import { getImage, getImageInfo } from '@/lib/gridfs'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getImage, getImageInfo } from '@/lib/mediaStorage'
 import { inspectInductionFile, publishInduction, inductionStatus, updateInductionProgress, progressId, inductionSettings } from '@/lib/hrms/induction.server'
 import { POST as settings } from '@/app/api/induction/settings/route'
 import { GET as file } from '@/app/api/induction/file/route'
 import { GET, POST } from '@/app/api/induction/route'
 
-jest.mock('@/lib/tenantDb', () => ({ getTenantConnection: jest.fn() }))
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
-jest.mock('@/lib/gridfs', () => ({ getImage: jest.fn(), getImageInfo: jest.fn() }))
+jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreTenantDatabase: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
+jest.mock('@/lib/mediaStorage', () => ({ getImage: jest.fn(), getImageInfo: jest.fn() }))
 jest.mock('@/lib/platform/blobStorage.server', () => ({ buildTenantRootPrefix: id => `tenants/${id}`, buildTenantBlobPrefix: ({ tenantId, ownerId }) => `tenants/${tenantId}/documents/${ownerId}`, getTenantBlob: jest.fn() }))
-let server, connection, models, auth, bytes, employee, source
+let database, auth, bytes, employee, source
+const oid = () => randomBytes(12).toString('hex')
 const request = input => new Request('https://talio.test/api/induction', { method: 'POST', body: JSON.stringify(input) })
 const publish = previousVersion => publishInduction(auth, { title: 'Company orientation', source, previousVersion, previewConfirmed: true })
 beforeAll(async () => {
-  server = await MongoMemoryServer.create()
-  connection = await mongoose.createConnection(server.getUri()).asPromise()
-  getTenantConnection.mockResolvedValue(connection)
-  models = await getTenantModels('induction-tests', ['Employee', 'User', 'InductionProgram', 'InductionProgress', 'Company'])
   const pdf = await PDFDocument.create(); pdf.addPage().drawText('Welcome'); pdf.addPage().drawText('Acknowledgement')
   bytes = Buffer.from(await pdf.save())
 }, 120000)
-afterAll(async () => { await connection?.close(); await server?.stop() })
 beforeEach(async () => {
-  await Promise.all(Object.values(models).map(model => model.deleteMany({})))
-  employee = new mongoose.Types.ObjectId()
-  const userId = new mongoose.Types.ObjectId()
-  await models.Employee.collection.insertOne({ _id: employee, firstName: 'Induction', lastName: 'Tester' })
-  await models.User.collection.insertOne({ _id: userId, employeeId: employee })
-  auth = { success: true, user: { _id: userId, role: 'hr' }, models, tenant: { databaseName: 'induction-tests' } }
-  source = { fileId: String(new mongoose.Types.ObjectId()), fileName: 'orientation.pdf' }
-  getAuthAndModels.mockResolvedValue(auth)
+  database = workflowStore()
+  getFirestoreTenantDatabase.mockResolvedValue(database)
+  employee = oid()
+  const userId = oid()
+  await database.create.bind(database, 'employees')({ _id: employee, firstName: 'Induction', lastName: 'Tester' })
+  await database.create.bind(database, 'users')({ _id: userId, employeeId: employee })
+  auth = { success: true, user: { _id: userId, role: 'hr' }, tenant: { databaseName: 'talio_company_tests' } }
+  source = { fileId: String(oid()), fileName: 'orientation.pdf' }
+  getAuthAndDatabase.mockResolvedValue(auth)
   getImage.mockResolvedValue(bytes)
   getImageInfo.mockResolvedValue({ length: bytes.length, metadata: { category: 'documents', userId: String(userId) } })
 })
@@ -77,8 +73,8 @@ test('progress survives new requests, completion is idempotent and stores the em
   const [one, two] = await Promise.all([1, 2].map(() => updateInductionProgress(auth, { version, action: 'acknowledge', acknowledged: true })))
   expect(one.acknowledgedAt).toEqual(two.acknowledgedAt)
   expect((await inductionStatus(auth)).required).toBe(false)
-  expect((await models.Employee.findById(employee).lean()).inductionCompletion.version).toBe(version)
-  expect(await models.InductionProgress.countDocuments()).toBe(1)
+  expect((await database.get('employees', employee)).inductionCompletion.version).toBe(version)
+  expect(await database.count('inductionprogresses')).toBe(1)
 })
 
 test('publishing a new version requires acknowledgement again and preserves prior history', async () => {
@@ -89,7 +85,7 @@ test('publishing a new version requires acknowledgement again and preserves prio
   const replacement = await publish(version)
   expect(replacement.version).not.toBe(version)
   expect((await inductionStatus(auth)).required).toBe(true)
-  expect((await models.InductionProgress.findById(progressId(employee, version))).acknowledgedAt).toBeTruthy()
+  expect((await database.get('inductionprogresses', progressId(employee, version))).acknowledgedAt).toBeTruthy()
   await expect(updateInductionProgress(auth, { version, action: 'page', page: 1 })).rejects.toThrow('changed')
   await expect(publish(version)).rejects.toThrow('changed')
 })
@@ -105,14 +101,14 @@ test('only HR/admin can publish or withdraw and withdrawal releases the mandator
 
 test('requires preview confirmation and rejects another users upload', async () => {
   await expect(publishInduction(auth, { title: 'Test', source })).rejects.toThrow('Preview')
-  getImageInfo.mockResolvedValue({ length: 100, metadata: { category: 'documents', userId: String(new mongoose.Types.ObjectId()) } })
+  getImageInfo.mockResolvedValue({ length: 100, metadata: { category: 'documents', userId: String(oid()) } })
   await expect(publish()).rejects.toThrow('own account')
 })
 
 test('legacy employee-to-user links still require induction', async () => {
   await publish()
-  await models.User.updateOne({ _id: auth.user._id }, { $unset: { employeeId: 1 } })
-  await models.Employee.collection.updateOne({ _id: employee }, { $set: { userId: auth.user._id } })
+  await database.mutate('users', auth.user._id, current => ({ ...current, employeeId: undefined }))
+  await database.mutate('employees', employee, current => ({ ...current, userId: auth.user._id }))
   expect((await inductionStatus(auth)).required).toBe(true)
 })
 
@@ -126,8 +122,8 @@ test('file delivery is authenticated and bound to the current tenant version', a
 })
 
 test('company cards show tenant companies and independent module versions', async () => {
-  const a = await models.Company.create({ name: 'Company A', code: 'A' })
-  const b = await models.Company.create({ name: 'Company B', code: 'B' })
+  const a = await database.create('companies', { _id: oid(), isActive: true, name: 'Company A', code: 'A' })
+  const b = await database.create('companies', { _id: oid(), isActive: true, name: 'Company B', code: 'B' })
   const global = await publish()
   const moduleA = await publishInduction(auth, { companyId: String(a._id), title: 'A orientation', source, previewConfirmed: true })
   const catalog = await inductionSettings(auth, String(a._id))
@@ -135,39 +131,39 @@ test('company cards show tenant companies and independent module versions', asyn
   expect(catalog.program.version).toBe(moduleA.version)
   expect(catalog.defaultProgram.version).toBe(global.version)
   expect(catalog.companies.find(item => item.id === String(b._id)).program).toBeNull()
-  await expect(publishInduction(auth, { companyId: String(new mongoose.Types.ObjectId()), title: 'Outside', source, previewConfirmed: true })).rejects.toMatchObject({ status: 404 })
+  await expect(publishInduction(auth, { companyId: String(oid()), title: 'Outside', source, previewConfirmed: true })).rejects.toMatchObject({ status: 404 })
   auth.user.role = 'employee'
   await expect(inductionSettings(auth)).rejects.toMatchObject({ status: 403 })
 })
 
 test('employees receive only their assigned company module, including after transfers', async () => {
-  const a = await models.Company.create({ name: 'Company A' })
-  const b = await models.Company.create({ name: 'Company B' })
+  const a = await database.create('companies', { _id: oid(), isActive: true, name: 'Company A' })
+  const b = await database.create('companies', { _id: oid(), isActive: true, name: 'Company B' })
   const global = await publish()
   const moduleA = await publishInduction(auth, { companyId: String(a._id), title: 'A orientation', source, previewConfirmed: true })
   const moduleB = await publishInduction(auth, { companyId: String(b._id), title: 'B orientation', source, previewConfirmed: true })
   expect((await inductionStatus(auth)).program.version).toBe(global.version)
-  await models.Employee.updateOne({ _id: employee }, { $set: { company: a._id } })
+  await database.mutate('employees', employee, current => ({ ...current, company: a._id }))
   expect((await inductionStatus(auth)).program.version).toBe(moduleA.version)
   await updateInductionProgress(auth, { version: moduleA.version, action: 'page', page: 1 })
   await updateInductionProgress(auth, { version: moduleA.version, action: 'page', page: 2 })
   await updateInductionProgress(auth, { version: moduleA.version, action: 'acknowledge', acknowledged: true })
   expect((await inductionStatus(auth)).required).toBe(false)
-  await models.Employee.updateOne({ _id: employee }, { $set: { company: b._id } })
+  await database.mutate('employees', employee, current => ({ ...current, company: b._id }))
   expect((await inductionStatus(auth)).required).toBe(true)
   await expect(updateInductionProgress(auth, { companyId: String(a._id), version: moduleA.version, action: 'page', page: 1 })).rejects.toMatchObject({ status: 409 })
   expect((await file(new Request(`https://talio.test/api/induction/file?companyId=${a._id}&version=${moduleA.version}`))).status).toBe(409)
   expect((await file(new Request(`https://talio.test/api/induction/file?version=${moduleB.version}`))).status).toBe(200)
-  expect((await models.InductionProgress.findById(progressId(employee, moduleA.version))).acknowledgedAt).toBeTruthy()
+  expect((await database.get('inductionprogresses', progressId(employee, moduleA.version))).acknowledgedAt).toBeTruthy()
 })
 
 test('withdrawing one company module leaves the organisation and other companies untouched', async () => {
-  const a = await models.Company.create({ name: 'Company A' })
+  const a = await database.create('companies', { _id: oid(), isActive: true, name: 'Company A' })
   const global = await publish()
   const moduleA = await publishInduction(auth, { companyId: String(a._id), title: 'A orientation', source, previewConfirmed: true })
-  await models.Employee.updateOne({ _id: employee }, { $set: { company: a._id } })
+  await database.mutate('employees', employee, current => ({ ...current, company: a._id }))
   expect((await settings(request({ action: 'withdraw', companyId: String(a._id), previousVersion: global.version }))).status).toBe(409)
   expect((await settings(request({ action: 'withdraw', companyId: String(a._id), previousVersion: moduleA.version }))).status).toBe(200)
   expect((await inductionStatus(auth)).required).toBe(false)
-  expect((await models.InductionProgram.findById('organisation')).active).toBe(true)
+  expect((await database.get('inductionprograms', 'organisation')).active).toBe(true)
 })

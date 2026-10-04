@@ -1,153 +1,26 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { geofenceContext } from '@/lib/platform/firestoreGeofence.server'
+import { attendanceId, attendanceError } from '@/lib/platform/firestoreAttendance.server'
 import { sendPushToUser } from '@/lib/pushNotification'
-import { getIO } from '@/lib/socket'
-import mongoose from 'mongoose'
-
-// POST - Approve or reject out-of-premises request
 export async function POST(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User', 'Notification']);
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 });
-    }
-    const { user, models } = auth;
-    const { GeofenceLog, Employee, User } = models;
-
-    const { logId, action, comments } = await request.json();
-
-    if (!logId || !mongoose.Types.ObjectId.isValid(logId) || !action) {
-      return NextResponse.json(
-        { success: false, message: 'Log ID and action are required' },
-        { status: 400 }
-      );
-    }
-
-    if (!['approved', 'rejected'].includes(action)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid action. Must be "approved" or "rejected"' },
-        { status: 400 }
-      );
-    }
-
-    // Get user and employee data
-    const userRecord = await User.findById(user._id || user.userId).populate('employeeId');
-    if (!userRecord || !userRecord.employeeId) {
-      return NextResponse.json(
-        { success: false, message: 'Employee not found' },
-        { status: 404 }
-      );
-    }
-
-    const reviewer = await Employee.findById(userRecord.employeeId).select('firstName lastName department');
-
-    // Get the geofence log
-    const log = await GeofenceLog.findById(logId)
-      .populate('employee', 'firstName lastName')
-      .populate('user')
-
-    if (!log) {
-      return NextResponse.json(
-        { success: false, message: 'Geofence log not found' },
-        { status: 404 }
-      )
-    }
-
-    if (log.outOfPremisesRequest?.status !== 'pending') {
-      return NextResponse.json(
-        { success: false, message: 'This request has already been reviewed' },
-        { status: 409 }
-      )
-    }
-
-    // Check if user has permission to approve/reject
-    // Only managers, department heads, admin, and HR can approve
-    const canApprove = 
-      user.role === 'admin' ||
-      user.role === 'hr' ||
-      (user.role === 'department_head' && reviewer.department?.toString() === log.department?.toString()) ||
-      (user.role === 'manager' && log.reportingManager?.toString() === reviewer._id.toString())
-
-    if (!canApprove) {
-      return NextResponse.json(
-        { success: false, message: 'You do not have permission to approve/reject this request' },
-        { status: 403 }
-      )
-    }
-
-    // Update the log
-    log.outOfPremisesRequest.status = action
-    log.outOfPremisesRequest.reviewedBy = reviewer._id
-    log.outOfPremisesRequest.reviewedAt = new Date()
-    log.outOfPremisesRequest.reviewerComments = comments || ''
-
-    await log.save()
-
-    // Send notification to employee
-    try {
-      const employeeUser = log.user
-      if (employeeUser) {
-        // Send push notification
-        await sendPushToUser(
-          employeeUser._id.toString(),
-          {
-            title: `Out-of-Premises Request ${action === 'approved' ? 'Approved ✅' : 'Rejected ❌'}`,
-            body: `Your request to be outside office premises has been ${action} by ${reviewer.firstName} ${reviewer.lastName}`,
-          },
-          {
-            eventType: 'geofenceApproval',
-            clickAction: '/dashboard/team/geofencing',
-            icon: '/icon-192x192.png',
-            data: {
-              type: 'geofence_approval',
-              logId: log._id.toString(),
-              action,
-            },
-            models: { User: models.User, Notification: models.Notification }
-          }
-        )
-
-        // Send Socket.IO event for real-time notification
-        try {
-          const io = getIO()
-          if (io) {
-            io.to(`user:${employeeUser._id.toString()}`).emit('geofence-approval', {
-              action,
-              log: {
-                _id: log._id,
-                reason: log.outOfPremisesRequest.reason,
-                status: action,
-                reviewedBy: {
-                  firstName: reviewer.firstName,
-                  lastName: reviewer.lastName
-                },
-                reviewedAt: log.outOfPremisesRequest.reviewedAt,
-                reviewerComments: log.outOfPremisesRequest.reviewerComments
-              }
-            })
-            console.log(`[Socket.IO] Sent geofence-approval event to user:${employeeUser._id}`)
-          }
-        } catch (socketError) {
-          console.error('Failed to send Socket.IO event:', socketError)
-        }
-      }
-    } catch (notifError) {
-      console.error('Failed to send notification:', notifError)
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Request ${action} successfully`,
-      data: log
+    const { database, user } = await geofenceContext(request)
+    const { logId, action, comments } = await request.json()
+    if (!/^[a-f0-9]{24}$/.test(logId || '') || !['approved', 'rejected'].includes(action) || (comments && typeof comments !== 'string')) throw attendanceError('Valid log ID and approval action required')
+    const result = await database.transaction(async tx => {
+      const [log, account] = await Promise.all([tx.get('geofencelogs', logId), tx.get('users', attendanceId(user._id || user.userId))])
+      const reviewer = account?.employeeId ? await tx.get('employees', attendanceId(account.employeeId)) : null
+      if (!log) throw attendanceError('Geofence log not found', 404)
+      if (!reviewer) throw attendanceError('Reviewer employee not found', 404)
+      if (log.outOfPremisesRequest?.status !== 'pending') throw attendanceError('This request has already been reviewed', 409)
+      const allowed = ['admin', 'hr'].includes(account.role) || (account.role === 'department_head' && attendanceId(reviewer.department) === attendanceId(log.department)) || (account.role === 'manager' && attendanceId(log.reportingManager) === reviewer._id)
+      if (!allowed) throw attendanceError('You do not have permission to review this request', 403)
+      const next = { ...log, outOfPremisesRequest: { ...log.outOfPremisesRequest, status: action, reviewedBy: reviewer._id, reviewedAt: new Date(), reviewerComments: String(comments || '').slice(0, 10000) }, updatedAt: new Date() }
+      await tx.replace('geofencelogs', next)
+      return { log: next, reviewer }
     })
-
-  } catch (error) {
-    console.error('Approve geofence request error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to process request' },
-      { status: 500 }
-    )
-  }
+    if (result.log.user && process.env.TALIO_LOCAL_ACCEPTANCE !== '1') await sendPushToUser(attendanceId(result.log.user), { title: 'Out-of-Premises Request ' + action, body: 'Your request has been ' + action + ' by ' + result.reviewer.firstName + ' ' + result.reviewer.lastName }, { database, eventType: 'geofenceApproval', clickAction: '/dashboard/team/geofencing', data: { type: 'geofence_approval', logId, action } }).catch(() => {})
+    return NextResponse.json({ success: true, message: 'Request ' + action + ' successfully', data: result.log })
+  } catch(error) { return NextResponse.json({ success: false, message: error.message }, { status: error.status || 500 }) }
 }
 

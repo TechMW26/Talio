@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
+import { getSuperadminStore, newRecordId, mutateCompany } from '@/lib/platform/firestoreSuperadmin.server';
 
 /**
  * GET - Get all notes for a company
@@ -23,9 +23,9 @@ export async function GET(request, { params }) {
     }
 
     const { id } = await params;
-    const TenantCompany = await getTenantCompanyModel();
+    const database = await getSuperadminStore();
 
-    const company = await TenantCompany.findById(id).select('notes name').lean();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -72,8 +72,8 @@ export async function POST(request, { params }) {
       );
     }
 
-    const TenantCompany = await getTenantCompanyModel();
-    const company = await TenantCompany.findById(id);
+    const database = await getSuperadminStore();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -83,19 +83,19 @@ export async function POST(request, { params }) {
     }
 
     const note = {
+      _id: newRecordId(),
       content,
       category: category || 'general',
       createdAt: new Date(),
       createdBy: auth.superadmin._id,
     };
 
-    company.notes.push(note);
-    await company.save();
+    await mutateCompany(database, id, current => ({ ...current, notes: [...(current.notes || []), note] }));
 
     return NextResponse.json({
       success: true,
       message: 'Note added successfully',
-      note: company.notes[company.notes.length - 1],
+      note,
     });
 
   } catch (error) {
@@ -130,8 +130,8 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const TenantCompany = await getTenantCompanyModel();
-    const company = await TenantCompany.findById(id);
+    const database = await getSuperadminStore();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -140,8 +140,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    company.notes = company.notes.filter(n => n._id.toString() !== noteId);
-    await company.save();
+    await mutateCompany(database, id, current => ({ ...current, notes: (current.notes || []).filter(note => String(note._id) !== String(noteId)) }));
 
     return NextResponse.json({
       success: true,

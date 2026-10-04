@@ -7,8 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
-import mongoose from 'mongoose';
+import { getSuperadminStore, getActiveCompanies, getTenantStorageReport, mutateCompany } from '@/lib/platform/firestoreSuperadmin.server';
 
 /**
  * GET - Get analytics data
@@ -23,10 +22,10 @@ export async function GET(request) {
       );
     }
 
-    const TenantCompany = await getTenantCompanyModel();
+    const database = await getSuperadminStore();
 
     // Get all active companies
-    const companies = await TenantCompany.find({ isActive: true }).lean();
+    const companies = await getActiveCompanies(database);
 
     // Calculate storage for each company (from their database)
     const storageData = [];
@@ -35,12 +34,7 @@ export async function GET(request) {
 
     for (const company of companies) {
       try {
-        // Connect to the company's database and get stats
-        const companyDb = mongoose.connection.useDb(company.databaseName);
-        const stats = await companyDb.db.stats();
-        
-        const storageUsedMB = Math.round((stats.dataSize + stats.indexSize) / (1024 * 1024) * 100) / 100;
-        const documentCount = stats.objects || 0;
+        const { storageUsedMB, documentCount, storageMetric } = await getTenantStorageReport(company.databaseName);
         const maxStorageGB = company.subscription?.maxStorageGB || 1;
         const maxStorageMB = maxStorageGB * 1024; // Convert GB to MB for comparison
 
@@ -49,6 +43,7 @@ export async function GET(request) {
           name: company.name,
           slug: company.slug,
           storageUsedMB,
+          storageMetric,
           maxStorageGB,
           documentCount,
           usagePercent: maxStorageMB > 0
@@ -61,17 +56,7 @@ export async function GET(request) {
         totalStorageUsed += storageUsedMB;
         totalDocuments += documentCount;
 
-        // Update company analytics in database (async, don't wait)
-        TenantCompany.updateOne(
-          { _id: company._id },
-          { 
-            $set: {
-              'analytics.storageUsedMB': storageUsedMB,
-              'analytics.documentCount': documentCount,
-              'analytics.lastStorageCheck': new Date(),
-            }
-          }
-        ).exec().catch(err => console.error('Failed to update analytics:', err));
+        await mutateCompany(database, company._id, current => ({ ...current, analytics: { ...current.analytics, storageUsedMB, documentCount, storageMetric, lastStorageCheck: new Date() } }));
 
       } catch (err) {
         console.error(`Failed to get stats for ${company.databaseName}:`, err.message);

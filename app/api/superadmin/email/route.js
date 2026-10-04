@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
+import { getSuperadminStore, newRecordId, mutateCompany } from '@/lib/platform/firestoreSuperadmin.server';
 import nodemailer from 'nodemailer';
 
 // Create email transporter
@@ -50,8 +50,8 @@ export async function POST(request) {
     // If companyId is provided, log the email activity
     let company = null;
     if (companyId) {
-      const TenantCompany = await getTenantCompanyModel();
-      company = await TenantCompany.findById(companyId);
+      const database = await getSuperadminStore();
+      company = await database.get('tenantcompanies', companyId);
       if (!company) {
         return NextResponse.json(
           { success: false, message: 'Company not found' },
@@ -79,17 +79,15 @@ export async function POST(request) {
     // Log email activity to company if applicable
     if (company) {
       // Add to company communication history
-      if (!company.communicationHistory) {
-        company.communicationHistory = [];
-      }
-      company.communicationHistory.push({
+      const entry = {
+        _id: newRecordId(),
         type: 'email',
         subject,
         sentAt: new Date(),
         sentBy: auth.superadmin._id,
         recipient: to,
-      });
-      await company.save();
+      };
+      await mutateCompany(await getSuperadminStore(), companyId, current => ({ ...current, communicationHistory: [...(current.communicationHistory || []), entry] }));
     }
 
     console.log(`[SuperAdmin Email] Email sent to ${to} by ${auth.superadmin.email}`);

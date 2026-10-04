@@ -10,10 +10,9 @@
  */
 
 import { NextResponse } from 'next/server';
-import { connectSuperadminDB } from '@/lib/superadminDb';
+import { companyJobDatabase, listJobCompanies, deliverCompanyJob } from '@/lib/platform/companyJobs.server';
+import { sendEmail } from '@/lib/mailer';
 import { getCronAuthErrorResponse } from '@/lib/cronAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
-import nodemailer from 'nodemailer';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Allow up to 60 seconds for processing
@@ -22,17 +21,7 @@ export const maxDuration = 60; // Allow up to 60 seconds for processing
 const REMINDER_THRESHOLDS = [85, 90, 95];
 
 // Create email transporter
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: 'smtp.hostinger.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: 'info@talio.in',
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  });
-}
+function createTransporter() { return { sendMail: message => sendEmail(message) }; }
 
 /**
  * Calculate tenure progress percentage
@@ -240,15 +229,10 @@ export async function POST(request) {
 
     console.log('[Subscription Reminder] Starting subscription reminder job...');
 
-    await connectSuperadminDB();
-    const TenantCompany = await getTenantCompanyModel();
+    const system = await companyJobDatabase();
 
     // Get all active companies with subscription end dates
-    const companies = await TenantCompany.find({
-      isActive: true,
-      serviceStatus: { $in: ['active', 'trial'] },
-      'subscription.endDate': { $exists: true },
-    }).lean();
+    const companies = (await listJobCompanies(system, { services: ['active', 'trial'] })).filter(row => row.subscription?.endDate);
 
     console.log(`[Subscription Reminder] Found ${companies.length} active companies`);
 
@@ -275,43 +259,12 @@ export async function POST(request) {
       const applicableThreshold = getApplicableThreshold(progress, remindersSent);
 
       if (applicableThreshold) {
-        // Send reminder to company
-        const result = await sendReminderToCompany(
-          transporter,
-          company,
-          applicableThreshold,
-          remainingDays
-        );
-
-        if (result.success) {
-          results.reminders_sent++;
-
-          // Update company with reminder sent
-          await TenantCompany.updateOne(
-            { _id: company._id },
-            {
-              $push: { 'subscription.remindersSent': applicableThreshold },
-              $set: { 'subscription.lastReminderAt': new Date() },
-            }
-          );
-
-          // Log to email history
-          await TenantCompany.updateOne(
-            { _id: company._id },
-            {
-              $push: {
-                emailHistory: {
-                  subject: `Subscription ${applicableThreshold}% Reminder`,
-                  template: 'subscription_reminder',
-                  sentAt: new Date(),
-                  sentBy: 'system',
-                },
-              },
-            }
-          );
-        } else {
-          results.errors++;
-        }
+        const result = await deliverCompanyJob(system, company._id, 'subscription-reminder',
+          current => !current.subscription?.remindersSent?.includes(applicableThreshold) && String(current.subscription?.endDate) === String(company.subscription.endDate),
+          current => sendReminderToCompany(transporter, current, applicableThreshold, remainingDays),
+          current => ({ ...current, subscription: { ...current.subscription, remindersSent: [...(current.subscription.remindersSent || []), applicableThreshold], lastReminderAt: new Date() }, emailHistory: [...(current.emailHistory || []), { subject: `Subscription ${applicableThreshold}% Reminder`, template: 'subscription_reminder', sentAt: new Date(), sentBy: 'system' }] }));
+        if (result?.success) results.reminders_sent++;
+        else if (!result?.skipped) results.errors++;
       }
 
       // Track companies expiring soon (>80% progress)
@@ -352,13 +305,9 @@ export async function GET(request) {
     const authError = getCronAuthErrorResponse(request);
     if (authError) return authError;
 
-    await connectSuperadminDB();
-    const TenantCompany = await getTenantCompanyModel();
+    const system = await companyJobDatabase();
 
-    const companies = await TenantCompany.find({
-      isActive: true,
-      'subscription.endDate': { $exists: true },
-    }).select('name subscription.startDate subscription.endDate subscription.remindersSent serviceStatus').lean();
+    const companies = (await listJobCompanies(system)).filter(row => row.subscription?.endDate);
 
     const status = companies.map(c => ({
       name: c.name,

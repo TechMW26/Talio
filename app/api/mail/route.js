@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { randomBytes } from 'node:crypto';
+import { getAuthAndDatabase } from '@/lib/auth';
+import { MAIL_ACCOUNT_OPTIONS, listMailAccounts, getMailAccount, updateMailAccount, disconnectMailAccount, getAuthenticatedMailClient } from '@/lib/mailAccounts.server';
 
 // Production URL - must match Google Cloud Console
 const PRODUCTION_URL = 'https://app.talio.in';
@@ -11,19 +13,18 @@ const REDIRECT_URI = `${PRODUCTION_URL}/api/auth/google/callback`;
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS)
     if (!auth.success) {
-      return NextResponse.json({ 
-        isConnected: false, 
-        email: null, 
-        accounts: [] 
+      return NextResponse.json({
+        isConnected: false,
+        email: null,
+        accounts: []
       });
     }
-    const { user, models } = auth
-    const { EmailAccount } = models
+    const { user, database } = auth
 
     // Get all connected email accounts for this user
-    const emailAccounts = await EmailAccount.find({ user: user._id, isConnected: true });
+    const emailAccounts = await listMailAccounts(database, user);
 
     if (!emailAccounts || emailAccounts.length === 0) {
       return NextResponse.json({
@@ -63,9 +64,9 @@ export async function GET(request) {
   } catch (error) {
     console.error('[Mail API GET] Error:', error.message, error.stack);
     // Return a safe response instead of 500 to prevent repeated retries
-    return NextResponse.json({ 
-      isConnected: false, 
-      email: null, 
+    return NextResponse.json({
+      isConnected: false,
+      email: null,
       accounts: [],
       error: 'Failed to check email status'
     });
@@ -76,7 +77,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user
-    const auth = await getAuthAndModels(request, [])
+    const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS)
     if (!auth.success) {
       console.error('[Mail OAuth] Authentication failed:', auth.message);
       return NextResponse.json({ error: auth.message }, { status: 401 });
@@ -102,6 +103,7 @@ export async function POST(request) {
       type: 'mail_connect',  // This tells the callback it's for mail
       userId: user._id.toString(),
       databaseName: tenant?.databaseName,  // Include tenant DB name for callback
+      nonce: randomBytes(24).toString('hex'),
       timestamp: Date.now()
     });
     // Use Buffer.from which is available in Node.js runtime
@@ -129,11 +131,13 @@ export async function POST(request) {
 
     console.log('[Mail OAuth] Generated auth URL with redirect:', REDIRECT_URI);
 
-    return NextResponse.json({ authUrl, state });
+    const response = NextResponse.json({ authUrl, state });
+    response.cookies.set('talio-mail-oauth-state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 600, path: '/api/auth/google/callback' });
+    return response;
 
   } catch (error) {
     console.error('[Mail OAuth] Error generating auth URL:', error.message, error.stack);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Server error while generating OAuth URL',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 });
@@ -144,15 +148,14 @@ export async function POST(request) {
 export async function DELETE(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { EmailAccount } = models
+    const { user, database } = auth
 
     // Remove email account
-    await EmailAccount.findOneAndDelete({ user: user._id });
+    await disconnectMailAccount(database, user, new URL(request.url).searchParams.get('accountId'));
 
     return NextResponse.json({ success: true, message: 'Email disconnected successfully' });
 

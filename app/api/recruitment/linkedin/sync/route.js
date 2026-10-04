@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { syncLinkedInApplicants } from '@/lib/linkedinSync';
 
 const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 export async function POST(request) {
     try {
-        const auth = await getAuthAndModels(request, ['Candidate', 'JobPosting', 'CompanySettings']);
+        const auth = await getAuthAndDatabase(request);
         if (!auth.success) {
             return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
         }
 
-        const { user, tenant, models } = auth;
+        const { user, tenant } = auth;
         if (!ALLOWED_ROLES.includes(user.role)) {
             return NextResponse.json(
                 { success: false, message: 'Only admin and HR can run LinkedIn sync' },
@@ -22,7 +22,6 @@ export async function POST(request) {
         const body = await request.json().catch(() => ({}));
         const actorId = user.employeeId?._id || user.employeeId || user._id;
         const summary = await syncLinkedInApplicants(tenant.databaseName, {
-            models,
             actorId,
             jobId: body.jobId,
             jobIds: body.jobIds,

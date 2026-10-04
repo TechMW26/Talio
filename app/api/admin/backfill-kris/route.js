@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { collectFirestorePages } from '@/lib/platform/firestoreQueries.server'
 import { generateAndStoreKRIsKPIs } from '@/lib/kriGenerator'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +16,7 @@ export const maxDuration = 300
  */
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Employee', 'User'])
+    const auth = await getAuthAndDatabase(request, { queryFields: { employees: ['status'] } })
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -25,16 +26,12 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Admin or HR access required' }, { status: 403 })
     }
 
-    const { Employee } = auth.models
     const url = new URL(request.url)
     const force = url.searchParams.get('force') === 'true'
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10) || 50, 200)
+    const limit = Math.max(1, Math.min(parseInt(url.searchParams.get('limit') || '50', 10) || 50, 200))
 
-    const filter = force
-      ? { status: { $ne: 'terminated' } }
-      : { status: { $ne: 'terminated' }, $or: [{ aiGeneratedKRIs: { $exists: false } }, { aiGeneratedKRIs: { $size: 0 } }] }
-
-    const employees = await Employee.find(filter).select('_id firstName lastName').limit(limit).lean()
+    const eligible = await collectFirestorePages(auth.database, 'employees', { filters: [{ field: 'status', operator: 'in', value: ['active', 'probation', 'inactive', 'resigned', 'on_leave'] }] })
+    const employees = eligible.filter(employee => force || !employee.aiGeneratedKRIs?.length).slice(0, limit)
 
     const userId = auth.user?._id || auth.user?.userId
 
@@ -42,7 +39,7 @@ export async function POST(request) {
     ;(async () => {
       for (const emp of employees) {
         try {
-          await generateAndStoreKRIsKPIs({ Employee, employeeId: emp._id, userId, generateKPIs: true })
+          await generateAndStoreKRIsKPIs({ database: auth.database, employeeId: emp._id, userId, generateKPIs: true })
         } catch (err) {
           console.error(`[Backfill KRI] Failed for ${emp._id}:`, err.message)
         }

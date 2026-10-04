@@ -19,10 +19,11 @@ export default function RemoteSupportOverlay() {
   const [session, setSession] = useState(null)
   const [error, setError] = useState('')
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async signal => {
     if (!getToken()) return
     try {
-      const result = await request('/api/remote-support/sessions')
+      const result = await request('/api/remote-support/sessions', { signal })
+      if (signal.aborted) return
       const employeeSessions = (result.sessions || []).filter(item => item.side === 'employee' && ['pending', 'approved'].includes(item.status))
       setSession(employeeSessions[0] || null)
       setError('')
@@ -30,9 +31,20 @@ export default function RemoteSupportOverlay() {
   }, [])
 
   useEffect(() => {
-    void refresh()
-    const timer = window.setInterval(refresh, 3500)
-    return () => window.clearInterval(timer)
+    let stopped = false, timer, controller, deadline
+    const poll = async () => {
+      controller = new AbortController()
+      deadline = window.setTimeout(() => controller.abort(), 20000)
+      try { await refresh(controller.signal) }
+      finally {
+        window.clearTimeout(deadline)
+        // Schedule from completion: a slow cloud read must never accumulate
+        // concurrent background polls and starve page navigation/asset loads.
+        if (!stopped) timer = window.setTimeout(poll, 3500)
+      }
+    }
+    void poll()
+    return () => { stopped = true; window.clearTimeout(timer); window.clearTimeout(deadline); controller?.abort() }
   }, [refresh])
 
   const decide = async action => {

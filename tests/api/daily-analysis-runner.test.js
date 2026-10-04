@@ -21,7 +21,7 @@ describe('daily analysis runner composite handoff', () => {
         jest.restoreAllMocks()
     })
 
-    test('uses freshly stitched buffer when immediate GridFS reload is unavailable', async () => {
+    test('uses freshly stitched buffer when immediate private media reload is unavailable', async () => {
         const stitchedBuffer = Buffer.from('stitched-composite')
         const composite = {
             _id: 'composite-id',
@@ -95,38 +95,15 @@ describe('daily analysis runner composite handoff', () => {
             },
         ]
 
-        const models = {
-            Screenshot: {
-                find: jest.fn().mockReturnValue(makeQuery(pendingScreenshots)),
-            },
-            ScreenshotAnalysis: {
-                findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
-                findOneAndUpdate: jest.fn().mockResolvedValue({ _id: { toString: () => 'analysis-id' } }),
-            },
-            ScreenshotComposite: {
-                findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
-            },
-            User: {
-                findById: jest.fn().mockReturnValue(makeQuery({
-                    _id: 'user-1',
-                    name: 'Test User',
-                    role: 'employee',
-                    employeeId: null,
-                })),
-            },
-            TaskAssignee: {
-                find: jest.fn().mockReturnValue(makeQuery([])),
-            },
-            Task: {
-                find: jest.fn().mockReturnValue(makeQuery([])),
-            },
-        }
+        const tx = { get: jest.fn(async name => name === 'screenshotcomposites' ? composite : null), create: jest.fn(), replace: jest.fn() }
+        const store = { list: jest.fn(async () => ({ records: [] })), transaction: jest.fn(async callback => callback(tx)) }
+        jest.doMock('@/lib/platform/firestoreScreenshots.server', () => ({ getScreenshotStore: async () => store, findScreenshotComposite: async () => null, listScreenshotMaintenanceRecords: async () => pendingScreenshots }))
+        jest.doMock('@/lib/platform/firestoreProductivityContext.server', () => ({ getProductivityEmployeeContext: async () => ({ employeeName: 'Test User' }) }))
 
         const { runDailyAnalysis } = require('@/lib/dailyAnalysisRunner')
         const result = await runDailyAnalysis({
             userId: 'user-1',
             dateString: '2026-05-07',
-            models,
             tenant: { databaseName: 'talio_company_test' },
             trigger: 'manual',
             forceReanalyze: true,

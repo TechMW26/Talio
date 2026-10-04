@@ -5,10 +5,10 @@
  * permission identical to /api/productivity/composite metadata endpoint.
  */
 import { NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { getAuthAndModels } from '@/lib/auth';
-import { canViewUserScreenshots } from '@/lib/productivityPermissions';
-import { getScreenshot } from '@/lib/gridfs';
+import { verifyTokenFromRequest } from '@/lib/auth';
+import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
+import { getScreenshotStore } from '@/lib/platform/firestoreScreenshots.server';
+import { getScreenshot } from '@/lib/mediaStorage';
 import sharp from 'sharp';
 
 export const dynamic = 'force-dynamic';
@@ -16,13 +16,13 @@ export const runtime = 'nodejs';
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ScreenshotComposite']);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    const { user, models, tenant } = auth;
-    const { ScreenshotComposite } = models;
+    const { user, tenant } = auth;
+    const store = await getScreenshotStore(tenant.databaseName);
 
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
@@ -32,27 +32,23 @@ export async function GET(request) {
     const date = searchParams.get('date');
     const targetUserId = searchParams.get('userId') || viewerId.toString();
 
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    if (!/^[a-f0-9]{24}$/i.test(id || '')) {
       return NextResponse.json({ success: false, error: 'Invalid id' }, { status: 400 });
     }
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return NextResponse.json({ success: false, error: 'Invalid date' }, { status: 400 });
     }
-    if (targetUserId !== viewerId.toString() && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (!/^[a-f0-9]{24}$/i.test(targetUserId)) {
       return NextResponse.json({ success: false, error: 'Invalid userId' }, { status: 400 });
     }
 
-    const composite = await ScreenshotComposite.findOne({
-      _id: id,
-      user: targetUserId,
-      dateString: date,
-    }).select('user dateString gridfsFileId mimeType tiles').lean();
+    const composite = await store.get('screenshotcomposites', id);
 
-    if (!composite || !composite.gridfsFileId) {
+    if (!composite || String(composite.user) !== targetUserId || composite.dateString !== date || !composite.gridfsFileId) {
       return NextResponse.json({ success: false, error: 'Composite not found' }, { status: 404 });
     }
 
-    const canView = await canViewUserScreenshots(viewerId, composite.user.toString(), viewerRole, models);
+    const canView = await canViewTenantScreenshots(viewerId, composite.user.toString(), viewerRole, tenant.databaseName);
     if (!canView) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }

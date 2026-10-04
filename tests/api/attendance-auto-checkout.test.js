@@ -1,25 +1,10 @@
 import {
-  buildOpenAttendanceQuery,
   getAttendanceDayRange,
   previousDateKey,
   resolveScheduledCheckout,
 } from '@/lib/attendanceAutoCheckout'
 
 describe('attendance auto-checkout recovery', () => {
-  test('backlog query includes every open in-progress row through the cutoff', () => {
-    const cutoff = new Date('2026-09-03T18:29:59.999Z')
-    expect(buildOpenAttendanceQuery({
-      targetDateStart: new Date('2026-09-02T18:30:00.000Z'),
-      targetDateEnd: cutoff,
-      includeBacklog: true,
-    })).toEqual({
-      date: { $lte: cutoff },
-      checkIn: { $exists: true, $ne: null },
-      $or: [{ checkOut: null }, { checkOut: { $exists: false } }],
-      status: 'in-progress',
-    })
-  })
-
   test('uses the configured company checkout time in its timezone', () => {
     const checkout = resolveScheduledCheckout({
       attendanceDate: new Date('2026-09-02T18:30:00.000Z'),

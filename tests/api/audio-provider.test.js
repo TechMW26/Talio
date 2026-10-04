@@ -13,7 +13,7 @@ test('call-alert TTS uses MIRA default voice when no override is configured', as
   delete process.env.ELEVENLABS_VOICE_ID
   fetch.mockResolvedValueOnce(new Response('audio'))
   expect((await generateSpeech('Hello')).success).toBe(true)
-  expect(fetch.mock.calls[0][0]).toContain('api.elevenlabs.io/v1/text-to-speech/komDQG4wp0wC5IDFwetv/stream')
+  expect(fetch.mock.calls[0][0]).toContain('api.elevenlabs.io/v1/text-to-speech/jJ0Hr51MaPgsgfPtFdR4/stream')
 })
 test('meeting uploads use native Scribe fields and return the detected language', async () => {
   fetch.mockResolvedValueOnce(new Response(JSON.stringify({ text: 'Hello', language_code: 'eng' })))

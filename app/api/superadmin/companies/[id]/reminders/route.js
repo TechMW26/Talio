@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
+import { getSuperadminStore, newRecordId, mutateCompany } from '@/lib/platform/firestoreSuperadmin.server';
 
 /**
  * GET - Get all reminders for a company
@@ -23,9 +23,9 @@ export async function GET(request, { params }) {
     }
 
     const { id } = await params;
-    const TenantCompany = await getTenantCompanyModel();
+    const database = await getSuperadminStore();
 
-    const company = await TenantCompany.findById(id).select('reminders name').lean();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -44,7 +44,7 @@ export async function GET(request, { params }) {
     console.error('[SuperAdmin Reminders GET] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to fetch reminders', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }
@@ -65,15 +65,15 @@ export async function POST(request, { params }) {
     const { id } = await params;
     const { title, description, dueDate, priority } = await request.json();
 
-    if (!title || !dueDate) {
+    if (typeof title !== 'string' || !title.trim() || !dueDate || !Number.isFinite(new Date(dueDate).getTime()) || (priority && !['low', 'medium', 'high', 'urgent'].includes(priority))) {
       return NextResponse.json(
         { success: false, message: 'Title and due date are required' },
         { status: 400 }
       );
     }
 
-    const TenantCompany = await getTenantCompanyModel();
-    const company = await TenantCompany.findById(id);
+    const database = await getSuperadminStore();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -83,6 +83,7 @@ export async function POST(request, { params }) {
     }
 
     const reminder = {
+      _id: newRecordId(),
       title,
       description,
       dueDate: new Date(dueDate),
@@ -92,20 +93,19 @@ export async function POST(request, { params }) {
       createdBy: auth.superadmin._id,
     };
 
-    company.reminders.push(reminder);
-    await company.save();
+    await mutateCompany(database, id, current => ({ ...current, reminders: [...(current.reminders || []), reminder] }));
 
     return NextResponse.json({
       success: true,
       message: 'Reminder added successfully',
-      reminder: company.reminders[company.reminders.length - 1],
+      reminder,
     });
 
   } catch (error) {
     console.error('[SuperAdmin Reminders POST] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to add reminder', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }
@@ -133,8 +133,8 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const TenantCompany = await getTenantCompanyModel();
-    const company = await TenantCompany.findById(id);
+    const database = await getSuperadminStore();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -143,7 +143,7 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const reminder = company.reminders.id(reminderId);
+    const reminder = (company.reminders || []).find(row => String(row._id) === String(reminderId));
     if (!reminder) {
       return NextResponse.json(
         { success: false, message: 'Reminder not found' },
@@ -151,31 +151,33 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    // Update fields
-    if (status) {
-      reminder.status = status;
-      if (status === 'completed') {
-        reminder.completedAt = new Date();
-      }
+    if ((status && !['pending', 'completed', 'cancelled'].includes(status)) ||
+      (priority && !['low', 'medium', 'high', 'urgent'].includes(priority)) ||
+      (dueDate && !Number.isFinite(new Date(dueDate).getTime())) ||
+      (title !== undefined && (typeof title !== 'string' || !title.trim()))) {
+      return NextResponse.json({ success: false, message: 'Invalid reminder fields' }, { status: 400 });
     }
-    if (title) reminder.title = title;
-    if (description !== undefined) reminder.description = description;
-    if (dueDate) reminder.dueDate = new Date(dueDate);
-    if (priority) reminder.priority = priority;
-
-    await company.save();
+    const updated = await mutateCompany(database, id, current => {
+      if (!(current.reminders || []).some(row => String(row._id) === String(reminderId))) throw Object.assign(new Error('Reminder not found'), { status: 404 });
+      return { ...current, reminders: current.reminders.map(row => String(row._id) === String(reminderId) ? {
+        ...row, ...(status ? { status, ...(status === 'completed' ? { completedAt: new Date() } : { completedAt: null }) } : {}),
+        ...(title !== undefined ? { title } : {}), ...(description !== undefined ? { description } : {}),
+        ...(dueDate ? { dueDate: new Date(dueDate) } : {}), ...(priority ? { priority } : {}),
+      } : row) };
+    });
+    const savedReminder = updated.reminders.find(row => String(row._id) === String(reminderId));
 
     return NextResponse.json({
       success: true,
       message: 'Reminder updated successfully',
-      reminder,
+      reminder: savedReminder,
     });
 
   } catch (error) {
     console.error('[SuperAdmin Reminders PATCH] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to update reminder', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }
@@ -203,8 +205,8 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const TenantCompany = await getTenantCompanyModel();
-    const company = await TenantCompany.findById(id);
+    const database = await getSuperadminStore();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -213,8 +215,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    company.reminders = company.reminders.filter(r => r._id.toString() !== reminderId);
-    await company.save();
+    await mutateCompany(database, id, current => ({ ...current, reminders: (current.reminders || []).filter(row => String(row._id) !== String(reminderId)) }));
 
     return NextResponse.json({
       success: true,
@@ -225,7 +226,7 @@ export async function DELETE(request, { params }) {
     console.error('[SuperAdmin Reminders DELETE] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to delete reminder', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }

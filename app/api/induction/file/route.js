@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import { INDUCTION_MODELS, inductionStatus, readInductionSource } from '@/lib/hrms/induction.server'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { inductionStatus, readInductionSource } from '@/lib/hrms/induction.server'
 export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, INDUCTION_MODELS)
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) return new NextResponse('Unauthorized', { status: 401 })
     const { program, employee, canManage } = await inductionStatus(auth)
     if (!employee && !canManage) return new NextResponse('Forbidden', { status: 403 })

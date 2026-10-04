@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import { getIpBlockModel } from '@/models/IpBlock';
+import { getSuperadminStore, readAdminPage } from '@/lib/platform/firestoreSuperadmin.server';
 import { blockIp, unblockIp } from '@/lib/security/ipBlocklist';
 
 export const dynamic = 'force-dynamic';
@@ -20,12 +20,12 @@ export async function GET(request) {
         const { searchParams } = new URL(request.url);
         const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 100, 1), 1000);
         const skip = Math.max(Number(searchParams.get('skip')) || 0, 0);
-        const IpBlock = await getIpBlockModel();
-        const [blocks, total] = await Promise.all([
-            IpBlock.find({}).sort({ blockedAt: -1 }).skip(skip).limit(limit).lean(),
-            IpBlock.countDocuments({}),
+        const database = await getSuperadminStore();
+        const [page, total] = await Promise.all([
+            readAdminPage(database, 'ipblocks', { orderBy: [{ field: 'blockedAt', direction: 'desc' }], skip, limit, cursor: searchParams.get('cursor') }),
+            database.count('ipblocks'),
         ]);
-        return NextResponse.json({ success: true, blocks, total, limit, skip });
+        return NextResponse.json({ success: true, blocks: page.records, total, limit, skip, nextCursor: page.nextCursor });
     } catch (err) {
         console.error('[superadmin/security/blocked-ips] GET error:', err);
         return NextResponse.json({ message: 'Failed to load blocked IPs' }, { status: 500 });

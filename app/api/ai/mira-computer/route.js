@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { generateVisionContent } from '@/lib/ai/aiProviderManager'
 import sharp from 'sharp'
@@ -31,7 +31,7 @@ function summarizeDeviceContext(value) {
   return JSON.stringify(context).slice(0, 4000)
 }
 export async function POST(request) {
-  const auth = await getAuthAndModels(request, ['User'])
+  const auth = await getAuthAndDatabase(request)
   if (!auth.success) return reply({ success: false }, 401)
   const bucket = await rateLimit('MIRA_COMPUTER', `${auth.tenant.databaseName}:${auth.user._id}`)
   if (!bucket.allowed) return reply({ success: false, message: 'Desktop vision is rate limited. Please try again shortly.' }, 429)

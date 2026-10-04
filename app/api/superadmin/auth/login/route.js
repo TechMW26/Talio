@@ -7,7 +7,8 @@
 
 import { NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
-import getSuperAdminModel from '@/models/SuperAdmin';
+import { getSuperadminStore } from '@/lib/platform/firestoreSuperadmin.server';
+import { compareStoredPassword } from '@/lib/passwordAuth';
 
 export async function POST(request) {
   try {
@@ -21,10 +22,11 @@ export async function POST(request) {
     }
 
     // Get SuperAdmin model
-    const SuperAdmin = await getSuperAdminModel();
+    const database = await getSuperadminStore();
 
     // Find superadmin by email
-    const superadmin = await SuperAdmin.findOne({ email: email.toLowerCase() }).select('+password');
+    const { records } = await database.list('superadmins', { filters: [{ field: 'email', operator: '==', value: email.toLowerCase().trim() }], limit: 2 });
+    let superadmin = records.length === 1 ? records[0] : null;
 
     if (!superadmin) {
       return NextResponse.json(
@@ -41,7 +43,7 @@ export async function POST(request) {
     }
 
     // Verify password
-    const isPasswordMatch = await superadmin.comparePassword(password);
+    const isPasswordMatch = await compareStoredPassword(password, superadmin.password);
 
     if (!isPasswordMatch) {
       return NextResponse.json(
@@ -51,16 +53,20 @@ export async function POST(request) {
     }
 
     // Update last login
-    superadmin.lastLogin = new Date();
-    await superadmin.save({ validateBeforeSave: false });
+    superadmin = await database.mutate('superadmins', superadmin._id, async current => {
+      if (!current.isActive || !await compareStoredPassword(password, current.password)) throw new Error('Credentials changed');
+      return { ...current, lastLogin: new Date(), updatedAt: new Date() };
+    });
 
     // Create JWT token with superadmin flag
+    if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required');
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     const token = await new SignJWT({
       superadminId: superadmin._id.toString(),
       email: superadmin.email,
       name: superadmin.name,
       isSuperAdmin: true,
+      authVersion: Number(superadmin.authVersion) || 0,
       permissions: superadmin.permissions,
     })
       .setProtectedHeader({ alg: 'HS256' })

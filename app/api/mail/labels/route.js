@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
+import { MAIL_ACCOUNT_OPTIONS, listMailAccounts, getMailAccount, updateMailAccount, disconnectMailAccount, getAuthenticatedMailClient } from '@/lib/mailAccounts.server';
 import { google } from 'googleapis';
 
 // Production URL and redirect URI - must match Google Cloud Console
@@ -7,49 +8,22 @@ const PRODUCTION_URL = 'https://app.talio.in';
 const REDIRECT_URI = `${PRODUCTION_URL}/api/auth/google/callback`;
 
 // Create OAuth2 client with user's tokens
-async function getAuthenticatedClient(emailAccount) {
-    const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI);
-
-    oauth2Client.setCredentials({
-        access_token: emailAccount.accessToken,
-        refresh_token: emailAccount.refreshToken,
-        expiry_date: emailAccount.tokenExpiry?.getTime()
-    });
-
-    // Check if token needs refresh
-    if (emailAccount.tokenExpiry && new Date() >= emailAccount.tokenExpiry) {
-        try {
-            const { credentials } = await oauth2Client.refreshAccessToken();
-            emailAccount.accessToken = credentials.access_token;
-            emailAccount.tokenExpiry = new Date(credentials.expiry_date);
-            await emailAccount.save();
-        } catch (error) {
-            console.error('Error refreshing token:', error);
-            throw new Error('Token refresh failed');
-        }
-    }
-
-    return oauth2Client;
-}
 
 // GET - Fetch all labels with message counts
 export async function GET(request) {
     try {
         // Get authenticated user and tenant-specific models
-        const auth = await getAuthAndModels(request, ['EmailAccount'])
+        const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS)
         if (!auth.success) {
             return NextResponse.json({ 
                 folderCounts: {},
                 userLabels: []
             });
         }
-        const { user, models } = auth
-        const { EmailAccount } = models
+        const { user, database } = auth
 
-        const emailAccount = await EmailAccount.findOne({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+        const emailAccount = await getMailAccount(database, user);
 
         if (!emailAccount) {
             // Return empty labels when not connected
@@ -59,7 +33,7 @@ export async function GET(request) {
             });
         }
 
-        const oauth2Client = await getAuthenticatedClient(emailAccount);
+        const oauth2Client = await getAuthenticatedMailClient(database, user, emailAccount);
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
         // Fetch all labels
@@ -165,11 +139,11 @@ export async function GET(request) {
 // POST - Create a new label
 export async function POST(request) {
     try {
-        const auth = await getAuthAndModels(request, ['EmailAccount']);
+        const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS);
         if (!auth.success) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        const { models, user } = auth;
+        const { database, user } = auth;
 
         const { name, backgroundColor, textColor } = await request.json();
 
@@ -177,13 +151,13 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Label name is required' }, { status: 400 });
         }
 
-        const emailAccount = await models.EmailAccount.findOne({ user: user.userId, isConnected: true }).select('+accessToken +refreshToken');
+        const emailAccount = await getMailAccount(database, user);
 
         if (!emailAccount) {
             return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
         }
 
-        const oauth2Client = await getAuthenticatedClient(emailAccount);
+        const oauth2Client = await getAuthenticatedMailClient(database, user, emailAccount);
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
         const labelRequest = {
@@ -223,11 +197,11 @@ export async function POST(request) {
 // DELETE - Delete a label
 export async function DELETE(request) {
     try {
-        const auth = await getAuthAndModels(request, ['EmailAccount']);
+        const auth = await getAuthAndDatabase(request, MAIL_ACCOUNT_OPTIONS);
         if (!auth.success) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        const { models, user } = auth;
+        const { database, user } = auth;
 
         const { searchParams } = new URL(request.url);
         const labelId = searchParams.get('labelId');
@@ -236,13 +210,13 @@ export async function DELETE(request) {
             return NextResponse.json({ error: 'Label ID is required' }, { status: 400 });
         }
 
-        const emailAccount = await models.EmailAccount.findOne({ user: user.userId, isConnected: true }).select('+accessToken +refreshToken');
+        const emailAccount = await getMailAccount(database, user);
 
         if (!emailAccount) {
             return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
         }
 
-        const oauth2Client = await getAuthenticatedClient(emailAccount);
+        const oauth2Client = await getAuthenticatedMailClient(database, user, emailAccount);
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
         await gmail.users.labels.delete({

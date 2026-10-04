@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { collectFirestorePages } from '@/lib/platform/firestoreQueries.server'
+import { adjustLeaveBalance, validateLeaveYear } from '@/lib/leaveBalances.server'
 import { generateContent } from '@/lib/gemini'
 import { clearCachePattern, buildCachePattern } from '@/lib/cache'
 import {
@@ -7,17 +9,16 @@ import {
   normalizeLeaveBalance,
   normalizeLeaveTypes,
 } from '@/lib/leaveData'
-import { EMPLOYED_STATUSES } from '@/lib/leaveAllocation.server'
+import { EMPLOYED_STATUSES, LEAVE_BALANCE_STORE_OPTIONS } from '@/lib/leaveAllocation.server'
 
 // POST - Bulk import leave balances from CSV/text data using AI parsing
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Employee', 'LeaveType', 'LeaveBalance'])
+    const auth = await getAuthAndDatabase(request, LEAVE_BALANCE_STORE_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models, tenant } = auth
-    const { Employee, LeaveType, LeaveBalance } = models
+    const { user, database, tenant } = auth
 
     if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
@@ -28,7 +29,10 @@ export async function POST(request) {
     const year = parseInt(formData.get('year')) || new Date().getFullYear()
     const mode = formData.get('mode') || 'preview' // 'preview' or 'apply'
 
-    if (!file) {
+    validateLeaveYear(year)
+    if (!['preview', 'apply'].includes(mode)) return NextResponse.json({ success: false, message: 'Invalid import mode' }, { status: 400 })
+    if (file?.size > 1024 * 1024) return NextResponse.json({ success: false, message: 'File must be smaller than 1 MB' }, { status: 413 })
+    if (!file && mode === 'preview') {
       return NextResponse.json(
         { success: false, message: 'File is required' },
         { status: 400 }
@@ -36,11 +40,11 @@ export async function POST(request) {
     }
 
     // Read file content
-    const arrayBuffer = await file.arrayBuffer()
+    const arrayBuffer = file ? await file.arrayBuffer() : new ArrayBuffer(0)
     const buffer = Buffer.from(arrayBuffer)
     const fileContent = buffer.toString('utf-8')
 
-    if (!fileContent.trim()) {
+    if (!fileContent.trim() && mode === 'preview') {
       return NextResponse.json(
         { success: false, message: 'File is empty' },
         { status: 400 }
@@ -49,8 +53,8 @@ export async function POST(request) {
 
     // Get all employees and leave types for matching
     const [employees, rawLeaveTypes] = await Promise.all([
-      Employee.find({ status: { $in: EMPLOYED_STATUSES } }).select('firstName lastName employeeCode email department').lean(),
-      LeaveType.find({ isActive: true }).select('name code maxDaysPerYear daysPerYear').lean(),
+      collectFirestorePages(database, 'employees', { filters: [{ field: 'status', operator: 'in', value: [...EMPLOYED_STATUSES] }] }),
+      collectFirestorePages(database, 'leavetypes', { filters: [{ field: 'isActive', operator: '==', value: true }] }),
     ])
     const leaveTypes = normalizeLeaveTypes(rawLeaveTypes)
 
@@ -107,6 +111,7 @@ FILE CONTENT:
 ${fileContent.substring(0, 15000)}`
 
     let parsedData
+    if (mode === 'preview') {
     try {
       const aiResponse = await generateContent(prompt, systemInstruction, { useCase: 'json' })
       // Clean up response - remove markdown fences if present
@@ -144,6 +149,9 @@ ${fileContent.substring(0, 15000)}`
       })
     }
 
+    }
+
+    // Apply mode uses confirmed rows only; no second AI request can change them.
     // Apply mode — create/update leave balances
     const allocationsToApply = formData.get('allocations')
     let confirmedAllocations
@@ -156,51 +164,32 @@ ${fileContent.substring(0, 15000)}`
       )
     }
 
+    if (!Array.isArray(confirmedAllocations) || confirmedAllocations.length > 2000) return NextResponse.json({ success: false, message: 'Provide at most 2000 allocation rows' }, { status: 400 })
+    const eligibleEmployees = new Set(employees.map(employee => String(employee._id)))
+    const eligibleTypes = new Set(leaveTypes.map(type => String(type._id)))
     let created = 0
     let updated = 0
     let failed = 0
     const errors = []
 
     for (const alloc of confirmedAllocations) {
-      if (!alloc.employeeId || !alloc.leaveTypeId || !alloc.totalDays) {
+      if (!alloc || !eligibleEmployees.has(alloc.employeeId) || !eligibleTypes.has(alloc.leaveTypeId) || alloc.totalDays === undefined || alloc.totalDays === null || alloc.totalDays === '') {
         failed++
-        errors.push(`Skipped: missing data for ${alloc.employeeName || 'unknown'}`)
+        errors.push(`Skipped: missing data for ${alloc?.employeeName || 'unknown'}`)
         continue
       }
 
       try {
-        const totalDays = parseInt(alloc.totalDays)
-        if (isNaN(totalDays) || totalDays < 0) {
+        const totalDays = Number(alloc.totalDays)
+        if (!Number.isFinite(totalDays) || totalDays < 0) {
           failed++
           errors.push(`Invalid days for ${alloc.employeeName}: ${alloc.totalDays}`)
           continue
         }
 
-        const existing = await LeaveBalance.findOne({
-          employee: alloc.employeeId,
-          leaveType: alloc.leaveTypeId,
-          year,
-        })
-
-        if (existing) {
-          const currentBalance = normalizeLeaveBalance(existing)
-          existing.set(buildLeaveBalanceFields({
-            totalDays,
-            usedDays: currentBalance.usedDays,
-            pending: currentBalance.pending,
-            carriedForward: currentBalance.carriedForward,
-          }))
-          await existing.save()
-          updated++
-        } else {
-          await LeaveBalance.create({
-            employee: alloc.employeeId,
-            leaveType: alloc.leaveTypeId,
-            year,
-            ...buildLeaveBalanceFields({ totalDays }),
-          })
-          created++
-        }
+        const result = await adjustLeaveBalance(database, user, { employee: alloc.employeeId, leaveType: alloc.leaveTypeId, year, totalDays })
+        if (result.created) created++
+        else updated++
       } catch (err) {
         failed++
         errors.push(`Failed for ${alloc.employeeName}: ${err.message}`)

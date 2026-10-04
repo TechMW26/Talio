@@ -87,6 +87,7 @@ test('searches names and codes and opens the selected folder', () => {
 test('HR switches to organisation folders and opens documents in a dialog', async () => {
   localStorage.setItem('user', JSON.stringify({ ...employee, employeeId: 'one', role: 'hr' }))
   render(<HeroUIProvider disableAnimation><DocumentsPage /></HeroUIProvider>)
+  expect(useAuthedSWR).toHaveBeenCalledWith('/api/documents?employeeId=one', { keepPreviousData: false })
   expect(screen.getByText('My onboarding checklist')).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'Appointment letter' })).toBeInTheDocument()
   expect(screen.queryByLabelText('Document folders')).not.toBeInTheDocument()

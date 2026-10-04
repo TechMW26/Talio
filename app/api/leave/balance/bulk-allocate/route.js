@@ -1,109 +1,27 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
-import { buildLeaveBalanceFields, normalizeLeaveType, prorateAnnualLeave } from '@/lib/leaveData'
-import { EMPLOYED_STATUSES } from '@/lib/leaveAllocation.server'
-// POST - Bulk allocate leave for all employees
+import { EMPLOYED_STATUSES, LEAVE_BALANCE_STORE_OPTIONS, ensureEmployeeLeaveBalances } from '@/lib/leaveAllocation.server'
+import { collectFirestorePages } from '@/lib/platform/firestoreQueries.server'
+import { validateLeaveYear } from '@/lib/leaveBalances.server'
 export async function POST(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'LeaveType', 'LeaveBalance'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models, tenant } = auth
-    const { Employee, LeaveType, LeaveBalance } = models
-    if (!['admin', 'hr'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-
-    const body = await request.json().catch(() => null)
-    const year = Number(body?.year)
-    
-    if (!Number.isInteger(year) || year < 1900 || year > 9998) {
-      return NextResponse.json(
-        { success: false, message: 'A valid leave year is required' },
-        { status: 400 }
-      )
-    }
-
-    // Get all active employees
-    const employees = await Employee.find({ status: { $in: EMPLOYED_STATUSES } })
-    
-    // Get all active leave types
-    const leaveTypes = await LeaveType.find({ isActive: true })
-
-    if (employees.length === 0) {
-      return NextResponse.json(
-        { success: false, message: 'No active employees found' },
-        { status: 400 }
-      )
-    }
-
-    if (leaveTypes.length === 0) {
-      return NextResponse.json(
-        { success: false, message: 'No active leave types found' },
-        { status: 400 }
-      )
-    }
-
-    let allocatedCount = 0
-    let skippedCount = 0
-
-    // Allocate leave for each employee and leave type combination
+    const auth = await getAuthAndDatabase(request, LEAVE_BALANCE_STORE_OPTIONS)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: auth.status || 401 })
+    if (!['admin', 'hr'].includes(auth.user.role)) return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    const year = Number((await request.json()).year)
+    validateLeaveYear(year)
+    const [employees, types] = await Promise.all([
+      collectFirestorePages(auth.database, 'employees', { filters: [{ field: 'status', operator: 'in', value: [...EMPLOYED_STATUSES] }] }),
+      collectFirestorePages(auth.database, 'leavetypes', { filters: [{ field: 'isActive', operator: '==', value: true }] }),
+    ])
+    if (!employees.length || !types.length) return NextResponse.json({ success: false, message: 'Active employees and leave types are required' }, { status: 400 })
+    let allocated = 0, skipped = 0
     for (const employee of employees) {
-      for (const leaveType of leaveTypes) {
-        const normalizedLeaveType = normalizeLeaveType(leaveType)
-        // Check if allocation already exists
-        const existingBalance = await LeaveBalance.findOne({
-          employee: employee._id,
-          leaveType: leaveType._id,
-          year: year,
-        })
-
-        if (existingBalance) {
-          skippedCount++
-          continue
-        }
-
-        // Create new leave balance allocation
-        await LeaveBalance.create({
-          employee: employee._id,
-          leaveType: leaveType._id,
-          year: year,
-          ...buildLeaveBalanceFields({
-            totalDays: prorateAnnualLeave(normalizedLeaveType.maxDaysPerYear, employee.dateOfJoining, year),
-          }),
-        })
-
-        allocatedCount++
-      }
+      const result = await ensureEmployeeLeaveBalances({ database: auth.database, employeeId: employee._id, year })
+      allocated += result.allocated; skipped += result.skipped
     }
-
-    await clearCachePattern(buildCachePattern({
-      tenantId: tenant?.databaseName,
-      namespace: 'leave-balance',
-      userId: '*',
-    }))
-    await clearCachePattern(buildCachePattern({
-      tenantId: tenant?.databaseName,
-      namespace: 'dashboard:unified',
-      userId: '*',
-    }))
-
-    return NextResponse.json({
-      success: true,
-      message: `Bulk allocation completed successfully`,
-      allocated: allocatedCount,
-      skipped: skippedCount,
-      totalEmployees: employees.length,
-      totalLeaveTypes: leaveTypes.length,
-    })
-  } catch (error) {
-    console.error('Bulk allocate error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to perform bulk allocation' },
-      { status: 500 }
-    )
-  }
+    await Promise.all(['leave-balance', 'dashboard:unified'].map(namespace => clearCachePattern(buildCachePattern({ tenantId: auth.tenant.databaseName, namespace, userId: '*' })).catch(() => {})))
+    return NextResponse.json({ success: true, message: 'Bulk allocation completed successfully', allocated, skipped, totalEmployees: employees.length, totalLeaveTypes: types.length })
+  } catch (error) { return NextResponse.json({ success: false, message: error.status ? error.message : 'Allocation did not complete; retrying safely preserves existing balances' }, { status: error.status || 500 }) }
 }

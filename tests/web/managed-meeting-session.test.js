@@ -3,6 +3,12 @@ import { TextEncoder, TextDecoder } from 'util'
 import { StrictMode } from 'react'
 
 Object.assign(global, { TextEncoder, TextDecoder })
+global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+Object.defineProperty(window, 'matchMedia', { writable: true, value: jest.fn(query => ({
+  matches: false, media: query, onchange: null,
+  addListener: jest.fn(), removeListener: jest.fn(),
+  addEventListener: jest.fn(), removeEventListener: jest.fn(), dispatchEvent: jest.fn(),
+})) })
 
 const mockRooms = []
 const mockConnect = jest.fn()
@@ -49,6 +55,7 @@ jest.mock('livekit-client', () => {
   }
 })
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }))
+jest.mock('@/contexts/ThemeContext', () => ({ useTheme: () => ({ isDarkMode: true }) }))
 jest.mock('@/hooks/useAuthedSWR', () => ({ __esModule: true, default: () => ({}) }))
 jest.mock('@/components/meetings/MeetingReactionPicker', () => ({ __esModule: true, default: () => null }))
 jest.mock('@/app/dashboard/meetings/components/AddMeetingParticipantsModal', () => ({ __esModule: true, default: () => null }))
@@ -98,6 +105,8 @@ test('incoming chat messages play a notification sound and remain easy to open',
 test('active speaker updates highlight that participant tile', async () => {
   const { room } = await join()
   const remote = mockParticipant('Colleague')
+  remote.isMicrophoneEnabled = true
+  remote.publications.set('microphone', { isMuted: false })
   act(() => {
     room.remoteParticipants.set(remote.identity, remote)
     room.emit('ParticipantConnected', remote)

@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
+import { getSuperadminStore, readReportPages } from '@/lib/platform/firestoreSuperadmin.server';
 
 export async function GET(request) {
   try {
@@ -19,79 +19,28 @@ export async function GET(request) {
       );
     }
 
-    const TenantCompany = await getTenantCompanyModel();
-
-    // Get company stats
-    const companyStats = await TenantCompany.aggregate([
-      { $match: { isActive: true } },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-          active: { $sum: { $cond: [{ $eq: ['$serviceStatus', 'active'] }, 1, 0] } },
-          paused: { $sum: { $cond: [{ $eq: ['$serviceStatus', 'paused'] }, 1, 0] } },
-          suspended: { $sum: { $cond: [{ $eq: ['$serviceStatus', 'suspended'] }, 1, 0] } },
-          pendingSetup: { $sum: { $cond: [{ $eq: ['$isSetupComplete', false] }, 1, 0] } },
-          setupComplete: { $sum: { $cond: [{ $eq: ['$isSetupComplete', true] }, 1, 0] } },
-        },
-      },
-    ]);
-
-    // Get subscription stats
-    const subscriptionStats = await TenantCompany.aggregate([
-      { $match: { isActive: true } },
-      {
-        $group: {
-          _id: '$subscription.plan',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    // Get companies with expiring subscriptions (within 30 days)
-    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const expiringSubscriptions = await TenantCompany.countDocuments({
-      isActive: true,
-      'subscription.endDate': { $lte: thirtyDaysFromNow, $gte: new Date() },
-    });
-
-    // Get companies with expired subscriptions
-    const expiredSubscriptions = await TenantCompany.countDocuments({
-      isActive: true,
-      'subscription.endDate': { $lt: new Date() },
-      'subscription.status': { $ne: 'cancelled' },
-    });
-
-    // Get pending reminders count
-    const companiesWithReminders = await TenantCompany.find({
-      isActive: true,
-      'reminders.status': 'pending',
-    }).select('reminders').lean();
-
-    let pendingReminders = 0;
-    let overdueReminders = 0;
+    const database = await getSuperadminStore();
+    const catalog = await readReportPages(database, 'tenantcompanies');
+    const companies = catalog.filter(company => company.isActive);
     const now = new Date();
-
-    for (const company of companiesWithReminders) {
-      for (const reminder of company.reminders || []) {
-        if (reminder.status === 'pending') {
-          pendingReminders++;
-          if (new Date(reminder.dueDate) < now) {
-            overdueReminders++;
-          }
-        }
-      }
-    }
-
-    // Get recently created companies (last 30 days)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const recentCompanies = await TenantCompany.find({
-      createdAt: { $gte: thirtyDaysAgo },
-    })
-      .select('name slug createdAt isSetupComplete serviceStatus')
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean();
+    const companyStats = [{
+      total: companies.length,
+      active: companies.filter(c => c.serviceStatus === 'active').length,
+      paused: companies.filter(c => c.serviceStatus === 'paused').length,
+      suspended: companies.filter(c => c.serviceStatus === 'suspended').length,
+      pendingSetup: companies.filter(c => c.isSetupComplete === false).length,
+      setupComplete: companies.filter(c => c.isSetupComplete === true).length,
+    }];
+    const plans = new Map();
+    companies.forEach(c => plans.set(c.subscription?.plan || 'unknown', (plans.get(c.subscription?.plan || 'unknown') || 0) + 1));
+    const subscriptionStats = [...plans].map(([plan, count]) => ({ _id: plan, count }));
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 86400000);
+    const expiringSubscriptions = companies.filter(c => c.subscription?.endDate && new Date(c.subscription.endDate) >= now && new Date(c.subscription.endDate) <= thirtyDaysFromNow).length;
+    const expiredSubscriptions = companies.filter(c => c.subscription?.endDate && new Date(c.subscription.endDate) < now && c.subscription.status !== 'cancelled').length;
+    const pending = companies.flatMap(c => c.reminders || []).filter(r => r.status === 'pending');
+    const pendingReminders = pending.length;
+    const overdueReminders = pending.filter(r => new Date(r.dueDate) < now).length;
+    const recentCompanies = catalog.filter(c => new Date(c.createdAt) >= new Date(now.getTime() - 30 * 86400000)).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5).map(({ _id, name, slug, createdAt, isSetupComplete, serviceStatus }) => ({ _id, name, slug, createdAt, isSetupComplete, serviceStatus }));
 
     return NextResponse.json({
       success: true,

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import path from 'path'
-import fs from 'fs/promises'
-import { uploadImage, deleteImage } from '@/lib/gridfs'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getProfileStore, getProfileRecords, replaceAadhaarImage, invalidateProfile } from '@/lib/platform/firestoreProfile.server'
+import { uploadImage, deleteImage } from '@/lib/mediaStorage'
 import { processImage, ImagePipelineError } from '@/lib/imagePipeline'
 
 export const dynamic = 'force-dynamic'
@@ -17,14 +16,13 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models } = auth
-    const { User, Employee } = models
-
-    const user = await User.findById(authUser._id || authUser.userId)
+    const { user: authUser } = auth
+    const store = await getProfileStore(auth.tenant.databaseName)
+    const { user, employee } = await getProfileRecords(store, authUser._id || authUser.userId)
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
@@ -90,17 +88,10 @@ export async function POST(request) {
       if (pipelineErr instanceof ImagePipelineError && pipelineErr.code === 'too_large') {
         return NextResponse.json({ success: false, message: 'Image too large.' }, { status: 413 })
       }
-      console.warn('[Aadhaar Upload] Pipeline failed, storing raw:', pipelineErr?.message || pipelineErr)
+      return NextResponse.json({ success: false, message: 'Invalid image. Please upload a clear supported image.' }, { status: 400 })
     }
 
     // Get employee info for folder structure
-    let employee = null
-    if (user.employeeId) {
-      employee = await Employee.findById(user.employeeId).select('firstName lastName employeeCode')
-    }
-    if (!employee) {
-      employee = await Employee.findOne({ userId: authUser._id || authUser.userId }).select('firstName lastName employeeCode')
-    }
 
     // Generate secure filename with employee code
     const timestamp = Date.now()
@@ -111,73 +102,37 @@ export async function POST(request) {
     let fileUrl = ''
     let fileId = null
 
-    // Upload to GridFS
+    // Upload to private Blob storage
     try {
-      console.log('[Aadhaar Upload] Uploading to GridFS...')
-      const gridfsResult = await uploadImage(imageBuffer, {
+      console.log('[Aadhaar Upload] Uploading to private Blob storage...')
+      const mediaResult = await uploadImage(imageBuffer, {
+        databaseName: auth.tenant.databaseName,
         category: 'aadhaar',
         contentType: processedContentType,
         originalName: filename,
         userId: String(authUser._id || authUser.userId),
         employeeId: employee?._id ? String(employee._id) : undefined,
       })
-      fileUrl = gridfsResult.url
-      fileId = String(gridfsResult._id)
-      console.log(`[Aadhaar Upload] ✅ Uploaded to GridFS: ${fileUrl}`)
-    } catch (gridfsError) {
-      console.error('[Aadhaar Upload] ❌ GridFS upload failed:', gridfsError.message)
+      fileUrl = mediaResult.url
+      fileId = String(mediaResult._id)
+      console.log(`[Aadhaar Upload] ✅ Uploaded to private Blob storage: ${fileUrl}`)
+    } catch (mediaError) {
+      console.error('[Aadhaar Upload] ❌ private Blob storage upload failed:', mediaError.message)
     }
 
     if (!fileUrl) {
       return NextResponse.json({ success: false, message: 'Document storage is unavailable. Please retry.' }, { status: 503 })
     }
 
-    // Update user's Aadhaar document status
-    const updateField = side === 'front' ? 'profileCompletion.aadhaarFront' : 'profileCompletion.aadhaarBack'
-
-    const updateData = {
-      [`${updateField}.url`]: fileUrl,
-      [`${updateField}.uploadedAt`]: new Date(),
-      ...(fileId && { [`${updateField}.fileId`]: fileId }),
+    let result
+    try {
+      result = await replaceAadhaarImage(store, user._id, side, { _id: fileId, url: fileUrl })
+    } catch (error) {
+      await deleteImage(fileId, { databaseName: auth.tenant.databaseName }).catch(() => {})
+      throw error
     }
-
-    // Check if both sides will be uploaded after this update
-    const otherSide = side === 'front' ? 'aadhaarBack' : 'aadhaarFront'
-    const otherSideUploaded = user.profileCompletion?.[otherSide]?.url
-
-    if (otherSideUploaded) {
-      updateData['profileCompletion.completedFields.aadhaarUploaded'] = true
-      // Update status to partially complete if personal info is done
-      if (user.profileCompletion?.completedFields?.personalInfo) {
-        updateData['profileCompletion.status'] = 'partially_complete'
-      }
-    }
-
-    await User.findByIdAndUpdate(authUser._id || authUser.userId, {
-      $set: updateData
-    })
-
-    // Delete old file if exists
-    const oldSideData = user.profileCompletion?.[side === 'front' ? 'aadhaarFront' : 'aadhaarBack']
-    if (oldSideData?.url) {
-      // If old file was on GridFS, delete from GridFS
-      if (oldSideData.fileId) {
-        try {
-          await deleteImage(oldSideData.fileId)
-          console.log(`[Aadhaar Upload] Deleted old GridFS file: ${oldSideData.fileId}`)
-        } catch (err) {
-          console.log('Old GridFS file cleanup:', err.message)
-        }
-      } else if (oldSideData.url.startsWith('/uploads/')) {
-        // Local file - delete from filesystem
-        const oldPath = path.join(process.cwd(), oldSideData.url)
-        try {
-          await fs.unlink(oldPath)
-        } catch (err) {
-          console.log('Old file cleanup:', err.message)
-        }
-      }
-    }
+    await invalidateProfile(auth.tenant.databaseName, user._id)
+    if (result.previous && result.previous !== fileId) await deleteImage(result.previous, { databaseName: auth.tenant.databaseName }).catch(() => {})
 
     return NextResponse.json({
       success: true,
@@ -186,7 +141,7 @@ export async function POST(request) {
         side,
         url: fileUrl,
         uploadedAt: new Date(),
-        bothUploaded: !!otherSideUploaded
+        bothUploaded: result.bothUploaded
       }
     })
 
@@ -206,14 +161,13 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models } = auth
-    const { User } = models
-
-    const user = await User.findById(authUser._id || authUser.userId).select('profileCompletion')
+    const { user: authUser } = auth
+    const store = await getProfileStore(auth.tenant.databaseName)
+    const user = await store.get('users', authUser._id || authUser.userId)
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }

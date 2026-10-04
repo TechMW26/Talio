@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { handleUpload } from '@vercel/blob/client'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { buildTenantBlobPrefix, getBlobAccessMode } from '@/lib/platform/blobStorage.server'
 import {
   MAX_UPLOAD_SIZE_BYTES,
@@ -23,7 +23,7 @@ export async function POST(request) {
       body,
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
-        const auth = await getAuthAndModels(request)
+        const auth = await getAuthAndDatabase(request)
         if (!auth.success) throw new Error('Unauthorized upload request')
 
         let metadata

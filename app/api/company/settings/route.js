@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 
 // Day name to numeric mapping (JavaScript: 0=Sunday, 1=Monday, etc.)
@@ -16,14 +16,13 @@ const DAY_NAME_TO_NUMBER = {
 // GET - Fetch current user's company settings
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Company', 'Employee'])
+    const auth = await getAuthAndDatabase(request)
 
     if (!auth.success) {
       return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 })
     }
 
-  const { user, models, tenant } = auth
-    const { Company, Employee } = models
+  const { user, database, tenant } = auth
 
     // Get user's employee record to find their company
     let companyId = user.company || user.companyId
@@ -31,7 +30,7 @@ export async function GET(request) {
     // If not directly on user, get from employee record
     if (!companyId && user.employeeId) {
       const empId = user.employeeId?._id || user.employeeId
-      const employee = await Employee.findById(empId).select('company').lean()
+      const employee = await database.get('employees', String(empId))
       companyId = employee?.company
     }
 
@@ -56,9 +55,7 @@ export async function GET(request) {
     }
 
     // Fetch company settings
-    const company = await Company.findById(companyId)
-      .select('name timezone workingHours geofence breakTimings')
-      .lean()
+    const company = await database.get('companies', String(companyId?._id || companyId))
 
     if (!company) {
       return NextResponse.json({

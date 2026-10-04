@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server'
-import mongoose from 'mongoose'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { clearCachePattern, buildCachePattern } from '@/lib/cache'
 import queryCache from '@/lib/queryCache'
 import { isFeatureEnabled } from '@/lib/planFeatures'
 import { applyLifecycleAction, getLifecycleProgress, hydrateEmployeeLifecycle, reconcileOnboardingChecklist } from '@/lib/hrms/employeeLifecycle.server'
 import { getOnboardingCompletionSignals } from '@/lib/hrms/onboardingProgress.server'
-import { loadOffboardingAssetClearance } from '@/lib/hrms/offboardingAssets.server'
-import { createWorkflow } from '@/lib/hrms/workflowService.server'
-import { buildDirectReportsFilter } from '@/lib/teamScope'
+import { loadExitAssets } from '@/lib/hrms/resignationStore.server'
+import { getLifecycleDatabase, persistLifecycleReview, syncLifecycleWorkflow } from '@/lib/hrms/lifecycleStore.server'
+import { recordDigest } from '@/lib/platform/firestoreCodec.cjs'
+import { isDirectReport } from '@/lib/teamScope'
 import { resolveInductionProgram, progressId } from '@/lib/hrms/induction.server'
-import { getOnboardingKycEvidence } from '@/lib/hrms/onboardingKyc.server'
+import { getNativeOnboardingKycEvidence } from '@/lib/hrms/onboardingKyc.server'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,105 +46,69 @@ function serializeProbationApproval(approval) {
   }
 }
 
-async function persistOnboardingEvidenceDocuments({ Document, employee, actor, item }) {
-  const documents = item?.verification?.documents || []
-  if (!documents.length) return []
-  const uploadedBy = mongoose.Types.ObjectId.isValid(actor?.employeeId)
-    ? actor.employeeId
-    : employee._id
-
-  return Promise.all(documents.map((document) => Document.findOneAndUpdate(
-    { employee: employee._id, fileId: document.fileId },
-    {
-      $set: { status: 'approved' },
-      $setOnInsert: {
-        name: document.fileName,
-        type: document.fileType,
-        url: document.fileUrl,
-        fileName: document.fileName,
-        fileType: document.fileType,
-        fileUrl: document.fileUrl,
-        fileId: document.fileId,
-        fileSize: document.fileSize,
-        employee: employee._id,
-        uploadedBy,
-        category: `onboarding_${document.requirementKey}`,
-        isActive: true,
-      },
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
-  ).lean()))
-}
-
 async function authorize(request, id) {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!/^[a-f\d]{24}$/i.test(id || '')) {
     return { response: NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 }) }
   }
-  const auth = await getAuthAndModels(request, ['Employee', 'User', 'HrmsWorkflow', 'HrmsWorkflowEvent', 'Document', 'Asset', 'Payroll', 'Policy', 'ProbationApproval', 'InductionProgram', 'InductionProgress'])
+  const auth = await getAuthAndDatabase(request)
   if (!auth.success) {
     return { response: NextResponse.json({ success: false, message: auth.message || 'Unauthorized' }, { status: 401 }) }
   }
+  const database = await getLifecycleDatabase(auth)
   if (!HR_ROLES.has(auth.user.role)) {
     const own = String(auth.user.employeeId?._id || auth.user.employeeId || '')
     if (own !== id) {
-      const scope = buildDirectReportsFilter(own, { _id: id })
-      if (!MANAGER_ROLES.has(auth.user.role) || !scope || !(await auth.models.Employee.exists(scope))) {
+      const target = await database.get('employees', id)
+      if (!MANAGER_ROLES.has(auth.user.role) || !isDirectReport(target, own)) {
         return { response: NextResponse.json({ success: false, message: 'You do not have access to this employee lifecycle' }, { status: 403 }) }
       }
     }
   }
-  return { auth }
+  return { auth, database }
 }
 
 async function getLifecycle(request, { params }) {
   const { id } = await params
-  const { auth, response } = await authorize(request, id)
+  const { auth, response, database } = await authorize(request, id)
   if (response) return response
 
-  const employee = await auth.models.Employee.findById(id)
-    .select('firstName lastName email phone dateOfJoining employmentType lifecycle status dateOfLeaving createdAt emergencyContact bankDetails salary pfEnrollment esiEnrollment professionalTax tdsConfiguration healthInsurance documents department company inductionCompletion')
-    .lean()
+  const employee = await database.get('employees', id)
   if (!employee) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
 
   const hydratedLifecycle = hydrateEmployeeLifecycle(employee)
-  const inductionProgram = await resolveInductionProgram(auth.models, employee.company)
-  const currentAcknowledgement = inductionProgram ? await auth.models.InductionProgress.findById(progressId(employee._id, inductionProgram.version)).select('acknowledgedAt').lean() : null
+  const inductionProgram = await resolveInductionProgram(database, employee.company)
+  const currentAcknowledgement = inductionProgram ? await database.get('inductionprogresses', progressId(employee._id, inductionProgram.version)) : null
   const inductionAcknowledgedAt = currentAcknowledgement?.acknowledgedAt || ((!inductionProgram?.active || inductionProgram.version === employee.inductionCompletion?.version) ? employee.inductionCompletion?.acknowledgedAt : null)
   const inductionComplete = Boolean(inductionAcknowledgedAt)
   const onboardingEnabled = isFeatureEnabled(auth.companyFeatures, 'onboarding')
   const signals = onboardingEnabled
-    ? await getOnboardingCompletionSignals({ models: auth.models, employee })
+    ? await getOnboardingCompletionSignals({ database, employee })
     : {}
   const reconciliation = reconcileOnboardingChecklist(hydratedLifecycle, signals)
   let lifecycle = reconciliation.lifecycle
   let lifecycleChanged = reconciliation.changed
   if (lifecycle.offboarding?.status && lifecycle.offboarding.status !== 'not_started') {
-    const clearance = await loadOffboardingAssetClearance({
-      Asset: auth.models.Asset,
-      employeeId: employee._id,
-      offboarding: lifecycle.offboarding,
-    })
+    const clearance = await loadExitAssets(database, { ...employee, lifecycle: { ...employee.lifecycle, offboarding: lifecycle.offboarding } })
     lifecycle = { ...lifecycle, offboarding: clearance.offboarding }
     lifecycleChanged ||= clearance.changed
   }
   if (lifecycleChanged) {
-    await auth.models.Employee.updateOne({ _id: employee._id }, { $set: { lifecycle } })
+    await database.transaction(async tx => {
+      const current = await tx.get('employees', id)
+      if (current && recordDigest(current) === recordDigest(employee)) await tx.replace('employees', { ...current, lifecycle, __v: Number(current.__v || 0) + 1, updatedAt: new Date() })
+    })
   }
   if (!HR_ROLES.has(auth.user.role)) {
     for (const item of lifecycle.onboarding?.checklist || []) {
       if (item.submission?.verification?.details?.accountNumber) delete item.submission.verification.details.accountNumber
     }
   }
-  const workflows = await auth.models.HrmsWorkflow.find({ subjectEmployee: employee._id })
-    .select('caseNumber module status dueAt completedAt')
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .lean()
-  const probationApproval = await auth.models.ProbationApproval.findOne({ employee: employee._id })
-    .sort({ createdAt: -1 })
-    .populate('approverEmployee', 'firstName lastName employeeCode')
-    .populate('requestedByEmployee', 'firstName lastName employeeCode')
-    .lean()
+  const workflows = (await database.list('hrmsworkflows', { filters: [{ field: 'subjectEmployee', operator: '==', value: String(employee._id) }], orderBy: [{ field: 'createdAt', direction: 'desc' }], limit: 50 })).records.map(({ _id, caseNumber, module, status, dueAt, completedAt }) => ({ _id, caseNumber, module, status, dueAt, completedAt }))
+  const probationApproval = (await database.list('probationapprovals', { filters: [{ field: 'employee', operator: '==', value: String(employee._id) }], orderBy: [{ field: 'createdAt', direction: 'desc' }], limit: 1 })).records[0]
+  if (probationApproval) for (const field of ['approverEmployee', 'requestedByEmployee']) {
+    const person = probationApproval[field] ? await database.get('employees', String(probationApproval[field])) : null
+    probationApproval[field] = person ? { _id: person._id, firstName: person.firstName, lastName: person.lastName, employeeCode: person.employeeCode } : null
+  }
 
   return NextResponse.json({
     success: true,
@@ -153,7 +117,7 @@ async function getLifecycle(request, { params }) {
       induction: { complete: inductionComplete, required: Boolean(inductionProgram?.active && !inductionComplete), acknowledgedAt: inductionAcknowledgedAt || null },
       employeeName: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
       profilePhone: employee.phone || '',
-      linkedEvidence: onboardingEnabled ? await getOnboardingKycEvidence(auth.models, employee._id) : {},
+      linkedEvidence: onboardingEnabled ? await getNativeOnboardingKycEvidence(database, employee._id) : {},
       progress: getLifecycleProgress(lifecycle),
       automation: { enabled: true, signals },
       workflows,
@@ -173,7 +137,7 @@ async function getLifecycle(request, { params }) {
 
 async function patchLifecycle(request, { params }) {
   const { id } = await params
-  const { auth, response } = await authorize(request, id)
+  const { auth, response, database } = await authorize(request, id)
   if (response) return response
 
   let body
@@ -206,9 +170,7 @@ async function patchLifecycle(request, { params }) {
   // Keep this read lean. Some older tenant records still contain legacy field
   // shapes (for example, a string address), and hydrating the whole document can
   // attach unrelated cast errors to it before a lifecycle action is applied.
-  const employee = await auth.models.Employee.findById(id)
-    .select('firstName lastName email phone dateOfJoining employmentType lifecycle status dateOfLeaving createdAt emergencyContact bankDetails salary documents department company __v')
-    .lean()
+  const employee = await database.get('employees', id)
   if (!employee) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
 
   const currentLifecycle = hydrateEmployeeLifecycle(employee)
@@ -220,15 +182,11 @@ async function patchLifecycle(request, { params }) {
   }
   const onboardingEnabled = isFeatureEnabled(auth.companyFeatures, 'onboarding')
   const signals = onboardingEnabled
-    ? await getOnboardingCompletionSignals({ models: auth.models, employee })
+    ? await getOnboardingCompletionSignals({ database, employee })
     : {}
   let reconciledLifecycle = reconcileOnboardingChecklist(currentLifecycle, signals).lifecycle
   if (reconciledLifecycle.offboarding?.status && reconciledLifecycle.offboarding.status !== 'not_started') {
-    const clearance = await loadOffboardingAssetClearance({
-      Asset: auth.models.Asset,
-      employeeId: employee._id,
-      offboarding: reconciledLifecycle.offboarding,
-    })
+    const clearance = await loadExitAssets(database, { ...employee, lifecycle: { ...employee.lifecycle, offboarding: reconciledLifecycle.offboarding } })
     reconciledLifecycle = { ...reconciledLifecycle, offboarding: clearance.offboarding }
   }
   let result
@@ -236,50 +194,17 @@ async function patchLifecycle(request, { params }) {
     result = applyLifecycleAction(reconciledLifecycle, action, body, {
       actorId: actorId(auth.user),
       employee,
-      linkedEvidence: action === 'complete_onboarding_item' && body.itemKey === 'documents' ? await getOnboardingKycEvidence(auth.models, employee._id) : {},
+      linkedEvidence: action === 'complete_onboarding_item' && body.itemKey === 'documents' ? await getNativeOnboardingKycEvidence(database, employee._id) : {},
     })
     if (action === 'start_offboarding') {
-      const clearance = await loadOffboardingAssetClearance({
-        Asset: auth.models.Asset,
-        employeeId: employee._id,
-        offboarding: result.lifecycle.offboarding,
-      })
+      const clearance = await loadExitAssets(database, { ...employee, lifecycle: { ...employee.lifecycle, offboarding: result.lifecycle.offboarding } })
       result.lifecycle.offboarding = clearance.offboarding
     }
   } catch (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 400 })
   }
 
-  if (action === 'complete_onboarding_item' && body.completed !== false) {
-    const item = result.lifecycle.onboarding?.checklist?.find((entry) => entry.key === body.itemKey)
-    try {
-      await persistOnboardingEvidenceDocuments({
-        Document: auth.models.Document,
-        employee,
-        actor: auth.user,
-        item,
-      })
-    } catch (error) {
-      console.error('[EmployeeLifecycle] Evidence document persistence failed:', error)
-      return NextResponse.json({
-        success: false,
-        message: 'Verification files were uploaded, but could not be attached to the employee record. Please try again.',
-        code: 'EVIDENCE_PERSISTENCE_FAILED',
-      }, { status: 500 })
-    }
-  }
-
-  // Persist only fields owned by the lifecycle action. Calling document.save()
-  // here revalidates unrelated legacy employee fields and previously made every
-  // lifecycle action fail when, for example, address was stored as a string.
-  const persistedEmployee = await auth.models.Employee.findOneAndUpdate(
-    { _id: employee._id, ...(Number.isInteger(employee.__v) ? { __v: employee.__v } : {}) },
-    {
-      $set: { lifecycle: result.lifecycle, ...result.employeeUpdates },
-      $inc: { __v: 1 },
-    },
-    { new: true, runValidators: true, context: 'query' },
-  ).select('_id firstName lastName').lean()
+  const persistedEmployee = await persistLifecycleReview(database, { employee, actor: auth.user, result, action, body })
 
   if (!persistedEmployee) {
     return NextResponse.json(
@@ -288,77 +213,9 @@ async function patchLifecycle(request, { params }) {
     )
   }
 
-  if (action === 'request_onboarding_changes') {
-    const item = result.lifecycle.onboarding.checklist.find(entry => entry.key === body.itemKey)
-    await auth.models.Document.updateMany({ employee: employee._id, fileId: { $in: (item.submission?.verification?.documents || []).map(file => file.fileId) } }, {
-      $set: { status: 'changes_requested', reviewReason: item.submission.reviewReason },
-    })
-  }
-
   let workflowWarning = null
   try {
-    let workflow = await auth.models.HrmsWorkflow.findOne({ subjectEmployee: persistedEmployee._id, module: moduleName }).sort({ createdAt: -1 })
-    if (!workflow) {
-      const moduleData = moduleName === 'exitManagement'
-        ? result.lifecycle.offboarding
-        : moduleName === 'probation'
-          ? result.lifecycle.probation
-          : result.lifecycle.onboarding
-      const dueAt = moduleName === 'exitManagement'
-        ? result.lifecycle.offboarding.lastWorkingDate
-        : moduleName === 'probation'
-          ? result.lifecycle.probation.reviewDate
-          : result.lifecycle.onboarding.targetDate
-      const created = await createWorkflow({
-        Workflow: auth.models.HrmsWorkflow,
-        Event: auth.models.HrmsWorkflowEvent,
-        actor: auth.user,
-        bypassPermission: true,
-        allowIncompleteData: true,
-        payload: {
-          module: moduleName,
-          title: `${moduleName === 'exitManagement' ? 'Offboarding' : moduleName === 'probation' ? 'Probation' : 'Onboarding'}: ${persistedEmployee.firstName} ${persistedEmployee.lastName}`,
-          subjectEmployee: persistedEmployee._id,
-          dueAt,
-          data: moduleData,
-          source: { entityType: 'Employee', entityId: persistedEmployee._id },
-          idempotencyKey: `employee:${persistedEmployee._id}:${moduleName}`,
-        },
-      })
-      if (!created.success || !created.workflow) {
-        throw new Error(created.message || created.errors?.[0]?.message || 'Workflow could not be created')
-      }
-      workflow = created.workflow
-    }
-
-    if (workflow) {
-      const completed = action === 'confirm_probation'
-        || action === 'complete_offboarding'
-        || (action === 'complete_onboarding_item' && getLifecycleProgress(result.lifecycle).percentage === 100)
-      const previousStatus = workflow.status
-      workflow.status = completed ? 'completed' : 'in_progress'
-      workflow.data = moduleName === 'exitManagement' ? result.lifecycle.offboarding : moduleName === 'probation' ? result.lifecycle.probation : result.lifecycle.onboarding
-      workflow.dueAt = moduleName === 'exitManagement' ? result.lifecycle.offboarding.lastWorkingDate : moduleName === 'probation' ? result.lifecycle.probation.reviewDate : result.lifecycle.onboarding.targetDate
-      workflow.completedAt = completed ? (workflow.completedAt || new Date()) : null
-      workflow.updatedBy = actorId(auth.user)
-      workflow.version = Number.isFinite(Number(workflow.version)) ? Number(workflow.version) + 1 : 1
-      await workflow.save()
-      await auth.models.HrmsWorkflowEvent.create({
-        workflow: workflow._id,
-        module: moduleName,
-        type: action,
-        fromStatus: previousStatus,
-        toStatus: workflow.status,
-        actor: actorId(auth.user),
-        comment: String(body.reason || '').slice(0, 2000),
-        metadata: {
-          source: 'employee_profile',
-          itemKey: body.itemKey || null,
-          verificationMethod: body.verification ? 'manual' : null,
-          evidenceDocumentCount: body.verification?.documents?.length || 0,
-        },
-      })
-    }
+    await syncLifecycleWorkflow(database, { actor: auth.user, employee: persistedEmployee, lifecycle: result.lifecycle, moduleName, action, body })
   } catch (error) {
     workflowWarning = 'Lifecycle updated, but its workflow audit could not be synchronized'
     console.error('[EmployeeLifecycle] Workflow synchronization failed:', error)

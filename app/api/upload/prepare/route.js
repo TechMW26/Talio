@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import {
   buildAuthenticatedBlobUrl,
   buildTenantBlobPath,
@@ -12,7 +12,7 @@ import { normalizeUploadCategory, validateUploadMetadata } from '@/lib/platform/
 export const runtime = 'nodejs'
 
 export async function POST(request) {
-  const auth = await getAuthAndModels(request)
+  const auth = await getAuthAndDatabase(request)
   if (!auth.success) {
     return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
   }

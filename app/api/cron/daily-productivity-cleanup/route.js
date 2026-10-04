@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
-import { connectSuperadminDB } from '@/lib/superadminDb';
-import getTenantCompanyModel from '@/models/TenantCompany';
-import { getTenantModels } from '@/lib/tenantModels';
+import { getFirestoreSystemDatabase, getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server';
+import { listScreenshotMaintenanceRecords } from '@/lib/platform/firestoreScreenshots.server';
 import { createDailyMosaicOnCheckout } from '@/lib/productivityMosaic';
 import { getTimezone, parseDateTimeInTimezone } from '@/lib/timezone';
 import { getCronAuthErrorResponse } from '@/lib/cronAuth';
-import { buildOpenAttendanceQuery, resolveScheduledCheckout } from '@/lib/attendanceAutoCheckout';
+import { resolveScheduledCheckout } from '@/lib/attendanceAutoCheckout';
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage';
 
 export const dynamic = 'force-dynamic';
@@ -50,65 +48,30 @@ function previousDateString({ year, month, day }) {
   return d.toISOString().split('T')[0];
 }
 
-async function autoCheckoutOpenAttendance({ models, dateString, timezone, now, companySettings }) {
-  const { Attendance } = models;
-  if (!Attendance) return { autoCheckedOut: 0 };
-
-  const dayStart = parseDateTimeInTimezone(`${dateString}T00:00:00`, timezone);
-  const dayEnd = parseDateTimeInTimezone(`${dateString}T23:59:59.999`, timezone);
-
-  const openRows = await Attendance.find(buildOpenAttendanceQuery({
-    targetDateStart: dayStart,
-    targetDateEnd: dayEnd,
-  }))
-    .select('_id date checkIn')
-    .lean();
-
-  if (openRows.length === 0) return { autoCheckedOut: 0 };
-
-  const checkOutTime = companySettings?.workingHours?.checkOutTime || '18:00';
-  const breakTimings = companySettings?.breakTimings || [];
-  const fullDayHours = companySettings?.workingHours?.fullDayHours || 8;
-  const halfDayHours = companySettings?.workingHours?.halfDayHours || 4;
-
-  const operations = openRows.map((row) => {
-    const checkOut = resolveScheduledCheckout({
-      attendanceDate: row.date,
-      checkIn: row.checkIn,
-      checkOutTime,
-      timezone,
+async function autoCheckoutOpenAttendance({ store, dateString, timezone, now, companySettings }) {
+  const dayStart = parseDateTimeInTimezone(dateString + 'T00:00:00', timezone);
+  const dayEnd = parseDateTimeInTimezone(dateString + 'T23:59:59.999', timezone);
+  const openRows = (await listScreenshotMaintenanceRecords(store, 'attendances', [
+    { field: 'date', operator: '>=', value: dayStart }, { field: 'date', operator: '<=', value: dayEnd },
+    { field: 'status', operator: '==', value: 'in-progress' },
+  ])).filter(row => row.checkIn && !row.checkOut);
+  let autoCheckedOut = 0;
+  for (const row of openRows) {
+    const changed = await store.transaction(async tx => {
+      const current = await tx.get('attendances', row._id);
+      if (!current || current.status !== 'in-progress' || current.checkOut || !current.checkIn) return false;
+      const checkOut = resolveScheduledCheckout({ attendanceDate: current.date, checkIn: current.checkIn, checkOutTime: companySettings?.workingHours?.checkOutTime || '18:00', timezone });
+      const work = calculateEffectiveWorkHours(current.checkIn, checkOut, companySettings?.breakTimings || []);
+      const finalStatus = determineAttendanceStatus(work.effectiveWorkHours, { fullDayHours: companySettings?.workingHours?.fullDayHours || 8, halfDayHours: companySettings?.workingHours?.halfDayHours || 4 });
+      await tx.replace('attendances', { ...current, checkOut, status: finalStatus.status, statusReason: finalStatus.reason + ' (Midnight auto-checkout)',
+        workHours: work.effectiveWorkHours, totalLoggedHours: work.totalLoggedHours, breakMinutes: work.breakMinutes,
+        shrinkagePercentage: work.shrinkagePercentage, source: 'auto_checkout', createdBySystem: true,
+        checkOutStatus: 'auto-checkout', autoCheckedOut: true, autoCheckoutReason: 'midnight_cutoff', autoCheckoutAt: now, updatedAt: now });
+      return true;
     });
-    const work = calculateEffectiveWorkHours(row.checkIn, checkOut, breakTimings);
-    const finalStatus = determineAttendanceStatus(work.effectiveWorkHours, { fullDayHours, halfDayHours });
-
-    return {
-      updateOne: {
-        filter: {
-          _id: row._id,
-          status: 'in-progress',
-          $or: [{ checkOut: null }, { checkOut: { $exists: false } }],
-        },
-        update: { $set: {
-          checkOut,
-          status: finalStatus.status,
-          statusReason: `${finalStatus.reason} (Midnight auto-checkout)`,
-          workHours: work.effectiveWorkHours,
-          totalLoggedHours: work.totalLoggedHours,
-          breakMinutes: work.breakMinutes,
-          shrinkagePercentage: work.shrinkagePercentage,
-          source: 'auto_checkout',
-          createdBySystem: true,
-          checkOutStatus: 'auto-checkout',
-          autoCheckedOut: true,
-          autoCheckoutReason: 'midnight_cutoff',
-          autoCheckoutAt: now,
-        } },
-      },
-    };
-  });
-
-  const result = await Attendance.bulkWrite(operations, { ordered: false });
-  return { autoCheckedOut: result.modifiedCount || 0 };
+    if (changed) autoCheckedOut++;
+  }
+  return { autoCheckedOut };
 }
 
 async function processTenant({ company, now, dateOverride, force }) {
@@ -122,31 +85,13 @@ async function processTenant({ company, now, dateOverride, force }) {
 
   const dateString = dateOverride || previousDateString(local);
 
-  const models = await getTenantModels(databaseName, [
-    'Screenshot',
-    'ScreenshotComposite',
-    'Attendance',
-    'Company',
-  ]);
-
-  const companySettings = await models.Company.findOne().lean();
-
-  const { autoCheckedOut } = await autoCheckoutOpenAttendance({
-    models,
-    dateString,
-    timezone: local.timezone,
-    now,
-    companySettings,
-  });
-
-  // Find every user who captured at least one screenshot for that day.
-  const { Screenshot, ScreenshotComposite } = models;
-  const screenshotUserIds = await Screenshot.distinct('user', { dateString });
-  const compositeUserIds = await ScreenshotComposite.distinct('user', { dateString });
-  const userIds = Array.from(new Set([
-    ...screenshotUserIds.map(String),
-    ...compositeUserIds.map(String),
-  ]));
+  const store = await getFirestoreTenantDatabase(databaseName, { queryFields: { attendances: ['date', 'status'], screenshots: ['dateString'], screenshotcomposites: ['dateString'] } });
+  const companySettings = (await store.list('companies', { limit: 1 })).records[0] || null;
+  const { autoCheckedOut } = await autoCheckoutOpenAttendance({ store, dateString, timezone: local.timezone, now, companySettings });
+  const scope = [{ field: 'dateString', operator: '==', value: dateString }];
+  const captures = await listScreenshotMaintenanceRecords(store, 'screenshots', scope);
+  const composites = await listScreenshotMaintenanceRecords(store, 'screenshotcomposites', scope);
+  const userIds = [...new Set([...captures, ...composites].map(record => String(record.user)).filter(Boolean))];
 
   const perUser = [];
   let stitched = 0;
@@ -192,15 +137,13 @@ async function runCron(request) {
     const authError = getCronAuthErrorResponse(request);
     if (authError) return authError;
 
-    await connectDB();
-    await connectSuperadminDB();
-
-    const TenantCompany = await getTenantCompanyModel();
-    const companies = await TenantCompany.find({ isActive: true }).lean();
+    const system = await getFirestoreSystemDatabase({ queryFields: { tenantcompanies: ['isActive'] } });
+    const companies = await listScreenshotMaintenanceRecords(system, 'tenantcompanies', [{ field: 'isActive', operator: '==', value: true }]);
 
     const url = new URL(request.url);
     const dateOverride = url.searchParams.get('date'); // YYYY-MM-DD optional
     const force = url.searchParams.get('force') === '1';
+    if (dateOverride && (!/^\d{4}-\d{2}-\d{2}$/.test(dateOverride) || !Number.isFinite(Date.parse(dateOverride)))) return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
 
     const now = new Date();
 

@@ -1,19 +1,19 @@
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn() }))
 jest.mock('@/lib/ai/aiProviderManager', () => ({ generateVisionContent: jest.fn() }))
 import { POST } from '@/app/api/ai/mira-computer/route'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { generateVisionContent } from '@/lib/ai/aiProviderManager'
 import sharp from 'sharp'
 const request = value => new Request('http://localhost/api/ai/mira-computer', { method: 'POST', body: JSON.stringify(value) })
 beforeEach(() => {
   jest.clearAllMocks()
-  getAuthAndModels.mockResolvedValue({ success: true, tenant: { databaseName: 'tenant' }, user: { _id: 'u' } })
+  getAuthAndDatabase.mockResolvedValue({ success: true, tenant: { databaseName: 'tenant' }, user: { _id: 'u' } })
   rateLimit.mockResolvedValue({ allowed: true })
 })
 test('auth and tenant rate limits precede vision work', async () => {
-  getAuthAndModels.mockResolvedValueOnce({ success: false })
+  getAuthAndDatabase.mockResolvedValueOnce({ success: false })
   expect((await POST(request({}))).status).toBe(401)
   rateLimit.mockResolvedValueOnce({ allowed: false })
   expect((await POST(request({}))).status).toBe(429)

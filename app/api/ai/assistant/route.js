@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { generateContent } from '@/lib/gemini';
 
 const TALIO_SYSTEM_PROMPT = `You are MIRA, the AI assistant built into Talio - an HR management and employee productivity platform. Your ONLY purpose is to help users navigate and use Talio effectively.
@@ -59,7 +59,7 @@ export async function POST(request) {
     // Auth is optional for login-page errors (user might not be logged in yet)
     let isAuthenticated = false;
     try {
-      const auth = await getAuthAndModels(request, []);
+      const auth = await getAuthAndDatabase(request);
       isAuthenticated = auth.success;
     } catch {
       // Allow unauthenticated access for login-related help

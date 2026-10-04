@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/permissions'
 import { MIRA_ACTION_PERMISSIONS, prepareMiraAction, validateMiraAction } from '@/lib/miraActions'
 import { miraProductivityGallery } from '@/lib/miraProductivity'
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
+import { randomBytes } from 'node:crypto'
 
 export async function POST(request) {
   try {
@@ -9,15 +11,17 @@ export async function POST(request) {
     const validation = validateMiraAction(input.action)
     if (validation.error) return NextResponse.json({ success: false, message: validation.error }, { status: 400 })
     if (validation.action.type === 'schedule_reminder') {
-      const { getAuthAndModels } = await import('@/lib/auth')
-      const auth = await getAuthAndModels(request, ['ScheduledNotification'])
+      const { verifyTokenFromRequest } = await import('@/lib/auth')
+      const auth = await verifyTokenFromRequest(request)
       if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
       if (input.confirmed !== true) return NextResponse.json({ success: true, preview: validation.action })
       const { message, scheduledFor, timezone } = validation.action.fields
-      const owner = auth.user.userId
+      const owner = auth.user.userId || auth.user._id
       if (!owner) return NextResponse.json({ success: false, message: 'Please sign in again.' }, { status: 401 })
       // Targeting is server-owned: the model cannot schedule alerts for other users.
-      const reminder = await auth.models.ScheduledNotification.create({
+      const store = await getFirestoreTenantDatabase(auth.tenant.databaseName)
+      const reminder = await store.create('schedulednotifications', {
+        _id: randomBytes(12).toString('hex'), createdAt: new Date(), updatedAt: new Date(),
         title: 'MIRA reminder', message, scheduledFor: new Date(scheduledFor), timezone,
         targetType: 'specific', targetUsers: [owner], recipients: [owner],
         createdBy: auth.user.employeeId?._id || auth.user.employeeId || owner,
@@ -28,14 +32,14 @@ export async function POST(request) {
       return NextResponse.json({ success: true, message: `Reminder set for ${time} (${timezone}): ${message}`, reminder: { id: String(reminder._id), scheduledFor, timezone, message } })
     }
     const [page, permission] = MIRA_ACTION_PERMISSIONS[validation.action.type]
-    const auth = await requirePermission(page, permission)(request, ['User', 'Employee', 'Department', 'Task', 'TaskAssignee', 'Meeting', 'Chat', 'Project', 'ProjectMember', ...(validation.action.type === 'view_productivity' ? ['Screenshot', 'ScreenshotComposite'] : [])])
+    const auth = await requirePermission(page, permission)(request)
     if (auth.denied) return NextResponse.json({ success: false, message: 'Your current access level does not permit this action. Ask an administrator for the required permission.' }, { status: auth.denied.status })
-    if (validation.action.type === 'view_productivity') return NextResponse.json(await miraProductivityGallery(validation.action.fields, auth.user, auth.models), { headers: { 'Cache-Control': 'no-store' } })
+    if (validation.action.type === 'view_productivity') return NextResponse.json(await miraProductivityGallery(validation.action.fields, auth.user, auth.tenant), { headers: { 'Cache-Control': 'no-store' } })
     if (validation.action.type === 'create_task' && validation.action.fields.assignees.some(name => !/^(me|myself|self)$/i.test(name))) {
       const assignment = await requirePermission('tasks', 'assign')(request)
       if (assignment.denied) return NextResponse.json({ success: false, message: 'Higher clearance is required to assign tasks to other people.' }, { status: 403 })
     }
-    const prepared = await prepareMiraAction(validation.action, auth.user, auth.models)
+    const prepared = await prepareMiraAction(validation.action, auth.user, auth.tenant)
     if (prepared.path === 'navigate') return NextResponse.json({ success: true, message: `Opening ${prepared.name}.`, navigation: { page: prepared.page, id: prepared.id } })
     if (prepared.path === 'lookup') {
       const people = prepared.resolution.candidates

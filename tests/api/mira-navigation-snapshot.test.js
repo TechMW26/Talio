@@ -1,7 +1,7 @@
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn() }))
 jest.mock('@/lib/ai/aiProviderManager', () => ({ generateContent: jest.fn(), generateVisionContent: jest.fn() }))
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { generateContent, generateVisionContent } from '@/lib/ai/aiProviderManager'
 import { POST } from '@/app/api/ai/mira-navigation-snapshot/route'
@@ -10,13 +10,13 @@ const payload = { target: 'टास्क', page: '/dashboard/projects/123', co
 const request = body => new Request('http://localhost/api/ai/mira-navigation-snapshot', { method: 'POST', body: JSON.stringify(body) })
 beforeEach(() => {
   jest.clearAllMocks()
-  getAuthAndModels.mockResolvedValue({ success: true, tenant: { databaseName: 'tenant' }, user: { _id: 'user' } })
+  getAuthAndDatabase.mockResolvedValue({ success: true, tenant: { databaseName: 'tenant' }, user: { _id: 'user' } })
   rateLimit.mockResolvedValue({ allowed: true })
   generateContent.mockResolvedValue('{"controlId":"0"}')
   generateVisionContent.mockResolvedValue('{"controlId":"0"}')
 })
 test('requires authentication and tenant-scoped rate limits', async () => {
-  getAuthAndModels.mockResolvedValueOnce({ success: false })
+  getAuthAndDatabase.mockResolvedValueOnce({ success: false })
   expect((await POST(request(payload))).status).toBe(401)
   rateLimit.mockResolvedValueOnce({ allowed: false })
   expect((await POST(request(payload))).status).toBe(429)

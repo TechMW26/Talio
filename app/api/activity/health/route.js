@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
 
 /**
@@ -10,7 +10,7 @@ import { isScreenCaptureProtectedRole } from '@/lib/productivityPrivacy';
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ 
         success: false, 
@@ -40,7 +40,7 @@ export async function GET(request) {
       role: userRole,
       captureEnabled: !isScreenCaptureProtectedRole(userRole),
       database: 'connected',
-      storage: { provider: 'mongodb-gridfs', persistentFilesystemRequired: false },
+      storage: { provider: 'vercel-blob', access: 'private', persistentFilesystemRequired: false },
       server: {
         uptime: process.uptime(),
         memory: process.memoryUsage().heapUsed,

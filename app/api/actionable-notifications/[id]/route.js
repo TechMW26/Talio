@@ -1,210 +1,27 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import mongoose from 'mongoose'
-import { buildCachePattern, clearCachePattern } from '@/lib/cache'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getActionableDatabase, notificationUserId, populateNotificationCreator, updateActionableNotification } from '@/lib/actionableNotificationStore.server'
 
-/**
- * GET /api/actionable-notifications/[id]
- * Get a specific actionable notification
- */
-export async function GET(request, { params }) {
+async function handle(request, { params }) {
   try {
     const { id } = await params
-    
-    // Validate ObjectId format
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { message: 'Invalid notification ID format' },
-        { status: 400 }
-      )
+    if (!/^[a-f\d]{24}$/i.test(id)) return NextResponse.json({ message: 'Invalid notification ID format' }, { status: 400 })
+    const auth = await getAuthAndDatabase(request)
+    if (!auth.success) return NextResponse.json({ message: auth.message }, { status: auth.status || 401 })
+    const database = await getActionableDatabase(auth), userId = notificationUserId(auth.user)
+    if (request.method === 'GET') {
+      const notification = await database.get('actionablenotifications', id)
+      if (!notification || String(notification.user) !== userId) return NextResponse.json({ message: 'Notification not found' }, { status: 404 })
+      return NextResponse.json({ success: true, notification: await populateNotificationCreator(database, notification) })
     }
-    
-    // Include Employee model for populate('createdBy')
-    const auth = await getAuthAndModels(request, ['ActionableNotification', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+    let input = { action: 'dismiss' }
+    if (request.method !== 'DELETE') {
+      try { input = await request.json() } catch { return NextResponse.json({ message: 'Invalid JSON request body' }, { status: 400 }) }
     }
-
-    const { user, models } = auth
-    const { ActionableNotification } = models
-
-    const notification = await ActionableNotification.findOne({
-      _id: id,
-      user: user.userId
-    }).populate('createdBy', 'firstName lastName avatar')
-
-    if (!notification) {
-      return NextResponse.json(
-        { message: 'Notification not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      notification
-    })
-  } catch (error) {
-    console.error('[GET /api/actionable-notifications/[id]] Error:', error)
-    return NextResponse.json(
-      { message: 'Failed to fetch notification', error: error.message },
-      { status: 500 }
-    )
-  }
+    const notification = await updateActionableNotification(database, userId, id, input)
+    return NextResponse.json({ success: true, notification, ...(input.action === 'snooze' ? { snoozedUntil: notification.snoozedUntil } : {}), message: input.action === 'snooze' ? 'We will remind you in 1 hour.' : 'Notification updated successfully' })
+  } catch (error) { return NextResponse.json({ success: false, message: error.status ? error.message : 'Failed to update notification' }, { status: error.status || 500 }) }
 }
-
-/**
- * PATCH /api/actionable-notifications/[id]
- * Update notification status (action taken or dismissed)
- */
-export async function PATCH(request, { params }) {
-  try {
-    const { id } = await params
-    
-    // Validate ObjectId format
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { message: 'Invalid notification ID format' },
-        { status: 400 }
-      )
-    }
-    
-    const auth = await getAuthAndModels(request, ['ActionableNotification'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-
-    const { user, models } = auth
-    const { ActionableNotification } = models
-
-    const body = await request.json()
-    const { action, reason } = body
-
-    if (action === 'snooze') {
-      const userId = user._id || user.userId
-      const snoozedUntil = new Date(Date.now() + 60 * 60 * 1000)
-      const notification = await ActionableNotification.findOneAndUpdate({
-        _id: id, user: userId, status: 'pending',
-        $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
-      }, { $set: { snoozedUntil } }, { new: true, runValidators: true })
-      if (!notification) return NextResponse.json({ success: false, message: 'This notification is no longer pending.' }, { status: 409 })
-      await clearCachePattern(buildCachePattern({ tenantId: auth.tenant?.databaseName || ActionableNotification.db?.name, userId, namespace: 'actionable-notifications' })).catch(() => {})
-      global.io?.to(`user:${userId}`).emit('actionable-notification-updated', { notificationId: id, status: 'pending', snoozedUntil })
-      return NextResponse.json({ success: true, snoozedUntil, message: 'We will remind you in 1 hour.' })
-    }
-
-    if (!action) {
-      return NextResponse.json(
-        { message: 'Action is required' },
-        { status: 400 }
-      )
-    }
-
-    const notification = await ActionableNotification.findOne({
-      _id: id,
-      user: user.userId
-    })
-
-    if (!notification) {
-      return NextResponse.json(
-        { message: 'Notification not found' },
-        { status: 404 }
-      )
-    }
-
-    if (notification.status !== 'pending') {
-      return NextResponse.json(
-        { message: 'Notification has already been actioned' },
-        { status: 400 }
-      )
-    }
-
-    // Update notification status
-    if (action === 'dismiss' || action === 'dismissed') {
-      await notification.dismiss()
-    } else {
-      await notification.markAsActioned(action, reason)
-    }
-
-    // Emit socket event to update UI in real-time
-    if (global.io) {
-      global.io.to(`user:${user.userId}`).emit('actionable-notification-updated', {
-        notificationId: id,
-        status: notification.status,
-        action,
-        reason
-      })
-    }
-
-    return NextResponse.json({
-      success: true,
-      notification,
-      message: 'Notification updated successfully'
-    })
-  } catch (error) {
-    console.error('[PATCH /api/actionable-notifications/[id]] Error:', error)
-    return NextResponse.json(
-      { message: 'Failed to update notification', error: error.message },
-      { status: 500 }
-    )
-  }
-}
-
-/**
- * DELETE /api/actionable-notifications/[id]
- * Delete a notification (same as dismiss)
- */
-export async function DELETE(request, { params }) {
-  try {
-    const { id } = await params
-    
-    // Validate ObjectId format
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { message: 'Invalid notification ID format' },
-        { status: 400 }
-      )
-    }
-    
-    const auth = await getAuthAndModels(request, ['ActionableNotification'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-
-    const { user, models } = auth
-    const { ActionableNotification } = models
-
-    const notification = await ActionableNotification.findOne({
-      _id: id,
-      user: user.userId
-    })
-
-    if (!notification) {
-      return NextResponse.json(
-        { message: 'Notification not found' },
-        { status: 404 }
-      )
-    }
-
-    // Mark as dismissed rather than deleting (for audit purposes)
-    await notification.dismiss()
-
-    // Emit socket event
-    if (global.io) {
-      global.io.to(`user:${user.userId}`).emit('actionable-notification-removed', {
-        notificationId: id
-      })
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Notification dismissed'
-    })
-  } catch (error) {
-    console.error('[DELETE /api/actionable-notifications/[id]] Error:', error)
-    return NextResponse.json(
-      { message: 'Failed to dismiss notification', error: error.message },
-      { status: 500 }
-    )
-  }
-}
+export const GET = handle
+export const PATCH = handle
+export const DELETE = handle

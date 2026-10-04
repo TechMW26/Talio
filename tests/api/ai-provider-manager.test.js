@@ -159,7 +159,7 @@ describe('AIProviderManager — DeepSeek text / Pollinations vision', () => {
         })
 
         const { generateContent } = reqRouter()
-        await expect(generateContent('hello')).rejects.toThrow(/failed after 3 attempts|Pollinations/)
+        await expect(generateContent('hello')).rejects.toThrow(/failed after (?:at most )?3 attempts|Pollinations/)
 
         expect(global.fetch.mock.calls.length).toBeGreaterThanOrEqual(1)
     })

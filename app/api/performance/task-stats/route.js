@@ -1,5 +1,7 @@
+import { performanceDatabase, performanceEmployees, joinPerformanceEmployees, scopedPerformanceRecords, performanceDates, assertTeamStatisticsAccess, performanceLinkedRecords, filter } from '@/lib/performanceStore.server'
+import { collectFirestorePages, readFirestoreReferences } from '@/lib/platform/firestoreQueries.server'
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { getDateTimePartsInTimezone, getTodayDateString } from '@/lib/timezone';
 
 /**
@@ -16,13 +18,13 @@ import { getDateTimePartsInTimezone, getTodayDateString } from '@/lib/timezone';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'Employee', 'User', 'Department', 'Project']);
+    const auth = await getAuthAndDatabase(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    const { user, models } = auth;
-    const { Task, TaskAssignee, Employee, User, Department, Project } = models;
+    const { user } = auth
+    const database = await performanceDatabase(auth)
     const { searchParams } = new URL(request.url);
 
     // Parse date range
@@ -32,78 +34,9 @@ export async function GET(request) {
     const departmentFilter = searchParams.get('department');
     const departmentsFilter = searchParams.get('departments'); // Comma-separated list of department IDs
 
-    // Permission check
-    const isAdminOrHR = ['admin', 'hr'].includes(user.role);
-    const currentUser = await User.findById(user._id).populate('employeeId');
-
-    // Check if user is department head
-    let isDeptHead = false;
-    let userDepartmentIds = [];
-
-    if (!isAdminOrHR) {
-      if (currentUser?.isDepartmentHead && currentUser?.headOfDepartments?.length > 0) {
-        isDeptHead = true;
-        userDepartmentIds = currentUser.headOfDepartments.map(d => d.toString());
-      } else if (currentUser?.employeeId?.department) {
-        const userDept = await Department.findById(currentUser.employeeId.department);
-        const currentEmployeeId = currentUser?.employeeId?._id?.toString();
-        if (userDept) {
-          const isLegacyHead = userDept.head?.toString() === currentEmployeeId;
-          const isInHeadsArray = userDept.heads?.some(h => h?.toString() === currentEmployeeId);
-          if (isLegacyHead || isInHeadsArray) {
-            isDeptHead = true;
-            userDepartmentIds = [userDept._id.toString()];
-          }
-        }
-      }
-
-      if (!isDeptHead) {
-        return NextResponse.json({
-          success: true,
-          data: null,
-          message: 'No permission to view team task stats'
-        });
-      }
-    }
-
-    // Build employee filter
-    let employeeQuery = { status: 'active' };
-    
-    // Handle multiple departments filter (comma-separated)
-    if (departmentsFilter) {
-      const deptIds = departmentsFilter.split(',').filter(id => id.trim());
-      if (!isAdminOrHR && isDeptHead) {
-        // Validate department head can only see their departments
-        const validDeptIds = deptIds.filter(id => userDepartmentIds.includes(id));
-        if (validDeptIds.length === 0) {
-          return NextResponse.json({
-            success: false,
-            message: 'Not authorized to view these departments'
-          }, { status: 403 });
-        }
-        employeeQuery.department = { $in: validDeptIds };
-      } else if (isAdminOrHR) {
-        employeeQuery.department = { $in: deptIds };
-      }
-    } else if (departmentFilter && departmentFilter !== 'all') {
-      if (!isAdminOrHR && isDeptHead && !userDepartmentIds.includes(departmentFilter)) {
-        return NextResponse.json({
-          success: false,
-          message: 'Not authorized to view this department'
-        }, { status: 403 });
-      }
-      employeeQuery.department = departmentFilter;
-    } else if (isDeptHead && !isAdminOrHR) {
-      // Default: show only departments the user heads
-      employeeQuery.department = { $in: userDepartmentIds };
-    }
-    // For admin/HR with no filter, show all employees (no department filter added)
-
-    // Get employees
-    const employees = await Employee.find(employeeQuery)
-      .select('_id firstName lastName department')
-      .populate('department', 'name')
-      .lean();
+    await assertTeamStatisticsAccess(database, user)
+    const { start: rangeStart, end: rangeEnd } = performanceDates(searchParams, new Date(startDate), new Date(endDate))
+    const employees = await joinPerformanceEmployees(database, await performanceEmployees(database, user, searchParams))
 
     const employeeIds = employees.map(e => e._id);
     const employeeMap = {};
@@ -116,10 +49,7 @@ export async function GET(request) {
     });
 
     // Get all task assignments for these employees
-    const taskAssignments = await TaskAssignee.find({
-      user: { $in: employeeIds },
-      assignmentStatus: { $in: ['pending', 'accepted'] }
-    }).lean();
+    const taskAssignments = await scopedPerformanceRecords(database, 'taskassignees', employees, [filter('assignmentStatus', ['pending', 'accepted'], 'in')], { employeeField: 'user' });
     
     const taskIds = [...new Set(taskAssignments.map(a => a.task.toString()))];
     
@@ -136,15 +66,7 @@ export async function GET(request) {
 
     // Get all tasks that are assigned to these employees
     // Filter by date range (created OR due within the range)
-    const tasks = await Task.find({
-      _id: { $in: taskIds },
-      status: { $ne: 'archived' },
-      $or: [
-        { createdAt: { $gte: new Date(startDate), $lte: new Date(endDate + 'T23:59:59.999Z') } },
-        { dueDate: { $gte: new Date(startDate), $lte: new Date(endDate + 'T23:59:59.999Z') } },
-        { completedAt: { $gte: new Date(startDate), $lte: new Date(endDate + 'T23:59:59.999Z') } }
-      ]
-    }).lean();
+    const tasks = [...(await readFirestoreReferences(database, 'tasks', taskIds)).values()].filter(task => task.status !== 'archived' && ['createdAt', 'dueDate', 'completedAt'].some(field => task[field] && new Date(task[field]) >= rangeStart && new Date(task[field]) <= rangeEnd));
 
     // Initialize counters
     let totalTasks = tasks.length;
@@ -404,6 +326,6 @@ export async function GET(request) {
       success: false,
       message: 'Failed to fetch task stats',
       error: error.message
-    }, { status: 500 });
+    }, { status: error.status || 500 });
   }
 }

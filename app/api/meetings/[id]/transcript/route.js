@@ -1,5 +1,6 @@
+import { getMeetingDatabase, populateMeeting, requireMeeting } from '@/lib/meetings/store.server'
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { transcribeAudio } from '@/lib/audio'
 import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import {
@@ -133,20 +134,20 @@ async function parseTranscriptPayload(request) {
 export async function POST(request, { params }) {
   try {
     const { id } = await params
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
 
-    const { user, models } = auth
-    const { Meeting } = models
+    const { user } = auth
+    const database = await getMeetingDatabase(auth.tenant.databaseName)
 
-    const employee = await resolveMeetingEmployee(models, user)
+    const employee = await resolveMeetingEmployee(database, user)
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    const meeting = await Meeting.findById(id)
+    let meeting = await database.get('meetings', id)
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
     }
@@ -195,8 +196,11 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'No transcript content provided' }, { status: 400 })
     }
 
-    updateMeetingTranscript(meeting, segments)
-    await meeting.save()
+    meeting = await database.mutate('meetings', id, current => {
+      if (!current || !userCanAccessMeeting(current, employee)) throw new Error('Meeting access changed')
+      updateMeetingTranscript(current, segments)
+      return { ...current, updatedAt: new Date() }
+    })
 
     return NextResponse.json({
       success: true,
@@ -217,18 +221,16 @@ export async function POST(request, { params }) {
 export async function GET(request, { params }) {
   try {
     const { id } = await params
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
 
-    const { user, models } = auth
-    const { Meeting } = models
+    const { user } = auth
+    const database = await getMeetingDatabase(auth.tenant.databaseName)
 
-    const employee = await resolveMeetingEmployee(models, user)
-    const meeting = await Meeting.findById(id)
-      .select('transcript transcriptLanguages organizer invitees')
-      .populate('transcript.speaker', 'firstName lastName')
+    const employee = await resolveMeetingEmployee(database, user)
+    const meeting = await database.get('meetings', id)
 
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })

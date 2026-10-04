@@ -4,9 +4,16 @@ import postcss from 'postcss'
 
 const read = file => fs.readFileSync(path.join(process.cwd(), file), 'utf8')
 test('Assets and other native action tables explicitly mark the action header', () => {
-  for (const file of ['assets', 'employees', 'attendance', 'documents', 'users', 'designations', 'recruitment', 'leave/requests', 'leave/approvals', 'leave/allocations', 'helpdesk/manage']) {
+  for (const file of ['assets', 'employees', 'attendance', 'users', 'designations', 'recruitment', 'leave/requests', 'leave/approvals', 'leave/allocations', 'helpdesk/manage']) {
     expect(read(`app/dashboard/${file}/page.js`)).toMatch(/<th\b[^>]*data-sticky-actions="true"[^>]*>\s*Actions?\s*<\/th>/)
   }
+})
+test('document grid keeps preview, download and delete actions on each card', () => {
+  const grid = read('components/employees/DocumentGrid.js')
+  expect(grid).toContain('aria-label="Documents grid"')
+  expect(grid).toContain('onPreview(doc)')
+  expect(grid).toContain('onDownload(doc)')
+  expect(grid).toContain('onDelete(doc._id)')
 })
 test('shared sticky rules pin the right edge with opaque surfaces and exclude spanning rows', () => {
   const ast = postcss.parse(read('app/globals.css'))

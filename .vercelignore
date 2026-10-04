@@ -2,6 +2,11 @@
 .next
 .next-dev
 .next-dev-next
+.next-*
+.migration-data
+.secrets
+firestore-debug.log
+firebase-debug.log
 node_modules
 coverage
 desktop-app

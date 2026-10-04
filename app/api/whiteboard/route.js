@@ -1,152 +1,41 @@
-import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { randomBytes } from 'node:crypto'
+import { getWhiteboardContext, listVisibleWhiteboards, populateWhiteboard, boardError } from '@/lib/whiteboards.server'
 
-// GET /api/whiteboard - List all whiteboards for user
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Whiteboard, User, Employee } = models
-
-    // Get employee ID from user
-    let employeeId = user.employeeId?._id || user.employeeId
-    if (!employeeId) {
-      const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
-      employeeId = userRecord?.employeeId
-    }
-    
-    if (!employeeId) {
-      const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
-      employeeId = employee?._id
-    }
-
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search') || '';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const skip = (page - 1) * limit;
-
-    // Build query - get boards created by user OR shared with user
-    const query = {
-      $or: [
-        { createdBy: employeeId },
-        { sharedWith: employeeId }
-      ]
-    };
-
-    // Add search filter
-    if (search) {
-      query.$and = [
-        { $or: query.$or },
-        { $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } }
-        ]}
-      ];
-      delete query.$or;
-    }
-
-    const [boards, total] = await Promise.all([
-      Whiteboard.find(query)
-        .select('name description thumbnail createdBy sharedWith isPublic createdAt updatedAt')
-        .populate('createdBy', 'firstName lastName email profilePicture')
-        .populate('sharedWith', 'firstName lastName email profilePicture')
-        .sort({ updatedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Whiteboard.countDocuments(query)
-    ]);
-
-    // Add permission info for each board
-    const boardsWithPermissions = boards.map(board => {
-      const isOwner = board.createdBy?._id?.toString() === employeeId?.toString();
-      const isShared = board.sharedWith?.some(s => s._id?.toString() === employeeId?.toString());
-      
-      return { 
-        ...board, 
-        // Normalize fields for UI compatibility
-        title: board.name,
-        owner: board.createdBy,
-        userPermission: isOwner ? 'owner' : (isShared ? 'editor' : 'view_only'),
-        isOwner: isOwner
-      };
-    });
-
-    return NextResponse.json({
-      boards: boardsWithPermissions,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
+    const context = await getWhiteboardContext(request)
+    const params = new URL(request.url).searchParams
+    const search = (params.get('search') || '').trim().toLowerCase()
+    const page = Math.max(1, Number(params.get('page')) || 1)
+    const limit = Math.min(100, Math.max(1, Number(params.get('limit')) || 20))
+    const records = (await listVisibleWhiteboards(context)).filter(board => !search || [board.title, board.name, board.description].some(value => String(value || '').toLowerCase().includes(search)))
+    records.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+    const boards = await Promise.all(records.slice((page - 1) * limit, page * limit).map(board => populateWhiteboard(context, board, { summary: true })))
+    return NextResponse.json({ boards, pagination: { page, limit, total: records.length, pages: Math.ceil(records.length / limit) } })
   } catch (error) {
-    console.error('Error fetching whiteboards:', error);
-    return NextResponse.json({ error: 'Failed to fetch whiteboards' }, { status: 500 });
+    return NextResponse.json({ error: error.status ? error.message : 'Failed to fetch whiteboards' }, { status: error.status || 500 })
   }
 }
 
-// POST /api/whiteboard - Create new whiteboard
 export async function POST(request) {
   const startedAt = performance.now()
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ error: auth.message }, { status: 401 })
+    const context = await getWhiteboardContext(request)
+    if (!context.employeeId) throw boardError('Employee not found', 404)
+    const body = await request.json()
+    const title = body.title || body.name || 'Untitled Board'
+    if (typeof title !== 'string' || title.length > 300 || (body.description !== undefined && (typeof body.description !== 'string' || body.description.length > 10000))) throw boardError('Invalid board title or description')
+    const whiteboard = {
+      _id: randomBytes(12).toString('hex'), title, name: title, description: body.description || '',
+      owner: context.userId, createdBy: context.employeeId, data: null, isPublic: false, sharedWith: [], sharing: [],
+      pages: [{ id: 'page-1', objects: [] }], currentPageIndex: 0, theme: 'white', showGrid: false,
+      defaultZoom: 1, defaultPanX: 0, defaultPanY: 0, aiAnalysis: { summary: '', messages: [], notes: [], keyPoints: [] },
+      lastModified: new Date(), createdAt: new Date(), updatedAt: new Date(),
     }
-    const { user, models } = auth
-    const { Whiteboard, User, Employee } = models
-
-    // Get employee ID from user
-    let employeeId = user.employeeId?._id || user.employeeId
-    if (!employeeId) {
-      const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
-      employeeId = userRecord?.employeeId
-    }
-    
-    if (!employeeId) {
-      const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
-      employeeId = employee?._id
-    }
-
-    if (!employeeId) {
-      return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
-    }
-
-    const body = await request.json();
-    const { title, name, description } = body;
-
-    // Get the user's _id (not employeeId) for the owner field
-    const userId = user._id || user.userId;
-
-    const whiteboard = new Whiteboard({
-      title: title || name || 'Untitled Board',
-      name: title || name || 'Untitled Board', // Legacy field
-      description: description || '',
-      owner: userId,  // Required field - uses User._id
-      createdBy: employeeId, // Legacy field - uses Employee._id
-      data: null,
-      isPublic: false,
-      sharedWith: [],
-      pages: [{ id: 'page-1', objects: [] }]
-    });
-
-    await whiteboard.save();
-
-    return NextResponse.json({
-      success: true,
-      whiteboard: { ...whiteboard.toObject(), title: whiteboard.name },
-      permission: 'owner',
-    }, { status: 201, headers: { 'Server-Timing': `board-create;dur=${(performance.now() - startedAt).toFixed(1)}` } });
+    await context.store.create('whiteboards', whiteboard)
+    return NextResponse.json({ success: true, whiteboard, permission: 'owner' }, { status: 201, headers: { 'Server-Timing': `board-create;dur=${(performance.now() - startedAt).toFixed(1)}` } })
   } catch (error) {
-    console.error('Error creating whiteboard:', error.message, error.stack);
-    return NextResponse.json({ error: 'Failed to create whiteboard', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.status ? error.message : 'Failed to create whiteboard' }, { status: error.status || 500 })
   }
 }

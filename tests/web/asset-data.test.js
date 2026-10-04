@@ -85,13 +85,18 @@ describe('asset data normalization', () => {
     const pageSource = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/assets/page.js'), 'utf8')
     const dashboardSource = fs.readFileSync(path.join(process.cwd(), 'app/api/dashboard/unified/route.js'), 'utf8')
     const updateRouteSource = fs.readFileSync(path.join(process.cwd(), 'app/api/assets/[id]/route.js'), 'utf8')
+    const dashboardServiceSource = fs.readFileSync(path.join(process.cwd(), 'lib/dashboardData.server.js'), 'utf8')
+    const assetApiSource = fs.readFileSync(path.join(process.cwd(), 'lib/assetsApi.server.js'), 'utf8')
 
     expect(pageSource).toContain('getAssetDisplayDetails(asset)')
     expect(pageSource).toContain('Edit or Reassign')
     expect(pageSource).toContain('`/api/assets/${selectedAsset._id}`')
-    expect(dashboardSource).toContain(".select('name assetCode category uin serialNumber manufacturer model status')")
-    expect(updateRouteSource).toContain('const { id } = await params')
-    expect(updateRouteSource).toContain("emitAssetUpdate(asset, recipients.map(user => user.id), { action: 'update', broadcast: false })")
+    expect(dashboardSource).toContain('unifiedDashboard as GET')
+    expect(dashboardServiceSource).toContain("selected(row, ['name', 'assetCode', 'category', 'uin', 'serialNumber', 'manufacturer', 'model', 'status'])")
+    expect(dashboardServiceSource).toContain("projectRows(database, 'assets', [f('assignedTo', employeeId)])")
+    expect(updateRouteSource).toContain("assetsApi(request, context, 'PUT')")
+    expect(assetApiSource).toContain('(await context.params).id')
+    expect(assetApiSource).toContain("emitAssetUpdate({ assetId: record._id, action }, [...recipients], { action, broadcast: false })")
   })
 
   test.each([

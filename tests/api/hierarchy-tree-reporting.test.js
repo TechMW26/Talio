@@ -1,16 +1,10 @@
 jest.mock('next/server', () => ({ NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) } }))
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
+const { workflowStore } = require('../helpers/firestoreWorkflowStore')
 const { GET } = require('@/app/api/hierarchy/tree/route')
-const { getAuthAndModels } = require('@/lib/auth')
-function query(value) {
-  const q = { lean: async () => value }
-  for (const method of ['populate', 'select']) q[method] = () => q
-  return q
-}
+const { getAuthAndDatabase } = require('@/lib/auth')
 async function tree(employees) {
-  getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'user', employeeId: 'employee' }, models: {
-    Employee: { find: () => query(employees) }, User: { find: () => query([]) },
-  } })
+  getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user', employeeId: 'employee' }, database: workflowStore({ employees: employees.map(e => ({ ...e, status: 'active' })) }) })
   const response = await GET(new Request('https://talio.test/api/hierarchy/tree'))
   expect(response.status).toBe(200)
   return (await response.json()).data

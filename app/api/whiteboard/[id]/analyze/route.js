@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
+import { getWhiteboardContext, assertWhiteboardAccess, saveWhiteboardAnalysis } from '@/lib/whiteboards.server'
 import { generateVisionContent as generateBaseVisionContent } from '@/lib/gemini';
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 import { generateSmartContent as generateBaseSmartContent } from '@/lib/promptEngine';
@@ -312,24 +312,19 @@ function cleanAIResponse(text) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Whiteboard'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Whiteboard } = models
+    const context = await getWhiteboardContext(request)
 
     const { id } = await params;
     const body = await request.json();
     const { action, message, canvasScreenshot } = body;
 
-    const whiteboard = await Whiteboard.findById(id);
+    const whiteboard = await context.store.get('whiteboards', id);
     if (!whiteboard) {
       return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 });
     }
 
     // Check permission
-    const permission = whiteboard.getUserPermission(user._id || user.userId);
+    const permission = assertWhiteboardAccess(whiteboard, context, 'editor');
     if (!permission) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
@@ -377,7 +372,7 @@ Be genuinely helpful and insightful rather than just describing what you see. Sh
       } else {
         // Use Smart Content for text-only analysis to get better human-like responses
         summary = await generateSmartContent(prompt, {
-          userId: user._id || user.userId,
+          userId: context.userId, databaseName: context.databaseName,
           feature: 'whiteboard-analyze',
           metadata: { whiteboardId: id },
           skipRefinement: true,
@@ -396,7 +391,7 @@ Be genuinely helpful and insightful rather than just describing what you see. Sh
         { role: 'assistant', content: summary, timestamp: new Date() }
       );
 
-      await whiteboard.save();
+      await saveWhiteboardAnalysis(context, whiteboard);
 
       return NextResponse.json({
         success: true,
@@ -441,7 +436,7 @@ ${hasScreenshot ? 'I can see your canvas now. ' : ''}Respond helpfully and natur
       } else {
         // Use Smart Content for chat to handle crude user inputs better
         response = await generateSmartContent(message, {
-          userId: user._id || user.userId,
+          userId: context.userId, databaseName: context.databaseName,
           feature: 'whiteboard-chat',
           systemInstruction: context,
           metadata: { whiteboardId: id },
@@ -472,7 +467,7 @@ ${hasScreenshot ? 'I can see your canvas now. ' : ''}Respond helpfully and natur
         }
       }
 
-      await whiteboard.save();
+      await saveWhiteboardAnalysis(context, whiteboard);
 
       return NextResponse.json({
         success: true,
@@ -483,7 +478,7 @@ ${hasScreenshot ? 'I can see your canvas now. ' : ''}Respond helpfully and natur
     } else if (action === 'clear') {
       // Clear AI analysis history
       whiteboard.aiAnalysis = { summary: '', messages: [], notes: [], keyPoints: [] };
-      await whiteboard.save();
+      await saveWhiteboardAnalysis(context, whiteboard);
 
       return NextResponse.json({
         success: true,
@@ -706,7 +701,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
 
       try {
         const aiResponse = await generateSmartContent(generatePrompt, {
-          userId: user._id || user.userId,
+          userId: context.userId, databaseName: context.databaseName,
           feature: 'whiteboard-generate',
           skipRefinement: true,
           skipContext: true,
@@ -848,7 +843,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
           whiteboard.aiAnalysis.pendingGeneration = null;
         }
 
-        await whiteboard.save();
+        await saveWhiteboardAnalysis(context, whiteboard);
 
         return NextResponse.json({
           success: true,
@@ -926,7 +921,7 @@ Return ONLY valid JSON:
 
       try {
         const aiResponse = await generateSmartContent(continuePrompt, {
-          userId: user._id || user.userId,
+          userId: context.userId, databaseName: context.databaseName,
           feature: 'whiteboard-continue',
           skipRefinement: true,
           skipContext: true,
@@ -1008,7 +1003,7 @@ Return ONLY valid JSON:
           whiteboard.aiAnalysis.pendingGeneration = null;
         }
 
-        await whiteboard.save();
+        await saveWhiteboardAnalysis(context, whiteboard);
 
         return NextResponse.json({
           success: true,
@@ -1024,7 +1019,7 @@ Return ONLY valid JSON:
       } catch (parseError) {
         console.error('Failed to continue generation:', parseError);
         whiteboard.aiAnalysis.pendingGeneration = null;
-        await whiteboard.save();
+        await saveWhiteboardAnalysis(context, whiteboard);
         return NextResponse.json({ error: 'Failed to continue. Try describing what else you want to add.' }, { status: 400 });
       }
     } else if (action === 'restructure') {
@@ -1080,7 +1075,7 @@ Return ONLY valid JSON array. No explanations.`;
 
       try {
         const aiResponse = await generateSmartContent(restructurePrompt, {
-          userId: user._id || user.userId,
+          userId: context.userId, databaseName: context.databaseName,
           feature: 'whiteboard-restructure',
           skipRefinement: true,
           skipContext: true,
@@ -1131,7 +1126,7 @@ Return ONLY valid JSON array. No explanations.`;
           { role: 'assistant', content: `I've restructured your diagram: aligned ${validObjects.length} elements to a clean grid, standardized spacing, straightened connections, and applied professional styling. The logical structure and all your content has been preserved.`, timestamp: new Date() }
         );
 
-        await whiteboard.save();
+        await saveWhiteboardAnalysis(context, whiteboard);
 
         return NextResponse.json({
           success: true,
@@ -1176,7 +1171,7 @@ Return ONLY valid JSON array. No explanations.`;
           console.log(`[MIRA] Content generation attempt ${retryCount + 1}/${MAX_RETRIES} for ${templateType}...`);
 
           const aiResponse = await generateSmartContent(preparePrompt, {
-            userId: user._id || user.userId,
+            userId: context.userId, databaseName: context.databaseName,
             feature: 'whiteboard-prepare',
             useCase: 'reasoning',
             thinking: false,
@@ -1322,7 +1317,7 @@ Return ONLY valid JSON array. No explanations.`;
           { role: 'assistant', content: `I've prepared structured content for your ${templateType}. Review and customize it, then click "Start Plotting" when ready.`, timestamp: new Date() }
         );
 
-        await whiteboard.save();
+        await saveWhiteboardAnalysis(context, whiteboard);
 
         return NextResponse.json({
           success: true,
@@ -1384,7 +1379,7 @@ Return ONLY this JSON structure:
 
       try {
         const aiResponse = await generateSmartContent(expandPrompt, {
-          userId: user._id || user.userId,
+          userId: context.userId, databaseName: context.databaseName,
           feature: 'whiteboard-expand-section',
           skipRefinement: true,
           skipContext: true,
@@ -1446,7 +1441,7 @@ Return ONLY this JSON structure:
 
       try {
         const aiResponse = await generateSmartContent(regeneratePrompt, {
-          userId: user._id || user.userId,
+          userId: context.userId, databaseName: context.databaseName,
           feature: 'whiteboard-regenerate-section',
           skipRefinement: true,
           skipContext: true,
@@ -1504,7 +1499,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
       try {
         const aiResponse = await generateSmartContent(editPrompt, {
-          userId: user._id || user.userId,
+          userId: context.userId, databaseName: context.databaseName,
           feature: 'whiteboard-edit-content',
           skipRefinement: true,
           skipContext: true,
@@ -1523,7 +1518,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           { role: 'assistant', content: `I've updated the content as requested.`, timestamp: new Date() }
         );
 
-        await whiteboard.save();
+        await saveWhiteboardAnalysis(context, whiteboard);
 
         return NextResponse.json({
           success: true,
@@ -3867,17 +3862,8 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         { role: 'assistant', content: `Created ${generatedObjects.length} elements from your prepared content as a ${templateType}. The content is now visualized on the canvas!`, timestamp: new Date() }
       );
 
-      // Mark as modified to ensure Mongoose detects changes in nested objects
-      whiteboard.markModified('aiAnalysis');
-      whiteboard.markModified('pages');
-
-      // One atomic write: never expose an empty or partially plotted page.
-      const saved = await Whiteboard.updateOne(
-        { _id: whiteboard._id, ...(whiteboard.updatedAt ? { updatedAt: whiteboard.updatedAt } : {}) },
-        { $set: { [`pages.${pageIndex}.objects`]: currentPage.objects, aiAnalysis: whiteboard.aiAnalysis, lastModified: new Date() } },
-        { maxTimeMS: 30000 }
-      );
-      if (saved?.matchedCount === 0) return NextResponse.json({ error: 'This board changed while plotting. Refresh and try again; your collaborators’ changes were preserved.' }, { status: 409 });
+      // Native transaction rechecks both permission and board revision.
+      await saveWhiteboardAnalysis(context, whiteboard);
 
       return NextResponse.json({
         success: true,
@@ -3896,7 +3882,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
     console.error('AI Analysis error:', error);
     return NextResponse.json({
       error: error.message || 'Failed to analyze canvas'
-    }, { status: 500 });
+    }, { status: error.status || 500 });
   }
 }
 
@@ -3904,21 +3890,16 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 export async function GET(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Whiteboard'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Whiteboard } = models
+    const context = await getWhiteboardContext(request)
 
     const { id } = await params;
-    const whiteboard = await Whiteboard.findById(id);
+    const whiteboard = await context.store.get('whiteboards', id);
 
     if (!whiteboard) {
       return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 });
     }
 
-    const permission = whiteboard.getUserPermission(user._id || user.userId);
+    const permission = assertWhiteboardAccess(whiteboard, context);
     if (!permission) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
@@ -3930,6 +3911,6 @@ export async function GET(request, { params }) {
 
   } catch (error) {
     console.error('Get AI Analysis error:', error);
-    return NextResponse.json({ error: 'Failed to get analysis' }, { status: 500 });
+    return NextResponse.json({ error: error.status ? error.message : 'Failed to get analysis' }, { status: error.status || 500 });
   }
 }
