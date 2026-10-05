@@ -42,6 +42,23 @@ test('failed check-in does not start success refreshes', async () => {
   expect(scope.fetchTodayAttendance).not.toHaveBeenCalled()
   expect(scope.toast.error).toHaveBeenCalledWith('Denied')
 })
+test.each([
+  ['handleCheckIn', 400, 'Already clocked in today'],
+  ['handleCheckOut', 400, 'Already clocked out today'],
+  ['handleCheckOut', 400, 'Please clock in first'],
+  ['handleCheckIn', 409, 'Concurrent attendance update'],
+])('%s reconciles rejected punches with authoritative reads (%s, %s)', async (name, status, message) => {
+  const scope = context()
+  scope.confirmedAttendanceRef.current = { record: { checkIn: 'stale' }, day: '2026-10-05' }
+  scope.fetch.mockResolvedValue({ status, json: async () => ({ success: false, message }) })
+  scope.fetchTodayAttendance.mockImplementation(() => expect(scope.attendanceSubmissionRef.current).toBe(false))
+  await callback(name, scope)()
+  expect(scope.fetchTodayAttendance).toHaveBeenCalledTimes(1)
+  expect(scope.fetchUnifiedWidgetData).toHaveBeenCalledWith(true)
+  expect(scope.fetchDashboardData).toHaveBeenCalledWith(true)
+  expect(scope.confirmedAttendanceRef.current).toBeNull()
+  expect(scope.toast.success).not.toHaveBeenCalled()
+})
 test('a stale attendance GET cannot overwrite a subsequent confirmed punch', async () => {
   const scope = context()
   let finish
@@ -51,6 +68,21 @@ test('a stale attendance GET cannot overwrite a subsequent confirmed punch', asy
   finish({ ok: true, json: async () => ({ success: true, data: [] }) })
   await pending
   expect(scope.setTodayAttendance).not.toHaveBeenCalled()
+})
+test.each([
+  ['handleCheckIn', 'Already clocked in today', { _id: 'a', checkIn: '2026-10-05T04:00:00Z' }],
+  ['handleCheckOut', 'Already clocked out today', { _id: 'a', checkIn: '2026-10-05T04:00:00Z', checkOut: '2026-10-05T12:00:00Z' }],
+])('%s replaces empty UI state with the saved record after a duplicate error', async (name, message, record) => {
+  const scope = context()
+  scope.fetch.mockImplementation(async (_, options) => options.method === 'POST'
+    ? { status: 400, json: async () => ({ success: false, message }) }
+    : { ok: true, json: async () => ({ success: true, data: [record] }) })
+  let refresh
+  scope.fetchTodayAttendance = () => { refresh = callback('fetchTodayAttendance', scope)(); return refresh }
+  await callback(name, scope)()
+  await refresh
+  expect(scope.setTodayAttendance).toHaveBeenLastCalledWith(record)
+  expect(scope.toast.success).not.toHaveBeenCalled()
 })
 test('a current empty GET clears previous-day attendance and bypasses HTTP caches', async () => {
   const scope = context()

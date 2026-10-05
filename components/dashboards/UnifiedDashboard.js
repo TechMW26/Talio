@@ -651,6 +651,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         if (attendanceSubmissionRef.current) return // Synchronous double-click guard
         const previousAttendance = todayAttendance
         let confirmed = false
+        let needsReconciliation = false
 
         attendanceSubmissionRef.current = true
         attendanceVersionRef.current++
@@ -690,6 +691,8 @@ export default function UnifiedDashboard({ user: userProp }) {
                 // Notify other tabs via BroadcastChannel
                 try { broadcastChannelRef.current?.postMessage({ type: 'check-in', attendance: data.data }) } catch (error) { console.warn('Attendance cross-tab sync failed', error) }
             } else {
+                needsReconciliation = response.status === 409 || data.message === 'Already clocked in today'
+                if (needsReconciliation) confirmedAttendanceRef.current = null
                 // Preserve the last confirmed attendance
                 attendanceVersionRef.current++
                 setTodayAttendance(previousAttendance)
@@ -704,7 +707,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         } finally {
             attendanceSubmissionRef.current = false
             setAttendanceLoading(false)
-            if (confirmed) {
+            if (confirmed || needsReconciliation) {
                 void fetchTodayAttendance()
                 void fetchUnifiedWidgetData(true)
                 void fetchDashboardData(true)
@@ -717,6 +720,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         if (attendanceSubmissionRef.current) return // Synchronous double-click guard
         const previousAttendance = todayAttendance
         let confirmed = false
+        let needsReconciliation = false
 
         attendanceSubmissionRef.current = true
         attendanceVersionRef.current++
@@ -756,6 +760,8 @@ export default function UnifiedDashboard({ user: userProp }) {
                 // Notify other tabs via BroadcastChannel
                 try { broadcastChannelRef.current?.postMessage({ type: 'check-out', attendance: data.data }) } catch (error) { console.warn('Attendance cross-tab sync failed', error) }
             } else {
+                needsReconciliation = response.status === 409 || ['Already clocked out today', 'Please clock in first'].includes(data.message)
+                if (needsReconciliation) confirmedAttendanceRef.current = null
                 // Preserve the last confirmed attendance
                 attendanceVersionRef.current++
                 setTodayAttendance(previousAttendance)
@@ -770,7 +776,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         } finally {
             attendanceSubmissionRef.current = false
             setAttendanceLoading(false)
-            if (confirmed) {
+            if (confirmed || needsReconciliation) {
                 void fetchTodayAttendance()
                 void fetchUnifiedWidgetData(true)
                 void fetchDashboardData(true)
