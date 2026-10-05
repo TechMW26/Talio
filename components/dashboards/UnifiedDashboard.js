@@ -11,6 +11,7 @@ import { CustomizableDashboard } from '@/components/dashboard'
 import AttendanceHeaderSummary from '@/components/widgets/AttendanceHeaderSummary'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import { getTodayDateString } from '@/lib/timezone'
+import { canApplyAttendanceSnapshot } from '@/lib/client/attendanceSnapshot'
 import useLocationCapture, { getAttendanceLocationOptions } from '@/hooks/useLocationCapture'
 import {
     FaUsers, FaCalendarAlt, FaUserPlus,
@@ -289,6 +290,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     // captures it before fetching and skips the update if it changed during the request.
     const attendanceVersionRef = useRef(0)
     const attendanceSubmissionRef = useRef(false)
+    const confirmedAttendanceRef = useRef(null)
     const dashboardStatsRequestRef = useRef(null)
     const unifiedWidgetsRequestRef = useRef(null)
     const realtimeRefreshTimerRef = useRef(null)
@@ -343,8 +345,8 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     // Fetch dashboard stats based on role - ONLY fetches KPI stats.
     // Leave requests load independently so other widgets cannot delay approvals.
-    const fetchDashboardData = useCallback(() => {
-        if (dashboardStatsRequestRef.current) {
+    const fetchDashboardData = useCallback((force = false) => {
+        if (!force && dashboardStatsRequestRef.current) {
             return dashboardStatsRequestRef.current
         }
 
@@ -364,10 +366,10 @@ export default function UnifiedDashboard({ user: userProp }) {
             // Only fetch the stats endpoint - departments, leave requests,
             // attendance summary, and employee data all come from the unified endpoint
             const response = await fetch(statsEndpoint, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store'
             })
             const statsData = await response.json()
-            if (statsData.success) {
+            if (statsData.success && dashboardStatsRequestRef.current === requestPromise) {
                 setDashboardStats(statsData.data)
             }
           } catch (error) {
@@ -377,8 +379,8 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         dashboardStatsRequestRef.current = requestPromise
         requestPromise.then(
-            () => { dashboardStatsRequestRef.current = null },
-            () => { dashboardStatsRequestRef.current = null }
+            () => { if (dashboardStatsRequestRef.current === requestPromise) dashboardStatsRequestRef.current = null },
+            () => { if (dashboardStatsRequestRef.current === requestPromise) dashboardStatsRequestRef.current = null }
         )
         return requestPromise
     }, [user?.role])
@@ -386,19 +388,20 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Fetch today's attendance - used for real-time updates only (initial load uses unified endpoint)
     const fetchTodayAttendance = useCallback(async () => {
         if (!employeeIdStr) return
+        const versionBeforeFetch = attendanceVersionRef.current
         try {
             setAttendanceLoading(true)
             const token = localStorage.getItem('token')
             const today = getTodayDateString()
 
             const response = await fetch(`/api/attendance?employeeId=${employeeIdStr}&date=${today}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store'
             })
 
             const data = await response.json()
-            if (data.success && data.data.length > 0) {
+            if (response.ok && data.success && Array.isArray(data.data) && !attendanceSubmissionRef.current && attendanceVersionRef.current === versionBeforeFetch && canApplyAttendanceSnapshot(data.data[0] || null, confirmedAttendanceRef.current, today)) {
                 attendanceVersionRef.current++
-                setTodayAttendance(data.data[0])
+                setTodayAttendance(data.data[0] || null)
             }
         } catch (error) {
             console.error('Fetch today attendance error:', error)
@@ -410,8 +413,8 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Fetch unified widget data - single API call for holidays, announcements, assets, expenses, helpdesk, policies
     // ALSO populates: departments, attendance summary, employee data, and today's attendance
     // This eliminates 5+ separate API calls that were causing browser connection queue stalling
-    const fetchUnifiedWidgetData = useCallback(() => {
-        if (unifiedWidgetsRequestRef.current) {
+    const fetchUnifiedWidgetData = useCallback((force = false) => {
+        if (!force && unifiedWidgetsRequestRef.current) {
             return unifiedWidgetsRequestRef.current
         }
 
@@ -420,10 +423,10 @@ export default function UnifiedDashboard({ user: userProp }) {
           try {
             const token = localStorage.getItem('token')
             const response = await fetch(`/api/dashboard/unified?widgets=${encodeURIComponent(unifiedWidgetSelection)}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store'
             })
             const data = await response.json()
-            if (data.success) {
+            if (data.success && unifiedWidgetsRequestRef.current === requestPromise) {
                 setUnifiedWidgetData(data)
 
                 // Populate departments from unified response (eliminates /api/departments call)
@@ -439,7 +442,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
                 // Populate today's attendance from unified response (eliminates /api/attendance?employeeId=... call)
                 // Only apply if no direct attendance update (check-in/check-out/socket) happened during this fetch
-                if (data.todayAttendance !== undefined && attendanceVersionRef.current === versionBeforeFetch) {
+                if (data.todayAttendance !== undefined && !attendanceSubmissionRef.current && attendanceVersionRef.current === versionBeforeFetch && canApplyAttendanceSnapshot(data.todayAttendance, confirmedAttendanceRef.current, getTodayDateString())) {
                     setTodayAttendance(data.todayAttendance)
                 }
 
@@ -455,8 +458,8 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         unifiedWidgetsRequestRef.current = requestPromise
         requestPromise.then(
-            () => { unifiedWidgetsRequestRef.current = null },
-            () => { unifiedWidgetsRequestRef.current = null }
+            () => { if (unifiedWidgetsRequestRef.current === requestPromise) unifiedWidgetsRequestRef.current = null },
+            () => { if (unifiedWidgetsRequestRef.current === requestPromise) unifiedWidgetsRequestRef.current = null }
         )
         return requestPromise
     }, [unifiedWidgetSelection])
@@ -647,6 +650,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     const handleCheckIn = useCallback(async () => {
         if (attendanceSubmissionRef.current) return // Synchronous double-click guard
         const previousAttendance = todayAttendance
+        let confirmed = false
 
         attendanceSubmissionRef.current = true
         attendanceVersionRef.current++
@@ -681,8 +685,10 @@ export default function UnifiedDashboard({ user: userProp }) {
                 // Display only the confirmed server record
                 attendanceVersionRef.current++
                 setTodayAttendance(data.data)
+                confirmedAttendanceRef.current = { record: data.data, day: getTodayDateString() }
+                confirmed = true
                 // Notify other tabs via BroadcastChannel
-                broadcastChannelRef.current?.postMessage({ type: 'check-in', attendance: data.data })
+                try { broadcastChannelRef.current?.postMessage({ type: 'check-in', attendance: data.data }) } catch (error) { console.warn('Attendance cross-tab sync failed', error) }
             } else {
                 // Preserve the last confirmed attendance
                 attendanceVersionRef.current++
@@ -698,13 +704,19 @@ export default function UnifiedDashboard({ user: userProp }) {
         } finally {
             attendanceSubmissionRef.current = false
             setAttendanceLoading(false)
+            if (confirmed) {
+                void fetchTodayAttendance()
+                void fetchUnifiedWidgetData(true)
+                void fetchDashboardData(true)
+            }
         }
-    }, [employeeIdStr, attendanceLoading, todayAttendance, getAttendanceLocation])
+    }, [employeeIdStr, attendanceLoading, todayAttendance, getAttendanceLocation, fetchTodayAttendance, fetchUnifiedWidgetData, fetchDashboardData])
 
     // Handle check-out
     const handleCheckOut = useCallback(async () => {
         if (attendanceSubmissionRef.current) return // Synchronous double-click guard
         const previousAttendance = todayAttendance
+        let confirmed = false
 
         attendanceSubmissionRef.current = true
         attendanceVersionRef.current++
@@ -739,8 +751,10 @@ export default function UnifiedDashboard({ user: userProp }) {
                 // Display only the confirmed server record
                 attendanceVersionRef.current++
                 setTodayAttendance(data.data)
+                confirmedAttendanceRef.current = { record: data.data, day: getTodayDateString() }
+                confirmed = true
                 // Notify other tabs via BroadcastChannel
-                broadcastChannelRef.current?.postMessage({ type: 'check-out', attendance: data.data })
+                try { broadcastChannelRef.current?.postMessage({ type: 'check-out', attendance: data.data }) } catch (error) { console.warn('Attendance cross-tab sync failed', error) }
             } else {
                 // Preserve the last confirmed attendance
                 attendanceVersionRef.current++
@@ -756,8 +770,13 @@ export default function UnifiedDashboard({ user: userProp }) {
         } finally {
             attendanceSubmissionRef.current = false
             setAttendanceLoading(false)
+            if (confirmed) {
+                void fetchTodayAttendance()
+                void fetchUnifiedWidgetData(true)
+                void fetchDashboardData(true)
+            }
         }
-    }, [employeeIdStr, attendanceLoading, todayAttendance, getAttendanceLocation])
+    }, [employeeIdStr, attendanceLoading, todayAttendance, getAttendanceLocation, fetchTodayAttendance, fetchUnifiedWidgetData, fetchDashboardData])
 
     // Build widget components object based on role permissions
     // CustomizableDashboard expects an object mapping widget IDs to rendered components
