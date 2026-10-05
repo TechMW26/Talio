@@ -91,6 +91,10 @@ test('a current empty GET clears previous-day attendance and bypasses HTTP cache
   expect(scope.setTodayAttendance).toHaveBeenCalledWith(null)
   expect(scope.fetch.mock.calls[0][1].cache).toBe('no-store')
 })
+test('initial dashboard load follows feature-gated widget selection changes', () => {
+  const effect = source.match(/useEffect\(\(\) => \{\n        if \(!user \|\| !employeeIdStr\) return[\s\S]*?\n    \}, \[user, employeeIdStr, unifiedWidgetSelection\]\)/)
+  expect(effect).not.toBeNull()
+})
 test('confirmed punches reject stale snapshots but permit fresh data and day rollover', () => {
   const fence = { day: '2026-10-05', record: { _id: 'a', checkIn: 'in', checkOut: 'out', updatedAt: '2026-10-05T12:00:00Z' } }
   expect(canApplyAttendanceSnapshot(null, fence, fence.day)).toBe(false)

@@ -566,7 +566,10 @@ export default function UnifiedDashboard({ user: userProp }) {
         // Fetch data in parallel (non-blocking) - only 2 API calls from UnifiedDashboard
         fetchUnifiedWidgetData()  // Single aggregated call (replaces 6+ separate calls, includes company settings)
         fetchDashboardData()       // KPI stats only
-    }, [user, employeeIdStr]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Feature flags load independently (and may be restored from cache). If
+    // they change the widget selection after the first render, rerun the
+    // unified request so attendance is not permanently omitted on reload.
+    }, [user, employeeIdStr, unifiedWidgetSelection]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Countdown timer effect
     useEffect(() => {
