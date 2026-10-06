@@ -164,7 +164,7 @@ export const roleBasedMenus = {
       ]
     },
     { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays', group: 'Company' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Work' },
     { name: 'Role Management', icon: HiOutlineShieldCheck, path: '/dashboard/rbac/roles', group: 'Company' },
   ],
 
@@ -298,7 +298,7 @@ export const roleBasedMenus = {
       ]
     },
     { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays', group: 'Company' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Work' },
   ],
 
   // MANAGER - Team management focused
@@ -364,7 +364,7 @@ export const roleBasedMenus = {
     { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
     { name: 'Ideas', icon: HiOutlineLightBulb, path: '/dashboard/sandbox', group: 'Resources' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Work' },
   ],
 
   // EMPLOYEE - Personal focused
@@ -429,7 +429,7 @@ export const roleBasedMenus = {
     { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
     { name: 'Ideas', icon: HiOutlineLightBulb, path: '/dashboard/sandbox', group: 'Resources' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Work' },
   ],
 
   // DEPARTMENT HEAD - Department management focused (inherits from manager with department oversight)
@@ -499,7 +499,7 @@ export const roleBasedMenus = {
     { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
     { name: 'Ideas', icon: HiOutlineLightBulb, path: '/dashboard/sandbox', group: 'Resources' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Work' },
   ],
 }
 

@@ -448,10 +448,19 @@ html.dark body .dashboard-page-canvas {
   isolation: isolate;
 }
 
+/* Fernly's shared fade/slide vocabulary. Keep persistent shell/Mira stationary. */
+@keyframes fernly-page-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fernly-dialog-enter { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes fernly-card-enter { from { opacity: 0; transform: translateY(36px) scale(.985); } to { opacity: 1; transform: none; } }
+/* Shared cards opt in without animating assistant overlays, charts or draggable items. */
+.dashboard-page-canvas .card:not([class*="mira"]):not([draggable="true"]), [data-fernly-card] { animation: fernly-card-enter .85s cubic-bezier(.22,1,.36,1) both; }
+.modal-overlay > .modal-container { animation: fernly-dialog-enter .35s cubic-bezier(.22,1,.36,1) both; }
+@media (prefers-reduced-motion: reduce) { .modal-overlay > .modal-container, .dashboard-page-canvas .card, [data-fernly-card] { animation: none; } }
+
 .dashboard-route-page {
   min-height: 100%;
   transform-origin: 50% 18%;
-  animation: dashboard-route-enter 160ms ease-out both;
+  animation: fernly-page-enter 350ms cubic-bezier(.22, 1, .36, 1) both;
   transition: opacity 180ms ease, filter 180ms ease, transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 

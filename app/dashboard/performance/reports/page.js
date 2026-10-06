@@ -7,6 +7,7 @@ import { downloadExcelWorkbook } from '@/lib/client/spreadsheetExport'
 import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle, FaRocket, FaUserFriends } from 'react-icons/fa'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart, ComposedChart } from '@/components/charts/FernlyCharts'
 import CustomTooltip from '@/components/charts/CustomTooltip'
+import { FernlyGauge } from '@/components/charts/FernlyCharts'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { Select, SelectItem, Input, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -26,76 +27,10 @@ const CHART_COLORS = {
   indigo: '#6366F1'
 }
 
-// Gauge Chart Component for key metrics
-const GaugeChart = ({ value, maxValue = 100, label, color = CHART_COLORS.primary, size = 120 }) => {
-  const percentage = Math.min(Math.max((value / maxValue) * 100, 0), 100)
-  const strokeWidth = 10
-  const radius = (size - strokeWidth) / 2
-  const circumference = 2 * Math.PI * radius
-
-  // For a 270-degree gauge (from bottom-left to bottom-right, going over top)
-  const gaugeArc = circumference * 0.75 // 270 degrees
-  const filledArc = (percentage / 100) * gaugeArc
-  const emptyArc = gaugeArc - filledArc
-
-  // Determine color based on value
-  const getColor = () => {
-    if (percentage >= 80) return CHART_COLORS.success
-    if (percentage >= 60) return CHART_COLORS.warning
-    return CHART_COLORS.danger
-  }
-
-  const gaugeColor = color === 'auto' ? getColor() : color
-
-  // Center of the SVG
-  const cx = size / 2
-  const cy = size / 2
-
-  return (
-    <div className="flex flex-col items-center">
-      <svg width={size} height={size * 0.7} viewBox={`0 0 ${size} ${size * 0.7}`}>
-        {/* Background arc (gray) */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={radius}
-          fill="none"
-          stroke="#E5E7EB"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={`${gaugeArc} ${circumference}`}
-          transform={`rotate(135 ${cx} ${cy})`}
-          style={{ strokeLinecap: 'round' }}
-        />
-        {/* Foreground arc (colored) - fills from left */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={radius}
-          fill="none"
-          stroke={gaugeColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={`${filledArc} ${circumference}`}
-          transform={`rotate(135 ${cx} ${cy})`}
-          style={{ transition: 'stroke-dasharray 0.5s ease', strokeLinecap: 'round' }}
-        />
-        {/* Value text - positioned in center of gauge */}
-        <text
-          x={cx}
-          y={cy - 2}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="text-2xl font-bold"
-          fill={gaugeColor}
-        >
-          {Math.round(value)}%
-        </text>
-      </svg>
-      <span className="text-sm font-medium text-gray-600 mt-1">{label}</span>
-    </div>
-  )
-}
+// Shared Fernly geometry keeps report gauges consistent with project progress.
+const GaugeChart = ({ value, maxValue = 100, label, color = CHART_COLORS.primary }) => (
+  <FernlyGauge value={value} maxValue={maxValue} label={label} color={color} showLegend={false} />
+)
 
 // Trend Indicator Component
 const TrendIndicator = ({ current, previous, suffix = '%', higherIsBetter = true }) => {

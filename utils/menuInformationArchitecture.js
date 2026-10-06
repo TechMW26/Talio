@@ -31,14 +31,14 @@ const CATEGORY_DEFINITIONS = [
     name: 'Work',
     description: 'Tasks, projects, boards and productivity',
     icon: HiOutlineBriefcase,
-    members: ["To-Do's", 'TalioBoard', 'Projects', 'Productivity'],
+    members: ["To-Do's", 'TalioBoard', 'Projects', 'Productivity', 'General Calendar'],
   },
   {
     id: 'time',
     name: 'Time & leave',
     description: 'Attendance, leave, holidays and calendars',
     icon: HiOutlineClock,
-    members: ['Attendance & Leaves', 'Holidays', 'General Calendar'],
+    members: ['Attendance & Leaves', 'Holidays'],
   },
   {
     id: 'people',

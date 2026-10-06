@@ -1,6 +1,7 @@
 'use client'
 
 import BackIcon from '@/components/ui/BackIcon'
+import styles from './chat.module.css'
 
 import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
@@ -27,7 +28,7 @@ export default function ChatPage() {
   const [selectedChat, setSelectedChat] = useState(null)
   const [messages, setMessages] = useState([])
   const [message, setMessage] = useState('')
-  const [chatSearchQuery] = useState('')
+  const [chatSearchQuery, setChatSearchQuery] = useState('')
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('')
   const [sending, setSending] = useState(false)
   const [showNewChatModal, setShowNewChatModal] = useState(false)
@@ -704,7 +705,7 @@ export default function ChatPage() {
   return (
     <>
       {/* Header - Hide on mobile when chat is selected, always show on desktop */}
-      <div className={`${selectedChat ? 'hidden md:flex' : 'flex'} fixed top-[72px] left-0 right-0 z-[45] bg-white px-4 py-3 md:relative md:top-auto md:left-auto md:right-auto md:z-auto md:px-0 md:pt-0 md:pb-0 md:mb-4 items-center justify-between md:bg-transparent md:page-container shadow-sm md:shadow-none`}>
+      <div className={styles.toolbar}>
         <div>
           <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-800">Chat</h1>
           <p className="text-xs md:text-sm lg:text-base text-gray-600 mt-1">Connect with your team</p>
@@ -728,16 +729,11 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Container - Full screen edge-to-edge on mobile */}
-      <div className={`${selectedChat
-        ? 'fixed top-[60px] left-0 right-0 bottom-[72px] z-[60] md:relative md:top-auto md:left-auto md:right-auto md:bottom-auto md:rounded-2xl md:h-100%'
-        : 'fixed top-[140px] left-0 right-0 bottom-[72px] z-[40] bg-white md:relative md:top-auto md:left-auto md:right-auto md:bottom-auto md:rounded-2xl md:shadow-md md:h-auto md:mt-0 px-4'
-        }`} style={{
-          height: 'auto',
-          maxHeight: 'none'
-        }}>
-        <div className="grid grid-cols-1 md:grid-cols-3 h-full m-0 p-0">
+      <div className={styles.shell}>
+        <div className={styles.layout}>
           {/* Chat List - Hide on mobile when chat is selected */}
-          <div className={`border-r border-gray-100 flex flex-col h-full m-0 p-0 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+          <div className={`${styles.rail} flex flex-col h-full ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+            <div className={styles.railHeader}><h2>Direct messages & groups</h2><input aria-label="Search conversations" placeholder="Find a conversation" value={chatSearchQuery} onChange={event => setChatSearchQuery(event.target.value)} /></div>
             {/* Chat list - no header, just the list */}
             <div className="overflow-y-auto flex-1 m-0 p-0">
               {filteredChats.length === 0 ? (
@@ -749,8 +745,12 @@ export default function ChatPage() {
                   {filteredChats.map((chat) => (
                     <div
                       key={chat._id}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedChat(chat) } }}
                       onClick={() => setSelectedChat(chat)}
-                      className={`py-4 px-0 md:py-4 md:px-4 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${selectedChat?._id === chat._id ? 'bg-gray-50' : ''
+                      aria-current={selectedChat?._id === chat._id ? 'true' : undefined}
+                      className={`${styles.conversation} cursor-pointer transition-colors ${selectedChat?._id === chat._id ? 'bg-gray-50' : ''
                         }`}
                     >
                       <div className="flex items-center gap-3">
@@ -787,7 +787,7 @@ export default function ChatPage() {
           </div>
 
           {/* Chat Messages - Full screen on mobile */}
-          <div className={`md:col-span-2 flex flex-col h-full overflow-hidden ${selectedChat ? 'flex' : 'hidden md:flex'}`}>
+          <div className={`${styles.pane} flex flex-col h-full overflow-hidden ${selectedChat ? 'flex' : 'hidden md:flex'}`}>
             {selectedChat ? (
               <>
                 {/* Chat Header - Clean minimal design */}
@@ -837,7 +837,7 @@ export default function ChatPage() {
                 <div
                   ref={messagesContainerRef}
                   onScroll={handleScroll}
-                  className="flex-1 overflow-y-auto -mt-[0.8em] mb-12 overflow-x-hidden px-4 py-6 pb-44 md:pb-12 md:px-6 md:py-6 space-y-4 bg-white min-h-0"
+                  className={`${styles.messages} flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 md:px-6 space-y-4 bg-white min-h-0`}
                 >
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -1073,7 +1073,7 @@ export default function ChatPage() {
                 )}
 
                 {/* Message Input - Sleek minimal design */}
-                <div className="fixed bottom-[72px] left-0 right-0 px-4 py-2 bg-white border-t border-gray-100 z-[100] md:relative md:bottom-auto md:left-auto md:right-auto md:px-6 md:py-2 flex-shrink-0">
+                <div className={`${styles.composer} bg-white border-t border-gray-100 flex-shrink-0`}>
                   {/* Reply Preview */}
                   {replyingTo && (
                     <div className="mb-2 bg-gray-50 rounded-lg p-[10px] flex items-start gap-2">
