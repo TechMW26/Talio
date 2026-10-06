@@ -33,7 +33,7 @@ import {
   FaThumbtack, FaLock, FaSync, FaExchangeAlt
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
-import { Button, Select, SelectItem, Skeleton } from '@/components/ui/fernly'
+import { Button, Select, SelectItem, Skeleton, Tabs, Tab } from '@/components/ui/fernly'
 import ProjectOverview from '@/components/projects/ProjectOverview'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import Portal from '@/components/ui/Portal'
@@ -1569,31 +1569,17 @@ export default function ProjectDetailPage() {
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-        <div className="">
-          <nav role="tablist" aria-label="Project sections" className="flex overflow-x-auto">
+          <Tabs aria-label="Project sections" selectedKey={activeTab} onSelectionChange={setActiveTab} color="primary" radius="full" className="px-6 pt-6">
             {[
-              { id: 'overview', label: 'Overview', icon: HiOutlineChartBar },
-              { id: 'tasks', label: 'Tasks', icon: HiOutlineClipboardDocumentList },
-              { id: 'members', label: 'Members', icon: HiOutlineUsers },
-              { id: 'notes', label: 'Notes', icon: HiOutlineDocumentText },
-              { id: 'timeline', label: 'Activity', icon: HiOutlineChatBubbleLeftRight }
+              { id: 'overview', label: 'Overview' },
+              { id: 'tasks', label: 'Tasks' },
+              { id: 'members', label: 'Members' },
+              { id: 'notes', label: 'Notes' },
+              { id: 'timeline', label: 'Activity' }
             ].map(tab => (
-              <NativeButton
-                key={tab.id}
-                role="tab"
-                aria-selected={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                <tab.icon className="w-5 h-5" />
-                {tab.label}
-              </NativeButton>
+              <Tab key={tab.id} title={tab.label} />
             ))}
-          </nav>
-        </div>
+          </Tabs>
 
         <div className="p-6">
           {/* Overview Tab - Advanced Analytics */}

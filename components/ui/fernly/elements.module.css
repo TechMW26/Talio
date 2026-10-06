@@ -6,6 +6,8 @@
   font-weight: 500;
   transition: background-color .2s, box-shadow .2s, color .2s;
 }
+/* Clickable content cards are rectangles, not pill-shaped action controls. */
+.button.button[data-shape="card"] { border-radius: 14px; }
 .button:focus-visible, .nativeControl:focus-visible {
   outline: 2px solid var(--color-primary, #2563eb);
   outline-offset: 3px;
@@ -29,6 +31,8 @@
 .chip.chip { border-radius: 999px; font-weight: 500; }
 .tabList.tabList { border-radius: 999px; }
 .tabCursor.tabCursor { border-radius: 999px; }
+.card.card[data-hover="true"], .card.card:hover { transform: none; }
+.button.button[data-hover="true"], .tabs [data-slot="tab"][data-hover="true"] { opacity: 1; filter: none; }
 .popover.popover { border-radius: 16px; }
 .dialog.dialog {
   border-radius: 22px;

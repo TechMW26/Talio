@@ -14,16 +14,15 @@ const available = ['check-in-out', 'attendance-summary', 'team-attendance', 'tod
 const gridCells = ids => ids.reduce((sum, id) => sum + (['check-in-out', 'team-attendance'].includes(id) ? 2 : 1), 0)
 beforeEach(() => localStorage.clear())
 
-test('upgrades an old odd saved grid once and respects later removals', () => {
+test('legacy layouts do not insert unrelated work widgets into attendance and respect removals', () => {
   localStorage.setItem('dashboard_widgets_config_test', JSON.stringify({ enabled: ['check-in-out', 'attendance-summary'], order: ['check-in-out', 'attendance-summary'] }))
   const { result, unmount } = renderHook(() => useDashboardWidgets('test', 'admin', available))
-  expect(result.current.enabledWidgets).toHaveLength(3)
+  expect(result.current.enabledWidgets).toHaveLength(2)
   expect(result.current.enabledWidgets[0]).toBe('check-in-out')
-  const added = result.current.enabledWidgets[2]
-  act(() => result.current.removeWidget(added))
+  act(() => result.current.removeWidget('attendance-summary'))
   unmount()
   const reopened = renderHook(() => useDashboardWidgets('test', 'admin', available))
-  expect(reopened.result.current.enabledWidgets).toEqual(['check-in-out', 'attendance-summary'])
+  expect(reopened.result.current.enabledWidgets).toEqual(['check-in-out'])
 })
 
 test('fresh and reset defaults use available widgets without duplicating them', () => {

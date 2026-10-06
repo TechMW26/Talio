@@ -3,6 +3,7 @@
 
 import { Heading2, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, RotateCw } from 'lucide-react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { getDateKeyInTimezone, getTodayDateString, getTimezone } from '@/lib/timezone'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
@@ -40,7 +41,7 @@ export default function MemberAttendance({ employee, showProductivity = true }) 
   const clock = value => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleTimeString('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit' }) : '—'
   return <>
     <section id="member-attendance" className={styles.section} aria-label="Employee attendance">
-      <header className={styles.sectionHeader}><div><Heading2>Attendance calendar</Heading2><p>Select a day to view attendance and productivity · {timezone}</p></div><div className={styles.toolbar}><NativeButton aria-label="Previous attendance month" onClick={() => moveMonth(-1)}>‹</NativeButton><strong>{title}</strong><NativeButton aria-label="Next attendance month" disabled={month >= today.slice(0, 7)} onClick={() => moveMonth(1)}>›</NativeButton><NativeButton disabled={isValidating} onClick={() => mutate()} aria-label="Refresh attendance">↻</NativeButton></div></header>
+      <header className={styles.sectionHeader}><div><Heading2>Attendance calendar</Heading2><p>Select a day to view attendance and productivity · {timezone}</p></div><div className={`${styles.toolbar} ${styles.attendanceControls}`}><NativeButton aria-label="Previous attendance month" onClick={() => moveMonth(-1)}><ChevronLeft size={20} aria-hidden="true" /></NativeButton><strong>{title}</strong><NativeButton aria-label="Next attendance month" disabled={month >= today.slice(0, 7)} onClick={() => moveMonth(1)}><ChevronRight size={20} aria-hidden="true" /></NativeButton><NativeButton disabled={isValidating} onClick={() => mutate()} aria-label="Refresh attendance"><RotateCw size={20} aria-hidden="true" /></NativeButton></div></header>
       {error ? <DataErrorState message="Unable to load employee attendance" onRetry={() => mutate()} /> : isLoading ? <p role="status" className={styles.emptyState}>Loading attendance…</p> : <div className={styles.calendarLayout}>
         <div className={styles.calendarMonth}><div className={`${styles.calendar} ${calendar.grid}`} style={{ '--calendar-weeks': Math.ceil((offset + days) / 7) }}>
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <span className={styles.weekday} key={day}>{day}</span>)}

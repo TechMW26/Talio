@@ -110,14 +110,14 @@ export function FernlyCompletionAnalytics({ data = [] }) {
 
 // Fernly's actual pill geometry and fill-rise treatment, with Talio blue tones.
 // Zero is deliberately not given the template's minimum-height bar.
-export function FernlyBars({ data = [], label = 'Activity', emptyMessage = 'No activity yet', valueLabel = 'tasks', percentageLabels = false }) {
+export function FernlyBars({ data = [], label = 'Activity', emptyMessage = 'No activity yet', valueLabel = 'tasks', percentageLabels = false, fillHeight = false }) {
   const [active, setActive] = useState(null)
   const rows = data.map(row => ({ ...row, value: count(row.value) }))
   const maximum = Math.max(0, ...rows.map(row => row.value))
   const total = rows.reduce((sum, row) => sum + row.value, 0)
   const percentage = value => `${Number((total ? value / total * 100 : 0).toFixed(1))}%`
   if (!maximum) return <div className={styles.empty}>{emptyMessage}</div>
-  return <div className={styles.barsScroll}>
+  return <div className={`${styles.barsScroll} ${fillHeight ? styles.barsFullHeight : ''}`}>
     {percentageLabels && <div className={styles.distributionTip} aria-live="polite">{rows[active] && <span role="tooltip">{rows[active].name} · {rows[active].value} {valueLabel} · {percentage(rows[active].value)}</span>}</div>}
     <ul className={styles.bars} aria-label={label} style={{ '--columns': rows.length, minWidth: rows.length * 62 }}>
       {rows.map((row, index) => <li key={`${row.name}-${index}`}>

@@ -29,5 +29,6 @@ test('nested list wrappers can shrink and project tasks fills its parent', () =>
     expect(source).toContain('flex-1 min-h-0 flex flex-col')
   }
   expect(fs.readFileSync('components/dashboards/ProjectTasksWidget.js', 'utf8')).toContain('flex min-h-0 flex-1 flex-col h-full')
-  expect(fs.readFileSync('components/dashboard/CustomizableDashboard.js', 'utf8')).toContain('data-scrollable-widget={scrollableList || undefined}')
+  expect(fs.readFileSync('components/dashboard/CustomizableDashboard.js', 'utf8')).toContain('data-scrollable-widget={WIDGET_REGISTRY[widget.id]?.scrollableList === true || undefined}')
+  expect(fs.readFileSync('components/dashboard/HomeDashboard.module.css', 'utf8')).toContain('grid-template-rows: minmax(0, 1fr); overflow: hidden')
 })

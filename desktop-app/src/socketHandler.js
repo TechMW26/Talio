@@ -136,13 +136,6 @@ class SocketHandler {
       }
     });
 
-    // Handle call alert
-    this.socket.on('call-alert', function (data) {
-      logger.log('debug', 'SocketHandler', 'Call alert received');
-      if (self.callbacks.onCallAlert) {
-        self.callbacks.onCallAlert(data);
-      }
-    });
 
     // Handle attendance update
     this.socket.on('attendance-update', function (data) {

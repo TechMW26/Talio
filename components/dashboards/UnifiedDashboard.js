@@ -10,6 +10,7 @@ import { getRoleDisplayLabel } from '@/hooks/useRoles'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import { CustomizableDashboard } from '@/components/dashboard'
 import AttendanceHeaderSummary from '@/components/widgets/AttendanceHeaderSummary'
+import homeStyles from '@/components/dashboard/HomeDashboard.module.css'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import { getTodayDateString } from '@/lib/timezone'
 import { canApplyAttendanceSnapshot } from '@/lib/client/attendanceSnapshot'
@@ -312,6 +313,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         leaveBalance: permissions.leaveBalance && isFeatureEnabled('leaveManagement'),
         projectTasks: permissions.projectTasks && isFeatureEnabled('projects'),
         todayTasks: permissions.todayTasks && isFeatureEnabled('projects'),
+        meetingReminders: isFeatureEnabled('meetings'),
         departmentChart: permissions.departmentChart && isFeatureEnabled('employees'),
         employeeDirectory: permissions.employeeDirectory && isFeatureEnabled('employees'),
         goals: permissions.goals && isFeatureEnabled('performance'),
@@ -536,6 +538,21 @@ export default function UnifiedDashboard({ user: userProp }) {
     }, [userRole, fetchDashboardData])
 
     // Load user from localStorage if not provided via props
+    useEffect(() => {
+        const syncPhoto = event => {
+            const updated = event.detail
+            if (!updated) return
+            const ref = updated.employeeId
+            const employeeId = typeof ref === 'object' && ref ? ref._id || ref.id : ref
+            const photo = updated.profilePicture || (typeof ref === 'object' && ref?.profilePicture)
+            if (!photo) return
+            const viewport = updated.profilePictureViewport || (typeof ref === 'object' && ref?.profilePictureViewport)
+            setEmployeeData(previous => previous && String(previous._id) === String(employeeId) ? { ...previous, profilePicture: photo, profilePictureViewport: viewport } : previous)
+            setUser(previous => previous && String(previous._id || previous.userId) === String(updated._id || updated.userId) ? { ...previous, profilePicture: photo, profilePictureViewport: viewport } : previous)
+        }
+        window.addEventListener('talio:user-updated', syncPhoto)
+        return () => window.removeEventListener('talio:user-updated', syncPhoto)
+    }, [])
     useEffect(() => {
         if (!userProp || !userProp.employeeId) {
             const parsedUser = getCurrentUser()
@@ -796,6 +813,8 @@ export default function UnifiedDashboard({ user: userProp }) {
         if (featurePermissions.checkInOut) {
             components['check-in-out'] = (
                 <CheckInOutWidget
+                    enableDayCompassTasks={featurePermissions.todayTasks}
+                    enableMeetingReminders={featurePermissions.meetingReminders}
                     user={user}
                     employeeData={employeeData}
                     todayAttendance={todayAttendance}
@@ -990,7 +1009,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         // Goals Widget (Employee-focused)
         if (featurePermissions.goals) {
-            components['goals'] = <GoalsWidget userId={user?.userId || user?._id} />
+            components['goals-widget'] = <GoalsWidget userId={user?.userId || user?._id} />
         }
 
         // Today's Tasks Widget
@@ -1022,7 +1041,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         // Birthday Widget
         if (featurePermissions.birthday) {
-            components['birthdays'] = <BirthdayWidget />
+            components['birthday-widget'] = <BirthdayWidget />
         }
 
         // === PERSONAL WIDGETS ===
@@ -1093,7 +1112,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Loading skeleton
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-[#09090b] p-4 sm:p-6">
+            <div data-dashboard-home className={`page-container ${homeStyles.page}`}>
                 <div className="animate-pulse space-y-4">
                     <div className="h-16 bg-white dark:bg-[#18181b] rounded-xl shadow-sm dark:shadow-none"></div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1112,7 +1131,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     }
 
     return (
-        <div className="page-container">
+        <div data-dashboard-home className={`page-container ${homeStyles.page}`}>
             {(dashboardErrors.stats || dashboardErrors.widgets) && <div role="alert" className="mb-4 rounded-xl border border-default-200 p-3 text-sm">
                 Some dashboard data could not be loaded. You can still use the rest of the app.
                 <button type="button" className="ml-3 underline" onClick={() => { fetchDashboardData(); fetchUnifiedWidgetData() }}>Retry data</button>

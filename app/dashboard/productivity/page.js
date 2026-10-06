@@ -77,6 +77,7 @@ function ScreenshotTile({ shot, onClick }) {
   return (
     <NativeButton
       type="button"
+      data-shape="card"
       onClick={onClick}
       className="group relative aspect-video overflow-hidden rounded-xl border border-gray-100 bg-gray-50 shadow-sm transition hover:shadow-md hover:border-indigo-300"
     >
@@ -811,6 +812,7 @@ export default function ProductivityPage() {
                 key={m.userId || m._id}
                 type="button"
                 onClick={() => setSelectedTeamUserId(m.userId || m._id)}
+                data-shape="card"
                 className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 text-left transition hover:shadow-md hover:border-indigo-200"
               >
                 <div className="flex items-start justify-between gap-2">

@@ -57,7 +57,6 @@ describe('department-grouped employee search', () => {
   test('all department-grouped people selectors use search-driven expansion', () => {
     const selectors = [
       'app/dashboard/meetings/components/CreateMeetingModal.js',
-      'components/CallAlertButton.js',
       'app/dashboard/payroll/generate/page.js',
       'app/dashboard/admin/live-users/page.js',
     ]
@@ -67,7 +66,7 @@ describe('department-grouped employee search', () => {
       expect(source).toContain('isDepartmentGroupExpanded({')
       expect(source).toContain('hasActiveGroupSearch(searchQuery)')
     }
-    for (const selector of selectors.slice(0, 2)) {
+    for (const selector of selectors.slice(0, 1)) {
       const source = fs.readFileSync(path.join(process.cwd(), selector), 'utf8')
       expect(source).toContain('filterDepartmentGroupEmployees({')
       expect(source).toContain('departmentName: group.department?.name')

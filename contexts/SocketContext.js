@@ -849,35 +849,6 @@ export function SocketProvider({ children }) {
     }
   }, [socket])
 
-  // Subscribe to call alert events
-  const onCallAlert = useCallback((callback) => {
-    if (socket) {
-      const wrappedCallback = (data) => {
-        try {
-          callback(data)
-        } catch (error) {
-          console.error('[SocketContext] Error in call-alert callback:', error)
-        }
-      }
-      socket.on('call-alert', wrappedCallback)
-      return () => socket.off('call-alert', wrappedCallback)
-    }
-  }, [socket])
-
-  // Subscribe to call alert acknowledged events
-  const onCallAlertAcknowledged = useCallback((callback) => {
-    if (socket) {
-      const wrappedCallback = (data) => {
-        try {
-          callback(data)
-        } catch (error) {
-          console.error('[SocketContext] Error in call-alert-acknowledged callback:', error)
-        }
-      }
-      socket.on('call-alert-acknowledged', wrappedCallback)
-      return () => socket.off('call-alert-acknowledged', wrappedCallback)
-    }
-  }, [socket])
 
   // Subscribe to attendance update events
   const onAttendanceUpdate = useCallback((callback) => {
@@ -1135,8 +1106,6 @@ export function SocketProvider({ children }) {
     onAssetUpdate,
     onPayrollUpdate,
     onNewNotification,
-    onCallAlert,
-    onCallAlertAcknowledged,
     // New real-time event subscriptions
     onAttendanceUpdate,
     onLeaveRequest,

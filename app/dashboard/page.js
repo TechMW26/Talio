@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import { Spinner, Skeleton, Card, CardBody } from '@/components/ui/fernly'
 import UnifiedDashboard from '@/components/dashboards/UnifiedDashboard'
+import homeStyles from '@/components/dashboard/HomeDashboard.module.css'
 
 // Modern skeleton loader for dashboard using Hero UI
 function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6">
+    <div data-dashboard-home className={`page-container ${homeStyles.page}`}>
       <div className="space-y-6">
         {/* Header skeleton */}
         <div className="flex items-center justify-between">

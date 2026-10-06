@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { FaCamera } from 'react-icons/fa';
+import { photoViewportStyle } from '@/lib/profilePhotoViewport';
 import { LOGO_BACKGROUND_FALLBACK, sampleLogoBackground } from '@/lib/client/logoContrast';
 import './Lanyard.css';
 
@@ -56,15 +58,8 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
       x: container.offsetWidth / 2,
       y: 0
     };
-    // Extend only the drawn ribbon behind the shell. The physics anchor stays
-    // unchanged so the card, clip and drag coordinates do not move with it.
-    let ribbonStartY = -64;
-
     function handleResize() {
       anchor.x = container.offsetWidth / 2;
-      const header = document.querySelector('header');
-      const headerBottom = header?.getBoundingClientRect().bottom || 0;
-      ribbonStartY = Math.min(-64, headerBottom - container.getBoundingClientRect().top - 32);
     }
     handleResize();
     const ribbonResizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(handleResize) : null;
@@ -236,6 +231,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
 
       const cx = anchor.x + pos.x;
       const cy = anchor.y + pos.y;
+      const sceneRect = container.getBoundingClientRect();
 
       cardOuter.style.left = (cx - CARD_W / 2) + "px";
       cardOuter.style.top = (cy - CARD_H / 2) + "px";
@@ -243,10 +239,12 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
       const attachX = cx;
       const attachY = cy - CARD_H / 2 - CLIP_HEIGHT / 2;
 
-      const ax = anchor.x;
-      const ay = ribbonStartY;
-      const bx = attachX;
-      const by = attachY;
+      // The decorative SVG lives at viewport level, outside the scrolling
+      // page's clipping boundary. Keep card physics in scene coordinates.
+      const ax = sceneRect.left + anchor.x;
+      const ay = 0;
+      const bx = sceneRect.left + attachX;
+      const by = sceneRect.top + attachY;
 
       const dxL = bx - ax;
       const dyL = by - ay;
@@ -334,7 +332,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
     <div className="lanyard-scene" ref={containerRef}>
       <div className="anchor-dot"></div>
 
-      <svg className="lanyard-svg">
+      {typeof document !== 'undefined' && createPortal(<svg className="lanyard-svg" aria-hidden="true">
         <defs>
           <linearGradient id="lanyard-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" style={{ stopColor: "#94a3b8" }} />
@@ -350,7 +348,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
         <path id="lanyard-path" className="lanyard-path" ref={lanyardPathRef}></path>
 
         <g id="lanyard-logos" ref={lanyardLogosRef}></g>
-      </svg>
+      </svg>, document.body)}
 
       <div className="card-outer" ref={cardOuterRef} id="card-outer">
         <div className="card-clip"></div>
@@ -363,7 +361,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
               <div className="avatar-container">
                 <div className="avatar">
                   {photo ? (
-                    <img src={photo} alt={name} />
+                    <img src={photo} alt={name} style={photoViewportStyle(employee?.photoViewport)} />
                   ) : (
                     <span className="avatar-placeholder">Employee<br />Photo</span>
                   )}

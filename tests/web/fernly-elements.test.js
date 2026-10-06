@@ -22,6 +22,17 @@ test('native button preserves disabled, click, type, class and ref behavior', ()
   fireEvent.click(screen.getByRole('button'))
   expect(click).toHaveBeenCalledTimes(1)
 })
+test('clickable screenshot and member cards opt out of the shared pill radius', () => {
+  const fs = require('fs')
+  render(<NativeButton data-shape="card">Preview</NativeButton>)
+  expect(screen.getByRole('button', { name: 'Preview' })).toHaveAttribute('data-shape', 'card')
+  const css = fs.readFileSync('components/ui/fernly/elements.module.css', 'utf8')
+  expect(css).toMatch(/\.button\.button\[data-shape="card"\]\s*\{\s*border-radius:\s*14px;/)
+  const productivity = fs.readFileSync('app/dashboard/productivity/page.js', 'utf8')
+  expect(productivity.match(/data-shape="card"/g)).toHaveLength(2)
+  const member = fs.readFileSync('app/dashboard/team/members/[id]/MemberProductivity.js', 'utf8')
+  expect(member).toContain('data-shape="card"')
+})
 test('native form semantics and heading level remain unchanged', () => {
   const change = jest.fn()
   render(<><Heading2>Details</Heading2><NativeInput aria-label="Name" defaultValue="A" onChange={change} /><NativeSelect aria-label="Department" defaultValue="tech"><option value="tech">Tech</option></NativeSelect></>)
@@ -34,4 +45,29 @@ test('slot styles preserve caller additions and collection metadata', () => {
   render(<Input aria-label="Styled" classNames={{ inputWrapper: 'existing-field' }} />)
   expect(screen.getByRole('textbox').dataset.wrapper).toContain('existing-field')
   expect(SelectItem.getCollectionNode()).toBe('collection')
+})
+
+test('shared controls remove hover classes without dropping focus or brand styling', () => {
+  render(<NativeButton className="bg-blue-600 hover:bg-blue-500 dark:hover:shadow-lg group-hover:text-white focus-visible:ring-2">Stable</NativeButton>)
+  const classes = screen.getByRole('button').className
+  expect(classes).toContain('bg-blue-600')
+  expect(classes).toContain('focus-visible:ring-2')
+  expect(classes).not.toContain('hover:')
+})
+
+test('actions previously revealed on hover remain visible without hover effects', () => {
+  render(<NativeButton className="opacity-0 group-hover:opacity-100">Remove</NativeButton>)
+  expect(screen.getByRole('button').className).toContain('opacity-100')
+  expect(screen.getByRole('button').className).not.toContain('opacity-0')
+})
+
+test('project navigation reuses shared tabs instead of bespoke bordered pill buttons', () => {
+  const fs = require('fs')
+  const source = fs.readFileSync('app/dashboard/projects/[projectId]/page.js', 'utf8')
+  const navigation = source.slice(source.indexOf('{/* Tabs */}'), source.indexOf('{/* Overview Tab'))
+  expect(navigation).toContain('<Tabs aria-label="Project sections" selectedKey={activeTab} onSelectionChange={setActiveTab}')
+  expect(navigation).toContain('<Tab key={tab.id} title={tab.label} />')
+  expect(navigation).not.toContain('<NativeButton')
+  expect(navigation).not.toContain('border-b-2')
+  expect(navigation).not.toContain('<tab.icon')
 })

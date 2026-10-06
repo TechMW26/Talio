@@ -19,7 +19,7 @@ jest.mock('@heroui/react', () => ({
 beforeEach(() => jest.clearAllMocks())
 test('restyled statistics retain navigation and values', () => {
   render(<KPIStatsWidget statsData={[{ title: 'Employees', value: 170, href: '/dashboard/employees', icon: () => <svg /> }]} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Employees 170' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Employees 170 Open details' }))
   expect(push).toHaveBeenCalledWith('/dashboard/employees')
 })
 test('restyled leave rows preserve approve and reject handlers', () => {

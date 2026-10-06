@@ -118,3 +118,10 @@ test('shared area theme provides gradients while preserving series data and even
   expect(tree.props.children[1].props.fill).toBe('url(#chart-one-value)')
   expect(tree.props.children[2].props.formatter).toBe(click)
 })
+test('department chart opts into remaining-height bars without changing other charts', () => {
+  const fs = require('fs')
+  const source = fs.readFileSync('components/widgets/DepartmentChartWidget.js', 'utf8')
+  const css = fs.readFileSync('components/charts/FernlyCharts.module.css', 'utf8')
+  expect(source).toContain('fillHeight percentageLabels')
+  expect(css).toContain('.barsFullHeight .bars li { grid-template-rows: minmax(0, 1fr) auto; }')
+})

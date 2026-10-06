@@ -173,11 +173,6 @@ jest.mock('@/hooks/useRealtimeDashboard', () => ({
     },
 }))
 
-// ── CallAlertButton ──
-jest.mock('@/components/CallAlertButton', () => ({
-    __esModule: true,
-    default: () => null,
-}))
 
 // ── CustomizableDashboard — renders widgetComponents values so we can test real widgets ──
 jest.mock('@/components/dashboard', () => ({

@@ -1,187 +1,33 @@
 'use client'
-import AIActivityBeam from '@/components/ui/AIActivityBeam'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import CallAlertButton from '@/components/CallAlertButton'
-import { getCurrentUser } from '@/utils/userHelper'
+import HeaderSearch from '@/components/HeaderSearch'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { FaSearch, FaTimes, FaSyncAlt, FaSun, FaMoon } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
+import { FaSyncAlt } from 'react-icons/fa'
 import MiraSphere from '@/components/ui/MiraPet'
 import MiraWakeReminder from '@/components/MiraWakeReminder'
-import { handleSessionExpired } from '@/utils/userHelper'
 import { useTheme } from '@/contexts/ThemeContext'
-import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { useFocusTimer } from '@/contexts/FocusTimerContext'
 import { useMiraChat } from '@/contexts/MiraChatContext'
-import { Button, Input, ScrollShadow } from '@heroui/react'
+import { Button } from '@heroui/react'
 
 export default function Header({ toggleSidebar, sidebarCollapsed }) {
-  const reducedMotion = useReducedMotion()
-  const searchMotion = {
-    initial: { opacity: 0, y: reducedMotion ? 0 : -12, scale: reducedMotion ? 1 : 0.97 },
-    animate: { opacity: 1, y: 0, scale: 1 },
-    exit: { opacity: 0, y: reducedMotion ? 0 : -8, scale: reducedMotion ? 1 : 0.98, transition: { duration: reducedMotion ? 0 : 0.18 } },
-    transition: { duration: reducedMotion ? 0 : 0.28, ease: [0.2, 0.8, 0.2, 1] },
-  }
   const { theme, isDarkMode, setDarkModePreference } = useTheme()
-  const router = useRouter()
-  const pathname = usePathname()
-  const { openWidget } = useChatWidget()
 
   const [mounted, setMounted] = useState(false)
-  const [currentUser, setCurrentUser] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState(null)
-  const [showSearchResults, setShowSearchResults] = useState(false)
-  const [showMobileSearch, setShowMobileSearch] = useState(false)
-  const [searching, setSearching] = useState(false)
-  const [isDesktop, setIsDesktop] = useState(false)
   const [isMiraHovered, setIsMiraHovered] = useState(false)
   const { openChat, isOpen: isMiraOpen, isThinking } = useMiraChat()
-  const searchRef = useRef(null)
-  const searchOverlayRef = useRef(null)
-  const mobileSearchRef = useRef(null)
-  const searchTimeoutRef = useRef(null)
-
-  // Check if desktop for header left positioning
-  useEffect(() => {
-    const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= 1024)
-    }
-    checkDesktop()
-    window.addEventListener('resize', checkDesktop)
-    return () => window.removeEventListener('resize', checkDesktop)
-  }, [])
-
-  // Keyboard shortcut: Cmd/Ctrl+K to open search
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        setShowSearchResults(true)
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
 
   useEffect(() => {
-    const syncUser = () => setCurrentUser(getCurrentUser())
-    syncUser()
     setMounted(true)
-    window.addEventListener('talio:user-updated', syncUser)
-    return () => window.removeEventListener('talio:user-updated', syncUser)
   }, [])
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const target = event.target
-      const insidePill = searchRef.current && searchRef.current.contains(target)
-      const insideOverlay = searchOverlayRef.current && searchOverlayRef.current.contains(target)
-      const insideMobile = mobileSearchRef.current && mobileSearchRef.current.contains(target)
-      if (!insidePill && !insideOverlay && !insideMobile) {
-        setShowSearchResults(false)
-        setShowMobileSearch(false)
-        setSearchQuery('')
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('touchstart', handleClickOutside)
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('touchstart', handleClickOutside)
-    }
-  }, [])
-
-  // Search functionality
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    if (searchQuery.trim().length < 2) {
-      setSearchResults(null)
-      setSearching(false)
-      return
-    }
-
-    const controller = new AbortController()
-    setSearching(true)
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const token = localStorage.getItem('token')
-        const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
-          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
-        })
-
-        // Handle 401 - session expired
-        if (response.status === 401) {
-          handleSessionExpired()
-          return
-        }
-
-        const result = await response.json()
-        if (result.success && !controller.signal.aborted) {
-          setSearchResults(result.data)
-          setShowSearchResults(true)
-        }
-      } catch (error) {
-        if (error.name !== 'AbortError') console.error('Search error:', error)
-      } finally {
-        if (!controller.signal.aborted) setSearching(false)
-      }
-    }, 300)
-
-    return () => {
-      controller.abort()
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [searchQuery])
-
-  const handleSearchResultClick = (link) => {
-    setShowSearchResults(false)
-    setShowMobileSearch(false)
-    setSearchQuery('')
-
-    // On desktop, open chat popup instead of navigating to chat page
-    if (link === '/dashboard/chat' && isDesktop) {
-      openWidget('button')
-      return
-    }
-
-    router.push(link)
-  }
-
-  const closeMobileSearch = () => {
-    setShowMobileSearch(false)
-    setSearchQuery('')
-    setSearchResults(null)
-    setShowSearchResults(false)
-  }
-
-  const getCategoryLabel = (category) => {
-    const labels = {
-      pages: 'Pages & Navigation',
-      tasks: 'Tasks',
-      leaves: 'Leaves',
-      announcements: 'Announcements',
-      policies: 'Policies'
-    }
-    return labels[category] || category.charAt(0).toUpperCase() + category.slice(1)
-  }
-
   // Don't render user-specific content until mounted to avoid hydration mismatch
   if (!mounted) {
     return (
       <header
-        className="talio-navigation-header h-[60.5px] w-full z-[40] transition-all duration-300 flex-shrink-0"
+        className="talio-navigation-header w-full z-[40] transition-all duration-300 flex-shrink-0"
       >
-        <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
+        <div className="talio-navigation-header-row flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <Button
               isIconOnly
@@ -204,11 +50,11 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
   return (
     <header
-      className="talio-navigation-header h-[60.5px] w-full z-[40] transition-all duration-300 flex-shrink-0"
+      className="talio-navigation-header w-full z-[40] transition-all duration-300 flex-shrink-0"
     >
-      <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
+      <div className="talio-navigation-header-row flex items-center justify-between">
         {/* Left side - Hamburger (mobile/tablet) + Search pill */}
-        <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
           <Button
             isIconOnly
             variant="light"
@@ -229,7 +75,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             type="button"
             aria-label={isMiraOpen ? 'Return to MIRA conversation' : 'Ask Mira'}
             aria-expanded={isMiraOpen}
-            className="mira-header-pill hidden md:flex items-center cursor-pointer relative group -ml-3"
+            className="mira-header-pill hidden md:flex items-center cursor-pointer relative group"
             data-mira-sphere="true"
             onClick={() => openChat()}
             onMouseEnter={() => setIsMiraHovered(true)}
@@ -238,7 +84,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               background: `linear-gradient(135deg, ${theme.primary[600]}, ${theme.primary[400]}, ${theme.primary[700]}, ${theme.primary[500]})`,
               backgroundSize: '300% 300%',
               animation: 'mira-gradient-shift 6s ease infinite',
-              borderRadius: '9999px',
+              borderRadius: 'var(--dashboard-header-control-radius)',
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -248,7 +94,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               style={{
                 position: 'absolute',
                 inset: 0,
-                borderRadius: '9999px',
+                borderRadius: 'inherit',
                 opacity: 0.12,
                 backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
                 backgroundSize: '128px 128px',
@@ -270,155 +116,11 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           </div>
           <div className="hidden md:block w-px h-7 bg-slate-400 dark:bg-zinc-300/40 mx-1" />
 
-          {/* Search Pill Button - opens floating search overlay */}
-          <div ref={searchRef}>
-            <button
-              onClick={() => {
-                if (window.innerWidth < 768) {
-                  setShowMobileSearch(true)
-                } else {
-                  setShowSearchResults(true)
-                }
-              }}
-              className="hidden md:flex items-center cursor-pointer relative group"
-              style={{
-                background: isDarkMode
-                  ? `linear-gradient(160deg, rgba(148,163,184,0.25) 0%, rgba(100,116,139,0.18) 50%, rgba(71,85,105,0.22) 100%)`
-                  : `linear-gradient(160deg, rgba(51,65,85,0.12) 0%, rgba(100,116,139,0.08) 50%, rgba(148,163,184,0.14) 100%)`,
-                backgroundSize: '200% 200%',
-                animation: 'mira-gradient-shift 8s ease infinite',
-                borderRadius: '9999px',
-                padding: '3px 14px 3px 3px',
-                position: 'relative',
-                overflow: 'hidden',
-                backdropFilter: 'blur(8px)',
-                border: isDarkMode ? '1px solid rgba(148,163,184,0.15)' : '1px solid rgba(100,116,139,0.12)',
-              }}
-            >
-              {/* Grain texture overlay */}
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  borderRadius: '9999px',
-                  opacity: 0.12,
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-                  backgroundSize: '128px 128px',
-                  pointerEvents: 'none',
-                }}
-              />
-              <div className="relative z-10 flex items-center justify-center rounded-full bg-default-200 dark:bg-white/15" style={{ width: 34, height: 34 }}>
-                <FaSearch className="w-3.5 h-3.5 text-default-600 dark:text-zinc-300" />
-              </div>
-              <span className="text-default-700 dark:text-zinc-200 text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5">
-                AI Search
-              </span>
-              <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-default-300/50 dark:bg-white/10 text-[10px] text-default-600 dark:text-zinc-300 font-mono relative z-10 ml-2">
-                ⌘K
-              </kbd>
-            </button>
-            {/* Mobile/Tablet fallback search button (unchanged) */}
-            <button
-              onClick={() => setShowMobileSearch(true)}
-              className="md:hidden flex items-center gap-2 px-4 py-2 rounded-full bg-default-50 dark:bg-default-100 hover:bg-default-100 dark:hover:bg-default-200 transition-all duration-200 cursor-pointer group"
-            >
-              <FaSearch className="w-3.5 h-3.5 text-default-400 group-hover:text-default-500 transition-colors" />
-              <span className="text-sm text-default-400 group-hover:text-default-500 transition-colors hidden sm:inline">Search...</span>
-            </button>
-
-            {/* Floating Search Overlay (Desktop) */}
-            <AnimatePresence>
-            {(showSearchResults || searchQuery.length >= 2) && (
-              <>
-                <motion.div
-                  key="search-backdrop"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  transition={{ duration: reducedMotion ? 0 : 0.2 }}
-                  className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-[10px]"
-                  onClick={() => {
-                    setSearchQuery('')
-                    setShowSearchResults(false)
-                  }}
-                />
-                <motion.div key="desktop-search" ref={searchOverlayRef} {...searchMotion} style={{ x: '-50%', transformOrigin: 'top center' }} className="ai-glass-panel fixed left-1/2 top-20 w-[90%] max-w-xl overflow-hidden z-[101] search-overlay-input">
-                  <AIActivityBeam active={searching} />
-                  <Input
-                    size="lg"
-                    value={searchQuery}
-                    onValueChange={setSearchQuery}
-                    placeholder="Search everything..."
-                    startContent={<FaSearch className="text-default-400 w-5 h-5" />}
-                    endContent={
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="light"
-                        aria-label="Close search"
-                        onPress={() => {
-                          setSearchQuery('')
-                          setShowSearchResults(false)
-                        }}
-                      >
-                        <FaTimes className="w-4 h-4" />
-                      </Button>
-                    }
-                    classNames={{
-                      inputWrapper: 'bg-transparent shadow-none rounded-none border-none',
-                      input: 'text-base'
-                    }}
-                    autoFocus
-                  />
-
-                  {/* Search Results */}
-                  {showSearchResults && searchResults && (
-                    <ScrollShadow className="max-h-[60vh]">
-                      {Object.entries(searchResults).map(([category, items]) => {
-                        if (items.length === 0) return null
-                        return (
-                          <div key={category} className="border-b border-divider last:border-b-0">
-                            {items.map((item, index) => (
-                              <div
-                                key={item._id || index}
-                                onClick={() => handleSearchResultClick(item.link)}
-                                className="px-4 py-3 cursor-pointer transition-colors hover:bg-default-100"
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-0.5">
-                                    <h4 className="font-medium text-sm text-default-900 truncate">{item.title}</h4>
-                                    {item.meta && item.type !== 'page' && (
-                                      <span className="text-xs text-default-500 bg-default-100 px-2 py-0.5 rounded">{item.meta}</span>
-                                    )}
-                                  </div>
-                                  {item.subtitle && (
-                                    <p className="text-xs text-default-500">{item.subtitle}</p>
-                                  )}
-                                  {item.description && (
-                                    <p className="text-xs text-default-400 line-clamp-1 mt-0.5">{item.description}</p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      })}
-                      {Object.values(searchResults).every(arr => arr.length === 0) && (
-                        <div className="px-4 py-8 text-center text-default-500">
-                          <p className="text-sm font-medium">No results found for &ldquo;{searchQuery}&rdquo;</p>
-                          <p className="text-xs text-default-400 mt-1">Try different keywords</p>
-                        </div>
-                      )}
-                    </ScrollShadow>
-                  )}
-                </motion.div>
-              </>
-            )}
-            </AnimatePresence>
-          </div>
+          <HeaderSearch />
         </div>
 
-        {/* Global actions: Call / Alert, focus timer and refresh */}
+        {/* Global actions: focus timer and refresh */}
         <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-          {currentUser && <CallAlertButton user={currentUser} />}
           {/* Focus Timer Pill */}
           <FocusTimerPill />
 
@@ -433,130 +135,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           </Button>
 
 
-          {/* Mobile/Tablet Search Button */}
-          <Button
-            isIconOnly
-            variant="light"
-            className="lg:!hidden"
-            onPress={() => setShowMobileSearch(true)}
-          >
-            <FaSearch className="w-4 h-4" />
-          </Button>
         </div>
       </div>
-
-      {/* Mobile Search Fullscreen Modal */}
-      <AnimatePresence>
-      {showMobileSearch && (
-        <motion.div key="mobile-search" ref={mobileSearchRef} {...searchMotion} style={{ transformOrigin: 'top center' }} className="ai-glass-panel fixed inset-x-3 top-20 bottom-4 z-[100] lg:!hidden overflow-hidden">
-          <AIActivityBeam active={searching} />
-          <div className="flex flex-col h-full">
-            {/* Search Header - Match header height */}
-            <div className="flex items-center gap-3 px-3 h-16 border-b border-divider bg-content1">
-              <Button
-                isIconOnly
-                variant="light"
-                onPress={closeMobileSearch}
-              >
-                <FaTimes className="w-5 h-5" />
-              </Button>
-              <div className="flex-1">
-                <Input
-                  value={searchQuery}
-                  onValueChange={setSearchQuery}
-                  placeholder="Search everything..."
-                  startContent={<FaSearch className="text-default-400 w-4 h-4" />}
-                  endContent={
-                    searching ? <Loader size="xs" /> :
-                      searchQuery ? (
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="light"
-                          onPress={() => {
-                            setSearchQuery('')
-                            setSearchResults(null)
-                          }}
-                        >
-                          <FaTimes className="w-4 h-4" />
-                        </Button>
-                      ) : null
-                  }
-                  variant="bordered"
-                  classNames={{
-                    inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
-                  }}
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            {/* Search Results */}
-            <ScrollShadow className="flex-1">
-              {searchQuery.length < 2 ? (
-                <div className="flex flex-col items-center justify-center h-full text-default-400 px-4">
-                  <FaSearch className="w-16 h-16 mb-4 text-default-300" />
-                  <p className="text-lg font-medium">Search Everything</p>
-                  <p className="text-sm text-center mt-2">
-                    Find pages, tasks, leaves, announcements, and more...
-                  </p>
-                </div>
-              ) : searching ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader size="md" />
-                </div>
-              ) : searchResults ? (
-                <div>
-                  {Object.entries(searchResults).map(([category, items]) => {
-                    if (items.length === 0) return null
-                    return (
-                      <div key={category} className="border-b border-divider">
-                        <div className="px-4 py-3 bg-default-100 dark:bg-default-50 font-semibold text-sm text-default-700 uppercase sticky top-0 z-10">
-                          {getCategoryLabel(category)} <span className="text-default-500">({items.length})</span>
-                        </div>
-                        {items.map((item, index) => (
-                          <div
-                            key={item._id || index}
-                            onClick={() => handleSearchResultClick(item.link)}
-                            className="px-4 py-4 cursor-pointer border-b border-default-50 transition-colors hover:bg-default-100"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-semibold text-base text-default-900">{item.title}</h4>
-                              </div>
-                              {item.subtitle && (
-                                <p className="text-sm mb-1 text-primary-600">{item.subtitle}</p>
-                              )}
-                              {item.description && (
-                                <p className="text-sm text-default-500 line-clamp-2">{item.description}</p>
-                              )}
-                              {item.meta && item.type !== 'page' && (
-                                <span className="inline-block text-xs text-default-500 bg-default-100 px-2 py-1 rounded mt-2">
-                                  {item.meta}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  })}
-                  {Object.values(searchResults).every(arr => arr.length === 0) && (
-                    <div className="flex flex-col items-center justify-center h-full text-default-400 px-4 py-12">
-                      <FaSearch className="w-16 h-16 mb-4 text-default-300" />
-                      <p className="text-lg font-medium">No results found</p>
-                      <p className="text-sm text-center mt-2 text-default-500">
-                        Try different keywords or check spelling
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </ScrollShadow>
-          </div>
-        </motion.div>
-      )}
-      </AnimatePresence>
 
     </header>
   )

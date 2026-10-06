@@ -15,9 +15,9 @@ test('dashboard layout delegates its geometry to a single shared frame', () => {
   expect(layout).not.toContain("isChatPage ? 'sm:pb-16 px-0")
   expect(read('app/layout.js')).toContain("import './dashboard/dashboard-layout.css'")
 })
-test('canonical gutters retain team reference measurements and scope root normalization', () => {
+test('canonical gutters use compact header clearance and scope root normalization', () => {
   const css = read('app/dashboard/dashboard-layout.css')
-  expect(css).toContain('--dashboard-gutter-top: 44px')
+  expect(css).toContain('--dashboard-gutter-top: 8px')
   expect(css).toContain('--dashboard-gutter-x: 32px')
   expect(css).toContain('.dashboard-route-page > :is(div, section, article, form)')
   expect(css).toContain(':not([role="dialog"])')

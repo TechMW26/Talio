@@ -70,6 +70,10 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const [activeSubmenu, setActiveSubmenu] = useState(null)
   const [activeMenuIndex, setActiveMenuIndex] = useState(null)
 
+  useEffect(() => {
+    if (isDesktop) setIsCollapsed(!slidingSidebarOpen)
+  }, [isDesktop, slidingSidebarOpen, setIsCollapsed])
+
   // Sidebar pending counts
   const [sidebarCounts, setSidebarCounts] = useState({
     projects: 0,
@@ -443,6 +447,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       {isDesktop && (
         <>
           <IconStrip
+            isHidden={slidingSidebarOpen}
             onExpandClick={handleIconStripExpand}
             sidebarCounts={sidebarCounts}
             isDepartmentHead={isDepartmentHead}
@@ -478,9 +483,12 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
 
           {/* Mobile Sidebar */}
           <aside
+            data-open={isOpen}
+            inert={!isOpen || undefined}
+            aria-hidden={!isOpen}
             className={`
-              talio-sidebar-shell fixed inset-y-0 left-0 z-[60]
-              flex flex-col h-screen shadow-[0_6px_24px_rgba(15,23,42,0.08)]
+              talio-sidebar-shell talio-floating-mobile-sidebar fixed z-[60]
+              flex flex-col shadow-[0_6px_24px_rgba(15,23,42,0.08)]
               ${isOpen ? 'translate-x-0' : '-translate-x-full'}
               w-full max-w-[288px]
               transition-transform duration-300 ease-in-out

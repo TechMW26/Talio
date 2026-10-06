@@ -8,7 +8,6 @@
 .grid.grid > button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #3b82f6; background: #2563eb20; }
 .grid.grid > button:disabled { cursor: default; }
 .grid.grid > :is(button, div):not(:empty) > * { max-width: 100%; min-width: 0; }
-.grid.grid > button:not(:disabled):hover { background: #2563eb16; }
 @media (max-width: 640px) {
   .grid.grid, .week.week { gap: 4px; }
   .grid.grid > :is(button, div):not(:empty) { min-height: 64px; padding: 6px !important; border-radius: 10px !important; }

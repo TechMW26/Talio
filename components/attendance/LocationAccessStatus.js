@@ -10,8 +10,22 @@ export default function LocationAccessStatus({
   loading,
   onRetry,
   compact = false,
+  showLocation = false,
 }) {
-  if (!geofence?.enabled) return null
+  const coordinate = value => (typeof value === 'number' || (typeof value === 'string' && value.trim())) && Number.isFinite(Number(value)) ? Number(value) : null
+  const latitude = coordinate(location?.latitude)
+  const longitude = coordinate(location?.longitude)
+  const address = typeof location?.address === 'string' ? location.address.trim() : ''
+  const coordinates = latitude !== null && longitude !== null && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
+    ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}` : ''
+  const locationText = showLocation ? address || coordinates : ''
+  if (!geofence?.enabled) {
+    if (!locationText) return null
+    return <div className={`flex items-center gap-2 rounded-xl border border-default-200 ${compact ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-sm'}`}>
+      <FaMapMarkerAlt className="shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1 break-words"><span className="font-semibold">Fetched location: </span>{locationText}</span>
+    </div>
+  }
 
   const denied = permissionStatus === 'denied' || permissionStatus === 'unsupported'
   const ready = permissionStatus === 'granted' && location
@@ -41,7 +55,7 @@ export default function LocationAccessStatus({
   return (
     <div className={`flex items-center gap-2 rounded-xl border ${compact ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-sm'} ${tone}`} role="status">
       <Icon className="shrink-0" aria-hidden="true" />
-      <span className="min-w-0 flex-1">{message}</span>
+      <span className="min-w-0 flex-1 break-words">{message}{locationText && <span className="mt-1 block"><span className="font-semibold">Fetched location: </span>{locationText}</span>}</span>
       <button
         type="button"
         onClick={onRetry}

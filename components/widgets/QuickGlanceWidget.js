@@ -158,7 +158,6 @@ export default function QuickGlanceWidget({
       <div className={styles.grid}>
         {tiles.map(({ label, description, value, icon: Icon, color }) => (
           <div className={styles.tile} key={label} style={{ '--accent': color }}>
-            {label === 'Work Hours' ? <div className={styles.bars} aria-hidden="true">{[28, 46, 66, 88].map(height => <i key={height} style={{ height: height + '%' }} />)}</div> : label === 'Status' ? <FaCheckCircle className={styles.watermark} aria-hidden="true" /> : <FaClock className={styles.watermark} aria-hidden="true" />}
             <div className={styles.tileHeading}>
               <span className={styles.icon}><Icon aria-hidden="true" /></span>
               <div><h4>{label}</h4><p>{description}</p></div>

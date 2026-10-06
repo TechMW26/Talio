@@ -1567,14 +1567,13 @@ html.dark .prose table th {
 }
 
 /* ---- Header ---- */
-/* Dashboard navigation uses one surface across the header and sidebar. */
+/* Navigation controls float directly on the page; the sidebar keeps its surface. */
 header.talio-navigation-header,
 html.dark header.talio-navigation-header {
-  background-color: var(--color-bg-sidebar, #111111) !important;
+  background: transparent !important;
 }
 
-/* Page headers inherit their containing surface. Only the navigation header
-   above owns a background; semantic <header> is not a card. */
+/* Semantic page headers inherit their containing surface; they are not cards. */
 
 /* ---- Bottom Nav ---- */
 html.dark .bottom-nav,
@@ -2309,10 +2308,7 @@ button[title="Close"] svg,
   transition: all 0.3s ease;
 }
 
-.card-hover:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-}
+.card-hover:hover { /* Entrance motion remains; hover lift is intentionally off. */ }
 
 /* Button Styles */
 .btn-primary {

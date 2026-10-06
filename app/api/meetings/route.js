@@ -11,8 +11,12 @@ export async function GET(request) {
     if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     const database = await getMeetingDatabase(auth.tenant.databaseName), employee = await resolveMeetingEmployee(database, auth.user)
     if (!employee) return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
-    const { records, pagination } = await listMeetings(database, employee, new URL(request.url).searchParams)
+    const params = new URL(request.url).searchParams
+    const { records, pagination } = await listMeetings(database, employee, params)
     const data = await Promise.all(records.map(async meeting => {
+      if (params.get('view') === 'upcoming') {
+        return Object.fromEntries(['_id', 'title', 'scheduledStart', 'scheduledEnd', 'status', 'priority', 'type'].map(key => [key, meeting[key]]))
+      }
       if (meeting.type === 'online' && (!meeting.roomPresenceCheckedAt || Date.now() - new Date(meeting.roomPresenceCheckedAt) > 15000)) {
         try { meeting = await refreshMeetingAvailability(database, meeting, auth.tenant.databaseName) } catch {}
       }

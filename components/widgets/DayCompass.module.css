@@ -1,0 +1,17 @@
+.compass { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 16px; padding: 16px; background: var(--color-bg-main); color: var(--color-text-primary); }
+.heading { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.heading h3 { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; margin: 0; }
+.heading > span { color: #b8c8df; font-size: 10px; }
+.reminders { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; scrollbar-width: thin; padding: 3px; }
+.reminder { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; padding: 12px; border-radius: 12px; background: var(--color-bg-card); }
+.reminderCopy { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.reminderMeta { font-size: 10px; color: var(--color-text-secondary); }
+.reminder strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.priority { flex-shrink: 0; border-radius: 999px; padding: 3px 7px; font-size: 10px; text-transform: capitalize; background: color-mix(in srgb, currentColor 12%, transparent); }
+.priority[data-priority="high"] { color: #fda4af; }
+.priority[data-priority="medium"] { color: #fcd34d; }
+.priority[data-priority="low"] { color: #6ee7b7; }
+.footnote { flex: none; font-size: 11px; line-height: 1.5; color: #b8c8df; margin: 0; padding: 8px 0; }
+.footnote button { font-size: inherit; text-decoration: underline; padding: 0; background: none; color: inherit; }
+.compass :is(button, a):focus-visible, .reminders:focus-visible { outline: 2px solid #93b4fa; outline-offset: 1px; }
+@container (max-height: 520px) { .compass { gap: 8px; padding: 12px; } .reminder { padding: 10px; } }

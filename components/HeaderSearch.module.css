@@ -1,0 +1,25 @@
+.shell { --search-radius: var(--dashboard-header-control-radius, 16px); position: relative; flex: 0 1 156px; min-width: 0; width: 156px; transition: flex-basis .28s cubic-bezier(.2,.8,.2,1), width .28s cubic-bezier(.2,.8,.2,1); outline: none; }
+.shell[data-expanded="true"] { flex-basis: 540px; width: 540px; }
+.control { position: relative; display: flex; align-items: center; gap: 9px; height: var(--dashboard-header-control-height, 42px); padding: 0 12px; border: 0; border-radius: var(--search-radius); background: var(--color-bg-card); color: var(--color-text-primary); }
+.shell .control[data-search-container]:has(input:focus-visible) { outline: none !important; box-shadow: none; border: 0; }
+.brand { display: none; position: relative; z-index: 1; flex-shrink: 0; font-size: 11px; font-weight: 500; color: var(--color-text-secondary); }
+.shell[data-expanded="true"] .brand { display: block; }
+.icon { flex-shrink: 0; width: 14px; height: 14px; color: var(--color-text-secondary); }
+.control input { position: relative; z-index: 1; min-width: 0; width: 100%; flex: 1; border: 0; outline: none; background: transparent; font-size: 13px; color: inherit; }
+.control input::-webkit-search-cancel-button { display: none; }
+.control input::placeholder { color: var(--color-text-secondary); }
+.shortcut { font-size: 10px; color: var(--color-text-secondary); }
+.close { position: relative; z-index: 1; display: grid; place-items: center; flex-shrink: 0; min-width: 24px; width: 24px; height: 24px; padding: 0; background: transparent; color: var(--color-text-secondary); }
+.results { position: absolute; z-index: 50; top: calc(100% + 8px); left: 0; width: 100%; min-width: 220px; border: 0; border-radius: var(--search-radius); background: var(--color-bg-card); box-shadow: 0 12px 40px #0003; overflow: hidden; }
+.list { max-height: min(55dvh, 460px); overflow-y: auto; overscroll-behavior: contain; }
+.message { padding: 16px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); }
+.message button { color: var(--color-text-primary); background: transparent; padding: 0 6px; text-decoration: underline; font-size: inherit; }
+.result { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; border-radius: 0; border: 0; background: transparent; padding: 12px 14px; text-align: left; color: var(--color-text-primary); }
+.result[aria-selected="true"] { background: #2563eb20; }
+.resultCopy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.resultCopy strong { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resultCopy > span { font-size: 11px; color: var(--color-text-secondary); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.category { font-size: 10px; color: var(--color-text-secondary); text-transform: capitalize; flex-shrink: 0; }
+.shell button:focus-visible { outline: none !important; box-shadow: none; background: #2563eb20; }
+@media (max-width: 767px) { .shell { flex-basis: 116px; width: 116px; } .shell[data-expanded="true"] { flex: 1; width: 100%; } .results { min-width: 0; } .shortcut { display: none; } }
+@media (prefers-reduced-motion: reduce) { .shell { transition: none; } }

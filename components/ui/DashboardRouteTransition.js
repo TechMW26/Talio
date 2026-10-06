@@ -49,7 +49,7 @@ export default function DashboardRouteTransition({ children }) {
   }, [pathname])
   const { isNavigating, targetPath } = usePageTransition()
   const pending = isNavigating && targetPath && targetPath !== pathname
-  const viewport = /^\/dashboard\/team\/members\/[^/]+$/.test(pathname || '') || pathname === '/dashboard/chat'
+  const viewport = /^\/dashboard\/team\/members\/[^/]+$/.test(pathname || '') || pathname === '/dashboard/chat' || pathname === '/dashboard'
   const title = pending ? targetPath.split('/').filter(Boolean).at(-1).replace(/-/g, ' ') : ''
 
   return (

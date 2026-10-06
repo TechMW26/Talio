@@ -16,6 +16,13 @@ jest.mock('@/contexts/PageTransitionContext', () => ({
 }))
 
 describe('DashboardRouteTransition', () => {
+  test('homepage opts into viewport sizing, while document pages retain scrolling', () => {
+    const view = render(<DashboardRouteTransition><section>Home</section></DashboardRouteTransition>)
+    expect(view.container.querySelector('.dashboard-route-page')).toHaveAttribute('data-page-sizing', 'viewport')
+    mockPathname = '/dashboard/documents'
+    view.rerender(<DashboardRouteTransition><section>Documents</section></DashboardRouteTransition>)
+    expect(view.container.querySelector('.dashboard-route-page')).toHaveAttribute('data-page-sizing', 'document')
+  })
   test.each([false, true])('loaded content animates without remounting; reduced motion=%s', async reduced => {
     const original = window.matchMedia, originalAnimate = Element.prototype.animate
     window.matchMedia = () => ({ matches: reduced, addEventListener() {}, removeEventListener() {} })

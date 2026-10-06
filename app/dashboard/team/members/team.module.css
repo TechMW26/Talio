@@ -49,3 +49,7 @@
 .skeleton p { margin-top: 18px; width: 65%; height: 16px; border-radius: 8px; background: var(--color-bg-hover); }
 @media (max-width: 640px) { .page { padding: 16px; } .header { align-items: stretch; flex-direction: column; gap: 16px; } .department, .search { width: 100%; max-width: none; } .toolbar { align-items: stretch; flex-direction: column; gap: 10px; } .grid { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .page *, .page *::before { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+.pagination { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 0; }
+.pagination button { border-radius: 999px; padding: 10px 24px; background: var(--color-primary, #2563eb); color: white; }
+.pagination button:disabled { opacity: .6; cursor: wait; }
+.pagination p { margin: 0; color: var(--color-danger, #f87171); }

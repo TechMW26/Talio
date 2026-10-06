@@ -88,7 +88,7 @@ function TicTacToeCard() {
             <HiOutlineTrophy className="w-4 h-4" />
             <span>Find Opponent</span>
           </div>
-          <button onClick={() => { setPhase('idle'); setSearchQuery(''); setSearchResults([]) }} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-700">
+          <button onClick={() => { setPhase('idle'); setSearchQuery(''); setSearchResults([]) }} className="p-1 rounded-lg  ">
             <HiOutlineXMark className="w-4 h-4 text-gray-400" />
           </button>
         </div>
@@ -112,7 +112,7 @@ function TicTacToeCard() {
             <button
               key={u._id}
               onClick={() => handleInvite(u)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700/50 transition-colors text-left"
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg   transition-colors text-left"
             >
               {u.avatar ? (
                 <img src={u.avatar} alt="" className="w-6 h-6 rounded-full object-cover" />
@@ -177,7 +177,7 @@ function TicTacToeCard() {
       <div className="px-5 pb-4 pt-2">
         <button
           onClick={() => setPhase('searching')}
-          className="w-full py-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          className="w-full py-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20   text-indigo-600 dark:text-indigo-400 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
         >
           <HiOutlineUserPlus className="w-4 h-4" /> Invite to Play
         </button>
@@ -302,7 +302,7 @@ export function LocationMapCard() {
             <button
               type="button"
               onClick={locate}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition-colors  focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-300 "
             >
               <HiOutlineArrowPath className="h-3.5 w-3.5" aria-hidden="true" />
               Retry location
@@ -369,7 +369,7 @@ function FocusTimerCard() {
               ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 animate-pulse'
               : done
                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                : 'bg-gray-100 text-gray-600 dark:bg-zinc-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-600'
+                : 'bg-gray-100 text-gray-600 dark:bg-zinc-700 dark:text-gray-300  '
           } ${running || alarming ? 'cursor-default' : 'cursor-pointer'}`}
         >
           {alarming ? '⏰ Alarm!' : done ? 'Done!' : `${duration} min`}
@@ -385,7 +385,7 @@ function FocusTimerCard() {
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
                 m === duration
                   ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-50 dark:bg-zinc-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700'
+                  : 'bg-gray-50 dark:bg-zinc-700/50 text-gray-700 dark:text-gray-300  '
               }`}
             >
               {m}m
@@ -411,7 +411,7 @@ function FocusTimerCard() {
       {alarming ? (
         <button
           onClick={dismissAlarm}
-          className="w-full py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors shadow-lg shadow-red-500/30 animate-pulse"
+          className="w-full py-2.5 rounded-xl bg-red-500  text-white text-sm font-bold transition-colors shadow-lg shadow-red-500/30 animate-pulse"
         >
           Dismiss Alarm
         </button>
@@ -420,7 +420,7 @@ function FocusTimerCard() {
           <button
             onClick={toggle}
             aria-label={done ? 'Restart focus timer' : running ? 'Pause focus timer' : 'Start focus timer'}
-            className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
+            className="p-1.5 rounded-xl   transition-colors"
             title={done ? 'Restart' : running ? 'Pause' : 'Start'}
           >
             {done
@@ -433,7 +433,7 @@ function FocusTimerCard() {
             <button
               onClick={reset}
               aria-label="Reset focus timer"
-              className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
+              className="p-1.5 rounded-xl   transition-colors"
               title="Reset"
             >
               <HiOutlineArrowPath className="w-5 h-5 text-gray-400" />
@@ -511,21 +511,21 @@ function CalculatorCard() {
 
       {/* Keypad */}
       <div className="grid grid-cols-4 gap-1.5">
-        <button onClick={clear} className={`${btnClass} bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 col-span-2`}>C</button>
-        <button onClick={() => operate('÷')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100`}>÷</button>
-        <button onClick={() => operate('×')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100`}>×</button>
+        <button onClick={clear} className={`${btnClass} bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400   col-span-2`}>C</button>
+        <button onClick={() => operate('÷')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 `}>÷</button>
+        <button onClick={() => operate('×')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 `}>×</button>
 
-        {['7','8','9'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700`}>{d}</button>)}
-        <button onClick={() => operate('-')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100`}>−</button>
+        {['7','8','9'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200  `}>{d}</button>)}
+        <button onClick={() => operate('-')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 `}>−</button>
 
-        {['4','5','6'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700`}>{d}</button>)}
-        <button onClick={() => operate('+')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100`}>+</button>
+        {['4','5','6'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200  `}>{d}</button>)}
+        <button onClick={() => operate('+')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 `}>+</button>
 
-        {['1','2','3'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700`}>{d}</button>)}
-        <button onClick={equals} className={`${btnClass} bg-emerald-500 text-white hover:bg-emerald-600 row-span-2`}>=</button>
+        {['1','2','3'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200  `}>{d}</button>)}
+        <button onClick={equals} className={`${btnClass} bg-emerald-500 text-white  row-span-2`}>=</button>
 
-        <button onClick={() => input('0')} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700 col-span-2`}>0</button>
-        <button onClick={() => input('.')} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700`}>.</button>
+        <button onClick={() => input('0')} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200   col-span-2`}>0</button>
+        <button onClick={() => input('.')} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200  `}>.</button>
       </div>
     </div>
   )
@@ -574,12 +574,12 @@ function StickyNoteCard() {
         </div>
         <div className="flex items-center gap-1">
           {!editing && note && (
-            <button onClick={clearNote} className="p-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors" title="Clear">
+            <button onClick={clearNote} className="p-1 rounded-lg   transition-colors" title="Clear">
               <HiOutlineXMark className="w-3.5 h-3.5 text-amber-500" />
             </button>
           )}
           {!editing && (
-            <button onClick={startEdit} className="p-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors" title="Edit">
+            <button onClick={startEdit} className="p-1 rounded-lg   transition-colors" title="Edit">
               <HiOutlinePencilSquare className="w-3.5 h-3.5 text-amber-500" />
             </button>
           )}
@@ -597,8 +597,8 @@ function StickyNoteCard() {
             maxLength={500}
           />
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setEditing(false)} className="text-xs px-3 py-1 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
-            <button onClick={save} className="text-xs px-3 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors font-medium">Save</button>
+            <button onClick={() => setEditing(false)} className="text-xs px-3 py-1 rounded-lg text-gray-500   transition-colors">Cancel</button>
+            <button onClick={save} className="text-xs px-3 py-1 rounded-lg bg-amber-500 text-white  transition-colors font-medium">Save</button>
           </div>
         </div>
       ) : (
@@ -606,7 +606,7 @@ function StickyNoteCard() {
           {note ? (
             <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-words">{note}</p>
           ) : (
-            <button onClick={startEdit} className="text-sm text-amber-500/70 hover:text-amber-600 transition-colors w-full text-left">
+            <button onClick={startEdit} className="text-sm text-amber-500/70  transition-colors w-full text-left">
               Tap to add a quick note...
             </button>
           )}

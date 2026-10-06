@@ -17,12 +17,6 @@ import {
   FaTimes,
   FaCheck,
   FaCamera,
-  FaSearchPlus,
-  FaSearchMinus,
-  FaUndo,
-  FaRedo,
-  FaSun,
-  FaAdjust,
   FaExclamationTriangle,
   FaSync,
   FaBrain,
@@ -39,6 +33,10 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { broadcastUserUpdate, syncUserData } from '@/utils/userHelper'
+import { useSWRConfig } from 'swr'
+import { patchProfilePhotoResponse } from '@/lib/client/profilePhoto'
+import ProfilePhotoEditor from '@/components/profile/ProfilePhotoEditor'
+import { DEFAULT_PHOTO_VIEWPORT } from '@/lib/profilePhotoViewport'
 
 // Dynamically import Lanyard with no SSR and error boundary
 const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) => {
@@ -58,6 +56,7 @@ const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) =>
 
 
 export default function ProfilePage() {
+  const { mutate: updateCache } = useSWRConfig()
   const [mounted, setMounted] = useState(false)
   const searchParams = useSearchParams()
 
@@ -160,16 +159,7 @@ export default function ProfilePage() {
   // Image editor state
   const [showImageEditor, setShowImageEditor] = useState(false)
   const [selectedImage, setSelectedImage] = useState(null)
-  const [imageScale, setImageScale] = useState(1)
-  const [imageRotation, setImageRotation] = useState(0)
-  const [imageBrightness, setImageBrightness] = useState(100)
-  const [imageContrast, setImageContrast] = useState(100)
-  const [imageSaturation, setImageSaturation] = useState(100)
-  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  const canvasRef = useRef(null)
-  const imageRef = useRef(null)
+  const [photoViewport, setPhotoViewport] = useState({ ...DEFAULT_PHOTO_VIEWPORT })
 
   // Check for edit mode from URL params (from profile completion modal)
   useEffect(() => {
@@ -216,155 +206,43 @@ export default function ProfilePage() {
     if (!file) return
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file')
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
+      toast.error('Choose a PNG, JPEG, WebP or GIF image')
       return
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB')
+    // Base64 plus JSON must stay below the hosting request-body limit.
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('Choose an image smaller than 3MB; original pixels are preserved')
       return
     }
 
     // Read the file and open editor
     const reader = new FileReader()
-    reader.onloadend = () => {
+    reader.onerror = () => toast.error('Unable to read this image. Please try again.')
+    reader.onload = () => {
       setSelectedImage(reader.result)
       setShowImageEditor(true)
       // Reset editor state
-      setImageScale(1)
-      setImageRotation(0)
-      setImageBrightness(100)
-      setImageContrast(100)
-      setImageSaturation(100)
-      setImagePosition({ x: 0, y: 0 })
+      setPhotoViewport({ ...DEFAULT_PHOTO_VIEWPORT })
     }
     reader.readAsDataURL(file)
-  }
-
-  const handleMouseDown = (e) => {
-    setIsDragging(true)
-    setDragStart({
-      x: e.clientX - imagePosition.x,
-      y: e.clientY - imagePosition.y,
-    })
-  }
-
-  const handleMouseMove = (e) => {
-    if (!isDragging) return
-    setImagePosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    })
-  }
-
-  const handleMouseUp = () => {
-    setIsDragging(false)
-  }
-
-  const handleTouchStart = (e) => {
-    const touch = e.touches[0]
-    setIsDragging(true)
-    setDragStart({
-      x: touch.clientX - imagePosition.x,
-      y: touch.clientY - imagePosition.y,
-    })
-  }
-
-  const handleTouchMove = (e) => {
-    if (!isDragging) return
-    const touch = e.touches[0]
-    setImagePosition({
-      x: touch.clientX - dragStart.x,
-      y: touch.clientY - dragStart.y,
-    })
-  }
-
-  const handleTouchEnd = () => {
-    setIsDragging(false)
-  }
-
-  const resetImageEditor = () => {
-    setImageScale(1)
-    setImageRotation(0)
-    setImageBrightness(100)
-    setImageContrast(100)
-    setImageSaturation(100)
-    setImagePosition({ x: 0, y: 0 })
   }
 
   const closeImageEditor = () => {
     setShowImageEditor(false)
     setSelectedImage(null)
-    resetImageEditor()
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
+    setPhotoViewport({ ...DEFAULT_PHOTO_VIEWPORT })
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const getCroppedImage = () => {
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    const size = 400 // Output size
-
-    canvas.width = size
-    canvas.height = size
-
-    const img = imageRef.current
-    if (!img) return null
-
-    // Create a circular clipping path
-    ctx.save()
-    ctx.beginPath()
-    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
-    ctx.closePath()
-    ctx.clip()
-
-    // Apply filters
-    ctx.filter = `brightness(${imageBrightness}%) contrast(${imageContrast}%) saturate(${imageSaturation}%)`
-
-    // Calculate the image dimensions to match object-cover behavior
-    const imgAspect = img.naturalWidth / img.naturalHeight
-    const containerAspect = 1 // Square container (300x300 in preview, 400x400 in output)
-
-    let drawWidth, drawHeight, offsetX, offsetY
-
-    if (imgAspect > containerAspect) {
-      // Image is wider - fit to height
-      drawHeight = size
-      drawWidth = size * imgAspect
-      offsetX = -(drawWidth - size) / 2
-      offsetY = 0
-    } else {
-      // Image is taller - fit to width
-      drawWidth = size
-      drawHeight = size / imgAspect
-      offsetX = 0
-      offsetY = -(drawHeight - size) / 2
-    }
-
-    // Apply transformations
-    ctx.translate(size / 2, size / 2)
-    ctx.rotate((imageRotation * Math.PI) / 180)
-    ctx.scale(imageScale, imageScale)
-    ctx.translate(imagePosition.x, imagePosition.y)
-
-    // Draw the image
-    ctx.drawImage(img, offsetX - size / 2, offsetY - size / 2, drawWidth, drawHeight)
-
-    ctx.restore()
-
-    return canvas.toDataURL('image/jpeg', 0.95)
-  }
 
   const handleSaveImage = async () => {
     try {
       setUploadingImage(true)
 
-      const croppedImage = getCroppedImage()
-      if (!croppedImage) {
+      const originalImage = selectedImage
+      if (!originalImage) {
         toast.error('Failed to process image')
         return
       }
@@ -376,19 +254,24 @@ export default function ProfilePage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ profilePicture: croppedImage }),
+        body: JSON.stringify({ profilePicture: originalImage, profilePictureViewport: photoViewport }),
       })
 
       const result = await response.json()
-      if (result.success) {
+      if (response.ok && result.success) {
         // Use the URL returned from the API
-        const rawUrl = result.data?.profilePicture || croppedImage
+        const rawUrl = result.data?.profilePicture || originalImage
         const profilePictureUrl = typeof rawUrl === 'string' && rawUrl.startsWith('http')
           ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}v=${Date.now()}`
           : rawUrl
 
-        setEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl }))
-        setEditedEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl }))
+        setEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl, profilePictureViewport: photoViewport }))
+        setEditedEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl, profilePictureViewport: photoViewport }))
+        await updateCache(
+          key => typeof key === 'string' && /^\/api\/(profile(?:[/?]|$)|employees(?:[/?]|$)|directory(?:[/?]|$)|team\/members(?:[/?]|$))/.test(key),
+          cached => patchProfilePhotoResponse(cached, employee._id, profilePictureUrl, photoViewport),
+          { revalidate: false }
+        )
         toast.success('Profile picture updated successfully!')
 
         // Update localStorage user data and broadcast app-wide update instantly.
@@ -396,9 +279,11 @@ export default function ProfilePage() {
         if (userData) {
           const parsedUser = JSON.parse(userData)
           parsedUser.profilePicture = profilePictureUrl
+          parsedUser.profilePictureViewport = photoViewport
           if (parsedUser.employeeId) {
             if (typeof parsedUser.employeeId === 'object') {
               parsedUser.employeeId.profilePicture = profilePictureUrl
+              parsedUser.employeeId.profilePictureViewport = photoViewport
             }
           }
           localStorage.setItem('user', JSON.stringify(parsedUser))
@@ -905,6 +790,7 @@ export default function ProfilePage() {
                     employeeId: employee?.employeeCode,
                     status: employee?.status,
                     photo: employee?.profilePicture,
+                    photoViewport: employee?.profilePictureViewport,
                     phone: employee?.phone,
                     bloodGroup: employee?.bloodGroup,
                     email: employee?.email,
@@ -1537,230 +1423,7 @@ export default function ProfilePage() {
         </ModalContent>
       </Modal>
 
-      {/* Image Editor Modal */}
-      <Modal isOpen={showImageEditor} onClose={closeImageEditor} size="5xl" scrollBehavior="inside" classNames={{ wrapper: 'z-[99999]' }}>
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1 bg-slate-50 border-b border-slate-200">
-            <div className="flex flex-col">
-              <Heading2 className="text-base sm:text-lg font-semibold text-slate-900">
-                Edit Profile Picture
-              </Heading2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Crop, adjust and fine-tune how your profile photo looks.
-              </p>
-            </div>
-          </ModalHeader>
-          <ModalBody className="bg-slate-50/60">
-            {/* Preview area */}
-            <div className="lg:flex-[2] flex-shrink-0 sticky top-0 bg-slate-50 z-10 lg:static rounded-none lg:rounded-2xl">
-              <div className="bg-slate-100 rounded-none lg:rounded-2xl overflow-hidden relative h-[300px] sm:h-[350px] lg:h-[450px] border border-slate-200/80">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div
-                    className="relative overflow-hidden rounded-full bg-slate-200 shadow-2xl shadow-slate-900/20 border-[6px] border-white"
-                    style={{ width: '260px', height: '260px' }}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                  >
-                    <img
-                      ref={imageRef}
-                      src={selectedImage}
-                      alt="Preview"
-                      className="absolute inset-0 w-full h-full object-cover"
-                      style={{
-                        transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale}) rotate(${imageRotation}deg)`,
-                        filter: `brightness(${imageBrightness}%) contrast(${imageContrast}%) saturate(${imageSaturation}%)`,
-                        cursor: isDragging ? 'grabbing' : 'grab',
-                        transformOrigin: 'center center',
-                      }}
-                      draggable={false}
-                    />
-                  </div>
-                </div>
-
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/80 text-white px-3 py-1.5 rounded-full text-[11px] shadow-lg">
-                  Drag to reposition • Use controls to adjust
-                </div>
-              </div>
-            </div>
-
-            {/* Controls */}
-            <div className="lg:flex-1 overflow-y-auto p-4 sm:p-6 lg:p-0">
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {/* Zoom */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                  <div className="flex items-center justify-start mb-2">
-                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                      <FaSearchPlus className="text-slate-500 text-xs" />
-                      Zoom
-                    </label>
-                    <span className="text-[11px] font-medium text-slate-500">
-                      {Math.round(imageScale * 100)}%
-                    </span>
-                  </div>
-                  <NativeInput
-                    type="range"
-                    min="0.5"
-                    max="3"
-                    step="0.1"
-                    value={imageScale}
-                    onChange={(e) => setImageScale(parseFloat(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                  />
-                  <div className="flex gap-2 mt-2">
-                    <NativeButton
-                      onClick={() => setImageScale(Math.max(0.5, imageScale - 0.1))}
-                      className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <FaSearchMinus className="inline mr-1" />
-                      Zoom out
-                    </NativeButton>
-                    <NativeButton
-                      onClick={() => setImageScale(Math.min(3, imageScale + 0.1))}
-                      className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <FaSearchPlus className="inline mr-1" />
-                      Zoom in
-                    </NativeButton>
-                  </div>
-                </div>
-
-                {/* Rotation */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                  <div className="flex items-center justify-start mb-2">
-                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                      <FaUndo className="text-slate-500 text-xs" />
-                      Rotation
-                    </label>
-                    <span className="text-[11px] font-medium text-slate-500">
-                      {imageRotation}°
-                    </span>
-                  </div>
-                  <NativeInput
-                    type="range"
-                    min="0"
-                    max="360"
-                    step="1"
-                    value={imageRotation}
-                    onChange={(e) => setImageRotation(parseInt(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                  />
-                  <div className="flex gap-2 mt-2">
-                    <NativeButton
-                      onClick={() => setImageRotation((imageRotation - 90 + 360) % 360)}
-                      className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <FaUndo className="inline mr-1" /> 90°
-                    </NativeButton>
-                    <NativeButton
-                      onClick={() => setImageRotation((imageRotation + 90) % 360)}
-                      className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <FaRedo className="inline mr-1" /> 90°
-                    </NativeButton>
-                  </div>
-                </div>
-
-                {/* Brightness */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                  <div className="flex items-center justify-start mb-2">
-                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                      <FaSun className="text-slate-500 text-xs" />
-                      Brightness
-                    </label>
-                    <span className="text-[11px] font-medium text-slate-500">
-                      {imageBrightness}%
-                    </span>
-                  </div>
-                  <NativeInput
-                    type="range"
-                    min="50"
-                    max="150"
-                    step="1"
-                    value={imageBrightness}
-                    onChange={(e) => setImageBrightness(parseInt(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                  />
-                </div>
-
-                {/* Contrast */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                  <div className="flex items-center justify-start mb-2">
-                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                      <FaAdjust className="text-slate-500 text-xs" />
-                      Contrast
-                    </label>
-                    <span className="text-[11px] font-medium text-slate-500">
-                      {imageContrast}%
-                    </span>
-                  </div>
-                  <NativeInput
-                    type="range"
-                    min="50"
-                    max="150"
-                    step="1"
-                    value={imageContrast}
-                    onChange={(e) => setImageContrast(parseInt(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                  />
-                </div>
-
-                {/* Saturation */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                  <div className="flex items-center justify-start mb-2">
-                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                      <FaAdjust className="text-slate-500 text-xs" />
-                      Saturation
-                    </label>
-                    <span className="text-[11px] font-medium text-slate-500">
-                      {imageSaturation}%
-                    </span>
-                  </div>
-                  <NativeInput
-                    type="range"
-                    min="0"
-                    max="200"
-                    step="1"
-                    value={imageSaturation}
-                    onChange={(e) => setImageSaturation(parseInt(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                  />
-                </div>
-
-                {/* Reset */}
-                <NativeButton
-                  onClick={resetImageEditor}
-                  className="col-span-2 sm:col-span-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-2xl hover:bg-slate-50 transition-colors text-xs font-semibold flex items-center justify-center"
-                >
-                  Reset all adjustments
-                </NativeButton>
-              </div>
-            </div>
-          </ModalBody>
-          {/* Footer */}
-          <ModalFooter className="border-t border-slate-200 bg-slate-50">
-            <Button
-              variant="bordered"
-              onPress={closeImageEditor}
-              isDisabled={uploadingImage}
-            >
-              Cancel
-            </Button>
-            <Button
-              color="primary"
-              onPress={handleSaveImage}
-              isLoading={uploadingImage}
-              startContent={!uploadingImage && <FaCheck />}
-            >
-              {uploadingImage ? 'Saving…' : 'Save Picture'}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      <ProfilePhotoEditor isOpen={showImageEditor} image={selectedImage} viewport={photoViewport} onChange={setPhotoViewport} onClose={closeImageEditor} onSave={handleSaveImage} busy={uploadingImage} />
     </div>
   )
 }

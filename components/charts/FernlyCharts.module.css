@@ -42,7 +42,10 @@
 .pill:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
 .pillFill { position: absolute; inset: 0; border-radius: inherit; background: var(--tone); animation: pillRise .85s cubic-bezier(.16, 1, .3, 1) both; animation-delay: var(--delay); }
 .planned .pillFill { background: repeating-linear-gradient(-45deg, #7494cd 0 2.4px, transparent 2.4px 8px); box-shadow: inset 0 0 0 1.5px #7494cd59; }
-.pill:hover .pillFill { filter: brightness(1.08); }
+.barsFullHeight { flex: 1; min-height: 220px; display: flex; flex-direction: column; padding-top: 0; }
+.barsFullHeight .distributionTip { flex: none; }
+.barsFullHeight .bars { flex: 1; min-height: 0; }
+.barsFullHeight .bars li { grid-template-rows: minmax(0, 1fr) auto; }
 .barLabel { text-align: center; font-size: 11px; color: var(--color-text-secondary, #a3a3a3); overflow-wrap: anywhere; }
 .barTip { position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; padding: 3px 8px; border-radius: 7px; font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--color-text-primary); background: var(--color-bg-card, #171717); box-shadow: 0 0 0 1px var(--color-border, #303030), 0 6px 16px -8px #0009; pointer-events: none; }
 .barTip::after { content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 10px; background: #7494cd; }

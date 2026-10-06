@@ -13,9 +13,12 @@
   .page-skeleton, .page-skeleton .animate-pulse { animation: none !important; }
 }
 :root {
+  --dashboard-shell-inset: 12px;
+  --dashboard-shell-radius: 22px;
+  --dashboard-shell-motion: 360ms cubic-bezier(.22, 1, .36, 1);
   --dashboard-font: var(--font-montserrat);
   --dashboard-gutter-x: 16px;
-  --dashboard-gutter-top: 24px;
+  --dashboard-gutter-top: 8px;
   --dashboard-gutter-bottom: 40px;
   --dashboard-heading-size: clamp(28px, 3vw, 42px);
   --dashboard-heading-weight: 500;
@@ -26,8 +29,49 @@
   --dashboard-heading-caption-gap: 6px;
   --dashboard-section-gap: 24px;
 }
+
+/* One floating geometry source for both navigation states and the header.
+ * Do not transform/filter the header: its search and MIRA overlays must keep
+ * their existing viewport positioning and interactive desktop drag regions. */
+.dashboard-floating-shell { height: 100dvh; padding: var(--dashboard-shell-inset); gap: 12px; }
+.dashboard-floating-shell > :last-child { min-height: 0; }
+.dashboard-floating-shell .talio-navigation-header {
+  --dashboard-header-inset: 10px;
+  --dashboard-header-control-height: 42px;
+  --dashboard-header-control-radius: max(0px, calc(var(--dashboard-shell-radius) - var(--dashboard-header-inset) - 1px));
+  position: relative;
+  height: auto;
+  padding: var(--dashboard-header-inset);
+  margin-bottom: 12px;
+  border: 0;
+  border-radius: var(--dashboard-shell-radius);
+  box-shadow: none;
+}
+.talio-navigation-header-row { min-height: var(--dashboard-header-control-height); min-width: 0; gap: 12px; }
+.talio-navigation-header-row .mira-header-pill,
+.talio-navigation-header-row .ai-search-header-pill,
+.talio-navigation-header-row > div:last-child > button { min-height: var(--dashboard-header-control-height); }
+.talio-floating-rail, .talio-floating-expanded, .talio-floating-mobile-sidebar {
+  top: var(--dashboard-shell-inset);
+  bottom: var(--dashboard-shell-inset);
+  left: var(--dashboard-shell-inset);
+  height: calc(100dvh - 2 * var(--dashboard-shell-inset));
+  border: 1px solid var(--color-border);
+  border-radius: var(--dashboard-shell-radius);
+  box-shadow: 0 16px 44px -20px rgb(0 0 0 / .65);
+  transition: transform var(--dashboard-shell-motion), opacity var(--dashboard-shell-motion), visibility 360ms;
+}
+.talio-floating-rail { transform-origin: left center; }
+.talio-floating-rail[data-open="false"] { transform: translateX(-24px) scale(.94); opacity: 0; visibility: hidden; pointer-events: none; }
+.talio-floating-expanded[data-open="false"] { transform: translateX(-36px) scale(.97); opacity: 0; visibility: hidden; pointer-events: none; }
+.talio-floating-rail[data-open="true"], .talio-floating-expanded[data-open="true"] { transform: none; opacity: 1; visibility: visible; }
+.talio-floating-mobile-sidebar { width: min(288px, calc(100vw - 2 * var(--dashboard-shell-inset))); }
+.talio-floating-mobile-sidebar[data-open="false"] { opacity: 0; visibility: hidden; pointer-events: none; }
+.talio-floating-mobile-sidebar[data-open="true"] { opacity: 1; visibility: visible; }
+@media (max-width: 639px) { :root { --dashboard-shell-inset: 8px; --dashboard-shell-radius: 18px; } .dashboard-floating-shell { gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .talio-floating-rail, .talio-floating-expanded, .talio-floating-mobile-sidebar { transition: none; } }
 @media (min-width: 640px) {
-  :root { --dashboard-gutter-x: 24px; --dashboard-gutter-top: 44px; --dashboard-gutter-bottom: 56px; }
+  :root { --dashboard-gutter-x: 24px; --dashboard-gutter-bottom: 56px; }
 }
 @media (min-width: 1024px) { :root { --dashboard-gutter-x: 32px; } }
 
@@ -92,6 +136,9 @@ main.dashboard-page-canvas:has([data-page-sizing="viewport"]) { overflow: hidden
 .dashboard-route-page[data-page-sizing="viewport"] > :first-child { height: 100%; min-height: 0; }
 @media (min-width: 768px) {
   .dashboard-content-frame:has([data-page-sizing="viewport"]) { padding-bottom: var(--dashboard-gutter-x); }
+  /* Home widgets and Quick Tools terminate at the floating navigation's shell
+   * baseline. The shell already provides the outer bottom inset. */
+  .dashboard-content-frame:has([data-page-sizing="viewport"]):has([data-dashboard-home]) { padding-bottom: 0; }
 }
 /* Persistent navigation clearance belongs to the shared frame, not each page. */
 @media (max-width: 767px) {

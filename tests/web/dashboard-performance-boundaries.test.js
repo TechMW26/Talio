@@ -4,17 +4,17 @@ const fs = require('fs')
 const path = require('path')
 
 describe('dashboard performance boundaries', () => {
-  test('punch cards align with the profile without outer insets', () => {
+  test('workday panels fill their stage without clipping actions on short screens', () => {
     const css = fs.readFileSync(path.join(process.cwd(), 'components/widgets/CheckInOutWidget.module.css'), 'utf8')
     const punches = css.match(/\.punches\s*\{([^}]+)\}/)[1]
-    expect(punches).toContain('padding: 0')
-    expect(punches).toContain('align-items: stretch')
-    expect(punches).toContain('repeat(2,minmax(0,1fr))')
+    expect(punches).toContain('display: grid')
+    expect(punches).toContain('repeat(2, minmax(0, 1fr))')
+    expect(punches).toContain('overflow: auto')
     const punch = css.match(/\.punch\s*\{([^}]+)\}/)[1]
+    expect(punch).toContain('display: flex')
     expect(punch).toContain('justify-content: space-between')
-    expect(punch).toContain('padding: 22px')
     expect(css).not.toContain('padding-left: 16px')
-    expect(css).toContain('@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }')
+    expect(css).toContain('@container (max-height: 520px)')
   })
   const layoutSource = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/layout.js'), 'utf8')
   const transitionCss = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')
@@ -91,7 +91,8 @@ describe('dashboard performance boundaries', () => {
     expect(draggableWidgetSource).not.toContain('onMouseLeave=')
     expect(draggableWidgetSource).not.toContain("transition || 'all")
     expect(draggableWidgetSource).toContain('dashboard-widget-enter')
-    expect(draggableWidgetSource).toContain('group-hover:opacity-100')
+    expect(draggableWidgetSource).not.toContain('group-hover:opacity-100')
+    expect(draggableWidgetSource).toContain('editable &&')
   })
 
   test('keeps authentication off the dashboard data fan-out path', () => {
@@ -108,12 +109,11 @@ describe('dashboard performance boundaries', () => {
     expect(cacheSource).toContain("process.env.VERCEL === '1'")
   })
 
-  test('defers offscreen widget work until it approaches the viewport', () => {
-    expect(customizableDashboardSource).toContain('function DeferredWidgetContent')
-    expect(customizableDashboardSource).toContain("rootMargin: '600px 0px'")
-    expect(customizableDashboardSource).toContain("<DeferredWidgetContent eager={section.id === 'attendance' || isEditMode}")
-    expect(customizableDashboardSource).toContain('scrollableList={WIDGET_REGISTRY[widget.id]?.scrollableList === true}')
-    expect(customizableDashboardSource).toContain("scrollableList ? 'min-h-[320px] sm:min-h-[400px]' : 'min-h-[280px]'")
+  test('mounts only the active bounded widget panel', () => {
+    expect(customizableDashboardSource).toContain('paginateDashboardWidgets(section?.widgets || [])')
+    expect(customizableDashboardSource).toContain('visibleWidgets.map((widget, index)')
+    expect(customizableDashboardSource).toContain('data-scrollable-widget={WIDGET_REGISTRY[widget.id]?.scrollableList === true || undefined}')
+    expect(customizableDashboardSource).not.toContain('sections.map(section => (')
   })
 
   test('coalesces realtime dashboard bursts and in-flight requests', () => {

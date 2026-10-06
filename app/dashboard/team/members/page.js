@@ -2,12 +2,12 @@
 
 
 import { Heading1, NativeSelect, NativeInput, NativeButton, Heading2 } from '@/components/ui/fernly/native'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { LayoutGroup, motion, useReducedMotion } from 'framer-motion'
 import { Search, ChevronLeft, ChevronRight, Users, Crown } from 'lucide-react'
 import { formatDesignation } from '@/lib/formatters'
-import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { useAuthedSWRInfinite } from '@/hooks/useAuthedSWR'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { getTeamChat } from '@/lib/client/teamChat'
 import styles from './team.module.css'
@@ -16,6 +16,11 @@ export default function TeamMembersPage() {
   const [department, setDepartment] = useState('all')
   const [team, setTeam] = useState('all')
   const [search, setSearch] = useState('')
+  const [query, setQuery] = useState('')
+  useEffect(() => {
+    const timeout = setTimeout(() => setQuery(search.trim()), 300)
+    return () => clearTimeout(timeout)
+  }, [search])
   const slider = useRef(null)
   const chatPending = useRef(false)
   const [openingChat, setOpeningChat] = useState(null)
@@ -31,19 +36,24 @@ export default function TeamMembersPage() {
     finally { chatPending.current = false; setOpeningChat(null) }
   }
   const reduceMotion = useReducedMotion()
-  // Stable metadata prevents the department/team controls disappearing on selection.
-  const directory = useAuthedSWR('/api/team/members')
   const params = new URLSearchParams()
+  params.set('limit', '24')
   if (department !== 'all') params.set('department', department)
   if (team !== 'all') params.set('team', team)
-  const filteredKey = params.size ? `/api/team/members?${params}` : null
-  const filtered = useAuthedSWR(filteredKey, { keepPreviousData: false })
-  const current = filteredKey ? filtered : directory
-  const departments = directory.data?.meta?.departments || []
-  const teams = (directory.data?.meta?.teams || []).filter(item => department === 'all' || (item.department?._id || item.department) === department)
-  const members = (current.data?.data || []).filter(member =>
-    [member.firstName, member.lastName, member.employeeCode, member.email, formatDesignation(member.designation, member)]
-      .filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase()))
+  if (query) params.set('search', query)
+  const baseKey = `/api/team/members?${params}`
+  const current = useAuthedSWRInfinite((index, previous) => {
+    if (index && !previous?.pagination?.nextCursor) return null
+    return index ? `${baseKey}&cursor=${encodeURIComponent(previous.pagination.nextCursor)}` : baseKey
+  }, { keepPreviousData: false })
+  const metadata = useRef({})
+  if (current.data?.[0]?.meta) metadata.current = current.data[0].meta
+  const departments = metadata.current.departments || []
+  const teams = (metadata.current.teams || []).filter(item => department === 'all' || (item.department?._id || item.department) === department)
+  const pages = current.data || []
+  const members = [...new Map(pages.flatMap(page => page.data || []).map(member => [member._id, member])).values()]
+  const hasMore = Boolean(pages.at(-1)?.pagination?.hasMore)
+  const loadingMore = current.isLoading || (current.isValidating && current.size > pages.length)
   const scroll = direction => slider.current?.scrollBy({ left: direction * 240, behavior: reduceMotion ? 'auto' : 'smooth' })
   return (
     <section className={styles.page} aria-labelledby="team-title">
@@ -70,11 +80,11 @@ export default function TeamMembersPage() {
             </div>
             {teams.length > 2 && <NativeButton className={styles.scroll} aria-label="Scroll teams right" onClick={() => scroll(1)}><ChevronRight size={18} /></NativeButton>}
           </div>
-          <span className={styles.count} role="status">{current.isLoading ? 'Loading members…' : `${members.length} members`}{current.isValidating && !current.isLoading ? ' · Updating…' : ''}</span>
+          <span className={styles.count} role="status">{current.isLoading ? 'Loading members…' : `${members.length} members loaded`}{current.isValidating && !current.isLoading ? ' · Updating…' : ''}</span>
         </div>
-        {directory.error || current.error ? <div className={styles.empty} role="alert"><Heading2>Unable to load your team</Heading2><p>Please try again.</p><NativeButton onClick={() => { directory.mutate(); if (filteredKey) filtered.mutate() }}>Retry</NativeButton></div>
+        {current.error && !members.length ? <div className={styles.empty} role="alert"><Heading2>Unable to load your team</Heading2><p>Please try again.</p><NativeButton onClick={() => current.mutate()}>Retry</NativeButton></div>
           : current.isLoading ? <div className={styles.grid} aria-label="Loading team members" aria-busy="true">{Array.from({ length: 6 }, (_, i) => <div className={`${styles.card} ${styles.skeleton}`} key={i}><div /><p /><p /><p /></div>)}</div>
-          : !members.length ? <div className={styles.empty}><Users size={32} /><Heading2>No team members found</Heading2><p>{search ? 'Try another name, employee code or email.' : 'There are no members in this selection yet.'}</p></div>
+          : !members.length ? <div className={styles.empty}><Users size={32} /><Heading2>{hasMore ? 'Continue searching members' : 'No team members found'}</Heading2><p>{hasMore ? 'Load the next batch to continue this search.' : search ? 'Try another name, employee code or email.' : 'There are no members in this selection yet.'}</p></div>
           : <div className={styles.grid}>{members.map((member, index) => {
             const name = [member.firstName, member.lastName].filter(Boolean).join(' ') || 'Team member'
             const joined = member.dateOfJoining ? new Date(member.dateOfJoining) : null
@@ -92,6 +102,10 @@ export default function TeamMembersPage() {
               <footer className={styles.actions}><NativeButton type="button" disabled={openingChat !== null} aria-label={`Chat with ${name}`} aria-busy={openingChat === member._id} onClick={() => startChat(member._id)}>{openingChat === member._id ? 'Opening…' : 'Chat'}</NativeButton><Link href={`/dashboard/team/members/${member._id}`} aria-label={`View ${name}'s profile and reviews`}>Profile <ChevronRight size={14} /></Link></footer>
             </motion.article>
           })}</div>}
+        {(hasMore || (current.error && members.length > 0)) && <footer className={styles.pagination}>
+          {current.error && <p role="alert">Could not load more members. Your loaded cards are still available.</p>}
+          <NativeButton disabled={loadingMore} aria-busy={loadingMore} onClick={() => current.error ? current.mutate() : current.setSize(current.size + 1)}>{loadingMore ? 'Loading more…' : current.error ? 'Retry loading more' : 'Load more'}</NativeButton>
+        </footer>}
       </LayoutGroup>
     </section>
   )

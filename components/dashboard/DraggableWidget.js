@@ -13,6 +13,7 @@ export default function DraggableWidget({
   colorIndex = 0,
   removable = true,
   frameless = false,
+  editable = true,
 }) {
   const {
     attributes,
@@ -21,7 +22,7 @@ export default function DraggableWidget({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id })
+  } = useSortable({ id, disabled: !editable })
 
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
@@ -40,16 +41,13 @@ export default function DraggableWidget({
         dashboard-widget-enter relative group h-full
         ${frameless ? 'bg-transparent border-0 rounded-none' : 'bg-white dark:bg-[#18181b] border border-gray-100/50 dark:border-zinc-800/50 rounded-2xl'}
         ${isDragging ? '' : 'transition-[box-shadow,border-color] duration-300 ease-out'}
-        ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : frameless ? 'shadow-none' : 'shadow-sm dark:shadow-none hover:shadow-lg dark:hover:shadow-black/20'}
+        ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : frameless ? 'shadow-none' : 'shadow-sm dark:shadow-none  '}
         ${className}
       `}
     >
       
-      {/* Widget Controls - appears on hover */}
-      <div
-        className={`absolute top-3 right-2 flex items-center gap-1 z-10 transition-opacity duration-200 ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-          }`}
-      >
+      {/* Edit controls stay visible; they never depend on hover. */}
+      {editable && <div className="absolute top-3 right-2 flex items-center gap-1 z-10">
         {/* Remove Button */}
         {removable && onRemove && (
           <button
@@ -57,7 +55,7 @@ export default function DraggableWidget({
               e.stopPropagation()
               onRemove(id)
             }}
-            className="p-1.5 rounded-md bg-red-100 hover:bg-red-200 transition-colors"
+            className="p-1.5 rounded-md bg-red-100  transition-colors"
             title="Remove widget"
           >
             <FaTimes className="w-3 h-3 text-red-500" />
@@ -68,12 +66,12 @@ export default function DraggableWidget({
         <div
           {...attributes}
           {...listeners}
-          className="p-1.5 rounded-md bg-white/80 dark:bg-white/10 hover:bg-gray-100 dark:hover:bg-white/20 cursor-grab active:cursor-grabbing transition-colors shadow-sm"
+          className="p-1.5 rounded-md bg-white/80 dark:bg-white/10   cursor-grab active:cursor-grabbing transition-colors shadow-sm"
           title="Drag to reorder"
         >
           <FaGripVertical className="w-3 h-3 text-gray-500" />
         </div>
-      </div>
+      </div>}
 
       {/* Widget Content */}
       <div className="h-full">

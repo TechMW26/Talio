@@ -34,7 +34,6 @@ import {
   clearAllSessionCaches
 } from '@/utils/sessionCache'
 import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebAccessRestriction'
-import CallAlertReceiver from '@/components/CallAlertReceiver'
 import { markClientDataChanged } from '@/lib/clientDataSync'
 
 // Keep non-critical dashboard features out of the initial route bundle. They
@@ -384,7 +383,6 @@ export default function DashboardLayout({ children }) {
                   <InAppNotificationProvider>
                     <ActionableToastProvider>
                       {children}
-                      <CallAlertReceiver />
                     </ActionableToastProvider>
                   </InAppNotificationProvider>
                 </ChatWidgetProvider>
@@ -413,7 +411,7 @@ export default function DashboardLayout({ children }) {
                     {/* Route progress bar - slim top bar during navigation */}
 
                     {/* Main Layout Container - Flex Row */}
-                    <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
+                    <div className="dashboard-floating-shell flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
 
                       {/* Sidebar - Static on Desktop, Fixed on Mobile */}
                       <Sidebar
@@ -477,8 +475,6 @@ export default function DashboardLayout({ children }) {
                         profileStatus={profileCompletionStatus}
                       />
 
-                      {/* Call Alert Receiver - Global alert listener */}
-                      <CallAlertReceiver />
 
                       {/* Web Push Notification Prompt */}
                       <WebPushPrompt />

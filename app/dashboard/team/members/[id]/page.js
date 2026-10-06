@@ -4,7 +4,8 @@
 import { Heading3, NativeButton, Heading1, Heading2, NativeSelect, NativeTextarea } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { patchProfilePhotoResponse } from '@/lib/client/profilePhoto'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Select, SelectItem, Button, Skeleton, Card, CardBody, Chip } from '@/components/ui/fernly'
@@ -84,6 +85,23 @@ export default function TeamMemberDetailsPage() {
 
   const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/team/members/${params.id}` : null)
   const memberData = res?.data || null
+  useEffect(() => {
+    const applyPhoto = updatedUser => {
+      const ref = updatedUser?.employeeId
+      const employeeId = typeof ref === 'object' && ref ? ref._id || ref.id : ref
+      const photo = updatedUser?.profilePicture || (typeof ref === 'object' && ref?.profilePicture)
+      if (!photo || String(employeeId) !== String(params.id)) return
+      void refresh(cached => patchProfilePhotoResponse(cached, employeeId, photo), { revalidate: false })
+    }
+    const onUpdate = event => applyPhoto(event.detail)
+    const onStorage = event => {
+      if (event.key !== 'user' || !event.newValue) return
+      try { applyPhoto(JSON.parse(event.newValue)) } catch { /* Ignore malformed storage notifications. */ }
+    }
+    window.addEventListener('talio:user-updated', onUpdate)
+    window.addEventListener('storage', onStorage)
+    return () => { window.removeEventListener('talio:user-updated', onUpdate); window.removeEventListener('storage', onStorage) }
+  }, [params.id, refresh])
 
   const reviewMutation = useApiMutation({
     method: 'POST',
