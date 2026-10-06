@@ -16,3 +16,12 @@ test('inactive legacy panels do not consume height in other tabs', () => {
   expect(css).toContain('.slide [hidden] { display: none !important; }')
   expect(css).toContain('.slide[data-slide="reviews"] .fillPanel > :last-child { flex: 1 0 auto; }')
 })
+
+test('attendance month stretches its actual week rows to match the details panel', () => {
+  const attendance = fs.readFileSync(path.join(base, 'MemberAttendance.js'), 'utf8')
+  expect(attendance).toContain('className={styles.calendarMonth}')
+  expect(attendance).toContain("'--calendar-weeks': Math.ceil((offset + days) / 7)")
+  expect(css).toContain('.calendarMonth { display: flex; flex-direction: column; min-height: 0; }')
+  expect(css).toContain('grid-template-rows: auto repeat(var(--calendar-weeks), minmax(76px, 1fr))')
+  expect(css).toContain('.calendarNote { flex: none; }')
+})

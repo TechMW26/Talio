@@ -36,6 +36,9 @@
 .slide[data-slide="reviews"] .fillPanel > :last-child { flex: 1 0 auto; }
 .slide[data-slide="attendance"] > section { display: flex; flex-direction: column; }
 .slide[data-slide="attendance"] .calendarLayout { flex: 1 0 auto; }
+.slide[data-slide="attendance"] .calendarMonth { display: flex; flex-direction: column; min-height: 0; }
+.slide[data-slide="attendance"] .calendarMonth > .calendar { flex: 1 0 auto; grid-template-rows: auto repeat(var(--calendar-weeks), minmax(76px, 1fr)); }
+.slide[data-slide="attendance"] .calendarNote { flex: none; }
 .datePicker { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; font-size: 14px; }
 .datePicker input { color-scheme: dark; padding: 8px 12px; border-radius: 12px; background: var(--color-bg-card); }
 .detailGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
