@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import AnalyticsPanel from '@/app/dashboard/todo/components/AnalyticsPanel'
+beforeAll(() => { global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } })
 
 test('zero completion days show the designed empty state and close works', () => {
   const onClose = jest.fn()
@@ -13,7 +14,7 @@ test('zero completion days show the designed empty state and close works', () =>
 test('renders real chart values, bounded priority bars and category details', () => {
   render(<AnalyticsPanel analytics={{ summary: { productivityScore: 72 }, trends: { completionTrend: [{ date: '2026-09-24', count: 3 }] }, breakdown: { byPriority: { urgent: { completed: 2, total: 4 } }, byCategory: [{ categoryName: 'Work', total: 4, completed: 2 }] } }} />)
   expect(screen.getByText('72%')).toBeInTheDocument()
-  expect(screen.getByRole('img')).toHaveAttribute('aria-label', '2026-09-24: 3 completed')
+  expect(screen.getByRole('group', { name: '2026-09-24: 3 completed' })).toBeInTheDocument()
   expect(screen.getByRole('progressbar', { name: 'urgent completion' })).toHaveAttribute('aria-valuenow', '50')
   expect(screen.getByText('By Category')).toBeInTheDocument()
 })

@@ -5,7 +5,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   Legend, ResponsiveContainer, RadialBarChart, RadialBar, PolarAngleAxis
-} from 'recharts'
+} from '@/components/charts/FernlyCharts'
 import {
   FaChartLine, FaUsers, FaTasks, FaCalendarAlt, FaClock,
   FaExclamationTriangle, FaRocket, FaLightbulb, FaCheckCircle,
