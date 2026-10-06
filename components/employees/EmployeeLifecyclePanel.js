@@ -7,7 +7,7 @@ import SettlementEditor from '@/components/employees/SettlementEditor'
 import EmploymentLetterEditor from '@/components/employees/EmploymentLetterEditor'
 import OnboardingVerificationModal from '@/components/employees/OnboardingVerificationModal'
 import toast from '@/utils/toast'
-import { Button, Chip, Progress, Skeleton } from '@heroui/react'
+import { Button, Chip, Progress, Skeleton } from '@/components/ui/fernly'
 import { FaCheck, FaClock, FaCommentDots, FaFlagCheckered, FaHourglassHalf, FaPaperPlane, FaRoute, FaSyncAlt } from 'react-icons/fa'
 
 const STAGE_LABELS = {

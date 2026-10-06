@@ -1,13 +1,15 @@
 'use client'
 
+
+import { Heading1, Heading3, Heading2, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaMoneyBillWave, FaCheckCircle, FaClock, FaTimesCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
-import Modal from '@/components/ui/HeroModal'
-import { Select, SelectItem, Input, Textarea, Button, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Select, SelectItem, Input, Textarea, Button, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -84,7 +86,7 @@ export default function ExpensesPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Expenses</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">Expenses</Heading1>
           <p className="text-gray-600 mt-1 flex items-center gap-2">
             Submit and track your expense claims
             <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -103,7 +105,7 @@ export default function ExpensesPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Total Expenses</h3>
+            <Heading3 className="text-sm font-medium text-gray-600">Total Expenses</Heading3>
             <FaMoneyBillWave className="text-primary-500" />
           </div>
           <div className="text-3xl font-bold text-gray-800">
@@ -113,7 +115,7 @@ export default function ExpensesPage() {
 
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Approved</h3>
+            <Heading3 className="text-sm font-medium text-gray-600">Approved</Heading3>
             <FaCheckCircle className="text-green-500" />
           </div>
           <div className="text-3xl font-bold text-gray-800">
@@ -127,7 +129,7 @@ export default function ExpensesPage() {
 
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Pending</h3>
+            <Heading3 className="text-sm font-medium text-gray-600">Pending</Heading3>
             <FaClock className="text-yellow-500" />
           </div>
           <div className="text-3xl font-bold text-gray-800">
@@ -141,7 +143,7 @@ export default function ExpensesPage() {
 
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Rejected</h3>
+            <Heading3 className="text-sm font-medium text-gray-600">Rejected</Heading3>
             <FaTimesCircle className="text-red-500" />
           </div>
           <div className="text-3xl font-bold text-gray-800">
@@ -153,7 +155,7 @@ export default function ExpensesPage() {
       {/* Expenses Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">My Expenses</h2>
+          <Heading2 className="text-xl font-semibold text-gray-800">My Expenses</Heading2>
         </div>
 
         {error ? (
@@ -236,7 +238,7 @@ export default function ExpensesPage() {
       <ModalPortal isOpen={showModal}>
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Submit Expense</h2>
+            <Heading2 className="text-2xl font-bold text-gray-800 mb-4">Submit Expense</Heading2>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
@@ -262,7 +264,7 @@ export default function ExpensesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Amount
                   </label>
-                  <input
+                  <NativeInput
                     type="number"
                     name="amount"
                     value={formData.amount}
@@ -278,7 +280,7 @@ export default function ExpensesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Date
                   </label>
-                  <input
+                  <NativeInput
                     type="date"
                     name="expenseDate"
                     value={formData.expenseDate}
@@ -292,7 +294,7 @@ export default function ExpensesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description
                   </label>
-                  <textarea
+                  <NativeTextarea
                     name="description"
                     value={formData.description}
                     onChange={handleInputChange}

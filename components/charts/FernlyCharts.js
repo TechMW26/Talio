@@ -110,23 +110,26 @@ export function FernlyCompletionAnalytics({ data = [] }) {
 
 // Fernly's actual pill geometry and fill-rise treatment, with Talio blue tones.
 // Zero is deliberately not given the template's minimum-height bar.
-export function FernlyBars({ data = [], label = 'Activity', emptyMessage = 'No activity yet', valueLabel = 'tasks' }) {
+export function FernlyBars({ data = [], label = 'Activity', emptyMessage = 'No activity yet', valueLabel = 'tasks', percentageLabels = false }) {
   const [active, setActive] = useState(null)
   const rows = data.map(row => ({ ...row, value: count(row.value) }))
   const maximum = Math.max(0, ...rows.map(row => row.value))
+  const total = rows.reduce((sum, row) => sum + row.value, 0)
+  const percentage = value => `${Number((total ? value / total * 100 : 0).toFixed(1))}%`
   if (!maximum) return <div className={styles.empty}>{emptyMessage}</div>
   return <div className={styles.barsScroll}>
+    {percentageLabels && <div className={styles.distributionTip} aria-live="polite">{rows[active] && <span role="tooltip">{rows[active].name} · {rows[active].value} {valueLabel} · {percentage(rows[active].value)}</span>}</div>}
     <ul className={styles.bars} aria-label={label} style={{ '--columns': rows.length, minWidth: rows.length * 62 }}>
       {rows.map((row, index) => <li key={`${row.name}-${index}`}>
         <div className={styles.barSpace}>
-          {row.value > 0 ? <button type="button" className={`${styles.pill} ${row.planned ? styles.planned : ''}`} style={{ height: `${row.value / maximum * 100}%`, '--tone': ['#2563eb', '#93b4fa', '#1e3a8a'][index % 3], '--delay': `${index * 55}ms` }}
+          {row.value > 0 || percentageLabels ? <button type="button" className={`${styles.pill} ${row.planned ? styles.planned : ''}`} style={{ height: row.value === 0 ? '4px' : `${row.value / maximum * 100}%`, '--tone': row.value === 0 ? 'transparent' : ['#2563eb', '#93b4fa', '#1e3a8a'][index % 3], '--delay': `${index * 55}ms` }}
             aria-label={`${row.name}: ${row.value} ${valueLabel}${row.planned ? ' (planned)' : ''}`}
             onPointerEnter={() => setActive(index)} onPointerLeave={() => setActive(null)} onFocus={() => setActive(index)} onBlur={() => setActive(null)} onClick={() => setActive(index)}>
             <span className={styles.pillFill} />
           </button> : <span role="img" aria-label={`${row.name}: 0 ${valueLabel}`} />}
-          {(active === index || row.value === 0) && <span className={styles.barTip} style={{ bottom: `calc(${row.value / maximum * 100}% + 12px)` }}>{row.planned ? 'Plan ' : ''}{row.value}</span>}
+          {!percentageLabels && (active === index || row.value === 0) && <span className={styles.barTip} style={{ bottom: `calc(${row.value / maximum * 100}% + 12px)` }}>{row.planned ? 'Plan ' : ''}{row.value}</span>}
         </div>
-        <span className={styles.barLabel} title={row.name}>{row.name}</span>
+        <span className={styles.barLabel} title={row.name}>{percentageLabels ? percentage(row.value) : row.name}</span>
       </li>)}
     </ul>
   </div>

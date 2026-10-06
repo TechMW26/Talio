@@ -1,5 +1,6 @@
 import { Inter, Montserrat } from 'next/font/google'
 import './globals.css'
+import './dashboard/dashboard-layout.css'
 import '../styles/notifications.css'
 import '../styles/mobile-responsive.css'
 import '../styles/mobile-fix.css'

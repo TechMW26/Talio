@@ -1,10 +1,12 @@
 'use client'
 
+
+import { Heading2, Heading1, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaCalendarCheck, FaExclamationCircle, FaChevronDown, FaChevronUp, FaFilter, FaBuilding, FaUserFriends } from 'react-icons/fa'
-import { Card, CardBody, Chip, Skeleton, Select, SelectItem, Avatar, Accordion, AccordionItem } from '@heroui/react'
+import { Card, CardBody, Chip, Skeleton, Select, SelectItem, Avatar, Accordion, AccordionItem } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -202,7 +204,7 @@ export default function TeamRegularisationPage() {
             <div className="w-16 h-16 bg-warning-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FaExclamationCircle className="h-8 w-8 text-warning-500" />
             </div>
-            <h2 className="text-2xl font-bold text-default-900 mb-2">Access Restricted</h2>
+            <Heading2 className="text-2xl font-bold text-default-900 mb-2">Access Restricted</Heading2>
             <p className="text-default-500">This section is only available to admins, HR, and department heads.</p>
           </CardBody>
         </Card>
@@ -217,7 +219,7 @@ export default function TeamRegularisationPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-default-900">Attendance Regularisation</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-default-900">Attendance Regularisation</Heading1>
           <p className="text-default-500 mt-1">
             Review and approve attendance correction requests {isAdminOrHR ? 'across all departments' : 'from your team'}
             <BackgroundRefreshIndicator isValidating={isValidating} className="ml-2" />
@@ -351,7 +353,7 @@ export default function TeamRegularisationPage() {
             <div className="w-20 h-20 bg-default-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FaCalendarCheck className="h-10 w-10 text-default-300" />
             </div>
-            <h3 className="text-xl font-semibold text-default-700 mb-2">No Requests Found</h3>
+            <Heading3 className="text-xl font-semibold text-default-700 mb-2">No Requests Found</Heading3>
             <p className="text-default-500">
               {statusFilter === 'pending'
                 ? 'There are no pending attendance correction requests at the moment.'
@@ -385,9 +387,9 @@ export default function TeamRegularisationPage() {
                         size="lg"
                       />
                       <div>
-                        <h3 className="font-semibold text-default-900 text-lg">
+                        <Heading3 className="font-semibold text-default-900 text-lg">
                           {correction.employee?.firstName} {correction.employee?.lastName}
-                        </h3>
+                        </Heading3>
                         <p className="text-sm text-default-500">
                           {correction.employee?.designation?.title || 'Employee'} • {formatDate(correction.date)}
                         </p>

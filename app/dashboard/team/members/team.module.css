@@ -1,6 +1,6 @@
 /* Team geometry adapted from Fernly, © 2026 Hasib (OVERSHOOT).
    Licensed source. Page-scoped, using Talio colours and typography. */
-.page { padding: 20px 0 32px; color: var(--color-text-primary); }
+.page { color: var(--color-text-primary); }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
 .header h1 { font-size: clamp(26px, 3vw, 34px); font-weight: 700; letter-spacing: -.035em; }
 .header p { margin-top: 6px; font-size: 14px; color: var(--color-text-secondary); }

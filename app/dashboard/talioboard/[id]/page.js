@@ -1,12 +1,14 @@
 'use client';
 
+
+import { NativeButton, Heading2, NativeInput, NativeSelect, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useParams } from 'next/navigation';
 import WhiteboardCanvas from '@/components/whiteboard/WhiteboardCanvas';
-import { Skeleton } from '@heroui/react';
+import { Skeleton } from '@/components/ui/fernly';
 import { FiShare2, FiX, FiUsers, FiMaximize, FiMinimize } from 'react-icons/fi';
 import ModalPortal from '@/components/ui/ModalPortal';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
@@ -289,7 +291,7 @@ export default function WhiteboardEditorPage() {
     return editorPortal(
       <div className="fixed inset-0 z-[80] h-[100dvh] flex flex-col bg-gray-50 whiteboard-light-override">
         <div className="talioboard-window-header flex shrink-0 items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
-          <button onClick={handleClose} className="p-2 text-gray-700" aria-label="Back to boards"><BackIcon size={20} /></button>
+          <NativeButton onClick={handleClose} className="p-2 text-gray-700" aria-label="Back to boards"><BackIcon size={20} /></NativeButton>
           <span role="status" className="text-gray-700">Opening board…</span>
         </div>
       </div>
@@ -298,7 +300,7 @@ export default function WhiteboardEditorPage() {
 
   if (error && !board) {
     return editorPortal(<div className="talioboard-window-error fixed inset-0 z-[80] bg-gray-50 whiteboard-light-override p-6">
-      <button onClick={handleClose} className="p-2 text-gray-700">Back to boards</button>
+      <NativeButton onClick={handleClose} className="p-2 text-gray-700">Back to boards</NativeButton>
       <DataErrorState message={error} onRetry={() => refreshBoard()} />
     </div>);
   }
@@ -321,41 +323,41 @@ export default function WhiteboardEditorPage() {
 
       {/* Header - FigJam style */}
       <div className="talioboard-window-header flex shrink-0 items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
-        <button
+        <NativeButton
           onClick={handleClose}
           className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           title="Exit (Esc)"
         >
           <BackIcon size={20} />
-        </button>
+        </NativeButton>
 
         <div className="h-6 w-px bg-gray-200" />
 
-        <button
+        <NativeButton
           onClick={() => permission === 'owner' && setShowRenameModal(true)}
           className={`min-w-0 truncate text-lg font-semibold text-gray-900 ${permission === 'owner' ? 'hover:text-violet-600 cursor-pointer' : ''}`}
         >
           {board.title}
-        </button>
+        </NativeButton>
 
         <div className="flex-1" />
 
-        <button
+        <NativeButton
           onClick={toggleFullscreen}
           className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
         >
           {isFullscreen ? <FiMinimize size={18} /> : <FiMaximize size={18} />}
-        </button>
+        </NativeButton>
 
         {permission === 'owner' && (
-          <button
+          <NativeButton
             onClick={() => setShowShareModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-medium"
           >
             <FiShare2 size={16} />
             Share
-          </button>
+          </NativeButton>
         )}
 
         {permission !== 'owner' && (
@@ -384,8 +386,8 @@ export default function WhiteboardEditorPage() {
           <div className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Share board</h2>
-                <button
+                <Heading2 className="text-xl font-semibold text-gray-900">Share board</Heading2>
+                <NativeButton
                   onClick={() => {
                     setShowShareModal(false);
                     setUserSearch('');
@@ -394,12 +396,12 @@ export default function WhiteboardEditorPage() {
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <FiX size={20} />
-                </button>
+                </NativeButton>
               </div>
 
               <div className="space-y-4 mb-6">
                 <div className="relative">
-                  <input
+                  <NativeInput
                     type="text"
                     value={userSearch}
                     onChange={(e) => {
@@ -427,7 +429,7 @@ export default function WhiteboardEditorPage() {
                       ) : (
                         <div className="divide-y divide-gray-100">
                           {userResults.map(user => (
-                            <button
+                            <NativeButton
                               key={user._id}
                               onClick={() => handleShareWithUser(user._id)}
                               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
@@ -447,7 +449,7 @@ export default function WhiteboardEditorPage() {
                                   Shared
                                 </span>
                               )}
-                            </button>
+                            </NativeButton>
                           ))}
                         </div>
                       )}
@@ -457,20 +459,20 @@ export default function WhiteboardEditorPage() {
 
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">Permission:</span>
-                  <select
+                  <NativeSelect
                     value={sharePermission}
                     onChange={(e) => setSharePermission(e.target.value)}
                     className="px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                   >
                     <option value="view_only">View only</option>
                     <option value="editor">Can edit</option>
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
 
               {safeArrayLength(sharing) > 0 && (
                 <div className="border-t border-gray-100 pt-6">
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Shared with</h3>
+                  <Heading3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Shared with</Heading3>
                   <div className="space-y-3">
                     {sharing.map(share => (
                       <div key={share.userId._id} className="flex items-center justify-between">
@@ -489,12 +491,12 @@ export default function WhiteboardEditorPage() {
                           <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md">
                             {share.permission === 'editor' ? 'Editor' : 'Viewer'}
                           </span>
-                          <button
+                          <NativeButton
                             onClick={() => handleRemoveShare(share.userId._id)}
                             className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             <FiX size={16} />
-                          </button>
+                          </NativeButton>
                         </div>
                       </div>
                     ))}
@@ -511,9 +513,9 @@ export default function WhiteboardEditorPage() {
         <div className="modal-overlay whiteboard-light-override">
           <div className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-sm overflow-hidden">
             <div className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Rename board</h2>
+              <Heading2 className="text-xl font-semibold text-gray-900 mb-4">Rename board</Heading2>
               <form onSubmit={handleRename}>
-                <input
+                <NativeInput
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
@@ -521,19 +523,19 @@ export default function WhiteboardEditorPage() {
                   autoFocus
                 />
                 <div className="flex gap-3">
-                  <button
+                  <NativeButton
                     type="button"
                     onClick={() => setShowRenameModal(false)}
                     className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     type="submit"
                     className="flex-1 px-4 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors font-medium"
                   >
                     Save
-                  </button>
+                  </NativeButton>
                 </div>
               </form>
             </div>

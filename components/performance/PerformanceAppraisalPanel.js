@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 
 import { useState } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -56,7 +57,7 @@ function RequestCard({ record, onAction, busy }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-bold text-slate-900 dark:text-zinc-100">
-            {record.employee ? `${record.employee.firstName} ${record.employee.lastName || ''}`.trim() : 'Employee'}
+            {record.employee?._id ? <Link href={`/dashboard/team/members/${encodeURIComponent(record.employee._id)}`} className="hover:underline">{`${record.employee.firstName} ${record.employee.lastName || ''}`.trim()}</Link> : 'Employee'}
           </h3>
           <p className="text-sm text-slate-500 dark:text-zinc-400">
             {record.employee?.employeeCode ? `${record.employee.employeeCode} · ` : ''}{record.reviewPeriod}

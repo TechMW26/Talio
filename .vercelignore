@@ -15,12 +15,9 @@ release
 android
 nginx
 tmp
-tests
 docs
 scripts/*
 !scripts/generate-mira-app-map.cjs
-Dockerfile
-docker-compose.yml
 deploy-production.sh
 *.dmg
 *.exe

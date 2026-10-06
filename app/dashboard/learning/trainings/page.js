@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect } from 'react'
 import { FaPlay, FaCheckCircle, FaClock, FaTrophy, FaBook, FaChartLine } from 'react-icons/fa'
 import toast from '@/utils/toast'
@@ -132,9 +134,9 @@ export default function TrainingsPage() {
     <div className="p-3 sm:p-6 pb-20 md:pb-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
+        <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
           My Trainings
-        </h1>
+        </Heading1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">
           Track your learning progress and continue where you left off
         </p>
@@ -186,7 +188,7 @@ export default function TrainingsPage() {
       {/* Filter Tabs */}
       <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-6">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide sm:flex-wrap">
-          <button
+          <NativeButton
             onClick={() => setFilter('all')}
             className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${filter === 'all'
                 ? 'bg-blue-600 text-white'
@@ -194,9 +196,9 @@ export default function TrainingsPage() {
               }`}
           >
             All ({stats.total})
-          </button>
+          </NativeButton>
 
-          <button
+          <NativeButton
             onClick={() => setFilter('in-progress')}
             className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${filter === 'in-progress'
                 ? 'bg-blue-600 text-white'
@@ -204,9 +206,9 @@ export default function TrainingsPage() {
               }`}
           >
             In Progress ({stats.inProgress})
-          </button>
+          </NativeButton>
 
-          <button
+          <NativeButton
             onClick={() => setFilter('completed')}
             className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${filter === 'completed'
                 ? 'bg-blue-600 text-white'
@@ -214,7 +216,7 @@ export default function TrainingsPage() {
               }`}
           >
             Completed ({stats.completed})
-          </button>
+          </NativeButton>
         </div>
       </div>
 
@@ -244,7 +246,7 @@ export default function TrainingsPage() {
                 {/* Training Info */}
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-gray-800">{training.title}</h3>
+                    <Heading3 className="text-lg font-bold text-gray-800">{training.title}</Heading3>
                     {training.status === 'completed' && (
                       <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                         <FaCheckCircle />
@@ -309,28 +311,28 @@ export default function TrainingsPage() {
                 <div className="flex flex-col gap-2 lg:w-48">
                   {training.status === 'completed' ? (
                     <>
-                      <button
+                      <NativeButton
                         onClick={() => handleViewCertificate(training.certificateId)}
                         className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700"
                       >
                         <FaTrophy />
                         View Certificate
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => handleContinue(training.id)}
                         className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                       >
                         Review Course
-                      </button>
+                      </NativeButton>
                     </>
                   ) : (
-                    <button
+                    <NativeButton
                       onClick={() => handleContinue(training.id)}
                       className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       <FaPlay />
                       Continue Learning
-                    </button>
+                    </NativeButton>
                   )}
                 </div>
               </div>

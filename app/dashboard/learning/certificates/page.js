@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, Heading3, NativeButton, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useEffect } from 'react'
 import { FaTrophy, FaDownload, FaShare, FaCalendar, FaClock, FaAward, FaMedal } from 'react-icons/fa'
 import toast from '@/utils/toast'
@@ -113,9 +115,9 @@ export default function CertificatesPage() {
     <div className="p-3 sm:p-6 pb-20 md:pb-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
+        <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
           My Certificates
-        </h1>
+        </Heading1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">
           View and manage your earned certificates
         </p>
@@ -192,7 +194,7 @@ export default function CertificatesPage() {
                     <FaTrophy className="text-2xl" />
                     <span className="text-sm font-medium opacity-90">Certificate of Completion</span>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">{certificate.courseTitle}</h3>
+                  <Heading3 className="text-xl font-bold mb-2">{certificate.courseTitle}</Heading3>
                   <p className="text-sm opacity-90">Certificate ID: {certificate.id}</p>
                 </div>
               </div>
@@ -256,20 +258,20 @@ export default function CertificatesPage() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
-                  <button
+                  <NativeButton
                     onClick={() => handleDownload(certificate)}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
                     <FaDownload />
                     Download
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     onClick={() => handleShare(certificate)}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                   >
                     <FaShare />
                     Share
-                  </button>
+                  </NativeButton>
                 </div>
               </div>
             </div>
@@ -283,20 +285,20 @@ export default function CertificatesPage() {
           <div className="bg-white rounded-[30px] animate-modal-enter max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-gray-800">Certificate Details</h2>
-                <button
+                <Heading2 className="text-2xl font-bold text-gray-800">Certificate Details</Heading2>
+                <NativeButton
                   onClick={() => setSelectedCertificate(null)}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   ✕
-                </button>
+                </NativeButton>
               </div>
               {/* Certificate preview would go here */}
               <div className="bg-yellow-100 dark:bg-yellow-900/30 p-8 rounded-lg text-center mb-4">
                 <FaTrophy className="text-6xl text-yellow-600 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                <Heading3 className="text-2xl font-bold text-gray-800 mb-2">
                   {selectedCertificate.courseTitle}
-                </h3>
+                </Heading3>
                 <p className="text-gray-600">Certificate ID: {selectedCertificate.id}</p>
               </div>
               <div className="space-y-3">

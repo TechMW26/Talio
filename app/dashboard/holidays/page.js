@@ -1,5 +1,8 @@
 'use client'
+import calendar from '@/components/ui/fernly/calendar.module.css'
 
+
+import { Heading2, NativeButton, Heading1, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
@@ -7,8 +10,8 @@ import {
   FaPlus, FaEdit, FaTrash, FaCalendarAlt,
   FaList, FaTh, FaChevronLeft, FaChevronRight
 } from 'react-icons/fa'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Checkbox, Skeleton } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Checkbox, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -167,27 +170,27 @@ export default function HolidaysPage() {
 
     return (
       <div className="bg-white rounded-lg shadow-md p-2 sm:p-4 overflow-x-auto">
-        <div className="min-w-[700px]">
+        <div className="min-w-0">
           {/* Calendar Controls */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800">
+            <Heading2 className="text-lg sm:text-xl font-bold text-gray-800">
               {format(currentMonth, 'MMMM yyyy')}
-            </h2>
+            </Heading2>
             <div className="flex space-x-2">
-              <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full">
+              <NativeButton onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full">
                 <FaChevronLeft />
-              </button>
-              <button onClick={goToToday} className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 rounded-md">
+              </NativeButton>
+              <NativeButton onClick={goToToday} className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 rounded-md">
                 Today
-              </button>
-              <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full">
+              </NativeButton>
+              <NativeButton onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full">
                 <FaChevronRight />
-              </button>
+              </NativeButton>
             </div>
           </div>
 
           {/* Days Header */}
-          <div className="grid grid-cols-7 gap-1 text-xs sm:text-sm border-b pb-2 mb-2">
+          <div className={calendar.week}>
             {weekDays.map((d, i) => (
               <div key={i} className="text-center font-semibold text-gray-500">
                 {d}
@@ -195,7 +198,7 @@ export default function HolidaysPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className={calendar.grid}>
             {daysInMonth.map((dayItem, idx) => {
               const holiday = getHolidayForDate(dayItem)
               const isCurrentMonth = isSameMonth(dayItem, monthStart)
@@ -217,12 +220,12 @@ export default function HolidaysPage() {
                     </span>
                     {holiday && (
                       <div className="flex space-x-1">
-                        <button
+                        <NativeButton
                           onClick={(e) => { e.stopPropagation(); handleEdit(holiday); }}
                           className="text-blue-600 hover:text-blue-800"
                         >
                           <FaEdit size={10} />
-                        </button>
+                        </NativeButton>
                       </div>
                     )}
                   </div>
@@ -266,28 +269,28 @@ export default function HolidaysPage() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Holidays</h1>
+          <Heading1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Holidays</Heading1>
           <p className="text-gray-600 text-sm mt-1">Manage company holidays and observances</p>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
           {/* View Toggle */}
           <div className="flex bg-gray-100 rounded-lg p-1">
-            <button
+            <NativeButton
               onClick={() => setViewMode('calendar')}
               className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${viewMode === 'calendar' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
               title="Calendar View"
             >
               <FaTh />
               <span className="hidden sm:inline">calendar</span>
-            </button>
-            <button
+            </NativeButton>
+            <NativeButton
               onClick={() => setViewMode('list')}
               className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${viewMode === 'list' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
               title="List View"
             >
               <FaList />
               <span className="hidden sm:inline">list</span>
-            </button>
+            </NativeButton>
           </div>
 
           <Button
@@ -305,7 +308,7 @@ export default function HolidaysPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-primary-500">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Holidays</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600">Total Holidays</Heading3>
             <FaCalendarAlt className="text-primary-500 text-sm sm:text-base" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">{holidays.length}</div>
@@ -313,7 +316,7 @@ export default function HolidaysPage() {
 
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-green-500">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600">Public Holidays</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600">Public Holidays</Heading3>
             <FaCalendarAlt className="text-green-500 text-sm sm:text-base" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -323,7 +326,7 @@ export default function HolidaysPage() {
 
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-blue-500">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600">Upcoming Holidays</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600">Upcoming Holidays</Heading3>
             <FaCalendarAlt className="text-blue-500 text-sm sm:text-base" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -358,7 +361,7 @@ export default function HolidaysPage() {
                 Object.entries(groupedHolidays).map(([monthYear, monthHolidays]) => (
                   <div key={monthYear} className="bg-white rounded-lg shadow-md overflow-hidden">
                     <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                      <h2 className="text-lg font-semibold text-gray-800">{monthYear}</h2>
+                      <Heading2 className="text-lg font-semibold text-gray-800">{monthYear}</Heading2>
                     </div>
                     <div className="divide-y divide-gray-200">
                       {monthHolidays.map((holiday) => (
@@ -377,7 +380,7 @@ export default function HolidaysPage() {
                                 </div>
                               </div>
                               <div>
-                                <h3 className="text-base font-semibold text-gray-800">{holiday.name}</h3>
+                                <Heading3 className="text-base font-semibold text-gray-800">{holiday.name}</Heading3>
                                 {holiday.description && (
                                   <p className="text-gray-500 text-sm">{holiday.description}</p>
                                 )}
@@ -400,18 +403,18 @@ export default function HolidaysPage() {
                               </div>
                             </div>
                             <div className="flex space-x-2">
-                              <button
+                              <NativeButton
                                 onClick={() => handleEdit(holiday)}
                                 className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50"
                               >
                                 <FaEdit />
-                              </button>
-                              <button
+                              </NativeButton>
+                              <NativeButton
                                 onClick={() => handleDelete(holiday._id)}
                                 className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50"
                               >
                                 <FaTrash />
-                              </button>
+                              </NativeButton>
                             </div>
                           </div>
                         </div>

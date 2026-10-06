@@ -1,8 +1,11 @@
 'use client'
+import UploadButton from '@/components/ui/UploadButton'
 
+
+import { Heading1, Heading2, Heading3, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo, useRef } from 'react'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, CardHeader, Button, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, CardHeader, Button, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload, FaFileUpload, FaCheckCircle, FaTimesCircle, FaRobot, FaClock, FaSearch } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -316,7 +319,7 @@ export default function LeaveAllocationsPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-default-800">Leave Allocations</h1>
+          <Heading1 className="text-3xl font-bold text-default-800">Leave Allocations</Heading1>
           <p className="text-default-500 mt-1">Manage employee leave balances and allocations</p>
         </div>
         <div className="flex gap-2 md:gap-3 items-center mt-4 md:mt-0 flex-nowrap">
@@ -379,7 +382,7 @@ export default function LeaveAllocationsPage() {
         <CardHeader className="px-6 py-4 border-b border-default-200 flex items-center gap-3">
           <FaClock className="text-primary" />
           <div>
-            <h2 className="text-lg font-semibold text-default-800">Half-Day Limits by Hierarchy</h2>
+            <Heading2 className="text-lg font-semibold text-default-800">Half-Day Limits by Hierarchy</Heading2>
             <p className="text-sm text-default-500">Annual half-day quota applied dynamically from each employee&apos;s designation level.</p>
           </div>
         </CardHeader>
@@ -437,7 +440,7 @@ export default function LeaveAllocationsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-default-500 text-sm font-medium">{stat.title}</p>
-                  <h3 className="text-2xl font-bold text-default-800 mt-2">{stat.value}</h3>
+                  <Heading3 className="text-2xl font-bold text-default-800 mt-2">{stat.value}</Heading3>
                 </div>
                 <div className={`bg-${stat.color} p-4 rounded-lg`}>
                   <stat.icon className="w-6 h-6 text-white" />
@@ -451,7 +454,7 @@ export default function LeaveAllocationsPage() {
       {/* Leave Balances Table */}
       <Card shadow="sm">
         <CardHeader className="flex flex-col items-start justify-between gap-4 px-6 py-4 border-b border-default-200 sm:flex-row sm:items-center">
-          <div><h2 className="text-lg font-semibold text-default-800">Employee Leave Balances - {selectedYear}</h2>
+          <div><Heading2 className="text-lg font-semibold text-default-800">Employee Leave Balances - {selectedYear}</Heading2>
           <p className="mt-1 text-sm text-default-500" role="status">Showing {filteredEmployees.length} of {employees.length} employees</p></div>
           <Input
             aria-label="Search employee leave balances"
@@ -566,7 +569,7 @@ export default function LeaveAllocationsPage() {
           {(onClose) => (
             <form onSubmit={(e) => { e.preventDefault(); handleSubmit(e); }}>
               <ModalHeader>
-                <h2 className="text-xl font-bold text-default-800">Add Leave Allocation</h2>
+                <Heading2 className="text-xl font-bold text-default-800">Add Leave Allocation</Heading2>
               </ModalHeader>
               <ModalBody>
                 <div className="space-y-4">
@@ -649,9 +652,9 @@ export default function LeaveAllocationsPage() {
           {(onClose) => (
             <>
               <ModalHeader className="flex flex-col gap-1">
-                <h2 className="text-xl font-bold text-default-800 flex items-center gap-2">
+                <Heading2 className="text-xl font-bold text-default-800 flex items-center gap-2">
                   AI-Powered Bulk Import
-                </h2>
+                </Heading2>
                 <p className="text-sm text-default-500 font-normal">
                   Upload a CSV/text file and AI will detect employee names, leave types, and days
                 </p>
@@ -674,14 +677,14 @@ export default function LeaveAllocationsPage() {
                       className="border-2 border-dashed border-default-300 rounded-xl p-8 text-center cursor-pointer hover:border-secondary transition-colors"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <input
+                      <NativeInput
                         ref={fileInputRef}
                         type="file"
                         accept=".csv,.txt,.xls,.xlsx"
                         onChange={handleImportFileChange}
                         className="hidden"
                       />
-                      <FaUpload className="w-10 h-10 text-default-400 mx-auto mb-3" />
+                      <UploadButton label="Choose import file" onClick={event => { event.stopPropagation(); fileInputRef.current?.click() }} />
                       {importFile ? (
                         <div>
                           <p className="text-default-800 font-medium">{importFile.name}</p>

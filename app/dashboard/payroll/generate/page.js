@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, Heading2, NativeButton, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { fetchCompleteEmployeeResponse } from '@/lib/client/employeePages'
@@ -27,7 +29,7 @@ import {
   PageLoader,
   KPICard,
 } from '@/components/ui/heroui'
-import { Input, Checkbox, Button, Divider, Chip, Progress, Tooltip } from '@heroui/react'
+import { Input, Checkbox, Button, Divider, Chip, Progress, Tooltip } from '@/components/ui/fernly'
 import AttendanceCorrectionModal from '@/components/payroll/AttendanceCorrectionModal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -802,7 +804,7 @@ export default function GeneratePayrollPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Generate Payroll</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-foreground">Generate Payroll</Heading1>
           <p className="text-default-500 mt-1">Generate salary with attendance-based calculations</p>
         </div>
         <SecondaryButton
@@ -819,7 +821,7 @@ export default function GeneratePayrollPage() {
           <HRMSCardBody className="p-6">
             <div className="flex items-center mb-4">
               <FaInfoCircle className="text-success-600 mr-2" />
-              <h2 className="text-lg font-bold text-foreground">Salary Calculation Method</h2>
+              <Heading2 className="text-lg font-bold text-foreground">Salary Calculation Method</Heading2>
               <Chip size="sm" color="success" variant="flat" className="ml-3">
                 Addition-Based (Simplified)
               </Chip>
@@ -886,7 +888,7 @@ export default function GeneratePayrollPage() {
       {/* Payroll Period */}
       <HRMSCard>
         <HRMSCardHeader>
-          <h2 className="text-xl font-bold text-foreground">Payroll Period</h2>
+          <Heading2 className="text-xl font-bold text-foreground">Payroll Period</Heading2>
         </HRMSCardHeader>
         <Divider />
         <HRMSCardBody>
@@ -937,7 +939,7 @@ export default function GeneratePayrollPage() {
           {/* Header with Search and Filters */}
           <HRMSCardHeader className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center gap-4 flex-wrap">
-              <h2 className="text-xl font-semibold text-foreground">Select Employees</h2>
+              <Heading2 className="text-xl font-semibold text-foreground">Select Employees</Heading2>
               <Chip size="sm" variant="flat" color="default">
                 {selectedEmployees.length} of {filteredEmployees.length} selected
               </Chip>
@@ -985,12 +987,12 @@ export default function GeneratePayrollPage() {
                       size="sm"
                       startContent={<FaSearch className="text-default-400 w-4 h-4" />}
                       endContent={searchQuery && (
-                        <button
+                        <NativeButton
                           onClick={() => setSearchQuery('')}
                           className="text-default-400 hover:text-default-600"
                         >
                           <FaTimes className="w-3 h-3" />
-                        </button>
+                        </NativeButton>
                       )}
                       variant="bordered"
                       classNames={{
@@ -1069,12 +1071,12 @@ export default function GeneratePayrollPage() {
                         <span className="text-xs text-gray-500">
                           {dept.employees.filter(e => selectedEmployees.includes(e._id)).length} selected
                         </span>
-                        <button
+                        <NativeButton
                           onClick={(e) => { e.stopPropagation(); handleSelectDepartment(dept.id, dept.employees); }}
                           className="text-xs px-3 py-1 bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
                         >
                           {dept.employees.every(e => selectedEmployees.includes(e._id)) ? 'Deselect All' : 'Select All'}
-                        </button>
+                        </NativeButton>
                       </div>
                     </div>
 
@@ -1085,7 +1087,7 @@ export default function GeneratePayrollPage() {
                           <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
                               <th className="px-4 py-2 text-left w-10">
-                                <input
+                                <NativeInput
                                   type="checkbox"
                                   checked={dept.employees.every(e => selectedEmployees.includes(e._id))}
                                   onChange={() => handleSelectDepartment(dept.id, dept.employees)}
@@ -1112,7 +1114,7 @@ export default function GeneratePayrollPage() {
                               return (
                                 <tr key={employee._id} className="hover:bg-gray-50">
                                   <td className="px-4 py-3">
-                                    <input
+                                    <NativeInput
                                       type="checkbox"
                                       checked={selectedEmployees.includes(employee._id)}
                                       onChange={() => handleSelectEmployee(employee._id)}
@@ -1133,7 +1135,7 @@ export default function GeneratePayrollPage() {
                                         <div className="text-xs text-gray-500">{employee.employeeCode} • {employee.designation?.title || 'N/A'}</div>
                                       </div>
                                       <Tooltip content="Edit Attendance">
-                                        <button
+                                        <NativeButton
                                           onClick={(e) => {
                                             e.stopPropagation()
                                             handleOpenCorrectionModal(employee)
@@ -1141,7 +1143,7 @@ export default function GeneratePayrollPage() {
                                           className="p-1.5 text-default-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
                                         >
                                           <FaEdit size={14} />
-                                        </button>
+                                        </NativeButton>
                                       </Tooltip>
                                     </div>
                                   </td>
@@ -1192,9 +1194,9 @@ export default function GeneratePayrollPage() {
       ) : (
         <HRMSCard>
           <HRMSCardHeader className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-foreground">
+            <Heading2 className="text-xl font-semibold text-foreground">
               Payroll Preview - {new Date(formData.year, formData.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
-            </h2>
+            </Heading2>
             <Button variant="light" onPress={() => setShowPreview(false)}><BackIcon className="mr-2 h-4 w-4" /> Back to Selection</Button>
           </HRMSCardHeader>
           <Divider />
@@ -1300,7 +1302,7 @@ export default function GeneratePayrollPage() {
                 <div className="flex items-start space-x-3">
                   <FaExclamationCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-semibold text-yellow-800">Pending Leave Requests</h3>
+                    <Heading3 className="text-sm font-semibold text-yellow-800">Pending Leave Requests</Heading3>
                     <p className="text-xs text-yellow-700 mt-1 mb-2">
                       The following employees have pending leave requests for this period. Please approve or reject before finalizing payroll.
                     </p>

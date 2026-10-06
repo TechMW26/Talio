@@ -1,5 +1,7 @@
 'use client'
 
+
+import { NativeButton, Heading1, Heading3, NativeInput } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
@@ -7,7 +9,7 @@ import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaUser, FaPaperPlane, FaClock, FaTag, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import { Select, SelectItem, Skeleton, Card, CardBody } from '@heroui/react'
+import { Select, SelectItem, Skeleton, Card, CardBody } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
@@ -95,12 +97,12 @@ export default function TicketDetailPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <button
+      <NativeButton
         onClick={() => router.back()}
         className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
       >
         <BackIcon className="mr-2" /> Back to Tickets
-      </button>
+      </NativeButton>
       <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -110,7 +112,7 @@ export default function TicketDetailPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800 mb-2">{ticket.subject}</h1>
+                <Heading1 className="text-2xl font-bold text-gray-800 mb-2">{ticket.subject}</Heading1>
                 <div className="flex items-center gap-3 text-sm text-gray-500">
                   <span className="bg-gray-100 px-2 py-1 rounded font-mono">{ticket.ticketNumber}</span>
                   <span className="flex items-center gap-1">
@@ -149,7 +151,7 @@ export default function TicketDetailPage() {
           {/* Comments Section */}
           <div className="bg-white rounded-lg shadow-md flex flex-col h-[500px]">
             <div className="p-4 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-800">Discussion</h3>
+              <Heading3 className="font-semibold text-gray-800">Discussion</Heading3>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
@@ -186,7 +188,7 @@ export default function TicketDetailPage() {
 
             <div className="p-4 bg-white border-t border-gray-200">
               <form onSubmit={handleAddComment} className="flex gap-2">
-                <input
+                <NativeInput
                   type="text"
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
@@ -194,13 +196,13 @@ export default function TicketDetailPage() {
                   className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   disabled={commentMutation.isLoading}
                 />
-                <button
+                <NativeButton
                   type="submit"
                   disabled={commentMutation.isLoading || !newComment.trim()}
                   className="bg-primary-600 text-white p-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                 >
                   <FaPaperPlane />
-                </button>
+                </NativeButton>
               </form>
             </div>
           </div>
@@ -209,7 +211,7 @@ export default function TicketDetailPage() {
         {/* Sidebar - Meta Info & Actions */}
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="font-semibold text-gray-800 mb-4">Ticket Details</h3>
+            <Heading3 className="font-semibold text-gray-800 mb-4">Ticket Details</Heading3>
 
             <div className="space-y-4">
               <div>

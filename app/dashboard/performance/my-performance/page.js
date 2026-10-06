@@ -1,8 +1,10 @@
 'use client'
 
+
+import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Skeleton } from '@heroui/react'
+import { Button, Skeleton } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import {
   FaChartLine, FaStar, FaTrophy, FaBullseye, FaCalendarAlt,
@@ -168,7 +170,7 @@ export default function MyPerformancePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">My Performance</h1>
+          <Heading1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">My Performance</Heading1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
             Track your goals, reviews, and overall performance
           </p>
@@ -245,7 +247,7 @@ export default function MyPerformancePage() {
               { id: 'reviews', label: 'Reviews', fullLabel: 'Reviews & Feedback', icon: FaStar },
               { id: 'performance-reviews', label: 'Formal', fullLabel: 'Formal Reviews', icon: FaUserTie }
             ].map(tab => (
-              <button
+              <NativeButton
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center justify-center gap-1.5 px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${activeTab === tab.id
@@ -256,7 +258,7 @@ export default function MyPerformancePage() {
                 <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">{tab.fullLabel || tab.label}</span>
                 <span className="sm:hidden">{tab.label}</span>
-              </button>
+              </NativeButton>
             ))}
           </nav>
         </div>
@@ -306,14 +308,14 @@ export default function MyPerformancePage() {
                 <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <h3 className="text-lg font-semibold text-gray-800">Recent Goals</h3>
+                      <Heading3 className="text-lg font-semibold text-gray-800">Recent Goals</Heading3>
                     </div>
-                    <button
+                    <NativeButton
                       onClick={() => setActiveTab('goals')}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors"
                     >
                       View All <FaChevronRight className="ml-1 w-3 h-3" />
-                    </button>
+                    </NativeButton>
                   </div>
                   <div className="space-y-3">
                     {goals.slice(0, 3).map((goal) => (
@@ -364,14 +366,14 @@ export default function MyPerformancePage() {
                 <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <h3 className="text-lg font-semibold text-gray-800">Recent Feedback</h3>
+                      <Heading3 className="text-lg font-semibold text-gray-800">Recent Feedback</Heading3>
                     </div>
-                    <button
+                    <NativeButton
                       onClick={() => setActiveTab('reviews')}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors"
                     >
                       View All <FaChevronRight className="ml-1 w-3 h-3" />
-                    </button>
+                    </NativeButton>
                   </div>
                   <div className="space-y-3">
                     {reviews.slice(0, 3).map((review) => (
@@ -412,7 +414,7 @@ export default function MyPerformancePage() {
           {activeTab === 'goals' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">My Goals ({goals.length})</h3>
+                <Heading3 className="text-lg font-semibold text-gray-800">My Goals ({goals.length})</Heading3>
                 <Button
                   onPress={() => router.push('/dashboard/performance/goals')}
                   color="primary"
@@ -428,7 +430,7 @@ export default function MyPerformancePage() {
                   <div className="w-20 h-20 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-5">
                     <FaBullseye className="w-10 h-10 text-blue-500" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No Goals Set Yet</h3>
+                  <Heading3 className="text-xl font-semibold text-gray-800 mb-2">No Goals Set Yet</Heading3>
                   <p className="text-gray-500 mb-6 max-w-md mx-auto">Set personal and professional goals to track your progress and achieve more</p>
                   <Button
                     onPress={() => router.push('/dashboard/performance/goals')}
@@ -488,13 +490,13 @@ export default function MyPerformancePage() {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <button
+                            <NativeButton
                               onClick={() => router.push(`/dashboard/performance/goals?goalId=${goal._id}`)}
                               className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
                               title="View Details"
                             >
                               <FaEye />
-                            </button>
+                            </NativeButton>
                           </div>
                         </div>
 
@@ -551,14 +553,14 @@ export default function MyPerformancePage() {
           {/* Reviews Tab */}
           {activeTab === 'reviews' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Reviews & Feedback ({reviews.length})</h3>
+              <Heading3 className="text-lg font-semibold text-gray-800 mb-4">Reviews & Feedback ({reviews.length})</Heading3>
 
               {reviews.length === 0 ? (
                 <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                   <div className="w-20 h-20 mx-auto bg-yellow-100 rounded-full flex items-center justify-center mb-5">
                     <FaStar className="w-10 h-10 text-yellow-500" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No Reviews Yet</h3>
+                  <Heading3 className="text-xl font-semibold text-gray-800 mb-2">No Reviews Yet</Heading3>
                   <p className="text-gray-500 max-w-md mx-auto">You haven't received any reviews or feedback yet. Keep up the good work and feedback will appear here!</p>
                 </div>
               ) : (
@@ -606,16 +608,16 @@ export default function MyPerformancePage() {
           {/* Formal Performance Reviews Tab */}
           {activeTab === 'performance-reviews' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              <Heading3 className="text-lg font-semibold text-gray-800 mb-4">
                 Formal Performance Reviews ({performanceReviews.length})
-              </h3>
+              </Heading3>
 
               {performanceReviews.length === 0 ? (
                 <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                   <div className="w-20 h-20 mx-auto bg-purple-100 rounded-full flex items-center justify-center mb-5">
                     <FaUserTie className="w-10 h-10 text-purple-500" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No Formal Reviews</h3>
+                  <Heading3 className="text-xl font-semibold text-gray-800 mb-2">No Formal Reviews</Heading3>
                   <p className="text-gray-500 max-w-md mx-auto">You don't have any formal performance reviews yet. Check back during review periods.</p>
                 </div>
               ) : (

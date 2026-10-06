@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { dashboardRequest } from '@/lib/client/dashboardRequest'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
@@ -242,6 +243,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     // State
     const [loading, setLoading] = useState(true)
+    const [dashboardErrors, setDashboardErrors] = useState({})
     const [user, setUser] = useState(userProp)
     const [todayAttendance, setTodayAttendance] = useState(null)
     const [attendanceLoading, setAttendanceLoading] = useState(false)
@@ -365,15 +367,13 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             // Only fetch the stats endpoint - departments, leave requests,
             // attendance summary, and employee data all come from the unified endpoint
-            const response = await fetch(statsEndpoint, {
-                headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store'
-            })
-            const statsData = await response.json()
+            const statsData = await dashboardRequest(statsEndpoint, token)
+            setDashboardErrors(previous => ({ ...previous, stats: null }))
             if (statsData.success && dashboardStatsRequestRef.current === requestPromise) {
                 setDashboardStats(statsData.data)
             }
           } catch (error) {
-            console.error('Fetch dashboard stats error:', error)
+            setDashboardErrors(previous => ({ ...previous, stats: error.message || 'Unable to load dashboard statistics.' }))
           }
         })()
 
@@ -422,10 +422,8 @@ export default function UnifiedDashboard({ user: userProp }) {
         const requestPromise = (async () => {
           try {
             const token = localStorage.getItem('token')
-            const response = await fetch(`/api/dashboard/unified?widgets=${encodeURIComponent(unifiedWidgetSelection)}`, {
-                headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store'
-            })
-            const data = await response.json()
+            const data = await dashboardRequest(`/api/dashboard/unified?widgets=${encodeURIComponent(unifiedWidgetSelection)}`, token)
+            setDashboardErrors(previous => ({ ...previous, widgets: null }))
             if (data.success && unifiedWidgetsRequestRef.current === requestPromise) {
                 setUnifiedWidgetData(data)
 
@@ -452,7 +450,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
             }
           } catch (error) {
-            console.error('Error fetching unified widget data:', error)
+            setDashboardErrors(previous => ({ ...previous, widgets: error.message || 'Unable to load dashboard widgets.' }))
           }
         })()
 
@@ -1115,6 +1113,10 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     return (
         <div className="page-container">
+            {(dashboardErrors.stats || dashboardErrors.widgets) && <div role="alert" className="mb-4 rounded-xl border border-default-200 p-3 text-sm">
+                Some dashboard data could not be loaded. You can still use the rest of the app.
+                <button type="button" className="ml-3 underline" onClick={() => { fetchDashboardData(); fetchUnifiedWidgetData() }}>Retry data</button>
+            </div>}
             {/* Dashboard Content */}
             <CustomizableDashboard
                 userId={user?._id || user?.userId || 'user'}

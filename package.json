@@ -9,8 +9,8 @@
     "mira:map": "node scripts/generate-mira-app-map.cjs",
     "prebuild": "npm run mira:map",
     "prevercel-build": "npm run mira:map",
-    "dev": "cross-env TZ=Asia/Kolkata NODE_ENV=development NEXT_DIST_DIR=.next-dev-next next dev",
-    "dev:next": "cross-env TZ=Asia/Kolkata NODE_ENV=development NEXT_DIST_DIR=.next-dev-next next dev",
+    "dev": "node scripts/dev.cjs",
+    "dev:next": "node scripts/dev.cjs",
     "build": "cross-env TZ=Asia/Kolkata NODE_OPTIONS=--max-old-space-size=6144 SKIP_ENV_VALIDATION=true next build",
     "vercel-build": "cross-env TZ=Asia/Kolkata NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=6144 NEXT_BUILD_CPUS=4 SKIP_ENV_VALIDATION=true next build",
     "start": "cross-env TZ=Asia/Kolkata next start",
@@ -24,6 +24,7 @@
     "test:api": "jest tests/api --verbose",
     "test:e2e": "jest tests/e2e --verbose --runInBand",
     "test:web": "jest tests/web --verbose",
+    "release:check": "jest tests/web/vercel-build-config.test.js tests/web/login-form.test.js tests/web/dashboard-request.test.js tests/web/dashboard-spacing.test.js tests/web/employee-dashboard-height.test.js tests/web/employee-tabs.test.js tests/web/own-profile.test.js tests/web/fernly-elements.test.js tests/web/calendar-design.test.js tests/web/report-dashboard.test.js tests/web/upload-button.test.js tests/api/employee-history.test.js --runInBand",
     "test:mobile": "jest tests/mobile --verbose"
   },
   "dependencies": {

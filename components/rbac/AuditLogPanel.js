@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Button, Select, SelectItem, Chip } from '@heroui/react'
+import { Button, Select, SelectItem, Chip } from '@/components/ui/fernly'
 import { FaTimes } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 

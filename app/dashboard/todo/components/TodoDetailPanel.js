@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading3, NativeButton, NativeInput, Heading2, NativeTextarea, NativeSelect } from '@/components/ui/fernly/native'
 import { useState, useEffect, Fragment } from 'react'
 import {
   HiOutlineXMark,
@@ -183,29 +185,29 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 sticky top-4 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-800">To-do Details</h3>
+          <Heading3 className="font-semibold text-gray-800">To-do Details</Heading3>
           <div className="flex items-center gap-1">
-            <button
+            <NativeButton
               onClick={() => setEditing(!editing)}
               className={`p-2 rounded-lg transition-colors ${
                 editing ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
               }`}
             >
               <HiOutlinePencil className="w-4 h-4" />
-            </button>
-            <button
+            </NativeButton>
+            <NativeButton
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
             >
               <HiOutlineXMark className="w-4 h-4" />
-            </button>
+            </NativeButton>
           </div>
         </div>
 
         <div className="p-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
           {/* Completion Toggle */}
           <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
-            <button
+            <NativeButton
               onClick={(e) => onToggleComplete(todo._id, e)}
               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
                 todo.status === 'completed'
@@ -214,7 +216,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
               }`}
             >
               {todo.status === 'completed' && <HiOutlineCheck className="w-4 h-4" />}
-            </button>
+            </NativeButton>
             <span className={`text-sm font-medium ${
               todo.status === 'completed' ? 'text-green-600' : 'text-gray-600'
             }`}>
@@ -224,18 +226,18 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
 
           {/* Title */}
           {editing ? (
-            <input
+            <NativeInput
               type="text"
               value={editForm.title}
               onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg font-medium mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           ) : (
-            <h2 className={`text-lg font-medium mb-4 ${
+            <Heading2 className={`text-lg font-medium mb-4 ${
               todo.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'
             }`}>
               {todo.title}
-            </h2>
+            </Heading2>
           )}
 
           {/* Description */}
@@ -245,7 +247,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
               Description
             </label>
             {editing ? (
-              <textarea
+              <NativeTextarea
                 value={editForm.description}
                 onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                 rows={3}
@@ -267,13 +269,13 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
             </label>
             {editing ? (
               <div className="grid grid-cols-2 gap-2">
-                <input
+                <NativeInput
                   type="date"
                   value={editForm.dueDate}
                   onChange={(e) => setEditForm(prev => ({ ...prev, dueDate: e.target.value }))}
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
-                <input
+                <NativeInput
                   type="time"
                   value={editForm.dueTime}
                   onChange={(e) => setEditForm(prev => ({ ...prev, dueTime: e.target.value }))}
@@ -296,7 +298,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
               Priority
             </label>
             {editing ? (
-              <select
+              <NativeSelect
                 value={editForm.priority}
                 onChange={(e) => setEditForm(prev => ({ ...prev, priority: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
@@ -304,7 +306,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
                 {PRIORITY_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
-              </select>
+              </NativeSelect>
             ) : (
               <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
                 PRIORITY_OPTIONS.find(p => p.value === todo.priority)?.color || 'text-gray-400 bg-gray-50'
@@ -321,7 +323,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
               Category
             </label>
             {editing ? (
-              <select
+              <NativeSelect
                 value={editForm.category}
                 onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
@@ -330,7 +332,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
                 {categories.map(cat => (
                   <option key={cat._id} value={cat._id}>{cat.name}</option>
                 ))}
-              </select>
+              </NativeSelect>
             ) : todo.category ? (
               <span className="inline-flex items-center gap-2 text-sm text-gray-600">
                 <div 
@@ -362,19 +364,19 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
                       onClick={() => toggleSubtask(subtask._id, subtask.completed)}
                       size="xs"
                     />
-                    <button
+                    <NativeButton
                       onClick={() => deleteSubtask(subtask._id)}
                       className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <HiOutlineTrash className="w-3.5 h-3.5" />
-                    </button>
+                    </NativeButton>
                   </div>
                 </div>
               ))}
               
               {/* Add subtask */}
               <div className="flex items-center gap-2 mt-2">
-                <input
+                <NativeInput
                   type="text"
                   placeholder="Add subtask..."
                   value={newSubtask}
@@ -387,13 +389,13 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
                   }}
                   className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-transparent"
                 />
-                <button
+                <NativeButton
                   onClick={addSubtask}
                   disabled={!newSubtask.trim()}
                   className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <HiOutlinePlus className="w-4 h-4" />
-                </button>
+                </NativeButton>
               </div>
             </div>
           </div>
@@ -442,13 +444,13 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
         {/* Footer Actions */}
         {editing ? (
           <div className="flex items-center justify-between p-4 border-t border-gray-100">
-            <button
+            <NativeButton
               onClick={() => setEditing(false)}
               className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
             >
               Cancel
-            </button>
-            <button
+            </NativeButton>
+            <NativeButton
               onClick={handleSave}
               disabled={saving}
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
@@ -461,17 +463,17 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
               ) : (
                 'Save Changes'
               )}
-            </button>
+            </NativeButton>
           </div>
         ) : (
           <div className="flex items-center justify-between p-4 border-t border-gray-100">
-            <button
+            <NativeButton
               onClick={() => onDelete(todo._id)}
               className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm flex items-center gap-2"
             >
               <HiOutlineTrash className="w-4 h-4" />
               Delete
-            </button>
+            </NativeButton>
           </div>
         )}
       </div>

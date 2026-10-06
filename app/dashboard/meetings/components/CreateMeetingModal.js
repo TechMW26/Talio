@@ -1,5 +1,7 @@
 'use client'
 
+
+import { NativeButton, NativeInput, NativeTextarea, NativeSelect, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useCallback } from 'react'
 import Loader from '@/components/ui/Loader'
 import {
@@ -18,8 +20,8 @@ import {
   HiOutlineSparkles
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@/components/ui/fernly'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { getDateTimePartsInTimezone, parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
 import { filterDepartmentGroupEmployees, hasActiveGroupSearch, isDepartmentGroupExpanded } from '@/lib/departmentGroupSearch'
@@ -352,7 +354,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   Meeting Type
                 </label>
                 <div className="grid grid-cols-2 gap-3">
-                  <button
+                  <NativeButton
                     type="button"
                     onClick={() => handleInputChange('type', 'online')}
                     className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
@@ -368,8 +370,8 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                       </p>
                       <p className="text-xs text-gray-500">Video conference</p>
                     </div>
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     type="button"
                     onClick={() => handleInputChange('type', 'offline')}
                     className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
@@ -385,7 +387,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                       </p>
                       <p className="text-xs text-gray-500">In-person meeting</p>
                     </div>
-                  </button>
+                  </NativeButton>
                 </div>
               </div>
 
@@ -394,7 +396,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Meeting Title *
                 </label>
-                <input
+                <NativeInput
                   type="text"
                   value={formData.title}
                   onChange={(e) => handleInputChange('title', e.target.value)}
@@ -439,7 +441,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     {generatingDescription ? 'Writing...' : 'AI Write'}
                   </Button>
                 </div>
-                <textarea
+                <NativeTextarea
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="Meeting agenda and objectives..."
@@ -453,7 +455,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   <p className="font-medium text-gray-800">Recurring meeting</p>
                   <p className="text-xs text-gray-500">Create the complete series and schedule invitations for every occurrence.</p>
                 </div>
-                <button
+                <NativeButton
                   type="button"
                   role="switch"
                   aria-checked={formData.isRecurring}
@@ -461,7 +463,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   className={`relative h-7 w-12 rounded-full transition-colors ${formData.isRecurring ? 'bg-primary-600' : 'bg-gray-300'}`}
                 >
                   <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${formData.isRecurring ? 'left-6' : 'left-1'}`} />
-                </button>
+                </NativeButton>
               </div>
 
               {/* Date & Time */}
@@ -471,7 +473,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Start Date & Time *
                   </label>
-                  <input
+                  <NativeInput
                     type="datetime-local"
                     min={new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16)}
                     value={formData.scheduledStart}
@@ -483,7 +485,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Duration *
                   </label>
-                  <select
+                  <NativeSelect
                     value={formData.duration}
                     onChange={(e) => handleInputChange('duration', parseInt(e.target.value))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -500,7 +502,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     <option value={300}>5 hours</option>
                     <option value={360}>6 hours</option>
                     <option value={480}>8 hours</option>
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
               ) : (
@@ -508,7 +510,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Repeat *</label>
-                      <select
+                      <NativeSelect
                         value={formData.recurrence.pattern}
                         onChange={(e) => handleRecurrenceChange('pattern', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900"
@@ -517,11 +519,11 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                         <option value="weekly">Weekly</option>
                         <option value="biweekly">Every two weeks</option>
                         <option value="monthly">Monthly</option>
-                      </select>
+                      </NativeSelect>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Repeat every *</label>
-                      <input
+                      <NativeInput
                         type="number"
                         min="1"
                         max="52"
@@ -532,7 +534,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Series Start *</label>
-                      <input
+                      <NativeInput
                         type="date"
                         min={new Date().toISOString().slice(0, 10)}
                         value={formData.recurrence.startDate}
@@ -555,7 +557,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Meeting Time *</label>
-                      <input
+                      <NativeInput
                         type="time"
                         value={formData.recurrence.time}
                         onChange={(e) => handleRecurrenceChange('time', e.target.value)}
@@ -564,7 +566,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Series End *</label>
-                      <input
+                      <NativeInput
                         type="date"
                         min={formData.recurrence.startDate || new Date().toISOString().slice(0, 10)}
                         value={formData.recurrence.endDate}
@@ -574,7 +576,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Duration *</label>
-                      <select
+                      <NativeSelect
                         value={formData.duration}
                         onChange={(e) => handleInputChange('duration', parseInt(e.target.value))}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900"
@@ -582,7 +584,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                         {[15, 30, 45, 60, 90, 120, 180, 240, 480].map(minutes => (
                           <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes} minutes` : `${minutes / 60} hour${minutes > 60 ? 's' : ''}`}</option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     </div>
                   </div>
                   {formData.recurrence.pattern === 'weekly' && (
@@ -592,7 +594,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                         {weekdayOptions.map(day => {
                           const selected = formData.recurrence.daysOfWeek.includes(day.value)
                           return (
-                            <button
+                            <NativeButton
                               key={day.value}
                               type="button"
                               onClick={() => handleRecurrenceChange(
@@ -604,7 +606,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                               className={`rounded-lg px-3 py-2 text-sm ${selected ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 border border-gray-300'}`}
                             >
                               {day.label}
-                            </button>
+                            </NativeButton>
                           )
                         })}
                       </div>
@@ -619,7 +621,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Location *
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     value={formData.location}
                     onChange={(e) => handleInputChange('location', e.target.value)}
@@ -634,7 +636,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Priority
                 </label>
-                <select
+                <NativeSelect
                   value={formData.priority}
                   onChange={(e) => handleInputChange('priority', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -643,7 +645,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                   <option value="urgent">Urgent</option>
-                </select>
+                </NativeSelect>
               </div>
 
               {/* Agenda Items */}
@@ -652,27 +654,27 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   Agenda Items (Optional)
                 </label>
                 <div className="flex gap-2 mb-2">
-                  <input
+                  <NativeInput
                     type="text"
                     value={agendaInput.title}
                     onChange={(e) => setAgendaInput(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="Agenda item title"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
-                  <input
+                  <NativeInput
                     type="number"
                     value={agendaInput.duration}
                     onChange={(e) => setAgendaInput(prev => ({ ...prev, duration: parseInt(e.target.value) || 15 }))}
                     placeholder="Min"
                     className="w-20 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
-                  <button
+                  <NativeButton
                     type="button"
                     onClick={addAgendaItem}
                     className="p-2 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200"
                   >
                     <HiOutlinePlus className="w-5 h-5" />
-                  </button>
+                  </NativeButton>
                 </div>
                 {formData.agenda.length > 0 && (
                   <div className="space-y-2">
@@ -681,13 +683,13 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                         <span className="text-sm text-gray-700">{item.title}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-500">{item.duration} min</span>
-                          <button
+                          <NativeButton
                             type="button"
                             onClick={() => removeAgendaItem(index)}
                             className="p-1 text-red-500 hover:bg-red-100 rounded"
                           >
                             <HiOutlineTrash className="w-4 h-4" />
-                          </button>
+                          </NativeButton>
                         </div>
                       </div>
                     ))}
@@ -703,7 +705,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
               {/* Search */}
               <div className="input-with-icon">
                 <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-                <input
+                <NativeInput
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -718,7 +720,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                   <strong>{selectedInvitees.length}</strong> employees selected
                 </span>
                 {selectedInvitees.length > 0 && (
-                  <button
+                  <NativeButton
                     onClick={() => {
                       setSelectedInvitees([])
                       setSelectedDepartments([])
@@ -726,7 +728,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     className="text-sm text-indigo-600 hover:text-indigo-700"
                   >
                     Clear all
-                  </button>
+                  </NativeButton>
                 )}
               </div>
 
@@ -761,7 +763,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                             onClick={() => toggleDepartmentExpand(deptId)}
                           >
                             <div className="flex items-center gap-3">
-                              <button
+                              <NativeButton
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -777,7 +779,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                               >
                                 {allSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
                                 {selectedCount > 0 && !allSelected && <div className="w-2 h-2 bg-indigo-600 rounded-sm"></div>}
-                              </button>
+                              </NativeButton>
                               <div>
                                 <p className="font-medium text-gray-800">
                                   {group.department.name}
@@ -807,7 +809,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                                       isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50'
                                     }`}
                                   >
-                                    <button
+                                    <NativeButton
                                       type="button"
                                       className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                                         isSelected
@@ -816,7 +818,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                                       }`}
                                     >
                                       {isSelected && <HiOutlineCheck className="w-3 h-3 text-white" />}
-                                    </button>
+                                    </NativeButton>
                                     {emp.profilePicture ? (
                                       <img
                                         src={emp.profilePicture}
@@ -864,9 +866,9 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     <HiOutlineMapPin className="w-6 h-6 text-amber-600 mt-0.5" />
                   )}
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-800">
+                    <Heading3 className="text-lg font-semibold text-gray-800">
                       {formData.title}
-                    </h3>
+                    </Heading3>
                     <p className="text-sm text-gray-600 capitalize">
                       {formData.type} Meeting • {formData.priority} priority
                     </p>

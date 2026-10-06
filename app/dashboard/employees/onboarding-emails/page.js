@@ -1,9 +1,11 @@
 'use client'
 
+
+import { Heading1, NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Checkbox } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Checkbox } from '@/components/ui/fernly'
 import {
   HiOutlineEnvelope,
   HiOutlineCheckCircle,
@@ -283,9 +285,9 @@ export default function OnboardingEmailsPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-3">
+          <Heading1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-3">
             Onboarding Emails
-          </h1>
+          </Heading1>
           <p className="text-theme-text-secondary mt-1">
             Track and manage welcome emails sent to new employees
           </p>
@@ -319,7 +321,7 @@ export default function OnboardingEmailsPage() {
                 </p>
               </div>
             </div>
-            <button
+            <NativeButton
               onClick={handleToggleAutoSend}
               disabled={toggleAutoSendMutation.isLoading || user?.role !== 'admin'}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${autoSendEnabled ? 'bg-success' : 'bg-default-300'
@@ -330,7 +332,7 @@ export default function OnboardingEmailsPage() {
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoSendEnabled ? 'translate-x-6' : 'translate-x-1'
                   }`}
               />
-            </button>
+            </NativeButton>
           </div>
         </div>
       </div>
@@ -430,7 +432,7 @@ export default function OnboardingEmailsPage() {
         {/* Search */}
         <div className="input-with-icon flex-1">
           <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-          <input
+          <NativeInput
             type="text"
             placeholder="Search by name, email, or employee code..."
             value={searchQuery}
@@ -495,7 +497,7 @@ export default function OnboardingEmailsPage() {
               <thead>
                 <tr className="border-b border-default-200 bg-default-50">
                   <th className="px-4 py-3 text-left">
-                    <input
+                    <NativeInput
                       type="checkbox"
                       checked={selectAll}
                       onChange={handleSelectAll}
@@ -570,7 +572,7 @@ export default function OnboardingEmailsPage() {
                   emails.map((email) => (
                     <tr key={email._id} className="hover:bg-default-50 transition-colors">
                       <td className="px-4 py-3">
-                        <input
+                        <NativeInput
                           type="checkbox"
                           checked={selectedEmails.includes(email._id)}
                           onChange={() => handleSelectEmail(email._id)}
@@ -723,7 +725,7 @@ export default function OnboardingEmailsPage() {
                 <label className="block text-sm font-medium text-default-500 mb-2">
                   Employee Email Address
                 </label>
-                <input
+                <NativeInput
                   type="email"
                   value={sendEmailAddress}
                   onChange={(e) => setSendEmailAddress(e.target.value)}

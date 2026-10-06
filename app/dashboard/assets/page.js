@@ -1,5 +1,9 @@
 'use client'
 
+
+
+import { UploadInput } from '@/components/ui/UploadButton'
+import { Heading1, Heading3, Heading2, NativeButton, NativeInput, NativeTextarea, NativeSelect } from '@/components/ui/fernly/native'
 import usePermission from '@/hooks/usePermission'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -15,7 +19,7 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 import ModalPortal from '@/components/ui/ModalPortal'
 import SearchableSelect from '@/components/ui/heroui/SearchableSelect'
 import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
-import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/react'
+import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@/components/ui/fernly'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { getAssetAssigneeLabel } from '@/utils/assetAssigneeSearch'
 import { formatAssetStatus, getAssetDisplayDetails, normalizeAssetInput, normalizeAssetStatus } from '@/utils/assetData'
@@ -262,7 +266,7 @@ export default function AssetsPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">{isAdmin ? 'Assets' : 'My Assets'}</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">{isAdmin ? 'Assets' : 'My Assets'}</Heading1>
           <p className="text-gray-600 mt-1">
             {isAdmin ? 'Manage company assets and equipment' : 'View assets assigned to you'}
           </p>
@@ -294,7 +298,7 @@ export default function AssetsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Total Assets</h3>
+              <Heading3 className="text-sm font-medium text-gray-600">Total Assets</Heading3>
               <FaLaptop className="text-primary-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">{assets.length}</div>
@@ -302,7 +306,7 @@ export default function AssetsPage() {
 
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Assigned</h3>
+              <Heading3 className="text-sm font-medium text-gray-600">Assigned</Heading3>
               <FaCheckCircle className="text-green-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">
@@ -312,7 +316,7 @@ export default function AssetsPage() {
 
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Available</h3>
+              <Heading3 className="text-sm font-medium text-gray-600">Available</Heading3>
               <FaClock className="text-blue-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">
@@ -322,7 +326,7 @@ export default function AssetsPage() {
 
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Under Maintenance</h3>
+              <Heading3 className="text-sm font-medium text-gray-600">Under Maintenance</Heading3>
               <FaTools className="text-orange-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">
@@ -334,7 +338,7 @@ export default function AssetsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Assets Assigned to You</h3>
+              <Heading3 className="text-sm font-medium text-gray-600">Assets Assigned to You</Heading3>
               <FaBox className="text-primary-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">{assets.length}</div>
@@ -342,7 +346,7 @@ export default function AssetsPage() {
 
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Under Maintenance</h3>
+              <Heading3 className="text-sm font-medium text-gray-600">Under Maintenance</Heading3>
               <FaTools className="text-orange-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">
@@ -355,9 +359,9 @@ export default function AssetsPage() {
       {/* Assets Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">
+          <Heading2 className="text-xl font-semibold text-gray-800">
             {isAdmin ? 'Asset Inventory' : 'Your Assigned Assets'}
-          </h2>
+          </Heading2>
         </div>
 
         {error ? (
@@ -469,14 +473,14 @@ export default function AssetsPage() {
                     {extraTrackerFields.map(([key, , type]) => <td key={key} className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap max-w-xs truncate" title={assetTrackerValue(asset, key, type)}>{assetTrackerValue(asset, key, type)}</td>)}
                     {isAdmin && (
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <button
+                        <NativeButton
                           type="button"
                           onClick={(event) => { event.stopPropagation(); openAsset(asset) }}
                           className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
                           aria-label={`Open ${details.name}`}
                         >
                           <FaEye aria-hidden="true" /> View
-                        </button>
+                        </NativeButton>
                       </td>
                     )}
                   </tr>
@@ -494,16 +498,16 @@ export default function AssetsPage() {
           <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="asset-details-title">
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
-                <h2 id="asset-details-title" className="text-xl font-bold text-gray-900">
+                <Heading2 id="asset-details-title" className="text-xl font-bold text-gray-900">
                   {isEditingAsset ? 'Edit Asset' : getAssetDisplayDetails(selectedAsset || {}).name}
-                </h2>
+                </Heading2>
                 <p className="mt-1 text-sm text-gray-500">
                   {isEditingAsset ? 'Update details, status, or employee assignment.' : getAssetDisplayDetails(selectedAsset || {}).code}
                 </p>
               </div>
-              <button type="button" onClick={closeAsset} className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700" aria-label="Close asset details">
+              <NativeButton type="button" onClick={closeAsset} className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700" aria-label="Close asset details">
                 <FaTimes />
-              </button>
+              </NativeButton>
             </div>
 
             {isEditingAsset ? (
@@ -605,7 +609,7 @@ export default function AssetsPage() {
                     </div>
                   )}
                   {isAdmin && <section className="mt-6 space-y-3" aria-label="Asset history">
-                    <h3 className="font-semibold">Asset history</h3>
+                    <Heading3 className="font-semibold">Asset history</Heading3>
                     <p className="text-xs text-gray-500">Changes recorded from this update onward. Earlier unrecorded events are not reconstructed.</p>
                     {!selectedAsset.history?.length ? <p className="text-sm text-gray-500">No recorded changes yet.</p> : [...selectedAsset.history].reverse().map((event, index) => <details key={event._id || index} className="rounded-xl border border-gray-200 p-3">
                       <summary className="cursor-pointer text-sm">{new Date(event.at).toLocaleString()} · {event.action} · {event.actorName || 'Authorized user'}</summary>
@@ -631,16 +635,16 @@ export default function AssetsPage() {
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Add New Asset</h2>
-              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
+              <Heading2 className="text-xl font-bold">Add New Asset</Heading2>
+              <NativeButton onClick={closeModal} className="text-gray-500 hover:text-gray-700">
                 <FaTimes />
-              </button>
+              </NativeButton>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Asset Name *</label>
-                  <input
+                  <NativeInput
                     type="text"
                     name="name"
                     value={formData.name}
@@ -651,7 +655,7 @@ export default function AssetsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Asset Code *</label>
-                  <input
+                  <NativeInput
                     type="text"
                     name="assetCode"
                     value={formData.assetCode}
@@ -662,7 +666,7 @@ export default function AssetsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">UIN</label>
-                  <input
+                  <NativeInput
                     type="text"
                     name="uin"
                     value={formData.uin}
@@ -722,24 +726,24 @@ export default function AssetsPage() {
                       {generatingDescription ? 'Writing...' : 'AI Write'}
                     </Button>
                   </div>
-                  <textarea
+                  <NativeTextarea
                     name="description"
                     value={formData.description}
                     onChange={handleInputChange}
                     rows="2"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 border p-2"
-                  ></textarea>
+                  ></NativeTextarea>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Specifications</label>
-                  <textarea
+                  <NativeTextarea
                     name="specs"
                     value={formData.specs}
                     onChange={handleInputChange}
                     rows="2"
                     placeholder="Processor, RAM, Storage, etc."
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 border p-2"
-                  ></textarea>
+                  ></NativeTextarea>
                 </div>
                 <div>
                   <SearchableSelect
@@ -778,7 +782,7 @@ export default function AssetsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Purchase Date</label>
-                  <input
+                  <NativeInput
                     type="date"
                     name="purchaseDate"
                     value={formData.purchaseDate}
@@ -788,7 +792,7 @@ export default function AssetsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Purchase Price</label>
-                  <input
+                  <NativeInput
                     type="number"
                     name="purchasePrice"
                     value={formData.purchasePrice}
@@ -799,13 +803,13 @@ export default function AssetsPage() {
               </div>
               <AssetTrackingFields values={formData} onChange={handleInputChange} />
               <div className="flex justify-end space-x-3 mt-6">
-                <button
+                <NativeButton
                   type="button"
                   onClick={closeModal}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
-                </button>
+                </NativeButton>
                 <LoadingButton
                   type="submit"
                   isLoading={submitMutation.isLoading}
@@ -825,10 +829,10 @@ export default function AssetsPage() {
         <div className="modal-overlay">
           <div role="dialog" aria-modal="true" aria-label="Bulk Import Assets" className="bg-white rounded-[30px] animate-modal-enter w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Bulk Import Assets</h2>
-              <button aria-label="Close bulk import" disabled={bulkImporting || bulkPreviewing} onClick={() => { setIsBulkImportOpen(false); setBulkFile(null); setBulkPreview(null); setBulkResult(null) }} className="text-gray-500 hover:text-gray-700">
+              <Heading2 className="text-xl font-bold">Bulk Import Assets</Heading2>
+              <NativeButton aria-label="Close bulk import" disabled={bulkImporting || bulkPreviewing} onClick={() => { setIsBulkImportOpen(false); setBulkFile(null); setBulkPreview(null); setBulkResult(null) }} className="text-gray-500 hover:text-gray-700">
                 <FaTimes />
-              </button>
+              </NativeButton>
             </div>
 
             {bulkResult ? <div className="space-y-4">
@@ -843,7 +847,7 @@ export default function AssetsPage() {
                 </p>
                 <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
                   <FaFileUpload className="mx-auto text-3xl text-gray-400 mb-3" />
-                  <input
+                  <UploadInput
                     type="file"
                     aria-label="Asset import workbook"
                     accept=".xlsx"
@@ -868,12 +872,12 @@ export default function AssetsPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {bulkPreview.headers?.map((header, index) => <label key={index} className="text-sm">{header || `Column ${index + 1}`}
-                    <select aria-label={`Map column ${index + 1}`} className="block w-full rounded-lg border border-default-200 bg-content1 p-2" value={bulkPreview.mapping[index] || ''} disabled={bulkImporting} onChange={event => {
+                    <NativeSelect aria-label={`Map column ${index + 1}`} className="block w-full rounded-lg border border-default-200 bg-content1 p-2" value={bulkPreview.mapping[index] || ''} disabled={bulkImporting} onChange={event => {
                       const mapping = { ...bulkPreview.mapping }
                       if (event.target.value) mapping[index] = event.target.value; else delete mapping[index]
                       const data = bulkPreview.samples.map((row, rowIndex) => ({ _rowNum: rowIndex + 2, ...Object.fromEntries(Object.entries(mapping).map(([column, field]) => [field, row[Number(column)] ?? ''])) }))
                       setBulkPreview({ ...bulkPreview, mapping, data, missingFields: ['assetCode', 'name'].filter(field => !Object.values(mapping).includes(field)) })
-                    }}><option value="">Ignore column</option>{bulkPreview.fields?.map(field => <option key={field.key} value={field.key}>{field.label}{field.required ? ' (required)' : ''}</option>)}</select>
+                    }}><option value="">Ignore column</option>{bulkPreview.fields?.map(field => <option key={field.key} value={field.key}>{field.label}{field.required ? ' (required)' : ''}</option>)}</NativeSelect>
                   </label>)}
                 </div>
                 {!!bulkPreview.missingFields?.length && <p role="alert" className="text-danger">Map Asset Code and Asset Name to continue.</p>}

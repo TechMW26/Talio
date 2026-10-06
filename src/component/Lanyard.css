@@ -486,6 +486,25 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
+.employee-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, .12);
+  color: #fbbf24;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: capitalize;
+  line-height: 1.4;
+}
+.employee-status[data-active="true"] {
+  background: rgba(16, 185, 129, .12);
+  color: #6ee7b7;
+}
+.employee-status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
 .footer-row {
   position: relative;
   z-index: 1;

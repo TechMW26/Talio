@@ -1,7 +1,9 @@
 'use client'
 
+
+import { Heading3, Heading2 } from '@/components/ui/fernly/native'
 import { FaFileAlt, FaDownload, FaChartBar } from 'react-icons/fa'
-import { Button, Select, SelectItem, Card, CardBody, Input } from '@heroui/react'
+import { Button, Select, SelectItem, Card, CardBody, Input } from '@/components/ui/fernly'
 import MobilePageWrapper, { MobileGrid } from '@/components/mobile/MobileComponents'
 
 export default function ReportsPage() {
@@ -72,9 +74,9 @@ export default function ReportsPage() {
                   {report.category}
                 </span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              <Heading3 className="text-lg font-semibold text-gray-800 mb-2">
                 {report.name}
-              </h3>
+              </Heading3>
               <p className="text-sm text-gray-600 mb-4">{report.description}</p>
               <Button color="primary" className="w-full" startContent={<FaDownload className="w-4 h-4" />}>
                 Generate Report
@@ -87,7 +89,7 @@ export default function ReportsPage() {
       {/* Custom Report Section */}
       <Card className="mb-8">
         <CardBody className="p-6">
-          <h2 className="text-xl font-bold text-default-800 mb-4">Custom Report</h2>
+          <Heading2 className="text-xl font-bold text-default-800 mb-4">Custom Report</Heading2>
           <p className="text-sm text-default-500 mb-6">
             Create a custom report with specific parameters
           </p>

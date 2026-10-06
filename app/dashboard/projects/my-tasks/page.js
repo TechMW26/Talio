@@ -1,10 +1,12 @@
 'use client'
 
+
+import { Heading1, NativeInput, NativeButton, Heading2, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import toast from '@/utils/toast'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Progress, Spinner, Select, SelectItem } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Progress, Spinner, Select, SelectItem } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -517,9 +519,9 @@ export default function MyTasksPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-default-800 flex items-center gap-2">
+          <Heading1 className="text-2xl font-bold text-default-800 flex items-center gap-2">
             My Tasks
-          </h1>
+          </Heading1>
           <p className="text-default-600 mt-1">
             View and manage your tasks across all projects
           </p>
@@ -608,7 +610,7 @@ export default function MyTasksPage() {
           {/* Search Row */}
           <div className="input-with-icon mb-4">
             <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-            <input
+            <NativeInput
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -665,22 +667,22 @@ export default function MyTasksPage() {
 
             {/* Month Navigator */}
             <div className="flex items-center gap-1 border border-default-300 rounded-lg px-1 py-0.5">
-              <button
+              <NativeButton
                 onClick={goToPrevMonth}
                 className="p-1 rounded hover:bg-default-100 text-default-600 transition-colors"
                 title="Previous month"
               >
                 <HiOutlineChevronLeft className="w-4 h-4" />
-              </button>
+              </NativeButton>
               <span className="text-sm font-medium text-default-700 min-w-[120px] text-center">{monthLabel}</span>
-              <button
+              <NativeButton
                 onClick={goToNextMonth}
                 disabled={isCurrentMonth}
                 className={`p-1 rounded transition-colors ${isCurrentMonth ? 'text-default-300 cursor-not-allowed' : 'hover:bg-default-100 text-default-600'}`}
                 title="Next month"
               >
                 <HiOutlineChevronRight className="w-4 h-4" />
-              </button>
+              </NativeButton>
             </div>
 
             {/* Spacer to push view toggle to the right */}
@@ -688,7 +690,7 @@ export default function MyTasksPage() {
 
             {/* View Toggle */}
             <div className="flex border border-default-300 rounded-lg overflow-hidden">
-              <button
+              <NativeButton
                 onClick={() => setViewMode('list')}
                 className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${viewMode === 'list'
                     ? 'bg-primary text-primary-foreground'
@@ -697,8 +699,8 @@ export default function MyTasksPage() {
                 title="List View"
               >
                 <HiOutlineQueueList className="w-5 h-5" />
-              </button>
-              <button
+              </NativeButton>
+              <NativeButton
                 onClick={() => setViewMode('kanban')}
                 className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-default-300 ${viewMode === 'kanban'
                     ? 'bg-primary text-primary-foreground'
@@ -707,7 +709,7 @@ export default function MyTasksPage() {
                 title="Kanban View"
               >
                 <HiOutlineViewColumns className="w-5 h-5" />
-              </button>
+              </NativeButton>
             </div>
           </div>
         </CardBody>
@@ -719,9 +721,9 @@ export default function MyTasksPage() {
           {/* Pending acceptance tasks above kanban for quick action */}
           {pendingAcceptance.length > 0 && (
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+              <Heading2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
                 Pending Acceptance ({pendingAcceptance.length})
-              </h2>
+              </Heading2>
               <div className="grid gap-4">
                 {pendingAcceptance.map(task => (
                   <TaskCard
@@ -773,9 +775,9 @@ export default function MyTasksPage() {
           {/* Pending Acceptance Tasks */}
           {pendingAcceptance.length > 0 && (
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+              <Heading2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
                 Pending Acceptance ({pendingAcceptance.length})
-              </h2>
+              </Heading2>
               <div className="grid gap-4">
                 {pendingAcceptance.map(task => (
                   <TaskCard
@@ -814,9 +816,9 @@ export default function MyTasksPage() {
           {/* Overdue Tasks */}
           {overdueTasks.length > 0 && (
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+              <Heading2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
                 Overdue ({overdueTasks.length})
-              </h2>
+              </Heading2>
               <div className="grid gap-4">
                 {overdueTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
                   <TaskCard
@@ -837,9 +839,9 @@ export default function MyTasksPage() {
           {/* Today's Tasks */}
           {todayTasks.length > 0 && (
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+              <Heading2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
                 Due Today ({todayTasks.length})
-              </h2>
+              </Heading2>
               <div className="grid gap-4">
                 {todayTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
                   <TaskCard
@@ -859,9 +861,9 @@ export default function MyTasksPage() {
           {/* Upcoming Tasks */}
           {upcomingTasks.filter(t => t.assignmentStatus !== 'pending').length > 0 && (
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-default-800 mb-3">
+              <Heading2 className="text-lg font-semibold text-default-800 mb-3">
                 All Tasks
-              </h2>
+              </Heading2>
               <div className="grid gap-4">
                 {upcomingTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
                   <TaskCard
@@ -882,9 +884,9 @@ export default function MyTasksPage() {
             <Card shadow="sm">
               <CardBody className="text-center py-12">
                 <HiOutlineClipboardDocumentList className="w-16 h-16 mx-auto text-default-300 mb-4" />
-                <h3 className="text-lg font-medium text-default-800 mb-2">
+                <Heading3 className="text-lg font-medium text-default-800 mb-2">
                   No tasks found
-                </h3>
+                </Heading3>
                 <p className="text-default-500">
                   Tasks assigned to you will appear here
                 </p>
@@ -1100,30 +1102,30 @@ export default function MyTasksPage() {
         {selectedTask && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
           <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-default-50 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-semibold text-default-800">Task Details</h3>
+              <Heading3 className="text-lg font-semibold text-default-800">Task Details</Heading3>
               <div className="flex items-center gap-2">
                 {selectedTask.project && (
-                  <button
+                  <NativeButton
                     onClick={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
                     className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3"
                   >
                     <FaProjectDiagram className="w-3 h-3" />
                     View Project
-                  </button>
+                  </NativeButton>
                 )}
-                <button
+                <NativeButton
                   onClick={() => setSelectedTask(null)}
                   className="p-2 hover:bg-default-100 rounded-lg text-default-500"
                 >
                   <FaTimes />
-                </button>
+                </NativeButton>
               </div>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
               {/* Task Title & Status */}
               <div className="flex items-start justify-between mb-4">
-                <h2 className="text-xl font-semibold text-default-800">{selectedTask.title}</h2>
+                <Heading2 className="text-xl font-semibold text-default-800">{selectedTask.title}</Heading2>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status]}`}>
                   {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </span>
@@ -1337,7 +1339,7 @@ export default function MyTasksPage() {
                   <div className="mb-6">
                     <h4 className="text-sm font-medium text-gray-500 mb-3">Update Status</h4>
                     <div className="relative">
-                      <button
+                      <NativeButton
                         onClick={() => setShowModalStatusDropdown(!showModalStatusDropdown)}
                         disabled={modalUpdatingStatus}
                         className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${modalUpdatingStatus ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:bg-gray-50 cursor-pointer'
@@ -1356,12 +1358,12 @@ export default function MyTasksPage() {
                           {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </span>
                         <FaChevronDown className={`transition-transform ${showModalStatusDropdown ? 'rotate-180' : ''}`} />
-                      </button>
+                      </NativeButton>
 
                       {showModalStatusDropdown && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
                           {['todo', 'in-progress', 'review', 'completed', 'blocked'].map(status => (
-                            <button
+                            <NativeButton
                               key={status}
                               onClick={async () => {
                                 if (status === selectedTask.status) {
@@ -1409,7 +1411,7 @@ export default function MyTasksPage() {
                                       <FaClock className="text-gray-400" />}
                               {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                               {status === selectedTask.status && <FaCheck className="ml-auto text-blue-500" />}
-                            </button>
+                            </NativeButton>
                           ))}
                         </div>
                       )}
@@ -1820,7 +1822,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <h3 className="font-medium text-gray-800">{task.title}</h3>
+                <Heading3 className="font-medium text-gray-800">{task.title}</Heading3>
                 <span className={`px-2 py-0.5 rounded text-xs border ${statusColors[task.status]}`}>
                   {task.status.replace('-', ' ')}
                 </span>
@@ -1838,13 +1840,13 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
               )}
               <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
                 {task.project && onViewProject && (
-                  <button
+                  <NativeButton
                     onClick={onViewProject}
                     className={`flex items-center gap-1 px-2 py-0.5 rounded ${projectColor.badge} ${projectColor.text} hover:opacity-80`}
                   >
                     <FaProjectDiagram className="text-xs" />
                     {task.project?.name}
-                  </button>
+                  </NativeButton>
                 )}
                 {!task.project && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600">
@@ -1915,14 +1917,14 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
               )}
 
               {/* Subtasks toggle button */}
-              <button
+              <NativeButton
                 onClick={() => setShowSubtasks(!showSubtasks)}
                 className="mt-3 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800"
               >
                 <FaTasks className="text-xs" />
                 <span>Subtasks ({subtasks.length})</span>
                 {showSubtasks ? <FaChevronUp className="text-xs" /> : <FaChevronDown className="text-xs" />}
-              </button>
+              </NativeButton>
             </div>
           </div>
         </div>
@@ -1931,20 +1933,20 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
         <div className="flex items-center gap-2 ml-4">
           {isPendingAcceptance ? (
             <>
-              <button
+              <NativeButton
                 onClick={onReject}
                 disabled={isUpdating}
                 className="px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50"
               >
                 {isUpdating ? <Loader size="xs" /> : 'Reject'}
-              </button>
-              <button
+              </NativeButton>
+              <NativeButton
                 onClick={onAccept}
                 disabled={isUpdating}
                 className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
               >
                 {isUpdating ? <Loader size="xs" /> : <><FaCheck /> Accept</>}
-              </button>
+              </NativeButton>
             </>
           ) : isCompleted ? (
             /* Show completed badge instead of dropdown for completed tasks */
@@ -1962,7 +1964,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
             </div>
           ) : (
             <div className="relative">
-              <button
+              <NativeButton
                 onClick={() => setShowStatusMenu(!showStatusMenu)}
                 disabled={isUpdating}
                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
@@ -1975,12 +1977,12 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                     <FaChevronDown className="text-xs" />
                   </>
                 )}
-              </button>
+              </NativeButton>
 
               {showStatusMenu && (
                 <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
                   {['todo', 'in-progress', 'review', 'completed'].map(status => (
-                    <button
+                    <NativeButton
                       key={status}
                       onClick={() => {
                         onStatusChange(task, status)
@@ -1991,7 +1993,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                         }`}
                     >
                       {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </button>
+                    </NativeButton>
                   ))}
                 </div>
               )}
@@ -1999,13 +2001,13 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
           )}
           {/* Delete Button */}
           {onDelete && (
-            <button
+            <NativeButton
               onClick={onDelete}
               className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
               title="Delete task"
             >
               <FaTrash className="text-sm" />
-            </button>
+            </NativeButton>
           )}
         </div>
       </div>
@@ -2085,13 +2087,13 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                             onClick={() => handleToggleSubtask(subtask._id, subtask.completed || subtask.pendingAcceptance)}
                           />
                           {!isPendingAcceptance && !subtask.pendingAcceptance && (
-                            <button
+                            <NativeButton
                               onClick={() => handleDeleteSubtask(subtask._id)}
                               className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
                               title="Delete subtask"
                             >
                               <FaTrash className="text-xs" />
-                            </button>
+                            </NativeButton>
                           )}
                         </div>
                       </div>
@@ -2112,22 +2114,22 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                             </span>
                           ) : (
                             <>
-                              <button
+                              <NativeButton
                                 onClick={() => handleAcceptSubtaskCompletion(subtask._id)}
                                 disabled={updatingSubtaskId === subtask._id}
                                 className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center gap-1"
                               >
                                 {updatingSubtaskId === subtask._id ? <Loader size="xs" color="#ffffff" /> : <FaCheck />}
                                 Accept
-                              </button>
-                              <button
+                              </NativeButton>
+                              <NativeButton
                                 onClick={() => handleRejectSubtaskCompletion(subtask._id)}
                                 disabled={updatingSubtaskId === subtask._id}
                                 className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 flex items-center gap-1"
                               >
                                 {updatingSubtaskId === subtask._id ? <Loader size="xs" color="#ffffff" /> : <FaTimes />}
                                 Reject
-                              </button>
+                              </NativeButton>
                               <span className="text-xs text-gray-500">
                                 by {subtask.completedBy?.firstName || 'teammate'}
                               </span>
@@ -2159,7 +2161,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                       {/* Add Comment Button */}
                       {!isPendingAcceptance && (
                         <div className="mt-2 pl-7">
-                          <button
+                          <NativeButton
                             onClick={() => {
                               const comment = prompt('Add a comment to this subtask:')
                               if (comment && comment.trim()) {
@@ -2170,7 +2172,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                           >
                             <FaComment className="w-3 h-3" />
                             Add Comment
-                          </button>
+                          </NativeButton>
                         </div>
                       )}
                     </div>
@@ -2183,7 +2185,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
           {!isPendingAcceptance && !isCompleted && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center gap-2">
-                <input
+                <NativeInput
                   type="text"
                   value={newSubtaskTitle}
                   onChange={(e) => setNewSubtaskTitle(e.target.value)}
@@ -2194,7 +2196,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500">ETA:</span>
-                <input
+                <NativeInput
                   type="number"
                   min="0"
                   value={newSubtaskEta.days}
@@ -2204,7 +2206,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   disabled={addingSubtask}
                 />
                 <span className="text-xs text-gray-400">d</span>
-                <input
+                <NativeInput
                   type="number"
                   min="0"
                   max="23"
@@ -2215,7 +2217,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   disabled={addingSubtask}
                 />
                 <span className="text-xs text-gray-400">h</span>
-                <button
+                <NativeButton
                   onClick={handleAddSubtask}
                   disabled={addingSubtask || !newSubtaskTitle.trim()}
                   className="ml-auto px-4 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -2225,7 +2227,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   ) : (
                     <><FaPlus className="text-xs" /> Add</>
                   )}
-                </button>
+                </NativeButton>
               </div>
             </div>
           )}

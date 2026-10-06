@@ -1,7 +1,9 @@
 'use client'
 
+
+import { NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   ModalContent,
   ModalHeader,
@@ -9,7 +11,7 @@ import {
   ModalFooter,
   Button,
   Input
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import {
   HiOutlineTrash,
   HiOutlineSwatch
@@ -177,7 +179,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
                   </p>
                   <div className="grid grid-cols-6 gap-2">
                     {PRESET_COLORS.map(color => (
-                      <button
+                      <NativeButton
                         key={color}
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, color }))}
@@ -190,7 +192,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-sm text-default-600">Custom:</span>
-                    <input
+                    <NativeInput
                       type="color"
                       value={formData.color}
                       onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}

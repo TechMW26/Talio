@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, NativeButton, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -7,8 +9,8 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle, FaTimes, FaCog } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Skeleton } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -116,26 +118,26 @@ export default function HelpdeskPage() {
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Helpdesk</h1>
+          <Heading1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Helpdesk</Heading1>
           <p className="mt-1 text-sm text-gray-600">Submit and track support tickets <BackgroundRefreshIndicator isValidating={isValidating} position="inline" /></p>
         </div>
         <div className="flex gap-3">
           {isManager && (
-            <button
+            <NativeButton
               onClick={() => router.push('/dashboard/helpdesk/manage')}
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
             >
               <FaCog className="w-4 h-4" />
               <span>Manage All Tickets</span>
-            </button>
+            </NativeButton>
           )}
-          <button
+          <NativeButton
             onClick={() => setShowModal(true)}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
             <FaPlus className="w-4 h-4" />
             <span>Create Ticket</span>
-          </button>
+          </NativeButton>
         </div>
       </div>
 
@@ -170,7 +172,7 @@ export default function HelpdeskPage() {
       {/* Tickets Table */}
       <div className="overflow-hidden bg-white rounded-lg shadow-md">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">My Tickets</h2>
+          <Heading2 className="text-xl font-semibold text-gray-800">My Tickets</Heading2>
         </div>
 
         {isLoading ? (

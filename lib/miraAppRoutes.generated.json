@@ -64,6 +64,7 @@
   "/dashboard/performance/my-performance",
   "/dashboard/performance",
   "/dashboard/performance/ratings",
+  "/dashboard/performance/reports/department/[id]",
   "/dashboard/performance/reports",
   "/dashboard/policies",
   "/dashboard/productivity",

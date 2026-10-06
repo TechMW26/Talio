@@ -5,7 +5,7 @@ import widgetStyles from './WidgetDesign.module.css'
 import { useState, useEffect } from 'react'
 import { FaBullhorn } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
-import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function AnnouncementsWidget({ initialData }) {
     const router = useRouter()

@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, NativeButton, Heading3, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
@@ -8,7 +10,7 @@ import {
   FaChartLine, FaUsers, FaPlus, FaEye, FaEdit, FaAward,
   FaStar, FaTrophy, FaBullseye, FaCalendarAlt
 } from 'react-icons/fa'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
@@ -150,7 +152,7 @@ export default function PerformancePage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Performance Management</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">Performance Management</Heading1>
           <p className="text-gray-600 mt-1">
             {user?.role === 'employee' ? 'Track your performance and goals' :
               user?.role === 'manager' ? 'Manage team performance and reviews' :
@@ -160,20 +162,20 @@ export default function PerformancePage() {
         </div>
         {canManagePerformance() && (
           <div className="flex space-x-3">
-            <button
+            <NativeButton
               onClick={() => router.push('/dashboard/team/members')}
               className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center space-x-2"
             >
               <FaPlus className="w-4 h-4" />
               <span>New Rating</span>
-            </button>
-            <button
+            </NativeButton>
+            <NativeButton
               onClick={() => router.push('/dashboard/performance/goals/create')}
               className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
             >
               <FaBullseye className="w-4 h-4" />
               <span>Set Goal</span>
-            </button>
+            </NativeButton>
           </div>
         )}
       </div>
@@ -190,7 +192,7 @@ export default function PerformancePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">{stat.title}</p>
-                <h3 className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</h3>
+                <Heading3 className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</Heading3>
               </div>
               <div className={`${stat.color} p-4 rounded-lg`}>
                 <stat.icon className="w-6 h-6 text-white" />
@@ -207,7 +209,7 @@ export default function PerformancePage() {
           { name: 'Employee Ratings', icon: FaStar, href: '/dashboard/performance/ratings', color: 'bg-yellow-500' },
           { name: 'Performance Reports', icon: FaTrophy, href: '/dashboard/performance/reports', color: 'bg-purple-500' },
         ].map((action, index) => (
-          <button
+          <NativeButton
             key={index}
             onClick={() => router.push(action.href)}
             className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer text-left"
@@ -217,18 +219,18 @@ export default function PerformancePage() {
                 <action.icon className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">{action.name}</h3>
+                <Heading3 className="font-semibold text-gray-900">{action.name}</Heading3>
                 <p className="text-sm text-gray-500">Manage {action.name.toLowerCase()}</p>
               </div>
             </div>
-          </button>
+          </NativeButton>
         ))}
       </div>
 
       {/* Reviews List */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">Performance Reviews</h2>
+          <Heading2 className="text-xl font-semibold text-gray-800">Performance Reviews</Heading2>
         </div>
 
         {isLoading ? (
@@ -246,9 +248,9 @@ export default function PerformancePage() {
               <div key={review._id} className="p-6 hover:bg-gray-50">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-800">
+                    <Heading3 className="text-lg font-semibold text-gray-800">
                       {review.reviewPeriod}
-                    </h3>
+                    </Heading3>
                     <p className="text-sm text-gray-600">
                       Reviewed by: {review.reviewer?.firstName} {review.reviewer?.lastName}
                     </p>

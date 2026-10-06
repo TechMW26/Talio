@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading2, NativeButton, Heading1, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, use, useMemo } from 'react'
@@ -26,8 +28,8 @@ import {
   HiOutlinePencilSquare
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea, Skeleton } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -298,7 +300,7 @@ export default function MeetingDetailPage({ params }) {
     return (
       <div className="page-container flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Meeting not found</h2>
+          <Heading2 className="text-xl font-semibold text-gray-800 mb-2">Meeting not found</Heading2>
           <Link href="/dashboard/meetings" className="text-indigo-600 hover:text-indigo-700">
             Back to meetings
           </Link>
@@ -379,30 +381,30 @@ export default function MeetingDetailPage({ params }) {
           {meeting.isOrganizer && (
             <div className="flex flex-wrap gap-2">
               {['scheduled', 'rescheduled'].includes(meeting.status) && (
-                <button
+                <NativeButton
                   onClick={() => setShowEditModal(true)}
                   className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-sm font-medium text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200"
                 >
                   <HiOutlinePencilSquare className="h-4 w-4" />
                   Edit meeting
-                </button>
+                </NativeButton>
               )}
               {meeting.status === 'scheduled' && (
-                <button
+                <NativeButton
                   onClick={handleCancelMeeting}
                   className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm font-medium text-amber-700 transition-colors hover:border-amber-300 hover:bg-amber-100"
                 >
                   <HiOutlineXMark className="w-4 h-4" />
                   Cancel
-                </button>
+                </NativeButton>
               )}
-              <button
+              <NativeButton
                 onClick={() => setShowDeleteModal(true)}
                 className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3.5 py-2 text-sm font-medium text-red-700 transition-colors hover:border-red-300 hover:bg-red-100"
               >
                 <HiOutlineTrash className="w-4 h-4" />
                 Delete
-              </button>
+              </NativeButton>
             </div>
           )}
         </div>
@@ -415,9 +417,9 @@ export default function MeetingDetailPage({ params }) {
               <div className="min-w-0 flex items-start gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="truncate text-2xl font-semibold text-gray-900">
+                    <Heading1 className="truncate text-2xl font-semibold text-gray-900">
                       {meeting.title}
-                    </h1>
+                    </Heading1>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusColor(meeting.status)}`}>
                       {meeting.continuing ? 'Continuing' : meeting.status}
                     </span>
@@ -457,30 +459,30 @@ export default function MeetingDetailPage({ params }) {
                 {/* Response buttons for pending invites */}
                 {!meeting.isOrganizer && meeting.myInviteStatus === 'pending' && (
                   <>
-                    <button
+                    <NativeButton
                       onClick={() => handleRespond('accepted')}
                       disabled={respondMutation.isLoading}
                       className="inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                     >
                       <HiOutlineCheck className="w-4 h-4" />
                       Accept
-                    </button>
-                    <button
+                    </NativeButton>
+                    <NativeButton
                       onClick={() => setShowRejectModal(true)}
                       disabled={respondMutation.isLoading}
                       className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
                     >
                       <HiOutlineXMark className="w-4 h-4" />
                       Decline
-                    </button>
-                    <button
+                    </NativeButton>
+                    <NativeButton
                       onClick={() => handleRespond('maybe')}
                       disabled={respondMutation.isLoading}
                       className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50"
                     >
                       <HiOutlineQuestionMarkCircle className="w-4 h-4" />
                       Maybe
-                    </button>
+                    </NativeButton>
                   </>
                 )}
                 </div>
@@ -548,7 +550,7 @@ export default function MeetingDetailPage({ params }) {
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-gray-800">Guest Access</span>
                         </div>
-                        <button
+                        <NativeButton
                           type="button"
                           role="switch"
                           aria-label="Allow guests to join with a shareable link"
@@ -563,7 +565,7 @@ export default function MeetingDetailPage({ params }) {
                             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${guestAccess.guestAccessEnabled ? 'translate-x-6' : 'translate-x-1'
                               }`}
                           />
-                        </button>
+                        </NativeButton>
                       </div>
 
                       <p className="text-sm text-gray-600 mb-3">
@@ -572,21 +574,21 @@ export default function MeetingDetailPage({ params }) {
 
                       {guestAccess.guestAccessEnabled && guestAccess.guestUrl && (
                         <div className="flex items-center gap-2">
-                          <input
+                          <NativeInput
                             readOnly
                             value={guestAccess.guestUrl}
                             onFocus={event => event.target.select()}
                             aria-label="Guest meeting link"
                             className="min-w-0 flex-1 truncate rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
                           />
-                          <button
+                          <NativeButton
                             type="button"
                             onClick={copyGuestLink}
                             className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                           >
                             <HiOutlineClipboard className="w-4 h-4" />
                             Copy
-                          </button>
+                          </NativeButton>
                         </div>
                       )}
 
@@ -604,7 +606,7 @@ export default function MeetingDetailPage({ params }) {
 
               {/* Organizer */}
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 mb-3">Organizer</h3>
+                <Heading3 className="text-sm font-medium text-gray-500 mb-3">Organizer</Heading3>
                 <div className="flex items-center gap-3">
                   {meeting.organizer?.profilePicture ? (
                     <img
@@ -631,9 +633,9 @@ export default function MeetingDetailPage({ params }) {
 
               {/* Invitees */}
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
+                <Heading3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
                   Invitees ({meeting.invitees?.length || 0})
-                </h3>
+                </Heading3>
 
                 {/* Accepted */}
                 {acceptedInvitees.length > 0 && (
@@ -716,9 +718,9 @@ export default function MeetingDetailPage({ params }) {
               {/* Agenda */}
               {meeting.agenda && meeting.agenda.length > 0 && (
                 <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
+                  <Heading3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
                     Agenda
-                  </h3>
+                  </Heading3>
                   <ul className="space-y-2">
                     {meeting.agenda.map((item, index) => (
                       <li key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -736,9 +738,9 @@ export default function MeetingDetailPage({ params }) {
               {meeting.transcript && meeting.transcript.length > 0 && (
                 <div className="flex flex-col overflow-hidden p-6 lg:h-full lg:min-h-0 lg:flex-1">
                   <div className="flex items-center justify-between gap-3 mb-4">
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-300 flex items-center gap-2">
+                    <Heading3 className="text-sm font-medium text-gray-500 dark:text-gray-300 flex items-center gap-2">
                       Transcript History
-                    </h3>
+                    </Heading3>
                     {meeting.transcriptLanguages?.length > 0 && (
                       <div className="flex flex-wrap gap-2 justify-end">
                         {meeting.transcriptLanguages.map(language => (
@@ -780,9 +782,9 @@ export default function MeetingDetailPage({ params }) {
                   <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                       <div>
-                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-300 flex items-center gap-2">
+                        <Heading3 className="text-sm font-medium text-gray-500 dark:text-gray-300 flex items-center gap-2">
                           Mira Notes Timeline
-                        </h3>
+                        </Heading3>
                         {latestSummary?.generatedAt && (
                           <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">
                             Latest update: {formatSummarySessionTag(latestSummary, timelineSessions.length - 1)} • {latestSummary.language || 'auto'}

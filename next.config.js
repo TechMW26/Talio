@@ -37,6 +37,7 @@ const nextConfig = {
       bodySizeLimit: '10mb',
     },
     optimizePackageImports: [
+      '@heroui/react',
       'react-icons',
       'date-fns',
       'lodash',

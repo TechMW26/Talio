@@ -43,8 +43,6 @@ These files implement the full flow:
 | `app/webhooks/github-release/route.js` | GitHub webhook route. Verifies GitHub signature and processes `release` events with action `published`. |
 | `server.js` | Starts the fallback release cron when the custom Node/Next server boots. |
 | `middleware.js` | Allows unauthenticated public access to `/api/latest-release`. |
-| `docker-compose.yml` | Mounts `./releases` into the app container for writes and into the Nginx container read-only for serving. |
-| `Dockerfile` | Creates the runtime release storage path and gives the app user write access. |
 | `nginx/conf.d/default.conf` | Routes `/download/latest`, `/api/latest-release`, and `/webhooks/github-release`; serves protected release files internally. |
 | `.env` | Stores GitHub token, webhook secret, repo details, and storage path. Never commit this file. |
 | `.env.example` | Documents the required release environment variables. |
@@ -654,13 +652,13 @@ ssh root@89.116.134.129 'cd /var/www/talio && ls -lah releases releases/*'
 Check release sync logs:
 
 ```bash
-ssh root@89.116.134.129 'docker logs --since 30m talio-app 2>&1 | grep -E "ReleaseCron|ReleaseSync|GitHubReleaseWebhook"'
+vercel logs https://app.talio.in
 ```
 
-Restart the production stack after changing release environment variables:
+Redeploy natively after changing release environment variables:
 
 ```bash
-ssh root@89.116.134.129 'cd /var/www/talio && docker compose down && docker compose up -d --wait talio-app nginx'
+vercel --prod
 ```
 
 ## Troubleshooting

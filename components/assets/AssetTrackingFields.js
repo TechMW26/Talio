@@ -1,6 +1,6 @@
 'use client'
 
-import { Input, Select, SelectItem, Textarea } from '@heroui/react'
+import { Input, Select, SelectItem, Textarea } from '@/components/ui/fernly'
 import { ASSET_TRACKER_FIELDS } from '@/utils/assetData'
 
 export default function AssetTrackingFields({ values, onChange }) {

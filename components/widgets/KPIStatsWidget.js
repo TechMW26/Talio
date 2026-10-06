@@ -3,7 +3,7 @@
 import widgetStyles from './WidgetDesign.module.css'
 
 import { useRouter } from 'next/navigation'
-import { Card, CardBody } from '@heroui/react'
+import { Card, CardBody } from '@/components/ui/fernly'
 import { FaChartBar } from 'react-icons/fa'
 
 export default function KPIStatsWidget({ statsData }) {

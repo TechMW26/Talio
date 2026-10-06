@@ -1,9 +1,11 @@
 'use client'
 
+
+import { Heading1, NativeInput, NativeTextarea, Heading3, NativeButton } from '@/components/ui/fernly/native'
 import React, { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { Select, SelectItem, Skeleton, Button } from '@heroui/react'
+import { Select, SelectItem, Skeleton, Button } from '@/components/ui/fernly'
 import { FaBullhorn, FaUsers, FaCalendarAlt, FaExclamationTriangle } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -113,7 +115,7 @@ export default function CreateAnnouncementPage() {
       {/* Header */}
       <div className="mb-4 sm:mb-6">
         <div className="flex items-center space-x-2 sm:space-x-3 mb-2">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Create Announcement</h1>
+          <Heading1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Create Announcement</Heading1>
         </div>
         <p className="text-sm sm:text-base text-gray-600">
           {user.role === 'manager'
@@ -137,7 +139,7 @@ export default function CreateAnnouncementPage() {
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
               Announcement Title *
             </label>
-            <input
+            <NativeInput
               type="text"
               required
               value={formData.title}
@@ -183,7 +185,7 @@ export default function CreateAnnouncementPage() {
                 {generatingDescription ? 'Writing...' : 'AI Write'}
               </Button>
             </div>
-            <textarea
+            <NativeTextarea
               required
               value={formData.content}
               onChange={(e) => setFormData({ ...formData, content: e.target.value })}
@@ -254,7 +256,7 @@ export default function CreateAnnouncementPage() {
                         <div className="max-h-32 sm:max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-2">
                           {departments.map((dept) => (
                             <label key={dept._id} className="flex items-center space-x-2 p-1.5 sm:p-2 hover:bg-gray-50 rounded cursor-pointer">
-                              <input
+                              <NativeInput
                                 type="checkbox"
                                 checked={formData.departments.includes(dept._id)}
                                 onChange={(e) => {
@@ -321,7 +323,7 @@ export default function CreateAnnouncementPage() {
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
               Expiry Date (Optional)
             </label>
-            <input
+            <NativeInput
               type="date"
               value={formData.expiryDate}
               onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
@@ -335,7 +337,7 @@ export default function CreateAnnouncementPage() {
 
           {/* Active Status */}
           <div className="flex items-center">
-            <input
+            <NativeInput
               type="checkbox"
               id="isActive"
               checked={formData.isActive}
@@ -349,7 +351,7 @@ export default function CreateAnnouncementPage() {
 
           {/* Preview */}
           <div className="border-t pt-4 sm:pt-6">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Preview</h3>
+            <Heading3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Preview</Heading3>
             <div className={`rounded-lg p-3 sm:p-4 border-l-4 ${user.role === 'manager' || user.role === 'department_head'
                 ? 'bg-purple-50 border-purple-500'
                 : 'bg-gray-50 border-primary-500'
@@ -403,13 +405,13 @@ export default function CreateAnnouncementPage() {
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 pt-4 sm:pt-6">
-            <button
+            <NativeButton
               type="button"
               onClick={() => router.push('/dashboard/announcements')}
               className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Cancel
-            </button>
+            </NativeButton>
             <LoadingButton
               type="submit"
               isLoading={submitMutation.isLoading}

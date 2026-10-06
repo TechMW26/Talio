@@ -1,9 +1,11 @@
 'use client'
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem, Checkbox } from '@heroui/react'
+import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem, Checkbox } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCalendarAlt, FaPlus, FaCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
@@ -220,7 +222,7 @@ export default function ApplyLeavePage() {
           <BackIcon className="w-4 h-4 sm:w-5 sm:h-5" />
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-default-800 truncate">Apply for Leave</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800 truncate">Apply for Leave</Heading1>
           <p className="text-default-500 mt-1 text-sm sm:text-base">Submit your leave application for approval</p>
         </div>
       </div>
@@ -400,7 +402,7 @@ export default function ApplyLeavePage() {
         <div className="lg:col-span-1">
           <Card shadow="sm">
             <CardBody className="p-6">
-              <h3 className="text-lg font-semibold text-default-800 mb-4">Leave Balance</h3>
+              <Heading3 className="text-lg font-semibold text-default-800 mb-4">Leave Balance</Heading3>
               {leaveBalance.length === 0 ? (
                 <p className="text-default-500 text-sm">No leave balance found</p>
               ) : (

@@ -4,7 +4,7 @@ import widgetStyles from './WidgetDesign.module.css'
 
 import { useState, useEffect } from 'react'
 import { FaTasks, FaExclamationTriangle, FaCheckCircle, FaSpinner } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow, Spinner } from '@heroui/react'
+import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow, Spinner } from '@/components/ui/fernly'
 import { getTodayDateString } from '@/lib/timezone'
 
 export default function TodayTasksWidget({ limit = 5 }) {

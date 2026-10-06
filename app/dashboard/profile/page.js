@@ -1,5 +1,8 @@
 'use client'
+import styles from './profile.module.css'
 
+
+import { NativeButton, Heading1, Heading3, NativeInput, NativeSelect, NativeTextarea, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Loader, { PageLoader } from '@/components/ui/Loader'
@@ -25,8 +28,8 @@ import {
   FaBrain,
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Skeleton } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Skeleton } from '@/components/ui/fernly'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 import TiltWrapper from "@/components/TiltWrapper";
 import dynamic from 'next/dynamic'
@@ -72,7 +75,6 @@ export default function ProfilePage() {
 
   // Profile completion state
   const [isCompleteProfileMode, setIsCompleteProfileMode] = useState(false)
-  const [activeProfileTab, setActiveProfileTab] = useState('profile')
   const [refreshingKri, setRefreshingKri] = useState(false)
 
   // --- SWR: Profile data ---
@@ -83,7 +85,7 @@ export default function ProfilePage() {
   const profileCompletionStatus = useMemo(() => completionRes?.data || null, [completionRes])
 
   // --- SWR: AI-generated role responsibilities ---
-  const { data: kriRes, isLoading: kriLoading, mutate: refreshKri } = useAuthedSWR('/api/profile/kri')
+  const { data: kriRes, error: kriError, isLoading: kriLoading, mutate: refreshKri } = useAuthedSWR('/api/profile/kri')
   const kriData = useMemo(() => kriRes?.data || null, [kriRes])
 
   // Initialize user/employee from SWR data
@@ -515,44 +517,32 @@ export default function ProfilePage() {
   // Status and Edit buttons component for reuse
   const StatusEditButtons = () => (
     <div className="flex items-center justify-center lg:justify-end gap-3 flex-wrap">
-      <span
-        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${employee.status === 'active'
-          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-500/30'
-          : 'bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30'
-          }`}
-      >
-        <span className="h-2 w-2 rounded-full mr-1.5 bg-current" />
-        {employee.status === 'active'
-          ? 'Active Employee'
-          : employee.status?.toUpperCase() || 'ACTIVE'}
-      </span>
-
       {!isEditing ? (
-        <button
+        <NativeButton
           onClick={handleEditClick}
           className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200 shadow-sm hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors"
         >
           <FaEdit className="text-xs" />
           <span>Edit Profile</span>
-        </button>
+        </NativeButton>
       ) : (
         <div className="flex items-center gap-2">
-          <button
+          <NativeButton
             onClick={handleCancelEdit}
             disabled={saving}
             className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-zinc-300 shadow-sm hover:bg-slate-50 dark:hover:bg-zinc-700 disabled:opacity-60"
           >
             <FaTimes className="text-xs" />
             <span>Cancel</span>
-          </button>
-          <button
+          </NativeButton>
+          <NativeButton
             onClick={handleSaveProfile}
             disabled={saving}
             className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 dark:bg-zinc-100 px-4 py-2 text-xs font-semibold text-white dark:text-zinc-900 shadow-sm hover:bg-black dark:hover:bg-white disabled:opacity-60"
           >
             <FaSave className="text-xs" />
             <span>{saving ? 'Saving…' : 'Save Changes'}</span>
-          </button>
+          </NativeButton>
         </div>
       )}
     </div>
@@ -686,9 +676,9 @@ export default function ProfilePage() {
               )}
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+              <Heading3 className="text-base sm:text-lg font-semibold text-slate-900">
                 {hasMismatch ? 'Profile Verification Issue' : 'Complete Your Profile'}
-              </h3>
+              </Heading3>
               <p className={`text-xs mt-0.5 ${hasMismatch ? 'text-red-600' : 'text-slate-500'}`}>
                 {hasMismatch
                   ? 'Aadhaar data doesn\'t match your profile - please update'
@@ -894,55 +884,26 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="page-container pb-24 md:pb-6 px-2 sm:px-4 lg:px-8">
-      <div className="max-w-[1400px] mx-auto w-full">
-        <div className="mb-4 flex justify-end">
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-900/70 p-2 w-fit">
-            <button
-              type="button"
-              onClick={() => setActiveProfileTab('profile')}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeProfileTab === 'profile'
-                ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800'
-                }`}
-            >
-              Profile
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveProfileTab('kri')}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeProfileTab === 'kri'
-                ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800'
-                }`}
-            >
-              Key Responsibilities
-            </button>
-            <a href="/dashboard/resignations?view=mine" className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800">Resignations & exits</a>
-          </div>
-        </div>
-
-        {/* Status and Edit buttons - Desktop only (hidden on mobile) */}
-        <div className="mb-4 hidden lg:flex items-center justify-end gap-3">
-          <StatusEditButtons />
-        </div>
+    <div className={`page-container ${styles.page}`}>
+      <div className={styles.frame}>
 
         {/* Content - Two Column Layout */}
-        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 lg:gap-8 overflow-visible">
+        <div className={styles.layout}>
           {/* Left Column: ID Card */}
-          <div className="lg:col-span-1 relative lg:sticky lg:top-4 lg:self-start order-1" style={{ overflow: 'visible' }}>
+          <aside className={styles.identity} aria-label="Your digital employee ID">
             {/* Hidden file input for profile picture */}
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+            <NativeInput ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
 
             {/* Lanyard Model - hanging from top */}
             {typeof window !== 'undefined' && (
-              <div className="relative w-full overflow-visible z-10 h-[560px] sm:h-[620px] md:h-[680px] lg:h-[750px] mt-[-60px] lg:mt-[-140px]">
+              <div className={styles.lanyard}>
                 <Lanyard
                   key={`lanyard-${employee?.company?._id || employee?.company || 'default'}`}
                   employee={{
                     name: employee ? `${employee.firstName} ${employee.lastName}` : undefined,
                     designation: employee?.designation?.title || employee?.designation,
                     employeeId: employee?.employeeCode,
+                    status: employee?.status,
                     photo: employee?.profilePicture,
                     phone: employee?.phone,
                     bloodGroup: employee?.bloodGroup,
@@ -961,12 +922,21 @@ export default function ProfilePage() {
                 />
               </div>
             )}
-          </div>
+          </aside>
 
           {/* Right Column: All Sections */}
-          <div className="lg:col-span-2 space-y-5 sm:space-y-6 order-2 mt-6 lg:mt-0">
-            {activeProfileTab === 'profile' ? (
-              <>
+          <div className={styles.content}>
+            <div className={styles.heading}>
+              <div>
+                <p className={styles.eyebrow}>Your workspace identity</p>
+                <Heading1>My profile</Heading1>
+                <p className={styles.subtitle}>Your details, responsibilities and account, together in one place.</p>
+              </div>
+              <div className={styles.headerActions}>
+                <a href="/dashboard/resignations?view=mine" className={styles.exitLink}>Resignations & exits</a>
+                <StatusEditButtons />
+              </div>
+            </div>
             {/* Complete Your Profile Section - Always at top */}
             {renderCompleteProfileSection()}
 
@@ -989,12 +959,12 @@ export default function ProfilePage() {
             )}
 
             {/* Personal Information */}
-            <section className="bg-white dark:bg-[#18181b] rounded-3xl border border-slate-100 dark:border-transparent shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-4 sm:p-6">
+            <section className={styles.details}>
               <div className="flex items-center justify-between mb-4 sm:mb-5">
                 <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-zinc-100">
+                  <Heading3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-zinc-100">
                     Personal Information
-                  </h3>
+                  </Heading3>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                     Basic details that help us identify and contact you.
                   </p>
@@ -1030,7 +1000,7 @@ export default function ProfilePage() {
                       Phone Number
                     </p>
                     {isEditing ? (
-                      <input
+                      <NativeInput
                         type="tel"
                         value={editedEmployee.phone || ''}
                         onChange={(e) => {
@@ -1060,7 +1030,7 @@ export default function ProfilePage() {
                     </p>
                     {isEditing ? (
                       <>
-                        <input
+                        <NativeInput
                           type="date"
                           value={
                             editedEmployee.dateOfBirth
@@ -1094,13 +1064,13 @@ export default function ProfilePage() {
                                 <p className="text-xs text-emerald-800 mb-2">
                                   {aadhaarDob}
                                 </p>
-                                <button
+                                <NativeButton
                                   type="button"
                                   onClick={() => handleFieldChange('dateOfBirth', aadhaarDateFormatted)}
                                   className="text-xs px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
                                 >
                                   Use this date
-                                </button>
+                                </NativeButton>
                               </div>
                             )
                           }
@@ -1166,7 +1136,7 @@ export default function ProfilePage() {
                       Gender
                     </p>
                     {isEditing ? (
-                      <select
+                      <NativeSelect
                         value={editedEmployee.gender || ''}
                         onChange={(e) => handleFieldChange('gender', e.target.value)}
                         className="w-full px-3 py-2 border border-pink-300 rounded-lg text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
@@ -1175,7 +1145,7 @@ export default function ProfilePage() {
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                         <option value="other">Other</option>
-                      </select>
+                      </NativeSelect>
                     ) : (
                       <p className="font-semibold text-slate-900 text-sm sm:text-base capitalize">
                         {employee.gender || 'N/A'}
@@ -1195,7 +1165,7 @@ export default function ProfilePage() {
                     </p>
                     {isEditing ? (
                       <>
-                        <textarea
+                        <NativeTextarea
                           value={editedEmployee.address || ''}
                           onChange={(e) => handleFieldChange('address', e.target.value)}
                           className="w-full px-3 py-2 border border-rose-300 rounded-lg text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all resize-none"
@@ -1213,13 +1183,13 @@ export default function ProfilePage() {
                               <p className="text-xs text-emerald-800 mb-2">
                                 {profileCompletionStatus.steps.ocrVerification.extractedData.address}
                               </p>
-                              <button
+                              <NativeButton
                                 type="button"
                                 onClick={() => handleFieldChange('address', profileCompletionStatus.steps.ocrVerification.extractedData.address)}
                                 className="text-xs px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
                               >
                                 Use this address
-                              </button>
+                              </NativeButton>
                             </div>
                           )}
                       </>
@@ -1265,7 +1235,7 @@ export default function ProfilePage() {
                       Bio
                     </p>
                     {isEditing ? (
-                      <textarea
+                      <NativeTextarea
                         value={editedEmployee.bio || ''}
                         onChange={(e) => handleFieldChange('bio', e.target.value.slice(0, 1000))}
                         className="w-full px-3 py-2 border border-sky-300 rounded-lg text-sm font-medium text-slate-900 bg-white focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all resize-none"
@@ -1291,7 +1261,7 @@ export default function ProfilePage() {
                       Blood Group
                     </p>
                     {isEditing ? (
-                      <select
+                      <NativeSelect
                         value={editedEmployee.bloodGroup || ''}
                         onChange={(e) => handleFieldChange('bloodGroup', e.target.value)}
                         className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
@@ -1305,7 +1275,7 @@ export default function ProfilePage() {
                         <option value="AB-">AB-</option>
                         <option value="O+">O+</option>
                         <option value="O-">O-</option>
-                      </select>
+                      </NativeSelect>
                     ) : (
                       <p className="font-semibold text-slate-900 text-sm sm:text-base">
                         {employee.bloodGroup || 'N/A'}
@@ -1317,12 +1287,12 @@ export default function ProfilePage() {
             </section>
 
             {/* Employment Information */}
-            <section className="bg-white dark:bg-[#18181b] rounded-3xl border border-slate-100 dark:border-transparent shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-4 sm:p-6">
+            <section className={styles.details}>
               <div className="flex items-center justify-between mb-4 sm:mb-5">
                 <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-zinc-100">
+                  <Heading3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-zinc-100">
                     Employment Information
-                  </h3>
+                  </Heading3>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                     Details about your current role and reporting structure.
                   </p>
@@ -1395,12 +1365,12 @@ export default function ProfilePage() {
             </section>
 
             {/* Emergency Contact */}
-            <section className="bg-white dark:bg-[#18181b] rounded-3xl border border-slate-100 dark:border-transparent shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-4 sm:p-6">
+            <section className={styles.details}>
               <div className="flex items-center justify-between mb-4 sm:mb-5">
                 <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-zinc-100">
+                  <Heading3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-zinc-100">
                     Emergency Contact
-                  </h3>
+                  </Heading3>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                     Person we should reach out to in case of any emergency.
                   </p>
@@ -1414,7 +1384,7 @@ export default function ProfilePage() {
                     Contact Name
                   </p>
                   {isEditing ? (
-                    <input
+                    <NativeInput
                       type="text"
                       value={editedEmployee.emergencyContact?.name || ''}
                       onChange={(e) =>
@@ -1436,7 +1406,7 @@ export default function ProfilePage() {
                     Relationship
                   </p>
                   {isEditing ? (
-                    <input
+                    <NativeInput
                       type="text"
                       value={editedEmployee.emergencyContact?.relationship || ''}
                       onChange={(e) =>
@@ -1458,7 +1428,7 @@ export default function ProfilePage() {
                     Phone Number
                   </p>
                   {isEditing ? (
-                    <input
+                    <NativeInput
                       type="tel"
                       value={editedEmployee.emergencyContact?.phone || ''}
                       onChange={(e) => {
@@ -1501,24 +1471,29 @@ export default function ProfilePage() {
             <a id="resignations" href={`/dashboard/resignations${searchParams.get('resignation') ? `?resignation=${encodeURIComponent(searchParams.get('resignation'))}` : '?view=mine'}`} className="mt-6 block rounded-2xl border border-default-200 p-5 text-sm">Manage resignation requests, approvals and exit settlement in Resignations &amp; Exits →</a>
 
             {/* Mobile only: Status and Edit buttons at bottom */}
-            <div className="lg:hidden mt-8 mb-4">
+            <div className={styles.bottomActions}>
               <StatusEditButtons />
             </div>
-              </>
-            ) : (
-              <section className="bg-white dark:bg-[#18181b] rounded-3xl border border-slate-100 dark:border-transparent shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-5 sm:p-6">
+          </div>
+          <aside className={styles.responsibilities} aria-label="Key responsibilities">
+              <section className={styles.details}>
                 <div className="mb-5">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">
+                  <Heading3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">
                     Key Responsibilities
-                  </h3>
+                  </Heading3>
                   <p className="text-sm text-slate-500 mt-1">
                     Your core responsibilities aligned to your designation and department.
                   </p>
                 </div>
 
                 <div className="space-y-3">
-                  {kriLoading ? (
-                    <div className="text-sm text-slate-500">Loading responsibilities...</div>
+                  {kriError ? (
+                    <div role="alert" className="text-sm text-default-500">
+                      <p>Unable to load responsibilities.</p>
+                      <NativeButton onClick={() => refreshKri()} className="mt-3 px-4 py-2 border border-default-200">Retry</NativeButton>
+                    </div>
+                  ) : kriLoading ? (
+                    <div role="status" className="text-sm text-slate-500">Loading responsibilities...</div>
                   ) : (kriData?.responsibilities || []).length === 0 ? (
                     <div className="rounded-2xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 px-4 py-3 text-sm text-slate-600 dark:text-zinc-300">
                       Your responsibilities will appear here shortly.
@@ -1536,8 +1511,7 @@ export default function ProfilePage() {
                   )}
                 </div>
               </section>
-            )}
-          </div>
+          </aside>
         </div>
       </div>
 
@@ -1568,9 +1542,9 @@ export default function ProfilePage() {
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1 bg-slate-50 border-b border-slate-200">
             <div className="flex flex-col">
-              <h2 className="text-base sm:text-lg font-semibold text-slate-900">
+              <Heading2 className="text-base sm:text-lg font-semibold text-slate-900">
                 Edit Profile Picture
-              </h2>
+              </Heading2>
               <p className="text-xs text-slate-500 mt-0.5">
                 Crop, adjust and fine-tune how your profile photo looks.
               </p>
@@ -1628,7 +1602,7 @@ export default function ProfilePage() {
                       {Math.round(imageScale * 100)}%
                     </span>
                   </div>
-                  <input
+                  <NativeInput
                     type="range"
                     min="0.5"
                     max="3"
@@ -1638,20 +1612,20 @@ export default function ProfilePage() {
                     className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
                   />
                   <div className="flex gap-2 mt-2">
-                    <button
+                    <NativeButton
                       onClick={() => setImageScale(Math.max(0.5, imageScale - 0.1))}
                       className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <FaSearchMinus className="inline mr-1" />
                       Zoom out
-                    </button>
-                    <button
+                    </NativeButton>
+                    <NativeButton
                       onClick={() => setImageScale(Math.min(3, imageScale + 0.1))}
                       className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <FaSearchPlus className="inline mr-1" />
                       Zoom in
-                    </button>
+                    </NativeButton>
                   </div>
                 </div>
 
@@ -1666,7 +1640,7 @@ export default function ProfilePage() {
                       {imageRotation}°
                     </span>
                   </div>
-                  <input
+                  <NativeInput
                     type="range"
                     min="0"
                     max="360"
@@ -1676,18 +1650,18 @@ export default function ProfilePage() {
                     className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
                   />
                   <div className="flex gap-2 mt-2">
-                    <button
+                    <NativeButton
                       onClick={() => setImageRotation((imageRotation - 90 + 360) % 360)}
                       className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <FaUndo className="inline mr-1" /> 90°
-                    </button>
-                    <button
+                    </NativeButton>
+                    <NativeButton
                       onClick={() => setImageRotation((imageRotation + 90) % 360)}
                       className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <FaRedo className="inline mr-1" /> 90°
-                    </button>
+                    </NativeButton>
                   </div>
                 </div>
 
@@ -1702,7 +1676,7 @@ export default function ProfilePage() {
                       {imageBrightness}%
                     </span>
                   </div>
-                  <input
+                  <NativeInput
                     type="range"
                     min="50"
                     max="150"
@@ -1724,7 +1698,7 @@ export default function ProfilePage() {
                       {imageContrast}%
                     </span>
                   </div>
-                  <input
+                  <NativeInput
                     type="range"
                     min="50"
                     max="150"
@@ -1746,7 +1720,7 @@ export default function ProfilePage() {
                       {imageSaturation}%
                     </span>
                   </div>
-                  <input
+                  <NativeInput
                     type="range"
                     min="0"
                     max="200"
@@ -1758,12 +1732,12 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Reset */}
-                <button
+                <NativeButton
                   onClick={resetImageEditor}
                   className="col-span-2 sm:col-span-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-2xl hover:bg-slate-50 transition-colors text-xs font-semibold flex items-center justify-center"
                 >
                   Reset all adjustments
-                </button>
+                </NativeButton>
               </div>
             </div>
           </ModalBody>

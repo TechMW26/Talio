@@ -1,12 +1,14 @@
 'use client'
 
+
+import { Heading1, Heading3, NativeTextarea, NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@/components/ui/fernly'
 import {
   FaCheck, FaTimes, FaTrash, FaProjectDiagram,
   FaClock, FaCheckCircle, FaTimesCircle, FaFilter,
@@ -227,7 +229,7 @@ export default function ApprovalsPage() {
             <BackIcon className="text-default-600" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-default-800">Request Approvals</h1>
+            <Heading1 className="text-2xl font-bold text-default-800">Request Approvals</Heading1>
             <p className="text-default-500 text-sm">Manage pending requests for your projects</p>
           </div>
         </div>
@@ -351,9 +353,9 @@ export default function ApprovalsPage() {
         <Card shadow="sm">
           <CardBody className="p-8 text-center">
             <FaCheckCircle className="text-6xl text-default-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-default-700 mb-2">
+            <Heading3 className="text-xl font-semibold text-default-700 mb-2">
               {statusFilter === 'pending' ? 'No pending requests' : `No ${statusFilter} requests`}
-            </h3>
+            </Heading3>
             <p className="text-default-500">
               {statusFilter === 'pending'
                 ? 'All caught up! No requests need your attention right now.'
@@ -492,7 +494,7 @@ export default function ApprovalsPage() {
         {selectedRequest && <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4 overflow-y-auto">
           <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
             <div className="px-6 py-4 bg-default-50 border-b border-default-200">
-              <h3 className="text-xl font-bold text-default-800">Reject Task Review</h3>
+              <Heading3 className="text-xl font-bold text-default-800">Reject Task Review</Heading3>
               {selectedRequest.relatedTask?.title && (
                 <p className="text-sm text-default-500 mt-1">Task: {selectedRequest.relatedTask.title}</p>
               )}
@@ -508,7 +510,7 @@ export default function ApprovalsPage() {
                     <label className="block text-sm font-medium text-default-700 mb-2">
                       Rejection Reason
                     </label>
-                    <textarea
+                    <NativeTextarea
                       value={rejectComment}
                       onChange={(e) => setRejectComment(e.target.value)}
                       placeholder="Explain why this task is being rejected..."
@@ -524,7 +526,7 @@ export default function ApprovalsPage() {
                         <label className="block text-sm font-medium text-default-700">
                           Select subtasks to mark as incomplete
                         </label>
-                        <button
+                        <NativeButton
                           type="button"
                           onClick={() => {
                             if (subtasksToUnmark.length === taskDetails.subtasks.length) {
@@ -536,7 +538,7 @@ export default function ApprovalsPage() {
                           className="text-xs text-primary-600 hover:text-primary-700"
                         >
                           {subtasksToUnmark.length === taskDetails.subtasks.length ? 'Deselect All' : 'Select All'}
-                        </button>
+                        </NativeButton>
                       </div>
                       <div className="space-y-3 max-h-60 overflow-y-auto border border-default-200 rounded-lg p-3 bg-default-50">
                         {taskDetails.subtasks.map((subtask) => {
@@ -545,7 +547,7 @@ export default function ApprovalsPage() {
                             <div key={subtask._id} className={`p-3 rounded-lg border transition-all ${isSelected ? 'border-danger-300 bg-danger-50' : 'border-default-200 bg-content1'
                               }`}>
                               <div className="flex items-start gap-3">
-                                <input
+                                <NativeInput
                                   type="checkbox"
                                   id={`subtask-${subtask._id}`}
                                   checked={isSelected}
@@ -575,7 +577,7 @@ export default function ApprovalsPage() {
                                   )}
                                   {isSelected && (
                                     <div className="mt-2">
-                                      <input
+                                      <NativeInput
                                         type="text"
                                         placeholder="Add comment for this subtask (optional)..."
                                         value={subtaskComments[subtask._id] || ''}

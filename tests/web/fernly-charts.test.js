@@ -5,6 +5,18 @@ import { styleChartTree, TaskDistribution, FernlyBars, FernlyGauge, FernlyMetric
 import MemberOverview from '@/app/dashboard/team/members/[id]/MemberOverview'
 jest.mock('framer-motion', () => ({ ...jest.requireActual('framer-motion'), useReducedMotion: () => true }))
 const originalResizeObserver = global.ResizeObserver
+test('distribution labels show shares of total and names only in hover or focus details', () => {
+  render(<FernlyBars percentageLabels valueLabel="employees" data={[{ name: 'Sales', value: 3 }, { name: 'Research and Development', value: 1 }, { name: 'Empty', value: 0 }]} />)
+  expect(screen.getByText('75%')).toBeInTheDocument()
+  expect(screen.getByText('25%')).toBeInTheDocument()
+  expect(screen.getByText('0%')).toBeInTheDocument()
+  expect(screen.queryByText('Research and Development')).not.toBeInTheDocument()
+  const bar = screen.getByRole('button', { name: 'Research and Development: 1 employees' })
+  fireEvent.focus(bar)
+  expect(screen.getByRole('tooltip')).toHaveTextContent('Research and Development · 1 employees · 25%')
+  fireEvent.blur(bar)
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+})
 beforeAll(() => { global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } })
 afterAll(() => { global.ResizeObserver = originalResizeObserver })
 test('theme preserves chart data, data keys, handlers and series colors', () => {
@@ -42,7 +54,7 @@ test('member portrait uses real image and falls back when image fails', () => {
   expect(photo).toHaveAttribute('src', '/photo.jpg')
   fireEvent.error(photo)
   expect(screen.getByLabelText('No profile photo')).toHaveTextContent('TU')
-  expect(screen.getByRole('heading', { name: 'Test User' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Test User', level: 1 })).toBeInTheDocument()
 })
 test('empty task data is honest and does not show fabricated bars', () => {
   render(<TaskDistribution stats={{ total: 0, completed: 0 }} />)

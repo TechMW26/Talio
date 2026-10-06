@@ -1,7 +1,9 @@
 'use client'
 
+
+import { NativeInput, NativeButton } from '@/components/ui/fernly/native'
 import { useEffect, useMemo, useState } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button,
   ModalBody,
@@ -9,7 +11,7 @@ import {
   ModalFooter,
   ModalHeader,
   Spinner,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import {
   HiOutlineCheck,
   HiOutlineClipboardDocument,
@@ -185,7 +187,7 @@ export default function AddMeetingParticipantsModal({
         <ModalBody>
           <div className="relative">
             <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400" />
-            <input
+            <NativeInput
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Search by name, email, role, or department"
@@ -216,7 +218,7 @@ export default function AddMeetingParticipantsModal({
               {filteredEmployees.map(employee => {
                 const isSelected = selectedIds.includes(String(employee._id))
                 return (
-                  <button
+                  <NativeButton
                     key={employee._id}
                     type="button"
                     onClick={() => toggleEmployee(employee._id)}
@@ -240,7 +242,7 @@ export default function AddMeetingParticipantsModal({
                     }`}>
                       {isSelected && <HiOutlineCheck className="h-4 w-4" />}
                     </span>
-                  </button>
+                  </NativeButton>
                 )
               })}
             </div>
@@ -264,7 +266,7 @@ export default function AddMeetingParticipantsModal({
                 </Button>
               </div>
               {guestAccess?.guestUrl && (
-                <input
+                <NativeInput
                   readOnly
                   value={guestAccess.guestUrl}
                   onFocus={event => event.target.select()}

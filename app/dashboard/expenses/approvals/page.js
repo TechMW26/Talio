@@ -1,7 +1,9 @@
 'use client'
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaEye, FaFileInvoiceDollar, FaUser } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
@@ -97,7 +99,7 @@ export default function ExpenseApprovalsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Expense Approvals</h1>
+        <Heading1 className="text-2xl font-bold text-gray-800">Expense Approvals</Heading1>
         <p className="text-gray-600 flex items-center gap-2">
           Review and approve employee expense claims
           <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -129,9 +131,9 @@ export default function ExpenseApprovalsPage() {
                       <FaUser />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-800">
+                      <Heading3 className="font-semibold text-gray-800">
                         {expense.employee?.firstName} {expense.employee?.lastName}
-                      </h3>
+                      </Heading3>
                       <p className="text-xs text-gray-500">{expense.employee?.employeeCode}</p>
                     </div>
                   </div>

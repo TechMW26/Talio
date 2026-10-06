@@ -1,7 +1,9 @@
 'use client'
 
+
+import { UploadInput } from '@/components/ui/UploadButton'
 import { useMemo, useState } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button,
   Chip,
@@ -13,7 +15,7 @@ import {
   Select,
   SelectItem,
   Skeleton,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import {
   FaBuilding,
   FaCheckCircle,
@@ -321,7 +323,7 @@ export default function AttendanceMachinesSettings() {
                   {machine.connectionMode === 'file_import' && (
                     <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-2 rounded-lg bg-default-100 px-3 text-sm font-medium transition hover:bg-default-200">
                       <FaPlus /> Import CSV
-                      <input
+                      <UploadInput
                         className="sr-only"
                         type="file"
                         accept=".csv,text/csv"

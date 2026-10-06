@@ -1,5 +1,9 @@
 'use client'
 
+
+
+import UploadButton from '@/components/ui/UploadButton'
+import { Heading1, NativeButton, Heading2, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 import styles from './chat.module.css'
 
@@ -13,8 +17,8 @@ import { useTheme } from '@/contexts/ThemeContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import MemberAvatar from '@/components/chat/MemberAvatar'
 import { playNotificationSound } from '@/utils/audio'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Checkbox, Skeleton } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Checkbox, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
@@ -703,28 +707,28 @@ export default function ChatPage() {
   }
 
   return (
-    <>
+    <div className={styles.page}>
       {/* Header - Hide on mobile when chat is selected, always show on desktop */}
       <div className={styles.toolbar}>
         <div>
-          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-800">Chat</h1>
+          <Heading1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-800">Chat</Heading1>
           <p className="text-xs md:text-sm lg:text-base text-gray-600 mt-1">Connect with your team</p>
         </div>
         <div className="flex gap-2">
-          <button
+          <NativeButton
             onClick={() => setShowNewChatModal(true)}
             className="bg-[#6B7FFF] text-white w-14 h-14 rounded-full hover:bg-[#5A6EEE] transition-colors flex items-center justify-center shadow-md"
             title="New Chat"
           >
             <FaUserPlus className="text-base" />
-          </button>
-          <button
+          </NativeButton>
+          <NativeButton
             onClick={() => setShowGroupModal(true)}
             className="bg-[#00D9A5] text-white w-14 h-14 rounded-full hover:bg-[#00C794] transition-colors flex items-center justify-center shadow-md"
             title="New Group"
           >
             <FaUsers className="text-base" />
-          </button>
+          </NativeButton>
         </div>
       </div>
 
@@ -733,7 +737,7 @@ export default function ChatPage() {
         <div className={styles.layout}>
           {/* Chat List - Hide on mobile when chat is selected */}
           <div className={`${styles.rail} flex flex-col h-full ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
-            <div className={styles.railHeader}><h2>Direct messages & groups</h2><input aria-label="Search conversations" placeholder="Find a conversation" value={chatSearchQuery} onChange={event => setChatSearchQuery(event.target.value)} /></div>
+            <div className={styles.railHeader}><Heading2>Direct messages & groups</Heading2><NativeInput aria-label="Search conversations" placeholder="Find a conversation" value={chatSearchQuery} onChange={event => setChatSearchQuery(event.target.value)} /></div>
             {/* Chat list - no header, just the list */}
             <div className="overflow-y-auto flex-1 m-0 p-0">
               {filteredChats.length === 0 ? (
@@ -773,7 +777,7 @@ export default function ChatPage() {
                         </div>
                         <div className="flex-1 min-w-0 pr-2">
                           <div className="flex items-center justify-between mb-1">
-                            <h3 className={`font-semibold truncate text-[15px] ${unreadChats[chat._id] > 0 ? 'text-gray-900' : 'text-gray-900'}`}>{getChatName(chat)}</h3>
+                            <Heading3 className={`font-semibold truncate text-[15px] ${unreadChats[chat._id] > 0 ? 'text-gray-900' : 'text-gray-900'}`}>{getChatName(chat)}</Heading3>
                             <span className="text-xs text-gray-400 ml-2 flex-shrink-0">{chat.lastMessageAt ? formatTime(chat.lastMessageAt) : ''}</span>
                           </div>
                           <p className={`text-sm truncate ${unreadChats[chat._id] > 0 ? 'text-gray-900 font-semibold' : 'text-gray-500'}`}>{chat.lastMessage || 'No messages yet'}</p>
@@ -792,13 +796,13 @@ export default function ChatPage() {
               <>
                 {/* Chat Header - Clean minimal design */}
                 <div className="px-4 py-3 md:px-6 md:py-4 bg-white flex items-center gap-3 flex-shrink-0 border-b border-gray-100">
-                  <button
+                  <NativeButton
                     onClick={() => setSelectedChat(null)}
                     className="text-gray-600 hover:text-gray-900 -ml-1 md:hidden"
                     title="Back to chats"
                   >
                     <BackIcon className="text-xl" />
-                  </button>
+                  </NativeButton>
                   <div
                     className="w-11 h-11 md:w-10 md:h-10 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
                     style={{
@@ -814,7 +818,7 @@ export default function ChatPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-lg md:text-base truncate">{getChatName(selectedChat)}</h3>
+                    <Heading3 className="font-semibold text-gray-900 text-lg md:text-base truncate">{getChatName(selectedChat)}</Heading3>
                     {selectedChat.isGroup ? (
                       <p className="text-xs text-gray-500">{selectedChat.participants?.length || 0} members</p>
                     ) : (
@@ -823,13 +827,13 @@ export default function ChatPage() {
                   </div>
                   {/* View Members Button - Only for group chats */}
                   {selectedChat.isGroup && (
-                    <button
+                    <NativeButton
                       onClick={() => setShowMembersModal(true)}
                       className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
                       title="View Members"
                     >
                       <FaUsers className="text-lg" />
-                    </button>
+                    </NativeButton>
                   )}
                 </div>
 
@@ -994,22 +998,22 @@ export default function ChatPage() {
                                   >
                                     <div className="bg-white rounded-2xl shadow-2xl px-4 py-3 flex gap-3 border border-gray-200 items-center">
                                       {reactions.map(reaction => (
-                                        <button
+                                        <NativeButton
                                           key={reaction}
                                           onClick={() => handleReaction(msg._id, reaction)}
                                           className="text-2xl hover:scale-125 transition-transform active:scale-110"
                                         >
                                           {reaction}
-                                        </button>
+                                        </NativeButton>
                                       ))}
                                       <div className="w-px h-6 bg-gray-200"></div>
-                                      <button
+                                      <NativeButton
                                         onClick={() => handleDeleteMessage(msg._id)}
                                         className="text-red-500 hover:scale-125 transition-transform text-xl active:scale-110"
                                         title="Delete message"
                                       >
                                         🗑️
-                                      </button>
+                                      </NativeButton>
                                     </div>
                                   </div>
                                 )}
@@ -1060,7 +1064,7 @@ export default function ChatPage() {
 
                 {/* Scroll to Bottom Button */}
                 {showScrollButton && (
-                  <button
+                  <NativeButton
                     onClick={() => scrollToBottom('smooth')}
                     className="fixed bottom-[180px] right-6 md:absolute md:bottom-24 md:right-8 w-12 h-12 rounded-full shadow-lg flex items-center justify-center z-50 transition-all hover:scale-110"
                     style={{
@@ -1069,7 +1073,7 @@ export default function ChatPage() {
                     title="Scroll to latest message"
                   >
                     <FaArrowDown className="text-white text-lg" />
-                  </button>
+                  </NativeButton>
                 )}
 
                 {/* Message Input - Sleek minimal design */}
@@ -1085,24 +1089,24 @@ export default function ChatPage() {
                           {replyingTo.content || replyingTo.fileName || 'File'}
                         </p>
                       </div>
-                      <button
+                      <NativeButton
                         onClick={() => setReplyingTo(null)}
                         className="text-gray-400 hover:text-gray-600 flex-shrink-0"
                       >
                         <FaTimes className="text-sm" />
-                      </button>
+                      </NativeButton>
                     </div>
                   )}
 
                   <div className="flex items-center gap-2 max-w-full">
-                    <input
+                    <NativeInput
                       ref={fileInputRef}
                       type="file"
                       onChange={handleFileUpload}
                       className="hidden"
                       accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx,.mp4,.mp3,.avi,.mov,.svg,.json,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*,video/*,audio/*"
                     />
-                    <button
+                    <UploadButton busy={uploadingFile} label="Attach file"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingFile}
                       className="transition-colors disabled:opacity-50 flex-shrink-0 p-2.5 rounded-full"
@@ -1114,8 +1118,8 @@ export default function ChatPage() {
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
-                    </button>
-                    <input
+                    </UploadButton>
+                    <NativeInput
                       type="text"
                       value={message}
                       onChange={(e) => {
@@ -1126,7 +1130,7 @@ export default function ChatPage() {
                       placeholder="Type a message..."
                       className="flex-1 min-w-0 px-4 py-2.5 border-0 rounded-full focus:outline-none text-[15px] bg-gray-50 text-gray-900 placeholder-gray-400"
                     />
-                    <button
+                    <NativeButton
                       onClick={handleSendMessage}
                       disabled={sending || !message.trim()}
                       className="transition-all disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
@@ -1144,7 +1148,7 @@ export default function ChatPage() {
                           <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />
                         </svg>
                       )}
-                    </button>
+                    </NativeButton>
                   </div>
                 </div>
               </>
@@ -1310,13 +1314,13 @@ export default function ChatPage() {
           className="fixed inset-0 bg-black bg-opacity-90 backdrop-blur-[10px] z-[200] flex items-center justify-center p-4"
           onClick={() => setLightboxImage(null)}
         >
-          <button
+          <NativeButton
             onClick={() => setLightboxImage(null)}
             className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors z-[201]"
             title="Close"
           >
             <FaTimes className="text-3xl" />
-          </button>
+          </NativeButton>
           <div className="relative max-w-7xl max-h-full">
             <img
               src={lightboxImage}
@@ -1344,16 +1348,16 @@ export default function ChatPage() {
                   <FaUsers className="text-white text-lg" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">{selectedChat.name}</h2>
+                  <Heading2 className="text-lg font-bold text-white">{selectedChat.name}</Heading2>
                   <p className="text-white/80 text-xs">{selectedChat.participants?.length || 0} members</p>
                 </div>
               </div>
-              <button
+              <NativeButton
                 onClick={() => setShowMembersModal(false)}
                 className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
               >
                 <FaTimes className="text-lg" />
-              </button>
+              </NativeButton>
             </div>
 
             {/* Search Bar */}
@@ -1362,7 +1366,7 @@ export default function ChatPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="input-icon" fill="#9CA3AF">
                   <path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z" />
                 </svg>
-                <input
+                <NativeInput
                   type="text"
                   value={memberSearchQuery}
                   onChange={(e) => setMemberSearchQuery(e.target.value)}
@@ -1418,7 +1422,7 @@ export default function ChatPage() {
                     </div>
                     {/* Send Message Button - Only for other members */}
                     {!isCurrentUser && (
-                      <button
+                      <NativeButton
                         onClick={async () => {
                           // Start or open direct chat with this member
                           await handleStartChat(member._id)
@@ -1432,7 +1436,7 @@ export default function ChatPage() {
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-5 h-5" fill="currentColor">
                           <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />
                         </svg>
-                      </button>
+                      </NativeButton>
                     )}
                   </div>
                 )
@@ -1441,7 +1445,7 @@ export default function ChatPage() {
 
             {/* Modal Footer */}
             <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-              <button
+              <NativeButton
                 onClick={() => {
                   setShowMembersModal(false)
                   setMemberSearchQuery('')
@@ -1449,11 +1453,11 @@ export default function ChatPage() {
                 className="w-full py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium text-sm transition-colors"
               >
                 Close
-              </button>
+              </NativeButton>
             </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }

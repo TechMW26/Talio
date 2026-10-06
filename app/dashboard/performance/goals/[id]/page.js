@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, NativeButton, Heading2, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useMemo } from 'react'
@@ -10,7 +12,7 @@ import {
   FaCheckCircle, FaClock, FaChartLine, FaFlag, FaTasks, FaSync,
   FaExclamationTriangle, FaBuilding
 } from 'react-icons/fa'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 
@@ -158,14 +160,14 @@ export default function GoalDetailsPage() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
             <FaBullseye className="w-8 h-8 text-gray-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Goal Not Found</h1>
+          <Heading1 className="text-2xl font-bold text-gray-800 mb-4">Goal Not Found</Heading1>
           <p className="text-gray-600 mb-6">The goal you're looking for doesn't exist or has been deleted.</p>
-          <button
+          <NativeButton
             onClick={() => router.push('/dashboard/performance/goals')}
             className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
           >
             Back to Goals
-          </button>
+          </NativeButton>
         </div>
       </div>
     )
@@ -184,41 +186,41 @@ export default function GoalDetailsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div className="flex items-center gap-4">
-          <button
+          <NativeButton
             onClick={() => router.back()}
             className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors shadow-sm"
           >
             <BackIcon className="w-5 h-5" />
-          </button>
+          </NativeButton>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Goal Details</h1>
+            <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-900">Goal Details</Heading1>
             <p className="text-gray-600 mt-1 truncate max-w-md">{goal.title}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <NativeButton
             onClick={() => mutateGoal()}
             className="p-2 text-gray-600 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
             title="Refresh"
           >
             <FaSync className={'w-4 h-4 ' + (loading ? 'animate-spin' : '')} />
-          </button>
+          </NativeButton>
           {canManageGoals() && (
             <>
-              <button
+              <NativeButton
                 onClick={() => router.push('/dashboard/performance/goals/edit/' + goal._id)}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
               >
                 <FaEdit className="w-4 h-4" />
                 <span className="hidden sm:inline">Edit</span>
-              </button>
-              <button
+              </NativeButton>
+              <NativeButton
                 onClick={handleDelete}
                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"
               >
                 <FaTrash className="w-4 h-4" />
                 <span className="hidden sm:inline">Delete</span>
-              </button>
+              </NativeButton>
             </>
           )}
         </div>
@@ -235,7 +237,7 @@ export default function GoalDetailsPage() {
                   {(goal.employee?.firstName?.charAt(0) || 'U')}{(goal.employee?.lastName?.charAt(0) || '')}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-bold text-gray-900 mb-1">{goal.title}</h2>
+                  <Heading2 className="text-xl font-bold text-gray-900 mb-1">{goal.title}</Heading2>
                   <p className="text-gray-600">
                     {goal.employee?.firstName} {goal.employee?.lastName}
                     {goal.employee?.employeeCode && <span className="text-gray-400 ml-2">({goal.employee.employeeCode})</span>}
@@ -275,7 +277,7 @@ export default function GoalDetailsPage() {
                   <div className="pt-2 border-t border-gray-200">
                     <label className="block text-xs font-medium text-gray-500 mb-2">Update Progress</label>
                     <div className="flex items-center gap-3">
-                      <input
+                      <NativeInput
                         type="range"
                         min="0"
                         max="100"
@@ -293,7 +295,7 @@ export default function GoalDetailsPage() {
               {/* Description */}
               {goal.description && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Description</h3>
+                  <Heading3 className="text-sm font-semibold text-gray-700 mb-2">Description</Heading3>
                   <p className="text-gray-600 leading-relaxed">{goal.description}</p>
                 </div>
               )}
@@ -306,7 +308,7 @@ export default function GoalDetailsPage() {
               <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FaTasks className="w-4 h-4 text-gray-500" />
-                  <h3 className="text-lg font-semibold text-gray-900">Milestones</h3>
+                  <Heading3 className="text-lg font-semibold text-gray-900">Milestones</Heading3>
                 </div>
                 <span className="text-sm text-gray-500">
                   {completedMilestones} of {totalMilestones} completed
@@ -316,7 +318,7 @@ export default function GoalDetailsPage() {
                 {goal.milestones.map((milestone, index) => (
                   <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-start gap-3">
-                      <button
+                      <NativeButton
                         onClick={() => handleMilestoneToggle(index, !milestone.completed)}
                         disabled={updating}
                         className={'w-6 h-6 rounded-full flex items-center justify-center transition-colors flex-shrink-0 mt-0.5 ' +
@@ -325,7 +327,7 @@ export default function GoalDetailsPage() {
                             : 'border-2 border-gray-300 hover:border-primary-500')}
                       >
                         {milestone.completed && <FaCheckCircle className="w-4 h-4" />}
-                      </button>
+                      </NativeButton>
                       <div className="flex-1 min-w-0">
                         <h4 className={'font-medium ' + (milestone.completed ? 'text-gray-500 line-through' : 'text-gray-900')}>
                           {milestone.title}
@@ -359,7 +361,7 @@ export default function GoalDetailsPage() {
           {goal.keyResults && goal.keyResults.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900">Key Results</h3>
+                <Heading3 className="text-lg font-semibold text-gray-900">Key Results</Heading3>
               </div>
               <div className="divide-y divide-gray-100">
                 {goal.keyResults.map((kr, index) => (
@@ -384,7 +386,7 @@ export default function GoalDetailsPage() {
           {goal.updates && goal.updates.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900">Updates History</h3>
+                <Heading3 className="text-lg font-semibold text-gray-900">Updates History</Heading3>
               </div>
               <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
                 {goal.updates.map((update, index) => (
@@ -408,7 +410,7 @@ export default function GoalDetailsPage() {
           {/* Quick Stats Card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900">Quick Stats</h3>
+              <Heading3 className="font-semibold text-gray-900">Quick Stats</Heading3>
             </div>
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between">
@@ -439,7 +441,7 @@ export default function GoalDetailsPage() {
           {/* Timeline Card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900">Timeline</h3>
+              <Heading3 className="font-semibold text-gray-900">Timeline</Heading3>
             </div>
             <div className="p-4 space-y-4">
               <div className="flex items-start gap-3">
@@ -478,7 +480,7 @@ export default function GoalDetailsPage() {
           {/* Details Card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900">Details</h3>
+              <Heading3 className="font-semibold text-gray-900">Details</Heading3>
             </div>
             <div className="p-4 space-y-4">
               {goal.category && (
@@ -526,7 +528,7 @@ export default function GoalDetailsPage() {
           {goal.tags && goal.tags.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-900">Tags</h3>
+                <Heading3 className="font-semibold text-gray-900">Tags</Heading3>
               </div>
               <div className="p-4">
                 <div className="flex flex-wrap gap-2">

@@ -69,10 +69,20 @@ describe('dashboard performance boundaries', () => {
   })
 
   test('uses the same Next.js runtime in development and production', () => {
-    expect(packageJson.scripts.dev).toContain('next dev')
+    expect(packageJson.scripts.dev).toBe('node scripts/dev.cjs')
+    const launcher = fs.readFileSync(path.join(process.cwd(), 'scripts/dev.cjs'), 'utf8')
+    expect(launcher).toContain("require.resolve('next/dist/bin/next')")
+    expect(launcher).toContain('`.next-dev-${port}`')
+    expect(launcher).toContain('NEXT_DIST_DIR: dist')
     expect(packageJson.scripts.start).toContain('next start')
     expect(packageJson.dependencies['node-schedule']).toBeUndefined()
     expect(packageJson.dependencies['socket.io']).toBeUndefined()
+  })
+
+  test('native UI primitives do not import the heavy component library', () => {
+    const native = fs.readFileSync(path.join(process.cwd(), 'components/ui/fernly/native.js'), 'utf8')
+    expect(native).not.toContain('@heroui')
+    expect(native).not.toContain('HeroModal')
   })
 
   test('does not schedule React rerenders for widget entrance or hover effects', () => {

@@ -1,11 +1,15 @@
 'use client'
 
+
+
+import { UploadInput } from '@/components/ui/UploadButton'
+import { Heading1, Heading3, NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle, FaBuilding, FaSitemap, FaPaperclip, FaTimes } from 'react-icons/fa'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Textarea, Checkbox, Skeleton, Chip } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Textarea, Checkbox, Skeleton, Chip } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -239,7 +243,7 @@ export default function PoliciesPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Company Policies</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">Company Policies</Heading1>
           <p className="text-gray-600 mt-1">View and manage company policies</p>
         </div>
         {['admin', 'hr'].includes(currentUser?.role) && (
@@ -257,7 +261,7 @@ export default function PoliciesPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Total Policies</h3>
+            <Heading3 className="text-sm font-medium text-gray-600">Total Policies</Heading3>
             <FaFileAlt className="text-primary-500" />
           </div>
           <div className="text-3xl font-bold text-gray-800">{policies.length}</div>
@@ -266,7 +270,7 @@ export default function PoliciesPage() {
         {['HR', 'IT', 'Finance', 'General'].map((cat) => (
           <div key={cat} className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
-              <h3 className="text-sm font-medium text-gray-600">{cat} Policies</h3>
+              <Heading3 className="text-sm font-medium text-gray-600">{cat} Policies</Heading3>
               <FaFileAlt className="text-blue-500" />
             </div>
             <div className="text-3xl font-bold text-gray-800">
@@ -292,7 +296,7 @@ export default function PoliciesPage() {
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
                     <FaFileAlt className="text-primary-500 text-xl" />
-                    <h3 className="text-xl font-bold text-gray-800">{policy.title}</h3>
+                    <Heading3 className="text-xl font-bold text-gray-800">{policy.title}</Heading3>
                     {policy.category && (
                       <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                         {policy.category}
@@ -354,18 +358,18 @@ export default function PoliciesPage() {
                 <div className="flex space-x-2 ml-4">
                   {['admin', 'super_admin', 'hr'].includes(currentUser?.role) && (
                     <>
-                      <button
+                      <NativeButton
                         onClick={() => handleEdit(policy)}
                         className="text-blue-600 hover:text-blue-800 p-2"
                       >
                         <FaEdit size={18} />
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => handleDelete(policy._id)}
                         className="text-red-600 hover:text-red-800 p-2"
                       >
                         <FaTrash size={18} />
-                      </button>
+                      </NativeButton>
                     </>
                   )}
                 </div>
@@ -453,7 +457,7 @@ export default function PoliciesPage() {
                       </div>
                       <label className="cursor-pointer rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
                         {uploadingAttachments ? 'Uploading…' : 'Upload files'}
-                        <input
+                        <UploadInput
                           type="file"
                           multiple
                           accept=".pdf,.doc,.docx,image/*"
@@ -470,7 +474,7 @@ export default function PoliciesPage() {
                         {formData.attachments.map((attachment, index) => (
                           <li key={attachment.fileId || attachment.url || index} className="flex items-center justify-between gap-3 rounded-lg bg-content1 px-3 py-2">
                             <span className="min-w-0 truncate text-sm text-default-700">{attachment.fileName}</span>
-                            <button
+                            <NativeButton
                               type="button"
                               aria-label={`Remove ${attachment.fileName}`}
                               onClick={() => setFormData(previous => ({
@@ -480,7 +484,7 @@ export default function PoliciesPage() {
                               className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-full text-danger hover:bg-danger-50"
                             >
                               <FaTimes aria-hidden="true" />
-                            </button>
+                            </NativeButton>
                           </li>
                         ))}
                       </ul>
@@ -614,7 +618,7 @@ export default function PoliciesPage() {
                 <div className="space-y-6">
                   {pendingPolicies.map((policy) => (
                     <div key={policy._id} className="border border-default-200 rounded-lg p-4">
-                      <h3 className="text-lg font-bold text-default-800 mb-2">{policy.title}</h3>
+                      <Heading3 className="text-lg font-bold text-default-800 mb-2">{policy.title}</Heading3>
                       <p className="text-sm text-default-500 mb-2">Effective: {new Date(policy.effectiveDate).toLocaleDateString()}</p>
                       <div className="bg-default-50 p-4 rounded text-sm text-default-700 mb-4 max-h-40 overflow-y-auto whitespace-pre-wrap">
                         {policy.content}

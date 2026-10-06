@@ -1,7 +1,9 @@
 'use client'
 
+
+import { Heading1, NativeInput, NativeSelect, Heading2, Heading3, NativeButton } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
-import { Button, Skeleton } from '@heroui/react'
+import { Button, Skeleton } from '@/components/ui/fernly'
 import {
   HiOutlineCalendarDays,
   HiOutlinePlus,
@@ -139,9 +141,9 @@ export default function MeetingsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <Heading1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             Meetings
-          </h1>
+          </Heading1>
           <p className="text-gray-600 mt-1">
             Schedule and manage your meetings
           </p>
@@ -215,7 +217,7 @@ export default function MeetingsPage() {
           {/* Search */}
           <div className="input-with-icon flex-1">
             <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-            <input
+            <NativeInput
               type="text"
               placeholder="Search meetings..."
               value={searchQuery}
@@ -226,7 +228,7 @@ export default function MeetingsPage() {
 
           {/* Filters */}
           <div className="flex flex-wrap gap-2">
-            <select
+            <NativeSelect
               value={filter.type}
               onChange={(e) => setFilter(prev => ({ ...prev, type: e.target.value }))}
               className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -234,9 +236,9 @@ export default function MeetingsPage() {
               <option value="all">All Types</option>
               <option value="online">Online</option>
               <option value="offline">Offline</option>
-            </select>
+            </NativeSelect>
 
-            <select
+            <NativeSelect
               value={filter.view}
               onChange={(e) => setFilter(prev => ({ ...prev, view: e.target.value }))}
               className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -244,9 +246,9 @@ export default function MeetingsPage() {
               <option value="all">All Meetings</option>
               <option value="my-meetings">My Meetings</option>
               <option value="invited">Invited</option>
-            </select>
+            </NativeSelect>
 
-            <select
+            <NativeSelect
               value={filter.status}
               onChange={(e) => setFilter(prev => ({ ...prev, status: e.target.value }))}
               className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -256,7 +258,7 @@ export default function MeetingsPage() {
               <option value="in-progress">In Progress</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
-            </select>
+            </NativeSelect>
           </div>
         </div>
       </div>
@@ -264,9 +266,9 @@ export default function MeetingsPage() {
       {/* Pending Invitations */}
       {pendingInvites.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <Heading2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
             Pending Invitations ({pendingInvites.length})
-          </h2>
+          </Heading2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {pendingInvites.slice(0, 3).map(meeting => (
               <MeetingCard
@@ -284,9 +286,9 @@ export default function MeetingsPage() {
       {/* Today's Meetings */}
       {todayMeetings.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <Heading2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
             Today's Meetings ({todayMeetings.length})
-          </h2>
+          </Heading2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {todayMeetings.map(meeting => (
               <MeetingCard
@@ -302,9 +304,9 @@ export default function MeetingsPage() {
 
       {/* All Meetings */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">
+        <Heading2 className="text-lg font-semibold text-gray-800 mb-3">
           All Meetings
-        </h2>
+        </Heading2>
 
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -319,9 +321,9 @@ export default function MeetingsPage() {
         ) : filteredMeetings.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
             <HiOutlineCalendarDays className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">
+            <Heading3 className="text-lg font-medium text-gray-800 mb-2">
               No meetings found
-            </h3>
+            </Heading3>
             <p className="text-gray-500 mb-4">
               {searchQuery ? 'Try adjusting your search' : 'Schedule your first meeting to get started'}
             </p>
@@ -349,23 +351,23 @@ export default function MeetingsPage() {
         {/* Pagination */}
         {paginationInfo.pages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-6">
-            <button
+            <NativeButton
               onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
               disabled={pagination.page === 1}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
             >
               <HiOutlineChevronLeft className="w-5 h-5 text-gray-600" />
-            </button>
+            </NativeButton>
             <span className="text-sm text-gray-600">
               Page {pagination.page} of {paginationInfo.pages}
             </span>
-            <button
+            <NativeButton
               onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
               disabled={pagination.page === paginationInfo.pages}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
             >
               <HiOutlineChevronRight className="w-5 h-5 text-gray-600" />
-            </button>
+            </NativeButton>
           </div>
         )}
       </div>

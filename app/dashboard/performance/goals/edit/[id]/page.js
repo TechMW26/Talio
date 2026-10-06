@@ -1,5 +1,7 @@
 'use client'
 
+
+import { NativeButton, Heading1, Heading2, NativeInput, NativeTextarea, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect } from 'react'
@@ -7,7 +9,7 @@ import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaSave, FaTimes, FaPlus } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
-import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/react'
+import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -163,14 +165,14 @@ export default function EditGoalPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <button
+          <NativeButton
             onClick={() => router.back()}
             className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <BackIcon className="w-5 h-5" />
-          </button>
+          </NativeButton>
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Edit Performance Goal</h1>
+            <Heading1 className="text-3xl font-bold text-gray-800">Edit Performance Goal</Heading1>
             <p className="text-gray-600 mt-1">Update goal details and milestones</p>
           </div>
         </div>
@@ -179,7 +181,7 @@ export default function EditGoalPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Information */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Basic Information</h2>
+          <Heading2 className="text-xl font-semibold text-gray-800 mb-4">Basic Information</Heading2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Select
@@ -239,13 +241,13 @@ export default function EditGoalPage() {
 
         {/* Goal Details */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Goal Details</h2>
+          <Heading2 className="text-xl font-semibold text-gray-800 mb-4">Goal Details</Heading2>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Goal Title *
               </label>
-              <input
+              <NativeInput
                 type="text"
                 name="title"
                 value={formData.title}
@@ -290,7 +292,7 @@ export default function EditGoalPage() {
                   {generatingDescription ? 'Writing...' : 'AI Write'}
                 </Button>
               </div>
-              <textarea
+              <NativeTextarea
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
@@ -304,7 +306,7 @@ export default function EditGoalPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Start Date
                 </label>
-                <input
+                <NativeInput
                   type="date"
                   name="startDate"
                   value={formData.startDate}
@@ -316,7 +318,7 @@ export default function EditGoalPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Due Date *
                 </label>
-                <input
+                <NativeInput
                   type="date"
                   name="dueDate"
                   value={formData.dueDate}
@@ -329,7 +331,7 @@ export default function EditGoalPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Progress (%)
                 </label>
-                <input
+                <NativeInput
                   type="number"
                   name="progress"
                   value={formData.progress}
@@ -346,24 +348,24 @@ export default function EditGoalPage() {
         {/* Milestones */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">Milestones</h2>
-            <button
+            <Heading2 className="text-xl font-semibold text-gray-800">Milestones</Heading2>
+            <NativeButton
               type="button"
               onClick={addMilestone}
               className="px-3 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center space-x-2"
             >
               <FaPlus className="w-4 h-4" />
               <span>Add Milestone</span>
-            </button>
+            </NativeButton>
           </div>
           <div className="space-y-4">
             {formData.milestones.map((milestone, index) => (
               <div key={index} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-medium text-gray-800">Milestone {index + 1}</h3>
+                  <Heading3 className="text-lg font-medium text-gray-800">Milestone {index + 1}</Heading3>
                   <div className="flex items-center space-x-2">
                     <label className="flex items-center space-x-2">
-                      <input
+                      <NativeInput
                         type="checkbox"
                         checked={milestone.completed}
                         onChange={(e) => handleMilestoneChange(index, 'completed', e.target.checked)}
@@ -372,13 +374,13 @@ export default function EditGoalPage() {
                       <span className="text-sm text-gray-700">Completed</span>
                     </label>
                     {formData.milestones.length > 1 && (
-                      <button
+                      <NativeButton
                         type="button"
                         onClick={() => removeMilestone(index)}
                         className="text-red-600 hover:text-red-800 p-1"
                       >
                         <FaTimes className="w-4 h-4" />
-                      </button>
+                      </NativeButton>
                     )}
                   </div>
                 </div>
@@ -387,7 +389,7 @@ export default function EditGoalPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Milestone Title
                     </label>
-                    <input
+                    <NativeInput
                       type="text"
                       value={milestone.title}
                       onChange={(e) => handleMilestoneChange(index, 'title', e.target.value)}
@@ -399,7 +401,7 @@ export default function EditGoalPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Due Date
                     </label>
-                    <input
+                    <NativeInput
                       type="date"
                       value={milestone.dueDate}
                       onChange={(e) => handleMilestoneChange(index, 'dueDate', e.target.value)}
@@ -411,7 +413,7 @@ export default function EditGoalPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description
                   </label>
-                  <textarea
+                  <NativeTextarea
                     value={milestone.description}
                     onChange={(e) => handleMilestoneChange(index, 'description', e.target.value)}
                     placeholder="Describe this milestone..."
@@ -426,14 +428,14 @@ export default function EditGoalPage() {
 
         {/* Action Buttons */}
         <div className="flex justify-end space-x-4">
-          <button
+          <NativeButton
             type="button"
             onClick={() => router.back()}
             className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
           >
             <FaTimes className="w-4 h-4" />
             <span>Cancel</span>
-          </button>
+          </NativeButton>
           <LoadingButton
             type="submit"
             isLoading={submitMutation.isLoading}

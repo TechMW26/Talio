@@ -1,7 +1,9 @@
 'use client'
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useCallback } from 'react'
-import { Button, Chip, Skeleton } from '@heroui/react'
+import { Button, Chip, Skeleton } from '@/components/ui/fernly'
 import { FaPlus, FaEdit, FaTrash, FaUsers, FaShieldAlt, FaSync, FaHistory } from 'react-icons/fa'
 import { toast } from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -84,9 +86,9 @@ export default function RBACRolesPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Heading1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             Role Management
-                        </h1>
+                        </Heading1>
                         <p className="text-gray-500 dark:text-gray-400 mt-1">
                             Create and manage roles with granular permissions
                         </p>
@@ -141,7 +143,7 @@ export default function RBACRolesPage() {
                 ) : roles.length === 0 ? (
                     <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                         <FaShieldAlt className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">No roles configured</h3>
+                        <Heading3 className="text-lg font-medium text-gray-800 dark:text-gray-200">No roles configured</Heading3>
                         <p className="text-gray-500 mt-2 mb-4">Seed system roles to get started, or create a custom role.</p>
                         <div className="flex items-center justify-center gap-3">
                             <Button color="primary" onPress={handleSeedRoles} isLoading={seedMutation.isLoading}>
@@ -162,9 +164,9 @@ export default function RBACRolesPage() {
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+                                            <Heading3 className="font-semibold text-gray-900 dark:text-white truncate">
                                                 {role.displayLabel}
-                                            </h3>
+                                            </Heading3>
                                             {role.isSystemRole && (
                                                 <Chip size="sm" variant="flat" color="primary" className="flex-shrink-0">
                                                     System

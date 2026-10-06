@@ -57,6 +57,18 @@ describe('Vercel production build configuration', () => {
     expect(vercelConfig.regions).toEqual(['bom1'])
   })
 
+  test('uses a tested native build and main-only automatic deployments', () => {
+    expect(vercelConfig.framework).toBe('nextjs')
+    expect(vercelConfig.services).toBeUndefined()
+    expect(vercelConfig.buildCommand).toBe('npm run release:check && npm run vercel-build')
+    expect(vercelConfig.git.deploymentEnabled).toEqual({ '**': false, main: true })
+    expect(nextConfig.output).toBeUndefined()
+    for (const file of ['Dockerfile', '.dockerignore', 'vercel.container.json', 'docs/CONTAINER_DEPLOYMENT.md']) {
+      expect(fs.existsSync(path.join(root, file))).toBe(false)
+    }
+    expect(fs.readFileSync(path.join(root, 'next.config.js'), 'utf8')).not.toContain('TALIO_CONTAINER_BUILD')
+  })
+
   test('documents encrypted, fail-fast Redis settings', () => {
     const envExample = fs.readFileSync(path.join(root, '.env.example'), 'utf8')
     expect(envExample).toContain('REDIS_URL=rediss://')

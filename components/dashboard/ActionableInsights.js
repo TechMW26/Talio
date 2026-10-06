@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 import { useFocusTimer } from '@/contexts/FocusTimerContext'
 import { useTicTacToe } from '@/contexts/TicTacToeContext'
 import { useTheme } from '@/contexts/ThemeContext'

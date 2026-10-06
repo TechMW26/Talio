@@ -3,7 +3,7 @@
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useMemo, useState } from 'react'
-import { Button, Card, CardBody, Chip, Input, Skeleton, Textarea } from '@heroui/react'
+import { Button, Card, CardBody, Chip, Input, Skeleton, Textarea } from '@/components/ui/fernly'
 import { FaCalendarCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'

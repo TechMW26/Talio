@@ -1,9 +1,11 @@
 'use client'
 
+
+import { Heading1, Heading3, NativeButton, Heading2 } from '@/components/ui/fernly/native'
 import { Suspense, useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaEye, FaFilter } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
@@ -122,7 +124,7 @@ function LeaveApprovalsContent() {
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-default-800">Leave Approvals</h1>
+            <Heading1 className="text-3xl font-bold text-default-800">Leave Approvals</Heading1>
             <BackgroundRefreshIndicator isValidating={isValidating} />
           </div>
           <p className="text-default-500 mt-1">Review and approve leave requests</p>
@@ -134,7 +136,7 @@ function LeaveApprovalsContent() {
         <Card shadow="sm">
           <CardBody className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-default-600">Pending</h3>
+              <Heading3 className="text-sm font-medium text-default-600">Pending</Heading3>
               <FaFilter className="text-warning" />
             </div>
             <div className="text-3xl font-bold text-default-800">
@@ -146,7 +148,7 @@ function LeaveApprovalsContent() {
         <Card shadow="sm">
           <CardBody className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-default-600">Approved</h3>
+              <Heading3 className="text-sm font-medium text-default-600">Approved</Heading3>
               <FaCheck className="text-success" />
             </div>
             <div className="text-3xl font-bold text-default-800">
@@ -158,7 +160,7 @@ function LeaveApprovalsContent() {
         <Card shadow="sm">
           <CardBody className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-default-600">Rejected</h3>
+              <Heading3 className="text-sm font-medium text-default-600">Rejected</Heading3>
               <FaTimes className="text-danger" />
             </div>
             <div className="text-3xl font-bold text-default-800">
@@ -170,7 +172,7 @@ function LeaveApprovalsContent() {
         <Card shadow="sm">
           <CardBody className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-default-600">Total Requests</h3>
+              <Heading3 className="text-sm font-medium text-default-600">Total Requests</Heading3>
               <FaFilter className="text-primary" />
             </div>
             <div className="text-3xl font-bold text-default-800">{leaves.length}</div>
@@ -182,7 +184,7 @@ function LeaveApprovalsContent() {
       <Card shadow="sm" className="mb-6">
         <CardBody className="p-0">
           <div className="flex border-b border-default-200">
-            <button
+            <NativeButton
               onClick={() => setFilter('pending')}
               className={`px-6 py-3 font-medium ${filter === 'pending'
                   ? 'text-primary border-b-2 border-primary'
@@ -190,8 +192,8 @@ function LeaveApprovalsContent() {
                 }`}
             >
               Pending
-            </button>
-            <button
+            </NativeButton>
+            <NativeButton
               onClick={() => setFilter('approved')}
               className={`px-6 py-3 font-medium ${filter === 'approved'
                   ? 'text-primary border-b-2 border-primary'
@@ -199,8 +201,8 @@ function LeaveApprovalsContent() {
                 }`}
             >
               Approved
-            </button>
-            <button
+            </NativeButton>
+            <NativeButton
               onClick={() => setFilter('rejected')}
               className={`px-6 py-3 font-medium ${filter === 'rejected'
                   ? 'text-primary border-b-2 border-primary'
@@ -208,8 +210,8 @@ function LeaveApprovalsContent() {
                 }`}
             >
               Rejected
-            </button>
-            <button
+            </NativeButton>
+            <NativeButton
               onClick={() => setFilter('')}
               className={`px-6 py-3 font-medium ${filter === ''
                   ? 'text-primary border-b-2 border-primary'
@@ -217,7 +219,7 @@ function LeaveApprovalsContent() {
                 }`}
             >
               All
-            </button>
+            </NativeButton>
           </div>
         </CardBody>
       </Card>
@@ -345,7 +347,7 @@ function LeaveApprovalsContent() {
           {(onClose) => (
             <>
               <ModalHeader>
-                <h2 className="text-xl font-bold text-default-800">Leave Request Details</h2>
+                <Heading2 className="text-xl font-bold text-default-800">Leave Request Details</Heading2>
               </ModalHeader>
               <ModalBody>
                 <div className="space-y-4 mb-6">

@@ -1,10 +1,12 @@
 'use client'
 
+
+import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect } from 'react'
 import { FaBook, FaClock, FaUsers, FaStar, FaPlay, FaFilter, FaSearch, FaGraduationCap } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
-import { Select, SelectItem, Input } from '@heroui/react'
+import { Select, SelectItem, Input } from '@/components/ui/fernly'
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState([])
@@ -159,9 +161,9 @@ export default function CoursesPage() {
     <div className="p-3 sm:p-6 pb-20 md:pb-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
+        <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
           Course Library
-        </h1>
+        </Heading1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">
           Browse and enroll in available courses
         </p>
@@ -238,7 +240,7 @@ export default function CoursesPage() {
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
           <FaBook className="text-6xl text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 text-lg">No courses found</p>
-          <button
+          <NativeButton
             onClick={() => {
               setSearchTerm('')
               setCategoryFilter('all')
@@ -247,7 +249,7 @@ export default function CoursesPage() {
             className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Clear Filters
-          </button>
+          </NativeButton>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -271,9 +273,9 @@ export default function CoursesPage() {
                   <span className="text-sm text-gray-600">{course.category}</span>
                 </div>
 
-                <h3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-2">
+                <Heading3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-2">
                   {course.title}
-                </h3>
+                </Heading3>
                 <p className="text-sm text-gray-600 mb-4 line-clamp-2">
                   {course.description}
                 </p>
@@ -298,17 +300,17 @@ export default function CoursesPage() {
                 </p>
 
                 {course.enrolled ? (
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                  <NativeButton className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                     <FaPlay />
                     Continue Learning
-                  </button>
+                  </NativeButton>
                 ) : (
-                  <button
+                  <NativeButton
                     onClick={() => handleEnroll(course.id)}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
                     Enroll Now
-                  </button>
+                  </NativeButton>
                 )}
               </div>
             </div>

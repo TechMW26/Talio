@@ -9,8 +9,8 @@ import {
     FaExternalLinkAlt
 } from 'react-icons/fa'
 import { HiOutlineNewspaper } from 'react-icons/hi2'
-import Modal from '@/components/ui/HeroModal'
-import { Button, Skeleton, ScrollShadow, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Button, Skeleton, ScrollShadow, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@/components/ui/fernly'
 
 // Category icons and colors matching other widgets
 const CATEGORY_CONFIG = {

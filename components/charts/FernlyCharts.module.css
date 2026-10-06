@@ -34,6 +34,7 @@
 .distribution { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); align-items: center; gap: 24px; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--color-border, #303030); }
 .plot { min-width: 0; }
 .barsScroll { min-width: 0; width: 100%; overflow-x: auto; padding-top: 32px; }
+.distributionTip { min-height: 42px; padding: 0 8px 12px; font-size: 12px; color: var(--color-text-primary); overflow-wrap: anywhere; }
 .bars { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: clamp(8px, 1.4vw, 16px); list-style: none; padding: 0 8px; margin: 0; }
 .bars li { display: grid; grid-template-rows: 180px auto; gap: 12px; min-width: 0; }
 .barSpace { position: relative; display: flex; align-items: flex-end; }

@@ -1,0 +1,26 @@
+.panel { border: 1px solid var(--border-color, #303034); border-radius: 28px; padding: 24px; background: var(--bg-secondary, #18181b); color: var(--text-primary, #f4f4f5); min-width: 0; }
+.panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel h2 { font-size: 21px; font-weight: 600; margin: 4px 0 18px; }
+.panel header p { font-size: 10px; letter-spacing: .14em; opacity: .6; }
+.panel button { border-radius: 20px; padding: 8px 12px; background: var(--bg-tertiary, #27272a); font-size: 12px; }
+.panel button:focus-visible, .panel summary:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+.panel button:disabled { opacity: .45; }
+.summary { padding: 18px; border-radius: 20px; background: #2563eb15; margin-bottom: 18px; }
+.summary span { text-transform: capitalize; }
+.summary strong { float: right; font-size: 26px; }
+.summary p { font-size: 12px; margin-top: 14px; opacity: .65; }
+.panel nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.panel button[aria-pressed=true] { background: #2563eb; color: white; }
+.timeline { list-style: none; padding: 0; margin: 0; max-height: 580px; overflow-y: auto; }
+.timeline li { display: flex; gap: 14px; padding: 0 0 24px; position: relative; }
+.timeline li:not(:last-child)::before { content: ''; position: absolute; left: 7px; top: 16px; bottom: 0; width: 1px; background: #71717a55; }
+.dot { width: 15px; height: 15px; flex-shrink: 0; border: 4px solid #2563eb40; border-radius: 50%; background: #3b82f6; margin-top: 4px; }
+.timeline li > div { min-width: 0; }
+.timeline h3 { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.timeline time { display: block; font-size: 12px; opacity: .6; margin: 5px 0; }
+.status { display: inline-block; font-size: 10px; padding: 3px 8px; border-radius: 10px; background: #2563eb20; color: #7da7ff; text-transform: capitalize; }
+.timeline details { font-size: 12px; margin-top: 8px; }
+.timeline summary { cursor: pointer; }
+.timeline details p { white-space: pre-wrap; overflow-wrap: anywhere; opacity: .75; margin-top: 8px; }
+.note { font-size: 11px; opacity: .55; margin-top: 18px; line-height: 1.5; }
+.more { width: 100%; }

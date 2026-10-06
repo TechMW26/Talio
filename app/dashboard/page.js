@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Spinner, Skeleton, Card, CardBody } from '@heroui/react'
+import { Spinner, Skeleton, Card, CardBody } from '@/components/ui/fernly'
 import UnifiedDashboard from '@/components/dashboards/UnifiedDashboard'
 
 // Modern skeleton loader for dashboard using Hero UI

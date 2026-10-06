@@ -4,7 +4,7 @@ import widgetStyles from './WidgetDesign.module.css'
 
 import { useRouter } from 'next/navigation'
 import { FaCheck, FaTimes, FaCalendarCheck } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Avatar, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Chip, Avatar, ScrollShadow } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 
 export default function LeaveRequestsWidget({

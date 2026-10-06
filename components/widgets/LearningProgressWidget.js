@@ -4,7 +4,7 @@ import widgetStyles from './WidgetDesign.module.css'
 
 import { useState, useEffect } from 'react'
 import { FaGraduationCap, FaCheckCircle, FaSpinner, FaPlayCircle } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Progress, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Chip, Progress, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function LearningProgressWidget({ limit = 4 }) {
     const [courses, setCourses] = useState([])

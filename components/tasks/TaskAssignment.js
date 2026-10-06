@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Select, SelectItem } from '@heroui/react'
+import { Select, SelectItem } from '@/components/ui/fernly'
 import { FaPlus, FaTrash, FaUser, FaUsers, FaSearch, FaCheck, FaTimes, FaChevronDown } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
 import Loader from '@/components/ui/Loader'

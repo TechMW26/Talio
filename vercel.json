@@ -2,6 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "fluid": true,
+  "buildCommand": "npm run release:check && npm run vercel-build",
+  "installCommand": "npm ci --legacy-peer-deps --no-audit --no-fund",
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true
+    }
+  },
   "regions": [
     "bom1"
   ],

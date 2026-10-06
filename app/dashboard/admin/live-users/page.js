@@ -1,7 +1,9 @@
 'use client'
 
+
+import { Heading1, NativeButton, NativeInput, NativeSelect, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Button, Skeleton } from '@heroui/react'
+import { Button, Skeleton } from '@/components/ui/fernly'
 import { useSocket } from '@/contexts/SocketContext'
 import toast from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -285,7 +287,7 @@ export default function LiveUsersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Live Users</h1>
+          <Heading1 className="text-2xl font-bold text-gray-800">Live Users</Heading1>
           <p className="text-gray-600 mt-1">Monitor active users and sync data without interrupting their work</p>
         </div>
         <div className="flex items-center gap-3">
@@ -296,14 +298,14 @@ export default function LiveUsersPage() {
             {isConnected ? 'Live' : 'Polling'}
           </div>
           {/* Refresh Button */}
-          <button
+          <NativeButton
             onClick={handleRefresh}
             disabled={isValidating}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <HiOutlineArrowPath className={`h-5 w-5 ${isValidating ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Refresh</span>
-          </button>
+          </NativeButton>
           {/* Broadcast All Button - Admin Only */}
           {permissions.canRefresh && (
             <Button
@@ -350,7 +352,7 @@ export default function LiveUsersPage() {
           {/* Search */}
           <div className="input-with-icon flex-1">
             <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-            <input
+            <NativeInput
               type="text"
               placeholder="Search by name, email, or department..."
               value={searchQuery}
@@ -360,7 +362,7 @@ export default function LiveUsersPage() {
           </div>
           {/* Department Filter */}
           {activeTab !== 'byDepartment' && (
-            <select
+            <NativeSelect
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
               className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
@@ -371,7 +373,7 @@ export default function LiveUsersPage() {
                   {dept.name} ({dept.users?.length || 0})
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           )}
           {/* Selected Users Actions - Admin Only */}
           {permissions.canRefresh && selectedUsers.length > 0 && (
@@ -391,7 +393,7 @@ export default function LiveUsersPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
         <div className="flex overflow-x-auto border-b border-gray-200">
           {tabs.map(tab => (
-            <button
+            <NativeButton
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-6 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === tab.id
@@ -404,7 +406,7 @@ export default function LiveUsersPage() {
                 }`}>
                 {tab.count}
               </span>
-            </button>
+            </NativeButton>
           ))}
         </div>
       </div>
@@ -416,9 +418,9 @@ export default function LiveUsersPage() {
           {visibleDepartments.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 text-center">
               <HiOutlineBuildingOffice2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-800 mb-2">
+              <Heading3 className="text-lg font-medium text-gray-800 mb-2">
                 {hasActiveGroupSearch(searchQuery) ? 'No matching employees' : 'No Departments Found'}
-              </h3>
+              </Heading3>
               <p className="text-gray-600">
                 {hasActiveGroupSearch(searchQuery) ? 'Try another name, email, role, or department.' : 'No department data available.'}
               </p>
@@ -439,13 +441,13 @@ export default function LiveUsersPage() {
                 >
                   <div className="flex items-center gap-3">
                     <div>
-                      <h3 className="font-medium text-gray-800">{dept.name}</h3>
+                      <Heading3 className="font-medium text-gray-800">{dept.name}</Heading3>
                       <p className="text-sm text-gray-600">{dept.users?.length || 0} users</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     {permissions.canRefresh && (
-                      <button
+                      <NativeButton
                         onClick={(e) => {
                           e.stopPropagation()
                           handleBroadcastRefresh('department', dept.id)
@@ -454,7 +456,7 @@ export default function LiveUsersPage() {
                         className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
                         Refresh Dept
-                      </button>
+                      </NativeButton>
                     )}
                     {isExpanded ? (
                       <HiOutlineChevronUp className="h-5 w-5 text-gray-400" />
@@ -474,7 +476,7 @@ export default function LiveUsersPage() {
                           <div key={user.id} className="flex items-center justify-between p-4 hover:bg-gray-50">
                             <div className="flex items-center gap-3">
                               {permissions.canRefresh && (
-                                <input
+                                <NativeInput
                                   type="checkbox"
                                   checked={selectedUsers.includes(user.userId)}
                                   onChange={() => toggleUserSelection(user.userId)}
@@ -500,14 +502,14 @@ export default function LiveUsersPage() {
                                 )}
                               </div>
                               {permissions.canRefresh && (
-                                <button
+                                <NativeButton
                                   onClick={() => handleBroadcastRefresh('user', user.userId)}
                                   disabled={broadcastMutation.isLoading}
                                   className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                   title="Refresh this user"
                                 >
                                   <HiOutlineArrowPath className="h-5 w-5" />
-                                </button>
+                                </NativeButton>
                               )}
                             </div>
                           </div>
@@ -527,7 +529,7 @@ export default function LiveUsersPage() {
           {filteredUsers.length === 0 ? (
             <div className="p-8 text-center">
               <HiOutlineUserGroup className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-800 mb-2">No Users Found</h3>
+              <Heading3 className="text-lg font-medium text-gray-800 mb-2">No Users Found</Heading3>
               <p className="text-gray-600">
                 {searchQuery || selectedDepartment
                   ? 'Try adjusting your filters.'
@@ -540,7 +542,7 @@ export default function LiveUsersPage() {
                 <div key={user.id} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-3">
                     {permissions.canRefresh && (
-                      <input
+                      <NativeInput
                         type="checkbox"
                         checked={selectedUsers.includes(user.userId)}
                         onChange={() => toggleUserSelection(user.userId)}
@@ -569,14 +571,14 @@ export default function LiveUsersPage() {
                       )}
                     </div>
                     {permissions.canRefresh && (
-                      <button
+                      <NativeButton
                         onClick={() => handleBroadcastRefresh('user', user.userId)}
                         disabled={broadcastMutation.isLoading}
                         className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Refresh this user"
                       >
                         <HiOutlineArrowPath className="h-5 w-5" />
-                      </button>
+                      </NativeButton>
                     )}
                   </div>
                 </div>

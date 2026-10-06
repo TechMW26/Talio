@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, NativeButton, Heading3, NativeInput, NativeTextarea, NativeSelect } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
 import { FaBell, FaClock, FaRedo, FaPaperPlane, FaUsers, FaBuilding, FaUserTag, FaCalendar, FaTrash, FaEdit, FaPause, FaPlay, FaHistory, FaPlus, FaEye, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
 import toast from '@/utils/toast'
@@ -9,7 +11,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import useRoles, { getRoleDisplayLabel } from '@/hooks/useRoles'
 import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 
 export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState('send')
@@ -54,9 +56,9 @@ export default function NotificationsPage() {
     <div className="p-3 sm:p-6 pb-20 md:pb-6">
       {/* Header */}
       <div className="mb-4 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
+        <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
           Notification Management
-        </h1>
+        </Heading1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">
           Send, schedule, and manage push notifications
         </p>
@@ -69,7 +71,7 @@ export default function NotificationsPage() {
             {tabs.map((tab) => {
               const Icon = tab.icon
               return (
-                <button
+                <NativeButton
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center space-x-2 px-4 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id
@@ -79,7 +81,7 @@ export default function NotificationsPage() {
                 >
                   <Icon className="w-4 h-4" />
                   <span>{tab.name}</span>
-                </button>
+                </NativeButton>
               )
             })}
           </nav>
@@ -146,13 +148,13 @@ function SendNotificationTab({ userRole, userDepartment }) {
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Notification Content */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Notification Content</h3>
+        <Heading3 className="text-lg font-semibold text-gray-900">Notification Content</Heading3>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Title *
           </label>
-          <input
+          <NativeInput
             type="text"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -166,7 +168,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Message *
           </label>
-          <textarea
+          <NativeTextarea
             value={formData.message}
             onChange={(e) => setFormData({ ...formData, message: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -180,7 +182,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Action URL
           </label>
-          <input
+          <NativeInput
             type="text"
             value={formData.url}
             onChange={(e) => setFormData({ ...formData, url: e.target.value })}
@@ -193,13 +195,13 @@ function SendNotificationTab({ userRole, userDepartment }) {
 
       {/* Target Audience */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Target Audience</h3>
+        <Heading3 className="text-lg font-semibold text-gray-900">Target Audience</Heading3>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Send To *
           </label>
-          <select
+          <NativeSelect
             value={formData.targetType}
             onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -209,7 +211,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
             {userRole !== 'department_head' && <option value="department">Specific Department</option>}
             <option value="role">Specific Role</option>
             <option value="specific">Specific Users</option>
-          </select>
+          </NativeSelect>
         </div>
 
         {formData.targetType === 'department' && userRole !== 'department_head' && (
@@ -217,7 +219,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Select Department
             </label>
-            <select
+            <NativeSelect
               value={formData.targetDepartment}
               onChange={(e) => setFormData({ ...formData, targetDepartment: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -227,7 +229,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
               {departments.map(dept => (
                 <option key={dept._id} value={dept._id}>{dept.name}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
         )}
 
@@ -239,7 +241,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
             <div className="space-y-2">
               {availableRoles.map(role => (
                 <label key={role.name} className="flex items-center space-x-2">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     checked={formData.targetRoles.includes(role.name)}
                     onChange={(e) => {
@@ -400,16 +402,16 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Scheduled Notifications</h3>
+          <Heading3 className="text-lg font-semibold text-gray-900">Scheduled Notifications</Heading3>
           <p className="text-sm text-gray-500">Schedule notifications to be sent at a specific time</p>
         </div>
-        <button
+        <NativeButton
           onClick={() => setShowCreateModal(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <FaPlus className="w-4 h-4" />
           <span>Schedule New</span>
-        </button>
+        </NativeButton>
       </div>
 
       {/* Notifications List */}
@@ -446,13 +448,13 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
                   </div>
                 </div>
                 {notification.status === 'pending' && (
-                  <button
+                  <NativeButton
                     onClick={() => handleCancelNotification(notification._id)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                     title="Cancel"
                   >
                     <FaTimes className="w-4 h-4" />
-                  </button>
+                  </NativeButton>
                 )}
               </div>
             </div>
@@ -465,15 +467,15 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Schedule Notification</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
+              <Heading3 className="text-lg font-semibold">Schedule Notification</Heading3>
+              <NativeButton onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
                 <FaTimes className="w-5 h-5" />
-              </button>
+              </NativeButton>
             </div>
             <form onSubmit={handleCreateScheduled} className="p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                <input
+                <NativeInput
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -483,7 +485,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Message *</label>
-                <textarea
+                <NativeTextarea
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -493,7 +495,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Schedule For *</label>
-                <input
+                <NativeInput
                   type="datetime-local"
                   value={formData.scheduledFor}
                   onChange={(e) => setFormData({ ...formData, scheduledFor: e.target.value })}
@@ -504,7 +506,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Target Audience</label>
-                <select
+                <NativeSelect
                   value={formData.targetType}
                   onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -512,12 +514,12 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
                   <option value="all">All Users</option>
                   {userRole !== 'department_head' && <option value="department">Specific Department</option>}
                   <option value="role">Specific Role</option>
-                </select>
+                </NativeSelect>
               </div>
               {formData.targetType === 'department' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select Department</label>
-                  <select
+                  <NativeSelect
                     value={formData.targetDepartment}
                     onChange={(e) => setFormData({ ...formData, targetDepartment: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -527,7 +529,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
                     {departments.map(dept => (
                       <option key={dept._id} value={dept._id}>{dept.name}</option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </div>
               )}
               {formData.targetType === 'role' && (
@@ -536,7 +538,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
                   <div className="space-y-2">
                     {availableRoles.map(role => (
                       <label key={role.name} className="flex items-center gap-2">
-                        <input
+                        <NativeInput
                           type="checkbox"
                           checked={formData.targetRoles.includes(role.name)}
                           onChange={(e) => {
@@ -555,13 +557,13 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
                 </div>
               )}
               <div className="flex justify-end gap-2 pt-4">
-                <button
+                <NativeButton
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
-                </button>
+                </NativeButton>
                 <LoadingButton
                   type="submit"
                   isLoading={createMutation.isLoading}
@@ -716,16 +718,16 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Recurring Notifications</h3>
+          <Heading3 className="text-lg font-semibold text-gray-900">Recurring Notifications</Heading3>
           <p className="text-sm text-gray-500">Set up notifications that repeat on a schedule</p>
         </div>
-        <button
+        <NativeButton
           onClick={() => setShowCreateModal(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <FaPlus className="w-4 h-4" />
           <span>Create Recurring</span>
-        </button>
+        </NativeButton>
       </div>
 
       {/* Notifications List */}
@@ -764,20 +766,20 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button
+                  <NativeButton
                     onClick={() => handleToggleActive(notification._id, notification.isActive)}
                     className={`p-2 rounded-lg ${notification.isActive ? 'text-yellow-600 hover:bg-yellow-50' : 'text-green-600 hover:bg-green-50'}`}
                     title={notification.isActive ? 'Pause' : 'Resume'}
                   >
                     {notification.isActive ? <FaPause className="w-4 h-4" /> : <FaPlay className="w-4 h-4" />}
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     onClick={() => handleDeleteRecurring(notification._id)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                     title="Delete"
                   >
                     <FaTrash className="w-4 h-4" />
-                  </button>
+                  </NativeButton>
                 </div>
               </div>
             </div>
@@ -790,15 +792,15 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Create Recurring Notification</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
+              <Heading3 className="text-lg font-semibold">Create Recurring Notification</Heading3>
+              <NativeButton onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
                 <FaTimes className="w-5 h-5" />
-              </button>
+              </NativeButton>
             </div>
             <form onSubmit={handleCreateRecurring} className="p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                <input
+                <NativeInput
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -808,7 +810,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Message *</label>
-                <textarea
+                <NativeTextarea
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -818,7 +820,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Frequency *</label>
-                <select
+                <NativeSelect
                   value={formData.frequency}
                   onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -826,13 +828,13 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                   <option value="monthly">Monthly</option>
-                </select>
+                </NativeSelect>
               </div>
 
               {formData.frequency === 'daily' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
-                  <input
+                  <NativeInput
                     type="time"
                     value={formData.dailyTime}
                     onChange={(e) => setFormData({ ...formData, dailyTime: e.target.value })}
@@ -849,7 +851,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                     <div className="flex flex-wrap gap-2">
                       {weekdays.map(day => (
                         <label key={day} className="flex items-center gap-1">
-                          <input
+                          <NativeInput
                             type="checkbox"
                             checked={formData.weeklyDays.includes(day)}
                             onChange={(e) => {
@@ -868,7 +870,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
-                    <input
+                    <NativeInput
                       type="time"
                       value={formData.weeklyTime}
                       onChange={(e) => setFormData({ ...formData, weeklyTime: e.target.value })}
@@ -883,7 +885,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Day of Month *</label>
-                    <input
+                    <NativeInput
                       type="number"
                       min="1"
                       max="31"
@@ -895,7 +897,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
-                    <input
+                    <NativeInput
                       type="time"
                       value={formData.monthlyTime}
                       onChange={(e) => setFormData({ ...formData, monthlyTime: e.target.value })}
@@ -908,7 +910,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
-                <input
+                <NativeInput
                   type="date"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
@@ -919,7 +921,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">End Date (Optional)</label>
-                <input
+                <NativeInput
                   type="date"
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
@@ -929,7 +931,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Target Audience</label>
-                <select
+                <NativeSelect
                   value={formData.targetType}
                   onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -937,13 +939,13 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                   <option value="all">All Users</option>
                   {userRole !== 'department_head' && <option value="department">Specific Department</option>}
                   <option value="role">Specific Role</option>
-                </select>
+                </NativeSelect>
               </div>
 
               {formData.targetType === 'department' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select Department</label>
-                  <select
+                  <NativeSelect
                     value={formData.targetDepartment}
                     onChange={(e) => setFormData({ ...formData, targetDepartment: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -953,7 +955,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                     {departments.map(dept => (
                       <option key={dept._id} value={dept._id}>{dept.name}</option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </div>
               )}
 
@@ -963,7 +965,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                   <div className="space-y-2">
                     {availableRoles.map(role => (
                       <label key={role.name} className="flex items-center gap-2">
-                        <input
+                        <NativeInput
                           type="checkbox"
                           checked={formData.targetRoles.includes(role.name)}
                           onChange={(e) => {
@@ -983,13 +985,13 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
               )}
 
               <div className="flex justify-end gap-2 pt-4">
-                <button
+                <NativeButton
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
-                </button>
+                </NativeButton>
                 <LoadingButton
                   type="submit"
                   isLoading={createMutation.isLoading}
@@ -1118,11 +1120,11 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Notification History</h3>
+          <Heading3 className="text-lg font-semibold text-gray-900">Notification History</Heading3>
           <p className="text-sm text-gray-500">View all sent notifications</p>
         </div>
         <div className="flex gap-2">
-          <select
+          <NativeSelect
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
@@ -1130,7 +1132,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
             <option value="all">All Types</option>
             <option value="scheduled">Scheduled Only</option>
             <option value="recurring">Recurring Only</option>
-          </select>
+          </NativeSelect>
         </div>
       </div>
 
@@ -1199,10 +1201,10 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
         {selectedNotification && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Notification Details</h3>
-              <button onClick={() => setSelectedNotification(null)} className="text-gray-500 hover:text-gray-700">
+              <Heading3 className="text-lg font-semibold">Notification Details</Heading3>
+              <NativeButton onClick={() => setSelectedNotification(null)} className="text-gray-500 hover:text-gray-700">
                 <FaTimes className="w-5 h-5" />
-              </button>
+              </NativeButton>
             </div>
             <div className="p-4 space-y-4">
               <div>
@@ -1285,12 +1287,12 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
               )}
             </div>
             <div className="p-4 border-t border-gray-200">
-              <button
+              <NativeButton
                 onClick={() => setSelectedNotification(null)}
                 className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
               >
                 Close
-              </button>
+              </NativeButton>
             </div>
           </div>
         </div>}

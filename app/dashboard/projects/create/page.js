@@ -1,12 +1,14 @@
 'use client'
 
+
+import { Heading1, Heading2, NativeInput, NativeTextarea, Heading3, NativeButton } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@/components/ui/fernly'
 import {
   HiOutlinePlus,
   HiOutlineMagnifyingGlass,
@@ -271,7 +273,7 @@ export default function CreateProjectPage() {
           <BackIcon className="w-5 h-5 text-default-600" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-default-800">Create New Project</h1>
+          <Heading1 className="text-2xl font-bold text-default-800">Create New Project</Heading1>
           <p className="text-default-600 mt-1">Set up a new project and invite team members</p>
         </div>
       </div>
@@ -279,7 +281,7 @@ export default function CreateProjectPage() {
       <form onSubmit={handleSubmit}>
         <Card shadow="sm" className="mb-6">
           <CardBody className="p-6">
-            <h2 className="text-lg font-semibold text-default-800 mb-4">Project Details</h2>
+            <Heading2 className="text-lg font-semibold text-default-800 mb-4">Project Details</Heading2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Project Name */}
@@ -287,7 +289,7 @@ export default function CreateProjectPage() {
                 <label className="block text-sm font-medium text-default-700 mb-2">
                   Project Name <span className="text-danger">*</span>
                 </label>
-                <input
+                <NativeInput
                   type="text"
                   name="name"
                   value={formData.name}
@@ -317,7 +319,7 @@ export default function CreateProjectPage() {
                     {generatingDescription ? 'Writing...' : 'AI Write'}
                   </Button>
                 </div>
-                <textarea
+                <NativeTextarea
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
@@ -334,7 +336,7 @@ export default function CreateProjectPage() {
                 </label>
                 <div className="relative">
                   <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
-                  <input
+                  <NativeInput
                     type="date"
                     name="startDate"
                     value={formData.startDate}
@@ -352,7 +354,7 @@ export default function CreateProjectPage() {
                 </label>
                 <div className="relative">
                   <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
-                  <input
+                  <NativeInput
                     type="date"
                     name="endDate"
                     value={formData.endDate}
@@ -423,7 +425,7 @@ export default function CreateProjectPage() {
                 <label className="block text-sm font-medium text-default-700 mb-2">
                   Tags (comma-separated)
                 </label>
-                <input
+                <NativeInput
                   type="text"
                   name="tags"
                   value={formData.tags}
@@ -440,9 +442,9 @@ export default function CreateProjectPage() {
         <Card shadow="sm" className="mb-6">
           <CardBody className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-default-800">
+              <Heading2 className="text-lg font-semibold text-default-800">
                 Project Heads <span className="text-danger">*</span>
-              </h2>
+              </Heading2>
               <Button
                 variant="bordered"
                 size="sm"
@@ -499,10 +501,10 @@ export default function CreateProjectPage() {
         <Card shadow="sm" className="mb-6">
           <CardBody className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-default-800">
+              <Heading2 className="text-lg font-semibold text-default-800">
                 <FaUsers className="inline mr-2" />
                 Team Members
-              </h2>
+              </Heading2>
               <Button
                 variant="bordered"
                 size="sm"
@@ -575,7 +577,7 @@ export default function CreateProjectPage() {
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-content1 rounded-[30px] shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="p-4 border-b border-default-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-semibold">Add Team Member</h3>
+              <Heading3 className="text-lg font-semibold">Add Team Member</Heading3>
               <Button
                 isIconOnly
                 variant="light"
@@ -591,7 +593,7 @@ export default function CreateProjectPage() {
             <div className="p-4 border-b border-default-200">
               <div className="input-with-icon">
                 <FaSearch className="input-icon" />
-                <input
+                <NativeInput
                   type="text"
                   value={searchEmployee}
                   onChange={(e) => setSearchEmployee(e.target.value)}
@@ -625,7 +627,7 @@ export default function CreateProjectPage() {
                       <div key={deptName} className="border border-default-200 rounded-lg overflow-hidden">
                         {/* Department Header - Clickable */}
                         <div className="flex items-center justify-between bg-default-50 px-3 py-2">
-                          <button
+                          <NativeButton
                             type="button"
                             onClick={() => setExpandedMemberDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }))}
                             className="flex items-center gap-2 flex-1 text-left"
@@ -637,8 +639,8 @@ export default function CreateProjectPage() {
                             )}
                             <span className="text-sm font-semibold text-default-700">{deptName}</span>
                             <span className="text-xs text-default-500">({deptEmployees.length})</span>
-                          </button>
-                          <button
+                          </NativeButton>
+                          <NativeButton
                             type="button"
                             onClick={() => {
                               if (allSelected) {
@@ -676,7 +678,7 @@ export default function CreateProjectPage() {
                           >
                             <FaCheckSquare className="w-3 h-3" />
                             {allSelected ? 'Deselect All' : 'Select All'}
-                          </button>
+                          </NativeButton>
                         </div>
 
                         {/* Employees List - Collapsible */}
@@ -685,7 +687,7 @@ export default function CreateProjectPage() {
                             {deptEmployees.map(emp => {
                               const isSelected = formData.members.some(m => m.userId === emp._id)
                               return (
-                                <button
+                                <NativeButton
                                   key={emp._id}
                                   type="button"
                                   onClick={() => {
@@ -718,7 +720,7 @@ export default function CreateProjectPage() {
                                     </p>
                                     <p className="text-xs text-default-500">{emp.email}</p>
                                   </div>
-                                </button>
+                                </NativeButton>
                               )
                             })}
                           </div>
@@ -738,7 +740,7 @@ export default function CreateProjectPage() {
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-content1 rounded-[30px] shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="p-4 border-b border-default-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-semibold">Add Project Head</h3>
+              <Heading3 className="text-lg font-semibold">Add Project Head</Heading3>
               <Button
                 isIconOnly
                 variant="light"
@@ -754,7 +756,7 @@ export default function CreateProjectPage() {
             <div className="p-4 border-b border-default-200">
               <div className="input-with-icon">
                 <FaSearch className="input-icon" />
-                <input
+                <NativeInput
                   type="text"
                   value={searchHead}
                   onChange={(e) => setSearchHead(e.target.value)}
@@ -788,7 +790,7 @@ export default function CreateProjectPage() {
                       <div key={deptName} className="border border-default-200 rounded-lg overflow-hidden">
                         {/* Department Header - Clickable */}
                         <div className="flex items-center justify-between bg-default-50 px-3 py-2">
-                          <button
+                          <NativeButton
                             type="button"
                             onClick={() => setExpandedHeadDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }))}
                             className="flex items-center gap-2 flex-1 text-left"
@@ -800,8 +802,8 @@ export default function CreateProjectPage() {
                             )}
                             <span className="text-sm font-semibold text-default-700">{deptName}</span>
                             <span className="text-xs text-default-500">({deptEmployees.length})</span>
-                          </button>
-                          <button
+                          </NativeButton>
+                          <NativeButton
                             type="button"
                             onClick={() => {
                               if (allSelected) {
@@ -832,7 +834,7 @@ export default function CreateProjectPage() {
                           >
                             <FaCheckSquare className="w-3 h-3" />
                             {allSelected ? 'Deselect All' : 'Select All'}
-                          </button>
+                          </NativeButton>
                         </div>
 
                         {/* Employees List - Collapsible */}
@@ -841,7 +843,7 @@ export default function CreateProjectPage() {
                             {deptEmployees.map(emp => {
                               const isSelected = formData.projectHeadIds.includes(emp._id)
                               return (
-                                <button
+                                <NativeButton
                                   key={emp._id}
                                   type="button"
                                   onClick={() => {
@@ -874,7 +876,7 @@ export default function CreateProjectPage() {
                                     </p>
                                     <p className="text-xs text-default-500">{emp.email}</p>
                                   </div>
-                                </button>
+                                </NativeButton>
                               )
                             })}
                           </div>

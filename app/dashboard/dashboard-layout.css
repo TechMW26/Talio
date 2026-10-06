@@ -1,0 +1,99 @@
+/* Canonical dashboard geometry, measured from /dashboard/team/members.
+ * The app shell owns outer spacing. Pages own only their internal layout.
+ * Keep this imported after globals; do not add route-specific outer gutters.
+ */
+.dashboard-loading-surface,
+.page-skeleton {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--color-text-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-skeleton, .page-skeleton .animate-pulse { animation: none !important; }
+}
+:root {
+  --dashboard-font: var(--font-montserrat);
+  --dashboard-gutter-x: 16px;
+  --dashboard-gutter-top: 24px;
+  --dashboard-gutter-bottom: 40px;
+  --dashboard-heading-size: clamp(28px, 3vw, 42px);
+  --dashboard-heading-weight: 500;
+  --dashboard-heading-tracking: -.045em;
+  --dashboard-heading-leading: 1.15;
+  --dashboard-heading-caption-size: 13px;
+  --dashboard-heading-caption-leading: 1.5;
+  --dashboard-heading-caption-gap: 6px;
+  --dashboard-section-gap: 24px;
+}
+@media (min-width: 640px) {
+  :root { --dashboard-gutter-x: 24px; --dashboard-gutter-top: 44px; --dashboard-gutter-bottom: 56px; }
+}
+@media (min-width: 1024px) { :root { --dashboard-gutter-x: 32px; } }
+
+.dashboard-content-frame {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: var(--dashboard-gutter-top) var(--dashboard-gutter-x) var(--dashboard-gutter-bottom);
+  width: 100%;
+  font-family: var(--dashboard-font);
+}
+/* Normalize only route roots, never nested cards, modals, editors or widgets.
+ * !important bridges legacy Tailwind utilities and route CSS modules until
+ * their redundant declarations are removed; this is the sole outer authority.
+ */
+.dashboard-content-frame .dashboard-route-page > :is(div, section, article, form):not([role="dialog"]):not([data-page-overlay]) {
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+/* Performance overview is the canonical page-heading treatment. These rules
+ * apply only to route content, not persistent navigation, Mira or dialogs.
+ * Legacy utility classes must not make individual page titles diverge. */
+.dashboard-content-frame .dashboard-route-page h1:not(:where([role="dialog"] *, [data-mira] *, [data-page-overlay] *)) {
+  font-family: var(--dashboard-font) !important;
+  font-size: var(--dashboard-heading-size) !important;
+  font-weight: var(--dashboard-heading-weight) !important;
+  letter-spacing: var(--dashboard-heading-tracking) !important;
+  line-height: var(--dashboard-heading-leading) !important;
+  color: var(--color-text-primary) !important;
+  text-transform: none !important;
+  text-shadow: none !important;
+  margin-block: 0 !important;
+  overflow-wrap: anywhere;
+}
+/* Only title-adjacent copy: never restyle all page paragraphs or card labels.
+ * Existing text stays intact; no invented eyebrows/descriptions are added. */
+.dashboard-content-frame .dashboard-route-page :is(p:has(+ h1), h1 + p):not(:where([role="dialog"] *, [data-mira] *, [data-page-overlay] *)) {
+  font-family: var(--dashboard-font) !important;
+  font-size: var(--dashboard-heading-caption-size) !important;
+  font-weight: 400 !important;
+  line-height: var(--dashboard-heading-caption-leading) !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  color: var(--color-text-secondary) !important;
+  margin-block: var(--dashboard-heading-caption-gap) 0 !important;
+}
+.dashboard-content-frame .dashboard-route-page p:has(+ h1):not(:where([role="dialog"] *, [data-mira] *, [data-page-overlay] *)) {
+  margin-block: 0 var(--dashboard-heading-caption-gap) !important;
+}
+.dashboard-content-frame .dashboard-route-page h2 {
+  font-family: var(--dashboard-font);
+  font-weight: var(--dashboard-heading-weight);
+  letter-spacing: -.025em;
+}
+/* Full-height routes use the same gutters but scroll inside their panels. */
+main.dashboard-page-canvas:has([data-page-sizing="viewport"]) { overflow: hidden; min-height: 0; }
+.dashboard-content-frame:has([data-page-sizing="viewport"]) { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.dashboard-route-stage:has([data-page-sizing="viewport"]),
+.dashboard-route-page[data-page-sizing="viewport"] { height: 100%; min-height: 0; }
+.dashboard-route-page[data-page-sizing="viewport"] > :first-child { height: 100%; min-height: 0; }
+@media (min-width: 768px) {
+  .dashboard-content-frame:has([data-page-sizing="viewport"]) { padding-bottom: var(--dashboard-gutter-x); }
+}
+/* Persistent navigation clearance belongs to the shared frame, not each page. */
+@media (max-width: 767px) {
+  .dashboard-content-frame { padding-bottom: max(var(--dashboard-gutter-bottom), calc(76px + env(safe-area-inset-bottom))); }
+}

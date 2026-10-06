@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -8,7 +10,7 @@ import {
   FaCalendarAlt, FaClock, FaChartLine, FaCheckCircle, FaExclamationTriangle,
   FaFlag, FaTasks, FaUserClock, FaSync, FaUserFriends
 } from 'react-icons/fa'
-import { Select, SelectItem, Input, Button, Skeleton } from '@heroui/react'
+import { Select, SelectItem, Input, Button, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
@@ -251,25 +253,25 @@ export default function PerformanceGoalsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Performance Goals</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-900">Performance Goals</Heading1>
           <p className="text-gray-600 mt-1">Track and manage employee objectives <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" /></p>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <NativeButton
             onClick={refresh}
             className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Refresh"
           >
             <FaSync className="w-4 h-4" />
-          </button>
+          </NativeButton>
           {canManageGoals() && (
-            <button
+            <NativeButton
               onClick={() => router.push('/dashboard/performance/goals/create')}
               className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
             >
               <FaPlus className="w-4 h-4" />
               <span>New Goal</span>
-            </button>
+            </NativeButton>
           )}
         </div>
       </div>
@@ -280,7 +282,7 @@ export default function PerformanceGoalsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-900 uppercase tracking-wide">Total</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</h3>
+              <Heading3 className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</Heading3>
             </div>
             <FaBullseye className="w-6 h-6 text-blue-600" />
           </div>
@@ -290,7 +292,7 @@ export default function PerformanceGoalsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-900 uppercase tracking-wide">Completed</p>
-              <h3 className="text-2xl font-bold text-emerald-600 mt-1">{stats.completed}</h3>
+              <Heading3 className="text-2xl font-bold text-emerald-600 mt-1">{stats.completed}</Heading3>
             </div>
             <FaCheckCircle className="w-6 h-6 text-emerald-600" />
           </div>
@@ -300,7 +302,7 @@ export default function PerformanceGoalsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-900 uppercase tracking-wide">In Progress</p>
-              <h3 className="text-2xl font-bold text-blue-600 mt-1">{stats.inProgress}</h3>
+              <Heading3 className="text-2xl font-bold text-blue-600 mt-1">{stats.inProgress}</Heading3>
             </div>
             <FaChartLine className="w-6 h-6 text-blue-600" />
           </div>
@@ -310,7 +312,7 @@ export default function PerformanceGoalsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-900 uppercase tracking-wide">Overdue</p>
-              <h3 className="text-2xl font-bold text-red-600 mt-1">{stats.overdue}</h3>
+              <Heading3 className="text-2xl font-bold text-red-600 mt-1">{stats.overdue}</Heading3>
             </div>
             <FaExclamationTriangle className="w-6 h-6 text-red-600" />
           </div>
@@ -320,7 +322,7 @@ export default function PerformanceGoalsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-900 uppercase tracking-wide">Avg Progress</p>
-              <h3 className="text-2xl font-bold text-purple-600 mt-1">{stats.avgProgress}%</h3>
+              <Heading3 className="text-2xl font-bold text-purple-600 mt-1">{stats.avgProgress}%</Heading3>
             </div>
             <FaTasks className="w-6 h-6 text-purple-600" />
           </div>
@@ -334,7 +336,7 @@ export default function PerformanceGoalsPage() {
             {/* View Mode Toggle */}
             <div className="flex items-center bg-gray-100 rounded-lg p-1">
               {['all', 'goals', 'projects'].map((mode) => (
-                <button
+                <NativeButton
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   className={'px-3 py-1.5 rounded-md text-sm font-medium transition-all ' +
@@ -345,7 +347,7 @@ export default function PerformanceGoalsPage() {
                   {mode === 'all' ? 'All (' + allItems.length + ')' :
                     mode === 'goals' ? 'Goals (' + goals.length + ')' :
                       'Projects (' + projects.length + ')'}
-                </button>
+                </NativeButton>
               ))}
             </div>
 
@@ -443,20 +445,20 @@ export default function PerformanceGoalsPage() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
             <FaBullseye className="w-8 h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No goals found</h3>
+          <Heading3 className="text-lg font-semibold text-gray-900 mb-2">No goals found</Heading3>
           <p className="text-gray-500 mb-6">
             {canManageGoals()
               ? 'Create your first performance goal to track employee objectives.'
               : 'No performance goals have been assigned yet.'}
           </p>
           {canManageGoals() && (
-            <button
+            <NativeButton
               onClick={() => router.push('/dashboard/performance/goals/create')}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
             >
               <FaPlus className="w-4 h-4" />
               Create Goal
-            </button>
+            </NativeButton>
           )}
         </div>
       ) : (
@@ -485,7 +487,7 @@ export default function PerformanceGoalsPage() {
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-gray-900 truncate">{goal.title}</h3>
+                          <Heading3 className="font-semibold text-gray-900 truncate">{goal.title}</Heading3>
                           {goal.type === 'project' && (
                             <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700">
                               Project
@@ -502,27 +504,27 @@ export default function PerformanceGoalsPage() {
                     {/* Actions */}
                     {canManageGoals() && (
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
+                        <NativeButton
                           onClick={() => router.push('/dashboard/performance/goals/' + goal._id)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="View"
                         >
                           <FaEye className="w-4 h-4" />
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={() => router.push('/dashboard/performance/goals/edit/' + goal._id)}
                           className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                           title="Edit"
                         >
                           <FaEdit className="w-4 h-4" />
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={() => handleDelete(goal._id, goal.type === 'project')}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
                         >
                           <FaTrash className="w-4 h-4" />
-                        </button>
+                        </NativeButton>
                       </div>
                     )}
                   </div>

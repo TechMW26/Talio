@@ -1,6 +1,13 @@
 'use client'
 
+
+import { Heading2, Heading1, NativeInput, Heading3, NativeButton } from '@/components/ui/fernly/native'
 import { Fragment, useState, useMemo } from 'react'
+import Link from 'next/link'
+import { FernlyMetricCard } from '@/components/charts/FernlyCharts'
+import FernlyMotion from '@/components/ui/FernlyMotion'
+import { attendanceReportTrend } from '@/lib/client/reportTrends'
+import { employeeDashboardHref } from '@/lib/client/reportInsights'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
@@ -11,7 +18,7 @@ import {
   FaCheckCircle, FaTimesCircle, FaChartPie, FaDownload, FaFileExcel,
   FaSearch, FaBuilding, FaUserTie, FaChevronDown, FaChevronUp
 } from 'react-icons/fa'
-import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
+import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input, Select, SelectItem } from '@/components/ui/fernly'
 import { getDateKeyInTimezone, getTodayDateString } from '@/lib/timezone'
 
 export default function AttendanceReportPage() {
@@ -98,6 +105,7 @@ export default function AttendanceReportPage() {
     isAuthorized && dateParams ? `/api/holidays?startDate=${dateParams.startDate}&endDate=${dateParams.endDate}` : null
   )
 
+  const dailyTrend = useMemo(() => attendanceReportTrend(attendanceRes?.data || []), [attendanceRes])
   const isLoading = attLoading || empLoading || compLoading || holLoading
   const error = attError || empError
   const isValidating = attValidating || empValidating
@@ -637,7 +645,7 @@ export default function AttendanceReportPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <FaExclamationTriangle className="mx-auto h-12 w-12 text-warning mb-4" />
-          <h2 className="text-2xl font-bold text-default-800 mb-2">Access Restricted</h2>
+          <Heading2 className="text-2xl font-bold text-default-800 mb-2">Access Restricted</Heading2>
           <p className="text-default-500">This report is only available to administrators and HR.</p>
         </div>
       </div>
@@ -645,12 +653,12 @@ export default function AttendanceReportPage() {
   }
 
   return (
-    <div className="page-container">
+    <FernlyMotion className="page-container">
       {/* Header */}
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-default-800">Attendance Report & Analytics</h1>
+            <Heading1 className="text-3xl font-bold text-default-800">Attendance Report & Analytics</Heading1>
             <p className="mt-2 text-xs text-default-500">Expand an employee row to view daily punch-in and punch-out times. Dates follow the company timezone; device punches appear after the attendance bridge syncs. Today’s record may change until the workday is complete.</p>
             <p className="text-default-500 mt-1">
               Comprehensive attendance KPIs, shrinkage analysis, and employee metrics
@@ -702,7 +710,7 @@ export default function AttendanceReportPage() {
               <>
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-2">Start Date</label>
-                  <input
+                  <NativeInput
                     type="date"
                     value={customStartDate}
                     onChange={(e) => setCustomStartDate(e.target.value)}
@@ -711,7 +719,7 @@ export default function AttendanceReportPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-2">End Date</label>
-                  <input
+                  <NativeInput
                     type="date"
                     value={customEndDate}
                     onChange={(e) => setCustomEndDate(e.target.value)}
@@ -749,9 +757,9 @@ export default function AttendanceReportPage() {
                 onClick={() => toggleSection('overview')}
               >
                 <div>
-                  <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                  <Heading2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
                     <span>Overview Metrics</span>
-                  </h2>
+                  </Heading2>
                   <p className="text-sm text-default-500 mt-1">
                     {reportData.period.startDate} to {reportData.period.endDate} ({reportData.period.workingDays} working days)
                   </p>
@@ -762,33 +770,10 @@ export default function AttendanceReportPage() {
               {expandedSections.overview && (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-primary-50 rounded-lg p-4">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm text-primary-700 font-medium">Total Employees</span>
-                      </div>
-                      <p className="text-3xl font-bold text-primary">{reportData.overview.totalEmployees}</p>
-                    </div>
-
-                    <div className="bg-success-50 rounded-lg p-4">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm text-success-700 font-medium">Attendance Rate</span>
-                      </div>
-                      <p className="text-3xl font-bold text-success">{reportData.overview.attendanceRate}%</p>
-                    </div>
-
-                    <div className="bg-danger-50 rounded-lg p-4">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm text-danger-700 font-medium">Absenteeism Rate</span>
-                      </div>
-                      <p className="text-3xl font-bold text-danger">{reportData.overview.absenteeismRate}%</p>
-                    </div>
-
-                    <div className="bg-warning-50 rounded-lg p-4">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm text-warning-700 font-medium">Punctuality Rate</span>
-                      </div>
-                      <p className="text-3xl font-bold text-warning">{reportData.overview.punctualityRate}%</p>
-                    </div>
+                    <FernlyMetricCard label="Total employees" value={reportData.overview.totalEmployees} note="Selected department" />
+                    <FernlyMetricCard label="Attendance rate" value={reportData.overview.attendanceRate + '%'} values={dailyTrend.map(day => day.attendanceRate)} note="Trend: recorded attendance by day" />
+                    <FernlyMetricCard label="Hours tracked" value={dailyTrend.reduce((sum,day) => sum + day.hours,0).toFixed(1)} values={dailyTrend.map(day => day.hours)} note="Recorded work hours per day" />
+                    <FernlyMetricCard label="Punctuality rate" value={reportData.overview.punctualityRate + '%'} note="Selected date range" />
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -826,9 +811,9 @@ export default function AttendanceReportPage() {
                 onClick={() => toggleSection('shrinkage')}
               >
                 <div>
-                  <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                  <Heading2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
                     <span>Shrinkage Analysis</span>
-                  </h2>
+                  </Heading2>
                   <p className="text-sm text-default-500 mt-1">
                     {reportData.period.startDate} to {reportData.period.endDate} ({reportData.period.workingDays} working days)
                   </p>
@@ -873,7 +858,7 @@ export default function AttendanceReportPage() {
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-default-800 mb-4">Shrinkage Breakdown</h3>
+                    <Heading3 className="text-lg font-semibold text-default-800 mb-4">Shrinkage Breakdown</Heading3>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center p-3 bg-danger-50 rounded-lg">
                         <span className="text-sm text-danger-700">Absent Days</span>
@@ -910,9 +895,9 @@ export default function AttendanceReportPage() {
                   className="flex items-center justify-between cursor-pointer mb-4"
                   onClick={() => toggleSection('departmentBreakdown')}
                 >
-                  <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                  <Heading2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
                     <span>Department Breakdown</span>
-                  </h2>
+                  </Heading2>
                   {expandedSections.departmentBreakdown ? <FaChevronUp /> : <FaChevronDown />}
                 </div>
 
@@ -957,9 +942,9 @@ export default function AttendanceReportPage() {
                 className="flex items-center justify-between cursor-pointer mb-4"
                 onClick={() => toggleSection('employeeDetails')}
               >
-                <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                <Heading2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
                   <span>Individual Employee Metrics</span>
-                </h2>
+                </Heading2>
                 {expandedSections.employeeDetails ? <FaChevronUp /> : <FaChevronDown />}
               </div>
 
@@ -1001,7 +986,7 @@ export default function AttendanceReportPage() {
                           <Fragment key={emp.id}>
                           <tr className="hover:bg-default-50">
                             <td className="px-3 py-4">
-                              <button
+                              <NativeButton
                                 type="button"
                                 aria-label={`${expandedEmployeeRows[emp.id] ? 'Hide' : 'Show'} daily punches for ${emp.name}`}
                                 aria-expanded={Boolean(expandedEmployeeRows[emp.id])}
@@ -1009,7 +994,7 @@ export default function AttendanceReportPage() {
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary hover:bg-primary-50"
                               >
                                 {expandedEmployeeRows[emp.id] ? <FaChevronUp /> : <FaChevronDown />}
-                              </button>
+                              </NativeButton>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center space-x-3">
@@ -1023,7 +1008,7 @@ export default function AttendanceReportPage() {
                                   </div>
                                 )}
                                 <div>
-                                  <p className="font-medium text-default-800">{emp.name}</p>
+                                  <Link className="font-medium text-primary hover:underline" href={employeeDashboardHref(emp.id)}>{emp.name}</Link>
                                   <p className="text-xs text-default-500">{emp.designation}</p>
                                 </div>
                               </div>
@@ -1102,6 +1087,6 @@ export default function AttendanceReportPage() {
           <p>Select filters above to generate the attendance report</p>
         </div>
       )}
-    </div>
+    </FernlyMotion>
   )
 }

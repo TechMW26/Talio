@@ -1,10 +1,13 @@
 'use client'
 
+
+import { Heading1, Heading3, NativeButton } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import toast from '@/utils/toast'
 import { FaPlus, FaEye, FaEdit, FaTrash, FaStar, FaSearch, FaFilter, FaUser, FaUserFriends } from 'react-icons/fa'
-import { Select, SelectItem, Input, Skeleton } from '@heroui/react'
+import { Select, SelectItem, Input, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
@@ -159,7 +162,7 @@ export default function EmployeeRatingsPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Employee Ratings</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">Employee Ratings</Heading1>
           <p className="text-gray-600 mt-1">Manage employee performance ratings and reviews <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" /></p>
         </div>
 
@@ -203,7 +206,7 @@ export default function EmployeeRatingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">{stat.title}</p>
-                <h3 className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</h3>
+                <Heading3 className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</Heading3>
               </div>
               <div className={`${stat.color} p-4 rounded-lg`}>
                 <stat.icon className="w-6 h-6 text-white" />
@@ -293,7 +296,7 @@ export default function EmployeeRatingsPage() {
       {filteredRatings.length === 0 ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <FaStar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No ratings found</h3>
+          <Heading3 className="text-lg font-medium text-gray-900 mb-2">No ratings found</Heading3>
           <p className="text-gray-500">
             {canManageRatings() ? 'Go to Team Dashboard to add reviews.' : 'No employee ratings have been created yet.'}
           </p>
@@ -312,9 +315,9 @@ export default function EmployeeRatingsPage() {
                     )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {rating.employee.firstName} {rating.employee.lastName}
-                    </h3>
+                    <Heading3 className="text-lg font-semibold text-gray-900">
+                      <Link href={`/dashboard/team/members/${encodeURIComponent(rating.employee._id)}`} className="hover:underline">{rating.employee.firstName} {rating.employee.lastName}</Link>
+                    </Heading3>
                     <p className="text-sm text-gray-500">{rating.employee.employeeCode}</p>
                     <p className="text-sm text-gray-600">{rating.employee.department}</p>
                     <p className="text-xs text-gray-400 mt-1 capitalize">{rating.type} • {rating.category}</p>
@@ -349,12 +352,12 @@ export default function EmployeeRatingsPage() {
                   </span>
                 </div>
                 {canManageRatings() && (
-                  <button
+                  <NativeButton
                     onClick={() => router.push(`/dashboard/team/members/${rating.employee._id}`)}
                     className="text-primary-600 hover:text-primary-800 text-xs font-medium"
                   >
                     View Profile
-                  </button>
+                  </NativeButton>
                 )}
               </div>
             </div>

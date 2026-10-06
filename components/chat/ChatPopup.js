@@ -1,4 +1,6 @@
 'use client'
+
+import UploadButton from '@/components/ui/UploadButton'
 import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -1315,14 +1317,14 @@ export default function ChatPopup({ chat, index }) {
               className="hidden"
               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx,.mp4,.mp3,.avi,.mov,.svg,.json,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*,video/*,audio/*"
             />
-            <button
+            <UploadButton label="Attach file"
               onClick={() => fileInputRef.current?.click()}
               className="p-2.5 rounded-xl transition-colors"
               style={{ background: 'rgba(0, 0, 0, 0.05)' }}
               title="Attach file"
             >
               <FaPaperclip className="w-4 h-4 text-gray-500" />
-            </button>
+            </UploadButton>
             <div className="relative flex-1">
               <input
                 ref={messageInputRef}

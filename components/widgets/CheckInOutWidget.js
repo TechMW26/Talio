@@ -3,7 +3,7 @@
 import styles from './CheckInOutWidget.module.css'
 
 import { FaSignInAlt, FaSignOutAlt, FaEnvelope, FaPhone, FaCalendarAlt } from 'react-icons/fa'
-import { Card, CardBody, Button, Avatar } from '@heroui/react'
+import { Card, CardBody, Button, Avatar } from '@/components/ui/fernly'
 import { formatDesignation } from '@/lib/formatters'
 import LocationAccessStatus from '@/components/attendance/LocationAccessStatus'
 

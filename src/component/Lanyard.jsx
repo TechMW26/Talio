@@ -56,10 +56,19 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
       x: container.offsetWidth / 2,
       y: 0
     };
+    // Extend only the drawn ribbon behind the shell. The physics anchor stays
+    // unchanged so the card, clip and drag coordinates do not move with it.
+    let ribbonStartY = -64;
 
     function handleResize() {
       anchor.x = container.offsetWidth / 2;
+      const header = document.querySelector('header');
+      const headerBottom = header?.getBoundingClientRect().bottom || 0;
+      ribbonStartY = Math.min(-64, headerBottom - container.getBoundingClientRect().top - 32);
     }
+    handleResize();
+    const ribbonResizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(handleResize) : null;
+    ribbonResizeObserver?.observe(container);
     window.addEventListener("resize", handleResize);
 
     // PHYSICS PARAMETERS - adjust rest position for elegant card, positioned higher
@@ -235,7 +244,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
       const attachY = cy - CARD_H / 2 - CLIP_HEIGHT / 2;
 
       const ax = anchor.x;
-      const ay = anchor.y;
+      const ay = ribbonStartY;
       const bx = attachX;
       const by = attachY;
 
@@ -289,6 +298,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
     animationFrameId = requestAnimationFrame(animate);
 
     return () => {
+      ribbonResizeObserver?.disconnect();
       window.removeEventListener("resize", handleResize);
       cardOuter.removeEventListener("pointerdown", onPointerDown);
       cardOuter.removeEventListener("pointerup", endDrag);
@@ -392,6 +402,8 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
                       onImageClick();
                     }}
                     disabled={uploadingImage}
+                    aria-label={uploadingImage ? 'Uploading profile photo' : 'Update profile photo'}
+                    title="Update profile photo"
                     className="avatar-camera-btn"
                   >
                     {uploadingImage ? (
@@ -431,7 +443,12 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
             </div>
 
             <div className="footer-row">
-              Tap to flip • Wear visibly inside premises
+              {employee?.status ? (
+                <span className="employee-status" data-active={employee.status === 'active'}>
+                  <span aria-hidden="true" className="employee-status-dot" />
+                  {employee.status === 'active' ? 'Active Employee' : employee.status.replace(/_/g, ' ')}
+                </span>
+              ) : 'Tap to flip • Wear visibly inside premises'}
             </div>
           </div>
 

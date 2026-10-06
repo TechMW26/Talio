@@ -1,7 +1,9 @@
 'use client'
 
+
+import { Heading1, Heading3, Heading2, NativeButton, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
 import { useEffect, useState } from 'react'
-import { Button, Skeleton } from '@heroui/react'
+import { Button, Skeleton } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBriefcase } from 'react-icons/fa'
@@ -84,7 +86,7 @@ export default function DesignationsPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Designations</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">Designations</Heading1>
           <p className="text-gray-600 mt-1 flex items-center gap-2">
             Manage job designations and roles
             <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -103,7 +105,7 @@ export default function DesignationsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Designations</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Designations</Heading3>
             <FaBriefcase className="text-primary-500 flex-shrink-0" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">{designations.length}</div>
@@ -113,7 +115,7 @@ export default function DesignationsPage() {
 
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Roles</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Roles</Heading3>
             <FaBriefcase className="text-blue-500 flex-shrink-0" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -125,7 +127,7 @@ export default function DesignationsPage() {
       {/* Designations Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">All Designations</h2>
+          <Heading2 className="text-xl font-semibold text-gray-800">All Designations</Heading2>
         </div>
 
         {error ? (
@@ -182,18 +184,18 @@ export default function DesignationsPage() {
                         {desig.description || 'No description'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
+                        <NativeButton
                           onClick={() => handleEdit(desig)}
                           className="text-blue-600 hover:text-blue-900 mr-4"
                         >
                           <FaEdit />
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={() => handleDelete(desig._id)}
                           className="text-red-600 hover:text-red-900"
                         >
                           <FaTrash />
-                        </button>
+                        </NativeButton>
                       </td>
                     </tr>
                   ))
@@ -208,16 +210,16 @@ export default function DesignationsPage() {
       <ModalPortal isOpen={showModal}>
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            <Heading2 className="text-2xl font-bold text-gray-800 mb-4">
               {editingDesig ? 'Edit Designation' : 'Add Designation'}
-            </h2>
+            </Heading2>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Title *
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     required
                     value={formData.title}
@@ -231,7 +233,7 @@ export default function DesignationsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description
                   </label>
-                  <textarea
+                  <NativeTextarea
                     rows="3"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}

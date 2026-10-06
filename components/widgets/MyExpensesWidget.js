@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { FaMoneyBillWave, FaPlus } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { getEmployeeId } from '@/utils/userHelper'
-import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function MyExpensesWidget({ user, initialData }) {
   const router = useRouter()

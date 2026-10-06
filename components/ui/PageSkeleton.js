@@ -19,7 +19,7 @@ export default function PageSkeleton({
   message = ''
 }) {
   return (
-    <div className="min-h-[400px] w-full animate-fade-in">
+    <div data-page-skeleton="true" aria-busy="true" className="page-skeleton min-h-[400px] w-full animate-fade-in">
       {/* Page Header Skeleton */}
       {title && (
         <div className="mb-6">

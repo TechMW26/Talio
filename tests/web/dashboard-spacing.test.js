@@ -1,0 +1,36 @@
+import fs from 'node:fs'
+import path from 'node:path'
+const read = file => fs.readFileSync(path.join(process.cwd(), file), 'utf8')
+test('employee navigation is icon-only and viewport panels grow into free space', () => {
+  const page = read('app/dashboard/team/members/[id]/page.js')
+  expect(page).toContain('aria-label="Back to previous page"')
+  expect(page).toContain('className={styles.backButton}')
+  expect(read('app/dashboard/team/members/[id]/member.module.css')).toContain('flex: 1 0 auto; margin-bottom: 0')
+  expect(read('app/dashboard/chat/chat.module.css')).toContain('.page .shell { flex:1; height:auto; min-height:0;')
+  expect(read('app/dashboard/calendar/calendar.module.css')).not.toContain('min-height: 680px')
+})
+test('dashboard layout delegates its geometry to a single shared frame', () => {
+  const layout = read('app/dashboard/layout.js')
+  expect(layout).toContain('className="dashboard-content-frame"')
+  expect(layout).not.toContain("isChatPage ? 'sm:pb-16 px-0")
+  expect(read('app/layout.js')).toContain("import './dashboard/dashboard-layout.css'")
+})
+test('canonical gutters retain team reference measurements and scope root normalization', () => {
+  const css = read('app/dashboard/dashboard-layout.css')
+  expect(css).toContain('--dashboard-gutter-top: 44px')
+  expect(css).toContain('--dashboard-gutter-x: 32px')
+  expect(css).toContain('.dashboard-route-page > :is(div, section, article, form)')
+  expect(css).toContain(':not([role="dialog"])')
+  expect(css).toContain('--dashboard-heading-weight: 500')
+  expect(css).not.toMatch(/\.dashboard-route-page\s+\*\s*\{/)
+})
+test('page headings and adjacent copy share the performance typography, excluding overlays', () => {
+  const css = read('app/dashboard/dashboard-layout.css')
+  expect(css).toContain('--dashboard-heading-size: clamp(28px, 3vw, 42px)')
+  expect(css).toContain('--dashboard-heading-tracking: -.045em')
+  expect(css).toContain('--dashboard-heading-caption-size: 13px')
+  expect(css).toContain('line-height: var(--dashboard-heading-leading) !important')
+  expect(css).toContain(':is(p:has(+ h1), h1 + p)')
+  expect(css).toContain('[role="dialog"] *, [data-mira] *, [data-page-overlay] *')
+  expect(css).toContain('text-transform: none !important')
+})

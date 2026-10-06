@@ -1,4 +1,4 @@
-.page { padding: 24px; color: var(--color-text-primary); }
+.page { color: var(--color-text-primary); }
 .heading, .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .heading { margin-bottom: 24px; }
 .heading h1 { font-size: 30px; font-weight: 600; letter-spacing: -.04em; }
@@ -10,10 +10,8 @@
 .next { grid-area: next; max-height: 480px; overflow-y: auto; }
 .card h2 { font-size: 22px; font-weight: 600; letter-spacing: -.03em; }
 .nav { display: flex; gap: 6px; align-items: center; }
-.nav button, .toggle button { border-radius: 999px; padding: 9px 13px; background: var(--color-bg-hover, #252525); font-size: 13px; }
-.nav button:focus-visible, .day:focus-visible, .toggle button:focus-visible, .upcoming:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
-.toggle { display: flex; padding: 4px; gap: 4px; background: var(--color-bg-card); border-radius: 999px; }
-.toggle button[aria-pressed=true] { background: #2563eb; color: #fff; }
+.nav button { border-radius: 999px; padding: 9px 13px; background: var(--color-bg-hover, #252525); font-size: 13px; }
+.nav button:focus-visible, .day:focus-visible, .upcoming:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
 .week, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .week { margin: 18px 0 8px; font-size: 11px; text-transform: uppercase; text-align: center; color: var(--color-text-secondary); }
 .grid { grid-auto-rows: minmax(84px, 1fr); }
@@ -31,5 +29,22 @@
 .dateBadge { flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: #2563eb20; color: #93b4fa; }
 .upcoming small { display: block; color: var(--color-text-secondary); font-size: 11px; }
 .empty { padding: 22px 0; font-size: 13px; color: var(--color-text-secondary); }
+/* Fill the dashboard's available content area, rather than guessing its header height. */
+@media(min-width:1001px) {
+  :global(main.dashboard-page-canvas):has(.page) { min-height: 0; }
+  :global(main.dashboard-page-canvas):has(.page) > div:first-child { height: 100%; }
+  :global(main.dashboard-page-canvas):has(.page) > div:last-child { display: none; }
+  :global(.dashboard-route-stage):has(.page),
+  :global(.dashboard-route-page):has(.page) { height: 100%; }
+  .page { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; }
+  .heading, .page > .empty { flex: none; }
+  .layout { flex: 1; min-height: 0; grid-template-rows: minmax(150px, .4fr) minmax(0, 1fr); }
+  .month { display: flex; flex-direction: column; min-height: 0; }
+  .toolbar, .week { flex: none; }
+  .grid { flex: 1; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+  .day { min-height: 0; overflow: hidden; }
+  .number { flex-shrink: 0; }
+  .events, .next { min-height: 0; max-height: none; overflow-y: auto; }
+}
 @media(max-width:1000px) { .layout { grid-template-columns: minmax(0,1fr); grid-template-areas: 'month' 'events' 'next'; } }
 @media(max-width:600px) { .page { padding: 12px; } .card { padding: 14px; } .day { padding: 3px; } .eventTag { font-size: 9px; } .grid { grid-auto-rows: minmax(70px,1fr); gap: 3px; } }

@@ -1,7 +1,9 @@
 'use client'
 
+
+import { Heading1, Heading3, NativeButton, Heading2, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Button, Skeleton } from '@heroui/react'
+import { Button, Skeleton } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBuilding, FaUsers, FaTimes, FaUserTie, FaSearch, FaLayerGroup, FaUserShield } from 'react-icons/fa'
@@ -343,7 +345,7 @@ export default function DepartmentsPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Departments</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">Departments</Heading1>
           <p className="text-gray-600 mt-1">
             {canManageDepartments() ? 'Manage company departments' : 'View company departments'}
             <BackgroundRefreshIndicator isValidating={isValidating} />
@@ -364,7 +366,7 @@ export default function DepartmentsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Departments</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Departments</Heading3>
             <FaBuilding className="text-primary-500 flex-shrink-0" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">{departments.length}</div>
@@ -372,7 +374,7 @@ export default function DepartmentsPage() {
 
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Departments</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Departments</Heading3>
             <FaBuilding className="text-green-500 flex-shrink-0" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -382,7 +384,7 @@ export default function DepartmentsPage() {
 
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Teams</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Teams</Heading3>
             <FaLayerGroup className="text-indigo-500 flex-shrink-0" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -392,7 +394,7 @@ export default function DepartmentsPage() {
 
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Employees</h3>
+            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Employees</Heading3>
             <FaUsers className="text-blue-500 flex-shrink-0" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -440,7 +442,7 @@ export default function DepartmentsPage() {
                     <FaBuilding className="text-primary-500 text-lg sm:text-xl" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-800 truncate">{dept.name}</h3>
+                    <Heading3 className="text-base sm:text-lg font-bold text-gray-800 truncate">{dept.name}</Heading3>
                     {dept.code && (
                       <p className="text-xs sm:text-sm text-gray-500 truncate">{dept.code}</p>
                     )}
@@ -448,21 +450,21 @@ export default function DepartmentsPage() {
                 </div>
                 {canManageDepartments() && (
                   <div className="flex space-x-1 sm:space-x-2 flex-shrink-0">
-                    <button
+                    <NativeButton
                       onClick={() => handleEdit(dept)}
                       className="text-blue-600 hover:text-blue-800 p-1.5 sm:p-2 rounded-lg hover:bg-blue-50 transition-colors"
                       title="Edit Department"
                     >
                       <FaEdit className="w-3 h-3 sm:w-4 sm:h-4" />
-                    </button>
-                    <button
+                    </NativeButton>
+                    <NativeButton
                       onClick={() => handleDelete(dept._id)}
                       disabled={deleteMutation.isLoading}
                       className="text-red-600 hover:text-red-800 p-1.5 sm:p-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                       title="Delete Department"
                     >
                       <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
-                    </button>
+                    </NativeButton>
                   </div>
                 )}
               </div>
@@ -529,21 +531,21 @@ export default function DepartmentsPage() {
               {/* Teams Section */}
               <div className="mt-2 pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between mb-1">
-                  <button
+                  <NativeButton
                     onClick={() => toggleDeptExpand(dept._id)}
                     className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700 transition-colors"
                   >
                     <FaLayerGroup className="text-indigo-500" />
                     <span>{dept.teams?.length || 0} Teams</span>
                     <span className="text-[10px]">{expandedDepts[dept._id] ? '▲' : '▼'}</span>
-                  </button>
+                  </NativeButton>
                   {canManageDepartments() && (
-                    <button
+                    <NativeButton
                       onClick={() => handleOpenTeamModal(dept._id)}
                       className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5"
                     >
                       <FaPlus className="w-2.5 h-2.5" /> Team
-                    </button>
+                    </NativeButton>
                   )}
                 </div>
                 {expandedDepts[dept._id] && dept.teams && dept.teams.length > 0 && (
@@ -558,20 +560,20 @@ export default function DepartmentsPage() {
                         </div>
                         {canManageDepartments() && (
                           <div className="flex gap-1 flex-shrink-0">
-                            <button
+                            <NativeButton
                               onClick={() => handleOpenTeamModal(dept._id, team)}
                               className="text-blue-500 hover:text-blue-700 p-1"
                               title="Edit Team"
                             >
                               <FaEdit className="w-2.5 h-2.5" />
-                            </button>
-                            <button
+                            </NativeButton>
+                            <NativeButton
                               onClick={() => handleDeleteTeam(team._id)}
                               className="text-red-500 hover:text-red-700 p-1"
                               title="Delete Team"
                             >
                               <FaTrash className="w-2.5 h-2.5" />
-                            </button>
+                            </NativeButton>
                           </div>
                         )}
                       </div>
@@ -588,16 +590,16 @@ export default function DepartmentsPage() {
       <ModalPortal isOpen={showModal}>
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            <Heading2 className="text-2xl font-bold text-gray-800 mb-4">
               {editingDept ? 'Edit Department' : 'Add Department'}
-            </h2>
+            </Heading2>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Department Name *
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     required
                     value={formData.name}
@@ -611,7 +613,7 @@ export default function DepartmentsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Department Code
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
@@ -624,7 +626,7 @@ export default function DepartmentsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description
                   </label>
-                  <textarea
+                  <NativeTextarea
                     rows="3"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -649,13 +651,13 @@ export default function DepartmentsPage() {
                             className="inline-flex items-center space-x-1 bg-primary-100 text-primary-800 px-3 py-1 rounded-full text-sm"
                           >
                             <span>{head.firstName} {head.lastName}</span>
-                            <button
+                            <NativeButton
                               type="button"
                               onClick={() => removeHead(headId)}
                               className="text-primary-600 hover:text-primary-800"
                             >
                               <FaTimes className="w-3 h-3" />
-                            </button>
+                            </NativeButton>
                           </span>
                         ) : null
                       })}
@@ -666,7 +668,7 @@ export default function DepartmentsPage() {
                   <div className="relative" ref={dropdownRef}>
                     <div className="input-with-icon">
                       <FaSearch className="input-icon" />
-                      <input
+                      <NativeInput
                         type="text"
                         value={headSearch}
                         onChange={(e) => {
@@ -682,7 +684,7 @@ export default function DepartmentsPage() {
                     {showHeadDropdown && filteredEmployees.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                         {filteredEmployees.slice(0, 10).map(employee => (
-                          <button
+                          <NativeButton
                             key={employee._id}
                             type="button"
                             onClick={() => addHead(employee)}
@@ -690,7 +692,7 @@ export default function DepartmentsPage() {
                           >
                             <span className="text-gray-800">{employee.firstName} {employee.lastName}</span>
                             <span className="text-xs text-gray-500">{employee.employeeCode || employee.email}</span>
-                          </button>
+                          </NativeButton>
                         ))}
                         {!headSearch.trim() && unselectedPeople.length > 10 && (
                           <div className="px-4 py-2 text-xs text-gray-400 text-center border-t border-gray-100 bg-gray-50">
@@ -739,14 +741,14 @@ export default function DepartmentsPage() {
       <ModalPortal isOpen={showTeamModal}>
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            <Heading2 className="text-2xl font-bold text-gray-800 mb-4">
               {editingTeam ? 'Edit Team' : 'Create Team'}
-            </h2>
+            </Heading2>
             <form onSubmit={handleTeamSubmit}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Team Name *</label>
-                  <input
+                  <NativeInput
                     type="text"
                     required
                     value={teamFormData.teamName}
@@ -758,7 +760,7 @@ export default function DepartmentsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Team Code *</label>
-                  <input
+                  <NativeInput
                     type="text"
                     required
                     value={teamFormData.teamCode}
@@ -770,7 +772,7 @@ export default function DepartmentsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <textarea
+                  <NativeTextarea
                     rows="2"
                     value={teamFormData.description}
                     onChange={(e) => setTeamFormData({ ...teamFormData, description: e.target.value })}
@@ -791,16 +793,16 @@ export default function DepartmentsPage() {
                         return p ? (
                           <span key={lid} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full text-xs">
                             {p.firstName} {p.lastName}
-                            <button type="button" onClick={() => removeTeamPerson(lid, 'leaders')} className="hover:text-indigo-950">
+                            <NativeButton type="button" onClick={() => removeTeamPerson(lid, 'leaders')} className="hover:text-indigo-950">
                               <FaTimes className="w-2.5 h-2.5" />
-                            </button>
+                            </NativeButton>
                           </span>
                         ) : null
                       })}
                     </div>
                   )}
                   <div className="relative" ref={teamDropdownRef}>
-                    <input
+                    <NativeInput
                       type="text"
                       value={teamSearchType === 'leaders' ? teamSearch : ''}
                       onChange={(e) => handleTeamSearchChange(e.target.value, 'leaders')}
@@ -815,7 +817,7 @@ export default function DepartmentsPage() {
                           .filter(p => !debouncedTeamSearch.trim() || `${p.firstName} ${p.lastName}`.toLowerCase().includes(debouncedTeamSearch.toLowerCase()))
                           .slice(0, 8)
                           .map(p => (
-                            <button
+                            <NativeButton
                               key={p._id}
                               type="button"
                               onMouseDown={(e) => { e.preventDefault(); addTeamPerson(p._id, 'leaders') }}
@@ -823,7 +825,7 @@ export default function DepartmentsPage() {
                             >
                               {p.firstName} {p.lastName}
                               <span className="text-[10px] text-gray-400 ml-2">{p.employeeCode || ''}</span>
-                            </button>
+                            </NativeButton>
                           ))}
                       </div>
                     )}
@@ -842,16 +844,16 @@ export default function DepartmentsPage() {
                         return p ? (
                           <span key={mid} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full text-xs">
                             {p.firstName} {p.lastName}
-                            <button type="button" onClick={() => removeTeamPerson(mid, 'members')} className="hover:text-gray-900">
+                            <NativeButton type="button" onClick={() => removeTeamPerson(mid, 'members')} className="hover:text-gray-900">
                               <FaTimes className="w-2.5 h-2.5" />
-                            </button>
+                            </NativeButton>
                           </span>
                         ) : null
                       })}
                     </div>
                   )}
                   <div className="relative" ref={teamMemberDropdownRef}>
-                    <input
+                    <NativeInput
                       type="text"
                       value={teamSearchType === 'members' ? teamSearch : ''}
                       onChange={(e) => handleTeamSearchChange(e.target.value, 'members')}
@@ -866,7 +868,7 @@ export default function DepartmentsPage() {
                           .filter(p => !debouncedTeamSearch.trim() || `${p.firstName} ${p.lastName}`.toLowerCase().includes(debouncedTeamSearch.toLowerCase()))
                           .slice(0, 8)
                           .map(p => (
-                            <button
+                            <NativeButton
                               key={p._id}
                               type="button"
                               onMouseDown={(e) => { e.preventDefault(); addTeamPerson(p._id, 'members') }}
@@ -874,7 +876,7 @@ export default function DepartmentsPage() {
                             >
                               {p.firstName} {p.lastName}
                               <span className="text-[10px] text-gray-400 ml-2">{p.employeeCode || ''}</span>
-                            </button>
+                            </NativeButton>
                           ))}
                       </div>
                     )}

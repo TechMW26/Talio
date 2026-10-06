@@ -1,9 +1,11 @@
 'use client'
 
+
+import { NativeButton, Heading3, NativeInput, Heading1, Heading2 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button,
   Tabs,
@@ -11,7 +13,7 @@ import {
   Skeleton,
   ModalContent,
   ModalBody,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import {
   HiOutlineSparkles,
   HiOutlineChevronLeft,
@@ -73,7 +75,7 @@ function StatCard({ icon: Icon, label, value, iconBg = 'bg-blue-100', iconText =
 
 function ScreenshotTile({ shot, onClick }) {
   return (
-    <button
+    <NativeButton
       type="button"
       onClick={onClick}
       className="group relative aspect-video overflow-hidden rounded-xl border border-gray-100 bg-gray-50 shadow-sm transition hover:shadow-md hover:border-indigo-300"
@@ -93,7 +95,7 @@ function ScreenshotTile({ shot, onClick }) {
           <span className="rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Pending</span>
         )}
       </div>
-    </button>
+    </NativeButton>
   )
 }
 
@@ -307,9 +309,9 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
       <div className="p-5 border-b border-gray-100">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <Heading3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               {analysis.sessionTitle || 'MIRA Daily Analysis'}
-            </h3>
+            </Heading3>
             {lastAnalyzedAt ? (
               <p className="mt-0.5 text-xs text-gray-500">
                 Last analyzed {new Date(lastAnalyzedAt).toLocaleString()}
@@ -524,19 +526,19 @@ function Lightbox({ shots, index, onClose, onIndexChange }) {
                   <span className="text-xs text-white/70 ml-1">{safeIndex + 1} / {total}</span>
                 ) : null}
               </div>
-              <button
+              <NativeButton
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
                 className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70 backdrop-blur transition"
               >
                 <HiOutlineXMark className="w-5 h-5" />
-              </button>
+              </NativeButton>
             </div>
 
             {/* Prev arrow */}
             {total > 1 ? (
-              <button
+              <NativeButton
                 type="button"
                 onClick={goPrev}
                 disabled={safeIndex === 0}
@@ -544,12 +546,12 @@ function Lightbox({ shots, index, onClose, onIndexChange }) {
                 className="absolute left-4 z-20 rounded-full bg-black/50 p-3 text-white hover:bg-black/70 backdrop-blur transition disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <HiOutlineChevronLeft className="w-6 h-6" />
-              </button>
+              </NativeButton>
             ) : null}
 
             {/* Next arrow */}
             {total > 1 ? (
-              <button
+              <NativeButton
                 type="button"
                 onClick={goNext}
                 disabled={safeIndex === total - 1}
@@ -557,7 +559,7 @@ function Lightbox({ shots, index, onClose, onIndexChange }) {
                 className="absolute right-4 z-20 rounded-full bg-black/50 p-3 text-white hover:bg-black/70 backdrop-blur transition disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <HiOutlineChevronRight className="w-6 h-6" />
-              </button>
+              </NativeButton>
             ) : null}
 
             {/* Image */}
@@ -770,7 +772,7 @@ export default function ProductivityPage() {
           </div>
           <div className="input-with-icon md:w-80">
             <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-            <input
+            <NativeInput
               type="text"
               value={teamSearch}
               onChange={(e) => setTeamSearch(e.target.value)}
@@ -794,7 +796,7 @@ export default function ProductivityPage() {
       ) : teamMembers.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
           <HiOutlineUsers className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-800 mb-2">No team members found</h3>
+          <Heading3 className="text-lg font-medium text-gray-800 mb-2">No team members found</Heading3>
           <p className="text-gray-500">Try adjusting your search or pick a different date.</p>
         </div>
       ) : (
@@ -805,7 +807,7 @@ export default function ProductivityPage() {
             const analyzed = memberStats.analyzedCaptures ?? memberStats.analyzedScreenshots ?? 0
             const score = memberStats.score ?? memberStats.avgScore ?? null
             return (
-              <button
+              <NativeButton
                 key={m.userId || m._id}
                 type="button"
                 onClick={() => setSelectedTeamUserId(m.userId || m._id)}
@@ -828,7 +830,7 @@ export default function ProductivityPage() {
                     <HiOutlineSparkles className="w-4 h-4" /> {analyzed} analyzed
                   </span>
                 </div>
-              </button>
+              </NativeButton>
             )
           })}
         </div>
@@ -845,9 +847,9 @@ export default function ProductivityPage() {
       {/* Header — matches meetings page header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <Heading1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             Productivity
-          </h1>
+          </Heading1>
           <p className="text-gray-600 mt-1">
             Screenshots from your work day, analyzed by MIRA.
           </p>
@@ -855,17 +857,17 @@ export default function ProductivityPage() {
 
         {/* Date picker bar (right side, like the "Schedule Meeting" CTA position) */}
         <div className="flex items-center gap-2">
-          <button
+          <NativeButton
             type="button"
             onClick={() => changeDate(-1)}
             aria-label="Previous day"
             className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
           >
             <HiOutlineChevronLeft className="w-5 h-5 text-gray-600" />
-          </button>
+          </NativeButton>
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
             <HiOutlineCalendarDays className="w-4 h-4 text-gray-500" />
-            <input
+            <NativeInput
               type="date"
               value={selectedDate}
               max={today}
@@ -873,7 +875,7 @@ export default function ProductivityPage() {
               className="bg-transparent text-sm text-gray-700 focus:outline-none"
             />
           </div>
-          <button
+          <NativeButton
             type="button"
             onClick={() => changeDate(1)}
             disabled={isFutureDisabled}
@@ -881,7 +883,7 @@ export default function ProductivityPage() {
             className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
           >
             <HiOutlineChevronRight className="w-5 h-5 text-gray-600" />
-          </button>
+          </NativeButton>
         </div>
       </div>
 
@@ -934,9 +936,9 @@ export default function ProductivityPage() {
       {/* Team grid (when in team tab and no member selected) */}
       {activeTab === 'team' && !selectedTeamUserId ? (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <Heading2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
             Team
-          </h2>
+          </Heading2>
           {renderTeamGrid()}
         </div>
       ) : null}
@@ -975,14 +977,14 @@ export default function ProductivityPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <NativeButton
                   type="button"
                   onClick={() => mutateDaily()}
                   className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
                   aria-label="Refresh"
                 >
                   <HiOutlineArrowPath className={`w-5 h-5 text-gray-600 ${dailyValidating && !dailyLoading ? 'animate-spin' : ''}`} />
-                </button>
+                </NativeButton>
                 <Button
                   color="primary"
                   onPress={handleAnalyze}
@@ -1030,9 +1032,9 @@ export default function ProductivityPage() {
               {/* Pending captures */}
               {pendingShots.length > 0 ? (
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <Heading2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
                     Pending Captures ({pendingShots.length})
-                  </h2>
+                  </Heading2>
                   <ScreenshotGrid
                     screenshots={pendingShots}
                     emptyHint="No pending captures."
@@ -1045,7 +1047,7 @@ export default function ProductivityPage() {
               {screenshots.length === 0 && !analysis ? (
                 <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
                   <HiOutlinePhoto className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">No captures for this day</h3>
+                  <Heading3 className="text-lg font-medium text-gray-800 mb-2">No captures for this day</Heading3>
                   <p className="text-gray-500">
                     Screenshots are captured every 4 minutes during your company&apos;s office hours.
                   </p>

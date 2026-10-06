@@ -1,8 +1,10 @@
 'use client'
 
+
+import { Heading1, Heading3, NativeButton, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, CardHeader, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, CardHeader, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCalendarAlt, FaClock, FaCheck, FaTimes, FaEye, FaFilter } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
@@ -82,7 +84,7 @@ export default function LeaveRequestsPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-default-800">My Leave Requests</h1>
+          <Heading1 className="text-3xl font-bold text-default-800">My Leave Requests</Heading1>
           <p className="text-default-500 mt-1 flex items-center gap-2">
             Track all your leave applications and their status
             <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -103,7 +105,7 @@ export default function LeaveRequestsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-default-500 text-sm font-medium">{stat.title}</p>
-                  <h3 className="text-2xl font-bold text-default-800 mt-2">{stat.value}</h3>
+                  <Heading3 className="text-2xl font-bold text-default-800 mt-2">{stat.value}</Heading3>
                 </div>
                 <div className={`bg-${stat.color} p-4 rounded-lg`}>
                   <stat.icon className="w-6 h-6 text-white" />
@@ -125,7 +127,7 @@ export default function LeaveRequestsPage() {
                 { key: 'approved', label: 'Approved', count: leaves.filter(l => l.status === 'approved').length },
                 { key: 'rejected', label: 'Rejected', count: leaves.filter(l => l.status === 'rejected').length },
               ].map((tab) => (
-                <button
+                <NativeButton
                   key={tab.key}
                   onClick={() => setFilter(tab.key)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm ${filter === tab.key
@@ -134,7 +136,7 @@ export default function LeaveRequestsPage() {
                     }`}
                 >
                   {tab.label} ({tab.count})
-                </button>
+                </NativeButton>
               ))}
             </nav>
           </div>
@@ -235,7 +237,7 @@ export default function LeaveRequestsPage() {
           {(onClose) => (
             <>
               <ModalHeader className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-default-800">Leave Request Details</h2>
+                <Heading2 className="text-xl font-bold text-default-800">Leave Request Details</Heading2>
               </ModalHeader>
               <ModalBody>
                 <div className="space-y-6">

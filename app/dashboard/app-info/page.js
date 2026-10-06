@@ -1,7 +1,9 @@
 'use client'
 
+
+import { NativeButton, Heading2, Heading1, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useCallback } from 'react'
-import { Button, Spinner } from '@heroui/react'
+import { Button, Spinner } from '@/components/ui/fernly'
 import {
   HiOutlineComputerDesktop,
   HiOutlineArrowPath,
@@ -40,7 +42,7 @@ function CopyPill({ label, value, icon: Icon }) {
     })
   }
   return (
-    <button
+    <NativeButton
       onClick={handleCopy}
       className="group/pill flex items-center justify-between w-full p-3.5 rounded-xl text-left relative overflow-hidden transition-all duration-300"
       style={{
@@ -69,7 +71,7 @@ function CopyPill({ label, value, icon: Icon }) {
           ? <HiOutlineCheck className="w-3 h-3 text-emerald-500" />
           : <HiOutlineClipboardDocument className="w-3 h-3" style={{ color: 'var(--color-text-secondary)' }} />}
       </div>
-    </button>
+    </NativeButton>
   )
 }
 
@@ -222,7 +224,7 @@ export default function AppInfoPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
           <HiOutlineComputerDesktop className="w-16 h-16 mx-auto text-default-300" />
-          <h2 className="text-xl font-semibold text-default-700">Desktop App Only</h2>
+          <Heading2 className="text-xl font-semibold text-default-700">Desktop App Only</Heading2>
           <p className="text-default-500 text-sm max-w-sm">
             App Info is only available in the Talio Desktop application.
           </p>
@@ -251,7 +253,7 @@ export default function AppInfoPage() {
             Talio Desktop {currentVersion ? `v${currentVersion}` : ''}
           </span>
         </div>
-        <h1 className="text-[clamp(32px,4vw,48px)] font-extrabold tracking-tighter leading-[1.1] animate-[fadeInUp_0.6s_0.2s_ease_both] opacity-0 [animation-fill-mode:forwards]" style={{ color: 'var(--color-text-primary)' }}>
+        <Heading1 className="text-[clamp(32px,4vw,48px)] font-extrabold tracking-tighter leading-[1.1] animate-[fadeInUp_0.6s_0.2s_ease_both] opacity-0 [animation-fill-mode:forwards]" style={{ color: 'var(--color-text-primary)' }}>
           System{' '}
           <span style={{
             background: 'linear-gradient(to right, var(--color-primary-500), var(--color-primary-300))',
@@ -259,7 +261,7 @@ export default function AppInfoPage() {
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
           }}>Information.</span>
-        </h1>
+        </Heading1>
         <p className="mt-3 text-sm font-medium animate-[fadeInUp_0.6s_0.3s_ease_both] opacity-0 [animation-fill-mode:forwards]" style={{ color: 'var(--color-text-secondary)' }}>
           Complete overview of your desktop environment and update status.
         </p>
@@ -272,7 +274,7 @@ export default function AppInfoPage() {
         <GlassCard className="md:col-span-5 animate-[fadeInUp_0.8s_0.4s_cubic-bezier(0.16,1,0.3,1)_both]">
           <div className="p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>System Details</h3>
+              <Heading3 className="text-base font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>System Details</Heading3>
               <div className="w-7 h-7 rounded-full flex items-center justify-center"
                 style={{ background: 'var(--color-primary-50)' }}>
                 <HiOutlineComputerDesktop className="w-3.5 h-3.5" style={{ color: 'var(--color-primary-500)' }} />

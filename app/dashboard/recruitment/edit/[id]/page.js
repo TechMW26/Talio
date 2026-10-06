@@ -1,5 +1,7 @@
 'use client';
 
+
+import { Heading1, Heading2 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect } from 'react';
@@ -7,7 +9,7 @@ import { useRouter, useParams } from 'next/navigation';
 import {
   Button, Input, Select, SelectItem, Textarea, Chip, Checkbox,
   Card, CardBody, CardHeader, Skeleton
-} from '@heroui/react';
+} from '@/components/ui/fernly';
 import toast from '@/utils/toast';
 import { FaSave, FaPlus, FaTimes } from 'react-icons/fa';
 import { HiOutlineSparkles } from 'react-icons/hi2';
@@ -177,7 +179,7 @@ export default function EditJobPage() {
             <Button isIconOnly variant="light" size="sm" onPress={() => router.push(`/dashboard/recruitment/${params.id}`)}>
               <BackIcon className="w-4 h-4" />
             </Button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Edit Job Posting</h1>
+            <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Edit Job Posting</Heading1>
           </div>
           <div className="flex gap-2 ml-10 md:ml-0">
             <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={submitMutation.isLoading} startContent={<FaSave className="w-3.5 h-3.5" />}>
@@ -194,7 +196,7 @@ export default function EditJobPage() {
         {/* Basic Info */}
         <Card shadow="sm">
           <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-            <h2 className="text-base font-semibold text-default-800">Basic Information</h2>
+            <Heading2 className="text-base font-semibold text-default-800">Basic Information</Heading2>
           </CardHeader>
           <CardBody className="p-4 sm:p-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -266,7 +268,7 @@ export default function EditJobPage() {
         {/* Experience & Salary */}
         <Card shadow="sm">
           <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-            <h2 className="text-base font-semibold text-default-800">Experience & Compensation</h2>
+            <Heading2 className="text-base font-semibold text-default-800">Experience & Compensation</Heading2>
           </CardHeader>
           <CardBody className="p-4 sm:p-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -304,7 +306,7 @@ export default function EditJobPage() {
         {/* Description */}
         <Card shadow="sm">
           <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3 flex justify-between items-center">
-            <h2 className="text-base font-semibold text-default-800">Job Description</h2>
+            <Heading2 className="text-base font-semibold text-default-800">Job Description</Heading2>
             <Button
               size="sm"
               variant="flat"
@@ -345,7 +347,7 @@ export default function EditJobPage() {
         {/* Skills */}
         <Card shadow="sm">
           <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3 flex justify-between items-center">
-            <h2 className="text-base font-semibold text-default-800">Skills</h2>
+            <Heading2 className="text-base font-semibold text-default-800">Skills</Heading2>
             <Button size="sm" variant="flat" onPress={() => addArrayItem('skills')} startContent={<FaPlus className="w-3 h-3" />}>
               Add Skill
             </Button>
@@ -382,7 +384,7 @@ export default function EditJobPage() {
         ].map(({ key, label, placeholder }) => (
           <Card key={key} shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3 flex justify-between items-center">
-              <h2 className="text-base font-semibold text-default-800">{label}</h2>
+              <Heading2 className="text-base font-semibold text-default-800">{label}</Heading2>
               <Button size="sm" variant="flat" onPress={() => addArrayItem(key)} startContent={<FaPlus className="w-3 h-3" />}>
                 Add
               </Button>

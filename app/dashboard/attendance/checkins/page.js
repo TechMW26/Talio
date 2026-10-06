@@ -1,12 +1,14 @@
 'use client'
 
+
+import { Heading1, NativeInput, Heading3, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useMemo, useEffect } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import toast from '@/utils/toast'
 import { FaClock, FaUsers, FaCalendarAlt, FaSearch, FaDownload, FaMapMarkerAlt } from 'react-icons/fa'
-import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input } from '@heroui/react'
+import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input } from '@/components/ui/fernly'
 import { getTodayDateString, IST_TIMEZONE } from '@/lib/timezone'
 
 export default function EmployeeCheckinsPage() {
@@ -132,14 +134,14 @@ export default function EmployeeCheckinsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Employee Check-ins</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Employee Check-ins</Heading1>
           <p className="text-default-500 mt-1 text-sm sm:text-base">
             Monitor real-time employee attendance
             <BackgroundRefreshIndicator isValidating={isValidating} />
           </p>
         </div>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-          <input
+          <NativeInput
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
@@ -167,7 +169,7 @@ export default function EmployeeCheckinsPage() {
             <CardBody className="flex flex-row items-center justify-between p-3 sm:p-6">
               <div className="flex-1 min-w-0">
                 <p className="text-default-500 text-xs sm:text-sm font-medium truncate">{stat.title}</p>
-                <h3 className="text-xl sm:text-2xl font-bold text-default-800 mt-1 sm:mt-2">{stat.value}</h3>
+                <Heading3 className="text-xl sm:text-2xl font-bold text-default-800 mt-1 sm:mt-2">{stat.value}</Heading3>
               </div>
               <div className={`bg-${stat.color} p-2 sm:p-4 rounded-lg flex-shrink-0`}>
                 <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -197,14 +199,14 @@ export default function EmployeeCheckinsPage() {
       {/* Check-ins Table */}
       <Card className="shadow-md">
         <CardHeader className="border-b border-divider px-6 py-4">
-          <h2 className="text-lg font-semibold text-default-800">
+          <Heading2 className="text-lg font-semibold text-default-800">
             Check-ins for {new Date(selectedDate).toLocaleDateString('en-US', {
               weekday: 'long',
               year: 'numeric',
               month: 'long',
               day: 'numeric'
             })}
-          </h2>
+          </Heading2>
         </CardHeader>
         <CardBody className="p-0">
           {filteredCheckins.length === 0 ? (

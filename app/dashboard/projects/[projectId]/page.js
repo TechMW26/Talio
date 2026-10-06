@@ -1,5 +1,9 @@
 'use client'
 
+
+
+import UploadButton from '@/components/ui/UploadButton'
+import { NativeButton, Heading1, NativeInput, NativeTextarea, Heading3, Heading2 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -29,7 +33,7 @@ import {
   FaThumbtack, FaLock, FaSync, FaExchangeAlt
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
-import { Button, Select, SelectItem, Skeleton } from '@heroui/react'
+import { Button, Select, SelectItem, Skeleton } from '@/components/ui/fernly'
 import ProjectOverview from '@/components/projects/ProjectOverview'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import Portal from '@/components/ui/Portal'
@@ -1341,23 +1345,23 @@ export default function ProjectDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-start">
-          <button
+          <NativeButton
             onClick={() => router.push('/dashboard/projects')}
             className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors mt-1"
           >
             <BackIcon className="text-gray-600" />
-          </button>
+          </NativeButton>
           <div>
             <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <h1 className="text-3xl font-bold text-gray-800">{project.name}</h1>
+              <Heading1 className="text-3xl font-bold text-gray-800">{project.name}</Heading1>
               {project.chatGroup && (
-                <button
+                <NativeButton
                   onClick={() => router.push(`/dashboard/chat?id=${project.chatGroup._id || project.chatGroup}`)}
                   className="p-2 bg-primary-100 text-primary-600 hover:bg-primary-200 rounded-lg transition-colors"
                   title="Open Project Chat"
                 >
                   <FaComments className="w-5 h-5" />
-                </button>
+                </NativeButton>
               )}
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 isWaitingForReview ? 'bg-yellow-100 text-yellow-800' : isOverdue ? statusColors.overdue : statusColors[project.status]
@@ -1376,7 +1380,7 @@ export default function ProjectDetailPage() {
                   {project.description}
                 </p>
                 {project.description.length > 200 && (
-                  <button
+                  <NativeButton
                     onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                     className="mt-2 text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center gap-1"
                   >
@@ -1391,7 +1395,7 @@ export default function ProjectDetailPage() {
                         Read More
                       </>
                     )}
-                  </button>
+                  </NativeButton>
                 )}
               </div>
             ) : (
@@ -1404,18 +1408,18 @@ export default function ProjectDetailPage() {
         <div className="flex gap-2 flex-wrap">
           {/* Edit button - for project head, creator, or admin */}
           {canManage && (
-            <button
+            <NativeButton
               onClick={() => router.push(`/dashboard/projects/${projectId}/edit`)}
               className="btn-secondary flex items-center"
             >
               <FaEdit className="mr-2" />
               Edit
-            </button>
+            </NativeButton>
           )}
 
           {/* Mark Complete button - ONLY visible for Project Head */}
           {isProjectHead && project.status !== 'completed' && (
-            <button
+            <NativeButton
               onClick={handleMarkComplete}
               disabled={submitting || !completionStatus.canComplete}
               className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${completionStatus.canComplete
@@ -1433,12 +1437,12 @@ export default function ProjectDetailPage() {
                   {completionStatus.completedTasks}/{completionStatus.totalTasks}
                 </span>
               )}
-            </button>
+            </NativeButton>
           )}
 
           {/* Request Completion button - for project MEMBERS (not heads), green, permanent */}
           {!isProjectHead && isAcceptedMember && project.status === 'ongoing' && (
-            <button
+            <NativeButton
               onClick={handleRequestCompletion}
               disabled={submitting || !completionStatus.allTasksCompleted}
               className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${completionStatus.allTasksCompleted
@@ -1456,7 +1460,7 @@ export default function ProjectDetailPage() {
                   {completionStatus.completedTasks}/{completionStatus.totalTasks}
                 </span>
               )}
-            </button>
+            </NativeButton>
           )}
         </div>
       </div>
@@ -1469,13 +1473,13 @@ export default function ProjectDetailPage() {
             <p className="text-sm text-yellow-700">Accept to participate or reject to decline</p>
           </div>
           <div className="flex gap-2">
-            <button
+            <NativeButton
               onClick={() => setShowRejectInvitationModal(true)}
               disabled={submitting}
               className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
             >
               Reject
-            </button>
+            </NativeButton>
             <Button
               onPress={() => handleRespondToInvitation('accept')}
               isDisabled={submitting}
@@ -1498,13 +1502,13 @@ export default function ProjectDetailPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <button
+              <NativeButton
                 onClick={() => handleApprovalResponse(false)}
                 disabled={submitting}
                 className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
               >
                 Reject
-              </button>
+              </NativeButton>
               <Button
                 onPress={() => handleApprovalResponse(true)}
                 isDisabled={submitting}
@@ -1574,7 +1578,7 @@ export default function ProjectDetailPage() {
               { id: 'notes', label: 'Notes', icon: HiOutlineDocumentText },
               { id: 'timeline', label: 'Activity', icon: HiOutlineChatBubbleLeftRight }
             ].map(tab => (
-              <button
+              <NativeButton
                 key={tab.id}
                 role="tab"
                 aria-selected={activeTab === tab.id}
@@ -1586,7 +1590,7 @@ export default function ProjectDetailPage() {
               >
                 <tab.icon className="w-5 h-5" />
                 {tab.label}
-              </button>
+              </NativeButton>
             ))}
           </nav>
         </div>
@@ -1603,22 +1607,22 @@ export default function ProjectDetailPage() {
               <div className="flex items-center justify-between mb-4">
                 {/* Month Navigator */}
                 <div className="flex items-center gap-1 border border-default-300 rounded-lg px-2 py-1.5">
-                  <button
+                  <NativeButton
                     onClick={goToPrevProjectMonth}
                     className="p-1 rounded hover:bg-default-100 text-default-600 transition-colors"
                     title="Previous month"
                   >
                     <HiOutlineChevronLeft className="w-4 h-4" />
-                  </button>
+                  </NativeButton>
                   <span className="text-sm font-medium text-default-700 min-w-[120px] text-center">{projectTaskMonthLabel}</span>
-                  <button
+                  <NativeButton
                     onClick={goToNextProjectMonth}
                     disabled={isProjectCurrentMonth}
                     className={`p-1 rounded transition-colors ${isProjectCurrentMonth ? 'text-default-300 cursor-not-allowed' : 'hover:bg-default-100 text-default-600'}`}
                     title="Next month"
                   >
                     <HiOutlineChevronRight className="w-4 h-4" />
-                  </button>
+                  </NativeButton>
                 </div>
 
                 {isAcceptedMember && (
@@ -1700,7 +1704,7 @@ export default function ProjectDetailPage() {
               <div className="mb-4 flex gap-3">
                   <div className="input-with-icon flex-1">
                   <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-                  <input
+                  <NativeInput
                     type="text"
                     placeholder="Search activity..."
                     className="input input-search"
@@ -1722,7 +1726,7 @@ export default function ProjectDetailPage() {
               {isAcceptedMember && (
                 <form onSubmit={handleAddComment} className="mb-6">
                   <div className="flex gap-3">
-                    <input
+                    <NativeInput
                       type="text"
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
@@ -1944,7 +1948,7 @@ export default function ProjectDetailPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Title (optional)
                       </label>
-                      <input
+                      <NativeInput
                         type="text"
                         value={noteForm.title}
                         onChange={(e) => setNoteForm(prev => ({ ...prev, title: e.target.value }))}
@@ -1956,7 +1960,7 @@ export default function ProjectDetailPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Content <span className="text-red-500">*</span>
                       </label>
-                      <textarea
+                      <NativeTextarea
                         value={noteForm.content}
                         onChange={(e) => setNoteForm(prev => ({ ...prev, content: e.target.value }))}
                         placeholder="Write your note..."
@@ -1970,7 +1974,7 @@ export default function ProjectDetailPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
                         <div className="flex gap-2">
                           {Object.keys(noteColors).map(color => (
-                            <button
+                            <NativeButton
                               key={color}
                               type="button"
                               onClick={() => setNoteForm(prev => ({ ...prev, color }))}
@@ -2032,14 +2036,14 @@ export default function ProjectDetailPage() {
                       >
                         {editingNote === note._id ? (
                           <div className="space-y-3">
-                            <input
+                            <NativeInput
                               type="text"
                               value={noteForm.title}
                               onChange={(e) => setNoteForm(prev => ({ ...prev, title: e.target.value }))}
                               placeholder="Note title..."
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
                             />
-                            <textarea
+                            <NativeTextarea
                               value={noteForm.content}
                               onChange={(e) => setNoteForm(prev => ({ ...prev, content: e.target.value }))}
                               placeholder="Write your note..."
@@ -2048,7 +2052,7 @@ export default function ProjectDetailPage() {
                             />
                             <div className="flex gap-2">
                               {Object.keys(noteColors).map(color => (
-                                <button
+                                <NativeButton
                                   key={color}
                                   type="button"
                                   onClick={() => setNoteForm(prev => ({ ...prev, color }))}
@@ -2058,19 +2062,19 @@ export default function ProjectDetailPage() {
                               ))}
                             </div>
                             <div className="flex justify-end gap-2">
-                              <button
+                              <NativeButton
                                 onClick={cancelEditNote}
                                 className="px-3 py-1 text-sm text-gray-600 hover:bg-white/50 rounded"
                               >
                                 Cancel
-                              </button>
-                              <button
+                              </NativeButton>
+                              <NativeButton
                                 onClick={() => handleUpdateNote(note._id)}
                                 disabled={submitting}
                                 className="px-3 py-1 text-sm bg-primary-500 text-white rounded hover:bg-primary-600"
                               >
                                 Save
-                              </button>
+                              </NativeButton>
                             </div>
                           </div>
                         ) : (
@@ -2079,30 +2083,30 @@ export default function ProjectDetailPage() {
                               {note.visibility === 'personal' && (
                                 <FaLock className="text-gray-400 text-xs" title="Personal note" />
                               )}
-                              <button
+                              <NativeButton
                                 onClick={() => handleTogglePinNote(note)}
                                 className="p-1 hover:bg-white/50 rounded text-primary-500"
                                 title="Unpin"
                               >
                                 <FaThumbtack />
-                              </button>
+                              </NativeButton>
                               {(note.createdBy?._id === user?.employeeId || note.createdBy?._id === currentEmployeeId) && (
-                                <button
+                                <NativeButton
                                   onClick={() => startEditNote(note)}
                                   className="p-1 hover:bg-white/50 rounded text-gray-500"
                                   title="Edit"
                                 >
                                   <FaEdit />
-                                </button>
+                                </NativeButton>
                               )}
                               {(note.createdBy?._id === user?.employeeId || note.createdBy?._id === currentEmployeeId || isProjectHead) && (
-                                <button
+                                <NativeButton
                                   onClick={() => handleDeleteNote(note._id)}
                                   className="p-1 hover:bg-white/50 rounded text-red-500"
                                   title="Delete"
                                 >
                                   <FaTrash />
-                                </button>
+                                </NativeButton>
                               )}
                             </div>
                             {note.title && (
@@ -2137,14 +2141,14 @@ export default function ProjectDetailPage() {
                     >
                       {editingNote === note._id ? (
                         <div className="space-y-3">
-                          <input
+                          <NativeInput
                             type="text"
                             value={noteForm.title}
                             onChange={(e) => setNoteForm(prev => ({ ...prev, title: e.target.value }))}
                             placeholder="Note title..."
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
                           />
-                          <textarea
+                          <NativeTextarea
                             value={noteForm.content}
                             onChange={(e) => setNoteForm(prev => ({ ...prev, content: e.target.value }))}
                             placeholder="Write your note..."
@@ -2153,7 +2157,7 @@ export default function ProjectDetailPage() {
                           />
                           <div className="flex gap-2">
                             {Object.keys(noteColors).map(color => (
-                              <button
+                              <NativeButton
                                 key={color}
                                 type="button"
                                 onClick={() => setNoteForm(prev => ({ ...prev, color }))}
@@ -2163,19 +2167,19 @@ export default function ProjectDetailPage() {
                             ))}
                           </div>
                           <div className="flex justify-end gap-2">
-                            <button
+                            <NativeButton
                               onClick={cancelEditNote}
                               className="px-3 py-1 text-sm text-gray-600 hover:bg-white/50 rounded"
                             >
                               Cancel
-                            </button>
-                            <button
+                            </NativeButton>
+                            <NativeButton
                               onClick={() => handleUpdateNote(note._id)}
                               disabled={submitting}
                               className="px-3 py-1 text-sm bg-primary-500 text-white rounded hover:bg-primary-600"
                             >
                               Save
-                            </button>
+                            </NativeButton>
                           </div>
                         </div>
                       ) : (
@@ -2184,30 +2188,30 @@ export default function ProjectDetailPage() {
                             {note.visibility === 'personal' && (
                               <FaLock className="text-gray-400 text-xs" title="Personal note" />
                             )}
-                            <button
+                            <NativeButton
                               onClick={() => handleTogglePinNote(note)}
                               className="p-1 hover:bg-white/50 rounded text-gray-400 hover:text-primary-500"
                               title="Pin"
                             >
                               <FaThumbtack />
-                            </button>
+                            </NativeButton>
                             {(note.createdBy?._id === user?.employeeId || note.createdBy?._id === currentEmployeeId) && (
-                              <button
+                              <NativeButton
                                 onClick={() => startEditNote(note)}
                                 className="p-1 hover:bg-white/50 rounded text-gray-500"
                                 title="Edit"
                               >
                                 <FaEdit />
-                              </button>
+                              </NativeButton>
                             )}
                             {(note.createdBy?._id === user?.employeeId || note.createdBy?._id === currentEmployeeId || isProjectHead) && (
-                              <button
+                              <NativeButton
                                 onClick={() => handleDeleteNote(note._id)}
                                 className="p-1 hover:bg-white/50 rounded text-red-500"
                                 title="Delete"
                               >
                                 <FaTrash />
-                              </button>
+                              </NativeButton>
                             )}
                           </div>
                           {note.title && (
@@ -2230,12 +2234,12 @@ export default function ProjectDetailPage() {
                     <FaStickyNote className="text-4xl text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-500">No notes yet</p>
                     {isAcceptedMember && (
-                      <button
+                      <NativeButton
                         onClick={() => setShowCreateNote(true)}
                         className="mt-4 text-primary-500 hover:text-primary-600 font-medium"
                       >
                         Create the first note
-                      </button>
+                      </NativeButton>
                     )}
                   </div>
                 )}
@@ -2250,13 +2254,13 @@ export default function ProjectDetailPage() {
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-xl font-bold text-gray-900">Create New Task</h3>
-              <button
+              <Heading3 className="text-xl font-bold text-gray-900">Create New Task</Heading3>
+              <NativeButton
                 onClick={() => setShowCreateTask(false)}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <FaTimes />
-              </button>
+              </NativeButton>
             </div>
 
             <form onSubmit={handleCreateTask} className="p-4 space-y-4 overflow-y-auto flex-1">
@@ -2264,7 +2268,7 @@ export default function ProjectDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Task Title <span className="text-red-500">*</span>
                 </label>
-                <input
+                <NativeInput
                   type="text"
                   value={taskForm.title}
                   onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
@@ -2276,7 +2280,7 @@ export default function ProjectDetailPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
+                <NativeTextarea
                   value={taskForm.description}
                   onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Describe the task..."
@@ -2303,7 +2307,7 @@ export default function ProjectDetailPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                  <input
+                  <NativeInput
                     type="date"
                     value={taskForm.dueDate}
                     onChange={(e) => setTaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
@@ -2335,7 +2339,7 @@ export default function ProjectDetailPage() {
                       return true
                     }).map(member => (
                       <label key={member.user._id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                        <input
+                        <NativeInput
                           type="checkbox"
                           checked={taskForm.assigneeIds.includes(member.user._id)}
                           onChange={(e) => {
@@ -2366,21 +2370,21 @@ export default function ProjectDetailPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Attachments</label>
                 <div className="flex items-center gap-3">
-                  <input
+                  <NativeInput
                     ref={taskAttachmentInputRef}
                     type="file"
                     multiple
                     className="hidden"
                     onChange={(e) => handleTaskAttachmentUpload(e.target.files)}
                   />
-                  <button
+                  <UploadButton busy={uploadingTaskAttachments} label="Upload file"
                     type="button"
                     onClick={() => taskAttachmentInputRef.current?.click()}
                     disabled={uploadingTaskAttachments}
                     className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm disabled:opacity-50"
                   >
                     {uploadingTaskAttachments ? 'Uploading...' : 'Add Attachments'}
-                  </button>
+                  </UploadButton>
                   <span className="text-xs text-gray-500">Any file type • Max 10MB each</span>
                 </div>
 
@@ -2392,7 +2396,7 @@ export default function ProjectDetailPage() {
                           <p className="text-sm text-gray-700 truncate">{file.name}</p>
                           <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                         </div>
-                        <button
+                        <NativeButton
                           type="button"
                           onClick={() => setTaskForm(prev => ({
                             ...prev,
@@ -2401,7 +2405,7 @@ export default function ProjectDetailPage() {
                           className="p-1.5 text-red-500 hover:text-red-700"
                         >
                           <FaTimes className="text-sm" />
-                        </button>
+                        </NativeButton>
                       </div>
                     ))}
                   </div>
@@ -2417,7 +2421,7 @@ export default function ProjectDetailPage() {
                   {taskForm.subtasks.map((subtask, index) => (
                     <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg group">
                       <span className="text-sm text-gray-700 flex-1">{subtask.title}</span>
-                      <button
+                      <NativeButton
                         type="button"
                         onClick={() => {
                           setTaskForm(prev => ({
@@ -2428,12 +2432,12 @@ export default function ProjectDetailPage() {
                         className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
                       >
                         <FaTimes className="text-sm" />
-                      </button>
+                      </NativeButton>
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  <input
+                  <NativeInput
                     type="text"
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
@@ -2452,7 +2456,7 @@ export default function ProjectDetailPage() {
                     placeholder="Add a subtask..."
                     className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
-                  <button
+                  <NativeButton
                     type="button"
                     onClick={() => {
                       if (newSubtaskTitle.trim()) {
@@ -2466,7 +2470,7 @@ export default function ProjectDetailPage() {
                     className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
                   >
                     <FaPlus />
-                  </button>
+                  </NativeButton>
                 </div>
               </div>
 
@@ -2498,8 +2502,8 @@ export default function ProjectDetailPage() {
         {pendingTaskData && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-900">Set Your ETA</h3>
-              <button
+              <Heading3 className="text-xl font-bold text-gray-900">Set Your ETA</Heading3>
+              <NativeButton
                 onClick={() => {
                   setShowTaskEtaModal(false)
                   setPendingTaskData(null)
@@ -2509,7 +2513,7 @@ export default function ProjectDetailPage() {
                 className="text-gray-400 hover:text-gray-600"
               >
                 <FaTimes />
-              </button>
+              </NativeButton>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <p className="text-gray-600 mb-4">
@@ -2533,7 +2537,7 @@ export default function ProjectDetailPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Days</label>
-                          <input
+                          <NativeInput
                             type="number"
                             min="0"
                             step="1"
@@ -2548,7 +2552,7 @@ export default function ProjectDetailPage() {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Hours</label>
-                          <input
+                          <NativeInput
                             type="number"
                             min="0"
                             max="23"
@@ -2580,7 +2584,7 @@ export default function ProjectDetailPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Days</label>
-                      <input
+                      <NativeInput
                         type="number"
                         min="0"
                         step="1"
@@ -2592,7 +2596,7 @@ export default function ProjectDetailPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Hours</label>
-                      <input
+                      <NativeInput
                         type="number"
                         min="0"
                         max="24"
@@ -2611,7 +2615,7 @@ export default function ProjectDetailPage() {
               )}
             </div>
             <div className="p-4 border-t border-gray-200 flex justify-end">
-              <button
+              <NativeButton
                 onClick={(e) => {
                   // Validate ETAs
                   if (pendingTaskData.subtasks?.length > 0) {
@@ -2641,7 +2645,7 @@ export default function ProjectDetailPage() {
                 ) : (
                   <><FaCheck /> Create Task</>
                 )}
-              </button>
+              </NativeButton>
             </div>
           </div>
         </div>}
@@ -2652,8 +2656,8 @@ export default function ProjectDetailPage() {
         {editTaskForm && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-900">Edit Task</h3>
-              <button
+              <Heading3 className="text-xl font-bold text-gray-900">Edit Task</Heading3>
+              <NativeButton
                 onClick={() => {
                   setShowEditTaskModal(false)
                   setEditTaskForm(null)
@@ -2661,7 +2665,7 @@ export default function ProjectDetailPage() {
                 className="p-2 hover:bg-gray-200 rounded-full transition-colors"
               >
                 <FaTimes />
-              </button>
+              </NativeButton>
             </div>
 
             <form onSubmit={handleEditTask} className="flex-1 overflow-y-auto">
@@ -2670,7 +2674,7 @@ export default function ProjectDetailPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Task Title *</label>
-                    <input
+                    <NativeInput
                       type="text"
                       value={editTaskForm.title}
                       onChange={(e) => setEditTaskForm(prev => ({ ...prev, title: e.target.value }))}
@@ -2682,7 +2686,7 @@ export default function ProjectDetailPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Due Date</label>
-                    <input
+                    <NativeInput
                       type="date"
                       value={editTaskForm.dueDate}
                       onChange={(e) => setEditTaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
@@ -2693,7 +2697,7 @@ export default function ProjectDetailPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Description</label>
-                  <textarea
+                  <NativeTextarea
                     value={editTaskForm.description}
                     onChange={(e) => setEditTaskForm(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Describe the task..."
@@ -2729,7 +2733,7 @@ export default function ProjectDetailPage() {
                         <div key={subtask._id || index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                           <div className="flex items-start gap-3">
                             <div className="flex-1">
-                              <input
+                              <NativeInput
                                 type="text"
                                 value={subtask.title}
                                 onChange={(e) => {
@@ -2742,7 +2746,7 @@ export default function ProjectDetailPage() {
                               />
                               <div className="flex items-center gap-2 mt-2">
                                 <div className="flex items-center gap-1">
-                                  <input
+                                  <NativeInput
                                     type="number"
                                     min="0"
                                     value={subtask.estimatedDays || ''}
@@ -2757,7 +2761,7 @@ export default function ProjectDetailPage() {
                                   <span className="text-xs text-gray-500">days</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <input
+                                  <NativeInput
                                     type="number"
                                     min="0"
                                     max="23"
@@ -2772,7 +2776,7 @@ export default function ProjectDetailPage() {
                                   />
                                   <span className="text-xs text-gray-500">hrs</span>
                                 </div>
-                                <button
+                                <NativeButton
                                   type="button"
                                   onClick={() => {
                                     const updated = editTaskForm.subtasks.filter((_, i) => i !== index)
@@ -2781,7 +2785,7 @@ export default function ProjectDetailPage() {
                                   className="ml-auto p-1 text-red-500 hover:bg-red-50 rounded"
                                 >
                                   <FaTrash className="w-3 h-3" />
-                                </button>
+                                </NativeButton>
                               </div>
                             </div>
                             <SubtaskCompletionButton
@@ -2803,7 +2807,7 @@ export default function ProjectDetailPage() {
 
                   {/* Add new subtask */}
                   <div className="flex gap-2">
-                    <input
+                    <NativeInput
                       type="text"
                       value={newSubtaskTitle}
                       onChange={(e) => setNewSubtaskTitle(e.target.value)}
@@ -2827,7 +2831,7 @@ export default function ProjectDetailPage() {
                         }
                       }}
                     />
-                    <button
+                    <NativeButton
                       type="button"
                       onClick={() => {
                         if (newSubtaskTitle.trim()) {
@@ -2848,7 +2852,7 @@ export default function ProjectDetailPage() {
                       className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
                     >
                       <FaPlus className="w-4 h-4" />
-                    </button>
+                    </NativeButton>
                   </div>
 
                   {/* Total ETA display */}
@@ -2899,11 +2903,11 @@ export default function ProjectDetailPage() {
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Reject Project Invitation</h3>
+              <Heading3 className="text-lg font-semibold text-gray-800 mb-4">Reject Project Invitation</Heading3>
               <p className="text-gray-600 text-sm mb-4">
                 Please provide a reason for rejecting this project invitation. This will be shared with the project creator.
               </p>
-              <textarea
+              <NativeTextarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Reason for rejection (required)..."
@@ -2911,7 +2915,7 @@ export default function ProjectDetailPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
               />
               <div className="flex justify-end gap-3 mt-4">
-                <button
+                <NativeButton
                   onClick={() => {
                     setShowRejectInvitationModal(false)
                     setRejectReason('')
@@ -2920,14 +2924,14 @@ export default function ProjectDetailPage() {
                   disabled={submitting}
                 >
                   Cancel
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   onClick={() => handleRespondToInvitation('reject', rejectReason)}
                   disabled={submitting || !rejectReason.trim()}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                 >
                   {submitting ? 'Rejecting...' : 'Reject Invitation'}
-                </button>
+                </NativeButton>
               </div>
             </div>
           </div>
@@ -2939,7 +2943,7 @@ export default function ProjectDetailPage() {
         {selectedTask && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
+              <Heading3 className="text-lg font-semibold text-gray-800">Task Details</Heading3>
               <div className="flex items-center gap-2">
                 {(() => {
                   const isAssignedAndAccepted = selectedTask.assignees?.some(
@@ -2970,19 +2974,19 @@ export default function ProjectDetailPage() {
                     </Button>
                   )
                 })()}
-                <button
+                <NativeButton
                   onClick={() => setSelectedTask(null)}
                   className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
                 >
                   <FaTimes />
-                </button>
+                </NativeButton>
               </div>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
               {/* Task Title & Status */}
               <div className="flex items-start justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">{selectedTask.title}</h2>
+                <Heading2 className="text-xl font-semibold text-gray-800">{selectedTask.title}</Heading2>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedTask.status === 'completed' ? 'bg-green-100 text-green-700' :
                     selectedTask.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
                       selectedTask.status === 'review' ? 'bg-purple-100 text-purple-700' :
@@ -3137,15 +3141,15 @@ export default function ProjectDetailPage() {
                             {/* Show Accept/Reject buttons for current user's pending assignment */}
                             {isCurrentUserPending ? (
                               <>
-                                <button
+                                <NativeButton
                                   onClick={() => handleRespondToTaskAssignment(selectedTask._id, 'accept')}
                                   disabled={isUpdating}
                                   className="px-3 py-1.5 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 flex items-center gap-1"
                                 >
                                   {isUpdating ? <Loader size="xs" /> : <FaCheck />}
                                   Accept
-                                </button>
-                                <button
+                                </NativeButton>
+                                <NativeButton
                                   onClick={() => {
                                     const reason = prompt('Please provide a reason for rejecting this task:')
                                     if (reason !== null) {
@@ -3157,7 +3161,7 @@ export default function ProjectDetailPage() {
                                 >
                                   {isUpdating ? <Loader size="xs" /> : <FaTimes />}
                                   Reject
-                                </button>
+                                </NativeButton>
                               </>
                             ) : (
                               <>
@@ -3168,7 +3172,7 @@ export default function ProjectDetailPage() {
                                   {a.assignmentStatus}
                                 </span>
                                 {canReassign && (
-                                  <button
+                                  <NativeButton
                                     onClick={() => {
                                       setReassignTask(selectedTask)
                                       setShowReassignModal(true)
@@ -3177,7 +3181,7 @@ export default function ProjectDetailPage() {
                                     className="px-3 py-1 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600"
                                   >
                                     Reassign
-                                  </button>
+                                  </NativeButton>
                                 )}
                               </>
                             )}
@@ -3332,7 +3336,7 @@ export default function ProjectDetailPage() {
                               }
                               return (
                                 <div className="mt-2 pl-8 flex gap-2">
-                                  <button
+                                  <NativeButton
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       handleAcceptSubtaskCompletion(selectedTask._id, subtask._id)
@@ -3340,8 +3344,8 @@ export default function ProjectDetailPage() {
                                     className="px-3 py-1.5 text-xs bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1"
                                   >
                                     <FaCheck className="w-3 h-3" /> Accept
-                                  </button>
-                                  <button
+                                  </NativeButton>
+                                  <NativeButton
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       const reason = prompt('Reason for rejection (optional):')
@@ -3350,7 +3354,7 @@ export default function ProjectDetailPage() {
                                     className="px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-1"
                                   >
                                     <FaTimes className="w-3 h-3" /> Reject
-                                  </button>
+                                  </NativeButton>
                                 </div>
                               )
                             })()
@@ -3379,7 +3383,7 @@ export default function ProjectDetailPage() {
                           {/* Add Comment Button */}
                           {canComment && (
                             <div className="mt-2 pl-8">
-                              <button
+                              <NativeButton
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   const comment = prompt('Add a comment to this subtask:')
@@ -3391,7 +3395,7 @@ export default function ProjectDetailPage() {
                               >
                                 <FaComment className="w-3 h-3" />
                                 Add Comment
-                              </button>
+                              </NativeButton>
                             </div>
                           )}
                         </div>
@@ -3419,43 +3423,43 @@ export default function ProjectDetailPage() {
                         <h4 className="text-sm font-medium text-gray-500 mb-3">Move Task To</h4>
                         <div className="flex flex-wrap gap-2">
                           {selectedTask.status !== 'todo' && (
-                            <button
+                            <NativeButton
                               onClick={() => handleUpdateTaskStatus(selectedTask._id, 'todo')}
                               disabled={isUpdating}
                               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
                             >
                               {isUpdating ? <Loader size="xs" /> : <FaTasks />}
                               To Do
-                            </button>
+                            </NativeButton>
                           )}
                           {selectedTask.status !== 'in-progress' && (
-                            <button
+                            <NativeButton
                               onClick={() => handleUpdateTaskStatus(selectedTask._id, 'in-progress')}
                               disabled={isUpdating}
                               className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-50 flex items-center gap-2"
                             >
                               {isUpdating ? <Loader size="xs" /> : <FaPlay />}
                               In Progress
-                            </button>
+                            </NativeButton>
                           )}
                           {selectedTask.status !== 'review' && (
-                            <button
+                            <NativeButton
                               onClick={() => handleUpdateTaskStatus(selectedTask._id, 'review')}
                               disabled={isUpdating}
                               className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-50 flex items-center gap-2"
                             >
                               {isUpdating ? <Loader size="xs" /> : <FaEye />}
                               Review
-                            </button>
+                            </NativeButton>
                           )}
-                          <button
+                          <NativeButton
                             onClick={() => handleUpdateTaskStatus(selectedTask._id, 'completed')}
                             disabled={isUpdating}
                             className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 flex items-center gap-2"
                           >
                             {isUpdating ? <Loader size="xs" /> : <FaCheckCircle />}
                             Complete
-                          </button>
+                          </NativeButton>
                         </div>
                       </div>
                     )}
@@ -3477,7 +3481,7 @@ export default function ProjectDetailPage() {
                     {/* Delete Button */}
                     {canDelete && (
                       <div className="border-t border-gray-200 pt-4">
-                        <button
+                        <NativeButton
                           onClick={() => {
                             setTaskToDelete(selectedTask)
                             setShowDeleteTaskModal(true)
@@ -3486,7 +3490,7 @@ export default function ProjectDetailPage() {
                         >
                           <FaTrash />
                           {isProjectHead ? 'Delete Task' : 'Request Deletion'}
-                        </button>
+                        </NativeButton>
                         {!isProjectHead && (
                           <p className="text-xs text-gray-500 mt-2">
                             Task deletion requires approval from the project head.
@@ -3507,9 +3511,9 @@ export default function ProjectDetailPage() {
         {taskToDelete && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              <Heading3 className="text-lg font-semibold text-gray-800 mb-4">
                 {isProjectHead ? 'Delete Task' : 'Request Task Deletion'}
-              </h3>
+              </Heading3>
               <p className="text-gray-600 text-sm mb-4">
                 {isProjectHead
                   ? 'Are you sure you want to delete this task? This action cannot be undone.'
@@ -3520,7 +3524,7 @@ export default function ProjectDetailPage() {
                 &quot;{taskToDelete.title}&quot;
               </p>
               {!isProjectHead && (
-                <textarea
+                <NativeTextarea
                   value={deleteReason}
                   onChange={(e) => setDeleteReason(e.target.value)}
                   placeholder="Reason for deletion request..."
@@ -3529,7 +3533,7 @@ export default function ProjectDetailPage() {
                 />
               )}
               <div className="flex justify-end gap-3">
-                <button
+                <NativeButton
                   onClick={() => {
                     setShowDeleteTaskModal(false)
                     setTaskToDelete(null)
@@ -3539,14 +3543,14 @@ export default function ProjectDetailPage() {
                   disabled={submitting}
                 >
                   Cancel
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   onClick={() => handleDeleteTask(taskToDelete._id)}
                   disabled={submitting || (!isProjectHead && !deleteReason.trim())}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                 >
                   {submitting ? 'Processing...' : (isProjectHead ? 'Delete Task' : 'Submit Request')}
-                </button>
+                </NativeButton>
               </div>
             </div>
           </div>
@@ -3558,8 +3562,8 @@ export default function ProjectDetailPage() {
         {reassignTask && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">Reassign Task</h3>
-              <button
+              <Heading3 className="text-lg font-semibold text-gray-800">Reassign Task</Heading3>
+              <NativeButton
                 onClick={() => {
                   setShowReassignModal(false)
                   setReassignTask(null)
@@ -3568,7 +3572,7 @@ export default function ProjectDetailPage() {
                 className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
               >
                 <FaTimes />
-              </button>
+              </NativeButton>
             </div>
             <div className="p-6">
               <p className="text-gray-600 text-sm mb-4">
@@ -3601,7 +3605,7 @@ export default function ProjectDetailPage() {
               </div>
 
               <div className="flex justify-end gap-3">
-                <button
+                <NativeButton
                   onClick={() => {
                     setShowReassignModal(false)
                     setReassignTask(null)
@@ -3611,14 +3615,14 @@ export default function ProjectDetailPage() {
                   disabled={submitting}
                 >
                   Cancel
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   onClick={handleReassignTask}
                   disabled={submitting || !reassignToId}
                   className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
                 >
                   {submitting ? 'Reassigning...' : 'Reassign Task'}
-                </button>
+                </NativeButton>
               </div>
             </div>
           </div>
@@ -3630,7 +3634,7 @@ export default function ProjectDetailPage() {
         {pendingStatusChange && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-md transform transition-all">
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-xl">
-              <h3 className="text-lg font-semibold text-white">Reason Required</h3>
+              <Heading3 className="text-lg font-semibold text-white">Reason Required</Heading3>
               <p className="text-amber-100 text-sm">Please provide a reason for this status change</p>
             </div>
             <div className="p-6">
@@ -3646,7 +3650,7 @@ export default function ProjectDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Reason for change <span className="text-red-500">*</span>
                 </label>
-                <textarea
+                <NativeTextarea
                   value={statusChangeReason}
                   onChange={(e) => setStatusChangeReason(e.target.value)}
                   placeholder="Enter the reason for this status change..."
@@ -3656,7 +3660,7 @@ export default function ProjectDetailPage() {
                 />
               </div>
               <div className="flex justify-end gap-3">
-                <button
+                <NativeButton
                   onClick={() => {
                     setShowReasonModal(false)
                     setPendingStatusChange(null)
@@ -3665,14 +3669,14 @@ export default function ProjectDetailPage() {
                   className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                 >
                   Cancel
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   onClick={executeStatusChange}
                   disabled={!statusChangeReason.trim()}
                   className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Confirm Change
-                </button>
+                </NativeButton>
               </div>
             </div>
           </div>

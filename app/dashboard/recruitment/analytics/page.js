@@ -1,9 +1,11 @@
 'use client';
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useRouter } from 'next/navigation';
-import { Button, Chip, Card, CardBody, CardHeader, Skeleton } from '@heroui/react';
+import { Button, Chip, Card, CardBody, CardHeader, Skeleton } from '@/components/ui/fernly';
 import toast from '@/utils/toast';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
@@ -54,7 +56,7 @@ export default function RecruitmentAnalyticsPage() {
       <div className="page-container">
         <Card shadow="sm">
           <CardBody className="p-8 sm:p-12 text-center">
-            <h1 className="text-2xl font-bold text-default-800 mb-2">No Analytics Data</h1>
+            <Heading1 className="text-2xl font-bold text-default-800 mb-2">No Analytics Data</Heading1>
             <Button color="primary" onPress={() => router.push('/dashboard/recruitment')}>
               Back to Recruitment
             </Button>
@@ -75,7 +77,7 @@ export default function RecruitmentAnalyticsPage() {
             <BackIcon className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment Analytics</h1>
+            <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment Analytics</Heading1>
             <p className="text-sm text-default-500">Overview of your hiring metrics</p>
           </div>
           <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -107,7 +109,7 @@ export default function RecruitmentAnalyticsPage() {
           {/* Pipeline Breakdown */}
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Pipeline Breakdown</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Pipeline Breakdown</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               {pipeline?.length > 0 ? (
@@ -142,7 +144,7 @@ export default function RecruitmentAnalyticsPage() {
           {/* Source Breakdown */}
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Candidate Sources</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Candidate Sources</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               {sources?.length > 0 ? (
@@ -166,7 +168,7 @@ export default function RecruitmentAnalyticsPage() {
           {/* Department Hiring */}
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Hiring by Department</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Hiring by Department</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               {departments?.length > 0 ? (
@@ -190,7 +192,7 @@ export default function RecruitmentAnalyticsPage() {
           {/* Interview Stats */}
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Interview Statistics</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Interview Statistics</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               {interviewStats ? (
@@ -225,7 +227,7 @@ export default function RecruitmentAnalyticsPage() {
         {overview.offerAcceptanceRate !== undefined && (
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Offer Metrics</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Offer Metrics</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

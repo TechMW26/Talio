@@ -247,7 +247,7 @@ There is **no separate `Role` or `Permission` model** in the codebase. Access co
 | `/api/setup/check` | GET | Setup status check |
 | `/api/setup/create-admin` | POST | First admin creation |
 | `/api/setup/tenant` | GET, POST | Tenant setup |
-| `/api/health` | GET | Docker health check |
+| `/api/health` | GET | Deployment health check |
 | `/api/redis-status` | GET, POST | Redis check |
 | `/api/desktop/min-version` | GET | Desktop min version |
 | `/api/assetlinks` | GET | Android deep links |

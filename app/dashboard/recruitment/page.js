@@ -1,11 +1,13 @@
 'use client';
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Button, Input, Select, SelectItem, Chip, Tooltip, Pagination,
   Card, CardBody, CardHeader, Skeleton
-} from '@heroui/react';
+} from '@/components/ui/fernly';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
@@ -110,7 +112,7 @@ export default function RecruitmentPage() {
         {/* Header */}
         <div className="flex md:justify-between md:items-center md:flex-row flex-col">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment</h1>
+            <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment</Heading1>
             <p className="text-sm sm:text-base text-default-500 mt-1">Manage job postings and candidates {' '}<BackgroundRefreshIndicator isValidating={isValidating} /></p>
           </div>
           <div className="flex items-center flex-wrap gap-2 mt-4 md:mt-0">
@@ -144,7 +146,7 @@ export default function RecruitmentPage() {
               <Card key={stat.label} shadow="sm">
                 <CardBody className="p-3 sm:p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xs sm:text-sm font-medium text-default-600 truncate">{stat.label}</h3>
+                    <Heading3 className="text-xs sm:text-sm font-medium text-default-600 truncate">{stat.label}</Heading3>
                     <div className={`w-8 h-8 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
                       <stat.icon className={`w-3.5 h-3.5 ${stat.iconColor}`} />
                     </div>
@@ -198,7 +200,7 @@ export default function RecruitmentPage() {
               <div className="w-16 h-16 rounded-full bg-default-100 flex items-center justify-center mx-auto mb-4">
                 <FaBriefcase className="w-7 h-7 text-default-400" />
               </div>
-              <h3 className="text-lg font-semibold text-default-700 mb-1">No job postings found</h3>
+              <Heading3 className="text-lg font-semibold text-default-700 mb-1">No job postings found</Heading3>
               <p className="text-sm text-default-500 mb-4 max-w-md mx-auto">
                 {filters.search || filters.status || filters.department || filters.employmentType
                   ? 'Try adjusting your filters to see more results'
@@ -276,7 +278,7 @@ export default function RecruitmentPage() {
                   <CardBody className="p-4">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-default-800 truncate">{job.jobTitle}</h3>
+                        <Heading3 className="text-sm font-semibold text-default-800 truncate">{job.jobTitle}</Heading3>
                         {job.jobCode && <p className="text-xs text-default-400">{job.jobCode}</p>}
                       </div>
                       <Chip size="sm" variant="flat" color={STATUS_COLOR_MAP[job.status] || 'default'} className="capitalize flex-shrink-0">{job.status}</Chip>

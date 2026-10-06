@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
     ModalContent,
     ModalHeader,
@@ -15,7 +15,7 @@ import {
     Divider,
     Skeleton,
     Tooltip,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import {
     FaCalendarAlt,
     FaClock,

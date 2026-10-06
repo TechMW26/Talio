@@ -1,9 +1,11 @@
 'use client'
 
+
+import { Heading1 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Card, CardBody, Button, Skeleton, Input, Chip } from '@heroui/react'
+import { Card, CardBody, Button, Skeleton, Input, Chip } from '@/components/ui/fernly'
 import { getRoleDisplayLabel } from '@/hooks/useRoles'
 import {
   HiOutlineKey,
@@ -179,10 +181,10 @@ export default function UserPasswordsPage() {
             <BackIcon className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-2">
+            <Heading1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-2">
               User Passwords
               <HiOutlineShieldCheck className="w-5 h-5 text-success ml-1" title="Passwords are encrypted at rest" />
-            </h1>
+            </Heading1>
             <p className="text-theme-text-secondary mt-1">
               View onboarding credentials (encrypted at rest, audit-logged)
             </p>

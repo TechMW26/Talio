@@ -73,23 +73,25 @@
       "Checked In Today",
       "Connection Error",
       "Error Loading Data",
-      "Live Users",
       "Logged In",
       "Logged In Today",
-      "No Users Found",
-      "Refresh Dept",
       "Refresh Selected ( )",
       "Refresh this user",
       "Retry",
       "Search by name, email, or department...",
       "Something went wrong",
       "Total Employees",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/admin/live-users/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -97,42 +99,47 @@
     "name": "Create Announcement",
     "controls": [
       "Announcement Title *",
-      "Cancel",
       "Content *",
-      "Create Announcement",
       "Enter announcement content...",
       "Enter announcement title...",
       "Expiry Date (Optional)",
-      "Preview",
       "Priority",
       "Priority *",
       "Publish announcement immediately",
       "Select Department(s)",
       "Target Audience",
-      "Target Audience *"
+      "Target Audience *",
+      "label"
     ],
     "sources": [
       "app/dashboard/announcements/create/page.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/announcements",
     "name": "Announcements",
     "controls": [
-      "Announcements",
       "Connection Error",
       "Delete Announcement",
       "Delete announcement",
       "Retry",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/announcements/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js",
       "components/ui/heroui/Button.js",
       "components/ui/heroui/Modal.js"
     ]
@@ -142,13 +149,15 @@
     "name": "app info",
     "controls": [
       "Check for Updates",
-      "Desktop App Only",
-      "System",
-      "System Details",
-      "Update to v"
+      "Update to v",
+      "label"
     ],
     "sources": [
-      "app/dashboard/app-info/page.js"
+      "app/dashboard/app-info/page.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -156,14 +165,10 @@
     "name": "Assets",
     "controls": [
       "Add Asset",
-      "Add New Asset",
       "Asset Code *",
       "Asset Name *",
       "Asset history",
       "Asset import workbook",
-      "Assets Assigned to You",
-      "Assigned",
-      "Available",
       "Back",
       "Bulk Import",
       "Bulk Import Assets",
@@ -182,12 +187,10 @@
       "Search by name or employee code",
       "Something went wrong",
       "Specifications",
-      "Total Assets",
       "Try Again",
       "UIN",
-      "Under Maintenance",
-      "View",
       "category",
+      "label",
       "status"
     ],
     "sources": [
@@ -195,8 +198,14 @@
       "components/assets/AssetTrackingFields.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js",
       "components/ui/heroui/SearchableSelect.js"
     ]
   },
@@ -205,9 +214,7 @@
     "name": "Employee Check-ins",
     "controls": [
       "Absent",
-      "Check-ins for",
       "Connection Error",
-      "Employee Check-ins",
       "Export",
       "In Progress",
       "Present",
@@ -215,12 +222,17 @@
       "Search by employee name or code...",
       "Something went wrong",
       "Total Employees",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/attendance/checkins/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -229,7 +241,6 @@
     "controls": [
       "Add Missing Entry",
       "Approve",
-      "Attendance",
       "Calendar",
       "Cancel",
       "Check-In Time",
@@ -242,11 +253,7 @@
       "Date *",
       "Description",
       "List",
-      "Monthly Summary",
-      "My Attendance -",
-      "My Correction Requests",
       "Overtime Check",
-      "Pending Correction Approvals",
       "Please explain why this correction is needed...",
       "Reason *",
       "Reason for Correction *",
@@ -256,9 +263,9 @@
       "Request Regularisation",
       "Requested Status",
       "Retry",
-      "Today&apos;s Attendance",
       "Why did you miss clocking in/out?",
-      "Your shift ended at"
+      "Your shift ended at",
+      "label"
     ],
     "sources": [
       "app/dashboard/attendance/page.js",
@@ -267,16 +274,23 @@
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js"
+      "components/ui/ModalPortal.js",
+      "components/ui/fernly/calendar.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/attendance/report",
     "name": "Attendance Report",
     "controls": [
-      "Access Restricted",
-      "Attendance Report & Analytics",
+      "Analytics period",
+      "Blocked",
+      "Completed",
+      "Completion Analytics",
       "Connection Error",
+      "D",
       "Daily Punches",
       "Date Range",
       "Department",
@@ -285,19 +299,33 @@
       "End Date",
       "Export CSV",
       "Export Excel",
+      "In Progress",
+      "In progress",
       "Overview",
+      "Pending",
       "Retry",
+      "Review",
       "Search by name, code, or department...",
       "Shrinkage Analysis",
-      "Shrinkage Breakdown",
       "Something went wrong",
       "Start Date",
-      "Try Again"
+      "Task completion analytics",
+      "Throughput",
+      "To do",
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/attendance/report/page.js",
+      "components/charts/FernlyCharts.js",
+      "components/charts/FernlyCharts.module.css",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/FernlyMotion.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -308,36 +336,40 @@
       "Department Filter",
       "Filter by department",
       "Filter by team",
-      "Monthly Summary",
       "Next employee page",
       "Previous employee page",
       "Retry",
       "Search employees by name or code...",
       "Something went wrong",
       "Team Filter",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/attendance/team/page.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/calendar.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/calendar",
     "name": "General Calendar",
     "controls": [
-      "Connection Error",
-      "Failed to load calendar data",
-      "General Calendar",
-      "Retry",
-      "Something went wrong",
-      "Try Again"
+      "Next month",
+      "Previous month"
     ],
     "sources": [
+      "app/dashboard/calendar/calendar.module.css",
       "app/dashboard/calendar/page.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/fernly/calendar.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -346,34 +378,40 @@
     "controls": [
       "Attach file",
       "Back to chats",
-      "Chat",
       "Close",
       "Create Group ( members)",
       "Delete message",
+      "Find a conversation",
       "Group name...",
       "New Chat",
       "New Group",
       "Scroll to latest message",
+      "Search conversations",
       "Search employees...",
       "Search members...",
       "Send message",
       "Type a message...",
       "View Members",
-      "🗑️"
+      "label"
     ],
     "sources": [
+      "app/dashboard/chat/chat.module.css",
       "app/dashboard/chat/page.js",
       "components/UnreadBadge.js",
       "components/chat/MemberAvatar.js",
       "components/ui/BackIcon.js",
-      "components/ui/HeroModal.js"
+      "components/ui/HeroModal.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/departments",
     "name": "Departments",
     "controls": [
-      "Active Departments",
       "Add Department",
       "Cancel",
       "Connection Error",
@@ -383,7 +421,6 @@
       "Department Heads",
       "Department Name *",
       "Department description",
-      "Departments",
       "Description",
       "Edit Department",
       "Edit Team",
@@ -392,20 +429,17 @@
       "Search leaders...",
       "Search members...",
       "Something went wrong",
-      "Team",
       "Team Code *",
       "Team Leaders",
       "Team Members",
       "Team Name *",
       "Team description",
-      "Total Departments",
-      "Total Employees",
-      "Total Teams",
       "Try Again",
       "e.g., ENG",
       "e.g., ENG-FE",
       "e.g., Engineering",
-      "e.g., Frontend Squad"
+      "e.g., Frontend Squad",
+      "label"
     ],
     "sources": [
       "app/dashboard/departments/page.js",
@@ -414,6 +448,9 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js",
       "components/ui/heroui/Button.js",
       "components/ui/heroui/Modal.js"
     ]
@@ -422,27 +459,28 @@
     "route": "/dashboard/designations",
     "name": "Designations",
     "controls": [
-      "Active Roles",
       "Add Designation",
-      "All Designations",
       "Cancel",
       "Connection Error",
       "Description",
-      "Designations",
       "Retry",
       "Role description",
       "Something went wrong",
       "Title *",
-      "Total Designations",
       "Try Again",
-      "e.g., Software Engineer"
+      "e.g., Software Engineer",
+      "label"
     ],
     "sources": [
       "app/dashboard/designations/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js"
+      "components/ui/ModalPortal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -456,7 +494,6 @@
       "Connection Error",
       "Document folders",
       "Document scope",
-      "Documents",
       "Documents grid",
       "Download",
       "Download original file",
@@ -479,6 +516,7 @@
       "Upload Document",
       "View",
       "View file",
+      "label",
       "— Documents"
     ],
     "sources": [
@@ -494,24 +532,25 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/employees/[id]",
     "name": "employees / [id]",
     "controls": [
-      "AI Suggested KRIs",
-      "About",
       "Access revoked",
       "Active remote support session",
       "Add",
       "Add a key responsibility…",
       "Add component",
-      "Appraisals",
       "Asset clearance progress",
       "Back",
-      "Bank Details",
       "Begin notice and clearance",
       "Calculation basis and approval notes",
       "Cancel",
@@ -519,16 +558,13 @@
       "Close",
       "Complete offboarding",
       "Connection Error",
-      "Contact & Personal",
       "Currency",
       "Decline",
       "Describe the support needed",
       "Done",
       "Download PDF",
       "Edit",
-      "Emergency Contact",
       "Employee lifecycle",
-      "Employment",
       "Exit interview",
       "Explain why this verification must be reviewed again",
       "Extend",
@@ -537,18 +573,14 @@
       "Full and final",
       "Include a performance improvement plan",
       "KPI name",
-      "KRI · KPI",
       "Last working date",
       "Letter type",
-      "Manual KPIs",
-      "Manual KRIs",
       "Measurable goals and support to be provided",
       "New appraisal recommendation",
       "Notes",
       "Onboarding checklist",
       "Onboarding progress",
       "Outcome",
-      "Overview",
       "PIP goals",
       "PIP review date",
       "Performance appraisals",
@@ -593,7 +625,8 @@
       "Use employee details",
       "View",
       "View file",
-      "e.g. 8"
+      "e.g. 8",
+      "label"
     ],
     "sources": [
       "app/dashboard/employees/[id]/page.js",
@@ -608,7 +641,12 @@
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js"
+      "components/ui/HeroModal.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -624,15 +662,12 @@
       "800",
       "AI Column Detection ( )",
       "AI Detected Columns ( )",
-      "Access Denied",
-      "Add New Employee",
       "Assigned Manager",
       "Assigned Team Lead",
       "Assigned Team Lead (optional)",
       "Basic Salary",
       "Calculated probation review date",
       "Cancel",
-      "Change file",
       "Clear selection",
       "Company",
       "Conveyance",
@@ -647,7 +682,6 @@
       "Employee Contribution %",
       "Employer Contribution %",
       "Employment Type",
-      "Employment lifecycle",
       "Enter login password",
       "Enter policy number",
       "Executive escalation",
@@ -689,25 +723,29 @@
       "User Role",
       "e.g., ICICI Lombard, Star Health",
       "employee@mushroomworldgroup.com",
+      "label",
       "🏥 Corporate Health Insurance",
       "🏥 ESI (Employee State Insurance)",
       "🏦 Provident Fund (PF)",
-      "💰 Salary & Statutory Details",
-      "📋 Professional Tax",
-      "📧 Login Credentials"
+      "📋 Professional Tax"
     ],
     "sources": [
       "app/dashboard/employees/add/page.js",
       "components/employees/BulkImportEmployees.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/employees/edit/[id]",
     "name": "employees / edit / [id]",
     "controls": [
-      "Access Denied",
       "Address",
       "Annual CTC",
       "Assigned Manager",
@@ -727,9 +765,7 @@
       "Designation *",
       "ESI Enrolled",
       "ESI Number",
-      "Edit Employee",
       "Email *",
-      "Employment Information",
       "Employment Type",
       "Enter policy number",
       "Executive escalation",
@@ -747,12 +783,10 @@
       "PAN Number",
       "PF Enrolled",
       "PF Number",
-      "Personal Information",
       "Phone",
       "Policy Number",
       "Policy Provider",
       "Reports To",
-      "Salary & Statutory Details",
       "Select Designation",
       "Select Gender",
       "Select Level",
@@ -762,7 +796,6 @@
       "Special allowance",
       "Status",
       "Status *",
-      "Statutory Compliance",
       "System Role",
       "UAN Number",
       "Work Location",
@@ -771,12 +804,17 @@
       "e.g., ABCDE1234567000123",
       "e.g., ABCDE1234F",
       "e.g., ICICI Lombard, Star Health",
+      "label",
       "🏥 Corporate Health Insurance"
     ],
     "sources": [
       "app/dashboard/employees/edit/[id]/page.js",
       "components/ui/BackIcon.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -788,7 +826,6 @@
       "Connection Error",
       "Employee Email Address",
       "Failed",
-      "Onboarding Emails",
       "Pending",
       "Queue all failed emails for automatic retry with rate limit protection",
       "Retry",
@@ -798,14 +835,18 @@
       "Sent",
       "Something went wrong",
       "Try Again",
-      "employee@company.com"
+      "employee@company.com",
+      "label"
     ],
     "sources": [
       "app/dashboard/employees/onboarding-emails/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -813,7 +854,6 @@
     "name": "Employees",
     "controls": [
       "-- Don't change --",
-      "Access Denied",
       "Active",
       "Add Employee",
       "All Departments",
@@ -821,7 +861,6 @@
       "All Levels",
       "All Statuses",
       "Bulk Edit ( )",
-      "Bulk Edit Employees",
       "Cancel",
       "Clear",
       "Clear Selection",
@@ -830,7 +869,6 @@
       "Current Workforce",
       "Edit Employee",
       "Employee Status",
-      "Employees",
       "Filters",
       "Go to Dashboard",
       "Inactive",
@@ -855,14 +893,18 @@
       "Sort by",
       "Terminated",
       "Try Again",
-      "View Details"
+      "View Details",
+      "label"
     ],
     "sources": [
       "app/dashboard/employees/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -878,15 +920,19 @@
       "Search by name, email...",
       "Something went wrong",
       "Try Again",
-      "User Passwords",
       "With Password",
-      "Without Password"
+      "Without Password",
+      "label"
     ],
     "sources": [
       "app/dashboard/employees/user-passwords/page.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -895,16 +941,20 @@
     "controls": [
       "-",
       "Connection Error",
-      "Expense Approvals",
       "Retry",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/expenses/approvals/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -913,23 +963,18 @@
     "controls": [
       "0.00",
       "Amount",
-      "Approved",
       "Cancel",
       "Connection Error",
       "Date",
       "Description",
       "Enter expense details",
-      "Expenses",
-      "My Expenses",
-      "Pending",
-      "Rejected",
       "Retry",
       "Select Category",
       "Something went wrong",
       "Submit Expense",
-      "Total Expenses",
       "Try Again",
-      "category"
+      "category",
+      "label"
     ],
     "sources": [
       "app/dashboard/expenses/page.js",
@@ -937,48 +982,47 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js"
+      "components/ui/ModalPortal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/fcm-diagnostic",
     "name": "fcm diagnostic",
-    "controls": [
-      "Actions",
-      "Status",
-      "⚠️ Troubleshooting Steps:",
-      "🔄 Refresh Status",
-      "🔍 FCM Diagnostic Tool",
-      "🗑️ Clear All FCM Tokens",
-      "🗑️ Clear FCM Tokens from Database"
-    ],
+    "controls": [],
     "sources": [
       "app/dashboard/fcm-diagnostic/page.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/helpdesk/[id]",
     "name": "helpdesk / [id]",
     "controls": [
-      "Back to Tickets",
       "Category",
       "Connection Error",
-      "Discussion",
       "Priority",
       "Retry",
       "Something went wrong",
-      "Ticket Details",
       "Try Again",
       "Type your reply...",
       "Update Status",
-      "Update status"
+      "Update status",
+      "label"
     ],
     "sources": [
       "app/dashboard/helpdesk/[id]/page.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -990,7 +1034,6 @@
       "Comments ( )",
       "Connection Error",
       "Export report",
-      "Helpdesk Management",
       "In Progress",
       "Open",
       "Resolved",
@@ -999,14 +1042,18 @@
       "Ticket:",
       "Total Tickets",
       "Try Again",
-      "Unassigned"
+      "Unassigned",
+      "label"
     ],
     "sources": [
       "app/dashboard/helpdesk/manage/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1019,35 +1066,37 @@
       "Create Ticket",
       "Description *",
       "Detailed description of the issue",
-      "Helpdesk",
       "In Progress",
-      "My Tickets",
       "Open",
       "Resolved",
       "Retry",
       "Select Category",
       "Something went wrong",
       "Total Tickets",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/helpdesk/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/hierarchy",
     "name": "Organogram",
     "controls": [
-      "Retry",
-      "Search employee by name, role, or department",
-      "⊙ Find Me"
+      "Search employee by name, role, or department"
     ],
     "sources": [
-      "app/dashboard/hierarchy/page.js"
+      "app/dashboard/hierarchy/page.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1059,24 +1108,24 @@
       "Cancel",
       "Connection Error",
       "Holiday description",
-      "Holidays",
       "List View",
-      "Public Holidays",
       "Retry",
       "Select Locations (Countries)",
       "Something went wrong",
-      "Today",
-      "Total Holidays",
       "Try Again",
-      "Upcoming Holidays",
-      "e.g., New Year's Day"
+      "e.g., New Year's Day",
+      "label"
     ],
     "sources": [
       "app/dashboard/holidays/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/calendar.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1090,17 +1139,13 @@
   {
     "route": "/dashboard/learning/certificates",
     "name": "Certificates",
-    "controls": [
-      "Certificate Details",
-      "Download",
-      "My Certificates",
-      "Share",
-      "✕"
-    ],
+    "controls": [],
     "sources": [
       "app/dashboard/learning/certificates/page.js",
       "components/ui/Loader.js",
-      "components/ui/ModalPortal.js"
+      "components/ui/ModalPortal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1108,22 +1153,23 @@
     "name": "Courses",
     "controls": [
       "Advanced JavaScript Programming",
-      "Clear Filters",
-      "Continue Learning",
-      "Course Library",
       "Data Analytics with Python",
       "Effective Communication Skills",
-      "Enroll Now",
       "Filter by category",
       "Filter by level",
       "Leadership & Team Building",
       "Project Management Fundamentals",
       "Search courses...",
-      "Time Management Mastery"
+      "Time Management Mastery",
+      "label"
     ],
     "sources": [
       "app/dashboard/learning/courses/page.js",
-      "components/ui/Loader.js"
+      "components/ui/HeroModal.js",
+      "components/ui/Loader.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1134,17 +1180,13 @@
       "Browse Courses",
       "Certificates",
       "Communication Skills",
-      "Completed",
-      "Continue Learning",
-      "Enrolled",
-      "Hours Learned",
-      "Learning Management System",
       "My Trainings",
-      "Project Management Basics",
-      "Total Courses"
+      "Project Management Basics"
     ],
     "sources": [
-      "app/dashboard/learning/page.js"
+      "app/dashboard/learning/page.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1152,20 +1194,15 @@
     "name": "My Trainings",
     "controls": [
       "Advanced JavaScript Programming",
-      "All ( )",
-      "Completed ( )",
-      "Continue Learning",
       "Effective Communication Skills",
-      "In Progress ( )",
       "Leadership & Team Building",
-      "My Trainings",
-      "Project Management Fundamentals",
-      "Review Course",
-      "View Certificate"
+      "Project Management Fundamentals"
     ],
     "sources": [
       "app/dashboard/learning/trainings/page.js",
-      "components/ui/Loader.js"
+      "components/ui/Loader.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1177,32 +1214,30 @@
       "Add Leave Type",
       "Cancel",
       "Connection Error",
-      "Leave Types",
       "Leave type description",
-      "Paid Leaves",
       "Retry",
       "Something went wrong",
-      "Total Days",
-      "Total Leave Types",
       "Try Again",
       "e.g., CL",
-      "e.g., Casual Leave"
+      "e.g., Casual Leave",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave-types/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/leave/allocations",
     "name": "Leave Allocations",
     "controls": [
-      "AI-Powered Bulk Import",
       "Add Allocation",
-      "Add Leave Allocation",
       "Allocate",
       "Back",
       "Bulk Allocate",
@@ -1210,12 +1245,9 @@
       "Cancel",
       "Clear search",
       "Connection Error",
-      "Employee Leave Balances -",
       "Employee balance pages",
       "Enter number of days",
       "Export",
-      "Half-Day Limits by Hierarchy",
-      "Leave Allocations",
       "Leave Types",
       "Next",
       "Pending Allocations",
@@ -1229,14 +1261,20 @@
       "Something went wrong",
       "Total Allocations",
       "Total Employees",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave/allocations/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1244,74 +1282,77 @@
     "name": "Apply Leave",
     "controls": [
       "Any important work handover instructions...",
-      "Apply for Leave",
       "Cancel",
       "Connection Error",
       "Contact number during leave",
-      "Leave Balance",
       "Please provide a detailed reason for your leave...",
       "Quick Tips",
       "Retry",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave/apply/page.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/leave/approvals",
     "name": "Leave Approvals",
     "controls": [
-      "All",
-      "Approved",
       "Close",
       "Connection Error",
       "Failed to load leave approvals",
-      "Leave Approvals",
-      "Leave Request Details",
-      "Pending",
-      "Rejected",
       "Retry",
       "Something went wrong",
-      "Total Requests",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave/approvals/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/leave/balance",
     "name": "My Leave Balance",
     "controls": [
+      "Analytics period",
       "Blocked",
       "Completed",
+      "Completion Analytics",
       "Connection Error",
+      "D",
+      "In Progress",
       "In progress",
-      "Leave Balance",
-      "Leave Balance Details",
-      "Leave Balance by Type",
       "Leave Requests",
-      "Monthly Leave Usage",
-      "Recent Leave History",
+      "Pending",
       "Remaining Balance",
       "Retry",
       "Review",
       "Select Year",
       "Something went wrong",
+      "Task completion analytics",
+      "Throughput",
       "To do",
       "Total Allocated",
       "Total Used",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave/balance/page.js",
@@ -1319,7 +1360,11 @@
       "components/charts/FernlyCharts.js",
       "components/charts/FernlyCharts.module.css",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1332,14 +1377,19 @@
       "Request history",
       "Retry",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave/early-leave/page.js",
       "components/leave/SpecialRequestPage.js",
       "components/ui/BackIcon.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1347,32 +1397,32 @@
     "name": "leave",
     "controls": [
       "Apply Leave",
-      "Apply for Leave",
       "Cancel",
       "Connection Error",
       "Enter reason for leave",
       "Failed to load leave data",
-      "Leave Management",
-      "My Leave Requests",
       "My Requests",
       "Retry",
       "Select Leave Type",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/leave/requests",
     "name": "Leave Requests",
     "controls": [
-      "( )",
       "All Requests",
       "Applied Date",
       "Approved",
@@ -1381,9 +1431,7 @@
       "Connection Error",
       "Duration",
       "End Date",
-      "Leave Request Details",
       "Leave Type",
-      "My Leave Requests",
       "Pending",
       "Reason",
       "Rejected",
@@ -1394,13 +1442,17 @@
       "Status",
       "Total Requests",
       "Try Again",
-      "View"
+      "View",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave/requests/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js"
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1413,14 +1465,19 @@
       "Retry",
       "Something went wrong",
       "Try Again",
-      "Work From Home"
+      "Work From Home",
+      "label"
     ],
     "sources": [
       "app/dashboard/leave/work-from-home/page.js",
       "components/leave/SpecialRequestPage.js",
       "components/ui/BackIcon.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1432,45 +1489,30 @@
       "Attach files",
       "Bold (Ctrl+B)",
       "Bulleted list",
-      "Cancel",
-      "Categories",
-      "Cc Bcc",
       "Compose",
-      "Connect Your Email",
-      "Create new label",
       "Critical",
       "Delete",
       "Discard draft",
       "Drafts",
-      "Filter messages like this",
       "Formatting options",
-      "Forward",
-      "Generate",
-      "I&apos;ve connected my email - Refresh",
       "Important",
       "Inbox",
       "Insert emoji",
       "Insert link",
       "Italic (Ctrl+I)",
       "Labels",
-      "Mail",
       "Mark as read",
       "Mark as unread",
-      "More",
       "More options",
       "Move to",
-      "Move to Inbox",
-      "Move to Trash",
       "New",
       "Numbered list",
       "Open in Browser to Connect",
-      "Print",
       "Quote",
       "Recipients",
       "Refresh",
       "Remove formatting",
       "Reply",
-      "Report spam",
       "Search mail...",
       "Sent",
       "Snooze",
@@ -1482,16 +1524,21 @@
       "Summarize with AI",
       "Tone",
       "Trash",
-      "Try Again",
       "Underline (Ctrl+U)",
-      "Welcome to Mail",
       "What should this email say?",
       "Write with AI",
-      "e.g. Write a polite decline to the meeting invitation for next Tuesday..."
+      "e.g. Write a polite decline to the meeting invitation for next Tuesday...",
+      "label"
     ],
     "sources": [
       "app/dashboard/mail/page.js",
-      "components/ui/BackIcon.js"
+      "components/ui/BackIcon.js",
+      "components/ui/HeroModal.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1523,32 +1570,21 @@
     "route": "/dashboard/meetings/[id]",
     "name": "meetings / [id]",
     "controls": [
-      "Accept",
       "Action Items",
-      "Agenda",
       "Allow guests to join with a shareable link",
       "Cancel",
       "Connection Error",
-      "Copy",
       "Decisions",
-      "Decline",
       "Decline Meeting",
-      "Delete",
       "Description",
-      "Edit meeting",
       "Follow Ups",
       "Guest meeting link",
-      "Invitees ( )",
       "Key Contributions",
       "Key Points",
       "Location",
-      "Maybe",
-      "Meeting not found",
       "Meeting title",
-      "Mira Notes Timeline",
       "Next Steps",
       "One meeting at a time",
-      "Organizer",
       "Priority",
       "Reason for declining...",
       "Retry",
@@ -1557,8 +1593,8 @@
       "Session Summary",
       "Something went wrong",
       "Stay here",
-      "Transcript History",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/meetings/[id]/page.js",
@@ -1568,22 +1604,21 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/meetings",
     "name": "Meetings",
     "controls": [
-      "Accept",
       "Agenda Items (Optional)",
       "Agenda item title",
-      "All Meetings",
       "Cancel",
-      "Clear all",
       "Connection Error",
       "Days of week *",
-      "Decline",
       "Decline Meeting",
       "Description",
       "Duration *",
@@ -1597,12 +1632,9 @@
       "Meeting Type",
       "Meeting agenda and objectives...",
       "Meeting title",
-      "Meetings",
       "Min",
       "Mon",
-      "No meetings found",
       "One meeting at a time",
-      "Pending Invitations ( )",
       "Priority",
       "Reason for declining...",
       "Repeat *",
@@ -1621,12 +1653,12 @@
       "Stay here",
       "Sun",
       "Thu",
-      "Today's Meetings ( )",
       "Try Again",
       "Tue",
       "Wed",
       "e.g., Conference Room A, 3rd Floor",
-      "e.g., Weekly Team Standup"
+      "e.g., Weekly Team Standup",
+      "label"
     ],
     "sources": [
       "app/dashboard/meetings/components/CreateMeetingModal.js",
@@ -1637,7 +1669,10 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/Loader.js"
+      "components/ui/Loader.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1660,14 +1695,20 @@
       "Pending Approvals",
       "Pending Tasks",
       "Present Today",
+      "Retry data",
       "Team Size",
       "Today's work hours",
-      "Total Employees"
+      "Total Employees",
+      "label"
     ],
     "sources": [
       "app/dashboard/page.js",
       "components/dashboard/index.js",
       "components/dashboards/UnifiedDashboard.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js",
       "components/widgets/AttendanceHeaderSummary.js",
       "components/widgets/index.js"
     ]
@@ -1682,21 +1723,16 @@
       "Clear Filters",
       "Done",
       "Filters",
-      "Generate Payroll",
       "Half Day",
       "Holiday",
       "Late",
       "No Department",
       "On Leave",
-      "Payroll Period",
-      "Payroll Preview -",
-      "Pending Leave Requests",
       "Present",
       "Refresh",
-      "Salary Calculation Method",
       "Search by name, code, email, department...",
-      "Select Employees",
-      "WFH"
+      "WFH",
+      "label"
     ],
     "sources": [
       "app/dashboard/payroll/generate/page.js",
@@ -1704,6 +1740,9 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js",
       "components/ui/heroui/index.js"
     ]
   },
@@ -1720,7 +1759,6 @@
       "Delete Payroll",
       "Download Payslip",
       "Draft",
-      "Earnings",
       "Edit Payroll",
       "Employees",
       "Federal Bank",
@@ -1746,7 +1784,6 @@
       "Select year",
       "Sheet will include:",
       "State Bank of India",
-      "Summary",
       "Total Deductions",
       "Total Earnings",
       "Total Gross",
@@ -1757,6 +1794,8 @@
     "sources": [
       "app/dashboard/payroll/page.js",
       "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js",
       "components/ui/heroui/index.js"
     ]
   },
@@ -1764,22 +1803,22 @@
     "route": "/dashboard/payroll/payslips/[id]",
     "name": "payroll / payslips / [id]",
     "controls": [
-      "ATTENDANCE SUMMARY",
       "Connection Error",
-      "DEDUCTIONS",
-      "EARNINGS",
       "Go Back",
       "Retry",
-      "SALARY SLIP",
-      "Salary Slip -",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/payroll/payslips/[id]/page.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1791,17 +1830,10 @@
       "Cancelled",
       "Connection Error",
       "Data table",
-      "Deductions",
       "Draft",
-      "Earnings",
-      "Employee Details",
       "Failed",
       "Inactive",
-      "My Payslips",
-      "Net Salary",
       "Paid",
-      "Payslip -",
-      "Payslips for",
       "Payslips table",
       "Pending",
       "Processing",
@@ -1813,6 +1845,7 @@
       "YTD Deductions",
       "YTD Gross",
       "YTD Net Pay",
+      "label",
       "text-default-600 font-medium text-sm",
       "text-default-700 text-sm"
     ],
@@ -1821,6 +1854,9 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js",
       "components/ui/heroui/Button.js",
       "components/ui/heroui/Card.js",
       "components/ui/heroui/Input.js",
@@ -1832,7 +1868,6 @@
     "route": "/dashboard/performance/appraisals",
     "name": "performance / appraisals",
     "controls": [
-      "Appraisal requests",
       "Cancel",
       "Decline",
       "FY 2026-27 / H1 2026",
@@ -1849,7 +1884,9 @@
     ],
     "sources": [
       "app/dashboard/performance/appraisals/page.js",
-      "components/performance/PerformanceAppraisalPanel.js"
+      "components/performance/PerformanceAppraisalPanel.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -1860,59 +1897,47 @@
       "Any additional comments or observations",
       "Areas of Improvement",
       "Cancel",
-      "Communication",
-      "Create Performance Review",
-      "Detailed Feedback",
-      "Employee Information",
       "Goals for Next Period",
-      "Initiative",
-      "Performance Ratings",
-      "Productivity",
-      "Quality of Work",
       "Review Period End *",
       "Review Period Start *",
       "Select Employee",
       "Set goals for the next review period",
       "Strengths",
-      "Teamwork",
       "What are the employee's key strengths?",
-      "What areas need improvement?"
+      "What areas need improvement?",
+      "label"
     ],
     "sources": [
       "app/dashboard/performance/create/page.js",
       "components/ui/BackIcon.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/performance/goals/[id]",
     "name": "performance / goals / [id]",
     "controls": [
-      "Back to Goals",
-      "Description",
-      "Details",
-      "Goal Details",
-      "Goal Not Found",
-      "Key Results",
-      "Milestones",
-      "Quick Stats",
       "Refresh",
-      "Tags",
-      "Timeline",
       "Update Progress",
-      "Updates History"
+      "label"
     ],
     "sources": [
       "app/dashboard/performance/goals/[id]/page.js",
-      "components/ui/BackIcon.js"
+      "components/ui/BackIcon.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/performance/goals/create",
     "name": "performance / goals / create",
     "controls": [
-      "Basic Information",
-      "Create Performance Goal",
       "Describe the goal in detail...",
       "Describe this milestone...",
       "Description",
@@ -1920,68 +1945,68 @@
       "Due Date *",
       "Enter goal title",
       "Enter milestone title",
-      "Goal Details",
       "Goal Title *",
-      "Milestone",
       "Milestone Title",
-      "Milestones",
       "Progress (%)",
       "Select Category",
       "Select Employee",
       "Start Date",
       "category",
       "employeeId",
+      "label",
       "priority",
       "status"
     ],
     "sources": [
       "app/dashboard/performance/goals/create/page.js",
       "components/ui/BackIcon.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/performance/goals/edit/[id]",
     "name": "performance / goals / edit / [id]",
     "controls": [
-      "Basic Information",
       "Describe the goal in detail...",
       "Describe this milestone...",
       "Description",
       "Due Date",
       "Due Date *",
-      "Edit Performance Goal",
       "Enter goal title",
       "Enter milestone title",
-      "Goal Details",
       "Goal Title *",
-      "Milestone",
       "Milestone Title",
-      "Milestones",
       "Progress (%)",
       "Select Category",
       "Select Employee",
       "Start Date",
       "category",
       "employeeId",
+      "label",
       "priority",
       "status"
     ],
     "sources": [
       "app/dashboard/performance/goals/edit/[id]/page.js",
       "components/ui/BackIcon.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/performance/goals",
     "name": "Goals & Objectives",
     "controls": [
-      "%",
       "Cancelled",
       "Completed",
       "Connection Error",
-      "Create Goal",
       "Delete",
       "Edit",
       "Filter by department",
@@ -1989,22 +2014,25 @@
       "Filter by status",
       "Filter by team",
       "In Progress",
-      "No goals found",
       "Not Started",
       "On Hold",
       "Pending",
-      "Performance Goals",
       "Refresh",
       "Retry",
       "Search...",
       "Something went wrong",
       "Try Again",
-      "View"
+      "View",
+      "label"
     ],
     "sources": [
       "app/dashboard/performance/goals/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2018,36 +2046,31 @@
       "Exceptional",
       "Failed to load performance data",
       "Formal",
-      "Formal Performance Reviews ( )",
       "Meets Expectations",
       "My Goals",
-      "My Goals ( )",
-      "My Performance",
       "Needs Improvement",
-      "No Formal Reviews",
-      "No Goals Set Yet",
-      "No Reviews Yet",
       "No goals set yet",
       "No reviews yet",
       "Overview",
-      "Recent Feedback",
-      "Recent Goals",
       "Retry",
       "Reviews",
-      "Reviews & Feedback ( )",
       "Set New Goal",
       "Set Your First Goal",
       "Set your first goal",
       "Something went wrong",
       "Tabs",
       "Try Again",
-      "View All",
-      "View Details"
+      "View Details",
+      "label"
     ],
     "sources": [
       "app/dashboard/performance/my-performance/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2062,19 +2085,22 @@
       "Employee Ratings",
       "Goals & Objectives",
       "Pending Reviews",
-      "Performance Management",
       "Performance Reports",
-      "Performance Reviews",
       "Retry",
       "Something went wrong",
       "Strengths:",
       "Total Reviews",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/performance/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2083,75 +2109,121 @@
     "controls": [
       "Average Rating",
       "Connection Error",
-      "Employee Ratings",
       "Filter by category",
       "Filter by department",
       "Filter by team",
       "High Performers",
-      "No ratings found",
       "Retry",
       "Search employees...",
       "Something went wrong",
       "This Month",
       "Total Reviews",
       "Try Again",
-      "View Profile"
+      "label"
     ],
     "sources": [
       "app/dashboard/performance/ratings/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
+    ]
+  },
+  {
+    "route": "/dashboard/performance/reports/department/[id]",
+    "name": "performance / reports / department / [id]",
+    "controls": [
+      "AI-assisted insights",
+      "Analytics period",
+      "Attendance",
+      "Attendance by weekday",
+      "Blocked",
+      "Completed",
+      "Completion Analytics",
+      "D",
+      "Department",
+      "Department Performance",
+      "Employee Metrics",
+      "Employee breakdown",
+      "Explore departments",
+      "Export Excel",
+      "From",
+      "In Progress",
+      "In progress",
+      "Needs attention",
+      "Next",
+      "Overview",
+      "Pending",
+      "Previous",
+      "Retry report",
+      "Review",
+      "Search employees…",
+      "Search report employees",
+      "Task completion analytics",
+      "Task distribution",
+      "Tasks",
+      "Team",
+      "Throughput",
+      "To",
+      "To do"
+    ],
+    "sources": [
+      "app/dashboard/performance/reports/department/[id]/page.js",
+      "app/dashboard/performance/reports/page.js",
+      "components/charts/FernlyCharts.js",
+      "components/charts/FernlyCharts.module.css",
+      "components/performance/ReportDashboard.js",
+      "components/performance/ReportDashboard.module.css",
+      "components/ui/FernlyMotion.js"
     ]
   },
   {
     "route": "/dashboard/performance/reports",
     "name": "Performance Reports",
     "controls": [
-      "AI Productivity Scores (Top 10)",
+      "AI-assisted insights",
+      "Analytics period",
       "Attendance",
-      "Attendance by Day of Week",
+      "Attendance by weekday",
       "Blocked",
       "Completed",
-      "Connection Error",
+      "Completion Analytics",
+      "D",
       "Department",
-      "Department Analysis",
-      "Department Attendance",
       "Department Performance",
-      "Department Performance Comparison",
-      "Dept Task Performance",
       "Employee Metrics",
-      "End Date",
+      "Employee breakdown",
+      "Explore departments",
+      "Export Excel",
+      "From",
+      "In Progress",
       "In progress",
-      "Individual Employee Performance",
-      "Key Metrics Summary",
-      "Needs Attention",
+      "Needs attention",
+      "Next",
       "Overview",
-      "Performance Overview",
-      "Performance Reports & Analytics",
-      "Rating Distribution",
-      "Retry",
+      "Pending",
+      "Previous",
+      "Retry report",
       "Review",
-      "Search by name, code, or department...",
-      "Select department",
-      "Select team",
-      "Something went wrong",
-      "Start Date",
-      "Task Status Distribution",
+      "Search employees…",
+      "Search report employees",
+      "Task completion analytics",
+      "Task distribution",
       "Tasks",
-      "Tasks by Priority",
       "Team",
-      "To do",
-      "Top Performers (Attendance)",
-      "Top Skills Analysis",
-      "Try Again"
+      "Throughput",
+      "To",
+      "To do"
     ],
     "sources": [
       "app/dashboard/performance/reports/page.js",
-      "components/charts/CustomTooltip.js",
       "components/charts/FernlyCharts.js",
       "components/charts/FernlyCharts.module.css",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/performance/ReportDashboard.js",
+      "components/performance/ReportDashboard.module.css",
+      "components/ui/FernlyMotion.js"
     ]
   },
   {
@@ -2165,25 +2237,28 @@
       "Choose one or more companies",
       "Choose one or more departments",
       "Close",
-      "Company Policies",
       "Connection Error",
       "Failed to load policies",
       "Full policy content...",
       "Pending Acknowledgments",
-      "Policies",
       "Retry",
       "Select Category",
       "Something went wrong",
-      "Total Policies",
       "Try Again",
-      "e.g., Work From Home Policy"
+      "e.g., Work From Home Policy",
+      "label"
     ],
     "sources": [
       "app/dashboard/policies/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2199,83 +2274,73 @@
       "Major Concerns",
       "Next day",
       "Next screenshot",
-      "No captures for this day",
-      "No team members found",
-      "Pending Captures ( )",
       "Previous day",
       "Previous screenshot",
-      "Productivity",
       "Refresh",
       "Search team...",
       "Strengths",
       "Suggestions for Improvement",
-      "Team"
+      "label"
     ],
     "sources": [
       "app/dashboard/productivity/page.js",
       "components/productivity/AnalyzedComposite.js",
       "components/ui/BackIcon.js",
-      "components/ui/HeroModal.js"
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/profile",
     "name": "profile",
     "controls": [
-      "90°",
       "Aadhaar Verification",
       "Active Sessions",
       "Brightness",
       "Cancel",
       "Continue",
       "Contrast",
-      "Edit Profile Picture",
-      "Emergency Contact",
-      "Employment Information",
       "Enter complete address",
       "Enter contact name",
       "Enter phone number",
-      "Key Responsibilities",
-      "Personal Information",
-      "Profile",
+      "Key responsibilities",
       "Profile Photo Guidelines",
-      "Reset all adjustments",
       "Rotation",
       "Saturation",
       "Tell a little bit about yourself, your expertise, and how you contribute.",
       "Use Aadhaar Value",
       "Use Address",
-      "Use this address",
-      "Use this date",
+      "Your digital employee ID",
       "Zoom",
-      "Zoom in",
-      "Zoom out",
-      "e.g., Spouse, Parent, Sibling"
+      "e.g., Spouse, Parent, Sibling",
+      "label"
     ],
     "sources": [
       "app/dashboard/profile/page.js",
+      "app/dashboard/profile/profile.module.css",
       "components/AadhaarVerificationSection.js",
       "components/ActiveSessionsSection.js",
       "components/ModalPortal.js",
       "components/TiltWrapper.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/projects/[projectId]/edit",
     "name": "projects / [projectId] / edit",
     "controls": [
-      "Add Head",
-      "Add Project Head",
-      "Add Team Members",
-      "Archive",
       "Cancel",
-      "Delete",
       "Describe the project...",
       "Description",
-      "Edit Project",
       "End Date",
       "Enter project name",
       "Priority",
@@ -2285,13 +2350,17 @@
       "Search employees by name...",
       "Start Date",
       "Status",
-      "Team Members"
+      "label"
     ],
     "sources": [
       "app/dashboard/projects/[projectId]/edit/page.js",
       "components/ui/BackIcon.js",
+      "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
-      "components/ui/Portal.js"
+      "components/ui/Portal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2299,14 +2368,13 @@
     "name": "projects / [projectId]",
     "controls": [
       "0",
-      "Accept",
       "Accept Invitation",
       "Activity",
-      "Add Comment",
       "Add Note",
       "Add Task",
       "Add a comment or update...",
       "Add a subtask...",
+      "Analytics period",
       "Approve",
       "Assign To",
       "Assigned To",
@@ -2315,14 +2383,11 @@
       "Blockers & Bottlenecks",
       "Cancel",
       "Color",
-      "Complete",
       "Completed",
-      "Confirm Change",
+      "Completion Analytics",
       "Content",
       "Create New Note",
-      "Create New Task",
-      "Create the first note",
-      "Daily Task Completion (Last 30 Days)",
+      "D",
       "Days",
       "Delete",
       "Describe the task...",
@@ -2340,7 +2405,6 @@
       "Immediate Actions",
       "In Progress",
       "In progress",
-      "Mark Complete",
       "Members",
       "Move Task To",
       "Next month",
@@ -2348,37 +2412,29 @@
       "Notes",
       "Open Project Chat",
       "Overview",
+      "Pending",
       "Personal note",
       "Pin",
       "Pinned Notes",
       "Post",
       "Previous month",
       "Priority",
-      "Progress",
       "Progress Overview",
       "Project Completion Forecast",
       "Project sections",
       "Quick Wins",
-      "Reason Required",
       "Reason for change",
       "Reason for deletion request...",
       "Reason for rejection (required)...",
-      "Reassign",
-      "Reassign Task",
       "Reassign To",
       "Refresh Insights",
       "Refresh activity",
-      "Reject",
-      "Reject Project Invitation",
-      "Request Completion",
       "Retry",
       "Review",
       "Review Rejected",
       "Risk Radar",
-      "Save",
       "Search activity...",
       "Select a team member",
-      "Set Your ETA",
       "Smart Insights",
       "Subtask Progress",
       "Subtask progress",
@@ -2386,19 +2442,20 @@
       "Subtasks",
       "Subtasks ( / )",
       "Task Burndown",
-      "Task Details",
       "Task Insights",
       "Task Priority Distribution",
       "Task Progress",
       "Task Status Distribution",
       "Task Title",
       "Task Title *",
+      "Task completion analytics",
       "Task kanban board",
       "Tasks",
       "Team Analytics",
       "Team Member Analysis",
       "Team Task Distribution",
       "This Week's Focus",
+      "Throughput",
       "Time Elapsed",
       "Time vs Task Progress",
       "Title (optional)",
@@ -2407,7 +2464,8 @@
       "Unpin",
       "Visibility",
       "Workload Distribution",
-      "Write your note..."
+      "Write your note...",
+      "label"
     ],
     "sources": [
       "app/dashboard/projects/[projectId]/page.js",
@@ -2418,9 +2476,15 @@
       "components/tasks/KanbanBoard.module.css",
       "components/tasks/SubtaskCompletionButton.js",
       "components/ui/BackIcon.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "components/ui/Portal.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2435,12 +2499,11 @@
       "In Progress",
       "On Hold",
       "Reject",
-      "Reject Task Review",
       "Rejection Reason",
-      "Request Approvals",
       "Select subtasks to mark as incomplete",
       "Set task status to",
-      "To Do"
+      "To Do",
+      "label"
     ],
     "sources": [
       "app/dashboard/projects/approvals/page.js",
@@ -2448,7 +2511,10 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "components/ui/Portal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2456,24 +2522,15 @@
     "name": "Assigned Tasks",
     "controls": [
       "0",
-      "Active Tasks",
-      "Add Subtask",
-      "Add User",
-      "Add Users to Task",
       "Add a subtask...",
       "Assign New Task",
       "Assign Task",
       "Assign To",
-      "Assigned Tasks",
       "Assignees",
       "Attachments",
-      "Awaiting Acceptance",
       "Cancel",
       "Completed",
       "Days",
-      "Delete",
-      "Delete Task",
-      "Deletion Request",
       "Describe the task...",
       "Description",
       "Drop task here",
@@ -2488,20 +2545,14 @@
       "Kanban View",
       "List View",
       "Next month",
-      "No assigned tasks found",
-      "Pending Deletion Approval",
       "Previous month",
       "Priority",
       "Progress",
       "Project",
       "Project filter",
       "Provide a reason for this status change (this will be logged in the task timeline)...",
-      "Reason for Status Change",
       "Reason for deletion",
       "Reason for rejection",
-      "Reassign",
-      "Reassign Task",
-      "Respond",
       "Review",
       "Search employees...",
       "Search tasks...",
@@ -2515,8 +2566,6 @@
       "Subtask progress",
       "Subtasks",
       "Subtasks ( / )",
-      "Switch to list view to review",
-      "Task Details",
       "Task Title",
       "Task kanban board",
       "Title *",
@@ -2526,7 +2575,7 @@
       "Why are you changing this task&apos;s status?",
       "Why are you rejecting this deletion?",
       "Why do you want to delete this task?",
-      "task(s) pending deletion approval"
+      "label"
     ],
     "sources": [
       "app/dashboard/projects/assigned-tasks/page.js",
@@ -2539,7 +2588,12 @@
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "components/ui/Portal.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2548,10 +2602,7 @@
     "controls": [
       "Add Head",
       "Add Member",
-      "Add Project Head",
-      "Add Team Member",
       "Cancel",
-      "Create New Project",
       "Department",
       "Department (Optional)",
       "Describe the project objectives and scope...",
@@ -2560,15 +2611,13 @@
       "Enter project name",
       "Initial Status",
       "Priority",
-      "Project Details",
-      "Project Heads",
       "Project Name",
       "Search by name, email, or code...",
       "Select Department",
       "Start Date",
       "Tags (comma-separated)",
-      "Team Members",
-      "e.g., frontend, urgent, Q1"
+      "e.g., frontend, urgent, Q1",
+      "label"
     ],
     "sources": [
       "app/dashboard/projects/create/page.js",
@@ -2576,7 +2625,10 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "components/ui/Portal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2584,10 +2636,7 @@
     "name": "My Tasks",
     "controls": [
       "0",
-      "Accept",
-      "Add Comment",
       "Add a subtask...",
-      "All Tasks",
       "Assign New Task",
       "Assign Task",
       "Assign To",
@@ -2603,7 +2652,6 @@
       "Description",
       "Drop task here",
       "Due Date",
-      "Due Today ( )",
       "Enter task title",
       "Estimated time",
       "Filter by Priority",
@@ -2613,17 +2661,12 @@
       "In Progress",
       "Kanban View",
       "List View",
-      "My Tasks",
       "Next month",
-      "No tasks found",
-      "Overdue ( )",
-      "Pending Acceptance ( )",
       "Previous month",
       "Priority",
       "Progress",
       "Project",
       "Reason for rejection...",
-      "Reject",
       "Reject Assignment",
       "Review",
       "Search employees...",
@@ -2634,12 +2677,11 @@
       "Subtasks",
       "Subtasks ( / )",
       "Switch to List View to Accept/Reject",
-      "Task Details",
       "Task Title",
       "Task kanban board",
       "To Do",
       "Update Status",
-      "View Project"
+      "label"
     ],
     "sources": [
       "app/dashboard/projects/my-tasks/page.js",
@@ -2651,7 +2693,12 @@
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "components/ui/Portal.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2659,22 +2706,39 @@
     "name": "Projects",
     "controls": [
       "Active",
+      "Analytics period",
       "Archived",
+      "Blocked",
       "Completed",
+      "Completion Analytics",
       "Connection Error",
       "Create Project",
-      "No projects found",
-      "Projects",
+      "D",
+      "In Progress",
+      "In progress",
+      "Pending",
       "Retry",
+      "Review",
       "Search projects...",
       "Something went wrong",
-      "Try Again"
+      "Task completion analytics",
+      "Throughput",
+      "To do",
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/projects/page.js",
+      "components/charts/FernlyCharts.js",
+      "components/charts/FernlyCharts.module.css",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/FernlyMotion.js",
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2699,21 +2763,20 @@
       "Go Back",
       "Go to Dashboard",
       "Next",
-      "No roles configured",
       "None",
       "Permission Denied",
       "Previous",
       "RBAC Audit Log",
       "Role Created",
       "Role Deleted",
-      "Role Management",
       "Role Updated",
       "Search users by name or email...",
       "Seed System Roles",
       "User Role Changed",
       "Your Access Level:",
       "e.g. Sales Manager",
-      "e.g. sales_manager"
+      "e.g. sales_manager",
+      "label"
     ],
     "sources": [
       "app/dashboard/rbac/roles/page.js",
@@ -2722,8 +2785,12 @@
       "components/rbac/RoleAssignModal.js",
       "components/rbac/RoleBuilder.js",
       "components/ui/BackIcon.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
-      "components/ui/Modal.js"
+      "components/ui/Modal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2732,30 +2799,21 @@
     "controls": [
       "Add Candidate",
       "Add Candidate to",
-      "Benefits",
       "Cancel",
       "Candidate CV / resume",
-      "Candidate Pipeline",
       "Close",
       "Connection Error",
-      "Job Description",
-      "Job Information",
       "Publish",
       "Put on Hold",
-      "Quick Links",
       "React, Node.js, MongoDB...",
-      "Recent Candidates",
       "Reopen",
-      "Required Skills",
-      "Requirements",
-      "Responsibilities",
       "Retry",
       "Something went wrong",
-      "Status Actions",
       "Try Again",
       "View All",
       "View Candidates ( )",
-      "View Interviews"
+      "View Interviews",
+      "label"
     ],
     "sources": [
       "app/dashboard/recruitment/[id]/page.js",
@@ -2763,7 +2821,12 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2772,28 +2835,26 @@
     "controls": [
       "Avg Time to Hire",
       "Back to Recruitment",
-      "Candidate Sources",
       "Connection Error",
       "Conversion Rate",
       "Hired",
-      "Hiring by Department",
-      "Interview Statistics",
-      "No Analytics Data",
-      "Offer Metrics",
       "Open Jobs",
-      "Pipeline Breakdown",
-      "Recruitment Analytics",
       "Retry",
       "Something went wrong",
       "Total Candidates",
       "Total Jobs",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/recruitment/analytics/page.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2802,11 +2863,9 @@
     "controls": [
       "Add Note",
       "Add your note...",
-      "Applied For",
       "Back to Candidates",
       "Background verification",
       "Cancel",
-      "Candidate Not Found",
       "Change Candidate Stage",
       "Change Stage",
       "Connection Error",
@@ -2816,24 +2875,17 @@
       "Generate & attach",
       "Generate Offer",
       "Generate Offer Letter",
-      "Interviews",
-      "Notes",
-      "Offer",
-      "Profile",
       "Rate",
       "Rate Candidate",
       "Reason for stage change...",
-      "Resume",
       "Retry",
       "Search or select reporting manager",
-      "Skills",
       "Something went wrong",
-      "Stage History",
-      "Tags",
       "Try Again",
       "Update Rating",
       "Update Stage",
-      "e.g., EMP-001"
+      "e.g., EMP-001",
+      "label"
     ],
     "sources": [
       "app/dashboard/recruitment/candidates/[id]/page.js",
@@ -2841,7 +2893,10 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2851,22 +2906,23 @@
       "All Jobs",
       "All Sources",
       "All Stages",
-      "Candidates",
       "Connection Error",
       "Failed to load candidates",
-      "List",
-      "No candidates found",
-      "Pipeline",
       "Retry",
       "Search candidates...",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/recruitment/candidates/page.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2876,27 +2932,27 @@
       "Add",
       "Add Skill",
       "Auto-generated if empty",
-      "Basic Information",
       "Benefit",
       "Benefits",
       "Cancel",
-      "Create Job Posting",
       "Describe the role, team, and what the ideal candidate will do...",
-      "Experience & Compensation",
-      "Job Description",
       "Publish Job",
       "Requirement",
       "Requirements",
       "Responsibilities",
       "Responsibility",
       "Save as Draft",
-      "Skills",
       "e.g. Mumbai, India",
-      "e.g. Senior Software Engineer"
+      "e.g. Senior Software Engineer",
+      "label"
     ],
     "sources": [
       "app/dashboard/recruitment/create/page.js",
-      "components/ui/BackIcon.js"
+      "components/ui/BackIcon.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2906,27 +2962,27 @@
       "Add",
       "Add Skill",
       "Auto-generated if empty",
-      "Basic Information",
       "Benefit",
       "Benefits",
       "Cancel",
       "Describe the role, team, and what the ideal candidate will do...",
-      "Edit Job Posting",
-      "Experience & Compensation",
-      "Job Description",
       "Publish Job",
       "Requirement",
       "Requirements",
       "Responsibilities",
       "Responsibility",
       "Save Changes",
-      "Skills",
       "e.g. Mumbai, India",
-      "e.g. Senior Software Engineer"
+      "e.g. Senior Software Engineer",
+      "label"
     ],
     "sources": [
       "app/dashboard/recruitment/edit/[id]/page.js",
-      "components/ui/BackIcon.js"
+      "components/ui/BackIcon.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2943,8 +2999,6 @@
       "Connection Error",
       "Failed to load interviews",
       "Feedback",
-      "Interviews",
-      "No interviews found",
       "Office / Room name",
       "Retry",
       "Schedule Interview",
@@ -2952,7 +3006,8 @@
       "Submit Feedback",
       "Try Again",
       "e.g., Technical Interview Round 1",
-      "https://meet.google.com/..."
+      "https://meet.google.com/...",
+      "label"
     ],
     "sources": [
       "app/dashboard/recruitment/interviews/page.js",
@@ -2960,7 +3015,10 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -2977,20 +3035,23 @@
       "Hired",
       "Interviews",
       "Manpower Requests",
-      "No job postings found",
       "Open Positions",
-      "Recruitment",
       "Retry",
       "Search jobs...",
       "Something went wrong",
       "Total Candidates",
       "Total Jobs",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/recruitment/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3023,7 +3084,6 @@
     "name": "reports",
     "controls": [
       "Attendance Report",
-      "Custom Report",
       "Employee Directory",
       "Generate Custom Report",
       "Generate Report",
@@ -3033,12 +3093,17 @@
       "Recruitment Report",
       "Report Type",
       "Reports",
-      "Select Type"
+      "Select Type",
+      "label"
     ],
     "sources": [
       "app/dashboard/reports/page.js",
       "components/mobile/MobileComponents.js",
-      "components/ui/Loader.js"
+      "components/ui/HeroModal.js",
+      "components/ui/Loader.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3074,7 +3139,8 @@
       "Settlement date",
       "Settlement notes",
       "Start F&amp;F / offboarding",
-      "Submit resignation"
+      "Submit resignation",
+      "label"
     ],
     "sources": [
       "app/dashboard/resignations/page.js",
@@ -3082,7 +3148,10 @@
       "components/employees/ResignationExitPanel.js",
       "components/employees/ResignationPanel.js",
       "components/employees/SettlementEditor.js",
-      "components/ui/HeroModal.js"
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3090,8 +3159,6 @@
     "name": "Ideas",
     "controls": [
       "Add a comment...",
-      "All Ideas",
-      "Cancel",
       "Category",
       "Comments ( )",
       "Connection Error",
@@ -3102,12 +3169,7 @@
       "Enter your idea title...",
       "Env",
       "Environment",
-      "Filters",
-      "Ideas Sandbox",
       "Learn",
-      "My Ideas",
-      "New Idea",
-      "No ideas found",
       "Office",
       "Other",
       "Process",
@@ -3122,7 +3184,8 @@
       "Title *",
       "Training",
       "Try Again",
-      "Workplace"
+      "Workplace",
+      "label"
     ],
     "sources": [
       "app/dashboard/sandbox/components/CreateIdeaModal.js",
@@ -3130,19 +3193,20 @@
       "app/dashboard/sandbox/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/Loader.js"
+      "components/ui/HeroModal.js",
+      "components/ui/Loader.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/settings/geofence-locations",
     "name": "settings / geofence locations",
     "controls": [
-      "Add Break",
-      "Add Location",
       "Address",
       "Break Timings",
       "Break name (e.g., Lunch Break)",
-      "Cancel",
       "Connection Error",
       "Delete",
       "Description",
@@ -3151,9 +3215,7 @@
       "End Time",
       "Failed to load geofence locations",
       "Full address",
-      "Geofence Locations",
       "Latitude",
-      "Location",
       "Location & Radius",
       "Location Name *",
       "Longitude",
@@ -3166,14 +3228,18 @@
       "Try Again",
       "Use current location",
       "e.g., Main Office, Branch Office",
-      "×"
+      "label"
     ],
     "sources": [
       "app/dashboard/settings/geofence-locations/page.js",
       "components/GeofenceMap.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/ModalPortal.js"
+      "components/ui/HeroModal.js",
+      "components/ui/ModalPortal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3183,8 +3249,6 @@
       "/dashboard",
       "Action URL",
       "Cancel",
-      "Close",
-      "Create Recurring Notification",
       "Created By",
       "Day of Month *",
       "Days *",
@@ -3201,18 +3265,11 @@
       "Last Sent",
       "Message",
       "Message *",
-      "Notification Content",
-      "Notification Details",
-      "Notification History",
-      "Notification Management",
       "Recipients",
       "Recurring",
-      "Recurring Notifications",
       "Schedule For *",
-      "Schedule Notification",
       "Scheduled",
       "Scheduled For",
-      "Scheduled Notifications",
       "Select Department",
       "Select Roles",
       "Send Notification",
@@ -3225,13 +3282,18 @@
       "Title",
       "Title *",
       "Total Times Sent",
-      "Type"
+      "Type",
+      "label"
     ],
     "sources": [
       "app/dashboard/settings/notifications/page.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js"
+      "components/ui/ModalPortal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3250,7 +3312,6 @@
       "Absent Threshold (min)",
       "Absent days",
       "Active Days",
-      "Add Break",
       "Add Company",
       "Add Department",
       "Add Designation",
@@ -3266,21 +3327,17 @@
       "Associate the correct company page",
       "Attendance machines",
       "Attendance machines could not be loaded",
-      "Attendance-Based Deductions",
       "Break name (e.g., Lunch Break)",
       "Brief description of the company",
       "Cancel",
-      "Casual Leave",
       "Check-in Time *",
       "Check-out Time *",
       "City",
-      "Clear search",
       "Clock in",
       "Company Code *",
       "Company Email",
       "Company Name",
       "Company Name *",
-      "Company Settings",
       "Company orientation modules",
       "Connected At",
       "Connection",
@@ -3291,48 +3348,34 @@
       "Currency",
       "Deduction Type",
       "Delete",
-      "Departments",
       "Description",
-      "Designations",
       "Disable connection",
-      "Discard changes",
       "Done",
       "ESI (Employee State Insurance)",
       "ESI Percentage (%)",
       "Edit",
-      "Edit Settings",
       "Email",
-      "Email Notifications",
       "Enable Overtime Pay",
       "Enable the auth product",
       "End Time",
-      "Engineering",
       "Enter company name",
       "Example: Keep routine answers concise and use my team's project naming conventions.",
       "Fixed Amount (₹)",
       "Full Day Hours",
       "Full address (auto-filled from map)",
-      "General Settings",
       "Geofence Coordinates",
-      "Geofencing Settings",
       "Grace Lates/Month",
-      "HR Manager",
       "Half Day Hours",
       "Half-Day Deduction",
       "Half-day days",
       "Head office, Gate 1",
-      "Holidays",
-      "How To Grab The Credentials",
-      "Human Resources",
       "Import CSV",
-      "Independence Day",
       "Induction & orientation",
       "Induction presentation",
       "Last Sync",
       "Late Arrival Deduction",
       "Late Threshold (min)",
       "Latitude",
-      "Leave Types",
       "Location Name",
       "Login",
       "Longitude",
@@ -3342,24 +3385,17 @@
       "Minimum Hours",
       "My knowledge for MIRA",
       "NY",
-      "New Year&apos;s Day",
       "New York",
       "Next",
-      "No companies found",
-      "No companies yet",
       "No machines configured",
-      "Notification Settings",
       "Notifications",
       "Open LinkedIn Developers",
       "Optional but recommended",
       "Optional description for this location",
       "Organisation",
       "Organisation default",
-      "Overtime Settings",
       "PF Percentage (%)",
-      "Paid Time Off",
       "Payroll",
-      "Payroll Settings",
       "Personal instructions",
       "Phone",
       "Present days",
@@ -3368,35 +3404,24 @@
       "Productivity",
       "Productivity screenshots",
       "Professional Tax",
-      "Professional setup for your current env-based LinkedIn flow",
       "Provident Fund (PF)",
       "Publish induction",
-      "Push Notifications",
       "Radius (meters)",
       "Rate Multiplier",
       "Recruitment",
-      "Recruitment Integrations",
       "Remove",
-      "Required .env Keys",
       "Required GPS accuracy",
-      "Reset",
       "Retry",
       "Rotate token",
-      "Sales",
       "Save Changes",
       "Save changes",
       "Search providers, protocols, or models",
       "Search settings",
-      "Select a Company",
       "Select or enter a model",
       "Selected",
-      "Settings",
       "Settings sections",
-      "Sick Leave",
-      "Software Engineer",
       "Start Time",
       "State / Province",
-      "Statutory Deductions",
       "Street Address",
       "TDS (Tax Deducted at Source)",
       "TDS Percentage (%)",
@@ -3418,11 +3443,8 @@
       "e.g., Main Office, Branch 1",
       "https://api.vendor.example",
       "https://www.example.com",
-      "· Induction & orientation",
-      "✏️",
-      "✕",
-      "📊 Settings Summary",
-      "🗑️"
+      "label",
+      "· Induction & orientation"
     ],
     "sources": [
       "app/dashboard/settings/page.js",
@@ -3435,6 +3457,11 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js",
       "components/ui/heroui/SearchableSelect.js"
     ]
   },
@@ -3443,26 +3470,25 @@
     "name": "settings / preferences",
     "controls": [
       "+91 12345 67890",
-      "Attendance Settings",
       "Company Address",
-      "Company Information",
       "Connection Error",
-      "Currency Settings",
       "Failed to load preferences",
       "Retry",
       "Something went wrong",
-      "System Preferences",
-      "Time & Date Settings",
       "Try Again",
-      "Work Settings",
       "Your Company Name",
       "info@company.com",
+      "label",
       "₹"
     ],
     "sources": [
       "app/dashboard/settings/preferences/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3558,7 +3584,6 @@
       "Rectangle (R)",
       "Redo (Cmd+Y)",
       "Regenerate All",
-      "Rename board",
       "Restructure",
       "Retry",
       "Rotation",
@@ -3569,9 +3594,6 @@
       "Send changes to MIRA",
       "Shadows Into Light",
       "Shapes",
-      "Share",
-      "Share board",
-      "Shared with",
       "Solid",
       "Solid Line",
       "Something went wrong",
@@ -3594,17 +3616,24 @@
       "Update Plot",
       "View all →",
       "View history",
-      "What would you like to create?"
+      "What would you like to create?",
+      "label"
     ],
     "sources": [
       "app/dashboard/talioboard/[id]/page.js",
       "components/ui/AIActivityBeam.js",
       "components/ui/BackIcon.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/MiraLoadingOverlay.js",
       "components/ui/MiraPet.js",
       "components/ui/ModalPortal.js",
+      "components/ui/UploadButton.js",
+      "components/ui/UploadButton.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js",
       "components/whiteboard/MiraAgentSidebar.js",
       "components/whiteboard/WhiteboardCanvas.js"
     ]
@@ -3648,78 +3677,81 @@
       "All Departments",
       "All My Departments",
       "All Teams",
-      "Approve",
       "Connection Error",
-      "Geofencing Monitoring",
-      "Reject",
       "Retry",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/team/geofencing/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/team/members/[id]",
     "name": "team / members / [id]",
     "controls": [
-      "Add Review / Remark",
+      "Activity date",
+      "Analytics period",
       "Analyzed Mosaic ( )",
-      "Attendance calendar",
-      "Back to Team Members",
-      "Basic Information",
+      "Back to previous page",
       "Blocked",
       "Category",
       "Close",
       "Completed",
-      "Completion",
+      "Completion Analytics",
       "Connection Error",
       "Content",
+      "D",
       "Employee attendance",
+      "Employee dashboards",
+      "Employee lifecycle",
       "Employee productivity",
       "Employee screenshot",
+      "Employee sections",
       "Enter your review, remark, or feedback...",
-      "Go Back",
       "In Progress",
       "In progress",
-      "Member Not Found",
+      "Lifecycle filters",
       "Member overview",
-      "Next",
       "Next attendance month",
       "No profile photo",
       "Pending",
-      "Previous",
       "Previous attendance month",
-      "Productivity & screenshots",
       "Rating",
-      "Refresh",
       "Refresh attendance",
+      "Refresh employee",
+      "Refresh lifecycle history",
       "Retry",
       "Review",
-      "Reviews & Remarks",
       "Screenshot pages",
-      "Screenshot ·",
       "Something went wrong",
-      "Task activity",
-      "Tasks",
+      "Task completion analytics",
+      "Throughput",
       "To do",
       "Todo",
       "Total",
       "Try Again",
       "Type",
-      "‹",
-      "›",
-      "↻"
+      "label"
     ],
     "sources": [
+      "app/dashboard/team/members/[id]/EmployeeTabs.js",
       "app/dashboard/team/members/[id]/MemberAttendance.js",
+      "app/dashboard/team/members/[id]/MemberDetails.js",
+      "app/dashboard/team/members/[id]/MemberLifecycle.js",
       "app/dashboard/team/members/[id]/MemberOverview.js",
       "app/dashboard/team/members/[id]/MemberProductivity.js",
+      "app/dashboard/team/members/[id]/MemberScreenshots.js",
       "app/dashboard/team/members/[id]/MemberTaskList.js",
+      "app/dashboard/team/members/[id]/lifecycle.module.css",
       "app/dashboard/team/members/[id]/member.module.css",
       "app/dashboard/team/members/[id]/page.js",
       "components/charts/FernlyCharts.js",
@@ -3728,9 +3760,14 @@
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/FernlyMotion.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/calendar.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3740,18 +3777,16 @@
       "Department",
       "Filter by team",
       "Loading team members",
-      "No team members found",
-      "Retry",
       "Scroll teams left",
       "Scroll teams right",
       "Search people",
-      "Search people, code or email…",
-      "Team",
-      "Unable to load your team"
+      "Search people, code or email…"
     ],
     "sources": [
       "app/dashboard/team/members/page.js",
-      "app/dashboard/team/members/team.module.css"
+      "app/dashboard/team/members/team.module.css",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3760,49 +3795,52 @@
     "controls": [
       "Connection Error",
       "Cross Department",
-      "My Teams",
-      "No Members Found",
-      "No Teams Found",
       "Retry",
       "Search by name, employee code, or email...",
       "Something went wrong",
       "Team Leader",
       "Try Again",
-      "View Details"
+      "label"
     ],
     "sources": [
       "app/dashboard/team/my-teams/page.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/team/regularisation",
     "name": "Attendance Regularisation",
     "controls": [
-      "Access Restricted",
       "All Departments",
       "All My Departments",
       "All Teams",
-      "Attendance Regularisation",
       "Connection Error",
       "Current Record",
       "Error loading regularisation data",
       "Filter by status",
-      "No Requests Found",
       "Reason",
       "Requested Changes",
       "Retry",
       "Reviewer Comments",
       "Something went wrong",
-      "Try Again"
+      "Try Again",
+      "label"
     ],
     "sources": [
       "app/dashboard/team/regularisation/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "components/ui/HeroModal.js",
+      "components/ui/LoadingButton.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3818,29 +3856,31 @@
       "Add To-do",
       "Add description...",
       "Add subtask...",
+      "Analytics period",
       "At time of due date",
       "Blocked",
       "Brief description...",
-      "By Priority",
       "Cancel",
-      "Categories",
       "Category",
       "Close to-do analytics",
       "Completed",
+      "Completion Analytics",
       "Completion by priority",
       "Create New To-do",
       "Create To-do",
+      "D",
       "Delete",
       "Description",
       "Due Date",
       "Enter to-do title",
       "Filter category",
       "High",
+      "In Progress",
       "In progress",
       "Low",
       "Medium",
       "No Priority",
-      "No project tasks",
+      "Pending",
       "Priority",
       "Review",
       "Search to-dos...",
@@ -3850,15 +3890,15 @@
       "Start task (move to In Progress)",
       "Subtasks ( / )",
       "Tags",
+      "Task completion analytics",
+      "Throughput",
       "To do",
-      "To-Do's",
       "To-do Analytics",
-      "To-do Details",
-      "To-dos Completed (Last 7 Days)",
       "Urgent",
       "View Analytics",
       "Weekly completions",
       "e.g., Work, Personal, Shopping",
+      "label",
       "work, urgent, follow-up"
     ],
     "sources": [
@@ -3873,25 +3913,31 @@
       "components/tasks/SubtaskCompletionButton.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/HeroModal.js",
-      "components/ui/Loader.js"
+      "components/ui/Loader.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
     "route": "/dashboard/users",
     "name": "users",
     "controls": [
-      "All Users",
       "Connection Error",
       "Copy password",
       "Retry",
       "Something went wrong",
       "Try Again",
-      "Users Management"
+      "label"
     ],
     "sources": [
       "app/dashboard/users/page.js",
       "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -3984,8 +4030,8 @@
       "Surprised",
       "Talio Meet compact picture in picture",
       "Thumbs up",
-      "Transcript History",
       "Try camera again",
+      "label",
       "←",
       "→"
     ],
@@ -4002,7 +4048,10 @@
       "components/ui/AIActivityBeam.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
-      "components/ui/Loader.js"
+      "components/ui/Loader.js",
+      "components/ui/fernly/elements.module.css",
+      "components/ui/fernly/index.js",
+      "components/ui/fernly/native.js"
     ]
   },
   {
@@ -4010,17 +4059,17 @@
     "name": " / login",
     "controls": [
       "Connection Error",
-      "Email Address",
       "Enter your password",
       "Incorrect Email Address !",
       "Incorrect Password",
       "Login Failed",
       "Password",
-      "Welcome Back",
-      "name@company.com",
-      "text-default-600 text-sm"
+      "Welcome back",
+      "name@company.com"
     ],
     "sources": [
+      "app/login/LoginForm.js",
+      "app/login/login-form.css",
       "app/login/page.js",
       "components/ui/HeroModal.js"
     ]

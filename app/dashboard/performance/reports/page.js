@@ -1,66 +1,17 @@
 'use client'
 
 import { fetchCompleteEmployeeResponse } from '@/lib/client/employeePages'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import ReportDashboard from '@/components/performance/ReportDashboard'
 import toast from '@/utils/toast'
 import { downloadExcelWorkbook } from '@/lib/client/spreadsheetExport'
-import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle, FaRocket, FaUserFriends } from 'react-icons/fa'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart, ComposedChart } from '@/components/charts/FernlyCharts'
-import CustomTooltip from '@/components/charts/CustomTooltip'
-import { FernlyGauge } from '@/components/charts/FernlyCharts'
 import { useAILoading } from '@/contexts/AILoadingContext'
-import { Select, SelectItem, Input, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
-import { DataErrorState } from '@/components/ui/ErrorBoundary'
-import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
-
-// Color palette for charts
-const CHART_COLORS = {
-  primary: '#3B82F6',
-  success: '#10B981',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  purple: '#8B5CF6',
-  pink: '#EC4899',
-  cyan: '#06B6D4',
-  indigo: '#6366F1'
-}
-
-// Shared Fernly geometry keeps report gauges consistent with project progress.
-const GaugeChart = ({ value, maxValue = 100, label, color = CHART_COLORS.primary }) => (
-  <FernlyGauge value={value} maxValue={maxValue} label={label} color={color} showLegend={false} />
-)
-
-// Trend Indicator Component
-const TrendIndicator = ({ current, previous, suffix = '%', higherIsBetter = true }) => {
-  if (previous === null || previous === undefined) return null
-
-  const diff = current - previous
-  const percentChange = previous !== 0 ? ((diff / previous) * 100).toFixed(1) : 0
-
-  const isPositive = higherIsBetter ? diff > 0 : diff < 0
-  const isNeutral = Math.abs(diff) < 0.5
-
-  if (isNeutral) {
-    return (
-      <span className="flex items-center text-gray-500 text-xs">
-        <FaMinus className="mr-1" /> No change
-      </span>
-    )
-  }
-
-  return (
-    <span className={`flex items-center text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-      {isPositive ? <FaArrowUp className="mr-1" /> : <FaArrowDown className="mr-1" />}
-      {Math.abs(percentChange)}{suffix} vs prev period
-    </span>
-  )
-}
 
 // Helper to format date as YYYY-MM-DD
 const formatDateForInput = (date) => {
-  return date.toISOString().split('T')[0]
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 }
 
 // Get default date range (month to date)
@@ -73,30 +24,20 @@ const getDefaultDateRange = () => {
   }
 }
 
-export default function PerformanceReportsPage() {
+export default function PerformanceReportsPage({ departmentId = 'all' }) {
+  const requestVersion = useRef(0)
+  const requestAbort = useRef(null)
+  const [reportError, setReportError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [reportData, setReportData] = useState(null)
   const [attendanceStats, setAttendanceStats] = useState(null)
   const [taskStats, setTaskStats] = useState(null)
   const [dateRange, setDateRange] = useState(getDefaultDateRange())
-  const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedDepartment, setSelectedDepartment] = useState(departmentId)
   const [selectedTeam, setSelectedTeam] = useState('all')
   const [aiInsights, setAiInsights] = useState(null)
-  const [expandedSections, setExpandedSections] = useState({
-    executive: true,
-    attendance: true,
-    tasks: true,
-    productivity: true,
-    overview: false,
-    departmentAnalysis: true,
-    employeeMetrics: true,
-    actionableInsights: true,
-    aiInsights: true
-  })
-  const [searchTerm, setSearchTerm] = useState('')
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
   const [isTeamLeader, setIsTeamLeader] = useState(false)
-  const [userDepartmentId, setUserDepartmentId] = useState(null)
   const [headedDepartments, setHeadedDepartments] = useState([])
   const [teamLeaderTeams, setTeamLeaderTeams] = useState([])
 
@@ -108,10 +49,10 @@ export default function PerformanceReportsPage() {
   }, [])
 
   // SWR: fetch department head status
-  const { data: headCheckRes, isLoading: headCheckLoading } = useAuthedSWR('/api/team/check-head')
+  const { data: headCheckRes, isLoading: headCheckLoading, error: headCheckError, mutate: retryHeadCheck } = useAuthedSWR('/api/team/check-head')
 
   // SWR: fetch departments list
-  const { data: deptsRes } = useAuthedSWR('/api/departments')
+  const { data: deptsRes, error: departmentsError, mutate: retryDepartments } = useAuthedSWR('/api/departments')
   const departments = deptsRes?.data || []
 
   // SWR: fetch teams for selected department (or team leader's teams)
@@ -131,27 +72,35 @@ export default function PerformanceReportsPage() {
 
   useEffect(() => {
     if (headCheckRes?.success) {
-      setIsDepartmentHead(headCheckRes.isDepartmentHead)
+      const departmentScoped = headCheckRes.isDepartmentHead && !['admin', 'super_admin', 'hr'].includes(user?.role)
+      setIsDepartmentHead(departmentScoped)
       setIsTeamLeader(headCheckRes.isTeamLeader || false)
       const depts = headCheckRes.departments || []
       setHeadedDepartments(depts)
-      setUserDepartmentId(headCheckRes.departmentId)
       setTeamLeaderTeams(headCheckRes.teamLeaderTeams || [])
-      if (headCheckRes.isDepartmentHead && depts.length > 0) {
+      if (departmentId === 'all' && departmentScoped && depts.length > 0) {
         setSelectedDepartment(depts.length > 1 ? 'all' : depts[0]._id)
       }
     }
-  }, [headCheckRes])
+  }, [headCheckRes, departmentId, user])
 
   // Only fetch report data after head check is complete
   useEffect(() => {
     if (user && headCheckComplete) {
       fetchReportData()
     }
+    return () => { requestVersion.current += 1; requestAbort.current?.abort() }
   }, [user, headCheckComplete, dateRange.startDate, dateRange.endDate, selectedDepartment, selectedTeam])
 
   const fetchReportData = async () => {
+    const version = ++requestVersion.current
+    requestAbort.current?.abort()
+    const controller = new AbortController()
+    requestAbort.current = controller
+    const deadline = setTimeout(() => controller.abort(), 45000)
     try {
+      setReportError(null)
+      setAiInsights(null)
       setLoading(true)
       const token = localStorage.getItem('token')
 
@@ -181,40 +130,43 @@ export default function PerformanceReportsPage() {
       // Fetch all necessary data including company settings, holidays, productivity scores, attendance stats, and task stats
       const [performanceRes, reviewsRes, goalsRes, projectsRes, employeesRes, companyRes, holidaysRes, productivityRes, attendanceStatsRes, taskStatsRes] = await Promise.all([
         fetch(`/api/performance/calculate?populate=true${deptFilter}${teamFilterParam}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         fetch(`/api/performance/ratings?populate=true${deptFilter}${teamFilterParam}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         fetch(`/api/performance/goals?populate=true${deptFilter}${teamFilterParam}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         fetch(`/api/projects?limit=1000&populate=true${deptFilter}${teamFilterParam}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         fetchCompleteEmployeeResponse(`/api/employees?limit=1000&status=active&populate=true${deptFilter}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         fetch(`/api/settings/company`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         fetch(`/api/holidays?year=${new Date(dateRange.startDate).getFullYear()}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         // Fetch productivity session scores
-        fetch(`/api/productivity/scores?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${deptFilter ? deptFilter : ''}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`/api/productivity/scores?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${deptFilter}${teamFilterParam}`, {
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         // Fetch attendance statistics
-        fetch(`/api/performance/attendance-stats?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${deptFilter ? deptFilter : ''}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`/api/performance/attendance-stats?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${deptFilter}${teamFilterParam}`, {
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         }),
         // Fetch task statistics
-        fetch(`/api/performance/task-stats?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${deptFilter ? deptFilter : ''}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`/api/performance/task-stats?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${deptFilter}${teamFilterParam}`, {
+          headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal
         })
       ])
 
+      if (version !== requestVersion.current) return
+      const responses = [performanceRes, reviewsRes, goalsRes, projectsRes, employeesRes, companyRes, holidaysRes, productivityRes, attendanceStatsRes, taskStatsRes]
+      if (responses.some(response => !response.ok)) throw new Error('Some report sources could not be loaded. Please retry.')
       const performanceData = await performanceRes.json()
       const reviewsData = await reviewsRes.json()
       const goalsData = await goalsRes.json()
@@ -225,6 +177,9 @@ export default function PerformanceReportsPage() {
       const productivityData = await productivityRes.json()
       const attendanceStatsData = await attendanceStatsRes.json()
       const taskStatsData = await taskStatsRes.json()
+
+      if (version !== requestVersion.current) return
+      if ([performanceData, reviewsData, goalsData, projectsData, employeesData, companyData, holidaysData, productivityData, attendanceStatsData, taskStatsData].some(result => result.success === false)) throw new Error('A report source returned an error. Please retry.')
 
       const performanceMetrics = performanceData.success ? performanceData.data : []
       const reviews = reviewsData.success ? reviewsData.data : []
@@ -311,10 +266,12 @@ export default function PerformanceReportsPage() {
       const kpis = calculateComprehensiveKPIs(filteredPerformanceMetrics, filteredReviews, filteredGoals, filteredProjects, filteredEmployees, companySettings, holidays, productivityScores)
       setReportData(kpis)
     } catch (error) {
-      console.error('Fetch report data error:', error)
-      toast.error('Failed to fetch report data')
+      if (version !== requestVersion.current) return
+      setReportError(error.message || 'Failed to fetch report data')
+      setReportData(null)
     } finally {
-      setLoading(false)
+      clearTimeout(deadline)
+      if (version === requestVersion.current) setLoading(false)
     }
   }
 
@@ -495,8 +452,8 @@ export default function PerformanceReportsPage() {
         innovation: empMetric?.metrics?.innovation || 0,
         engagement: empMetric?.metrics?.engagement || 0,
         // New: Session-based productivity (AI-analyzed screenshots)
-        sessionProductivity: empProductivity?.averageProductivityScore || null,
-        sessionFocusScore: empProductivity?.averageFocusScore || null,
+        sessionProductivity: empProductivity?.averageProductivityScore ?? null,
+        sessionFocusScore: empProductivity?.averageFocusScore ?? null,
         sessionCount: empProductivity?.analyzedSessions || 0,
         productivityTrend: empProductivity?.productivityTrend || null
       }
@@ -659,10 +616,6 @@ export default function PerformanceReportsPage() {
     aiInsightsMutation.execute('/api/performance/ai-insights', { reportData })
   }
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
-  }
-
   const exportToExcel = async () => {
     if (!reportData) return
 
@@ -779,1115 +732,15 @@ export default function PerformanceReportsPage() {
     }
   }
 
-  const filteredEmployees = reportData?.employeePerformance.filter(emp => {
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      emp.name.toLowerCase().includes(searchLower) ||
-      emp.employeeCode.toLowerCase().includes(searchLower) ||
-      emp.department.toLowerCase().includes(searchLower)
-    )
-  }) || []
-
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
-
-  if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Skeleton className="h-8 w-80 rounded-lg mb-2" />
-            <Skeleton className="h-4 w-60 rounded-lg" />
-          </div>
-          <div className="flex space-x-3">
-            <Skeleton className="h-10 w-32 rounded-lg" />
-            <Skeleton className="h-10 w-32 rounded-lg" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-lg" />
-          ))}
-        </div>
-        <Skeleton className="h-64 rounded-lg" />
-        <Skeleton className="h-64 rounded-lg" />
-      </div>
-    )
-  }
-
-  if (!reportData) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <FaChartBar className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <p className="text-gray-600">No performance data available</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="page-container">
-      <BackgroundRefreshIndicator isValidating={headCheckLoading} />
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Performance Reports & Analytics</h1>
-            <p className="text-gray-600 mt-1">Comprehensive performance insights with AI-powered analysis</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={generateAIInsights}
-              disabled={aiInsightsMutation.isLoading}
-              className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {aiInsightsMutation.isLoading ? <Skeleton className="h-4 w-4 rounded-full" /> : <FaRobot />}
-              <span>{aiInsightsMutation.isLoading ? 'Generating...' : 'AI Insights'}</span>
-            </button>
-            <button
-              onClick={exportToExcel}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              <FaFileExcel />
-              <span>Export Excel</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <FaCalendarAlt className="inline mr-2" />
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-              max={dateRange.endDate}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <FaCalendarAlt className="inline mr-2" />
-              End Date
-            </label>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-              min={dateRange.startDate}
-              max={formatDateForInput(new Date())}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-            <Select
-              selectedKeys={[selectedDepartment]}
-              onSelectionChange={(keys) => { setSelectedDepartment(Array.from(keys)[0] || 'all'); setSelectedTeam('all') }}
-              isDisabled={isDepartmentHead && headedDepartments.length === 1}
-              aria-label="Select department"
-            >
-              {/* Admin/HR see all departments, multi-dept heads see "All My Departments" */}
-              {(!isDepartmentHead || headedDepartments.length > 1) && (
-                <SelectItem key="all">{isDepartmentHead ? 'All My Departments' : 'All Departments'}</SelectItem>
-              )}
-              {/* Show departments based on role */}
-              {isDepartmentHead
-                ? headedDepartments.map(dept => (
-                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
-                ))
-                : departments.map(dept => (
-                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
-                ))
-              }
-            </Select>
-            {isDepartmentHead && headedDepartments.length === 1 && (
-              <p className="text-xs text-gray-500 mt-1">You can only view your department's performance</p>
-            )}
-          </div>
-          {/* Team Filter */}
-          {availableTeams.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <FaUserFriends className="inline mr-2" />
-                Team
-              </label>
-              <Select
-                selectedKeys={[selectedTeam]}
-                onSelectionChange={(keys) => setSelectedTeam(Array.from(keys)[0] || 'all')}
-                aria-label="Select team"
-              >
-                <SelectItem key="all">All Teams</SelectItem>
-                {availableTeams.map(team => (
-                  <SelectItem key={team._id}>{team.teamName}</SelectItem>
-                ))}
-              </Select>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ==================== AI INSIGHTS (TOP) ==================== */}
-      {aiInsights && (
-        <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg shadow-md p-6 mb-6 border border-purple-200 dark:border-purple-800">
-          <div
-            className="flex items-center justify-between cursor-pointer mb-4"
-            onClick={() => toggleSection('aiInsights')}
-          >
-            <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-              <span>AI-Powered Insights</span>
-            </h2>
-            {expandedSections.aiInsights ? <FaChevronUp /> : <FaChevronDown />}
-          </div>
-
-          {expandedSections.aiInsights && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Key Strengths */}
-              <div className="bg-white rounded-lg p-4 border border-green-200">
-                <h3 className="font-semibold text-green-800 mb-3 flex items-center space-x-2">
-                  <span>Key Strengths</span>
-                </h3>
-                <ul className="space-y-2">
-                  {(Array.isArray(aiInsights.strengths) ? aiInsights.strengths : [aiInsights.strengths]).map((item, idx) => (
-                    <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
-                      <span className="text-green-500 mt-0.5">✓</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Areas for Improvement */}
-              <div className="bg-white rounded-lg p-4 border border-amber-200">
-                <h3 className="font-semibold text-amber-800 mb-3 flex items-center space-x-2">
-                  <span>Areas to Improve</span>
-                </h3>
-                <ul className="space-y-2">
-                  {(Array.isArray(aiInsights.improvements) ? aiInsights.improvements : [aiInsights.improvements]).map((item, idx) => (
-                    <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
-                      <span className="text-amber-500 mt-0.5">⚠</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Recommendations */}
-              <div className="bg-white rounded-lg p-4 border border-blue-200">
-                <h3 className="font-semibold text-blue-800 mb-3 flex items-center space-x-2">
-                  <span>Action Items</span>
-                </h3>
-                <ul className="space-y-2">
-                  {(Array.isArray(aiInsights.recommendations) ? aiInsights.recommendations : [aiInsights.recommendations]).map((item, idx) => (
-                    <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
-                      <span className="text-blue-500 mt-0.5">→</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Predictions */}
-              {aiInsights.predictions && aiInsights.predictions.length > 0 && (
-                <div className="bg-white rounded-lg p-4 border border-purple-200">
-                  <h3 className="font-semibold text-purple-800 mb-3 flex items-center space-x-2">
-                    <span>Predictions</span>
-                  </h3>
-                  <ul className="space-y-2">
-                    {aiInsights.predictions.map((item, idx) => (
-                      <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
-                        <span className="text-purple-500 mt-0.5">📈</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Risk Alerts */}
-              {aiInsights.riskAlerts && aiInsights.riskAlerts.length > 0 && (
-                <div className="bg-white rounded-lg p-4 border border-red-200">
-                  <h3 className="font-semibold text-red-800 mb-3 flex items-center space-x-2">
-                    <span>Risk Alerts</span>
-                  </h3>
-                  <ul className="space-y-2">
-                    {aiInsights.riskAlerts.map((item, idx) => (
-                      <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
-                        <span className="text-red-500 mt-0.5">⚡</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Quick Wins */}
-              {aiInsights.quickWins && aiInsights.quickWins.length > 0 && (
-                <div className="bg-white rounded-lg p-4 border border-teal-200">
-                  <h3 className="font-semibold text-teal-800 mb-3 flex items-center space-x-2">
-                    <span>Quick Wins</span>
-                  </h3>
-                  <ul className="space-y-2">
-                    {aiInsights.quickWins.map((item, idx) => (
-                      <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
-                        <span className="text-teal-500 mt-0.5">🚀</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ==================== EXECUTIVE SUMMARY ==================== */}
-      <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg shadow-lg p-6 mb-6 border border-blue-200 dark:border-blue-800">
-        <div
-          className="flex items-center justify-between cursor-pointer mb-6"
-          onClick={() => toggleSection('executive')}
-        >
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center space-x-3">
-            <span>Executive Summary</span>
-          </h2>
-          {expandedSections.executive ? <FaChevronUp className="text-gray-500" /> : <FaChevronDown className="text-gray-500" />}
-        </div>
-
-        {expandedSections.executive && (
-          <div className="space-y-6">
-            {/* Key Metrics Gauges */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-              {/* Attendance Rate */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart
-                  value={attendanceStats?.summary?.attendanceRate || 0}
-                  label="Attendance Rate"
-                  color="auto"
-                />
-              </div>
-
-              {/* Punctuality Rate */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart
-                  value={attendanceStats?.summary?.punctualityRate || 0}
-                  label="Punctuality"
-                  color="auto"
-                />
-              </div>
-
-              {/* Task Completion Rate */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart
-                  value={taskStats?.summary?.taskCompletionRate || 0}
-                  label="Task Completion"
-                  color="auto"
-                />
-              </div>
-
-              {/* On-Time Delivery */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart
-                  value={taskStats?.summary?.onTimeDeliveryRate || 0}
-                  label="On-Time Delivery"
-                  color="auto"
-                />
-              </div>
-
-              {/* AI Productivity Score */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart
-                  value={reportData?.sessionProductivityScore || 0}
-                  label="AI Productivity"
-                  color={CHART_COLORS.purple}
-                />
-              </div>
-            </div>
-
-            {/* Quick Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <FaUsers className="text-blue-500 text-2xl" />
-                  <span className="text-xs text-gray-500">Total</span>
-                </div>
-                <p className="text-2xl font-bold text-gray-800 mt-2">{reportData?.totalEmployees || 0}</p>
-                <p className="text-sm text-gray-600">Employees</p>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border-l-4 border-green-500 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <FaCheckCircle className="text-green-500 text-2xl" />
-                  <span className="text-xs text-gray-500">Completed</span>
-                </div>
-                <p className="text-2xl font-bold text-gray-800 mt-2">{taskStats?.summary?.completedTasks || 0}</p>
-                <p className="text-sm text-gray-600">Tasks Done</p>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border-l-4 border-red-500 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <FaExclamationTriangle className="text-red-500 text-2xl" />
-                  <span className="text-xs text-gray-500">Attention</span>
-                </div>
-                <p className="text-2xl font-bold text-gray-800 mt-2">{taskStats?.summary?.overdueTasks || 0}</p>
-                <p className="text-sm text-gray-600">Overdue Tasks</p>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border-l-4 border-yellow-500 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <FaClock className="text-yellow-500 text-2xl" />
-                  <span className="text-xs text-gray-500">Average</span>
-                </div>
-                <p className="text-2xl font-bold text-gray-800 mt-2">{attendanceStats?.summary?.avgWorkingHours?.toFixed(1) || '0.0'}h</p>
-                <p className="text-sm text-gray-600">Work Hours/Day</p>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border-l-4 border-purple-500 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <FaTrophy className="text-purple-500 text-2xl" />
-                  <span className="text-xs text-gray-500">Stars</span>
-                </div>
-                <p className="text-2xl font-bold text-gray-800 mt-2">{reportData?.topPerformers || 0}</p>
-                <p className="text-sm text-gray-600">Top Performers</p>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border-l-4 border-indigo-500 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <FaBullseye className="text-indigo-500 text-2xl" />
-                  <span className="text-xs text-gray-500">Goals</span>
-                </div>
-                <p className="text-2xl font-bold text-gray-800 mt-2">{reportData?.goalCompletionRate || 0}%</p>
-                <p className="text-sm text-gray-600">Goal Completion</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ==================== ATTENDANCE ANALYTICS ==================== */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div
-          className="flex items-center justify-between cursor-pointer mb-4"
-          onClick={() => toggleSection('attendance')}
-        >
-          <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-            <span>Attendance Analytics</span>
-          </h2>
-          {expandedSections.attendance ? <FaChevronUp /> : <FaChevronDown />}
-        </div>
-
-        {expandedSections.attendance && attendanceStats && (
-          <div className="space-y-6">
-            {/* Attendance Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-green-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-green-600">{attendanceStats.summary?.attendanceRate || 0}%</p>
-                <p className="text-sm text-green-700 font-medium">Attendance Rate</p>
-                <p className="text-xs text-gray-500 mt-1">{attendanceStats.summary?.presentDays || 0} present days</p>
-              </div>
-              <div className="bg-blue-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-blue-600">{attendanceStats.summary?.punctualityRate || 0}%</p>
-                <p className="text-sm text-blue-700 font-medium">Punctuality Rate</p>
-                <p className="text-xs text-gray-500 mt-1">{attendanceStats.summary?.lateArrivals || 0} late arrivals</p>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-purple-600">{attendanceStats.summary?.avgWorkingHours?.toFixed(1) || '0.0'}h</p>
-                <p className="text-sm text-purple-700 font-medium">Avg Working Hours</p>
-                <p className="text-xs text-gray-500 mt-1">per day</p>
-              </div>
-              <div className="bg-orange-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-orange-600">{attendanceStats.summary?.utilizationRate || 0}%</p>
-                <p className="text-sm text-orange-700 font-medium">Utilization Rate</p>
-                <p className="text-xs text-gray-500 mt-1">of expected hours</p>
-              </div>
-            </div>
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Attendance by Day of Week - Heat Map Style */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Attendance by Day of Week</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={attendanceStats.dayOfWeekBreakdown || []} layout="vertical" margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                      <YAxis dataKey="day" type="category" width={80} />
-                      <Tooltip
-                        formatter={(value, name) => [`${value}%`, name === 'attendanceRate' ? 'Attendance' : 'Late Rate']}
-                      />
-                      <Legend />
-                      <Bar dataKey="attendanceRate" fill={CHART_COLORS.success} name="Attendance %" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="lateRate" fill={CHART_COLORS.warning} name="Late %" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Department Attendance Comparison */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Department Attendance</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={(attendanceStats.departmentBreakdown || []).map(d => ({
-                      ...d,
-                      name: departments.find(dept => dept._id === d.departmentId)?.name || 'Unknown'
-                    }))} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" fontSize={10} angle={-45} textAnchor="end" height={60} />
-                      <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                      <Tooltip formatter={(value) => [`${value}%`]} />
-                      <Legend />
-                      <Bar dataKey="attendanceRate" fill={CHART_COLORS.success} name="Attendance %" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="punctualityRate" fill={CHART_COLORS.primary} name="Punctuality %" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ==================== TASK ANALYTICS ==================== */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div
-          className="flex items-center justify-between cursor-pointer mb-4"
-          onClick={() => toggleSection('tasks')}
-        >
-          <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-            <span>Task Analytics</span>
-          </h2>
-          {expandedSections.tasks ? <FaChevronUp /> : <FaChevronDown />}
-        </div>
-
-        {expandedSections.tasks && taskStats && (
-          <div className="space-y-6">
-            {/* Task Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-blue-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-blue-600">{taskStats.summary?.totalTasks || 0}</p>
-                <p className="text-sm text-blue-700 font-medium">Total Tasks</p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-green-600">{taskStats.summary?.taskCompletionRate || 0}%</p>
-                <p className="text-sm text-green-700 font-medium">Completion Rate</p>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-purple-600">{taskStats.summary?.onTimeDeliveryRate || 0}%</p>
-                <p className="text-sm text-purple-700 font-medium">On-Time Delivery</p>
-              </div>
-              <div className="bg-yellow-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-yellow-600">{taskStats.summary?.inProgressTasks || 0}</p>
-                <p className="text-sm text-yellow-700 font-medium">In Progress</p>
-              </div>
-              <div className="bg-red-50 rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-red-600">{taskStats.summary?.overdueTasks || 0}</p>
-                <p className="text-sm text-red-700 font-medium">Overdue</p>
-              </div>
-            </div>
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Task Status Distribution - Pie */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Task Status Distribution</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={taskStats.statusBreakdown || []}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={40}
-                        outerRadius={80}
-                        dataKey="count"
-                        nameKey="status"
-                        label={({ status, count }) => `${status}: ${count}`}
-                        labelLine={false}
-                      >
-                        {(taskStats.statusBreakdown || []).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Task by Priority */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Tasks by Priority</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={taskStats.priorityBreakdown || []} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="priority" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="total" fill={CHART_COLORS.primary} name="Total" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="completed" fill={CHART_COLORS.success} name="Completed" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="overdue" fill={CHART_COLORS.danger} name="Overdue" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Department Task Performance */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Dept Task Performance</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={(taskStats.departmentBreakdown || []).slice(0, 5)} layout="vertical" margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                      <YAxis dataKey="name" type="category" width={100} fontSize={10} />
-                      <Tooltip formatter={(value) => [`${value}%`]} />
-                      <Bar dataKey="taskCompletionRate" fill={CHART_COLORS.success} name="Completion %" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ==================== ACTIONABLE INSIGHTS ==================== */}
-      <div className="bg-orange-50 dark:bg-orange-950/30 rounded-lg shadow-md p-6 mb-6 border border-orange-200 dark:border-orange-800">
-        <div
-          className="flex items-center justify-between cursor-pointer mb-4"
-          onClick={() => toggleSection('actionableInsights')}
-        >
-          <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-            <span>Actionable Insights</span>
-          </h2>
-          {expandedSections.actionableInsights ? <FaChevronUp /> : <FaChevronDown />}
-        </div>
-
-        {expandedSections.actionableInsights && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Top Performers */}
-            <div className="bg-white rounded-lg p-4 border border-green-200">
-              <h3 className="text-lg font-semibold text-green-700 mb-4 flex items-center">
-                Top Performers (Attendance)
-              </h3>
-              <div className="space-y-3">
-                {(attendanceStats?.employeeBreakdown || [])
-                  .sort((a, b) => b.attendanceRate - a.attendanceRate)
-                  .slice(0, 5)
-                  .map((emp, idx) => (
-                    <div key={emp.employeeId} className="flex items-center justify-between p-2 bg-green-50 rounded">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold">
-                          {idx + 1}
-                        </span>
-                        <span className="font-medium text-gray-700">{emp.name}</span>
-                      </div>
-                      <span className="text-green-600 font-bold">{emp.attendanceRate}%</span>
-                    </div>
-                  ))}
-                {(attendanceStats?.employeeBreakdown || []).length === 0 && (
-                  <p className="text-gray-500 text-sm text-center py-4">No attendance data available</p>
-                )}
-              </div>
-            </div>
-
-            {/* Needs Attention */}
-            <div className="bg-white rounded-lg p-4 border border-red-200">
-              <h3 className="text-lg font-semibold text-red-700 mb-4 flex items-center">
-                Needs Attention
-              </h3>
-              <div className="space-y-3">
-                {(taskStats?.employeeBreakdown || [])
-                  .filter(e => e.overdueTasks > 0)
-                  .sort((a, b) => b.overdueTasks - a.overdueTasks)
-                  .slice(0, 5)
-                  .map((emp, idx) => (
-                    <div key={emp.employeeId} className="flex items-center justify-between p-2 bg-red-50 rounded">
-                      <span className="font-medium text-gray-700">{emp.name}</span>
-                      <div className="text-right">
-                        <span className="text-red-600 font-bold">{emp.overdueTasks}</span>
-                        <span className="text-xs text-gray-500 ml-1">overdue</span>
-                      </div>
-                    </div>
-                  ))}
-                {(taskStats?.employeeBreakdown || []).filter(e => e.overdueTasks > 0).length === 0 && (
-                  <p className="text-green-600 text-sm text-center py-4">✓ No employees with overdue tasks</p>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg p-4 border border-blue-200">
-              <h3 className="text-lg font-semibold text-blue-700 mb-4 flex items-center">
-                Key Metrics Summary
-              </h3>
-              <div className="space-y-3">
-                <div className="p-3 bg-gray-50 rounded">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Late Arrivals</span>
-                    <span className={`font-bold ${(attendanceStats?.summary?.lateArrivals || 0) > 10 ? 'text-red-600' : 'text-green-600'}`}>
-                      {attendanceStats?.summary?.lateArrivals || 0}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gray-50 rounded">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Blocked Tasks</span>
-                    <span className={`font-bold ${(taskStats?.summary?.blockedTasks || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {taskStats?.summary?.blockedTasks || 0}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gray-50 rounded">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Employees Analyzed</span>
-                    <span className="font-bold text-purple-600">
-                      {reportData?.employeesWithSessionData || 0}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gray-50 rounded">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Absent Days</span>
-                    <span className={`font-bold ${(attendanceStats?.summary?.absentDays || 0) > 5 ? 'text-red-600' : 'text-yellow-600'}`}>
-                      {attendanceStats?.summary?.absentDays || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Overview Metrics */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div
-          className="flex items-center justify-between cursor-pointer mb-4"
-          onClick={() => toggleSection('overview')}
-        >
-          <h2 className="text-xl font-bold text-gray-800">Performance Overview</h2>
-          {expandedSections.overview ? <FaChevronUp /> : <FaChevronDown />}
-        </div>
-
-        {expandedSections.overview && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaUsers className="text-blue-600" />
-                <span className="text-sm text-blue-700 font-medium">Employees</span>
-              </div>
-              <p className="text-2xl font-bold text-blue-600">{reportData.totalEmployees}</p>
-            </div>
-
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaStar className="text-purple-600" />
-                <span className="text-sm text-purple-700 font-medium">Avg Score</span>
-              </div>
-              <p className="text-2xl font-bold text-purple-600">{reportData.avgPerformanceScore}</p>
-            </div>
-
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaTasks className="text-green-600" />
-                <span className="text-sm text-green-700 font-medium">Productivity</span>
-              </div>
-              <p className="text-2xl font-bold text-green-600">{reportData.productivityIndex}</p>
-            </div>
-
-            <div className="bg-amber-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaAward className="text-amber-600" />
-                <span className="text-sm text-amber-700 font-medium">Quality</span>
-              </div>
-              <p className="text-2xl font-bold text-amber-600">{reportData.qualityScore}</p>
-            </div>
-
-            <div className="bg-indigo-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaTrophy className="text-indigo-600" />
-                <span className="text-sm text-indigo-700 font-medium">Innovation</span>
-              </div>
-              <p className="text-2xl font-bold text-indigo-600">{reportData.innovationScore}</p>
-            </div>
-
-            <div className="bg-pink-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaUsers className="text-pink-600" />
-                <span className="text-sm text-pink-700 font-medium">Engagement</span>
-              </div>
-              <p className="text-2xl font-bold text-pink-600">{reportData.engagementScore}</p>
-            </div>
-
-            <div className="bg-teal-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaBullseye className="text-teal-600" />
-                <span className="text-sm text-teal-700 font-medium">Goal Rate</span>
-              </div>
-              <p className="text-2xl font-bold text-teal-600">{reportData.goalCompletionRate}%</p>
-            </div>
-
-            <div className="bg-cyan-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaChartBar className="text-cyan-600" />
-                <span className="text-sm text-cyan-700 font-medium">Project Rate</span>
-              </div>
-              <p className="text-2xl font-bold text-cyan-600">{reportData.projectCompletionRate}%</p>
-            </div>
-
-            <div className="bg-yellow-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaTrophy className="text-yellow-600" />
-                <span className="text-sm text-yellow-700 font-medium">Top Performers</span>
-              </div>
-              <p className="text-2xl font-bold text-yellow-600">{reportData.topPerformers}</p>
-            </div>
-
-            <div className="bg-red-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaStar className="text-red-600" />
-                <span className="text-sm text-red-700 font-medium">Avg Rating</span>
-              </div>
-              <p className="text-2xl font-bold text-red-600">{reportData.avgRating}/5</p>
-            </div>
-
-            <div className="bg-orange-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaChartBar className="text-orange-600" />
-                <span className="text-sm text-orange-700 font-medium">Reviews</span>
-              </div>
-              <p className="text-2xl font-bold text-orange-600">{reportData.totalReviews}</p>
-            </div>
-
-            <div className="bg-lime-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaTasks className="text-lime-600" />
-                <span className="text-sm text-lime-700 font-medium">Projects</span>
-              </div>
-              <p className="text-2xl font-bold text-lime-600">{reportData.totalProjects}</p>
-            </div>
-
-            {/* Session Productivity - AI Analyzed */}
-            <div className="bg-violet-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FaBrain className="text-violet-600" />
-                <span className="text-sm text-violet-700 font-medium">AI Productivity</span>
-              </div>
-              <p className="text-2xl font-bold text-violet-600">
-                {reportData.sessionProductivityScore != null ? `${reportData.sessionProductivityScore}%` : 'N/A'}
-              </p>
-              {reportData.employeesWithSessionData > 0 && (
-                <p className="text-xs text-violet-500 mt-1">
-                  {reportData.employeesWithSessionData} employees analyzed
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Department Performance - Using Real Data */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Department Performance Comparison</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={(attendanceStats?.departmentBreakdown || []).map(dept => {
-                  const taskDept = (taskStats?.departmentBreakdown || []).find(t => t.departmentId === dept.departmentId)
-                  const deptName = departments.find(d => d._id === dept.departmentId)?.name || 'Unknown'
-                  return {
-                    department: deptName,
-                    attendance: dept.attendanceRate || 0,
-                    punctuality: dept.punctualityRate || 0,
-                    taskCompletion: taskDept?.taskCompletionRate || 0
-                  }
-                })}
-                margin={{ top: 5, right: 5, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="department" fontSize={10} angle={-20} textAnchor="end" height={50} />
-                <YAxis fontSize={10} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                <Tooltip formatter={(value) => [`${value}%`]} />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Bar dataKey="attendance" fill={CHART_COLORS.success} name="Attendance %" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="punctuality" fill={CHART_COLORS.primary} name="Punctuality %" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="taskCompletion" fill={CHART_COLORS.purple} name="Task Completion %" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* AI Productivity by Employee */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">AI Productivity Scores (Top 10)</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={(reportData?.employeePerformance || [])
-                  .filter(e => e.sessionProductivity != null)
-                  .slice(0, 10)
-                  .map(e => ({
-                    name: e.name?.split(' ')[0] || 'N/A',
-                    aiScore: e.sessionProductivity || 0,
-                    focusScore: e.sessionFocusScore || 0
-                  }))}
-                layout="vertical"
-                margin={{ top: 5, right: 5, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                <YAxis dataKey="name" type="category" width={80} fontSize={10} />
-                <Tooltip formatter={(value) => [`${value}%`]} />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Bar dataKey="aiScore" fill={CHART_COLORS.purple} name="AI Score" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="focusScore" fill={CHART_COLORS.cyan} name="Focus Score" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Rating Distribution - Full Width */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-4">Rating Distribution</h3>
-        {reportData.ratingDistribution && reportData.ratingDistribution.some(r => r.count > 0) ? (
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={reportData.ratingDistribution.filter(r => r.count > 0)}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={true}
-                  label={({ rating, percentage, count }) => `${rating}: ${count} (${percentage}%)`}
-                  outerRadius={120}
-                  fill="#8884d8"
-                  dataKey="count"
-                >
-                  {reportData.ratingDistribution.filter(r => r.count > 0).map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="h-80 flex flex-col items-center justify-center text-gray-400">
-            <FaStar className="text-6xl mb-4 text-gray-300" />
-            <p className="text-lg font-medium">No Ratings Yet</p>
-            <p className="text-sm">Performance ratings will appear here once reviews are submitted</p>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-
-        {/* Skill Analysis Radar */}
-        {reportData.skillAnalysis.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Top Skills Analysis</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={reportData.skillAnalysis}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="skill" fontSize={10} />
-                  <PolarRadiusAxis fontSize={10} />
-                  <Radar name="Avg Rating" dataKey="avgRating" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.6} />
-                  <Tooltip />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Department Breakdown Table */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div
-          className="flex items-center justify-between cursor-pointer mb-4"
-          onClick={() => toggleSection('departmentAnalysis')}
-        >
-          <h2 className="text-xl font-bold text-gray-800">Department Analysis</h2>
-          {expandedSections.departmentAnalysis ? <FaChevronUp /> : <FaChevronDown />}
-        </div>
-
-        {expandedSections.departmentAnalysis && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employees</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Score</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Rating</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Goal %</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project %</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Productivity</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AI Score</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quality</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Innovation</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {reportData.departmentPerformance.map((dept, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{dept.department}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">{dept.employees}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`font-semibold ${parseFloat(dept.avgScore) >= 80 ? 'text-green-600' : parseFloat(dept.avgScore) >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
-                        {dept.avgScore}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-amber-600 font-semibold">{dept.avgRating}/5</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">{dept.goalCompletion}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-purple-600 font-semibold">{dept.projectCompletion}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-green-600 font-semibold">{dept.productivity}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {dept.sessionProductivity != null ? (
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${dept.sessionProductivity >= 70 ? 'bg-green-100 text-green-800' :
-                            dept.sessionProductivity >= 40 ? 'bg-amber-100 text-amber-800' :
-                              'bg-red-100 text-red-800'
-                          }`}>
-                          {dept.sessionProductivity}%
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">N/A</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-indigo-600 font-semibold">{dept.quality}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-pink-600 font-semibold">{dept.innovation}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Employee Performance Table */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div
-          className="flex items-center justify-between cursor-pointer mb-4"
-          onClick={() => toggleSection('employeeMetrics')}
-        >
-          <h2 className="text-xl font-bold text-gray-800">Individual Employee Performance</h2>
-          {expandedSections.employeeMetrics ? <FaChevronUp /> : <FaChevronDown />}
-        </div>
-
-        {expandedSections.employeeMetrics && (
-          <>
-            <div className="mb-4">
-              <div className="relative">
-                <div className="input-with-icon">
-                  <FaSearch className="input-icon" />
-                  <input
-                    type="text"
-                    placeholder="Search by name, code, or department..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="input input-search"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rating</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Goals</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Productivity</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AI Score</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quality</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Innovation</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Engagement</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredEmployees.map((emp) => (
-                    <tr key={emp.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-3">
-                          {emp.avatar ? (
-                            <img src={emp.avatar} alt={emp.name} className="w-8 h-8 rounded-full" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                              <span className="text-xs font-medium text-primary-600">
-                                {emp.name.split(' ').map(n => n[0]).join('')}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-medium text-gray-900">{emp.name}</p>
-                            <p className="text-xs text-gray-500">{emp.designation}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{emp.employeeCode}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{emp.department}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${emp.performanceScore >= 85 ? 'bg-green-100 text-green-800' :
-                            emp.performanceScore >= 70 ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                          }`}>
-                          {emp.performanceScore}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-amber-600 font-semibold">{emp.avgRating}/5</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">{emp.goalsCompleted}/{emp.totalGoals}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">{emp.productivity}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {emp.sessionProductivity != null ? (
-                          <div className="flex items-center gap-1">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${emp.sessionProductivity >= 70 ? 'bg-green-100 text-green-800' :
-                                emp.sessionProductivity >= 40 ? 'bg-amber-100 text-amber-800' :
-                                  'bg-red-100 text-red-800'
-                              }`}>
-                              {emp.sessionProductivity}%
-                            </span>
-                            {emp.productivityTrend != null && emp.productivityTrend !== 0 && (
-                              <span className={`text-xs ${emp.productivityTrend > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {emp.productivityTrend > 0 ? '↑' : '↓'}{Math.abs(emp.productivityTrend)}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">No data</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-semibold">{emp.quality}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-pink-600 font-semibold">{emp.innovation}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600 font-semibold">{emp.engagement}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
+  return <ReportDashboard
+    report={reportData} attendance={attendanceStats} tasks={taskStats}
+    departmentId={selectedDepartment}
+    departments={isDepartmentHead ? headedDepartments : departments}
+    teams={availableTeams} team={selectedTeam} setTeam={setSelectedTeam}
+    dateRange={dateRange} setDateRange={setDateRange}
+    onExport={exportToExcel} onGenerate={generateAIInsights}
+    generating={aiInsightsMutation.isLoading} aiInsights={aiInsights}
+    loading={!headCheckError && (loading || headCheckLoading)} error={headCheckError ? 'Unable to verify report access. Please retry.' : reportError || (departmentsError ? 'Department filters could not be loaded. Please retry.' : null)}
+    onRetry={() => { retryDepartments(); if (headCheckError) retryHeadCheck(); else fetchReportData() }}
+  />
 }

@@ -1,8 +1,10 @@
 'use client'
 
+
+import { Heading1, Heading3, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, CardHeader, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Select, SelectItem, Checkbox } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, CardHeader, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Select, SelectItem, Checkbox } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock } from 'react-icons/fa'
@@ -180,7 +182,7 @@ export default function LeavePage() {
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Leave Management</h1>
+              <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Leave Management</Heading1>
               <BackgroundRefreshIndicator isValidating={leavesValidating} />
             </div>
             <p className="text-sm sm:text-base text-default-500 mt-1">Apply and manage your leave requests</p>
@@ -212,9 +214,9 @@ export default function LeavePage() {
           <Card key={balance._id} shadow="sm">
             <CardBody className="p-3 sm:p-4">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs sm:text-sm font-medium text-default-600 truncate">
+                <Heading3 className="text-xs sm:text-sm font-medium text-default-600 truncate">
                   {balance.leaveType?.name || 'Leave'}
-                </h3>
+                </Heading3>
                 <FaCalendarAlt className="text-primary text-sm sm:text-base flex-shrink-0" />
               </div>
               <div className="text-2xl sm:text-3xl font-bold text-default-800 mb-1">
@@ -231,7 +233,7 @@ export default function LeavePage() {
       {/* Leave Requests */}
       <Card shadow="sm">
         <CardHeader className="border-b border-default-200 px-3 sm:px-4 py-3">
-          <h2 className="text-lg sm:text-xl font-semibold text-default-800">My Leave Requests</h2>
+          <Heading2 className="text-lg sm:text-xl font-semibold text-default-800">My Leave Requests</Heading2>
         </CardHeader>
         <CardBody className="p-0">
 
@@ -247,7 +249,7 @@ export default function LeavePage() {
                   <div key={leave._id} className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h3 className="font-semibold text-default-800">{leave.leaveType?.name || 'N/A'}</h3>
+                        <Heading3 className="font-semibold text-default-800">{leave.leaveType?.name || 'N/A'}</Heading3>
                         <p className="text-sm text-default-600">{leave.numberOfDays} {leave.isHalfDay ? '(Half Day)' : 'days'}</p>
                       </div>
                       <Chip
@@ -354,7 +356,7 @@ export default function LeavePage() {
           {(onClose) => (
             <form onSubmit={handleSubmit}>
               <ModalHeader className="flex flex-col gap-1">
-                <h2 className="text-xl font-bold text-default-800">Apply for Leave</h2>
+                <Heading2 className="text-xl font-bold text-default-800">Apply for Leave</Heading2>
               </ModalHeader>
               <ModalBody>
                 <div className="space-y-4">

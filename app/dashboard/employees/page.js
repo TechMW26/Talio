@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading1, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -10,8 +12,8 @@ import {
   FaLayerGroup, FaSave, FaUndo
 } from 'react-icons/fa'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, CardHeader, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Select, SelectItem, Input, Checkbox } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, CardHeader, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Select, SelectItem, Input, Checkbox } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -317,7 +319,7 @@ export default function EmployeesPage() {
           <div className="bg-danger-50 rounded-full p-6 mb-6">
             <FaExclamationTriangle className="w-16 h-16 text-danger" />
           </div>
-          <h1 className="text-2xl font-bold text-default-800 mb-2">Access Denied</h1>
+          <Heading1 className="text-2xl font-bold text-default-800 mb-2">Access Denied</Heading1>
           <p className="text-default-500 text-center max-w-md mb-6">
             You don&apos;t have permission to access the Employees section.
             This page is restricted to Admin and HR users only.
@@ -338,7 +340,7 @@ export default function EmployeesPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-default-800">Employees</h1>
+          <Heading1 className="text-3xl font-bold text-default-800">Employees</Heading1>
           <p className="text-default-500 mt-1">
             {canManageEmployees() ? "Manage your organization's employees" : 'View organization employees'}
             {totalEmployees > 0 && <span className="ml-2 text-primary font-medium">({totalEmployees} total)</span>}
@@ -375,7 +377,7 @@ export default function EmployeesPage() {
             <div className="flex flex-col md:flex-row gap-4">
               <div className="input-with-icon flex-1">
                 <FaSearch className="input-icon" />
-                <input
+                <NativeInput
                   type="text"
                   placeholder="Search by name, email, or employee code..."
                   value={search}
@@ -562,7 +564,7 @@ export default function EmployeesPage() {
                     <tr>
                       {canManageEmployees() && (
                         <th className="px-4 py-3 text-left">
-                          <input
+                          <NativeInput
                             type="checkbox"
                             checked={isAllSelected}
                             onChange={handleSelectAll}
@@ -584,7 +586,7 @@ export default function EmployeesPage() {
                       <tr key={employee._id} className={`hover:bg-default-50 ${selectedEmployees.includes(employee._id) ? 'bg-primary-50' : ''}`}>
                         {canManageEmployees() && (
                           <td className="px-4 py-4">
-                            <input
+                            <NativeInput
                               type="checkbox"
                               checked={selectedEmployees.includes(employee._id)}
                               onChange={() => handleSelectEmployee(employee._id)}
@@ -690,7 +692,7 @@ export default function EmployeesPage() {
               <div className="flex-shrink-0 w-10 h-10 bg-danger-100 rounded-full flex items-center justify-center">
                 <FaExclamationTriangle className="text-danger text-lg" />
               </div>
-              <h3 className="text-lg font-semibold text-danger-800">Permanently Delete Employee</h3>
+              <Heading3 className="text-lg font-semibold text-danger-800">Permanently Delete Employee</Heading3>
             </div>
           </ModalHeader>
           <ModalBody className="py-4">
@@ -734,7 +736,7 @@ export default function EmployeesPage() {
                 <FaEdit className="text-secondary text-lg" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-secondary-800">Bulk Edit Employees</h3>
+                <Heading3 className="text-lg font-semibold text-secondary-800">Bulk Edit Employees</Heading3>
                 <p className="text-sm text-secondary-600">{selectedEmployees.length} employee(s) selected</p>
               </div>
             </div>

@@ -1,5 +1,8 @@
 'use client'
+import calendar from '@/components/ui/fernly/calendar.module.css'
 
+
+import { Heading1, Heading3, Heading2 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -8,7 +11,7 @@ import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import toast from '@/utils/toast'
 import { FaUsers, FaBuilding, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter, FaUserFriends } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
+import { Card, CardBody, Button, Chip, Skeleton, Input, Select, SelectItem } from '@/components/ui/fernly'
 
 // Department color palette
 const DEPARTMENT_COLORS = [
@@ -369,10 +372,10 @@ export default function TeamAttendancePage() {
             </Button>
           ) : null}
           <div>
-            <h1 className="text-3xl font-bold text-default-800">
+            <Heading1 className="text-3xl font-bold text-default-800">
               {view === 'employees' && (isAdmin ? 'Team Attendance' : `${departmentInfo?.name || 'My Team'} Attendance`)}
               {view === 'calendar' && `${selectedEmployee?.firstName} ${selectedEmployee?.lastName}`}
-            </h1>
+            </Heading1>
             <p className="text-default-500 mt-1">
               {view === 'employees' && (isAdmin
                 ? <>{`View attendance for all ${employeePagination.total} employees${isDepartmentHead ? ' (your department shown first)' : ''}`} <BackgroundRefreshIndicator isValidating={attValidating} /></>
@@ -527,9 +530,9 @@ export default function TeamAttendancePage() {
 
                           {/* Info */}
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-semibold text-default-800 truncate">
+                            <Heading3 className="text-sm font-semibold text-default-800 truncate">
                               {emp.firstName} {emp.lastName}
-                            </h3>
+                            </Heading3>
                             <p className="text-xs text-default-500 truncate">{emp.designation?.title || 'No Designation'}</p>
                             <p className="text-xs text-default-400">{emp.employeeCode || ''}</p>
 
@@ -608,9 +611,9 @@ export default function TeamAttendancePage() {
                 </div>
               )}
               <div>
-                <h2 className="text-xl font-semibold text-default-800">
+                <Heading2 className="text-xl font-semibold text-default-800">
                   {selectedEmployee.firstName} {selectedEmployee.lastName}
-                </h2>
+                </Heading2>
                 <p className="text-sm text-default-500">{selectedEmployee.designation?.title || 'No Designation'}</p>
                 <p className="text-xs text-default-400">{selectedEmployee.employeeCode || ''} • {selectedEmployee.email}</p>
               </div>
@@ -686,9 +689,9 @@ export default function TeamAttendancePage() {
                 {[...Array(35)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
               </div>
             ) : (
-              <div className="overflow-x-auto overflow-y-visible p-2 -m-2">
+              <div className="min-w-0 p-2">
                 {/* Day Headers */}
-                <div className="grid grid-cols-7 gap-1 mb-2">
+                <div className={calendar.week}>
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                     <div key={day} className="text-center text-sm font-semibold text-default-500 py-2">
                       {day}
@@ -697,7 +700,7 @@ export default function TeamAttendancePage() {
                 </div>
 
                 {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-1">
+                <div className={calendar.grid}>
                   {calendarData.map((dayData, index) => (
                     <div
                       key={index}
@@ -772,7 +775,7 @@ export default function TeamAttendancePage() {
 
             {/* Monthly Summary */}
             <div className="mt-6 pt-6 border-t border-default-200">
-              <h3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</h3>
+              <Heading3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</Heading3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-success-50 rounded-lg p-4 text-center">
                   <p className="text-2xl font-bold text-success-600">

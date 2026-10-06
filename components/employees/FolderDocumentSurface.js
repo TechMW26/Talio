@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef } from 'react'
-import { ModalContent, ModalHeader, ModalBody } from '@heroui/react'
-import Modal from '@/components/ui/HeroModal'
+import { ModalContent, ModalHeader, ModalBody } from '@/components/ui/fernly'
+import { Modal as Modal } from '@/components/ui/fernly'
 import DocumentGrid from './DocumentGrid'
 import styles from './FolderDocumentSurface.module.css'
 import { folderGenieFrames } from '@/lib/client/folderGenie'

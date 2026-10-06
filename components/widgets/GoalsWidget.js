@@ -4,7 +4,7 @@ import widgetStyles from './WidgetDesign.module.css'
 
 import { useState, useEffect } from 'react'
 import { FaBullseye, FaCheckCircle, FaHourglassHalf, FaExclamationTriangle } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function GoalsWidget({ userId }) {
     const [goals, setGoals] = useState([])

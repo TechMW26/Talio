@@ -1,5 +1,7 @@
 'use client'
 
+
+import { Heading3, NativeButton } from '@/components/ui/fernly/native'
 import { useState } from 'react'
 import Link from 'next/link'
 import {
@@ -16,8 +18,8 @@ import {
   HiOutlineDocumentText,
   HiOutlinePencilSquare
 } from 'react-icons/hi2'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@/components/ui/fernly'
 import { IST_TIMEZONE } from '@/lib/timezone'
 import MeetingJoinLink from './MeetingJoinLink'
 
@@ -151,9 +153,9 @@ export default function MeetingCard({ meeting, onRespond, onEdit, showResponseAc
         {/* Content */}
         <div className="p-4">
           <Link href={`/dashboard/meetings/${meeting._id}`}>
-            <h3 className="font-semibold text-gray-800 mb-2 hover:text-indigo-600 transition-colors line-clamp-2">
+            <Heading3 className="font-semibold text-gray-800 mb-2 hover:text-indigo-600 transition-colors line-clamp-2">
               {meeting.title}
-            </h3>
+            </Heading3>
           </Link>
 
           {meeting.description && (
@@ -222,34 +224,34 @@ export default function MeetingCard({ meeting, onRespond, onEdit, showResponseAc
           {/* Response actions for pending invites */}
           {showResponseActions && meeting.myInviteStatus === 'pending' && !meeting.isOrganizer ? (
             <div className="flex items-center gap-2">
-              <button
+              <NativeButton
                 onClick={() => handleRespond('accepted')}
                 disabled={responding}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
               >
                 <HiOutlineCheck className="w-4 h-4" />
                 Accept
-              </button>
-              <button
+              </NativeButton>
+              <NativeButton
                 onClick={() => setShowRejectModal(true)}
                 disabled={responding}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
               >
                 <HiOutlineXMark className="w-4 h-4" />
                 Decline
-              </button>
-              <button
+              </NativeButton>
+              <NativeButton
                 onClick={() => handleRespond('maybe')}
                 disabled={responding}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
               >
                 <HiOutlineQuestionMarkCircle className="w-4 h-4" />
-              </button>
+              </NativeButton>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               {meeting.isOrganizer && ['scheduled', 'rescheduled'].includes(meeting.status) && onEdit && (
-                <button
+                <NativeButton
                   type="button"
                   onClick={() => onEdit(meeting)}
                   aria-label={`Edit ${meeting.title}`}
@@ -257,7 +259,7 @@ export default function MeetingCard({ meeting, onRespond, onEdit, showResponseAc
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 transition-colors hover:bg-indigo-100"
                 >
                   <HiOutlinePencilSquare className="h-4 w-4" />
-                </button>
+                </NativeButton>
               )}
               {/* Join meeting button for online meetings */}
               {meeting.type === 'online' && (isNow || (isUpcoming && ['scheduled', 'rescheduled'].includes(meeting.status))) && (meeting.isOrganizer || meeting.myInviteStatus === 'accepted') && (

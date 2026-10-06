@@ -1,15 +1,17 @@
 'use client';
 
+
+import { Heading1, Heading3, NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button, Chip, Divider, ModalContent, ModalHeader,
   ModalBody, ModalFooter, useDisclosure, Select, SelectItem,
   Textarea, Input, Card, CardBody, CardHeader, Skeleton, Tooltip
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
@@ -232,7 +234,7 @@ export default function CandidateDetailPage() {
             <div className="w-16 h-16 rounded-full bg-default-100 flex items-center justify-center mx-auto mb-4">
               <FaUser className="w-7 h-7 text-default-400" />
             </div>
-            <h1 className="text-2xl font-bold text-default-800 mb-2">Candidate Not Found</h1>
+            <Heading1 className="text-2xl font-bold text-default-800 mb-2">Candidate Not Found</Heading1>
             <Button color="primary" onPress={() => router.push('/dashboard/recruitment/candidates')}>
               Back to Candidates
             </Button>
@@ -253,9 +255,9 @@ export default function CandidateDetailPage() {
             </Button>
             <div>
               <div className="flex items-center flex-wrap gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-default-800">
+                <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">
                   {candidate.firstName} {candidate.lastName}
-                </h1>
+                </Heading1>
                 <Chip size="sm" variant="flat" color={STAGE_COLOR[candidate.stage]} className="capitalize">
                   {candidate.stage}
                 </Chip>
@@ -310,7 +312,7 @@ export default function CandidateDetailPage() {
             {candidate.jobPosting && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Applied For</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Applied For</Heading3>
                 </CardHeader>
                 <CardBody className="p-4 sm:p-5">
                   <Card
@@ -334,7 +336,7 @@ export default function CandidateDetailPage() {
             {/* Stage History */}
             <Card shadow="sm">
               <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-                <h3 className="text-sm font-semibold text-default-700">Stage History</h3>
+                <Heading3 className="text-sm font-semibold text-default-700">Stage History</Heading3>
               </CardHeader>
               <CardBody className="p-4 sm:p-5">
                 {candidate.stageHistory?.length > 0 ? (
@@ -364,7 +366,7 @@ export default function CandidateDetailPage() {
             {candidate.interviews?.length > 0 && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Interviews</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Interviews</Heading3>
                 </CardHeader>
                 <CardBody className="p-4 sm:p-5 space-y-3">
                   {candidate.interviews.map((interview) => (
@@ -406,7 +408,7 @@ export default function CandidateDetailPage() {
             {/* Notes */}
             <Card shadow="sm">
               <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3 flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-default-700">Notes</h3>
+                <Heading3 className="text-sm font-semibold text-default-700">Notes</Heading3>
                 {canManage && (
                   <Button size="sm" variant="light" color="primary" onPress={onNoteOpen} startContent={<FaPlus className="w-3 h-3" />}>
                     Add Note
@@ -437,7 +439,7 @@ export default function CandidateDetailPage() {
             {/* Profile Info */}
             <Card shadow="sm">
               <CardHeader className="border-b border-default-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-default-700">Profile</h3>
+                <Heading3 className="text-sm font-semibold text-default-700">Profile</Heading3>
               </CardHeader>
               <CardBody className="p-4 space-y-3 text-sm">
                 {candidate.currentCompany && (
@@ -489,7 +491,7 @@ export default function CandidateDetailPage() {
             {candidate.skills?.length > 0 && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Skills</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Skills</Heading3>
                 </CardHeader>
                 <CardBody className="p-4">
                   <div className="flex flex-wrap gap-1.5">
@@ -505,16 +507,16 @@ export default function CandidateDetailPage() {
             {candidate.resume?.url && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Resume</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Resume</Heading3>
                 </CardHeader>
                 <CardBody className="p-4">
-                  {/^https?:\/\//i.test(candidate.resume.url) ? <a href={candidate.resume.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline"><FaFileAlt className="w-4 h-4" />{candidate.resume.name || 'View Resume'}</a> : <button
+                  {/^https?:\/\//i.test(candidate.resume.url) ? <a href={candidate.resume.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline"><FaFileAlt className="w-4 h-4" />{candidate.resume.name || 'View Resume'}</a> : <NativeButton
                     onClick={() => downloadDocumentFile({ fileUrl: candidate.resume.url, fileName: candidate.resume.name || 'resume' }).catch(error => toast.error(error.message))}
                     className="flex items-center gap-2 text-sm text-primary hover:underline"
                   >
                     <FaFileAlt className="w-4 h-4" />
                     {candidate.resume.name || 'View Resume'}
-                  </button>}
+                  </NativeButton>}
                 </CardBody>
               </Card>
             )}
@@ -524,7 +526,7 @@ export default function CandidateDetailPage() {
             {candidate.offer?.offeredDate && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Offer</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Offer</Heading3>
                 </CardHeader>
                 <CardBody className="p-4 space-y-2 text-sm">
                   <div>
@@ -561,7 +563,7 @@ export default function CandidateDetailPage() {
             {candidate.tags?.length > 0 && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Tags</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Tags</Heading3>
                 </CardHeader>
                 <CardBody className="p-4">
                   <div className="flex flex-wrap gap-1.5">
@@ -712,7 +714,7 @@ export default function CandidateDetailPage() {
                   <SelectItem key="contractor">Contractor</SelectItem>
                 </Select>
                 <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-lg bg-default-50 px-3 py-2">
-                  <input type="checkbox" checked={convertData.probationApplicable} onChange={(event) => setConvertData((prev) => ({ ...prev, probationApplicable: event.target.checked }))} className="h-4 w-4 rounded text-primary" />
+                  <NativeInput type="checkbox" checked={convertData.probationApplicable} onChange={(event) => setConvertData((prev) => ({ ...prev, probationApplicable: event.target.checked }))} className="h-4 w-4 rounded text-primary" />
                   <span className="text-sm text-default-700">Probation applies</span>
                 </label>
                 {convertData.probationApplicable && (
@@ -741,8 +743,8 @@ export default function CandidateDetailPage() {
                   <SelectItem key="90">90 days</SelectItem>
                 </Select>
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-default-50 px-3 py-2 text-sm text-default-700"><input type="checkbox" checked={convertData.backgroundVerificationRequired} onChange={(event) => setConvertData((prev) => ({ ...prev, backgroundVerificationRequired: event.target.checked }))} />Background verification</label>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-default-50 px-3 py-2 text-sm text-default-700"><input type="checkbox" checked={convertData.assetProvisioningRequired} onChange={(event) => setConvertData((prev) => ({ ...prev, assetProvisioningRequired: event.target.checked }))} />Equipment and access</label>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-default-50 px-3 py-2 text-sm text-default-700"><NativeInput type="checkbox" checked={convertData.backgroundVerificationRequired} onChange={(event) => setConvertData((prev) => ({ ...prev, backgroundVerificationRequired: event.target.checked }))} />Background verification</label>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-default-50 px-3 py-2 text-sm text-default-700"><NativeInput type="checkbox" checked={convertData.assetProvisioningRequired} onChange={(event) => setConvertData((prev) => ({ ...prev, assetProvisioningRequired: event.target.checked }))} />Equipment and access</label>
                 </div>
               </div>
             </ModalBody>

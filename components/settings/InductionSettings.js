@@ -1,6 +1,8 @@
 'use client'
+
+import { UploadInput } from '@/components/ui/UploadButton'
 import { useEffect, useRef, useState } from 'react'
-import { Button, Checkbox, Input } from '@heroui/react'
+import { Button, Checkbox, Input } from '@/components/ui/fernly'
 import { inductionRequest } from '@/lib/client/induction'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import PresentationReader from '@/components/induction/PresentationReader'
@@ -67,7 +69,7 @@ function InductionEditor({ companyId, companyName, onUpdated, onBusy }) {
     {!status && !error && <p role="status">Loading settings…</p>}
     {status?.program ? <div className="rounded-xl bg-default-100 p-4"><p className="font-medium">{status.program.title}</p><p className="text-sm text-default-500">{status.program.fileName} · {status.program.pageCount} pages · {status.program.active ? 'Published — acknowledgement required' : 'Withdrawn'}</p>{status.program.active && <Button className="mt-3" color="warning" variant="flat" size="sm" onPress={withdraw} isDisabled={busy}>Withdraw presentation</Button>}</div> : status && <p className="rounded-xl bg-default-100 p-4 text-sm">{companyId && status.defaultProgram?.active ? 'No company module yet. Employees currently receive the organisation default.' : 'No presentation published for this scope.'}</p>}
     <Input label="Presentation title" value={title} onValueChange={setTitle} maxLength={160} isRequired isDisabled={busy} />
-    <label className="block rounded-xl border border-dashed border-default-300 p-4 text-sm">Upload induction PDF or PowerPoint (.pptx), up to 25 MB / 100 pages<input className="mt-3 block w-full" aria-label="Induction presentation" type="file" accept=".pdf,.pptx" disabled={busy || !status} onChange={event => choose(event.target.files?.[0]).catch(error => setError(error.message))} /></label>
+    <label className="block rounded-xl border border-dashed border-default-300 p-4 text-sm">Upload induction PDF or PowerPoint (.pptx), up to 25 MB / 100 pages<UploadInput className="mt-3 block w-full" aria-label="Induction presentation" type="file" accept=".pdf,.pptx" disabled={busy || !status} onChange={event => choose(event.target.files?.[0]).catch(error => setError(error.message))} /></label>
     <p className="text-xs text-default-500">PowerPoint is shown as static slides; review the preview before publishing. For exact fonts, animations captured as stills, or older .ppt files, export to PDF first.</p>
     {buffer && <div className="space-y-3"><div className="max-h-[60vh] overflow-auto rounded-xl border border-default-200 p-2"><PresentationReader buffer={buffer} format={file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'pptx'} page={page} onReady={setCount} onRendered={number => setSeen(previous => previous.includes(number) ? previous : [...previous, number])} onError={error => { setCount(0); setError(error.message) }} /></div><div className="flex items-center justify-between"><Button isDisabled={page <= 1 || busy} onPress={() => setPage(value => value - 1)}>Previous</Button><span>Page {page} of {count || '…'}</span><Button isDisabled={page >= count || busy} onPress={() => setPage(value => value + 1)}>Next</Button></div><Checkbox isSelected={confirmed} onValueChange={setConfirmed} isDisabled={seen.length !== count || !count || busy}>I reviewed all pages. Require acknowledgement from employees in this scope.</Checkbox><Button color="primary" isLoading={busy} isDisabled={!confirmed || !title.trim() || !count || seen.length !== count || busy} onPress={publish}>Publish induction</Button></div>}
   </section>
