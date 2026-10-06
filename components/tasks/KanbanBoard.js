@@ -4,8 +4,9 @@ import { useState, useCallback } from 'react'
 import { FaClock, FaExclamationTriangle, FaTasks, FaProjectDiagram, FaGripVertical } from 'react-icons/fa'
 import { HiOutlineXMark } from 'react-icons/hi2'
 
-// Status columns configuration
-const STATUS_COLUMNS = [
+// Default status columns - used when no project-specific statusColumns prop
+// is passed (e.g. the cross-project "My Tasks"/"Assigned Tasks" boards).
+const DEFAULT_STATUS_COLUMNS = [
   { id: 'todo', label: 'To Do', color: 'bg-gray-100', headerColor: 'text-gray-700' },
   { id: 'in-progress', label: 'In Progress', color: 'bg-blue-50', headerColor: 'text-blue-700' },
   { id: 'review', label: 'Review', color: 'bg-purple-50', headerColor: 'text-purple-700' },
@@ -60,14 +61,22 @@ const formatDate = (date) => {
  * @param {boolean} enableDragDrop - Whether drag-drop is enabled (disabled for tasks with subtasks)
  * @param {Function} onProjectClick - Callback when project badge is clicked
  */
-export default function KanbanBoard({ 
-  tasks = [], 
-  onTaskClick, 
-  onStatusChange, 
+export default function KanbanBoard({
+  tasks = [],
+  onTaskClick,
+  onStatusChange,
   showProject = false,
   enableDragDrop = true,
-  onProjectClick
+  onProjectClick,
+  // Optional: a project's own ordered, configurable status list
+  // (see lib/taskStatusConfig.js), shaped as [{ id/key, label, color, headerColor }].
+  // Falls back to the original fixed 4-column board when not provided.
+  statusColumns
 }) {
+  const STATUS_COLUMNS = (Array.isArray(statusColumns) && statusColumns.length > 0)
+    ? statusColumns
+    : DEFAULT_STATUS_COLUMNS
+
   const [draggedTask, setDraggedTask] = useState(null)
   const [dragOverColumn, setDragOverColumn] = useState(null)
 

@@ -162,9 +162,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       }
 
       const data = await response.json()
-      console.log('[DEBUG] sidebar counts from server:', data.data)
-
-      if (data.success) {
+    if (data.success) {
         setSidebarCounts(data.data)
       }
     } catch (error) {
@@ -594,8 +592,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                         <div className="flex items-center gap-3 flex-1">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="truncate text-[13px] font-medium">{item.name}</span>
-                            {item.name !== 'Chat' && <InlineBadge count={getLeafBadgeCount(item)} />}
-                          </div>
+                            {getLeafBadgeCount(item) > 0 && <UnreadBadge count={getLeafBadgeCount(item)} />}                          </div>
                         </div>
                       </Link>
                     )}

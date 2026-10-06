@@ -1,4 +1,31 @@
 import mongoose from 'mongoose';
+import { DEFAULT_TASK_STATUSES } from '@/lib/taskStatusConfig';
+
+const ProjectTaskStatusSchema = new mongoose.Schema({
+  key: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  label: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: [60, 'Status label cannot exceed 60 characters']
+  },
+  color: {
+    type: String,
+    default: 'gray'
+  },
+  order: {
+    type: Number,
+    default: 0
+  },
+  isSystem: {
+    type: Boolean,
+    default: false
+  }
+}, { _id: false });
 
 const ProjectSchema = new mongoose.Schema({
   name: {
@@ -34,7 +61,6 @@ const ProjectSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee'
   }],
-  // Deprecated: kept for backward compatibility during migration
   projectHead: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee'
@@ -45,31 +71,30 @@ const ProjectSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
-  // Reference to the auto-created chat group
   chatGroup: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Chat'
   },
-  // Department for filtering
   department: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Department'
   },
-  // Priority level
   priority: {
     type: String,
     enum: ['low', 'medium', 'high', 'critical'],
     default: 'medium'
   },
-  // Tags for categorization
   tags: [{
     type: String,
     trim: true
   }],
-  // Metadata for additional info
   metadata: {
     type: mongoose.Schema.Types.Mixed,
     default: {}
+  },
+  taskStatuses: {
+    type: [ProjectTaskStatusSchema],
+    default: () => DEFAULT_TASK_STATUSES.map(s => ({ ...s }))
   }
 }, {
   timestamps: true,
@@ -77,28 +102,24 @@ const ProjectSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual for members
 ProjectSchema.virtual('members', {
   ref: 'ProjectMember',
   localField: '_id',
   foreignField: 'project'
 });
 
-// Virtual for tasks
 ProjectSchema.virtual('tasks', {
   ref: 'Task',
   localField: '_id',
   foreignField: 'project'
 });
 
-// Virtual for timeline events
 ProjectSchema.virtual('timelineEvents', {
   ref: 'ProjectTimelineEvent',
   localField: '_id',
   foreignField: 'project'
 });
 
-// Virtual to check if project is overdue
 ProjectSchema.virtual('isOverdue').get(function() {
   if (['completed', 'approved', 'archived'].includes(this.status)) {
     return false;
@@ -106,7 +127,6 @@ ProjectSchema.virtual('isOverdue').get(function() {
   return new Date() > this.endDate;
 });
 
-// Virtual for days remaining
 ProjectSchema.virtual('daysRemaining').get(function() {
   const now = new Date();
   const end = new Date(this.endDate);
@@ -114,7 +134,6 @@ ProjectSchema.virtual('daysRemaining').get(function() {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 });
 
-// Indexes for performance
 ProjectSchema.index({ status: 1, createdAt: -1 });
 ProjectSchema.index({ createdBy: 1 });
 ProjectSchema.index({ projectHeads: 1 });

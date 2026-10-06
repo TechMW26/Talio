@@ -1,9 +1,5 @@
 import mongoose from 'mongoose';
 
-/**
- * Task Attachment Schema
- * Separate schema for task attachments to ensure proper type handling
- */
 const TaskAttachmentSchema = new mongoose.Schema({
   name: String,
   url: String,
@@ -38,7 +34,6 @@ const TaskSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['todo', 'in-progress', 'review', 'completed', 'completed-pending-approval', 'rejected', 'blocked', 'archived'],
     default: 'todo'
   },
   priority: {
@@ -64,7 +59,6 @@ const TaskSchema = new mongoose.Schema({
   completedAt: {
     type: Date
   },
-  // Rejection tracking
   lastRejectedAt: {
     type: Date
   },
@@ -80,7 +74,6 @@ const TaskSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  // Subtasks/micro tasks for granular progress tracking
   subtasks: [{
     _id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -104,18 +97,14 @@ const TaskSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Employee'
     },
-    // Multi-assignee acceptance tracking
-    // When one assignee marks subtask complete, others must accept
     pendingAcceptance: {
       type: Boolean,
       default: false
     },
-    // List of employee IDs who have accepted this subtask completion
     acceptedBy: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Employee'
     }],
-    // List of employee IDs who rejected this subtask completion
     rejectedBy: [{
       employee: {
         type: mongoose.Schema.Types.ObjectId,
@@ -127,7 +116,6 @@ const TaskSchema = new mongoose.Schema({
         default: Date.now
       }
     }],
-    // Subtask-level ETA for accurate tracking
     estimatedDays: {
       type: Number,
       default: 0,
@@ -143,7 +131,6 @@ const TaskSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
-    // Subtask comments from assignee, project head, etc.
     comments: [{
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -176,7 +163,6 @@ const TaskSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  // Progress percentage based on subtasks (0-100)
   progressPercentage: {
     type: Number,
     default: 0,
@@ -191,7 +177,6 @@ const TaskSchema = new mongoose.Schema({
     type: Number,
     min: 0
   },
-  // Deletion request - requires approval from assignee or project head
   deletionRequest: {
     status: {
       type: String,
@@ -221,24 +206,19 @@ const TaskSchema = new mongoose.Schema({
       trim: true
     }
   },
-  // Tags for categorization
   tags: [{
     type: String,
     trim: true
   }],
-  // Order/position within project (for drag-drop)
   order: {
     type: Number,
     default: 0
   },
-  // Parent task for sub-task support (future extensibility)
   parentTask: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Task'
   },
-  // Attachments
   attachments: [TaskAttachmentSchema],
-  // Metadata for additional info
   metadata: {
     type: mongoose.Schema.Types.Mixed,
     default: {}
@@ -249,21 +229,18 @@ const TaskSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual for assignees
 TaskSchema.virtual('assignees', {
   ref: 'TaskAssignee',
   localField: '_id',
   foreignField: 'task'
 });
 
-// Virtual for sub-tasks
 TaskSchema.virtual('subTasks', {
   ref: 'Task',
   localField: '_id',
   foreignField: 'parentTask'
 });
 
-// Virtual to check if task is overdue
 TaskSchema.virtual('isOverdue').get(function() {
   if (['completed', 'archived'].includes(this.status)) {
     return false;
@@ -272,7 +249,6 @@ TaskSchema.virtual('isOverdue').get(function() {
   return new Date() > this.dueDate;
 });
 
-// Indexes for performance
 TaskSchema.index({ project: 1, status: 1 });
 TaskSchema.index({ project: 1, createdAt: -1 });
 TaskSchema.index({ createdBy: 1 });
