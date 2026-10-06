@@ -61,6 +61,7 @@ describe('Vercel production build configuration', () => {
     expect(vercelConfig.framework).toBe('nextjs')
     expect(vercelConfig.services).toBeUndefined()
     expect(vercelConfig.buildCommand).toBe('npm run release:check && npm run vercel-build')
+    expect(packageJson.scripts['release:check']).toContain('cross-env NODE_ENV=test jest')
     expect(vercelConfig.git.deploymentEnabled).toEqual({ '**': false, main: true })
     expect(nextConfig.output).toBeUndefined()
     for (const file of ['Dockerfile', '.dockerignore', 'vercel.container.json', 'docs/CONTAINER_DEPLOYMENT.md']) {
