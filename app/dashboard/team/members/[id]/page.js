@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useMemo, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -11,12 +13,16 @@ import Loader from '@/components/ui/Loader'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import {
-  FaArrowLeft, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
+  FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
   FaBriefcase, FaStar, FaTasks, FaChartLine, FaComments,
   FaPaperPlane, FaExclamationCircle, FaCheckCircle, FaClock,
   FaChevronLeft, FaChevronRight, FaFilter, FaProjectDiagram
 } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
+import MemberOverview from './MemberOverview'
+import MemberTaskList from './MemberTaskList'
+import MemberAttendance from './MemberAttendance'
+import styles from './member.module.css'
 
 export default function TeamMemberDetailsPage() {
   const router = useRouter()
@@ -47,7 +53,7 @@ export default function TeamMemberDetailsPage() {
     return p.toString()
   }, [taskMonth, taskYear, taskStatus, taskProject, taskAssignedBy])
 
-  const { data: tasksRes, isLoading: tasksLoading } = useAuthedSWR(
+  const { data: tasksRes, isLoading: tasksLoading, error: tasksError, mutate: refreshTasks } = useAuthedSWR(
     params.id ? `/api/team/members/${params.id}/tasks?${taskQueryString}` : null
   )
   const memberTasks = tasksRes?.data?.tasks || []
@@ -188,7 +194,7 @@ export default function TeamMemberDetailsPage() {
           onClick={() => router.back()}
           className="flex items-center text-blue-600 hover:text-blue-700 mb-4"
         >
-          <FaArrowLeft className="mr-2" />
+          <BackIcon className="mr-2" />
           Go Back
         </button>
         <p className="text-gray-600">Employee data not available</p>
@@ -197,37 +203,19 @@ export default function TeamMemberDetailsPage() {
   }
 
   return (
-    <div className="px-4 py-4 sm:p-6 lg:p-8 pb-24 md:pb-6">
+    <div className={`${styles.page} px-4 py-4 sm:p-6 lg:p-8 pb-24 md:pb-6`}>
       {/* Header */}
-      <div className="mb-6">
+      <div className={`${styles.hero} mb-6`}>
         <button
           onClick={() => router.back()}
           className="flex items-center text-blue-600 hover:text-blue-700 mb-4"
         >
-          <FaArrowLeft className="mr-2" />
+          <BackIcon className="mr-2" />
           Back to Team Members
         </button>
-        <div className="flex items-center">
-          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-2xl mr-4">
-            {employee.profilePicture ? (
-              <img
-                src={employee.profilePicture}
-                alt={`${employee.firstName} ${employee.lastName}`}
-                className="w-20 h-20 rounded-full object-cover"
-              />
-            ) : (
-              `${employee.firstName.charAt(0)}${employee.lastName.charAt(0)}`
-            )}
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              {employee.firstName} {employee.lastName}
-            </h1>
-            <p className="text-gray-600">{employee.employeeCode}</p>
-          </div>
-        </div>
       </div>
       <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
+      <MemberOverview employee={employee} stats={taskStats} />
 
       {/* Employee Details */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -259,7 +247,7 @@ export default function TeamMemberDetailsPage() {
               <div className="flex items-center text-gray-600">
                 <div>
                   <p className="text-xs text-gray-500">Date of Joining</p>
-                  <p className="font-medium">{new Date(employee.dateOfJoining).toLocaleDateString()}</p>
+                  <p className="font-medium">{employee.dateOfJoining && !Number.isNaN(new Date(employee.dateOfJoining).getTime()) ? new Date(employee.dateOfJoining).toLocaleDateString() : 'Not provided'}</p>
                 </div>
               </div>
             </div>
@@ -280,31 +268,6 @@ export default function TeamMemberDetailsPage() {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Task Statistics */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-              Task Statistics
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{taskStats.total}</p>
-                <p className="text-xs text-gray-600">Total Tasks</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-yellow-600">{taskStats.in_progress}</p>
-                <p className="text-xs text-gray-600">In Progress</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-purple-600">{taskStats.review}</p>
-                <p className="text-xs text-gray-600">In Review</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{taskStats.completed}</p>
-                <p className="text-xs text-gray-600">Completed</p>
-              </div>
-            </div>
           </div>
 
           {/* Member Tasks - Month Wise */}
@@ -392,7 +355,7 @@ export default function TeamMemberDetailsPage() {
             </div>
 
             {/* Task List */}
-            {tasksLoading ? (
+            {tasksError ? <DataErrorState message="Unable to load this month's tasks" onRetry={() => refreshTasks()} /> : tasksLoading ? (
               <div className="flex justify-center py-8">
                 <Loader />
               </div>
@@ -401,80 +364,7 @@ export default function TeamMemberDetailsPage() {
                 No tasks found for {monthLabel}
               </p>
             ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                {memberTasks.map((task) => {
-                  const isCompleted = task.status === 'completed'
-                  const isPending = task.assignmentStatus === 'pending'
-                  const isRejected = task.assignmentStatus === 'rejected'
-
-                  return (
-                  <div
-                    key={task._id}
-                    className={`border rounded-lg p-3 transition-colors ${
-                      isCompleted
-                        ? 'border-green-200 dark:border-green-800/40 bg-green-50/60 dark:bg-green-900/10'
-                        : isPending
-                          ? 'border-amber-200 dark:border-amber-800/40 bg-amber-50/40 dark:bg-amber-900/10'
-                          : isRejected
-                            ? 'border-red-200 dark:border-red-800/40 bg-red-50/40 dark:bg-red-900/10'
-                            : 'border-gray-200 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className={`font-medium flex-1 text-sm ${isCompleted ? 'text-green-800 dark:text-green-300' : 'text-gray-900 dark:text-zinc-100'}`}>
-                        {isCompleted && <FaCheckCircle className="inline w-3 h-3 mr-1.5 text-green-500" />}
-                        {task.title}
-                      </h3>
-                      <div className="flex items-center gap-1.5 ml-2">
-                        {isPending && (
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 whitespace-nowrap">
-                            Pending Acceptance
-                          </span>
-                        )}
-                        {isRejected && (
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 whitespace-nowrap">
-                            Rejected
-                          </span>
-                        )}
-                        <span className={`px-2 py-0.5 text-xs rounded-full capitalize whitespace-nowrap ${getStatusColor(task.status)}`}>
-                          {task.status.replace(/-/g, ' ')}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-zinc-400">
-                      {task.project && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded">
-                          <FaProjectDiagram className="w-2.5 h-2.5" />
-                          {task.project.name}
-                        </span>
-                      )}
-                      {!task.project && (
-                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-zinc-400 rounded">
-                          Standalone
-                        </span>
-                      )}
-                      <span>
-                        Assigned by: {task.assignedBy?.firstName || task.createdBy?.firstName || 'Unknown'} {task.assignedBy?.lastName || task.createdBy?.lastName || ''}
-                      </span>
-                      {task.dueDate && (
-                        <span className={`${new Date(task.dueDate) < new Date() && task.status !== 'completed' ? 'text-red-500' : ''}`}>
-                          Due: {new Date(task.dueDate).toLocaleDateString()}
-                        </span>
-                      )}
-                      {task.priority && task.priority !== 'medium' && (
-                        <span className={`px-2 py-0.5 rounded capitalize ${
-                          task.priority === 'critical' ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' :
-                          task.priority === 'high' ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' :
-                          'bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-zinc-400'
-                        }`}>
-                          {task.priority}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  )
-                })}
-              </div>
+              <MemberTaskList tasks={memberTasks} />
             )}
           </div>
         </div>
@@ -610,6 +500,7 @@ export default function TeamMemberDetailsPage() {
           </div>
         </div>
       </div>
+      <MemberAttendance key={employee._id} employee={employee} />
     </div>
   )
 }

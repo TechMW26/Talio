@@ -146,8 +146,9 @@ export default function AttendancePage() {
   // Monthly attendance (depends on employeeId + currentMonth)
   const monthNum = currentMonth.getMonth() + 1
   const yearNum = currentMonth.getFullYear()
-  const { data: attendanceRes, mutate: mutateAttendance } = useAuthedSWR(
-    employeeId ? `/api/attendance?employeeId=${employeeId}&month=${monthNum}&year=${yearNum}` : null
+  const { data: attendanceRes, error: attendanceLoadError, isLoading: attendanceLoading, mutate: mutateAttendance } = useAuthedSWR(
+    employeeId ? `/api/attendance?employeeId=${employeeId}&month=${monthNum}&year=${yearNum}` : null,
+    { keepPreviousData: false }
   )
   const attendance = attendanceRes?.data || []
 
@@ -1132,7 +1133,14 @@ export default function AttendancePage() {
             </div>
           </div>
 
-          {viewMode === 'calendar' ? (
+          {attendanceLoadError ? (
+            <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger">
+              <p>Unable to load attendance. Please retry.</p>
+              <Button className="mt-3" size="sm" onPress={() => mutateAttendance()}>Retry</Button>
+            </div>
+          ) : attendanceLoading ? (
+            <p role="status" className="p-6 text-default-500">Loading attendance…</p>
+          ) : viewMode === 'calendar' ? (
             /* Calendar View */
             <div className="overflow-x-auto overflow-y-visible">
               <div className="min-w-[700px] p-2">

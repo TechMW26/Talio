@@ -5,9 +5,11 @@ import {
   getBlobAccessMode,
 } from '@/lib/platform/blobStorage.server'
 import { getRuntimeCapabilities, getRuntimeEnvironment, getVercelReadiness } from '@/lib/platform/runtime'
-import { getMongoPoolConfig } from '@/lib/platform/databaseConfig'
 
 describe('platform runtime capabilities', () => {
+  test('local acceptance reports intentionally isolated cache and realtime', () => {
+    expect(getRuntimeCapabilities({ TALIO_LOCAL_ACCEPTANCE: '1', REDIS_URL: 'rediss://cache.example', PUSHER_APP_ID: 'app', PUSHER_KEY: 'key', PUSHER_SECRET: 'secret', PUSHER_CLUSTER: 'ap2' })).toMatchObject({ localAcceptance: true, distributedCache: false, managedRealtime: false })
+  })
   test('detects Vercel and disables persistent process assumptions', () => {
     expect(getRuntimeEnvironment({ VERCEL: '1', NODE_ENV: 'production' })).toBe('vercel')
     expect(getRuntimeCapabilities({ VERCEL: '1', NODE_ENV: 'production' })).toMatchObject({
@@ -40,7 +42,7 @@ describe('platform runtime capabilities', () => {
 
 describe('Vercel readiness', () => {
   const complete = {
-    MONGODB_URI: 'mongodb://example', JWT_SECRET: 'secret', NEXT_PUBLIC_APP_URL: 'https://talio.example',
+    FIRESTORE_PROJECT_ID: 'talio-test', FIRESTORE_DATASET: 'verified-test', FIRESTORE_SERVICE_ACCOUNT_JSON: '{}', JWT_SECRET: 'secret', NEXT_PUBLIC_APP_URL: 'https://talio.example',
     BLOB_READ_WRITE_TOKEN: 'blob', CRON_SECRET: 'cron', PUSHER_APP_ID: 'app', PUSHER_KEY: 'key',
     PUSHER_SECRET: 'secret', PUSHER_CLUSTER: 'ap2', NEXT_PUBLIC_PUSHER_KEY: 'key',
     NEXT_PUBLIC_PUSHER_CLUSTER: 'ap2', LIVEKIT_URL: 'wss://livekit', LIVEKIT_API_KEY: 'key',
@@ -60,8 +62,9 @@ describe('Vercel readiness', () => {
     expect(getVercelReadiness({ ...complete, NEXT_PUBLIC_MEETING_TRANSPORT: 'socket' }).invalid)
       .toContainEqual(expect.objectContaining({ capability: 'managed meetings' }))
   })
-  test('accepts existing GridFS storage without an unused Blob credential', () => {
-    expect(getVercelReadiness({ ...complete, BLOB_READ_WRITE_TOKEN: '' }).ready).toBe(true)
+  test('requires private Blob storage and rejects a public store', () => {
+    expect(getVercelReadiness({ ...complete, BLOB_READ_WRITE_TOKEN: '' }).ready).toBe(false)
+    expect(getVercelReadiness({ ...complete, BLOB_ACCESS: 'public' }).ready).toBe(false)
   })
 })
 
@@ -104,40 +107,5 @@ describe('tenant Blob path construction', () => {
       .toBe('/api/files/tenants/acme/documents/u/file.pdf')
     expect(getBlobAccessMode({})).toBe('private')
     expect(getBlobAccessMode({ BLOB_ACCESS: 'public' })).toBe('public')
-  })
-})
-
-describe('MongoDB pool configuration', () => {
-  test('uses low, zero-minimum pools on Vercel', () => {
-    expect(getMongoPoolConfig('primary', { VERCEL: '1', NODE_ENV: 'production' })).toEqual({
-      maxPoolSize: 5,
-      minPoolSize: 0,
-      maxIdleTimeMS: 60_000,
-    })
-    expect(getMongoPoolConfig('tenant', { VERCEL: '1', NODE_ENV: 'production' })).toEqual({
-      maxPoolSize: 5,
-      minPoolSize: 0,
-      maxIdleTimeMS: 60_000,
-    })
-  })
-
-  test('honours bounded tenant overrides including a zero minimum', () => {
-    expect(getMongoPoolConfig('tenant', {
-      VERCEL: '1',
-      NODE_ENV: 'production',
-      TENANT_DB_MAX_POOL_SIZE: '8',
-      TENANT_DB_MIN_POOL_SIZE: '0',
-    })).toMatchObject({ maxPoolSize: 8, minPoolSize: 0 })
-
-    expect(getMongoPoolConfig('tenant', {
-      VERCEL: '1',
-      NODE_ENV: 'production',
-      TENANT_DB_MAX_POOL_SIZE: '4',
-      TENANT_DB_MIN_POOL_SIZE: '20',
-    })).toMatchObject({ maxPoolSize: 4, minPoolSize: 4 })
-  })
-
-  test('rejects unknown connection scopes', () => {
-    expect(() => getMongoPoolConfig('unknown', {})).toThrow('Unknown MongoDB pool scope')
   })
 })

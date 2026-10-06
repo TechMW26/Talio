@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { generateContent } from '@/lib/gemini'
 
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Holiday'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }

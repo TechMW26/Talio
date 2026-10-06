@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import mongoose from 'mongoose'
 import { getRuntimeCapabilities, getVercelReadiness } from '@/lib/platform/runtime'
-import connectDB from '@/lib/mongodb'
 
 // Lightweight liveness endpoint; detailed checks verify managed services.
 export async function HEAD() {
@@ -19,6 +17,9 @@ export async function GET(request) {
     runtime: runtime.runtime,
     deployment: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || null,
     instanceUptimeSeconds: Math.round(process.uptime()),
+    // Client boot must not contact a deliberately disabled provider. This
+    // capability check is configuration-only: no database or Redis reads.
+    capabilities: { managedRealtime: runtime.managedRealtime },
   }
 
   // Quick health check (no detailed checks)
@@ -28,14 +29,12 @@ export async function GET(request) {
 
   // Detailed health check for monitoring dashboards
   try {
-    // Check MongoDB connection
-    await connectDB()
-    await mongoose.connection.db.admin().ping()
-    const mongoState = mongoose.connection.readyState
-    health.mongodb = {
-      connected: mongoState === 1,
-      state: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoState] || 'unknown'
-    }
+    const { getFirestoreProvisioningContext } = await import('@/lib/platform/firestoreApplication.server')
+    // An uncached read verifies the configured native data plane, not merely
+    // that credentials or a cached tenant catalog exist.
+    const { firestore, dataset } = await getFirestoreProvisioningContext()
+    const snapshot = await firestore.collection('talioDatasets').doc(dataset).get()
+    health.firestore = { connected: snapshot.exists }
 
     // Check Redis if available
     try {
@@ -45,10 +44,7 @@ export async function GET(request) {
         available,
         type: info.connected ? 'redis' : 'memory',
         connected: info.connected,
-        host: info.host,
         connectedAt: info.connectedAt,
-        lastError: info.lastError,
-        ...(info.serverInfo ? { serverInfo: info.serverInfo } : {}),
       }
       if (runtime.distributedCache && !available) health.status = 'degraded'
     } catch {
@@ -85,13 +81,13 @@ export async function GET(request) {
     }
 
     // Check if all critical services are healthy
-    if (!health.mongodb?.connected) {
+    if (!health.firestore?.connected) {
       health.status = 'degraded'
     }
 
   } catch (error) {
     health.status = 'error'
-    health.error = error.message
+    health.error = 'Managed database health check failed'
   }
 
   const statusCode = health.status === 'ok' ? 200 : health.status === 'degraded' ? 200 : 503

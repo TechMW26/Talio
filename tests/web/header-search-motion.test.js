@@ -4,8 +4,8 @@ import path from 'path'
 const source = fs.readFileSync(path.join(process.cwd(), 'components/Header.js'), 'utf8')
 test('desktop and mobile search retain exit animations through presence boundaries', () => {
   expect(source.match(/<AnimatePresence>/g)).toHaveLength(2)
-  expect(source).toContain('key="desktop-search" {...searchMotion}')
-  expect(source).toContain('key="mobile-search" {...searchMotion}')
+  expect(source).toMatch(/key="desktop-search"\s+(?:ref=\{\w+\}\s+)?\{\.\.\.searchMotion\}/)
+  expect(source).toMatch(/key="mobile-search"\s+(?:ref=\{\w+\}\s+)?\{\.\.\.searchMotion\}/)
   expect(source).toContain('key="search-backdrop"')
   expect(source).toContain('exit: { opacity: 0')
 })

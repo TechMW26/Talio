@@ -1,179 +1,34 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import mongoose from 'mongoose'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { ensureProbationReviewReminder } from '@/lib/hrms/probationReminder.server'
 import { isFeatureEnabled } from '@/lib/planFeatures'
-import { buildCacheKey, getCache, setCache } from '@/lib/cache'
+import { getActionableDatabase, listActionableNotifications, storeActionableNotification, notificationUserId } from '@/lib/actionableNotificationStore.server'
 
-/**
- * GET /api/actionable-notifications
- * Get all pending actionable notifications for the current user
- */
 export async function GET(request) {
   try {
-    // Include Employee for populate('createdBy')
-    const auth = await getAuthAndModels(request, ['ActionableNotification', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-
-    const { user, models, tenant } = auth
-    const { ActionableNotification } = models
-
-    if (isFeatureEnabled(auth.companyFeatures, 'probation')) {
-      await ensureProbationReviewReminder({ models, user }).catch(error => console.error('[Probation reminder]', error.message))
-    }
-
-    // Parse query params
-    const { searchParams } = new URL(request.url)
-    const type = searchParams.get('type')
-    const status = searchParams.get('status') || 'pending'
-    const limit = parseInt(searchParams.get('limit') || '50')
-
-    // Check Redis cache
-    const cacheKey = buildCacheKey({
-      tenantId: tenant?.databaseName,
-      role: user.role,
-      userId: user._id || user.userId,
-      namespace: 'actionable-notifications',
-      params: { status, type: type || 'all', limit }
-    })
-    // Pending decisions must be fresh when an hour-long reminder wakes.
-    const cached = status === 'pending' ? null : await getCache(cacheKey)
-    if (cached && (!cached.nextReminderAt || new Date(cached.nextReminderAt).getTime() > Date.now())) {
-      return NextResponse.json({ ...cached, cached: true })
-    }
-
-    // Build query
-    const query = {
-      user: user._id || user.userId,
-      status
-    }
-
-    const now = new Date()
-    const unexpired = { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] }
-    if (status === 'pending') query.$and = [unexpired, { $or: [{ snoozedUntil: null }, { snoozedUntil: { $lte: now } }] }]
-
-    if (type) {
-      query.type = type
-    }
-
-    const [notifications, nextReminder] = await Promise.all([ActionableNotification.find(query)
-      .sort({ priority: -1, createdAt: -1 })
-      .limit(limit)
-      .populate('createdBy', 'firstName lastName avatar')
-      .lean(), status === 'pending' ? ActionableNotification.findOne({ user: query.user, status: 'pending', ...(type ? { type } : {}), snoozedUntil: { $gt: now }, ...unexpired }).sort({ snoozedUntil: 1 }).select('snoozedUntil').lean() : null])
-
-    const responseData = {
-      success: true,
-      notifications,
-      nextReminderAt: nextReminder?.snoozedUntil || null,
-      count: notifications.length
-    }
-    if (status !== 'pending') await setCache(cacheKey, responseData, 30).catch(() => { })
-
-    return NextResponse.json(responseData)
-  } catch (error) {
-    console.error('[GET /api/actionable-notifications] Error:', error)
-    return NextResponse.json(
-      { message: 'Failed to fetch notifications', error: error.message },
-      { status: 500 }
-    )
-  }
+    const auth = await getAuthAndDatabase(request)
+    if (!auth.success) return NextResponse.json({ message: auth.message }, { status: auth.status || 401 })
+    const database = await getActionableDatabase(auth)
+    if (isFeatureEnabled(auth.companyFeatures, 'probation')) await ensureProbationReviewReminder({ database, user: auth.user }).catch(error => console.error('[Probation reminder]', error.message))
+    const params = new URL(request.url).searchParams
+    const result = await listActionableNotifications(database, notificationUserId(auth.user), { status: params.get('status') || 'pending', type: params.get('type'), limit: Number(params.get('limit') || 50) })
+    return NextResponse.json(result)
+  } catch (error) { return NextResponse.json({ success: false, message: error.status ? error.message : 'Failed to fetch notifications' }, { status: error.status || 500 }) }
 }
 
-/**
- * POST /api/actionable-notifications
- * Create a new actionable notification
- * This is typically called by other API routes when events occur
- */
 export async function POST(request) {
   try {
-    // Include Employee for createdBy field
-    const auth = await getAuthAndModels(request, ['ActionableNotification', 'User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-
-    const { user, models } = auth
-    const { ActionableNotification } = models
-
+    const auth = await getAuthAndDatabase(request)
+    if (!auth.success) return NextResponse.json({ message: auth.message }, { status: auth.status || 401 })
+    if (!['admin', 'hr', 'superadmin', 'super_admin'].includes(auth.user.role)) return NextResponse.json({ message: 'HR or admin access is required to create notifications' }, { status: 403 })
+    const database = await getActionableDatabase(auth)
     const body = await request.json()
-    const {
-      targetUserId,
-      title,
-      message,
-      icon,
-      type,
-      priority,
-      reference,
-      actions,
-      url,
-      metadata,
-      expiresAt,
-      displaySettings
-    } = body
-
-    // Validate required fields
-    if (!targetUserId || !title || !message || !type) {
-      return NextResponse.json(
-        { message: 'Missing required fields: targetUserId, title, message, type' },
-        { status: 400 }
-      )
-    }
-
-    // Validate targetUserId is a valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
-      return NextResponse.json(
-        { message: 'Invalid targetUserId format' },
-        { status: 400 }
-      )
-    }
-
-    // Validate reference.id if provided
-    if (reference?.id && !mongoose.Types.ObjectId.isValid(reference.id)) {
-      return NextResponse.json(
-        { message: 'Invalid reference.id format' },
-        { status: 400 }
-      )
-    }
-
-    // Create the notification
-    const notification = await ActionableNotification.create({
-      user: targetUserId,
-      title,
-      message,
-      icon: icon || getDefaultIcon(type),
-      type,
-      priority: priority || 'medium',
-      reference,
-      actions: actions || getDefaultActions(type, body),
-      url,
-      metadata,
-      createdBy: user.employeeId,
-      expiresAt,
-      displaySettings: displaySettings || { persistent: true, showInBell: true, playSound: true }
-    })
-
-    // Emit Socket.IO event to target user
-    if (global.io) {
-      global.io.to(`user:${targetUserId}`).emit('actionable-notification', {
-        notification: notification.toObject()
-      })
-    }
-
-    return NextResponse.json({
-      success: true,
-      notification,
-      message: 'Notification created successfully'
-    }, { status: 201 })
-  } catch (error) {
-    console.error('[POST /api/actionable-notifications] Error:', error)
-    return NextResponse.json(
-      { message: 'Failed to create notification', error: error.message },
-      { status: 500 }
-    )
-  }
+    if (!/^[a-f\d]{24}$/i.test(body.targetUserId)) return NextResponse.json({ message: 'Invalid targetUserId format' }, { status: 400 })
+    if (body.reference?.id && !/^[a-f\d]{24}$/i.test(body.reference.id)) return NextResponse.json({ message: 'Invalid reference.id format' }, { status: 400 })
+    const notification = await storeActionableNotification(database, { user: body.targetUserId, title: body.title, message: body.message, icon: body.icon || getDefaultIcon(body.type), type: body.type, priority: body.priority || 'medium', reference: body.reference, actions: body.actions || getDefaultActions(body.type, body), url: body.url, metadata: body.metadata, expiresAt: body.expiresAt, displaySettings: body.displaySettings, createdBy: auth.user.employeeId })
+    global.io?.to(`user:${body.targetUserId}`).emit('actionable-notification', { notification })
+    return NextResponse.json({ success: true, notification, message: 'Notification created successfully' }, { status: 201 })
+  } catch (error) { return NextResponse.json({ success: false, message: error.status ? error.message : 'Failed to create notification' }, { status: error.status || 500 }) }
 }
 
 /**

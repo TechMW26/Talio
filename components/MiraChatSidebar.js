@@ -1,7 +1,9 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaChevronLeft, FaRegTrashAlt, FaCopy, FaCheck, FaDownload, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb } from 'react-icons/fa'
+import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaRegTrashAlt, FaCopy, FaCheck, FaDownload, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb } from 'react-icons/fa'
 import { useRouter, usePathname } from 'next/navigation'
 import { useMiraChat } from '@/contexts/MiraChatContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
@@ -754,7 +756,7 @@ export default function MiraChatSidebar() {
             <button onClick={startNewChat} title="New chat" aria-label="New chat" disabled={isThinking} className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-40"><FaPlus className="w-3 h-3" /></button>
             {showHistory && <>
               <button onClick={toggleHistory} aria-label="Back to chat" className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors">
-                <FaChevronLeft className="w-3.5 h-3.5" />
+                <BackIcon white className="w-3.5 h-3.5" />
               </button>
             <div>
               <h2 className="text-sm font-bold text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>

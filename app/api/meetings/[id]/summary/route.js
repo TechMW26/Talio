@@ -1,5 +1,6 @@
+import { getMeetingDatabase, populateMeeting, requireMeeting } from '@/lib/meetings/store.server'
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import {
   hasMeetingInsightSource,
   generateMeetingInsights,
@@ -105,13 +106,13 @@ function buildScopedMeetingForSummary(meeting, sessionStartedAt, sessionEndedAt)
 export async function POST(request, { params }) {
   try {
     const { id } = await params
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
 
-    const { user, models } = auth
-    const { Meeting } = models
+    const { user } = auth
+    const database = await getMeetingDatabase(auth.tenant.databaseName)
     const body = await request.json().catch(() => ({}))
     const allowNoContent = body?.allowNoContent === true
     const shouldSendMomEmails = body?.sendMomEmails === true
@@ -119,14 +120,13 @@ export async function POST(request, { params }) {
     const sessionEndedAt = toOptionalDate(body?.sessionEndedAt)
     const hasSessionWindow = Boolean(sessionStartedAt || sessionEndedAt)
 
-    const employee = await resolveMeetingEmployee(models, user)
+    const employee = await resolveMeetingEmployee(database, user)
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    const meeting = await Meeting.findById(id)
-      .populate('organizer', 'firstName lastName email profilePicture')
-      .populate('invitees.employee', 'firstName lastName email profilePicture department')
+    const source = await database.get('meetings', id)
+    const meeting = source ? await populateMeeting(database, source) : null
 
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
@@ -169,7 +169,7 @@ export async function POST(request, { params }) {
 
     const insights = await generateMeetingInsights(meetingForSummary)
 
-    const persistedInsights = await persistMeetingInsights(Meeting, meeting, insights, {
+    const persistedInsights = await persistMeetingInsights(database, meeting, insights, {
       sourceUpdatedAt: latestSourceUpdatedAt,
       appendHistory: hasSessionWindow,
       replaceLatestHistory: hasPreviousSummary && !hasSessionWindow,
@@ -181,7 +181,7 @@ export async function POST(request, { params }) {
 
     if (shouldSendMomEmails) {
       try {
-        momEmails = await sendMeetingMinutesEmails(Meeting, {
+        momEmails = await sendMeetingMinutesEmails(database, {
           ...(meeting?.toObject ? meeting.toObject() : meeting),
           aiSummary: persistedInsights.aiSummary,
           aiParticipantNotes: persistedInsights.aiParticipantNotes,
@@ -226,22 +226,22 @@ export async function POST(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const { id } = await params
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
 
-    const { user, models } = auth
-    const { Meeting } = models
+    const { user } = auth
+    const database = await getMeetingDatabase(auth.tenant.databaseName)
     const data = await request.json()
     const { mom, notes } = data
 
-    const employee = await resolveMeetingEmployee(models, user)
+    const employee = await resolveMeetingEmployee(database, user)
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    const meeting = await Meeting.findById(id)
+    let meeting = await database.get('meetings', id)
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
     }
@@ -264,7 +264,10 @@ export async function PUT(request, { params }) {
       meeting.notes = notes
     }
 
-    await meeting.save()
+    await database.mutate('meetings', id, current => {
+      if (!current || !canGenerateMeetingInsights(current, employee)) throw new Error('Meeting access changed')
+      return { ...current, ...(Array.isArray(mom) ? { mom, momGeneratedAt: new Date() } : {}), ...(notes !== undefined ? { notes } : {}), updatedAt: new Date() }
+    })
 
     return NextResponse.json({
       success: true,

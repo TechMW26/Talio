@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
-import { getAuthAndModels } from '@/lib/auth'
-import { getTenantModel } from '@/lib/tenantModels'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getMeetingDatabase, meetingFilter } from '@/lib/meetings/store.server'
 import { checkTenantFeatureAccess } from '@/lib/companyFeatures.server'
 import { refreshMeetingAvailability } from '@/lib/meetings/meetingAvailability.server'
 import {
@@ -17,7 +17,7 @@ function error(message, status, code, data) {
   return NextResponse.json({ success: false, message, code, ...(data ? { data } : {}) }, { status })
 }
 
-async function checkActiveMeeting({ Meeting, databaseName, identity, roomId }) {
+async function checkActiveMeeting({ database, databaseName, identity, roomId }) {
   let activeRoom
   try {
     activeRoom = await findParticipantActiveMeeting({
@@ -36,9 +36,7 @@ async function checkActiveMeeting({ Meeting, databaseName, identity, roomId }) {
 
   if (!activeRoom) return null
 
-  const activeMeeting = await Meeting.findOne({ roomId: activeRoom.roomId })
-    .select('_id roomId title')
-    .lean()
+  const activeMeeting = (await database.list('meetings', { filters: [meetingFilter('roomId', activeRoom.roomId)], limit: 1 })).records[0]
   return error(
     `You are already in ${activeMeeting?.title || 'another meeting'}. Leave it before joining a different meeting.`,
     409,
@@ -69,21 +67,17 @@ async function issueGuestToken(request, body, guest) {
   if (guest.roomId !== body.roomId || !guest.tenantDatabaseName || !guest.guestId) {
     return error('Guest session does not match this meeting', 403, 'GUEST_SESSION_MISMATCH')
   }
-  const Meeting = await getTenantModel(guest.tenantDatabaseName, 'Meeting')
-  let meeting = await Meeting.findOne({
-    roomId: body.roomId,
-    type: 'online',
-    isLinkActive: true,
-    'guestAccess.enabled': true,
-  }).select('_id type isLinkActive roomId scheduledEnd status roomEmptySince roomPresenceCheckedAt').lean()
+  const database = await getMeetingDatabase(guest.tenantDatabaseName)
+  let meeting = (await database.list('meetings', { filters: [meetingFilter('roomId', body.roomId)], limit: 1 })).records[0]
+  if (meeting && (meeting.type !== 'online' || meeting.isLinkActive === false || !meeting.guestAccess?.enabled)) meeting = null
   if (!meeting) return error('Meeting guest access is unavailable', 404, 'MEETING_NOT_FOUND')
-  try { meeting = await refreshMeetingAvailability(Meeting, meeting, guest.tenantDatabaseName) } catch { return error('Meeting presence could not be checked. Please retry.', 503, 'PRESENCE_UNAVAILABLE') }
+  try { meeting = await refreshMeetingAvailability(database, meeting, guest.tenantDatabaseName) } catch { return error('Meeting presence could not be checked. Please retry.', 503, 'PRESENCE_UNAVAILABLE') }
   if (meeting.isLinkActive === false || ['completed', 'cancelled'].includes(meeting.status)) {
     return error('This meeting has ended', 410, 'MEETING_ENDED')
   }
   if (body.presenceOnly === true) return NextResponse.json({ success: true, data: { status: meeting.status, continuing: meeting.continuing } })
   const activeMeetingResponse = await checkActiveMeeting({
-    Meeting,
+    database,
     databaseName: guest.tenantDatabaseName,
     identity: guest.guestId,
     roomId: meeting.roomId,
@@ -112,22 +106,22 @@ export async function POST(request) {
     const guest = await readGuestSession(request)
     if (guest) return issueGuestToken(request, body, guest)
 
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) return error(auth.message || 'Unauthorized', 401, 'UNAUTHORIZED')
     const featureAccess = await checkTenantFeatureAccess(auth, { allOf: ['meetings'] })
     if (!featureAccess.success) return error(featureAccess.message, featureAccess.status, featureAccess.code)
 
-    let meeting = await auth.models.Meeting.findOne({ roomId, type: 'online', isLinkActive: true })
-      .select('_id type isLinkActive roomId organizer invitees scheduledEnd status roomEmptySince roomPresenceCheckedAt')
-      .lean()
+    const database = await getMeetingDatabase(auth.tenant.databaseName)
+    let meeting = (await database.list('meetings', { filters: [meetingFilter('roomId', roomId)], limit: 1 })).records[0]
+    if (meeting && (meeting.type !== 'online' || meeting.isLinkActive === false)) meeting = null
     if (!meeting) return error('Meeting not found', 404, 'MEETING_NOT_FOUND')
-    const employeeId = String(auth.user.employeeId || '')
+    const employeeId = String(auth.user.employeeId?._id || auth.user.employeeId || '')
     const invited = meeting.invitees?.some((invitee) => String(invitee.employee) === employeeId)
     const organizer = String(meeting.organizer) === employeeId
     if (!organizer && !invited && !['admin', 'hr'].includes(auth.user.role)) {
       return error('You are not invited to this meeting', 403, 'NOT_INVITED')
     }
-    try { meeting = await refreshMeetingAvailability(auth.models.Meeting, meeting, auth.tenant.databaseName) } catch { return error('Meeting presence could not be checked. Please retry.', 503, 'PRESENCE_UNAVAILABLE') }
+    try { meeting = await refreshMeetingAvailability(database, meeting, auth.tenant.databaseName) } catch { return error('Meeting presence could not be checked. Please retry.', 503, 'PRESENCE_UNAVAILABLE') }
     if (meeting.isLinkActive === false || ['completed', 'cancelled'].includes(meeting.status)) {
       return error('This meeting has ended', 410, 'MEETING_ENDED')
     }
@@ -135,7 +129,7 @@ export async function POST(request) {
 
     const identity = `user_${auth.user.id || auth.user._id}`
     const activeMeetingResponse = await checkActiveMeeting({
-      Meeting: auth.models.Meeting,
+      database,
       databaseName: auth.tenant.databaseName,
       identity,
       roomId: meeting.roomId,
@@ -143,7 +137,7 @@ export async function POST(request) {
     if (activeMeetingResponse) return activeMeetingResponse
 
     const employee = auth.user.employeeId
-      ? await auth.models.Employee.findById(auth.user.employeeId).select('firstName lastName').lean()
+      ? await database.get('employees', employeeId)
       : null
     const displayName = [employee?.firstName, employee?.lastName].filter(Boolean).join(' ') || auth.user.email
     const credentials = await createLiveKitParticipantToken({

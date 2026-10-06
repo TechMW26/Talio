@@ -33,6 +33,7 @@ describe('dashboard performance boundaries', () => {
   const socketContextSource = fs.readFileSync(path.join(process.cwd(), 'contexts/SocketContext.js'), 'utf8')
   const employeeStatsSource = fs.readFileSync(path.join(process.cwd(), 'app/api/dashboard/employee-stats/route.js'), 'utf8')
   const liveUsersSource = fs.readFileSync(path.join(process.cwd(), 'app/api/admin/live-users/route.js'), 'utf8')
+  const liveUsersServiceSource = fs.readFileSync(path.join(process.cwd(), 'lib/adminOperations.server.js'), 'utf8')
   const managerStatsSource = fs.readFileSync(path.join(process.cwd(), 'app/api/dashboard/manager-stats/route.js'), 'utf8')
   const cacheSource = fs.readFileSync(path.join(process.cwd(), 'lib/cache.js'), 'utf8')
 
@@ -144,13 +145,15 @@ describe('dashboard performance boundaries', () => {
   })
 
   test('batches high-frequency dashboard database work', () => {
-    expect((employeeStatsSource.match(/Attendance\.find\(/g) || []).length).toBe(1)
+    expect((employeeStatsSource.match(/projectRows\(database, 'attendances'/g) || []).length).toBe(1)
+    expect(employeeStatsSource).toContain("f('employee', employee._id), f('date', lastMonthStart, '>='), f('date', currentMonthEnd, '<=')")
     expect(employeeStatsSource).toContain('attendanceWindow')
     expect(employeeStatsSource).toContain('] = await Promise.all([')
-    expect(liveUsersSource).toContain('attendanceByEmployeeId')
-    expect(liveUsersSource).not.toContain('todayAttendance.find(')
-    expect(liveUsersSource).not.toContain('allUsers.filter(')
-    expect((managerStatsSource.match(/Attendance\.find\(/g) || []).length).toBe(1)
+    expect(liveUsersSource).toContain("handleAdminOperation(request, 'live-users')")
+    expect(liveUsersServiceSource).toContain('new Map(attendance.map')
+    expect(liveUsersServiceSource).not.toContain('todayAttendance.find(')
+    expect(liveUsersServiceSource).not.toContain('allUsers.filter(')
+    expect((managerStatsSource.match(/scopedEmployeeRows\(database, 'attendances'/g) || []).length).toBe(1)
     expect(managerStatsSource).toContain('todayAttendanceRows')
     expect(managerStatsSource).toContain('attendanceCountByStatus')
   })

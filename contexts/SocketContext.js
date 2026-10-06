@@ -280,6 +280,14 @@ export function SocketProvider({ children }) {
       setIsConnected(false)
     })
 
+    // An intentionally disabled provider is not an outage. Keep the existing
+    // database polling fallback without starting Pusher/auth retry traffic.
+    socketInstance.on('realtime_disabled', () => {
+      setIsConnected(false)
+      startRefreshPolling()
+      startHeartbeat()
+    })
+
     // When all reconnection attempts are exhausted, start DB polling fallback
     socketInstance.on('reconnect_failed', () => {
       console.warn('⚠️ [Socket.IO Client] All reconnection attempts failed - switching to polling fallback.')

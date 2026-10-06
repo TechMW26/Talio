@@ -1,20 +1,23 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Select, SelectItem, Button, Skeleton } from '@heroui/react'
-import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch, FaMicrophone } from 'react-icons/fa'
-import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
+import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch, FaMicrophone } from 'react-icons/fa'
+import { HiOutlineOfficeBuilding, HiOutlineCog, } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
 import { useTheme } from '@/contexts/ThemeContext'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
-import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
+import { saveCompanySettings, validateCompanyLogo } from '@/lib/client/companySettings'
 import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
 import MiraSettings from '@/components/settings/MiraSettings'
 import InductionSettings from '@/components/settings/InductionSettings'
+import ProductivitySettings from '@/components/settings/ProductivitySettings'
 import WordPressRecruitmentSettings from '@/components/settings/WordPressRecruitmentSettings'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 
@@ -40,7 +43,7 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
           onClick={onBack}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
         >
-          <HiOutlineArrowLeft className="w-5 h-5" />
+          <BackIcon className="w-5 h-5" />
           <span>Back to Companies</span>
         </button>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
@@ -146,6 +149,7 @@ export default function SettingsPage() {
       )
     }
 
+    if (userRole === 'admin') baseTabs.push({ id: 'productivity', name: 'Productivity', description: 'Screenshot capture and storage controls', group: 'Attendance & workplace', icon: FaDesktop })
     // MIRA preferences are personal and available to every signed-in user.
     baseTabs.push({ id: 'mira', name: 'MIRA', description: 'Voice, personal instructions and knowledge', group: 'Personalisation', icon: FaMicrophone })
 
@@ -331,6 +335,7 @@ export default function SettingsPage() {
           {activeTab === 'notifications' && <NotificationsTab />}
           {activeTab === 'mira' && <MiraSettings />}
           {activeTab === 'induction' && <InductionSettings />}
+          {activeTab === 'productivity' && userRole === 'admin' && <ProductivitySettings />}
         </section>
       </div>
     </div>
@@ -669,6 +674,7 @@ function CompanySettingsTab() {
   const [editingCompany, setEditingCompany] = useState(null)
   const [saving, setSaving] = useState(false)
   const [logoFile, setLogoFile] = useState(null)
+  const [savePhase, setSavePhase] = useState('Saving…')
   const [logoPreview, setLogoPreview] = useState(null)
   const [isMounted, setIsMounted] = useState(false)
   const [formData, setFormData] = useState({
@@ -785,6 +791,11 @@ function CompanySettingsTab() {
   const handleLogoChange = (e) => {
     const file = e.target.files[0]
     if (file) {
+      try { validateCompanyLogo(file) } catch (error) {
+        toast.error(error.message)
+        e.target.value = ''
+        return
+      }
       setLogoFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
@@ -794,73 +805,26 @@ function CompanySettingsTab() {
     }
   }
 
-  const uploadLogo = async () => {
-    if (!logoFile) return null
-
-    try {
-      const token = localStorage.getItem('token')
-      const data = await uploadAuthenticatedFile(logoFile, { category: 'company', token })
-      if (data.success) {
-        // Handle both response formats (direct fileUrl or nested in data object)
-        return data.fileUrl || (data.data && data.data.fileUrl)
-      } else {
-        toast.error(data.message || 'Failed to upload logo')
-        return null
-      }
-    } catch (error) {
-      console.error('Error uploading logo:', error)
-      toast.error('Error uploading logo')
-    }
-    return null
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Submitting company form:', formData) // Debug log
+    if (saving) return
     setSaving(true)
-
     try {
-      let logoUrl = formData.logo
-
-      // Upload logo if changed
-      if (logoFile) {
-        const uploadedUrl = await uploadLogo()
-        if (uploadedUrl) {
-          logoUrl = uploadedUrl
-        }
-      }
-
-      const submitData = {
-        ...formData,
-        logo: logoUrl
-      }
-
-      const token = localStorage.getItem('token')
-      const url = editingCompany
-        ? `/api/companies/${editingCompany._id}`
-        : '/api/companies'
-
-      console.log('Sending request to:', url, 'with data:', submitData)
-      const response = await fetch(url, {
-        method: editingCompany ? 'PUT' : 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      await saveCompanySettings({
+        companyId: editingCompany?._id,
+        values: formData, logoFile,
+        token: localStorage.getItem('token'),
+        onPhase: setSavePhase,
+        onLogoUploaded: logo => {
+          setFormData(previous => ({ ...previous, logo }))
+          setLogoFile(null)
         },
-        body: JSON.stringify(submitData)
       })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(editingCompany ? 'Company updated successfully!' : 'Company created successfully!')
-        mutateCompanies()
-        handleCloseModal()
-      } else {
-        toast.error(data.message || 'Failed to save company')
-      }
+      toast.success(editingCompany ? 'Company updated successfully!' : 'Company created successfully!')
+      mutateCompanies()
+      handleCloseModal()
     } catch (error) {
-      console.error('Error saving company:', error)
-      toast.error('Failed to save company')
+      toast.error(error.message || 'Failed to save company')
     } finally {
       setSaving(false)
     }
@@ -1058,11 +1022,12 @@ function CompanySettingsTab() {
                     <div className="flex-1">
                       <input
                         type="file"
-                        accept="image/*"
+                        accept=".svg,.webp,.png,.jpg,.jpeg,.gif,image/svg+xml,image/png,image/jpeg,image/webp,image/gif"
+                        disabled={saving}
                         onChange={handleLogoChange}
                         className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
                       />
-                      <p className="text-xs text-gray-500 mt-2">Recommended: Square image, max 10MB</p>
+                      <p className="text-xs text-gray-500 mt-2">SVG, WebP, PNG, JPG/JPEG or GIF · Max 10 MB. Logos are optimized for display.</p>
                     </div>
                   </div>
                 </div>
@@ -1350,7 +1315,7 @@ function CompanySettingsTab() {
                 <LoadingButton
                   type="submit"
                   isLoading={saving}
-                  loadingText="Saving..."
+                  loadingText={savePhase}
                   color="primary"
                 >
                   {editingCompany ? 'Update Company' : 'Create Company'}

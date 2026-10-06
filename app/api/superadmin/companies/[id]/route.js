@@ -7,9 +7,9 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
-import getUserTenantMappingModel from '@/models/UserTenantMapping';
-import { getTenantConnection, dropTenantDatabase } from '@/lib/tenantDb';
+import { validateCompanyInput, getSuperadminStore, mutateCompany, readReportPages } from '@/lib/platform/firestoreSuperadmin.server';
+import { getFirestoreTenantDatabase, setFirestoreTenantActive } from '@/lib/platform/firestoreApplication.server';
+import { clearTenantCache } from '@/lib/tenantContext';
 import { mergeCompanyFeatures } from '@/lib/planFeatures';
 import { normalizeHrmsFeatures } from '@/lib/hrms/moduleRegistry';
 import { clearTenantCompanyFeaturesCache } from '@/lib/companyFeatures.server';
@@ -29,9 +29,9 @@ export async function GET(request, { params }) {
     }
 
     const { id } = await params;
-    const TenantCompany = await getTenantCompanyModel();
+    const database = await getSuperadminStore();
 
-    const company = await TenantCompany.findById(id).lean();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -40,31 +40,17 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Get user count from tenant database if setup is complete
     let userStats = null;
-    if (company.isSetupComplete) {
-      try {
-        const tenantConnection = await getTenantConnection(company.databaseName);
-        const usersCollection = tenantConnection.db.collection('users');
-        const userCount = await usersCollection.countDocuments({});
-        const activeUserCount = await usersCollection.countDocuments({ isActive: true });
-        userStats = { total: userCount, active: activeUserCount };
-      } catch (error) {
-        console.warn(`Could not get user stats for ${company.databaseName}:`, error.message);
-      }
-    }
-
-    // Fallback: get mapped users count from central DB
-    if (!userStats) {
-      try {
-        const UserTenantMapping = await getUserTenantMappingModel();
-        const mappedUsersCount = await UserTenantMapping.countDocuments({ tenantCompanyId: company._id });
-        if (mappedUsersCount > 0) {
-          userStats = { total: mappedUsersCount, active: mappedUsersCount };
-        }
-      } catch (error) {
-        console.warn(`Could not get mapped user count for ${company.name}:`, error.message);
-      }
+    if (company.isActive && company.isSetupComplete) {
+      const tenant = await getFirestoreTenantDatabase(company.databaseName, { queryFields: { users: ['isActive'] } });
+      const [total, active] = await Promise.all([
+        tenant.count('users'),
+        tenant.count('users', [{ field: 'isActive', operator: '==', value: true }]),
+      ]);
+      userStats = { total, active };
+    } else {
+      const mapped = await readReportPages(database, 'usertenantmappings', { filters: [{ field: 'tenantCompanyId', operator: '==', value: company._id }] });
+      userStats = { total: mapped.length, active: mapped.filter(row => row.isActive).length };
     }
 
     // Generate setup URL if not yet used
@@ -88,7 +74,7 @@ export async function GET(request, { params }) {
     console.error('[SuperAdmin Company GET] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to fetch company', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }
@@ -107,13 +93,13 @@ export async function PATCH(request, { params }) {
     }
 
     const { id } = await params;
-    const body = await request.json();
+    const body = validateCompanyInput(await request.json());
     if (body.features && typeof body.features === 'object') {
       body.features = normalizeHrmsFeatures(body.features)
     }
-    const TenantCompany = await getTenantCompanyModel();
+    const database = await getSuperadminStore();
 
-    const company = await TenantCompany.findById(id);
+    let company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -142,38 +128,27 @@ export async function PATCH(request, { params }) {
       'features', 'miraTokens',
     ];
 
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        if (nestedFields.includes(field)) {
-          // Merge nested objects to preserve existing data
-          const existingData = company[field]?.toObject?.() || company[field] || {};
-          company[field] = { ...existingData, ...body[field] };
-
-          // Handle subscription tenure calculation
-          if (field === 'subscription' && body[field].tenureDays && body[field].startDate) {
-            const startDate = new Date(body[field].startDate);
-            const endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + parseInt(body[field].tenureDays));
-            company.subscription.endDate = endDate;
-          }
-        } else {
-          company[field] = body[field];
-        }
-      }
+    if (body.serviceStatus !== undefined && !['active', 'paused', 'suspended', 'terminated'].includes(body.serviceStatus)) return NextResponse.json({ success: false, message: 'Invalid service status' }, { status: 400 });
+    for (const field of nestedFields) {
+      if (body[field] !== undefined && (!body[field] || typeof body[field] !== 'object' || Array.isArray(body[field]))) return NextResponse.json({ success: false, message: field + ' must be an object' }, { status: 400 });
     }
-
-    // Handle service status changes
-    if (body.serviceStatus) {
-      if (body.serviceStatus === 'paused' || body.serviceStatus === 'suspended') {
-        company.servicePausedAt = new Date();
-        company.servicePausedReason = body.servicePausedReason || 'No reason provided';
-      } else if (body.serviceStatus === 'active' && company.serviceStatus !== 'active') {
-        company.serviceResumedAt = new Date();
+    company = await mutateCompany(database, id, current => {
+      const next = { ...current };
+      for (const field of allowedFields) {
+        if (body[field] !== undefined) next[field] = nestedFields.includes(field) ? { ...current[field], ...body[field] } : body[field];
       }
-      company.serviceStatus = body.serviceStatus;
-    }
-
-    await company.save();
+      if (body.subscription?.tenureDays && body.subscription?.startDate) {
+        const startDate = new Date(body.subscription.startDate);
+        const days = Number(body.subscription.tenureDays);
+        if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(days) || days <= 0) throw Object.assign(new Error('Invalid subscription dates'), { status: 400 });
+        next.subscription.endDate = new Date(startDate.getTime() + days * 86400000);
+      }
+      if (['paused', 'suspended'].includes(body.serviceStatus)) {
+        next.servicePausedAt = new Date();
+        next.servicePausedReason = body.servicePausedReason || 'No reason provided';
+      } else if (body.serviceStatus === 'active' && current.serviceStatus !== 'active') next.serviceResumedAt = new Date();
+      return next;
+    });
 
     if (featuresOrPlanChanged) {
       await Promise.all([
@@ -219,7 +194,7 @@ export async function PATCH(request, { params }) {
     console.error('[SuperAdmin Company PATCH] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to update company', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }
@@ -251,8 +226,8 @@ export async function DELETE(request, { params }) {
     const { searchParams } = new URL(request.url);
     const isPermanent = searchParams.get('permanent') === 'true';
 
-    const TenantCompany = await getTenantCompanyModel();
-    const company = await TenantCompany.findById(id);
+    const database = await getSuperadminStore();
+    const company = await database.get('tenantcompanies', id);
 
     if (!company) {
       return NextResponse.json(
@@ -261,65 +236,28 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const UserTenantMapping = await getUserTenantMappingModel();
-
     if (isPermanent) {
-      // Hard delete - drop database and remove all records
-      console.log(`🗑️ [SuperAdmin] Hard deleting company: ${company.name} (${company.slug})`);
-
-      // 1. Drop the tenant database
-      if (company.databaseName) {
-        const dropResult = await dropTenantDatabase(company.databaseName);
-        if (!dropResult.success) {
-          console.error(`Failed to drop database: ${dropResult.message}`);
-          // Continue with deletion even if database drop fails
-        } else {
-          console.log(`✅ Dropped database: ${company.databaseName}`);
+      return NextResponse.json({ success: false, message: 'Permanent deletion is disabled during migration acceptance. Archive the company instead; all data will be preserved.' }, { status: 409 });
+    }
+    await setFirestoreTenantActive(id, false, { superadminId: auth.superadmin._id });
+    const mappings = await readReportPages(database, 'usertenantmappings', { filters: [{ field: 'tenantCompanyId', operator: '==', value: company._id }] });
+    for (let offset = 0; offset < mappings.length; offset += 50) {
+      await database.transaction(async tx => {
+        for (const mapping of mappings.slice(offset, offset + 50)) {
+          const current = await tx.get('usertenantmappings', String(mapping._id));
+          if (current?.tenantCompanyId === company._id) await tx.replace('usertenantmappings', { ...current, isActive: false, updatedAt: new Date() });
         }
-      }
-
-      // 2. Delete all user tenant mappings for this company
-      const mappingDeleteResult = await UserTenantMapping.deleteMany({ tenantCompanyId: company._id });
-      console.log(`✅ Deleted ${mappingDeleteResult.deletedCount} user mappings`);
-
-      // 3. Permanently delete the company record
-      await TenantCompany.findByIdAndDelete(id);
-      console.log(`✅ Deleted company record: ${company.name}`);
-
-      return NextResponse.json({
-        success: true,
-        message: `Company "${company.name}" and all its data have been permanently deleted`,
-        deleted: {
-          company: company.name,
-          databaseDropped: company.databaseName,
-          userMappingsDeleted: mappingDeleteResult.deletedCount,
-        },
-      });
-    } else {
-      // Soft delete - mark as inactive
-      company.isActive = false;
-      company.serviceStatus = 'terminated';
-      company.servicePausedAt = new Date();
-      company.servicePausedReason = 'Company deleted by superadmin';
-      await company.save();
-
-      // Also deactivate all user mappings for this company
-      await UserTenantMapping.updateMany(
-        { tenantCompanyId: company._id },
-        { $set: { isActive: false } }
-      );
-
-      return NextResponse.json({
-        success: true,
-        message: 'Company soft deleted successfully (data preserved)',
       });
     }
+    clearTenantCache();
+    await clearTenantCompanyFeaturesCache({ companySlug: company.slug, databaseName: company.databaseName });
+    return NextResponse.json({ success: true, message: 'Company archived successfully (all data preserved)' });
 
   } catch (error) {
     console.error('[SuperAdmin Company DELETE] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to delete company', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }

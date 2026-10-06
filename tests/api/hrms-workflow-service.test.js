@@ -1,10 +1,13 @@
 import {
-  buildWorkflowVisibilityFilter,
   canCreateWorkflow,
+  createWorkflow,
   sanitizeWorkflowData,
   transitionWorkflow,
   validateWorkflowPayload,
 } from '@/lib/hrms/workflowService.server'
+
+import { canReadWorkflow } from '@/lib/hrms/workflowStore.server'
+import { workflowStore } from '../helpers/firestoreWorkflowStore'
 
 describe('HRMS workflow service', () => {
   test('validates module-specific required data', () => {
@@ -40,56 +43,38 @@ describe('HRMS workflow service', () => {
   })
 
   test('keeps confidential manager access scoped to assigned or owned cases', () => {
-    expect(buildWorkflowVisibilityFilter({ role: 'manager', id: 'u1', employeeId: 'e1' }))
-      .toEqual({ $or: [
-        { confidential: { $ne: true } },
-        { owner: 'u1' },
-        { createdBy: 'u1' },
-        { assignees: 'u1' },
-        { subjectEmployee: 'e1' },
-      ] })
+    const user = { role: 'manager', id: 'u1', employeeId: 'e1' }
+    expect(canReadWorkflow(user, { confidential: true, owner: 'other' })).toBe(false)
+    expect(canReadWorkflow(user, { confidential: true, owner: 'u1' })).toBe(true)
+    expect(canReadWorkflow(user, { confidential: false })).toBe(true)
   })
-
   test('rejects invalid transitions without writing', async () => {
-    const Workflow = { findOneAndUpdate: jest.fn() }
-    const Event = { create: jest.fn() }
-    const result = await transitionWorkflow({
-      Workflow, Event,
-      workflow: { _id: 'case1', version: 1, status: 'draft', module: 'mrfWorkflow' },
-      actor: { id: 'u1', role: 'hr' },
-      action: 'approve',
-    })
+    const database = workflowStore()
+    const result = await transitionWorkflow({ database, workflow: { _id: 'case1', version: 1, status: 'draft', module: 'mrfWorkflow' }, actor: { id: 'u1', role: 'hr' }, action: 'approve' })
     expect(result).toMatchObject({ success: false, status: 409, code: 'INVALID_TRANSITION' })
-    expect(Workflow.findOneAndUpdate).not.toHaveBeenCalled()
+    expect(database.transaction).not.toHaveBeenCalled()
   })
-
-  test('uses optimistic concurrency and writes an immutable audit event', async () => {
-    const updated = { _id: 'case1', version: 2, status: 'submitted', module: 'mrfWorkflow' }
-    const Workflow = { findOneAndUpdate: jest.fn().mockResolvedValue(updated) }
-    const Event = { create: jest.fn().mockResolvedValue({}) }
-    const result = await transitionWorkflow({
-      Workflow, Event,
-      workflow: { _id: 'case1', version: 1, status: 'draft', module: 'mrfWorkflow' },
-      actor: { id: 'u1', role: 'employee' },
-      action: 'submit',
-    })
-    expect(result).toMatchObject({ success: true, workflow: updated })
-    expect(Workflow.findOneAndUpdate).toHaveBeenCalledWith(
-      { _id: 'case1', version: 1 },
-      expect.objectContaining({ $inc: { version: 1 } }),
-      { new: true },
-    )
-    expect(Event.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'submit', fromStatus: 'draft', toStatus: 'submitted' }))
+  test('uses optimistic concurrency and atomically writes an immutable audit event', async () => {
+    const workflow = { _id: 'case1', version: 1, status: 'draft', module: 'mrfWorkflow' }
+    const database = workflowStore({ hrmsworkflows: [workflow] })
+    const result = await transitionWorkflow({ database, workflow, actor: { id: 'u1', role: 'employee' }, action: 'submit' })
+    expect(result).toMatchObject({ success: true, workflow: { _id: 'case1', version: 2, status: 'submitted' } })
+    expect((await database.list('hrmsworkflowevents')).records[0]).toMatchObject({ type: 'submit', fromStatus: 'draft', toStatus: 'submitted' })
   })
-
-  test('returns a version conflict if another actor won the race', async () => {
-    const result = await transitionWorkflow({
-      Workflow: { findOneAndUpdate: jest.fn().mockResolvedValue(null) },
-      Event: { create: jest.fn() },
-      workflow: { _id: 'case1', version: 3, status: 'submitted', module: 'mrfWorkflow' },
-      actor: { id: 'u2', role: 'hr' },
-      action: 'approve',
-    })
+  test('returns version conflict if another actor won the race', async () => {
+    const database = workflowStore()
+    const result = await transitionWorkflow({ database, workflow: { _id: 'case1', version: 3, status: 'submitted', module: 'mrfWorkflow' }, actor: { id: 'u2', role: 'hr' }, action: 'approve' })
     expect(result).toMatchObject({ success: false, status: 409, code: 'VERSION_CONFLICT' })
+  })
+  test('create retries reuse deterministic ID and event; event failure rolls back workflow', async () => {
+    const database = workflowStore(), args = { database, actor: { id: 'u1', role: 'hr' }, payload: { module: 'helpdesk', title: 'Printer repair', data: {}, idempotencyKey: 'stable' }, allowIncompleteData: true }
+    const first = await createWorkflow(args)
+    const second = await createWorkflow(args)
+    expect(first.success).toBe(true); expect(second.deduplicated).toBe(true)
+    expect(first.workflow._id).toBe(second.workflow._id)
+    expect(await database.count('hrmsworkflowevents')).toBe(1)
+    database.failCreate = 'hrmsworkflowevents'
+    await expect(createWorkflow({ ...args, payload: { ...args.payload, idempotencyKey: 'other' } })).rejects.toThrow('Simulated write failure')
+    expect(await database.count('hrmsworkflows')).toBe(1)
   })
 })

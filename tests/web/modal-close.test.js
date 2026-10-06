@@ -2,6 +2,33 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import Modal from '@/components/ui/HeroModal'
 import { ModalContent, ModalHeader, ModalBody } from '@heroui/react'
 import { useState } from 'react'
+import fs from 'fs'
+import path from 'path'
+import postcss from 'postcss'
+
+test('default close icon uses a standard compact size and stroke', () => {
+  render(<Modal isOpen disableAnimation><ModalContent><ModalHeader>Example</ModalHeader></ModalContent></Modal>)
+  const icon = screen.getByRole('button', { name: 'Close' }).querySelector('svg')
+  expect(icon).toHaveAttribute('width', '18')
+  expect(icon).toHaveAttribute('height', '18')
+  expect(icon).toHaveAttribute('stroke-width', '2')
+})
+
+test('shared close styles are compact with larger touch targets', () => {
+  const css = postcss.parse(fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8'))
+  const rules = []
+  css.walkRules(rule => rules.push(rule))
+  const controls = rules.find(rule => rule.selector.includes('button[title="Close"]') && rule.parent.type === 'root' && !rule.selector.includes('svg'))
+  const icons = rules.find(rule => rule.selector.includes('button[title="Close"] svg'))
+  const touch = rules.find(rule => rule.selector.includes('button[title="Close"]') && rule.parent.params === '(pointer: coarse)')
+  for (const prop of ['min-width', 'min-height']) {
+    expect(controls.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ prop, value: '32px' })]))
+    expect(touch.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ prop, value: '44px' })]))
+  }
+  for (const prop of ['width', 'height']) {
+    expect(icons.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ prop, value: '18px', important: true })]))
+  }
+})
 
 test('close button notifies the owner once', () => {
   const onClose = jest.fn()

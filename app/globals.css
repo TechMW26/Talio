@@ -46,6 +46,19 @@ html[data-desktop-platform] .talioboard-window-header button,
 html[data-desktop-platform] .talioboard-window-header button * {
   -webkit-app-region: no-drag;
 }
+
+/* Older desktop builds marked every header descendant as draggable. Override
+   that injected rule for page/dialog headers and interactive hit targets.
+   Keep only the navigation and board title bars available for window dragging. */
+html[data-desktop-platform] header:not(.talio-navigation-header):not(.talioboard-window-header),
+html[data-desktop-platform] header:not(.talio-navigation-header):not(.talioboard-window-header) *,
+html[data-desktop-platform] :is([role="dialog"], [role="alertdialog"]),
+html[data-desktop-platform] :is([role="dialog"], [role="alertdialog"]) *,
+html[data-desktop-platform] :is(button, a, input, textarea, select, label, summary, [role="button"], [tabindex], [contenteditable="true"], .cursor-pointer),
+html[data-desktop-platform] :is(button, a, label, summary, [role="button"], [tabindex], [contenteditable="true"], .cursor-pointer) * {
+  -webkit-app-region: no-drag !important;
+  app-region: no-drag !important;
+}
 html[data-desktop-platform] .talioboard-window-error {
   padding-top: calc(var(--desktop-safe-top, 0px) + 24px);
 }
@@ -159,6 +172,15 @@ html:is(:root, .dark, .light) body [data-slot="input-wrapper"] input {
 html:is(:root, .dark, .light) body [data-search-container] input {
   background: transparent !important;
   border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Keyboard focus belongs to the same outer boundary as the field surface. */
+html:is(:root, .dark, .light) body [data-search-container]:has(input:focus-visible) {
+  outline: 2px solid var(--color-primary-500, #737373);
+  outline-offset: 2px;
 }
 
 /* Floating AI surfaces share MIRA's glass treatment without changing canvas colors. */
@@ -222,6 +244,11 @@ html body :is([data-slot="input-wrapper"], button[data-slot="trigger"][aria-hasp
 
 html body [data-slot="input-wrapper"] :is(input, textarea, [data-slot="inner-wrapper"]) {
   background-color: transparent !important;
+}
+
+/* Round the visible Select control, not its borderless layout shell. */
+html body button[data-slot="trigger"][aria-haspopup="listbox"] {
+  border-radius: 0.75rem !important;
 }
 
 html body [data-slot="input-wrapper"]:focus-within,
@@ -295,9 +322,9 @@ button[data-slot="trigger"] [data-slot="innerWrapper"] {
   background-color: transparent !important;
 }
 
-[data-slot="input-wrapper"] input,
-[data-slot="input-wrapper"] textarea,
-[data-slot="input-wrapper"] [data-slot="inner-wrapper"] {
+html body [data-slot="input-wrapper"] input,
+html body [data-slot="input-wrapper"] textarea,
+html body [data-slot="input-wrapper"] [data-slot="inner-wrapper"] {
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -2175,8 +2202,8 @@ section[role="dialog"] {
 [role="dialog"] > button[aria-label="Close"] {
   top: 14px !important;
   right: 14px !important;
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   z-index: 30;
   pointer-events: auto !important;
   -webkit-app-region: no-drag;
@@ -2186,26 +2213,43 @@ section[role="dialog"] {
 [role="dialog"] > button[aria-label="Close"] svg { pointer-events: none; }
 [role="dialog"]:has(> button[aria-label="Close"]) > header { padding-right: 72px !important; }
 
-/* Consistent, readable crosses for shared modals and labelled popup controls. */
+.talio-back-icon {
+  display: inline-block;
+  object-fit: contain;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+html.dark .talio-back-icon { filter: invert(1); }
+
+/* Standard compact close controls; retain larger targets on touch devices. */
 button[aria-label^="Close"],
 button[title="Close"],
 .modal-close-btn {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 32px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 18px;
   line-height: 1;
   flex-shrink: 0;
 }
 button[aria-label^="Close"] svg,
 button[title="Close"] svg,
 .modal-close-btn svg {
-  width: 24px !important;
-  height: 24px !important;
+  width: 18px !important;
+  height: 18px !important;
   flex-shrink: 0;
   pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  button[aria-label^="Close"],
+  button[title="Close"],
+  .modal-close-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* ============================================

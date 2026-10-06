@@ -1,8 +1,10 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useMemo, useCallback } from 'react'
 import { Button, Input, Textarea, Switch, Chip } from '@heroui/react'
-import { FaArrowLeft, FaSave, FaToggleOn, FaToggleOff } from 'react-icons/fa'
+import { FaSave, FaToggleOn, FaToggleOff } from 'react-icons/fa'
 import { toast } from '@/utils/toast'
 import useApiMutation from '@/hooks/useApiMutation'
 import {
@@ -184,7 +186,7 @@ export default function RoleBuilder({ role, onClose }) {
             <div className="flex items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-3">
                     <Button size="sm" variant="light" isIconOnly onPress={onClose}>
-                        <FaArrowLeft />
+                        <BackIcon />
                     </Button>
                     <div>
                         <h1 className="text-xl font-bold text-gray-900 dark:text-white">

@@ -1,9 +1,11 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { FaUserPlus, FaUsers, FaTimes, FaFile, FaImage, FaFilePdf, FaUser, FaComments, FaArrowDown, FaArrowLeft } from 'react-icons/fa'
+import { FaUserPlus, FaUsers, FaTimes, FaFile, FaImage, FaFilePdf, FaUser, FaComments, FaArrowDown, } from 'react-icons/fa'
 import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -795,7 +797,7 @@ export default function ChatPage() {
                     className="text-gray-600 hover:text-gray-900 -ml-1 md:hidden"
                     title="Back to chats"
                   >
-                    <FaArrowLeft className="text-xl" />
+                    <BackIcon className="text-xl" />
                   </button>
                   <div
                     className="w-11 h-11 md:w-10 md:h-10 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"

@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, use } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -167,7 +169,7 @@ export default function ResetPasswordPage({ params }) {
 
               <div className="mt-6 pt-6 border-t border-white/10">
                 <Link href="/login" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  ← Back to Login
+                  <BackIcon className="mr-2 h-4 w-4" /> Back to Login
                 </Link>
               </div>
             </div>

@@ -1,297 +1,54 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { randomBytes } from 'node:crypto'
+import { geofenceContext, populateGeofenceRecord } from '@/lib/platform/firestoreGeofence.server'
+import { attendanceId, attendanceError, populateAttendanceEmployee } from '@/lib/platform/firestoreAttendance.server'
+import { getProductivityVisibility, queryProductivityByIds } from '@/lib/platform/firestoreProductivityView.server'
 import { evaluateEmployeeGeofence, isValidCoordinate } from '@/lib/geofencing'
-
-// Check if current time is during work hours
-function isDuringWorkHours(checkInTime, checkOutTime) {
-  if (!checkInTime || !checkOutTime) return false
-  const now = new Date()
-  const currentTime = now.getHours() * 60 + now.getMinutes() // Minutes since midnight
-
-  const [checkInHour, checkInMin] = checkInTime.split(':').map(Number)
-  const [checkOutHour, checkOutMin] = checkOutTime.split(':').map(Number)
-
-  const checkInMinutes = checkInHour * 60 + checkInMin
-  const checkOutMinutes = checkOutHour * 60 + checkOutMin
-
-  return currentTime >= checkInMinutes && currentTime <= checkOutMinutes
-}
-
-// Check if current time is during break time
-function isDuringBreakTime(breakTimings) {
-  if (!breakTimings || breakTimings.length === 0) return { isDuringBreak: false }
-
-  const now = new Date()
-  const currentTime = now.getHours() * 60 + now.getMinutes()
-  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][now.getDay()]
-
-  for (const breakTiming of breakTimings) {
-    if (!breakTiming.isActive) continue
-
-    // Check if today is in the break timing's days
-    if (breakTiming.days && breakTiming.days.length > 0 && !breakTiming.days.includes(currentDay)) {
-      continue
-    }
-
-    const [startHour, startMin] = breakTiming.startTime.split(':').map(Number)
-    const [endHour, endMin] = breakTiming.endTime.split(':').map(Number)
-
-    const startMinutes = startHour * 60 + startMin
-    const endMinutes = endHour * 60 + endMin
-
-    if (currentTime >= startMinutes && currentTime <= endMinutes) {
-      return { isDuringBreak: true, breakName: breakTiming.name }
-    }
-  }
-
-  return { isDuringBreak: false }
-}
-
-// POST - Log geofence event
+import { getDateKeyInTimezone, getDayNameInTimezone, getTimezone, parseDateTimeInTimezone } from '@/lib/timezone'
+const failure = error => NextResponse.json({ success: false, message: error.message }, { status: error.status || 500 })
 export async function POST(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['GeofenceLog', 'GeofenceLocation', 'Employee', 'User', 'CompanySettings']);
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
-    }
-    const { user, models } = auth;
-    const { GeofenceLog, GeofenceLocation, Employee, User, CompanySettings } = models;
-
-    const { latitude, longitude, accuracy, eventType, reason } = await request.json();
-
-    if (!isValidCoordinate(latitude, longitude)) {
-      return NextResponse.json(
-        { success: false, message: 'Location coordinates are required' },
-        { status: 400 }
-      );
-    }
-
-    // Get user and employee data
-    const userId = user._id || user.userId;
-    const userRecord = await User.findById(userId).populate('employeeId');
-    if (!userRecord || !userRecord.employeeId) {
-      return NextResponse.json(
-        { success: false, message: 'Employee not found' },
-        { status: 404 }
-      );
-    }
-
-    const employee = await Employee.findById(userRecord.employeeId)
-      .populate('department')
-      .populate('reportingManager')
-      .populate('company')
-
-    // Get company settings for geofence
-    const globalSettings = await CompanySettings.findOne().lean()
-    const settings = employee.company?.geofence
-      ? {
-          ...globalSettings,
-          geofence: employee.company.geofence,
-          checkInTime: employee.company.workingHours?.checkInTime || globalSettings?.checkInTime || '09:00',
-          checkOutTime: employee.company.workingHours?.checkOutTime || globalSettings?.checkOutTime || '18:00',
-          breakTimings: employee.company.breakTimings || globalSettings?.breakTimings || [],
-        }
-      : globalSettings
-    if (!settings?.geofence?.enabled) {
-      return NextResponse.json(
-        { success: false, message: 'Geofencing is not enabled' },
-        { status: 400 }
-      )
-    }
-
-    const duringWorkHours = isDuringWorkHours(settings.checkInTime, settings.checkOutTime)
-
-    // Check if during break time
-    const breakCheck = isDuringBreakTime(settings.breakTimings)
-
-    const geofenceCheck = await evaluateEmployeeGeofence({
-      GeofenceLocation,
-      settings,
-      latitude,
-      longitude,
-      accuracy,
-      locationSource: 'gps',
-      employeeId: employee._id,
-      departmentId: employee.department?._id,
-      companyId: employee.company?._id,
-    })
-    const isWithinGeofence = geofenceCheck.withinGeofence
-    const distance = geofenceCheck.closestDistance || 0
-    const geofenceCenter = geofenceCheck.closestLocation?.center || null
-    const geofenceRadius = geofenceCheck.closestLocation?.radius || 0
-    const geofenceLocation = geofenceCheck.closestLocation?._id || null
-    const geofenceLocationName = geofenceCheck.closestLocation?.name || null
-    const checkedLocations = geofenceCheck.checkedLocations
-
-    // Create geofence log
-    const logData = {
-      employee: employee._id,
-      user: user._id,
-      eventType: ['exit', 'entry', 'outside_during_hours', 'location_update'].includes(eventType)
-        ? eventType
-        : (isWithinGeofence ? 'entry' : 'exit'),
-      location: {
-        latitude,
-        longitude,
-        accuracy,
-        timestamp: new Date(),
-      },
-      geofenceCenter,
-      geofenceRadius,
-      distanceFromCenter: Math.round(distance),
-      isWithinGeofence,
-      geofenceLocation,
-      geofenceLocationName,
-      checkedLocations,
-      duringBreakTime: breakCheck.isDuringBreak,
-      breakTimingName: breakCheck.breakName,
-      department: employee.department?._id,
-      reportingManager: employee.reportingManager?._id,
-      duringWorkHours,
-      deviceInfo: {
-        userAgent: request.headers.get('user-agent'),
-      },
-    }
-
-    // If outside geofence during work hours and reason provided (and not during break)
-    if (!isWithinGeofence && duringWorkHours && !breakCheck.isDuringBreak && reason) {
-      logData.outOfPremisesRequest = {
-        reason,
-        requestedAt: new Date(),
-        status: 'pending',
-      }
-    }
-
-    const log = await GeofenceLog.create(logData)
-
-    // Populate for response
-    await log.populate('employee reportingManager department geofenceLocation')
-
-    return NextResponse.json({
-      success: true,
-      message: 'Location logged successfully',
-      data: {
-        log,
-        isWithinGeofence,
-        distance: Math.round(distance),
-        locationName: geofenceLocationName,
-        duringBreakTime: breakCheck.isDuringBreak,
-        requiresApproval: !isWithinGeofence && duringWorkHours && !breakCheck.isDuringBreak && settings.geofence.requireApproval,
-      }
-    })
-
-  } catch (error) {
-    console.error('Geofence log error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to log location' },
-      { status: 500 }
-    )
-  }
+    const { database, user } = await geofenceContext(request)
+    const { latitude, longitude, accuracy, eventType, reason } = await request.json()
+    if (!isValidCoordinate(latitude, longitude)) throw attendanceError('Valid location coordinates required')
+    const employee = await populateAttendanceEmployee(database, await database.get('employees', attendanceId(user.employeeId)))
+    if (!employee) throw attendanceError('Employee not found', 404)
+    const global = (await database.list('companysettings', { limit: 1 })).records[0] || {}
+    const settings = { ...global, ...employee.company?.workingHours, geofence: employee.company?.geofence || global.geofence, breakTimings: employee.company?.breakTimings || global.breakTimings || [], timezone: getTimezone(employee.company?.timezone || global.timezone) }
+    if (!settings.geofence?.enabled) throw attendanceError('Geofencing is not enabled')
+    const now = new Date(), dateKey = getDateKeyInTimezone(now, settings.timezone), day = getDayNameInTimezone(now, settings.timezone)
+    const time = value => value ? parseDateTimeInTimezone(dateKey + 'T' + value + ':00', settings.timezone) : null
+    const duringWorkHours = Boolean(time(settings.checkInTime) && time(settings.checkOutTime) && now >= time(settings.checkInTime) && now <= time(settings.checkOutTime))
+    const currentBreak = settings.breakTimings.find(b => b.isActive && (!b.days?.length || b.days.includes(day)) && time(b.startTime) && now >= time(b.startTime) && now <= time(b.endTime))
+    const result = await evaluateEmployeeGeofence({ database, settings, latitude, longitude, accuracy, locationSource: 'gps', employeeId: employee._id, departmentId: employee.department?._id, companyId: employee.company?._id })
+    const log = { _id: randomBytes(12).toString('hex'), employee: employee._id, user: attendanceId(user._id || user.userId), eventType: ['exit', 'entry', 'outside_during_hours', 'location_update'].includes(eventType) ? eventType : result.withinGeofence ? 'entry' : 'exit',
+      location: { latitude: Number(latitude), longitude: Number(longitude), accuracy: Number.isFinite(Number(accuracy)) ? Number(accuracy) : null, timestamp: now },
+      geofenceCenter: result.closestLocation?.center || null, geofenceRadius: result.closestLocation?.radius || 0, distanceFromCenter: result.closestDistance, isWithinGeofence: result.withinGeofence,
+      geofenceLocation: result.closestLocation?._id || null, geofenceLocationName: result.closestLocation?.name || null, checkedLocations: result.checkedLocations,
+      duringBreakTime: Boolean(currentBreak), breakTimingName: currentBreak?.name || null, department: employee.department?._id || null, reportingManager: attendanceId(employee.reportingManager) || null,
+      duringWorkHours, deviceInfo: { userAgent: request.headers.get('user-agent') }, createdAt: now, updatedAt: now }
+    if (!result.withinGeofence && duringWorkHours && !currentBreak && reason) log.outOfPremisesRequest = { reason: String(reason).slice(0, 10000), requestedAt: now, status: 'pending' }
+    await database.create('geofencelogs', log)
+    return NextResponse.json({ success: true, message: 'Location logged successfully', data: { log: await populateGeofenceRecord(database, log, true), isWithinGeofence: result.withinGeofence, distance: result.closestDistance,
+      locationName: result.closestLocation?.name || null, duringBreakTime: Boolean(currentBreak), requiresApproval: !result.withinGeofence && duringWorkHours && !currentBreak && settings.geofence.requireApproval } })
+  } catch(error) { return failure(error) }
 }
-
-// GET - Get geofence logs (filtered by role and department)
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User', 'Department', 'Team']);
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
+    const { database, user } = await geofenceContext(request)
+    const params = new URL(request.url).searchParams, employeeId = params.get('employeeId'), status = params.get('status'), department = params.get('department'), teamId = params.get('team')
+    const limit = Math.min(100, Math.max(1, parseInt(params.get('limit'), 10) || 50))
+    const scope = await getProductivityVisibility(database, user, { includeSelf: true })
+    let employees = scope.employees.filter(e => (!employeeId || e._id === employeeId) && (!department || department === 'all' || attendanceId(e.department) === department))
+    if (teamId && teamId !== 'all') {
+      const team = await database.get('teams', teamId)
+      const ids = new Set([...(team?.members || []), ...(team?.teamLeaders || [])].map(attendanceId))
+      employees = employees.filter(e => ids.has(e._id))
     }
-    const { user, models } = auth;
-    const { GeofenceLog, Employee, User, Department, Team } = models;
-
-    const { searchParams } = new URL(request.url);
-    const employeeId = searchParams.get('employeeId');
-    const status = searchParams.get('status');
-    const limit = parseInt(searchParams.get('limit')) || 50;
-    const departmentFilter = searchParams.get('department');
-    const teamFilter = searchParams.get('team');
-
-    // Get user and employee data
-    const userId = user._id || user.userId;
-    const userRecord = await User.findById(userId).populate('employeeId');
-    if (!userRecord || !userRecord.employeeId) {
-      return NextResponse.json(
-        { success: false, message: 'Employee not found' },
-        { status: 404 }
-      );
-    }
-
-    const employee = await Employee.findById(userRecord.employeeId);
-
-    let query = {}
-
-    // Role-based filtering
-    if (user.role === 'admin' || user.role === 'hr') {
-      // Admin and HR can see all logs
-      if (employeeId) {
-        query.employee = employeeId
-      }
-      // Apply department filter
-      if (departmentFilter && departmentFilter !== 'all') {
-        query.department = departmentFilter
-      }
-    } else if (user.role === 'manager') {
-      // Managers can only see their department's logs
-      query.department = employee.department
-    } else if (employee) {
-      // Check if department head
-      const userRecord2 = await User.findById(userId).select('isDepartmentHead headOfDepartments').lean()
-      if (userRecord2?.isDepartmentHead && userRecord2?.headOfDepartments?.length > 0) {
-        // Department head: see their departments' logs
-        if (departmentFilter && departmentFilter !== 'all') {
-          query.department = departmentFilter
-        } else {
-          query.department = { $in: userRecord2.headOfDepartments }
-        }
-      } else {
-        // Employees can only see their own logs
-        query.employee = employee._id
-      }
-    }
-
-    // Apply team filter
-    if (teamFilter && teamFilter !== 'all' && Team) {
-      const team = await Team.findById(teamFilter).select('members teamLeaders').lean()
-      if (team) {
-        const teamMemberIds = [
-          ...team.members.map(id => id.toString()),
-          ...team.teamLeaders.map(id => id.toString())
-        ]
-        if (query.employee?.$in) {
-          query.employee = { $in: query.employee.$in.filter(id => teamMemberIds.includes(id.toString())) }
-        } else if (!query.employee) {
-          query.employee = { $in: teamMemberIds }
-        }
-      }
-    }
-
-    // Filter by status if provided
-    if (status) {
-      query['outOfPremisesRequest.status'] = status
-    }
-
-    const logs = await GeofenceLog.find(query)
-      .populate('employee', 'firstName lastName employeeCode profilePicture')
-      .populate('reportingManager', 'firstName lastName')
-      .populate('department', 'name')
-      .populate('geofenceLocation', 'name address')
-      .populate('outOfPremisesRequest.reviewedBy', 'firstName lastName')
-      .sort({ createdAt: -1 })
-      .limit(limit)
-
-    return NextResponse.json({
-      success: true,
-      data: logs
-    })
-
-  } catch (error) {
-    console.error('Get geofence logs error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch geofence logs' },
-      { status: 500 }
-    )
-  }
+    const filters = status ? [{ field: 'outOfPremisesRequest.status', operator: '==', value: status }] : []
+    const logs = await queryProductivityByIds(database, 'geofencelogs', 'employee', employees.map(e => e._id), filters)
+    const selected = logs.sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0, limit)
+    return NextResponse.json({ success: true, data: await Promise.all(selected.map(r => populateGeofenceRecord(database, r, true))) })
+  } catch(error) { return failure(error) }
 }
 

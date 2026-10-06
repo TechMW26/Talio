@@ -9,9 +9,10 @@ jest.mock('next/server', () => {
   return { NextResponse: MockNextResponse }
 })
 
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 
-const { getAuthAndModels } = require('@/lib/auth')
+const { getAuthAndDatabase } = require('@/lib/auth')
+const { workflowStore } = require('../helpers/firestoreWorkflowStore')
 const { PUT } = require('@/app/api/designations/[id]/route')
 
 const DESIGNATION_ID = '6957b35cbf0b9ea49ca507a1'
@@ -19,16 +20,9 @@ const DESIGNATION_ID = '6957b35cbf0b9ea49ca507a1'
 describe('designation item route', () => {
   beforeEach(() => jest.clearAllMocks())
 
-  test('uses the authenticated tenant model when a super admin updates a designation', async () => {
-    const existingQuery = {
-      select: jest.fn(() => existingQuery),
-      lean: jest.fn().mockResolvedValue({ title: 'Engineering Manager', level: 6 }),
-    }
-    const Designation = {
-      findById: jest.fn(() => existingQuery),
-      findByIdAndUpdate: jest.fn().mockResolvedValue({ _id: DESIGNATION_ID, title: 'Assistant Director', level: 8 }),
-    }
-    getAuthAndModels.mockResolvedValue({ success: true, user: { role: 'super_admin' }, models: { Designation } })
+  test('uses the authenticated tenant database when an admin updates a designation', async () => {
+    const database = workflowStore({ users: [{ _id: 'admin', role: 'admin', isActive: true }], designations: [{ _id: DESIGNATION_ID, title: 'Engineering Manager', level: 6 }] })
+    getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'admin', role: 'admin' }, database })
 
     const response = await PUT(new Request(`http://localhost/api/designations/${DESIGNATION_ID}`, {
       method: 'PUT',
@@ -39,16 +33,12 @@ describe('designation item route', () => {
 
     expect(response.status).toBe(200)
     expect(body.success).toBe(true)
-    expect(Designation.findByIdAndUpdate).toHaveBeenCalledWith(
-      DESIGNATION_ID,
-      expect.objectContaining({ title: 'Assistant Director', level: 8, levelName: 'Assistant Director' }),
-      { new: true, runValidators: true },
-    )
+    expect(await database.get('designations', DESIGNATION_ID)).toMatchObject({ title: 'Assistant Director', level: 8, levelName: 'Assistant Director' })
   })
 
   test('rejects malformed IDs before touching the tenant database', async () => {
-    const Designation = { findById: jest.fn() }
-    getAuthAndModels.mockResolvedValue({ success: true, user: { role: 'admin' }, models: { Designation } })
+    const database = workflowStore()
+    getAuthAndDatabase.mockResolvedValue({ success: true, user: { role: 'admin' }, database })
     const response = await PUT(new Request('http://localhost/api/designations/not-an-id', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
@@ -56,6 +46,6 @@ describe('designation item route', () => {
     }), { params: Promise.resolve({ id: 'not-an-id' }) })
 
     expect(response.status).toBe(400)
-    expect(Designation.findById).not.toHaveBeenCalled()
+    expect(database.get).not.toHaveBeenCalled()
   })
 })

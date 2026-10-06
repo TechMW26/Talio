@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import { sendTestNotification, getNotificationStatus } from '@/lib/unifiedPushService'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { sendTestNotification, getNotificationStatus, UNIFIED_PUSH_STORE_OPTIONS } from '@/lib/unifiedPushService'
 
 // POST - Test push notification (send test to authenticated user)
 export async function POST(request) {
   try {
     // Authenticate and initialize tenant connection
-    const auth = await getAuthAndModels(request, ['User', 'PushSubscription'])
+    const auth = await getAuthAndDatabase(request, UNIFIED_PUSH_STORE_OPTIONS)
     if (!auth.success) {
       return NextResponse.json(
         { success: false, message: auth.message || 'Unauthorized' },
@@ -16,7 +16,7 @@ export async function POST(request) {
     const { user } = auth
 
     // Get notification status for the user
-    const status = await getNotificationStatus(user.userId)
+    const status = await getNotificationStatus(user._id || user.userId, { database: auth.database })
 
     if (!status.hasAndroid && !status.hasWeb) {
       return NextResponse.json({
@@ -27,7 +27,7 @@ export async function POST(request) {
     }
 
     // Send test notification
-    const result = await sendTestNotification(user.userId)
+    const result = await sendTestNotification(user._id || user.userId, { database: auth.database })
 
     if (result.success) {
       return NextResponse.json({
@@ -61,7 +61,7 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     // Authenticate and initialize tenant connection
-    const auth = await getAuthAndModels(request, ['User', 'PushSubscription'])
+    const auth = await getAuthAndDatabase(request, UNIFIED_PUSH_STORE_OPTIONS)
     if (!auth.success) {
       return NextResponse.json(
         { success: false, message: auth.message || 'Unauthorized' },
@@ -70,7 +70,7 @@ export async function GET(request) {
     }
     const { user } = auth
 
-    const status = await getNotificationStatus(user.userId)
+    const status = await getNotificationStatus(user._id || user.userId, { database: auth.database })
 
     return NextResponse.json({
       success: true,
@@ -84,4 +84,3 @@ export async function GET(request) {
     )
   }
 }
-

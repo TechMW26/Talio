@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { connectSuperadminDB } from '@/lib/superadminDb'
-import getTenantCompanyModel from '@/models/TenantCompany'
-import { getTenantModels } from '@/lib/tenantModels'
+import { getFirestoreSystemDatabase, getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
+import { collectFirestorePages } from '@/lib/platform/firestoreQueries.server'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 
 export const dynamic = 'force-dynamic'
@@ -33,20 +33,17 @@ async function checkProfileDeadlinesForTenant(tenant, now) {
 
   try {
     // Get tenant-specific User model
-    const models = await getTenantModels(tenant.databaseName, ['User'])
-    const { User } = models
+    const database = await getFirestoreTenantDatabase(tenant.databaseName, { queryFields: { users: ['isActive', 'profileCompletion.profileCompletionDeadline'] } })
 
     // Find users who:
     // 1. Are currently active
     // 2. Have a profile completion deadline that has passed
     // 3. Profile is not complete
     // 4. Are NOT admins
-    const overdueUsers = await User.find({
-      isActive: true,
-      role: { $ne: 'admin' },
-      'profileCompletion.profileCompletionDeadline': { $lt: now },
-      'profileCompletion.status': { $ne: 'complete' }
-    }).select('_id email role profileCompletion')
+    const overdueUsers = (await collectFirestorePages(database, 'users', { filters: [
+      { field: 'isActive', operator: '==', value: true },
+      { field: 'profileCompletion.profileCompletionDeadline', operator: '<', value: now },
+    ] })).filter(user => !['admin', 'super_admin'].includes(user.role) && user.profileCompletion?.status !== 'complete')
 
     if (overdueUsers.length === 0) {
       return results
@@ -54,11 +51,6 @@ async function checkProfileDeadlinesForTenant(tenant, now) {
 
     // LOG overdue users but DO NOT deactivate them
     for (const user of overdueUsers) {
-      console.log(
-        `[Profile Deadline Check] OVERDUE (not deactivated): ${user.email} in tenant ${tenant.slug}, ` +
-        `deadline was ${user.profileCompletion?.profileCompletionDeadline?.toISOString()}`
-      )
-
       results.overdue++
       results.users.push({
         id: user._id.toString(),
@@ -92,14 +84,10 @@ export async function GET(request) {
     console.log(`[Profile Deadline Check] Starting multi-tenant processing at ${now.toISOString()}`)
 
     // Connect to superadmin DB and get all active tenants
-    await connectSuperadminDB()
-    const TenantCompany = await getTenantCompanyModel()
-
-    const activeTenants = await TenantCompany.find({
-      isActive: true,
-      serviceStatus: { $in: ['active', 'trial'] },
-      isSetupComplete: true
-    }).lean()
+    const system = await getFirestoreSystemDatabase({ queryFields: { tenantcompanies: ['isActive', 'serviceStatus', 'isSetupComplete'] } })
+    const activeTenants = await collectFirestorePages(system, 'tenantcompanies', { filters: [
+      { field: 'isActive', operator: '==', value: true }, { field: 'serviceStatus', operator: 'in', value: ['active', 'trial'] }, { field: 'isSetupComplete', operator: '==', value: true },
+    ] })
 
     console.log(`[Profile Deadline Check] Found ${activeTenants.length} active tenants to process`)
 
@@ -115,7 +103,7 @@ export async function GET(request) {
       const tenantResult = await checkProfileDeadlinesForTenant(tenant, now)
       allResults.tenantResults.push(tenantResult)
       allResults.totalOverdue += tenantResult.overdue
-      if (tenantResult.overdue > 0) {
+      if (tenantResult.overdue > 0 && process.env.TALIO_LOCAL_ACCEPTANCE !== '1') {
         global.io?.to(`tenant:${tenant.databaseName}`).emit('users:profile-overdue', {
           count: tenantResult.overdue, reason: 'profile_incomplete', timestamp: now,
         })
@@ -145,36 +133,12 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    // This endpoint requires admin authentication
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    // Verify token and check if user is admin
-    const { jwtVerify } = await import('jose')
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-
-    const { payload } = await jwtVerify(token, secret)
-
-    if (!payload || !payload.userId) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    // Connect to tenant DB to verify user role
-    if (!payload.databaseName) {
-      return NextResponse.json({ success: false, message: 'Invalid session - please log in again' }, { status: 401 })
-    }
-
-    const models = await getTenantModels(payload.databaseName, ['User'])
-    const user = await models.User.findById(payload.userId).select('role')
-
-    if (!user || !['admin', 'hr'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Admin access required' }, { status: 403 })
-    }
-
-    // Call the GET handler logic
-    return GET(request)
+    const auth = await getAuthAndDatabase(request)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    if (!['admin', 'hr'].includes(auth.user.role)) return NextResponse.json({ success: false, message: 'Admin access required' }, { status: 403 })
+    // A tenant administrator may only trigger their own tenant, never the global sweep.
+    const result = await checkProfileDeadlinesForTenant({ databaseName: auth.tenant.databaseName, name: auth.tenant.companyName, slug: auth.tenant.companySlug }, new Date())
+    return NextResponse.json({ success: !result.error, data: result }, { status: result.error ? 500 : 200 })
 
   } catch (error) {
     console.error('[Profile Deadline Check Manual] Error:', error)

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import mongoose from 'mongoose'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { getPusherServer } from '@/lib/pusherServer'
 import { parsePrivateChannel } from '@/lib/platform/realtimeChannels'
 import { hasDepartmentAuthority } from '@/lib/hierarchyAuth'
@@ -19,27 +18,24 @@ async function authorizeResourceChannel(auth, channel) {
   const employeeId = String(auth.user.employeeId?._id || auth.user.employeeId || '')
 
   if (channel.scope === 'global') return false
+  if (['user', 'chat', 'project', 'whiteboard'].includes(channel.scope) && channel.tenantId !== auth.tenant.databaseName) return false
   if (channel.scope === 'user') return channel.resourceId === userId
   if (channel.scope === 'tenant') return channel.resourceId === auth.tenant.databaseName
 
   if (channel.scope === 'chat') {
-    const chat = await auth.models.Chat.findById(channel.resourceId)
-      .select('participants')
-      .lean()
-    return Boolean(chat && includesId(chat.participants, userId, employeeId))
+    const chat = await auth.database.get('chats', channel.resourceId)
+    return Boolean(chat && employeeId && includesId(chat.participants, '', employeeId))
   }
 
   if (channel.scope === 'project') {
-    const project = await auth.models.Project.findById(channel.resourceId)
-      .select('createdBy projectHead projectHeads department assignedTeams')
-      .lean()
-    if (!project) return false
+    const project = await auth.database.get('projects', channel.resourceId)
+    if (!project || project.isDeleted) return false
     if (['admin', 'hr'].includes(auth.user.role)
       || includesId([project.createdBy, project.projectHead, ...(project.projectHeads || [])], userId, employeeId)
       || (project.department && hasDepartmentAuthority(auth.user, String(project.department)))
       || (auth.user.teamLeaderOf || []).some(id => includesId(project.assignedTeams, String(id), ''))) return true
     if (!employeeId) return false
-    return Boolean(await auth.models.ProjectMember.exists({ project: channel.resourceId, user: employeeId }))
+    return (await auth.database.list('projectmembers', { filters: [{ field: 'project', operator: '==', value: channel.resourceId }, { field: 'user', operator: '==', value: employeeId }], limit: 2 })).records.some(member => member.invitationStatus === 'accepted' && !member.removedAt)
   }
 
   return false
@@ -55,14 +51,11 @@ export async function POST(request) {
   const channel = parsePrivateChannel(channelName)
 
   if (!/^\d+\.\d+$/.test(socketId) || !channel
-    || (['chat', 'project', 'user'].includes(channel.scope) && !mongoose.isValidObjectId(channel.resourceId))) {
+    || (['chat', 'project', 'user'].includes(channel.scope) && !/^[a-f\d]{24}$/i.test(channel.resourceId))) {
     return NextResponse.json({ error: 'Invalid realtime authorization request' }, { status: 400 })
   }
 
-  const modelNames = channel.scope === 'chat'
-    ? ['Chat']
-    : channel.scope === 'project' ? ['Project', 'ProjectMember'] : []
-  const auth = await getAuthAndModels(request, modelNames)
+  const auth = await getAuthAndDatabase(request, { queryFields: { projectmembers: ['project', 'user'] } })
   if (!auth.success) {
     return NextResponse.json({ error: auth.message }, { status: 401 })
   }

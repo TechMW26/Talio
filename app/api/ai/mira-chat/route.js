@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { checkAndDeductMiraToken } from '@/lib/miraChatStore.server'
+import { MIRA_CONTEXT_STORE_OPTIONS, fetchMiraContext, miraEmployeeProfile } from '@/lib/miraContext.server'
 import { generateContent } from '@/lib/gemini'
-import { buildDirectReportsFilter } from '@/lib/teamScope'
-import { normalizeLeaveBalance } from '@/lib/leaveData'
 import { miraTaskLink } from '@/lib/miraTaskLink'
 import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
 import { MIRA_LANGUAGE_POLICY, buildMiraConversationPrompt, buildMiraOutputLanguageDirective } from '@/lib/miraLanguage'
 import { validMiraAttachments, miraAttachmentContext } from '@/lib/miraAttachments'
-import { MIRA_SCREEN_INSTRUCTIONS } from '@/lib/miraDesktopScreen'
+import { MIRA_SCREEN_INSTRUCTIONS, isExplicitMiraScreenRequest } from '@/lib/miraDesktopScreen'
 import { miraAppKnowledge } from '@/lib/miraAppMap'
 import { MIRA_COMPUTER_INSTRUCTIONS } from '@/lib/miraComputerClient'
 import { MIRA_DESKTOP_CAPABILITIES } from '@/lib/miraDesktopCapabilities'
@@ -29,45 +29,6 @@ import { miraDesktopIntent, miraAppNameFollowup } from '@/lib/miraDesktopIntent'
 import { miraOutputModeInstructions, miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { sanitizeMiraPreferences } from '@/lib/miraVoices'
 
-// Get current month key in "YYYY-MM" format
-function getCurrentMonth() {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-}
-
-// Check token balance and deduct one token
-async function checkAndDeductToken(MiraTokenUsage, userId) {
-  const month = getCurrentMonth()
-
-  // Upsert: create record if missing, then return it
-  let usage = await MiraTokenUsage.findOneAndUpdate(
-    { user: userId, month },
-    { $setOnInsert: { tokensUsed: 0, tokenLimit: 100 } },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  )
-
-  if (usage.tokensUsed >= usage.tokenLimit) {
-    return { allowed: false, tokensUsed: usage.tokensUsed, tokenLimit: usage.tokenLimit, tokensRemaining: 0 }
-  }
-
-  // Deduct one token atomically
-  usage = await MiraTokenUsage.findOneAndUpdate(
-    { user: userId, month, tokensUsed: { $lt: usage.tokenLimit } },
-    { $inc: { tokensUsed: 1 } },
-    { new: true }
-  )
-
-  if (!usage) {
-    return { allowed: false, tokensUsed: usage?.tokensUsed ?? 0, tokenLimit: 100, tokensRemaining: 0 }
-  }
-
-  return {
-    allowed: true,
-    tokensUsed: usage.tokensUsed,
-    tokenLimit: usage.tokenLimit,
-    tokensRemaining: usage.tokenLimit - usage.tokensUsed
-  }
-}
 
 // Route all MIRA generation through the shared Gemini provider.
 async function generateContentWithSearch(prompt, systemInstruction, useCase = 'mira') {
@@ -161,282 +122,6 @@ You MUST respond in valid JSON with this exact structure:
 - Only decline if the question is inappropriate or harmful.`
 }
 
-// Fetch relevant data based on user query intent
-async function fetchContextData(models, user, role, query) {
-  const context = {}
-  const queryLower = query.toLowerCase()
-
-  const isAdmin = ['admin', 'hr'].includes(role)
-  const isManager = ['manager', 'department_head', 'department_manager', 'team_leader'].includes(role)
-  const isPersonalQuery = /\b(my|mine|assigned to me|i have|i am|my own)\b/i.test(queryLower)
-  let assignmentPromise
-  const myAssignments = () => assignmentPromise ||= Promise.resolve(models.TaskAssignee.find({
-    user: user.employeeId, assignmentStatus: { $in: ['pending', 'accepted'] },
-  }).select('task').lean())
-
-  try {
-    // Attendance queries
-    if (/attend|check.?in|check.?out|present|absent|late|punch|working hours/i.test(queryLower)) {
-      if (isAdmin && !isPersonalQuery && models.Attendance) {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const todayAttendance = await models.Attendance.find({ date: { $gte: today } })
-          .select('employee checkIn checkOut status workHours')
-          .populate('employee', 'firstName lastName employeeCode')
-          .lean().limit(50)
-        context.todayAttendance = todayAttendance.map(a => ({
-          employee: a.employee ? `${a.employee.firstName} ${a.employee.lastName}` : 'Unknown',
-          code: a.employee?.employeeCode,
-          checkIn: a.checkIn, checkOut: a.checkOut,
-          status: a.status, workingHours: a.workHours
-        }))
-      } else if (models.Attendance) {
-        const myAttendance = await models.Attendance.find({ employee: user.employeeId })
-          .select('date checkIn checkOut status workHours')
-          .sort({ date: -1 }).lean().limit(14)
-        context.myAttendance = myAttendance.map(a => ({
-          date: a.date, checkIn: a.checkIn, checkOut: a.checkOut,
-          status: a.status, workingHours: a.workHours
-        }))
-      }
-    }
-
-    // Task queries - assignments stored in TaskAssignee join table
-    if (/task|todo|assign|work|backlog|deadline|overdue|pending task/i.test(queryLower)) {
-      if (isAdmin && !isPersonalQuery && models.Task) {
-        // Admin asking about all tasks (not personal)
-        const tasks = await models.Task.find({})
-          .select('title status priority project dueDate progressPercentage')
-          .populate('project', 'name')
-          .sort({ updatedAt: -1 }).lean().limit(30)
-        // Attach assignee names from TaskAssignee
-        if (models.TaskAssignee && tasks.length > 0) {
-          const taskIds = tasks.map(t => t._id)
-          const assignments = await models.TaskAssignee.find({ task: { $in: taskIds } })
-            .select('task user')
-            .populate('user', 'firstName lastName').lean()
-          const assigneeMap = {}
-          for (const a of assignments) {
-            const name = a.user ? `${a.user.firstName} ${a.user.lastName}` : 'Unknown'
-            if (!assigneeMap[a.task.toString()]) assigneeMap[a.task.toString()] = []
-            assigneeMap[a.task.toString()].push(name)
-          }
-          context.tasks = tasks.map(t => ({
-            id: t._id.toString(), title: t.title, status: t.status, priority: t.priority,
-            assignees: (assigneeMap[t._id.toString()] || []).join(', ') || 'Unassigned',
-            project: t.project?.name, projectId: t.project?._id?.toString(), dueDate: t.dueDate, progress: t.progressPercentage
-          }))
-        } else {
-          context.tasks = tasks.map(t => ({
-            id: t._id.toString(), title: t.title, status: t.status, priority: t.priority,
-            project: t.project?.name, projectId: t.project?._id?.toString(), dueDate: t.dueDate, progress: t.progressPercentage
-          }))
-        }
-      } else if (models.Task && models.TaskAssignee) {
-        // Personal tasks - for any role (including admin when asking "my tasks")
-        const myTaskIds = (await myAssignments()).map(a => a.task)
-        // Also include tasks created by this user
-        const myTasks = await models.Task.find({
-          $or: [{ _id: { $in: myTaskIds } }, { createdBy: user.employeeId }]
-        }).select('title status priority project dueDate progressPercentage').populate('project', 'name').sort({ updatedAt: -1 }).lean().limit(20)
-        context.myTasks = myTasks.map(t => ({
-          id: t._id.toString(), title: t.title, status: t.status, priority: t.priority,
-          project: t.project?.name, projectId: t.project?._id?.toString(), dueDate: t.dueDate, progress: t.progressPercentage
-        }))
-      }
-    }
-
-    // Leave queries
-    if (/leave|vacation|day.?off|sick|holiday|time.?off|pto|balance/i.test(queryLower)) {
-      if (models.Leave) {
-        const filter = isAdmin ? {} : { employee: user.employeeId }
-        const leaves = await models.Leave.find(filter)
-          .populate('employee', 'firstName lastName')
-          .sort({ createdAt: -1 }).lean().limit(20)
-        context.leaves = leaves.map(l => ({
-          employee: l.employee ? `${l.employee.firstName} ${l.employee.lastName}` : 'Unknown',
-          type: l.leaveType, startDate: l.startDate, endDate: l.endDate,
-          status: l.status, reason: l.reason
-        }))
-      }
-      if (models.LeaveBalance) {
-        const balFilter = isAdmin ? {} : { employee: user.employeeId }
-        const balances = await models.LeaveBalance.find(balFilter)
-          .populate('employee', 'firstName lastName')
-          .populate('leaveType', 'name code')
-          .lean().limit(20)
-        context.leaveBalances = balances.map(rawBalance => {
-          const balance = normalizeLeaveBalance(rawBalance)
-          return {
-            employee: balance.employee ? `${balance.employee.firstName} ${balance.employee.lastName}` : 'Unknown',
-            type: balance.leaveType?.name || balance.leaveType,
-            total: balance.totalDays,
-            used: balance.usedDays,
-            remaining: balance.remainingDays,
-          }
-        })
-      }
-    }
-
-    // Project queries
-    if (/project|milestone|progress|team|sprint/i.test(queryLower)) {
-      if (models.Project) {
-        const projFilter = isAdmin ? {} : { $or: [{ projectHead: user.employeeId }, { createdBy: user._id }] }
-        const projects = await models.Project.find(projFilter)
-          .select('name status completionPercentage projectHead deadline startDate')
-          .populate('projectHead', 'firstName lastName')
-          .sort({ updatedAt: -1 }).lean().limit(15)
-        context.projects = projects.map(p => ({
-          name: p.name, status: p.status, completion: p.completionPercentage,
-          head: p.projectHead ? `${p.projectHead.firstName} ${p.projectHead.lastName}` : 'N/A',
-          deadline: p.deadline, startDate: p.startDate
-        }))
-      }
-    }
-
-    // Employee queries (admin/manager only)
-    if (/employee|staff|team member|headcount|people|roster/i.test(queryLower)) {
-      if ((isAdmin || isManager) && models.Employee) {
-        const empFilter = isAdmin
-          ? { status: 'active' }
-          : buildDirectReportsFilter(user.employeeId, { status: 'active' })
-        const employees = await models.Employee.find(empFilter)
-          .select('firstName lastName employeeCode department designation email status')
-          .populate('department designation', 'name')
-          .lean().limit(50)
-        context.employeeDirectory = { total: await models.Employee.countDocuments(empFilter), returned: employees.length, scope: isAdmin ? 'active employees in this organization' : 'active direct reports' }
-        context.employees = employees.map(e => ({
-          name: `${e.firstName} ${e.lastName}`, code: e.employeeCode,
-          department: e.department?.name, designation: e.designation?.name,
-          email: e.email, status: e.status
-        }))
-      }
-    }
-
-    // Announcement/policy queries
-    if (/announce|policy|notice|update|news|circular/i.test(queryLower)) {
-      if (models.Announcement) {
-        const announcements = await models.Announcement.find({ status: 'published' })
-          .sort({ createdAt: -1 }).lean().limit(10)
-        context.announcements = announcements.map(a => ({
-          title: a.title, content: a.content?.substring(0, 200),
-          priority: a.priority, createdAt: a.createdAt, category: a.category
-        }))
-      }
-      if (models.Policy) {
-        const policies = await models.Policy.find({ isActive: true }).lean().limit(10)
-        context.policies = policies.map(p => ({
-          title: p.title, category: p.category, description: p.description?.substring(0, 200)
-        }))
-      }
-    }
-
-    // Performance queries
-    if (/performance|review|rating|goal|kpi|appraisal|feedback/i.test(queryLower)) {
-      if (models.PerformanceGoal) {
-        const goalFilter = isAdmin ? {} : { employee: user.employeeId }
-        const goals = await models.PerformanceGoal.find(goalFilter)
-          .populate('employee', 'firstName lastName')
-          .sort({ createdAt: -1 }).lean().limit(15)
-        context.goals = goals.map(g => ({
-          title: g.title, employee: g.employee ? `${g.employee.firstName} ${g.employee.lastName}` : 'Unknown',
-          status: g.status, progress: g.progress, dueDate: g.dueDate
-        }))
-      }
-    }
-
-    // Meeting queries
-    if (/meeting|calendar|schedule|call|standup|sync/i.test(queryLower)) {
-      if (models.Meeting) {
-        const meetFilter = isAdmin && !isPersonalQuery ? {} : { $or: [{ organizer: user.employeeId }, { 'invitees.employee': user.employeeId }] }
-        const meetings = await models.Meeting.find(meetFilter)
-          .populate('organizer', 'firstName lastName')
-          .sort({ scheduledStart: -1 }).lean().limit(10)
-        context.meetings = meetings.map(m => ({
-          title: m.title, date: m.scheduledStart, status: m.status,
-          organizer: m.organizer ? `${m.organizer.firstName} ${m.organizer.lastName}` : 'Unknown'
-        }))
-      }
-    }
-
-  } catch (err) {
-    console.error('[Mira Chat] Requested context unavailable:', err.message)
-    context.requestedDataUnavailable = true
-  }
-
-  try {
-    // Fetch only relevant baseline domains, including multilingual requests.
-    {
-      const overview = /dashboard|overview|summary|डैशबोर्ड|सारांश|मेरी स्थिति|my status/i.test(query)
-      const jobs = []
-      const schedule = job => jobs.push(job().catch(err => {
-        console.error('[Mira Chat] Dashboard domain unavailable:', err.message)
-        context.dashboardContextIncomplete = true
-      }))
-      if ((overview || /attend|check.?in|check.?out|present|absent|late|punch|working hours|उपस्थिति|हाजिरी|चेक|घंटे/i.test(query)) && models.Attendance) {
-        schedule(async () => {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        if (isAdmin) {
-          const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
-          const [presentCount, totalEmp] = await Promise.all([
-            models.Attendance.countDocuments({ date: { $gte: today, $lt: tomorrow }, status: { $in: ['present', 'late', 'in-progress'] } }),
-            models.Employee ? models.Employee.countDocuments({ status: 'active' }) : 0,
-          ])
-          context.overview = { presentToday: presentCount, totalEmployees: totalEmp }
-        }
-        const endOfDay = new Date(today); endOfDay.setDate(endOfDay.getDate() + 1)
-        const myToday = await models.Attendance.findOne({ employee: user.employeeId, date: { $gte: today, $lt: endOfDay } }).select('checkIn checkOut status workHours location.checkIn').lean()
-        context.myTodayAttendance = myToday ? {
-          checkIn: myToday.checkIn, checkOut: myToday.checkOut,
-          status: myToday.status, workingHours: myToday.workHours
-        } : null
-        if (myToday?.location?.checkIn) {
-          const { latitude, longitude, address } = myToday.location.checkIn
-          context.lastCheckInLocation = { latitude, longitude, address, recordedAt: myToday.checkIn, source: 'today recorded check-in, not current device location' }
-        }
-        })
-      }
-      if ((overview || /task|काम|टास्क|कार्य/i.test(query)) && models.Task && models.TaskAssignee) {
-        schedule(async () => {
-        const myTaskIds = (await myAssignments()).map(a => a.task)
-        const myPending = await models.Task.countDocuments({ _id: { $in: myTaskIds }, status: { $in: ['todo', 'in-progress'] } })
-        context.myPendingTasks = myPending
-        if (!context.myTasks) {
-          const tasks = await models.Task.find({ _id: { $in: myTaskIds }, status: { $in: ['todo', 'in-progress'] } })
-            .select('title status priority dueDate').sort({ dueDate: 1 }).lean().limit(5)
-          context.myTaskPreview = tasks.map(t => ({ title: t.title, status: t.status, priority: t.priority, dueDate: t.dueDate }))
-        }
-        })
-      }
-      if ((overview || /leave|balance|छुट्टी|अवकाश/i.test(query)) && models.LeaveBalance && !context.myLeaveBalances) {
-        schedule(async () => {
-        const balances = await models.LeaveBalance.find({ employee: user.employeeId, year: new Date().getFullYear() })
-          .populate('leaveType', 'name code').lean().limit(12)
-        context.myLeaveBalances = balances.map(value => {
-          const balance = normalizeLeaveBalance(value)
-          return { type: balance.leaveType?.name, remaining: balance.remainingDays, used: balance.usedDays }
-        })
-        })
-      }
-      if ((overview || /meeting|calendar|मीटिंग|बैठक/i.test(query)) && models.Meeting) {
-        schedule(async () => {
-        const meetings = await models.Meeting.find({ $or: [{ organizer: user.employeeId }, { 'invitees.employee': user.employeeId }], scheduledStart: { $gte: new Date() }, status: { $ne: 'cancelled' } })
-          .select('title scheduledStart status')
-          .sort({ scheduledStart: 1 }).lean().limit(5)
-        context.myUpcomingMeetings = meetings.map(m => ({ title: m.title, scheduledStart: m.scheduledStart, status: m.status }))
-        })
-      }
-      await Promise.all(jobs)
-    }
-
-  } catch (err) {
-    console.error('[Mira Chat] Context fetch error:', err.message)
-    context.dashboardContextIncomplete = true
-  }
-
-  return context
-}
 
 // Build reliable data cards directly from fetched context (bypasses AI formatting)
 function generateDataCards(ctx) {
@@ -746,11 +431,7 @@ function normalizeParsedResponse(parsed) {
 
 export async function POST(request) {
   try {
-    const { success, user, models, message: authMsg } = await getAuthAndModels(request, [
-      'User', 'Employee', 'Attendance', 'Leave', 'LeaveBalance', 'LeaveType',
-      'Task', 'TaskAssignee', 'Project', 'Announcement', 'Policy', 'Meeting',
-      'PerformanceGoal', 'Department', 'Designation', 'MiraTokenUsage'
-    ])
+    const { success, user, database, message: authMsg } = await getAuthAndDatabase(request, MIRA_CONTEXT_STORE_OPTIONS)
 
     if (!success) {
       return NextResponse.json({ success: false, message: authMsg }, { status: 401 })
@@ -781,7 +462,7 @@ export async function POST(request) {
     if (!user.employeeId) return NextResponse.json({ success: false, message: 'Link an employee profile before asking MIRA for workplace data.' }, { status: 403 })
 
     // Check and deduct token
-    const tokenResult = await checkAndDeductToken(models.MiraTokenUsage, user._id)
+    const tokenResult = await checkAndDeductMiraToken(database, user._id)
     if (!tokenResult.allowed) {
       return NextResponse.json({
         success: false,
@@ -812,10 +493,7 @@ export async function POST(request) {
 
     // Explicit commands need a schema decision, not a dashboard data dump.
     const decisionFirst = Boolean(activeTask) || isMiraDecisionRequest(userMessage, conversationHistory)
-    const employeePromise = !decisionFirst && user.employeeId && models.Employee ? models.Employee.findById(user.employeeId)
-        .select('firstName lastName employeeCode department designation')
-        .populate('department designation', 'name')
-        .lean() : Promise.resolve(null)
+    const employeePromise = !decisionFirst && user.employeeId ? miraEmployeeProfile(database, user.employeeId) : Promise.resolve(null)
 
     const role = user.role || 'employee'
 
@@ -825,17 +503,20 @@ export async function POST(request) {
     const contextQuery = isFollowUp ? `${recentUserContext} ${userMessage}` : userMessage
     const useCase = decisionFirst ? 'mira' : miraChatUseCase(contextQuery)
     const screen = sanitizeMiraClientContext(body.clientContext)
+    if (screen.desktopScreenAvailable && body.screenContextAttempted !== true && isExplicitMiraScreenRequest(userMessage) && !body.attachments?.length) {
+      return NextResponse.json({ success: true, response: {
+        message: '', cards: [], suggestedQuestions: [], action: { type: 'read_screen' },
+      }, tokens: tokenResult })
+    }
     const contextStarted = performance.now()
     let databaseContextMs = 0
     const timedContext = async () => {
       const result = await (decisionFirst || /^(?:hi|hello|hey|ssup|sup|what'?s up|thanks|thank you|नमस्ते|धन्यवाद)[\s!?.।]*$/iu.test(userMessage.trim())
-        ? Promise.resolve({}) : fetchContextData(models, user, role, contextQuery))
+        ? Promise.resolve({}) : fetchMiraContext(database, user, role, contextQuery))
       databaseContextMs = performance.now() - contextStarted
       return result
     }
-    const miraProfilePromise = models.User
-      ? models.User.findById(user._id).select('miraPreferences').lean()
-      : Promise.resolve(null)
+    const miraProfilePromise = database.get('users', user._id)
     const [employeeData, contextData, internet, miraProfile] = await Promise.all([
       employeePromise,
       timedContext(),

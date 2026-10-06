@@ -1,40 +1,24 @@
 jest.mock('@/lib/pushNotification', () => ({ sendPushToUser: jest.fn() }))
 const { notifyAssetAssignment } = require('@/lib/assetNotifications.server')
 const { sendPushToUser } = require('@/lib/pushNotification')
-
-describe('asset assignment notifications', () => {
-  const asset = { _id: 'asset', name: 'Laptop', assetCode: 'L1', assignedTo: { _id: 'employee' } }
-  let models
+describe('native asset notification recipients', () => {
+  const asset = { _id: 'asset', name: 'Laptop', assetCode: 'L1', assignedTo: 'employee' }
+  let database
   beforeEach(() => {
     jest.clearAllMocks()
-    models = {
-      Employee: { findById: jest.fn(() => ({ select: () => ({ lean: async () => ({ userId: 'user' }) }) })) },
-      Team: { find: jest.fn(() => ({ select: () => ({ lean: async () => [{ teamLeaders: ['lead'] }] }) })) },
-      User: { find: jest.fn(() => ({ select: () => ({ lean: async () => [{ _id: 'user', employeeId: 'employee' }] }) })) }, Notification: {},
-    }
+    database = { get: jest.fn(async (table, id) => table === 'employees' ? { _id: id, userId: 'user', department: 'dept', assignedTeamLead: 'lead' } : table === 'departments' ? { head: 'head', heads: ['head2'] } : { _id: 'user', employeeId: 'employee', isActive: true }), list: jest.fn(async table => ({ records: table === 'teams' ? [{ teamLeaders: ['lead'] }] : [{ _id: 'user', employeeId: 'employee' }], nextCursor: null })) }
   })
-  test('notifies on initial assignment with tenant models', async () => {
-    await notifyAssetAssignment({ models, asset })
-    expect(sendPushToUser).toHaveBeenCalledWith('user', expect.objectContaining({ body: 'Laptop (L1) has been assigned to you.' }), expect.objectContaining({ models: { User: models.User, Notification: models.Notification } }))
+  test('notifies the initial assignee using the native tenant database', async () => {
+    await notifyAssetAssignment({ database, asset })
+    expect(sendPushToUser).toHaveBeenCalledWith('user', expect.objectContaining({ body: 'Laptop (L1) has been assigned to you.' }), expect.objectContaining({ database }))
   })
-  test('does not re-notify unchanged assignments or unassignments', async () => {
-    await notifyAssetAssignment({ models, asset, previousAssignee: 'employee' })
-    await notifyAssetAssignment({ models, asset: { ...asset, assignedTo: null } })
-    expect(sendPushToUser).not.toHaveBeenCalled()
-    expect(models.Employee.findById).not.toHaveBeenCalled()
+  test('unchanged assignments and unassignments never re-notify', async () => {
+    await notifyAssetAssignment({ database, asset, previousAssignee: 'employee' }); await notifyAssetAssignment({ database, asset: { ...asset, assignedTo: null } })
+    expect(sendPushToUser).not.toHaveBeenCalled(); expect(database.get).not.toHaveBeenCalled()
   })
-  test('notifies a new assignee', async () => {
-    await notifyAssetAssignment({ models, asset, previousAssignee: 'old-employee' })
+  test('reassignment notifies once and recipient queries are scoped', async () => {
+    await notifyAssetAssignment({ database, asset, previousAssignee: 'old' })
     expect(sendPushToUser).toHaveBeenCalledTimes(1)
-  })
-  test('targets only privileged users, the assignee and their heads', async () => {
-    models.Employee.findById.mockReturnValue({ select: () => ({ lean: async () => ({ userId: 'user', department: 'dept', assignedTeamLead: 'lead' }) }) })
-    models.Department = { findById: jest.fn(() => ({ select: () => ({ lean: async () => ({ head: 'head', heads: ['head', 'head2'] }) }) })) }
-    await notifyAssetAssignment({ models, asset })
-    expect(models.User.find).toHaveBeenCalledWith({ isActive: { $ne: false }, $or: [
-      { role: { $in: ['admin', 'hr'] } },
-      { employeeId: { $in: ['employee', 'lead', 'head', 'head2'] } },
-      { _id: 'user' },
-    ] })
+    expect(database.list).toHaveBeenCalledWith('users', expect.objectContaining({ filters: [{ field: 'isActive', operator: '==', value: true }, { field: 'employeeId', operator: 'in', value: ['employee', 'lead', 'head', 'head2'] }] }))
   })
 })

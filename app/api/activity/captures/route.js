@@ -1,80 +1,20 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
+import { verifyTokenFromRequest } from '@/lib/auth'
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
-import mongoose from 'mongoose';
+import { getScreenshotStore, listScreenshotMaintenanceRecords } from '@/lib/platform/firestoreScreenshots.server';
+import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
 import { getTodayDateString } from '@/lib/timezone';
 
-// Roles that can view all captures
-const ADMIN_ROLES = ['admin', 'hr'];
-
-/**
- * Check if a user is a department head
- * Returns the department IDs they are head of
- * @param {Object} Department - Tenant Department model
- */
-async function getDepartmentsWhereUserIsHead(employeeId, Department) {
-  if (!employeeId) return [];
-
-  const departments = await Department.find({
-    $or: [
-      { head: employeeId },
-      { heads: employeeId }
-    ],
-    isActive: true
-  }).select('_id name');
-
-  return departments;
-}
-
-/**
- * Get all employees in a department (including sub-departments)
- * @param {Object} Department - Tenant Department model
- * @param {Object} Employee - Tenant Employee model
- */
-async function getEmployeesInDepartments(departmentIds, Department, Employee) {
-  if (!departmentIds || departmentIds.length === 0) return [];
-
-  // Get sub-departments recursively
-  const allDeptIds = [...departmentIds];
-  const subDepts = await Department.find({
-    parentDepartment: { $in: departmentIds },
-    isActive: true
-  }).select('_id');
-
-  subDepts.forEach(d => {
-    if (!allDeptIds.some(id => id.toString() === d._id.toString())) {
-      allDeptIds.push(d._id);
-    }
-  });
-
-  // Get employees in these departments
-  const employees = await Employee.find({
-    $or: [
-      { department: { $in: allDeptIds } },
-      { departments: { $in: allDeptIds } }
-    ]
-  }).select('_id');
-
-  return employees.map(e => e._id);
-}
-
-/**
- * GET /api/activity/captures
- * Get captures with proper role-based access control
- * 
- * Department heads can view captures of their team members
- * (identified by being in Department.head or Department.heads array)
- */
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ProductivitySession', 'Screenshot'])
+    const auth = await verifyTokenFromRequest(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { User, Employee, Department, ProductivitySession, Screenshot } = models
+    const { user, tenant } = auth;
+    const store = await getScreenshotStore(tenant.databaseName);
 
     const currentUserId = user._id || user.userId;
     const currentUserRole = user.role;
@@ -90,69 +30,15 @@ export async function GET(request) {
     const departmentId = searchParams.get('departmentId'); // Filter by department
 
     // Validate targetUserId format if different from current user
-    if (targetUserId !== currentUserId && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (targetUserId !== currentUserId && !/^[a-f\d]{24}$/i.test(String(targetUserId))) {
       return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
     }
 
-    // Permission check
-    if (targetUserId !== currentUserId) {
-      const isAdmin = ADMIN_ROLES.includes(currentUserRole);
-
-      if (!isAdmin) {
-        // Check if current user is department head of target user's department
-        const currentUser = await User.findById(currentUserId).populate('employeeId');
-        const targetUser = await User.findById(targetUserId).populate('employeeId');
-
-        if (!currentUser?.employeeId || !targetUser?.employeeId) {
-          return NextResponse.json(
-            { error: 'Permission denied - Employee records not found' },
-            { status: 403 }
-          );
-        }
-
-        // Get departments where current user is head
-        const headOfDepartments = await getDepartmentsWhereUserIsHead(currentUser.employeeId._id, Department);
-
-        if (headOfDepartments.length === 0) {
-          return NextResponse.json(
-            { error: 'Permission denied - You can only view your own captures' },
-            { status: 403 }
-          );
-        }
-
-        // Get target user's departments
-        const targetDeptIds = [];
-        if (targetUser.employeeId.department) {
-          targetDeptIds.push(targetUser.employeeId.department.toString());
-        }
-        if (targetUser.employeeId.departments) {
-          targetUser.employeeId.departments.forEach(d => targetDeptIds.push(d.toString()));
-        }
-
-        // Check if any of target's departments are headed by current user
-        const headDeptIds = headOfDepartments.map(d => d._id.toString());
-        const hasAccess = targetDeptIds.some(id => headDeptIds.includes(id));
-
-        // Also check sub-departments
-        if (!hasAccess) {
-          const subDepts = await Department.find({
-            parentDepartment: { $in: headOfDepartments.map(d => d._id) }
-          }).select('_id');
-          const subDeptIds = subDepts.map(d => d._id.toString());
-          const hasSubAccess = targetDeptIds.some(id => subDeptIds.includes(id));
-
-          if (!hasSubAccess) {
-            return NextResponse.json(
-              { error: 'Permission denied - User is not in your department' },
-              { status: 403 }
-            );
-          }
-        }
-      }
-    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam) || !Number.isFinite(Date.parse(dateParam))) return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+    if (!await canViewTenantScreenshots(currentUserId, targetUserId, currentUserRole, tenant.databaseName)) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
     // Check if target user is admin (no captures)
-    const targetUser = await User.findById(targetUserId);
+    const targetUser = await store.get('users', String(targetUserId));
     if (['admin'].includes(targetUser?.role)) {
       return NextResponse.json({
         success: true,
@@ -171,14 +57,11 @@ export async function GET(request) {
     const seenPaths = new Set();
 
     // First, get captures from Screenshot model (v3.0.0+ desktop app)
-    const dbScreenshots = await Screenshot.find({
-      user: targetUserId,
-      dateString: dateParam
-    }).sort({ capturedAt: 1 }).lean();
+    const dbScreenshots = (await listScreenshotMaintenanceRecords(store, 'screenshots', [{ field: 'user', operator: '==', value: String(targetUserId) }, { field: 'dateString', operator: '==', value: dateParam }])).sort((a, b) => new Date(a.capturedAt) - new Date(b.capturedAt));
 
     for (const ss of dbScreenshots) {
       // Prefer path, then construct from gridfs/screenshot ID
-      const displayPath = ss.path || (ss._id ? `/api/activity/screenshot?id=${ss._id}` : null);
+      const displayPath = ss._id ? `/api/activity/screenshot?id=${ss._id}` : ss.path;
 
       if (displayPath) {
         captures.push({
@@ -230,10 +113,7 @@ export async function GET(request) {
     const dateEnd = new Date(dateParam);
     dateEnd.setHours(23, 59, 59, 999);
 
-    const sessions = await ProductivitySession.find({
-      user: targetUserId,
-      date: { $gte: dateStart, $lte: dateEnd }
-    }).sort({ startTime: -1 }); // Sort by latest session first
+    const sessions = (await listScreenshotMaintenanceRecords(store, 'productivitysessions', [{ field: 'user', operator: '==', value: String(targetUserId) }, { field: 'date', operator: '>=', value: dateStart }, { field: 'date', operator: '<=', value: dateEnd }])).sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
 
     // Filter by capture type if specified
     if (captureType && sessions.length > 0) {
@@ -247,9 +127,7 @@ export async function GET(request) {
     }
 
     // Get user info
-    const userInfo = await User.findById(targetUserId)
-      .populate('employeeId', 'firstName lastName employeeCode department')
-      .select('email role');
+    const userInfo = targetUser ? { ...targetUser, employeeId: targetUser.employeeId ? await store.get('employees', String(targetUser.employeeId)) : null } : null;
 
     return NextResponse.json({
       success: true,

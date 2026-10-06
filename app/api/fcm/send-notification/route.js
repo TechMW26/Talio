@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { sendPushToUsers } from '@/lib/pushNotification'
 
 /**
@@ -14,12 +14,11 @@ import { sendPushToUsers } from '@/lib/pushNotification'
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Notification'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { User, Notification } = models
+    const { user, database } = auth
 
     // Parse request body
     const { userId, title, body, data = {}, imageUrl = null, deviceType = null } = await request.json()
@@ -31,10 +30,12 @@ export async function POST(request) {
       )
     }
 
+    if (userId && userId !== String(user._id || user.userId) && !['admin', 'hr', 'super_admin'].includes(user.role)) return NextResponse.json({ success: false, message: 'Not authorized to notify another user' }, { status: 403 })
+
     // Find target user (or use current user if no userId provided)
     const targetUser = userId
-      ? await User.findById(userId)
-      : await User.findOne({ email: session.user.email })
+      ? await database.get('users', userId)
+      : await database.get('users', String(user._id || user.userId))
 
     if (!targetUser) {
       return NextResponse.json(
@@ -54,7 +55,7 @@ export async function POST(request) {
         data,
         url: data.url || '/dashboard',
         type: data.type || 'custom',
-        models: { User, Notification }
+        database
       }
     )
 

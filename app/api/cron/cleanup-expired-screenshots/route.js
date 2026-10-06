@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
-import { connectSuperadminDB } from '@/lib/superadminDb';
-import getTenantCompanyModel from '@/models/TenantCompany';
-import { getTenantModels } from '@/lib/tenantModels';
-import { cleanupOrphanedScreenshots, deleteOldScreenshots } from '@/lib/gridfs';
+import { getFirestoreSystemDatabase } from '@/lib/platform/firestoreApplication.server';
 import { cleanupExpiredScreenshotsForTenant } from '@/lib/productivityScreenshotRetention';
 import { getScreenshotRetentionCutoff } from '@/lib/productivitySessionRules';
 import { getCronAuthErrorResponse } from '@/lib/cronAuth';
@@ -13,11 +9,13 @@ async function runCleanup(request) {
         const authError = getCronAuthErrorResponse(request);
         if (authError) return authError;
 
-        await connectDB();
-        await connectSuperadminDB();
-
-        const TenantCompany = await getTenantCompanyModel();
-        const companies = await TenantCompany.find({ isActive: true }).lean();
+        const system = await getFirestoreSystemDatabase({ queryFields: { tenantcompanies: ['isActive'] } });
+        const companies = [];
+        let cursor;
+        do {
+            const page = await system.list('tenantcompanies', { filters: [{ field: 'isActive', operator: '==', value: true }], limit: 100, cursor });
+            companies.push(...page.records); cursor = page.nextCursor;
+        } while (cursor);
 
         const results = {
             success: true,
@@ -38,10 +36,8 @@ async function runCleanup(request) {
 
         for (const company of companies) {
             try {
-                const tenantModels = await getTenantModels(company.databaseName, ['Screenshot', 'ProductivitySession', 'ScreenshotComposite']);
                 const tenantResult = await cleanupExpiredScreenshotsForTenant({
                     databaseName: company.databaseName,
-                    models: tenantModels,
                     cutoff,
                 });
 
@@ -61,23 +57,8 @@ async function runCleanup(request) {
             }
         }
 
-        try {
-            const legacyResult = await deleteOldScreenshots(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-            results.legacySharedBucketDeleted = legacyResult?.deletedCount || 0;
-            results.gridfsDeleted += results.legacySharedBucketDeleted;
-        } catch (error) {
-            console.error('[ScreenshotRetentionCron] Legacy shared bucket cleanup failed:', error.message);
-            results.errors.push({ tenant: 'legacy-shared-bucket', error: error.message });
-        }
-
-        try {
-            const legacyOrphanResult = await cleanupOrphanedScreenshots();
-            results.legacySharedBucketOrphanChunksDeleted = legacyOrphanResult?.orphanChunksDeleted || 0;
-            results.legacySharedBucketOrphanFilesDeleted = legacyOrphanResult?.orphanFilesDeleted || 0;
-        } catch (error) {
-            console.error('[ScreenshotRetentionCron] Legacy orphan cleanup failed:', error.message);
-            results.errors.push({ tenant: 'legacy-shared-bucket-orphans', error: error.message });
-        }
+        // The preserved shared source is read-only. Retention applies solely to
+        // each registered tenant's application media, never migration backups.
 
         return NextResponse.json(results);
     } catch (error) {

@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import mongoose from 'mongoose'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { failure, idOf, isHr } from '@/lib/hrms/resignation.server'
 import { startResignationExit, finaliseExit, emailExitDocument } from '@/lib/hrms/resignationExit.server'
 import { validateSettlement } from '@/lib/hrms/settlement'
-import { loadOffboardingAssetClearance } from '@/lib/hrms/offboardingAssets.server'
+import { getResignationStore, loadExitAssets } from '@/lib/hrms/resignationStore.server'
 import { clearCachePattern, buildCachePattern } from '@/lib/cache'
 import { isFeatureEnabled } from '@/lib/planFeatures'
 import queryCache from '@/lib/queryCache'
@@ -15,14 +14,15 @@ const json = (body, status = 200) => NextResponse.json(body, { status, headers: 
 const failed = error => json({ success: false, message: error.status ? error.message : 'Could not update exit. Refresh to check the latest status before retrying.' }, error.status || 500)
 async function context(request, params) {
   const { id } = await params
-  if (!mongoose.Types.ObjectId.isValid(id)) throw failure('Invalid request', 400)
-  const auth = await getAuthAndModels(request, ['ResignationRequest', 'Employee', 'User', 'UserSession', 'Asset', 'Document', 'Company', 'CompanySettings', 'SystemPreferences'])
+  if (!/^[a-f\d]{24}$/i.test(id || '')) throw failure('Invalid request', 400)
+  const auth = await getAuthAndDatabase(request)
   if (!auth.success) throw failure(auth.message || 'Please sign in', auth.status || 401)
-  const actor = await auth.models.User.findById(auth.user._id || auth.user.userId).select('_id role employeeId isActive').lean()
+  const store = await getResignationStore(auth)
+  const actor = await store.get('users', idOf(auth.user._id || auth.user.userId))
   if (!actor || actor.isActive === false) throw failure('Active account required', 403)
-  const record = await auth.models.ResignationRequest.findById(id).lean()
+  const record = await store.get('resignationrequests', id)
   if (!record || (!isHr(actor) && idOf(record.requestedBy) !== idOf(actor._id))) throw failure('Exit not found', 404)
-  return { auth, actor, record }
+  return { auth, actor, record, store }
 }
 async function invalidate(auth) {
   queryCache.clearPattern('employee')
@@ -30,17 +30,18 @@ async function invalidate(auth) {
 }
 export async function GET(request, { params }) {
   try {
-    const { auth, actor, record } = await context(request, params)
-    const employee = await auth.models.Employee.findById(record.employee).lean()
+    const { auth, actor, record, store } = await context(request, params)
+    const employee = await store.get('employees', idOf(record.employee))
     if (!employee) throw failure('Employee not found', 404)
-    const clearance = await loadOffboardingAssetClearance({ Asset: auth.models.Asset, employeeId: employee._id, offboarding: employee.lifecycle?.offboarding })
-    const document = record.exitDocument ? await auth.models.Document.findById(record.exitDocument).select('_id fileName emailDelivery').lean() : null
+    const clearance = await loadExitAssets(store, employee)
+    const storedDocument = record.exitDocument ? await store.get('documents', idOf(record.exitDocument)) : null
+    const document = storedDocument ? { _id: storedDocument._id, fileName: storedDocument.fileName, emailDelivery: storedDocument.emailDelivery } : null
     return json({ success: true, data: { status: record.status, version: record.version, employeeId: idOf(employee._id), lastWorkingDate: record.proposal?.lastWorkingDate, started: idOf(clearance.offboarding.resignationRequest) === idOf(record._id), settlement: clearance.offboarding.settlement || null, assets: clearance.summary, document, canManage: isHr(actor) && idOf(record.requestedBy) !== idOf(actor._id) } })
   } catch (error) { return failed(error) }
 }
 export async function POST(request, { params }) {
   try {
-    const { auth, actor, record } = await context(request, params)
+    const { auth, actor, record, store } = await context(request, params)
     if (!isHr(actor) || idOf(record.requestedBy) === idOf(actor._id)) throw failure('An independent HR/admin must manage this exit', 403)
     if (!isFeatureEnabled(auth.companyFeatures, 'exitManagement')) throw failure('Exit management is disabled for this organisation', 403)
     let input
@@ -49,7 +50,7 @@ export async function POST(request, { params }) {
     // A repeated completion only checks delivery; it never repeats the settlement or creates a second PDF.
     if (record.status === 'completed' && ['finalise', 'send_documents'].includes(input.action)) {
       await invalidate(auth)
-      const email = await emailExitDocument(auth.models, record.exitDocument)
+      const email = await emailExitDocument(store, record.exitDocument)
       return json({ success: true, message: email?.status === 'sent' ? 'Exit completed. Documents sent by email.' : `Exit completed. Email status: ${email?.status || 'not_sent'}.`, email })
     }
     if (record.status !== 'accepted') throw failure('The employee must accept the notice period first', 409)
@@ -60,25 +61,23 @@ export async function POST(request, { params }) {
       await invalidate(auth)
       // Persisted completion remains successful if the mail service is unavailable.
       let email
-      try { email = await emailExitDocument(auth.models, documentId) } catch { email = { status: 'not_sent' } }
+      try { email = await emailExitDocument(store, documentId) } catch { email = { status: 'not_sent' } }
       return json({ success: true, message: email.status === 'sent' ? 'Employee marked Resigned. Documents sent by email.' : 'Employee marked Resigned. Review the document email status below.', email })
     }
     let settlement
     if (input.action === 'save_settlement') {
       try { settlement = validateSettlement(input.settlement) } catch (error) { throw failure(error.message) }
     }
-    const session = await auth.models.ResignationRequest.db.startSession()
-    try {
-      await session.withTransaction(async () => {
-        const employee = await auth.models.Employee.findById(record.employee).session(session).lean()
-        if (!employee) throw failure('Employee not found', 404)
-        const lifecycle = startResignationExit(employee, record)
-        if (settlement) { lifecycle.offboarding.settlement = { ...settlement, savedAt: new Date(), savedBy: actor._id }; lifecycle.offboarding.fullAndFinalStatus = 'pending' }
-        const changed = await auth.models.ResignationRequest.updateOne({ _id: record._id, version: input.version, status: 'accepted' }, { $inc: { version: 1 }, $push: { timeline: { action: input.action, actor: actor._id, at: new Date(), reason: settlement ? 'HR saved the full-and-final calculation' : 'HR started offboarding' } } }, { session })
-        if (changed.modifiedCount !== 1) throw failure('Request changed. Refresh before acting.', 409)
-        await auth.models.Employee.updateOne({ _id: employee._id }, { $set: { lifecycle }, $inc: { __v: 1 } }, { session, runValidators: true })
-      })
-    } finally { await session.endSession() }
+    await store.transaction(async tx => {
+      const [employee, latest] = await Promise.all([tx.get('employees', idOf(record.employee)), tx.get('resignationrequests', idOf(record))])
+      if (!employee) throw failure('Employee not found', 404)
+      if (!latest || latest.version !== input.version || latest.status !== 'accepted') throw failure('Request changed. Refresh before acting.', 409)
+      const lifecycle = startResignationExit(employee, latest)
+      const now = new Date()
+      if (settlement) { lifecycle.offboarding.settlement = { ...settlement, savedAt: now, savedBy: actor._id }; lifecycle.offboarding.fullAndFinalStatus = 'pending' }
+      await tx.replace('resignationrequests', { ...latest, version: latest.version + 1, updatedAt: now, timeline: [...(latest.timeline || []), { action: input.action, actor: actor._id, at: now, reason: settlement ? 'HR saved the full-and-final calculation' : 'HR started offboarding' }] })
+      await tx.replace('employees', { ...employee, lifecycle, __v: Number(employee.__v || 0) + 1, updatedAt: now })
+    })
     await invalidate(auth)
     return json({ success: true, message: settlement ? 'Settlement calculation saved. Payment has not been marked complete.' : 'Offboarding started.' })
   } catch (error) { return failed(error) }

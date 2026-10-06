@@ -19,7 +19,8 @@ function createMiraPointer({ BrowserWindow }) {
     pointerWindow.setBackgroundColor('#00000000');
     window.setIgnoreMouseEvents(true);
     window.setAlwaysOnTop(true, 'screen-saver');
-    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Avoid Electron's process-type toggle, which briefly hides Talio and its Dock icon.
+    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     window.setContentProtection(true);
     const html = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'"><style>:root{color-scheme:only light}html,body{margin:0;padding:0;width:100%;height:100%;background:transparent!important;overflow:hidden;pointer-events:none}svg{position:absolute;left:42px;top:45px;display:block;width:24px;height:24px;background:transparent!important}</style></head><body><svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path fill="#386de8" d="M128 110 Q125 45 185 67 Q209 77 239 102 L430 269 Q473 314 415 334 L336 338 L227 432 Q144 490 139 410 Z"/></svg></body></html>';
     window.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));

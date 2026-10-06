@@ -17,18 +17,18 @@ describe('calendar-day leave allocation', () => {
     expect(() => prorateAnnualLeave(12, null, 'bad')).toThrow('Invalid leave year')
   })
   test('uses insert-only updates to preserve adjustments, pending requests and usage', async () => {
-    const query = value => ({ select: () => ({ lean: async () => value }) })
-    const bulkWrite = jest.fn().mockResolvedValue({ upsertedCount: 1 })
-    const models = {
-      Employee: { findById: () => query({ _id: 'employee', status: 'probation', dateOfJoining: '2026-07-01' }) },
-      LeaveType: { find: () => query([{ _id: 'annual', maxDaysPerYear: 12 }]) },
-      LeaveBalance: { bulkWrite },
+    const create = jest.fn()
+    const get = async collection => collection === 'employees' ? { _id: 'employee', status: 'probation', dateOfJoining: '2026-07-01' } : { _id: 'annual', isActive: true, maxDaysPerYear: 12 }
+    const database = {
+      get,
+      list: async () => ({ records: [{ _id: 'annual', isActive: true, maxDaysPerYear: 12 }] }),
+      transaction: callback => callback({ get, list: async () => ({ records: [] }), create }),
     }
-    await ensureEmployeeLeaveBalances({ models, employeeId: 'employee', year: 2026 })
-    const operation = bulkWrite.mock.calls[0][0][0].updateOne
-    expect(operation.update.$setOnInsert.totalDays).toBe(6.05)
-    expect(Object.keys(operation.update)).toEqual(['$setOnInsert'])
-    expect(operation.filter).toEqual({ employee: 'employee', leaveType: 'annual', year: 2026 })
+    await ensureEmployeeLeaveBalances({ database, employeeId: 'employee', year: 2026 })
+    expect(create).toHaveBeenCalledWith('leavebalances', expect.objectContaining({ totalDays: 6.05, employee: 'employee', leaveType: 'annual', year: 2026 }))
+    database.transaction = callback => callback({ get, list: async () => ({ records: [{ _id: 'existing' }] }), create })
+    await ensureEmployeeLeaveBalances({ database, employeeId: 'employee', year: 2026 })
+    expect(create).toHaveBeenCalledTimes(1)
   })
 })
 

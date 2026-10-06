@@ -12,7 +12,7 @@ jest.mock('next/navigation', () => ({
 }))
 
 jest.mock('@/contexts/PageTransitionContext', () => ({
-  usePageTransition: () => ({ isNavigating: mockIsNavigating }),
+  usePageTransition: () => ({ isNavigating: mockIsNavigating, targetPath: '/dashboard/documents' }),
 }))
 
 describe('DashboardRouteTransition', () => {
@@ -33,7 +33,7 @@ describe('DashboardRouteTransition', () => {
     expect(container.querySelector('.dashboard-route-veil')).toBeNull()
   })
 
-  test('never covers route content while navigating', () => {
+  test('shows the destination shell immediately while old data is still loading', () => {
     mockIsNavigating = true
 
     const { container } = render(
@@ -48,7 +48,17 @@ describe('DashboardRouteTransition', () => {
     const navigating = css.match(/\.dashboard-route-stage\.is-navigating \.dashboard-route-page\s*\{([^}]+)/)[1]
     expect(navigating).toContain('opacity: 1')
     expect(navigating).toContain('filter: none')
-    expect(screen.getByText('Current route remains visible')).toBeInTheDocument()
+    expect(screen.getByText('Current route remains visible')).not.toBeVisible()
+    expect(screen.getByRole('status', { name: 'Loading page' })).toBeVisible()
+    expect(screen.getByText('documents')).toBeVisible()
+  })
+
+  test('shows destination content as soon as the pathname commits', () => {
+    mockIsNavigating = true
+    mockPathname = '/dashboard/documents'
+    render(<DashboardRouteTransition><p>Documents ready</p></DashboardRouteTransition>)
+    expect(screen.getByText('Documents ready')).toBeVisible()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   test('releases the 3D compositor layer after the route-entry animation', () => {

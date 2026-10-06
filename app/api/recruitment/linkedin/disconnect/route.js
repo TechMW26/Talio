@@ -1,23 +1,25 @@
+import { getLinkedInDatabase, readLinkedInSettings, updateLinkedInSettings } from '@/lib/recruitment/linkedinStore.server';
 import { NextResponse } from 'next/server';
 import { buildCachePattern, clearCachePattern } from '@/lib/cache';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { buildLinkedInStatusPayload } from '@/lib/linkedinIntegration';
 
 const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
 export async function DELETE(request) {
     try {
-        const auth = await getAuthAndModels(request, ['CompanySettings']);
+        const auth = await getAuthAndDatabase(request);
         if (!auth.success) {
             return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
         }
 
-        const { user, models, tenant } = auth;
+        const { user, tenant } = auth;
         if (!ALLOWED_ROLES.includes(user.role)) {
             return NextResponse.json({ success: false, message: 'Only admin and HR can disconnect LinkedIn' }, { status: 403 });
         }
 
-        let settings = await models.CompanySettings.findOne();
+        const database = await getLinkedInDatabase(tenant.databaseName);
+        let settings = await readLinkedInSettings(database);
 
         if (!settings) {
             return NextResponse.json({
@@ -42,8 +44,7 @@ export async function DELETE(request) {
                 isActive: false,
             },
         };
-        settings.markModified('integrations');
-        await settings.save();
+        settings = await updateLinkedInSettings(database, settings.integrations.linkedin);
 
         const cachePattern = buildCachePattern({
             tenantId: tenant.databaseName,

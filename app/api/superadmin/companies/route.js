@@ -7,7 +7,8 @@
 
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
-import getTenantCompanyModel from '@/models/TenantCompany';
+import { validateCompanyInput, getSuperadminStore, getActiveCompanies, createSetupCode, newRecordId } from '@/lib/platform/firestoreSuperadmin.server';
+import { registerFirestoreTenant } from '@/lib/platform/firestoreApplication.server';
 import { getFeaturesForPlan, PLAN_TEMPLATES } from '@/lib/planFeatures';
 
 /**
@@ -28,59 +29,27 @@ export async function GET(request) {
     const status = searchParams.get('status') || '';
     const subscriptionStatus = searchParams.get('subscriptionStatus') || '';
     const tag = searchParams.get('tag') || '';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20') || 20));
 
-    const TenantCompany = await getTenantCompanyModel();
-
-    // Build query
-    const query = { isActive: true };
-
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { slug: { $regex: search, $options: 'i' } },
-        { 'primaryContact.email': { $regex: search, $options: 'i' } },
-        { 'primaryContact.name': { $regex: search, $options: 'i' } },
-      ];
-    }
-
-    if (status) {
-      query.serviceStatus = status;
-    }
-
-    if (subscriptionStatus) {
-      query['subscription.status'] = subscriptionStatus;
-    }
-
-    if (tag) {
-      query.tags = tag;
-    }
-
-    // Get total count
-    const total = await TenantCompany.countDocuments(query);
-
-    // Get companies
-    const companies = await TenantCompany.find(query)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
-
-    // Get stats
-    const stats = await TenantCompany.aggregate([
-      { $match: { isActive: true } },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-          active: { $sum: { $cond: [{ $eq: ['$serviceStatus', 'active'] }, 1, 0] } },
-          paused: { $sum: { $cond: [{ $eq: ['$serviceStatus', 'paused'] }, 1, 0] } },
-          suspended: { $sum: { $cond: [{ $eq: ['$serviceStatus', 'suspended'] }, 1, 0] } },
-          pendingSetup: { $sum: { $cond: [{ $eq: ['$isSetupComplete', false] }, 1, 0] } },
-        },
-      },
-    ]);
+    const database = await getSuperadminStore();
+    const catalog = await getActiveCompanies(database);
+    const needle = search.toLowerCase();
+    const matching = catalog.filter(company =>
+      (!needle || [company.name, company.slug, company.primaryContact?.email, company.primaryContact?.name].some(value => String(value || '').toLowerCase().includes(needle))) &&
+      (!status || company.serviceStatus === status) &&
+      (!subscriptionStatus || company.subscription?.status === subscriptionStatus) &&
+      (!tag || company.tags?.includes(tag))
+    ).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const total = matching.length;
+    const companies = matching.slice((page - 1) * limit, page * limit);
+    const stats = [{
+      total: catalog.length,
+      active: catalog.filter(company => company.serviceStatus === 'active').length,
+      paused: catalog.filter(company => company.serviceStatus === 'paused').length,
+      suspended: catalog.filter(company => company.serviceStatus === 'suspended').length,
+      pendingSetup: catalog.filter(company => company.isSetupComplete === false).length,
+    }];
 
     return NextResponse.json({
       success: true,
@@ -104,7 +73,7 @@ export async function GET(request) {
     console.error('[SuperAdmin Companies GET] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to fetch companies', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }
@@ -129,7 +98,7 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
+    const body = validateCompanyInput(await request.json());
     const {
       name,
       slug,
@@ -160,10 +129,11 @@ export async function POST(request) {
       );
     }
 
-    const TenantCompany = await getTenantCompanyModel();
+    const database = await getSuperadminStore();
 
     // Check if slug already exists
-    const existingCompany = await TenantCompany.findOne({ slug });
+    const { records: existing } = await database.list('tenantcompanies', { filters: [{ field: 'slug', operator: '==', value: slug }], limit: 1 });
+    const existingCompany = existing[0];
     if (existingCompany) {
       return NextResponse.json(
         { success: false, message: 'A company with this slug already exists' },
@@ -212,7 +182,11 @@ export async function POST(request) {
     const miraTokensPerUser = planTemplate?.miraTokensPerUser || 0;
 
     // Create company
-    const company = new TenantCompany({
+    const company = {
+      _id: newRecordId(),
+      databaseName: `talio_company_${slug.replace(/-/g, '_')}`,
+      createdAt: new Date(), updatedAt: new Date(),
+      isSetupComplete: false, notes: [], reminders: [], communicationHistory: [],
       name,
       slug,
       description,
@@ -227,6 +201,7 @@ export async function POST(request) {
         tenureDays: subscription?.tenureDays || 30,
         billingCycle: subscription?.billingCycle || 'monthly',
         amount: subscription?.amount || 0,
+        currency: subscription?.currency || 'INR', currentUserCount: 0,
         maxUsers: subscription?.maxUsers || (planTemplate?.maxUsers || 10),
         maxStorageGB: subscription?.maxStorageGB || (planTemplate?.maxStorageGB || 1),
       },
@@ -240,12 +215,13 @@ export async function POST(request) {
       createdBy: auth.superadmin._id,
       isActive: true,
       serviceStatus: 'active',
-    });
+    };
 
     // Generate setup code
-    const setupCode = company.generateSetupCode(7); // 7 days expiry
-
-    await company.save();
+    company.setupCode = createSetupCode(7);
+    const setupCode = company.setupCode.code;
+    await database.create('tenantcompanies', company);
+    await registerFirestoreTenant(company);
 
     // Generate setup URL
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.talio.in';
@@ -272,7 +248,7 @@ export async function POST(request) {
     console.error('[SuperAdmin Companies POST] Error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to create company', error: error.message },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }

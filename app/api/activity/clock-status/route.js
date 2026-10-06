@@ -1,86 +1,23 @@
-import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
-
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-/**
- * GET /api/activity/clock-status
- * Check if user is currently clocked in (has checkIn but no checkOut for today)
- * Used by desktop app to determine if screenshots should be taken
- */
-export async function GET(request) {
-  try {
-    // Get authenticated user and tenant-specific models - include Employee for populate
-    const auth = await getAuthAndModels(request, ['Attendance', 'User', 'Employee']);
-    if (!auth.success) {
-      return NextResponse.json({ error: auth.message }, { status: 401 });
-    }
-    const { user: authUser, models } = auth;
-    const { Attendance, User } = models;
-
-    const userId = authUser._id || authUser.userId;
-    if (!userId) {
-      return NextResponse.json({
-        success: true,
-        isClockedIn: false,
-        reason: 'User ID not found'
-      }, {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        },
-      });
-    }
-
-    // Get user with employee reference
-    const userWithEmployee = await User.findById(userId).select('employeeId');
-    
-    if (!userWithEmployee || !userWithEmployee.employeeId) {
-      return NextResponse.json({
-        success: true,
-        isClockedIn: false,
-        reason: 'No employee profile linked'
-      }, {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        },
-      });
-    }
-
-    // Get today's date range (IST)
-    const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
-
-    // Check for today's attendance record
-    const attendance = await Attendance.findOne({
-      employee: userWithEmployee.employeeId,
-      date: { $gte: todayStart, $lte: todayEnd }
-    }).select('checkIn checkOut status');
-
-    // User is clocked in if they have checkIn but no checkOut
-    const isClockedIn = attendance && attendance.checkIn && !attendance.checkOut;
-
-    return NextResponse.json({
-      success: true,
-      isClockedIn,
-      status: attendance?.status || null,
-      checkIn: attendance?.checkIn || null,
-      checkOut: attendance?.checkOut || null,
-      userId: authUser._id
-    }, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-      },
-    });
-
-  } catch (error) {
-    console.error('Clock status check error:', error);
-    return NextResponse.json(
-      { error: 'Failed to check clock status', details: error.message },
-      { status: 500 }
-    );
-  }
+import { NextResponse } from 'next/server'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { ATTENDANCE_DATABASE_OPTIONS, attendanceId } from '@/lib/platform/firestoreAttendance.server'
+import { resolveAttendanceCalendar } from '@/lib/services/attendanceAbsenceService.server'
+import { getAttendanceDayRange } from '@/lib/attendanceAutoCheckout'
+export const dynamic='force-dynamic'
+export const runtime='nodejs'
+const headers={'Cache-Control':'no-store, no-cache, must-revalidate, proxy-revalidate'}
+export async function GET(request){
+ try{
+  const auth=await getAuthAndDatabase(request,ATTENDANCE_DATABASE_OPTIONS)
+  if(!auth.success)return NextResponse.json({error:auth.message},{status:401,headers})
+  const account=await auth.database.get('users',attendanceId(auth.user._id||auth.user.userId))
+  const employee=account?.employeeId?await auth.database.get('employees',attendanceId(account.employeeId)):null
+  if(!employee)return NextResponse.json({success:true,isClockedIn:false,reason:'No employee profile linked'},{headers})
+  const calendar=await resolveAttendanceCalendar(auth.database,attendanceId(employee.company))
+  const range=getAttendanceDayRange(new Date(),calendar.timezone)
+  const records=(await auth.database.list('attendances',{filters:[{field:'employee',operator:'==',value:employee._id},{field:'date',operator:'>=',value:range.start},{field:'date',operator:'<=',value:range.end}],limit:2})).records
+  if(records.length>1)return NextResponse.json({success:false,isClockedIn:false,error:'Duplicate attendance requires reconciliation'},{status:409,headers})
+  const attendance=records[0]
+  return NextResponse.json({success:true,isClockedIn:Boolean(attendance?.checkIn&&!attendance.checkOut),status:attendance?.status||null,checkIn:attendance?.checkIn||null,checkOut:attendance?.checkOut||null,userId:account._id},{headers})
+ }catch(error){return NextResponse.json({success:false,error:'Failed to check clock status'},{status:500,headers})}
 }

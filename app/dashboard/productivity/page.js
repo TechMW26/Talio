@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Modal from '@/components/ui/HeroModal'
 import {
@@ -946,7 +948,7 @@ export default function ProductivityPage() {
             variant="flat"
             size="sm"
             onPress={() => setSelectedTeamUserId(null)}
-            startContent={<HiOutlineChevronLeft className="w-4 h-4" />}
+            startContent={<BackIcon className="w-4 h-4" />}
           >
             Back to team
           </Button>

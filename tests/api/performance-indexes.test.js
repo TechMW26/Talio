@@ -1,18 +1,19 @@
-const { INDEXES, sameIndex } = require('../../scripts/migrate-performance-indexes')
-
-test('recent list indexes cover audited MIRA sort patterns', () => {
-  expect(INDEXES.tasks[0].key).toEqual({ updatedAt: -1 })
-  expect(INDEXES.projects[0].key).toEqual({ updatedAt: -1 })
-  expect(INDEXES.announcements[0].key).toEqual({ status: 1, createdAt: -1 })
-  expect(INDEXES.meetings[0].key).toEqual({ scheduledStart: -1 })
+const manifest = require('../../firestore.indexes.json')
+const contains = fields => manifest.indexes.some(index => JSON.stringify(index.fields) === JSON.stringify([...fields.map(([name, mode = 'ASCENDING']) => ({ fieldPath: 'data.' + name, ...(mode === 'CONTAINS' ? { arrayConfig: 'CONTAINS' } : { order: mode }) })), { fieldPath: '__name__', order: 'ASCENDING' }]))
+test.each([
+  [['status'], ['createdAt', 'DESCENDING']],
+  [['employee'], ['createdAt', 'DESCENDING']],
+  [['employee'], ['status'], ['createdAt', 'DESCENDING']],
+  [['employee'], ['reviewPeriod'], ['status']],
+  [['approverUserIds', 'CONTAINS'], ['updatedAt', 'DESCENDING']],
+])('native query indexes cover performance scope and ordering %j', (...fields) => {
+  expect(contains(fields)).toBe(true)
 })
-
-test('index audit compares ordered key definitions, not names', () => {
-  const definition = INDEXES.employees[0]
-  expect(sameIndex({ key: definition.key, name: 'legacy-name' }, definition)).toBe(true)
-  expect(sameIndex({ key: { _id: -1, createdAt: -1 } }, definition)).toBe(false)
-  expect(sameIndex({ key: { createdAt: -1 } }, definition)).toBe(false)
-})
-test.each([{ sparse: true }, { partialFilterExpression: { status: 'active' } }, { collation: { locale: 'en' } }])('does not confuse restricted index %p with full index', options => {
-  expect(sameIndex({ key: INDEXES.employees[0].key, ...options }, INDEXES.employees[0])).toBe(false)
+test('index declarations are unique and retain explicit document cursor ordering', () => {
+  expect(new Set(manifest.indexes.map(index => JSON.stringify(index))).size).toBe(manifest.indexes.length)
+  for (const index of manifest.indexes) {
+    expect(index.collectionGroup).toBe('records')
+    expect(index.queryScope).toBe('COLLECTION')
+    expect(index.fields.at(-1)).toEqual({ fieldPath: '__name__', order: 'ASCENDING' })
+  }
 })

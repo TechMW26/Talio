@@ -1,258 +1,96 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import toast from '@/utils/toast'
-import { Select, SelectItem, Skeleton } from '@heroui/react'
-import {
-  FaUsers, FaSearch, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
-  FaBriefcase, FaStar, FaChartLine, FaFilter, FaCrown, FaUserFriends
-} from 'react-icons/fa'
+import { useRef, useState } from 'react'
+import Link from 'next/link'
+import { LayoutGroup, motion, useReducedMotion } from 'framer-motion'
+import { Search, ChevronLeft, ChevronRight, Users, Crown } from 'lucide-react'
 import { formatDesignation } from '@/lib/formatters'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
-import { DataErrorState } from '@/components/ui/ErrorBoundary'
-import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { useChatWidget } from '@/contexts/ChatWidgetContext'
+import { getTeamChat } from '@/lib/client/teamChat'
+import styles from './team.module.css'
 
 export default function TeamMembersPage() {
-  const router = useRouter()
-  const [selectedDepartment, setSelectedDepartment] = useState('all')
-  const [selectedTeam, setSelectedTeam] = useState('all')
-  const [searchTerm, setSearchTerm] = useState('')
-
-  // --- SWR data fetching ---
-  const swrKey = (() => {
-    let url = '/api/team/members'
-    const params = []
-    if (selectedDepartment && selectedDepartment !== 'all') params.push(`department=${selectedDepartment}`)
-    if (selectedTeam && selectedTeam !== 'all') params.push(`team=${selectedTeam}`)
-    if (params.length > 0) url += '?' + params.join('&')
-    return url
-  })()
-  const { data: teamRes, error, isLoading, isValidating, mutate: refreshTeam } = useAuthedSWR(swrKey)
-  const teamMembers = teamRes?.data || []
-  const department = teamRes?.meta?.department || null
-  const departments = teamRes?.meta?.departments || []
-
-  // Fetch teams for selected department
-  const teamsSwrKey = selectedDepartment && selectedDepartment !== 'all'
-    ? `/api/teams?department=${selectedDepartment}`
-    : departments.length === 1 ? `/api/teams?department=${departments[0]?._id}` : null
-  const { data: teamsRes } = useAuthedSWR(teamsSwrKey)
-  const teams = teamsRes?.data || []
-
-  const filteredMembers = teamMembers.filter(member => {
-    if (!searchTerm) return true
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      member.firstName.toLowerCase().includes(searchLower) ||
-      member.lastName.toLowerCase().includes(searchLower) ||
-      member.employeeCode.toLowerCase().includes(searchLower) ||
-      member.email.toLowerCase().includes(searchLower)
-    )
-  })
-
+  const [department, setDepartment] = useState('all')
+  const [team, setTeam] = useState('all')
+  const [search, setSearch] = useState('')
+  const slider = useRef(null)
+  const chatPending = useRef(false)
+  const [openingChat, setOpeningChat] = useState(null)
+  const [chatError, setChatError] = useState('')
+  const { openChat } = useChatWidget()
+  const startChat = async employeeId => {
+    if (chatPending.current) return
+    chatPending.current = true
+    setOpeningChat(employeeId)
+    setChatError('')
+    try { openChat(await getTeamChat(employeeId)) }
+    catch (error) { setChatError(error.message || 'Unable to open chat. Please try again.') }
+    finally { chatPending.current = false; setOpeningChat(null) }
+  }
+  const reduceMotion = useReducedMotion()
+  // Stable metadata prevents the department/team controls disappearing on selection.
+  const directory = useAuthedSWR('/api/team/members')
+  const params = new URLSearchParams()
+  if (department !== 'all') params.set('department', department)
+  if (team !== 'all') params.set('team', team)
+  const filteredKey = params.size ? `/api/team/members?${params}` : null
+  const filtered = useAuthedSWR(filteredKey, { keepPreviousData: false })
+  const current = filteredKey ? filtered : directory
+  const departments = directory.data?.meta?.departments || []
+  const teams = (directory.data?.meta?.teams || []).filter(item => department === 'all' || (item.department?._id || item.department) === department)
+  const members = (current.data?.data || []).filter(member =>
+    [member.firstName, member.lastName, member.employeeCode, member.email, formatDesignation(member.designation, member)]
+      .filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase()))
+  const scroll = direction => slider.current?.scrollBy({ left: direction * 240, behavior: reduceMotion ? 'auto' : 'smooth' })
   return (
-    <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center mb-2">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Team Members</h1>
-            <p className="text-gray-600 text-sm sm:text-base">
-              {selectedDepartment === 'all'
-                ? (departments.length > 1 ? 'All Departments' : department?.name + ' Department')
-                : departments.find(d => d._id === selectedDepartment)?.name + ' Department'}
-            </p>
+    <section className={styles.page} aria-labelledby="team-title">
+      <header className={styles.header}>
+        <div><h1 id="team-title">Team</h1><p>Your people, their roles, and the teams that bring it all together.</p></div>
+        <label className={styles.department}>Department
+          <select aria-label="Department" value={department} onChange={event => { setDepartment(event.target.value); setTeam('all') }}>
+            <option value="all">All departments</option>
+            {departments.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}
+          </select>
+        </label>
+      </header>
+      <label className={styles.search}><Search size={18} aria-hidden="true" /><input aria-label="Search people" placeholder="Search people, code or email…" value={search} onChange={event => setSearch(event.target.value)} /></label>
+      <LayoutGroup id="talio-team-directory">
+        {chatError && <p role="alert" className="text-danger text-sm mt-4">{chatError}</p>}
+        <div className={styles.toolbar}>
+          <div className={styles.switcher}>
+            {teams.length > 2 && <button className={styles.scroll} aria-label="Scroll teams left" onClick={() => scroll(-1)}><ChevronLeft size={18} /></button>}
+            <div className={styles.tabs} ref={slider} role="group" aria-label="Filter by team">
+              {[{ _id: 'all', teamName: 'All teams' }, ...teams].map(item => <button key={item._id} aria-pressed={team === item._id} onClick={event => { setTeam(item._id); event.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }) }}>
+                {team === item._id && <motion.span className={styles.selection} layoutId="selected-team" transition={{ duration: reduceMotion ? 0 : .55, ease: [.22, 1, .36, 1] }} />}
+                <span className={styles.tabLabel}>{item.teamName}</span>
+              </button>)}
+            </div>
+            {teams.length > 2 && <button className={styles.scroll} aria-label="Scroll teams right" onClick={() => scroll(1)}><ChevronRight size={18} /></button>}
           </div>
+          <span className={styles.count} role="status">{current.isLoading ? 'Loading members…' : `${members.length} members`}{current.isValidating && !current.isLoading ? ' · Updating…' : ''}</span>
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600 font-medium">Total Team Members</p>
-            <p className="text-3xl font-bold text-gray-900">{teamMembers.length}</p>
-          </div>
-          <FaUsers className="text-blue-500 text-4xl" />
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search Input */}
-          <div className="input-with-icon flex-1">
-            <FaSearch className="input-icon" />
-            <input
-              type="text"
-              placeholder="Search by name, employee code, or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input input-search"
-            />
-          </div>
-
-          {/* Department Filter - show only if multiple departments */}
-          {departments.length > 1 && (
-            <div className="sm:w-64">
-              <Select
-                selectedKeys={[selectedDepartment]}
-                onChange={(e) => { setSelectedDepartment(e.target.value); setSelectedTeam('all') }}
-                aria-label="Department Filter"
-                startContent={<FaFilter className="text-gray-400" />}
-                classNames={{ trigger: "bg-white" }}
-              >
-                <SelectItem key="all">All Departments</SelectItem>
-                {departments.map((dept) => (
-                  <SelectItem key={dept._id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </Select>
-            </div>
-          )}
-
-          {/* Team Filter - show when teams are available */}
-          {teams.length > 0 && (
-            <div className="sm:w-64">
-              <Select
-                selectedKeys={[selectedTeam]}
-                onChange={(e) => setSelectedTeam(e.target.value)}
-                aria-label="Team Filter"
-                startContent={<FaUserFriends className="text-gray-400" />}
-                classNames={{ trigger: "bg-white" }}
-              >
-                <SelectItem key="all">All Teams</SelectItem>
-                {teams.map((team) => (
-                  <SelectItem key={team._id}>
-                    {team.teamName}
-                  </SelectItem>
-                ))}
-              </Select>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Team Members List */}
-      {error ? (
-        <DataErrorState message="Failed to load team members" onRetry={() => refreshTeam()} />
-      ) : isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-md p-6 space-y-3">
-              <div className="flex items-center gap-3">
-                <Skeleton className="w-12 h-12 rounded-full" />
-                <div>
-                  <Skeleton className="h-4 w-28 rounded-lg mb-1" />
-                  <Skeleton className="h-3 w-20 rounded-lg" />
-                </div>
+        {directory.error || current.error ? <div className={styles.empty} role="alert"><h2>Unable to load your team</h2><p>Please try again.</p><button onClick={() => { directory.mutate(); if (filteredKey) filtered.mutate() }}>Retry</button></div>
+          : current.isLoading ? <div className={styles.grid} aria-label="Loading team members" aria-busy="true">{Array.from({ length: 6 }, (_, i) => <div className={`${styles.card} ${styles.skeleton}`} key={i}><div /><p /><p /><p /></div>)}</div>
+          : !members.length ? <div className={styles.empty}><Users size={32} /><h2>No team members found</h2><p>{search ? 'Try another name, employee code or email.' : 'There are no members in this selection yet.'}</p></div>
+          : <div className={styles.grid}>{members.map((member, index) => {
+            const name = [member.firstName, member.lastName].filter(Boolean).join(' ') || 'Team member'
+            const joined = member.dateOfJoining ? new Date(member.dateOfJoining) : null
+            return <motion.article layout={!reduceMotion} initial={reduceMotion ? false : { opacity: 0, y: 24, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: reduceMotion ? 0 : .6, ease: [.22, 1, .36, 1], opacity: { delay: Math.min(index, 8) * .035 } }} className={styles.card} key={member._id}>
+              <div className={styles.avatar}>
+                <span>{`${member.firstName?.[0] || ''}${member.lastName?.[0] || ''}` || '?'}</span>
+                {member.profilePicture && <img src={member.profilePicture} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden' }} />}
+                {member.isDepartmentHead && <i title={`Head of ${member.headOfDepartment || 'Department'}`}><Crown size={13} /></i>}
               </div>
-              <Skeleton className="h-3 w-3/4 rounded-lg" />
-              <Skeleton className="h-3 w-1/2 rounded-lg" />
-            </div>
-          ))}
-        </div>
-      ) : filteredMembers.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <FaUsers className="text-gray-400 text-4xl mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No Team Members Found</h3>
-          <p className="text-gray-600">
-            {searchTerm ? 'Try adjusting your search' : 'No team members in your department yet'}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {filteredMembers.map((member) => (
-            <div
-              key={member._id}
-              onClick={() => router.push(`/dashboard/team/members/${member._id}`)}
-              className="bg-white rounded-lg shadow-md p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow"
-            >
-              {/* Profile Picture */}
-              <div className="flex items-center mb-4">
-                <div className="relative">
-                  <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl">
-                    {member.profilePicture ? (
-                      <img
-                        src={member.profilePicture}
-                        alt={`${member.firstName} ${member.lastName}`}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
-                    ) : (
-                      `${member.firstName.charAt(0)}${member.lastName.charAt(0)}`
-                    )}
-                  </div>
-                  {member.isDepartmentHead && (
-                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center" title={`Head of ${member.headOfDepartment || 'Department'}`}>
-                      <FaCrown className="text-white text-xs" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 ml-4">
-                  <h3 className="text-lg font-bold text-gray-900">
-                    {member.firstName} {member.lastName}
-                  </h3>
-                  <p className="text-sm text-gray-600">{member.employeeCode}</p>
-                  {member.isDepartmentHead && (
-                    <span className="inline-block mt-1 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
-                      Dept Head{member.headOfDepartment ? ` - ${member.headOfDepartment}` : ''}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Details */}
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center text-sm text-gray-600">
-                  <span>
-                    {formatDesignation(member.designation, member) || 'No designation'}
-                  </span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <span className="truncate">{member.email}</span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <span>{member.phone}</span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <span>Joined {new Date(member.dateOfJoining).toLocaleDateString()}</span>
-                </div>
-              </div>
-
-              {/* Skills */}
-              {member.skills && member.skills.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs text-gray-500 mb-2">Skills:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {member.skills.slice(0, 3).map((skill, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {member.skills.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                        +{member.skills.length - 3} more
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* View Details Button */}
-              <button className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center">
-                <FaChartLine className="mr-2" />
-                View Details & Reviews
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+              <h2>{name}</h2><p className={styles.role}>{formatDesignation(member.designation, member) || 'Team member'}</p>
+              <span className={styles.badge}>{member.department?.name || member.headOfDepartment || 'Team'}</span>
+              <dl className={styles.stats}><div><dt>Employee code</dt><dd>{member.employeeCode || '—'}</dd></div><div><dt>Joined</dt><dd>{joined && !Number.isNaN(joined.getTime()) ? joined.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '—'}</dd></div></dl>
+              <div className={styles.contact}><span title={member.email}>{member.email || 'Email not provided'}</span><span>{member.phone || 'Phone not provided'}</span></div>
+              {!!member.skills?.length && <div className={styles.skills}>{member.skills.slice(0, 3).map((skill, i) => <span key={i}>{typeof skill === 'string' ? skill : skill.name}</span>)}{member.skills.length > 3 && <span>+{member.skills.length - 3} more</span>}</div>}
+              <footer className={styles.actions}><button type="button" disabled={openingChat !== null} aria-label={`Chat with ${name}`} aria-busy={openingChat === member._id} onClick={() => startChat(member._id)}>{openingChat === member._id ? 'Opening…' : 'Chat'}</button><Link href={`/dashboard/team/members/${member._id}`} aria-label={`View ${name}'s profile and reviews`}>Profile <ChevronRight size={14} /></Link></footer>
+            </motion.article>
+          })}</div>}
+      </LayoutGroup>
+    </section>
   )
 }
-

@@ -1,10 +1,35 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { SWRConfig } from 'swr'
-import useAuthedSWR, { useAuthedSWRStatic } from '@/hooks/useAuthedSWR'
+import useAuthedSWR, { useAuthedSWRStatic, useAuthedSWRRealtime } from '@/hooks/useAuthedSWR'
 
 const response = data => ({ ok: true, status: 200, json: async () => data })
 beforeEach(() => { global.fetch = jest.fn(); localStorage.setItem('token', 'test') })
 afterEach(() => { delete global.fetch; localStorage.clear() })
+
+test('timeout remains active while the response body is stalled', async () => {
+  jest.useFakeTimers()
+  try {
+    fetch.mockImplementation(async (_, { signal }) => ({ ok: true, status: 200,
+      json: () => new Promise((_, reject) => signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })))),
+    }))
+    const wrapper = ({ children }) => <SWRConfig value={{ provider: () => new Map() }}>{children}</SWRConfig>
+    const { result, unmount } = renderHook(() => ({ error: useAuthedSWR('/api/stalled-body').error }), { wrapper })
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { jest.advanceTimersByTime(15001) })
+    expect(result.current.error.message).toContain('timed out')
+    expect(fetch).toHaveBeenCalledTimes(1)
+    unmount()
+  } finally { jest.useRealTimers() }
+})
+
+test('realtime permanent client errors do not schedule retries', async () => {
+  fetch.mockResolvedValue({ ok: false, status: 403, json: async () => ({ message: 'Forbidden' }) })
+  const onErrorRetry = jest.fn()
+  const wrapper = ({ children }) => <SWRConfig value={{ provider: () => new Map() }}>{children}</SWRConfig>
+  const { result } = renderHook(() => useAuthedSWRRealtime('/api/forbidden', { onErrorRetry }), { wrapper })
+  await waitFor(() => expect(result.current.error?.status).toBe(403))
+  expect(onErrorRetry).not.toHaveBeenCalled()
+})
 
 test('page switches retain visible data while fetching and show updated values when ready', async () => {
   let finish

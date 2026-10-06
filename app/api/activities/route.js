@@ -1,141 +1,34 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import mongoose from 'mongoose'
-
-// GET - Fetch activities
+import { randomBytes } from 'node:crypto'
+import { activityContext } from '@/lib/platform/firestoreActivity.server'
+import { attendanceError, attendanceId } from '@/lib/platform/firestoreAttendance.server'
+import { getAttendanceDayRange } from '@/lib/attendanceAutoCheckout'
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Activity', 'User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Activity, User } = models
-
-    const userId = user._id || user.userId
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'User ID not found' }, { status: 400 })
-    }
-
-    const currentUser = await User.findById(userId).select('employeeId role')
-    const employeeId = currentUser?.employeeId
-
-    if (!employeeId) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-        count: 0,
-        message: 'No employee profile linked'
-      })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const date = searchParams.get('date') // Format: YYYY-MM-DD
-    const limit = parseInt(searchParams.get('limit')) || 50
-    const type = searchParams.get('type')
-
-    // Build query
-    const query = { employee: employeeId }
-
-    // Filter by date (today by default)
-    if (date) {
-      const startOfDay = new Date(date)
-      startOfDay.setHours(0, 0, 0, 0)
-      const endOfDay = new Date(date)
-      endOfDay.setHours(23, 59, 59, 999)
-      
-      query.createdAt = {
-        $gte: startOfDay,
-        $lte: endOfDay
-      }
-    } else {
-      // Default to today
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const endOfToday = new Date()
-      endOfToday.setHours(23, 59, 59, 999)
-      
-      query.createdAt = {
-        $gte: today,
-        $lte: endOfToday
-      }
-    }
-
-    // Filter by type
-    if (type) {
-      query.type = type
-    }
-
-    const activities = await Activity.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean()
-
-    return NextResponse.json({
-      success: true,
-      data: activities,
-      count: activities.length
-    })
-
-  } catch (error) {
-    console.error('Get activities error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch activities' },
-      { status: 500 }
-    )
-  }
+    const {database,user}=await activityContext(request),params=new URL(request.url).searchParams
+    const account=await database.get('users',attendanceId(user._id||user.userId))
+    if(!account?.employeeId) return NextResponse.json({success:true,data:[],count:0,message:'No employee profile linked'})
+    const date=params.get('date')||new Date()
+    if(Number.isNaN(+new Date(date))) throw attendanceError('Invalid date')
+    const range=getAttendanceDayRange(date,'Asia/Kolkata')
+    const filters=[{field:'employee',operator:'==',value:attendanceId(account.employeeId)},{field:'createdAt',operator:'>=',value:range.start},{field:'createdAt',operator:'<=',value:range.end}]
+    if(params.get('type')) filters.push({field:'type',operator:'==',value:params.get('type')})
+    const data=(await database.list('activities',{filters,orderBy:[{field:'createdAt',direction:'desc'}],limit:Math.min(100,Math.max(1,Number(params.get('limit'))||50))})).records
+    return NextResponse.json({success:true,data,count:data.length})
+  } catch(error){return NextResponse.json({success:false,message:error.message},{status:error.status||500})}
 }
-
-// POST - Create activity (for manual logging)
 export async function POST(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Activity', 'User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Activity, User } = models
-
-    const userId = user._id || user.userId
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'User ID not found' }, { status: 400 })
-    }
-
-    const currentUser = await User.findById(userId).select('employeeId')
-    const employeeId = currentUser?.employeeId
-
-    if (!employeeId) {
-      return NextResponse.json({ success: false, message: 'No employee profile linked' }, { status: 400 })
-    }
-
-    const body = await request.json()
-    const { type, action, details, metadata, relatedModel, relatedId } = body
-
-    const activity = await Activity.create({
-      employee: employeeId,
-      type,
-      action,
-      details,
-      metadata,
-      relatedModel,
-      relatedId,
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
-      userAgent: request.headers.get('user-agent')
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: activity
-    }, { status: 201 })
-
-  } catch (error) {
-    console.error('Create activity error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to create activity' },
-      { status: 500 }
-    )
-  }
+    const {database,user}=await activityContext(request),input=await request.json()
+    const account=await database.get('users',attendanceId(user._id||user.userId))
+    if(!account?.employeeId) throw attendanceError('No employee profile linked')
+    if(typeof input.type!=='string'||!input.type.trim()||input.type.length>100||typeof input.action!=='string'||!input.action.trim()||input.action.length>500) throw attendanceError('A valid activity type and action are required')
+    if(input.details&&String(input.details).length>10000||JSON.stringify(input.metadata||{}).length>20000) throw attendanceError('Activity details exceed the allowed size')
+    if(input.relatedId&&!/^[a-f0-9]{24}$/.test(input.relatedId)) throw attendanceError('Invalid related record ID')
+    const now=new Date()
+    const data={_id:randomBytes(12).toString('hex'),employee:attendanceId(account.employeeId),type:input.type,action:input.action,details:String(input.details||''),metadata:input.metadata||{},relatedModel:input.relatedModel?String(input.relatedModel).slice(0,100):null,relatedId:input.relatedId||null,ipAddress:request.headers.get('x-forwarded-for')?.split(',')[0]||request.headers.get('x-real-ip'),userAgent:request.headers.get('user-agent'),createdAt:now,updatedAt:now}
+    await database.create('activities',data)
+    return NextResponse.json({success:true,data},{status:201})
+  } catch(error){return NextResponse.json({success:false,message:error.message},{status:error.status||500})}
 }
 

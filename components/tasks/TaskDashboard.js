@@ -7,7 +7,7 @@ import {
   FaPlus, FaFilter, FaChartBar, FaUsers, FaProjectDiagram,
   FaCalendarAlt, FaHourglassHalf, FaArrowUp, FaArrowDown
 } from 'react-icons/fa'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from '@/components/charts/FernlyCharts'
 import { Select, SelectItem, Button } from '@heroui/react'
 import CustomTooltip, { CustomPieTooltip } from '@/components/charts/CustomTooltip'
 import Loader from '@/components/ui/Loader'

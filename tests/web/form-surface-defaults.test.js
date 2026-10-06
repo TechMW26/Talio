@@ -36,13 +36,24 @@ test('transparent wrappers are scoped to fields, with opaque native options reta
 })
 
 test('inner field content has no second boundary or curved edge', () => {
-  const inner = rules.find(rule => rule.selectors?.includes('[data-slot="input-wrapper"] input'))
+  const inner = rules.find(rule => rule.selectors?.includes('html body [data-slot="input-wrapper"] input'))
   for (const [prop, value] of [['border', 'none'], ['border-radius', '0'], ['box-shadow', 'none']]) {
     expect(inner.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ prop, value, important: true })]))
   }
   expect(css).toContain('[data-slot="input-wrapper"]:focus-within')
   const focus = rules.find(rule => rule.selectors?.includes('.talio-searchable-select [data-slot="input-wrapper"][data-focus="true"]'))
   expect(focus.nodes.some(node => node.prop === 'box-shadow')).toBe(false)
+})
+
+test('wrapped searches remove inner decoration without stripping standalone search borders', () => {
+  const inner = rules.find(rule => rule.selector === 'html:is(:root, .dark, .light) body [data-search-container] input')
+  for (const [prop, value] of [['border', '0'], ['border-radius', '0'], ['box-shadow', 'none'], ['outline', 'none']]) {
+    expect(inner.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ prop, value, important: true })]))
+  }
+  const focus = rules.find(rule => rule.selector === 'html:is(:root, .dark, .light) body [data-search-container]:has(input:focus-visible)')
+  expect(focus.nodes.some(node => node.prop === 'outline' && node.value.startsWith('2px solid'))).toBe(true)
+  const standalone = rules.find(rule => rule.selector.includes('body input:is('))
+  expect(standalone.nodes.some(node => ['border', 'outline'].includes(node.prop))).toBe(false)
 })
 
 test('field layout shells do not add another outline around the wrapper', () => {

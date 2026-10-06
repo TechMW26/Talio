@@ -1,3 +1,4 @@
+import { getLinkedInDatabase, readLinkedInSettings, updateLinkedInSettings } from '@/lib/recruitment/linkedinStore.server';
 import { NextResponse } from 'next/server';
 import { buildCachePattern, clearCachePattern } from '@/lib/cache';
 import {
@@ -8,7 +9,7 @@ import {
     LINKEDIN_OAUTH_STATE_COOKIE,
     verifyLinkedInStateToken,
 } from '@/lib/linkedinIntegration';
-import { getTenantModels } from '@/lib/tenantModels';
+
 
 const ALLOWED_ROLES = ['admin', 'super_admin', 'hr'];
 
@@ -56,8 +57,8 @@ export async function GET(request) {
             });
         }
 
-        const { CompanySettings, User } = await getTenantModels(statePayload.databaseName, ['CompanySettings', 'User']);
-        const user = await User.findById(statePayload.userId).select('_id role isActive').lean();
+        const database = await getLinkedInDatabase(statePayload.databaseName);
+        const user = await database.get('users', statePayload.userId);
 
         if (!user || !user.isActive || !ALLOWED_ROLES.includes(user.role)) {
             return buildRedirectResponse(request, statePayload.returnTo, {
@@ -69,10 +70,7 @@ export async function GET(request) {
         const tokenData = await exchangeLinkedInCodeForTokens(request, code);
         const profile = await fetchLinkedInConnectedAccount(tokenData.access_token);
 
-        let settings = await CompanySettings.findOne();
-        if (!settings) {
-            settings = new CompanySettings({});
-        }
+        let settings = await readLinkedInSettings(database) || {};
 
         const existingLinkedIn = settings.integrations?.linkedin?.toObject?.() || settings.integrations?.linkedin || {};
         const tokenExpiresAt = tokenData.expires_in
@@ -92,8 +90,7 @@ export async function GET(request) {
                 isActive: true,
             },
         };
-        settings.markModified('integrations');
-        await settings.save();
+        settings = await updateLinkedInSettings(database, settings.integrations.linkedin);
 
         const cachePattern = buildCachePattern({
             tenantId: statePayload.databaseName,

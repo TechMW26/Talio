@@ -1,9 +1,11 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaArrowLeft, FaSave, FaTimes, FaPlus } from 'react-icons/fa'
+import { FaSave, FaTimes, FaPlus } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -165,7 +167,7 @@ export default function EditGoalPage() {
             onClick={() => router.back()}
             className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <FaArrowLeft className="w-5 h-5" />
+            <BackIcon className="w-5 h-5" />
           </button>
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Edit Performance Goal</h1>

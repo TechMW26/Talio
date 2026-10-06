@@ -1,9 +1,11 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaArrowLeft, FaUser, FaPaperPlane, FaClock, FaTag, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa'
+import { FaUser, FaPaperPlane, FaClock, FaTag, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import { Select, SelectItem, Skeleton, Card, CardBody } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -97,7 +99,7 @@ export default function TicketDetailPage() {
         onClick={() => router.back()}
         className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
       >
-        <FaArrowLeft className="mr-2" /> Back to Tickets
+        <BackIcon className="mr-2" /> Back to Tickets
       </button>
       <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
 

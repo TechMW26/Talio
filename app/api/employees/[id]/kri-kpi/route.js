@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,14 +27,13 @@ function normalizeKris(kris) {
 export async function GET(request, { params }) {
   try {
     const { id } = await params
-    const auth = await getAuthAndModels(request, ['Employee'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
 
-    const employee = await auth.models.Employee.findById(id)
-      .select('manualKRIs manualKPIs aiGeneratedKRIs aiGeneratedKRIsMeta firstName lastName')
-      .lean()
+    if (!/^[a-f\d]{24}$/i.test(id)) return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    const employee = await auth.database.get('employees', id)
 
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
@@ -58,7 +57,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const { id } = await params
-    const auth = await getAuthAndModels(request, ['Employee'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -73,24 +72,14 @@ export async function PUT(request, { params }) {
     const manualKRIs = normalizeKris(body.manualKRIs)
     const manualKPIs = normalizeKpis(body.manualKPIs)
 
-    const employee = await auth.models.Employee.findByIdAndUpdate(
-      id,
-      {
-        $set: {
-          manualKRIs,
-          manualKPIs,
-        },
-      },
-      { new: true }
-    )
-      .select('manualKRIs manualKPIs')
-      .lean()
+    if (!/^[a-f\d]{24}$/i.test(id)) return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    const employee = await auth.database.mutate('employees', id, current => ({ ...current, manualKRIs, manualKPIs, updatedAt: new Date() }))
 
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true, data: employee, message: 'KRI/KPI updated' })
+    return NextResponse.json({ success: true, data: { _id: employee._id, manualKRIs: employee.manualKRIs, manualKPIs: employee.manualKPIs }, message: 'KRI/KPI updated' })
   } catch (error) {
     console.error('Employee KRI/KPI PUT error:', error)
     return NextResponse.json({ success: false, message: 'Failed to update KRI/KPI' }, { status: 500 })

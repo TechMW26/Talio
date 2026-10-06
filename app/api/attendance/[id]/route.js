@@ -1,149 +1,59 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import mongoose from 'mongoose'
-
+import { getAuthAndDatabase } from '@/lib/auth'
+import { ATTENDANCE_DATABASE_OPTIONS, attendanceId, attendanceError } from '@/lib/platform/firestoreAttendance.server'
+import { getProductivityVisibility } from '@/lib/platform/firestoreProductivityView.server'
 export const dynamic = 'force-dynamic'
-
-// Helper to validate MongoDB ObjectId
-const isValidObjectId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id) &&
-    (new mongoose.Types.ObjectId(id)).toString() === id
-}
-
-// GET - Get single attendance record
-export async function GET(request, { params }) {
-  try {
-    const { id } = await params
-
-    // Validate ObjectId
-    if (!isValidObjectId(id)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid attendance record ID' },
-        { status: 400 }
-      )
-    }
-
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Attendance } = models
-
-    const attendance = await Attendance.findById(id)
-      .populate('employee', 'firstName lastName employeeCode')
-
-    if (!attendance) {
-      return NextResponse.json(
-        { success: false, message: 'Attendance record not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: attendance,
-    })
-  } catch (error) {
-    console.error('Get attendance error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch attendance record' },
-      { status: 500 }
-    )
+const failure = error => NextResponse.json({ success: false, message: error.message }, { status: error.status || 500 })
+async function context(request, params, write = false) {
+  const { id } = await params
+  if (!/^[a-f0-9]{24}$/.test(id || '')) throw attendanceError('Invalid attendance record ID')
+  const auth = await getAuthAndDatabase(request, ATTENDANCE_DATABASE_OPTIONS)
+  if (!auth.success) throw attendanceError(auth.message || 'Unauthorized', 401)
+  if (write && !['admin', 'hr', 'owner', 'superadmin'].includes(auth.user.role)) throw attendanceError('Admin or HR access required', 403)
+  const record = await auth.database.get('attendances', id)
+  if (!record) throw attendanceError('Attendance record not found', 404)
+  if (!write) {
+    const scope = await getProductivityVisibility(auth.database, auth.user, { includeSelf: true })
+    if (!scope.employees.some(e => e._id === attendanceId(record.employee))) throw attendanceError('Access denied', 403)
   }
+  return { ...auth, id, record }
 }
-
-// PUT - Update attendance record
+async function populate(database, record) {
+  const employee = await database.get('employees', attendanceId(record.employee))
+  return { ...record, employee: employee ? { _id: employee._id, firstName: employee.firstName, lastName: employee.lastName, employeeCode: employee.employeeCode } : null }
+}
+export async function GET(request, { params }) {
+  try { const { database, record } = await context(request, params); return NextResponse.json({ success: true, data: await populate(database, record) }) }
+  catch(error) { return failure(error) }
+}
 export async function PUT(request, { params }) {
   try {
-    const { id } = await params
-
-    // Validate ObjectId
-    if (!isValidObjectId(id)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid attendance record ID' },
-        { status: 400 }
-      )
+    const { database, user, id } = await context(request, params, true), body = await request.json()
+    const fields = {}
+    for (const field of ['checkIn', 'checkOut']) if (body[field] !== undefined) {
+      fields[field] = body[field] ? new Date(body[field]) : null
+      if (fields[field] && Number.isNaN(+fields[field])) throw attendanceError('Invalid ' + field)
     }
-
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { models } = auth
-    const { Attendance } = models
-
-    const data = await request.json()
-
-    const attendance = await Attendance.findByIdAndUpdate(
-      id,
-      data,
-      { new: true, runValidators: true }
-    ).populate('employee', 'firstName lastName employeeCode')
-
-    if (!attendance) {
-      return NextResponse.json(
-        { success: false, message: 'Attendance record not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Attendance updated successfully',
-      data: attendance,
+    if (body.status !== undefined) { if (!['present','absent','half-day','late','on-leave','holiday','weekend','in-progress'].includes(body.status)) throw attendanceError('Invalid status'); fields.status = body.status }
+    for (const field of ['workHours', 'overtime']) if (body[field] !== undefined) { if (!Number.isFinite(+body[field]) || +body[field] < 0 || +body[field] > 48) throw attendanceError('Invalid hours'); fields[field] = +body[field] }
+    if (body.remarks !== undefined) fields.remarks = String(body.remarks).slice(0, 10000)
+    const record = await database.mutate('attendances', id, current => {
+      const next = { ...current, ...fields, correctedAt: new Date(), correctedBy: attendanceId(user._id || user.userId), isManualEntry: true, source: 'correction', updatedAt: new Date() }
+      if (next.checkOut && (!next.checkIn || next.checkOut <= next.checkIn)) throw attendanceError('Checkout must follow check-in')
+      return next
     })
-  } catch (error) {
-    console.error('Update attendance error:', error)
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to update attendance' },
-      { status: 500 }
-    )
-  }
+    if (!record) throw attendanceError('Attendance record not found', 404)
+    return NextResponse.json({ success: true, message: 'Attendance updated successfully', data: await populate(database, record) })
+  } catch(error) { return failure(error) }
 }
-
-// DELETE - Delete attendance record
 export async function DELETE(request, { params }) {
   try {
-    const { id } = await params
-
-    // Validate ObjectId
-    if (!isValidObjectId(id)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid attendance record ID' },
-        { status: 400 }
-      )
-    }
-
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { models } = auth
-    const { Attendance } = models
-
-    const attendance = await Attendance.findByIdAndDelete(id)
-
-    if (!attendance) {
-      return NextResponse.json(
-        { success: false, message: 'Attendance record not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Attendance deleted successfully',
+    const { database, id } = await context(request, params, true)
+    await database.transaction(async tx => {
+      if (!await tx.get('attendances', id)) throw attendanceError('Attendance record not found', 404)
+      await tx.delete('attendances', id)
     })
-  } catch (error) {
-    console.error('Delete attendance error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to delete attendance' },
-      { status: 500 }
-    )
-  }
+    return NextResponse.json({ success: true, message: 'Attendance deleted successfully' })
+  } catch(error) { return failure(error) }
 }
 

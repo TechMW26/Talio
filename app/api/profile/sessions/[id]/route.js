@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import mongoose from 'mongoose'
+import { getAuthAndDatabase } from '@/lib/auth'
 
 // DELETE - Revoke a specific session
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['UserSession'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { UserSession } = models
+    const { user, database } = auth
 
     const { id } = await params
 
@@ -23,24 +21,19 @@ export async function DELETE(request, { params }) {
     }
 
     // Validate session ID format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!/^[a-f\d]{24}$/i.test(id)) {
       return NextResponse.json(
         { error: 'Invalid session ID format' },
         { status: 400 }
       )
     }
 
-    // Get user ID - could be ObjectId or string from cache
-    const userId = user._id || user.userId
-    const userObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId
+    const userId = String(user._id || user.userId)
 
     // Find the session and ensure it belongs to the current user
-    const session = await UserSession.findOne({
-      _id: new mongoose.Types.ObjectId(id),
-      user: userObjectId,
-    })
+    const session = await database.get('usersessions', id)
 
-    if (!session) {
+    if (!session || String(session.user) !== userId) {
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
@@ -64,10 +57,10 @@ export async function DELETE(request, { params }) {
     }
 
     // Revoke the session
-    session.isActive = false
-    session.revokedAt = new Date()
-    session.revokedReason = 'user_logout'
-    await session.save()
+    await database.mutate('usersessions', id, current => {
+      if (String(current.user) !== userId || (currentTokenId && current.tokenId === currentTokenId)) throw new Error('Session ownership changed')
+      return { ...current, isActive: false, revokedAt: new Date(), revokedReason: 'user_logout', updatedAt: new Date() }
+    })
 
     console.log(`[sessions] Revoked session ${id} for user ${user._id || user.userId}`)
 

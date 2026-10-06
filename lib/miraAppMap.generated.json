@@ -36,7 +36,8 @@
       "text-default-700 font-semibold"
     ],
     "sources": [
-      "app/auth/forgot-password/page.js"
+      "app/auth/forgot-password/page.js",
+      "components/ui/BackIcon.js"
     ]
   },
   {
@@ -57,6 +58,7 @@
     ],
     "sources": [
       "app/auth/reset-password/[token]/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/Loader.js"
     ]
   },
@@ -253,6 +255,7 @@
       "Request Attendance Correction",
       "Request Regularisation",
       "Requested Status",
+      "Retry",
       "Today&apos;s Attendance",
       "Why did you miss clocking in/out?",
       "Your shift ended at"
@@ -316,6 +319,7 @@
     ],
     "sources": [
       "app/dashboard/attendance/team/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -361,6 +365,7 @@
       "app/dashboard/chat/page.js",
       "components/UnreadBadge.js",
       "components/chat/MemberAvatar.js",
+      "components/ui/BackIcon.js",
       "components/ui/HeroModal.js"
     ]
   },
@@ -458,6 +463,7 @@
       "Enter document name",
       "Explain why this verification must be reviewed again",
       "File *",
+      "Load more",
       "Loading documents",
       "My documents",
       "My onboarding documents",
@@ -599,6 +605,7 @@
       "components/performance/PerformanceAppraisalPanel.js",
       "components/remoteSupport/RemoteSupportAdminPanel.js",
       "components/remoteSupport/RemoteSupportSessionView.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js"
@@ -768,6 +775,7 @@
     ],
     "sources": [
       "app/dashboard/employees/edit/[id]/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -876,6 +884,7 @@
     ],
     "sources": [
       "app/dashboard/employees/user-passwords/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -967,6 +976,7 @@
     ],
     "sources": [
       "app/dashboard/helpdesk/[id]/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -1211,6 +1221,8 @@
       "Pending Allocations",
       "Previous",
       "Retry",
+      "Search employee leave balances",
+      "Search name or employee code…",
       "Select Employee",
       "Select Leave Type",
       "Select Year",
@@ -1245,6 +1257,7 @@
     ],
     "sources": [
       "app/dashboard/leave/apply/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/LoadingButton.js"
@@ -1280,7 +1293,10 @@
     "route": "/dashboard/leave/balance",
     "name": "My Leave Balance",
     "controls": [
+      "Blocked",
+      "Completed",
       "Connection Error",
+      "In progress",
       "Leave Balance",
       "Leave Balance Details",
       "Leave Balance by Type",
@@ -1289,8 +1305,10 @@
       "Recent Leave History",
       "Remaining Balance",
       "Retry",
+      "Review",
       "Select Year",
       "Something went wrong",
+      "To do",
       "Total Allocated",
       "Total Used",
       "Try Again"
@@ -1298,6 +1316,8 @@
     "sources": [
       "app/dashboard/leave/balance/page.js",
       "components/charts/CustomTooltip.js",
+      "components/charts/FernlyCharts.js",
+      "components/charts/FernlyCharts.module.css",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -1317,6 +1337,7 @@
     "sources": [
       "app/dashboard/leave/early-leave/page.js",
       "components/leave/SpecialRequestPage.js",
+      "components/ui/BackIcon.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/LoadingButton.js"
     ]
@@ -1397,6 +1418,7 @@
     "sources": [
       "app/dashboard/leave/work-from-home/page.js",
       "components/leave/SpecialRequestPage.js",
+      "components/ui/BackIcon.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/LoadingButton.js"
     ]
@@ -1468,7 +1490,8 @@
       "e.g. Write a polite decline to the meeting invitation for next Tuesday..."
     ],
     "sources": [
-      "app/dashboard/mail/page.js"
+      "app/dashboard/mail/page.js",
+      "components/ui/BackIcon.js"
     ]
   },
   {
@@ -1541,6 +1564,7 @@
       "app/dashboard/meetings/[id]/page.js",
       "app/dashboard/meetings/components/EditMeetingModal.js",
       "app/dashboard/meetings/components/MeetingJoinLink.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
@@ -1654,6 +1678,7 @@
     "controls": [
       "Absent",
       "Attendance Correction -",
+      "Back to Selection",
       "Clear Filters",
       "Done",
       "Filters",
@@ -1671,12 +1696,12 @@
       "Salary Calculation Method",
       "Search by name, code, email, department...",
       "Select Employees",
-      "WFH",
-      "← Back to Selection"
+      "WFH"
     ],
     "sources": [
       "app/dashboard/payroll/generate/page.js",
       "components/payroll/AttendanceCorrectionModal.js",
+      "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/heroui/index.js"
@@ -1752,6 +1777,7 @@
     ],
     "sources": [
       "app/dashboard/payroll/payslips/[id]/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -1854,6 +1880,7 @@
     ],
     "sources": [
       "app/dashboard/performance/create/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1876,7 +1903,8 @@
       "Updates History"
     ],
     "sources": [
-      "app/dashboard/performance/goals/[id]/page.js"
+      "app/dashboard/performance/goals/[id]/page.js",
+      "components/ui/BackIcon.js"
     ]
   },
   {
@@ -1908,6 +1936,7 @@
     ],
     "sources": [
       "app/dashboard/performance/goals/create/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -1940,6 +1969,7 @@
     ],
     "sources": [
       "app/dashboard/performance/goals/edit/[id]/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/LoadingButton.js"
     ]
   },
@@ -2080,6 +2110,8 @@
       "AI Productivity Scores (Top 10)",
       "Attendance",
       "Attendance by Day of Week",
+      "Blocked",
+      "Completed",
       "Connection Error",
       "Department",
       "Department Analysis",
@@ -2089,6 +2121,7 @@
       "Dept Task Performance",
       "Employee Metrics",
       "End Date",
+      "In progress",
       "Individual Employee Performance",
       "Key Metrics Summary",
       "Needs Attention",
@@ -2097,6 +2130,7 @@
       "Performance Reports & Analytics",
       "Rating Distribution",
       "Retry",
+      "Review",
       "Search by name, code, or department...",
       "Select department",
       "Select team",
@@ -2106,6 +2140,7 @@
       "Tasks",
       "Tasks by Priority",
       "Team",
+      "To do",
       "Top Performers (Attendance)",
       "Top Skills Analysis",
       "Try Again"
@@ -2113,6 +2148,8 @@
     "sources": [
       "app/dashboard/performance/reports/page.js",
       "components/charts/CustomTooltip.js",
+      "components/charts/FernlyCharts.js",
+      "components/charts/FernlyCharts.module.css",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -2177,6 +2214,7 @@
     "sources": [
       "app/dashboard/productivity/page.js",
       "components/productivity/AnalyzedComposite.js",
+      "components/ui/BackIcon.js",
       "components/ui/HeroModal.js"
     ]
   },
@@ -2251,6 +2289,7 @@
     ],
     "sources": [
       "app/dashboard/projects/[projectId]/edit/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/LoadingButton.js",
       "components/ui/Portal.js"
     ]
@@ -2272,6 +2311,7 @@
       "Assign To",
       "Assigned To",
       "Attachments",
+      "Blocked",
       "Blockers & Bottlenecks",
       "Cancel",
       "Color",
@@ -2287,16 +2327,19 @@
       "Delete",
       "Describe the task...",
       "Description",
+      "Drop task here",
       "Due Date",
       "Edit",
       "Edit Task",
       "Enter task title",
       "Enter task title...",
       "Enter the reason for this status change...",
+      "Estimated time",
       "Generate Smart Insights",
       "Hours",
       "Immediate Actions",
       "In Progress",
+      "In progress",
       "Mark Complete",
       "Members",
       "Move Task To",
@@ -2338,6 +2381,7 @@
       "Set Your ETA",
       "Smart Insights",
       "Subtask Progress",
+      "Subtask progress",
       "Subtask title...",
       "Subtasks",
       "Subtasks ( / )",
@@ -2349,6 +2393,7 @@
       "Task Status Distribution",
       "Task Title",
       "Task Title *",
+      "Task kanban board",
       "Tasks",
       "Team Analytics",
       "Team Member Analysis",
@@ -2358,6 +2403,7 @@
       "Time vs Task Progress",
       "Title (optional)",
       "To Do",
+      "To do",
       "Unpin",
       "Visibility",
       "Workload Distribution",
@@ -2365,9 +2411,13 @@
     ],
     "sources": [
       "app/dashboard/projects/[projectId]/page.js",
+      "components/charts/FernlyCharts.js",
+      "components/charts/FernlyCharts.module.css",
       "components/projects/ProjectOverview.js",
       "components/tasks/KanbanBoard.js",
+      "components/tasks/KanbanBoard.module.css",
       "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/BackIcon.js",
       "components/ui/Loader.js",
       "components/ui/ModalPortal.js",
       "components/ui/Portal.js"
@@ -2394,6 +2444,7 @@
     ],
     "sources": [
       "app/dashboard/projects/approvals/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
@@ -2425,10 +2476,12 @@
       "Deletion Request",
       "Describe the task...",
       "Description",
+      "Drop task here",
       "Due Date",
       "Edit Task",
       "Enter subtask title...",
       "Enter task title",
+      "Estimated time",
       "Filters",
       "Hours",
       "In Progress",
@@ -2459,11 +2512,13 @@
       "Status",
       "Status filter",
       "Subtask Title *",
+      "Subtask progress",
       "Subtasks",
       "Subtasks ( / )",
       "Switch to list view to review",
       "Task Details",
       "Task Title",
+      "Task kanban board",
       "Title *",
       "To Do",
       "Update Status",
@@ -2477,7 +2532,9 @@
       "app/dashboard/projects/assigned-tasks/page.js",
       "components/tasks/CreateTaskModal.js",
       "components/tasks/KanbanBoard.js",
+      "components/tasks/KanbanBoard.module.css",
       "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
@@ -2515,6 +2572,7 @@
     ],
     "sources": [
       "app/dashboard/projects/create/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
@@ -2543,9 +2601,11 @@
       "Delete task",
       "Describe the task...",
       "Description",
+      "Drop task here",
       "Due Date",
       "Due Today ( )",
       "Enter task title",
+      "Estimated time",
       "Filter by Priority",
       "Filter by Project",
       "Filter by Status",
@@ -2570,11 +2630,13 @@
       "Search tasks...",
       "Set Estimated Time",
       "Set Your ETA",
+      "Subtask progress",
       "Subtasks",
       "Subtasks ( / )",
       "Switch to List View to Accept/Reject",
       "Task Details",
       "Task Title",
+      "Task kanban board",
       "To Do",
       "Update Status",
       "View Project"
@@ -2583,6 +2645,7 @@
       "app/dashboard/projects/my-tasks/page.js",
       "components/tasks/CreateTaskModal.js",
       "components/tasks/KanbanBoard.js",
+      "components/tasks/KanbanBoard.module.css",
       "components/tasks/SubtaskCompletionButton.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
@@ -2658,6 +2721,7 @@
       "components/rbac/AuditLogPanel.js",
       "components/rbac/RoleAssignModal.js",
       "components/rbac/RoleBuilder.js",
+      "components/ui/BackIcon.js",
       "components/ui/Loader.js",
       "components/ui/Modal.js"
     ]
@@ -2695,6 +2759,7 @@
     ],
     "sources": [
       "app/dashboard/recruitment/[id]/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
@@ -2726,6 +2791,7 @@
     ],
     "sources": [
       "app/dashboard/recruitment/analytics/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -2771,6 +2837,7 @@
     ],
     "sources": [
       "app/dashboard/recruitment/candidates/[id]/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
@@ -2797,6 +2864,7 @@
     ],
     "sources": [
       "app/dashboard/recruitment/candidates/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -2827,7 +2895,8 @@
       "e.g. Senior Software Engineer"
     ],
     "sources": [
-      "app/dashboard/recruitment/create/page.js"
+      "app/dashboard/recruitment/create/page.js",
+      "components/ui/BackIcon.js"
     ]
   },
   {
@@ -2856,7 +2925,8 @@
       "e.g. Senior Software Engineer"
     ],
     "sources": [
-      "app/dashboard/recruitment/edit/[id]/page.js"
+      "app/dashboard/recruitment/edit/[id]/page.js",
+      "components/ui/BackIcon.js"
     ]
   },
   {
@@ -2886,6 +2956,7 @@
     ],
     "sources": [
       "app/dashboard/recruitment/interviews/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
@@ -3294,6 +3365,8 @@
       "Present days",
       "Previous",
       "Primary Location",
+      "Productivity",
+      "Productivity screenshots",
       "Professional Tax",
       "Professional setup for your current env-based LinkedIn flow",
       "Provident Fund (PF)",
@@ -3311,6 +3384,7 @@
       "Rotate token",
       "Sales",
       "Save Changes",
+      "Save changes",
       "Search providers, protocols, or models",
       "Search settings",
       "Select a Company",
@@ -3356,7 +3430,9 @@
       "components/settings/AttendanceMachinesSettings.js",
       "components/settings/InductionSettings.js",
       "components/settings/MiraSettings.js",
+      "components/settings/ProductivitySettings.js",
       "components/settings/WordPressRecruitmentSettings.js",
+      "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/heroui/SearchableSelect.js"
@@ -3523,6 +3599,7 @@
     "sources": [
       "app/dashboard/talioboard/[id]/page.js",
       "components/ui/AIActivityBeam.js",
+      "components/ui/BackIcon.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/Loader.js",
       "components/ui/MiraLoadingOverlay.js",
@@ -3591,34 +3668,67 @@
     "name": "team / members / [id]",
     "controls": [
       "Add Review / Remark",
+      "Analyzed Mosaic ( )",
+      "Attendance calendar",
       "Back to Team Members",
       "Basic Information",
       "Blocked",
       "Category",
+      "Close",
       "Completed",
+      "Completion",
       "Connection Error",
       "Content",
+      "Employee attendance",
+      "Employee productivity",
+      "Employee screenshot",
       "Enter your review, remark, or feedback...",
       "Go Back",
       "In Progress",
+      "In progress",
       "Member Not Found",
+      "Member overview",
+      "Next",
+      "Next attendance month",
+      "No profile photo",
       "Pending",
+      "Previous",
+      "Previous attendance month",
+      "Productivity & screenshots",
       "Rating",
+      "Refresh",
+      "Refresh attendance",
       "Retry",
       "Review",
       "Reviews & Remarks",
+      "Screenshot pages",
+      "Screenshot ·",
       "Something went wrong",
-      "Task Statistics",
+      "Task activity",
       "Tasks",
+      "To do",
       "Todo",
       "Total",
       "Try Again",
-      "Type"
+      "Type",
+      "‹",
+      "›",
+      "↻"
     ],
     "sources": [
+      "app/dashboard/team/members/[id]/MemberAttendance.js",
+      "app/dashboard/team/members/[id]/MemberOverview.js",
+      "app/dashboard/team/members/[id]/MemberProductivity.js",
+      "app/dashboard/team/members/[id]/MemberTaskList.js",
+      "app/dashboard/team/members/[id]/member.module.css",
       "app/dashboard/team/members/[id]/page.js",
+      "components/charts/FernlyCharts.js",
+      "components/charts/FernlyCharts.module.css",
+      "components/productivity/AnalyzedComposite.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
+      "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js"
     ]
@@ -3627,21 +3737,21 @@
     "route": "/dashboard/team/members",
     "name": "team / members",
     "controls": [
-      "Connection Error",
-      "Department Filter",
-      "No Team Members Found",
+      "Department",
+      "Filter by team",
+      "Loading team members",
+      "No team members found",
       "Retry",
-      "Search by name, employee code, or email...",
-      "Something went wrong",
-      "Team Filter",
-      "Team Members",
-      "Try Again",
-      "View Details & Reviews"
+      "Scroll teams left",
+      "Scroll teams right",
+      "Search people",
+      "Search people, code or email…",
+      "Team",
+      "Unable to load your team"
     ],
     "sources": [
       "app/dashboard/team/members/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app/dashboard/team/members/team.module.css"
     ]
   },
   {
@@ -3662,6 +3772,7 @@
     ],
     "sources": [
       "app/dashboard/team/my-teams/page.js",
+      "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js"
     ]
@@ -3708,12 +3819,14 @@
       "Add description...",
       "Add subtask...",
       "At time of due date",
+      "Blocked",
       "Brief description...",
       "By Priority",
       "Cancel",
       "Categories",
       "Category",
       "Close to-do analytics",
+      "Completed",
       "Completion by priority",
       "Create New To-do",
       "Create To-do",
@@ -3723,11 +3836,13 @@
       "Enter to-do title",
       "Filter category",
       "High",
+      "In progress",
       "Low",
       "Medium",
       "No Priority",
       "No project tasks",
       "Priority",
+      "Review",
       "Search to-dos...",
       "Select category",
       "Select priority",
@@ -3735,6 +3850,7 @@
       "Start task (move to In Progress)",
       "Subtasks ( / )",
       "Tags",
+      "To do",
       "To-Do's",
       "To-do Analytics",
       "To-do Details",
@@ -3752,6 +3868,8 @@
       "app/dashboard/todo/components/CreateTodoModal.js",
       "app/dashboard/todo/components/TodoDetailPanel.js",
       "app/dashboard/todo/page.js",
+      "components/charts/FernlyCharts.js",
+      "components/charts/FernlyCharts.module.css",
       "components/tasks/SubtaskCompletionButton.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/HeroModal.js",
@@ -3826,6 +3944,7 @@
     "controls": [
       "Add people",
       "Applause",
+      "Back to home",
       "Camera preview",
       "Cancel",
       "Celebrate",
@@ -3868,7 +3987,6 @@
       "Transcript History",
       "Try camera again",
       "←",
-      "← Back to home",
       "→"
     ],
     "sources": [
@@ -3882,6 +4000,7 @@
       "components/meetings/MeetingVisualIcons.js",
       "components/meetings/ParticipantGrid.js",
       "components/ui/AIActivityBeam.js",
+      "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js"
     ]
@@ -4097,6 +4216,7 @@
     "sources": [
       "app/superadmin/companies/[id]/page.js",
       "components/superadmin/HrmsModuleControls.js",
+      "components/ui/BackIcon.js",
       "components/ui/Loader.js",
       "components/ui/ModalPortal.js"
     ]
@@ -4192,7 +4312,8 @@
     ],
     "sources": [
       "app/superadmin/companies/new/page.js",
-      "components/superadmin/HrmsModuleControls.js"
+      "components/superadmin/HrmsModuleControls.js",
+      "components/ui/BackIcon.js"
     ]
   },
   {

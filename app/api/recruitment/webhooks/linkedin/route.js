@@ -1,5 +1,6 @@
+import { getLinkedInDatabase, readLinkedInSettings, updateLinkedInSettings } from '@/lib/recruitment/linkedinStore.server';
 import { NextResponse } from 'next/server';
-import { getTenantModels } from '@/lib/tenantModels';
+
 import {
     resolveLinkedInTenantDatabaseName,
     syncLinkedInApplicants,
@@ -41,7 +42,7 @@ function buildVerificationResponse(request) {
     const verifyToken = searchParams.get('verifyToken') || searchParams.get('hub.verify_token');
     const expectedToken = process.env.LINKEDIN_WEBHOOK_VERIFY_TOKEN;
 
-    if (expectedToken && verifyToken && verifyToken !== expectedToken) {
+    if (expectedToken && verifyToken !== expectedToken) {
         return NextResponse.json({ success: false, message: 'Invalid webhook verification token' }, { status: 403 });
     }
 
@@ -66,11 +67,12 @@ export async function POST(request) {
         const rawBody = await request.text();
         const payload = rawBody ? JSON.parse(rawBody) : {};
         const tenantDatabaseName = resolveTenantFromRequest(request, payload);
-        const models = await getTenantModels(tenantDatabaseName, ['Candidate', 'JobPosting', 'CompanySettings']);
+        const database = await getLinkedInDatabase(tenantDatabaseName);
         const signature = getWebhookSignatureHeader(request);
-        const settings = await models.CompanySettings.findOne();
+        let settings = await readLinkedInSettings(database);
         const signatureSecret = process.env.LINKEDIN_WEBHOOK_SECRET || '';
 
+        if (!signatureSecret) return NextResponse.json({ success: false, message: 'LinkedIn webhook signing is not configured' }, { status: 503 });
         if (signatureSecret) {
             const isValid = verifyLinkedInWebhookSignature(rawBody, signature, signatureSecret);
             if (!isValid) {
@@ -85,7 +87,7 @@ export async function POST(request) {
 
         if (payload.profileData || payload.applicant) {
             result = await importLinkedInProfile(tenantDatabaseName, {
-                models,
+                database,
                 actorId,
                 jobPosting: payload.jobPosting || payload.jobPostingId || payload.jobId,
                 profileData: payload.profileData || payload.applicant,
@@ -101,7 +103,7 @@ export async function POST(request) {
                 : [payload.jobId, payload.jobPostingId, payload.jobPosting].filter(Boolean);
 
             result = await syncLinkedInApplicants(tenantDatabaseName, {
-                models,
+                database,
                 actorId,
                 jobId: payload.jobPosting || payload.jobPostingId || payload.jobId,
                 jobIds,
@@ -126,8 +128,7 @@ export async function POST(request) {
                     lastWebhookEventType: eventType,
                 },
             };
-            settings.markModified('integrations');
-            await settings.save();
+            settings = await updateLinkedInSettings(database, { lastWebhookAt: new Date(), lastWebhookEventType: eventType });
         }
 
         return NextResponse.json({

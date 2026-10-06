@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify, SignJWT } from 'jose'
+import { SignJWT } from 'jose'
+import { verifyTokenFromRequest } from '@/lib/auth'
+import { getNativeAuthRepository } from '@/lib/platform/firestoreAuth.server'
 
 // Cache the encoded JWT secret
 let _cachedJwtSecret = null
 function getJwtSecret() {
   if (!_cachedJwtSecret) {
+    if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required')
     _cachedJwtSecret = new TextEncoder().encode(process.env.JWT_SECRET)
   }
   return _cachedJwtSecret
@@ -35,7 +38,9 @@ export async function GET(request) {
     }
 
     // Verify JWT token
-    const { payload } = await jwtVerify(activeToken, getJwtSecret())
+    const auth = await verifyTokenFromRequest(request)
+    if (!auth.success) return NextResponse.json({ user: null, expires: null })
+    const payload = auth.user
 
     // Return session in NextAuth format
     return NextResponse.json({
@@ -75,16 +80,17 @@ export async function POST(request) {
     }
 
     // Verify the existing token
-    let payload
-    try {
-      const result = await jwtVerify(token, getJwtSecret())
-      payload = result.payload
-    } catch (verifyError) {
+    const auth = await verifyTokenFromRequest(request)
+    if (!auth.success) {
       return NextResponse.json(
         { success: false, message: 'Invalid or expired token' },
         { status: 401 }
       )
     }
+    const repository = await getNativeAuthRepository(auth.tenant.databaseName)
+    const expiresAt = new Date(Date.now() + 7 * 86400000)
+    const account = await repository.refreshSession(auth.user, expiresAt)
+    const payload = { ...auth.user, role: account.role, email: account.email }
 
     // Issue a new token with the same claims but fresh expiry
     const newToken = await new SignJWT({
@@ -92,6 +98,7 @@ export async function POST(request) {
       email: payload.email,
       role: payload.role,
       tokenId: payload.tokenId,
+      authVersion: Number(account.authVersion) || 0,
       // Preserve multi-tenant info
       ...(payload.databaseName && { databaseName: payload.databaseName }),
       ...(payload.companySlug && { companySlug: payload.companySlug }),
@@ -108,14 +115,14 @@ export async function POST(request) {
       success: true,
       data: {
         token: newToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: expiresAt.toISOString(),
       },
     })
   } catch (error) {
     console.error('[Auth] Token refresh error:', error)
     return NextResponse.json(
-      { success: false, message: 'Failed to refresh token' },
-      { status: 500 }
+      { success: false, message: error.status === 401 ? error.message : 'Failed to refresh token' },
+      { status: error.status || 500 }
     )
   }
 }

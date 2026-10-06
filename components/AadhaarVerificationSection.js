@@ -17,6 +17,7 @@ import toast from '@/utils/toast'
 import ModalPortal from '@/components/ModalPortal'
 import { useAILoading } from '@/contexts/AILoadingContext'
 import Loader from '@/components/ui/Loader'
+import { profileDocumentUrl } from '@/lib/client/profileDocumentUrl'
 
 /**
  * AadhaarVerificationSection
@@ -43,12 +44,14 @@ export default function AadhaarVerificationSection({
 
   const frontInputRef = useRef(null)
   const backInputRef = useRef(null)
+  const previewUrls = useRef(new Set())
 
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading()
 
   // Load existing uploads on mount
   useEffect(() => {
+    const controller = new AbortController()
     const loadExistingImages = async () => {
       const token = localStorage.getItem('token')
       if (!token) return
@@ -56,17 +59,18 @@ export default function AadhaarVerificationSection({
       // Fetch Aadhaar upload status
       try {
         const response = await fetch('/api/profile/aadhaar-upload', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
+          signal: controller.signal,
         })
         const result = await response.json()
 
         if (result.success && result.data) {
           if (result.data.aadhaarFront?.url) {
             // Load the actual image through the secured endpoint
-            loadSecuredImage(result.data.aadhaarFront.url, setFrontPreview, token)
+            loadSecuredImage(result.data.aadhaarFront, setFrontPreview, token, controller.signal)
           }
           if (result.data.aadhaarBack?.url) {
-            loadSecuredImage(result.data.aadhaarBack.url, setBackPreview, token)
+            loadSecuredImage(result.data.aadhaarBack, setBackPreview, token, controller.signal)
           }
         }
       } catch (error) {
@@ -75,28 +79,35 @@ export default function AadhaarVerificationSection({
     }
 
     loadExistingImages()
+    return () => {
+      controller.abort()
+      for (const url of previewUrls.current) URL.revokeObjectURL(url)
+      previewUrls.current.clear()
+    }
   }, [])
 
   // Load image - either directly from external URL or through secured API endpoint
-  const loadSecuredImage = async (url, setPreview, token) => {
+  const loadSecuredImage = async (document, setPreview, token, signal) => {
     try {
+      const url = profileDocumentUrl(document, window.location.origin)
+      if (!url || signal?.aborted) return
       // If URL is an external URL, use it directly
       if (url.startsWith('http://') || url.startsWith('https://')) {
-        console.log('[Aadhaar] Loading image directly from external URL:', url)
         setPreview(url)
         return
       }
 
       // For local paths, load through secured API endpoint
-      const apiUrl = `/api${url}`
-      console.log('[Aadhaar] Loading image through secured API:', apiUrl)
-      const response = await fetch(apiUrl, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal,
       })
 
       if (response.ok) {
         const blob = await response.blob()
+        if (signal?.aborted) return
         const objectUrl = URL.createObjectURL(blob)
+        previewUrls.current.add(objectUrl)
         setPreview(objectUrl)
       }
     } catch (error) {

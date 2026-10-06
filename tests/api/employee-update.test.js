@@ -1,193 +1,34 @@
-jest.mock('next/server', () => {
-  class MockNextResponse extends Response {
-    static json(data, init = {}) {
-      const headers = new Headers(init.headers || {})
-      if (!headers.has('content-type')) headers.set('content-type', 'application/json')
-      return new MockNextResponse(JSON.stringify(data), {
-        ...init,
-        headers,
-        status: init.status || 200,
-      })
-    }
-  }
-
-  return { NextResponse: MockNextResponse }
+jest.mock('next/server', () => ({ NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) } }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
+jest.mock('@/lib/cache', () => ({ buildCachePattern: jest.fn(), clearCachePattern: jest.fn().mockResolvedValue() }))
+jest.mock('@/lib/platform/firestoreEmployeeAccount.server', () => ({ mutateFirestoreEmployee: jest.fn().mockResolvedValue({}) }))
+jest.mock('@/lib/employeeDetails.server', () => ({ readEmployeeDetails: jest.fn().mockResolvedValue({}) }))
+jest.mock('@/lib/kriGenerator', () => ({ generateAndStoreKRIsKPIs: jest.fn().mockResolvedValue() }))
+const { getAuthAndDatabase } = require('@/lib/auth')
+const { mutateFirestoreEmployee } = require('@/lib/platform/firestoreEmployeeAccount.server')
+const { PUT } = require('@/app/api/employees/[id]/route')
+const { workflowStore } = require('../helpers/firestoreWorkflowStore')
+const employeeId = '6957b35cbf0b9ea49ca507a1', managerId = '111111111111111111111111'
+let database
+beforeEach(() => {
+  jest.clearAllMocks()
+  database = workflowStore({ employees: [{ _id: employeeId, employeeCode: 'EMP-001', email: 'employee@example.test', designationLevel: 9 }, { _id: managerId, designationLevel: 6 }] })
+  getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'admin', role: 'admin' }, tenant: { databaseName: 'talio_company_test' }, database })
 })
-
-jest.mock('@/lib/auth', () => ({
-  getAuthAndModels: jest.fn(),
-}))
-
-jest.mock('@/lib/queryCache', () => ({
-  __esModule: true,
-  default: {
-    generateKey: jest.fn(() => 'employee-key'),
-    get: jest.fn(),
-    set: jest.fn(),
-    delete: jest.fn(),
-    clearPattern: jest.fn(),
-  },
-}))
-
-jest.mock('@/lib/cache', () => ({
-  buildCacheKey: jest.fn(() => 'cache-key'),
-  buildCachePattern: jest.fn(() => 'cache-pattern'),
-  getCache: jest.fn(),
-  setCache: jest.fn().mockResolvedValue(undefined),
-  clearCachePattern: jest.fn().mockResolvedValue(undefined),
-}))
-
-jest.mock('@/lib/activityLogger', () => ({
-  logActivity: jest.fn().mockResolvedValue(undefined),
-}))
-
-jest.mock('@/lib/backupDb', () => ({
-  deleteUserFromBackup: jest.fn(),
-}))
-
-jest.mock('@/lib/realtimeEvents', () => ({
-  emitEmployeeUpdate: jest.fn(),
-  emitDashboardRefresh: jest.fn(),
-  emitAssetUpdate: jest.fn(),
-}))
-
-const { getAuthAndModels } = require('@/lib/auth')
-const { PUT: updateEmployee } = require('@/app/api/employees/[id]/route')
-
-const EMPLOYEE_ID = '6957b35cbf0b9ea49ca507a1'
-
-function createPopulateQuery(result) {
-  const query = {
-    populate: jest.fn(() => query),
-    lean: jest.fn().mockResolvedValue(result),
-  }
-  return query
-}
-
-function createModels() {
-  const existingEmployee = {
-    _id: EMPLOYEE_ID,
-    employeeCode: 'EMP-001',
-    email: 'employee@talio.in',
-    designationLevel: 9,
-  }
-  const updatedEmployee = {
-    ...existingEmployee,
-    reportsTo: null,
-    reportingManager: null,
-  }
-  const updateQuery = createPopulateQuery(updatedEmployee)
-
-  return {
-    existingEmployee,
-    updatedEmployee,
-    models: {
-      Employee: {
-        findById: jest.fn(() => ({
-          lean: jest.fn().mockResolvedValue(existingEmployee),
-        })),
-        findOne: jest.fn(),
-        findByIdAndUpdate: jest.fn(() => updateQuery),
-      },
-      User: {},
-      Department: {},
-      Designation: null,
-      Role: null,
-    },
-  }
-}
-
-describe('employee update references', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-  })
-
-  test('accepts empty optional relationships and persists them as null', async () => {
-    const { models } = createModels()
-    getAuthAndModels.mockResolvedValue({
-      success: true,
-      user: { _id: 'admin-1', role: 'admin' },
-      tenant: { databaseName: 'talio_company_test' },
-      models,
-    })
-
-    const request = new Request(`http://localhost:3000/api/employees/${EMPLOYEE_ID}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        reportsTo: '',
-        reportingManager: '',
-        assignedManager: '',
-        assignedTeamLead: '',
-        designation: '',
-        department: '',
-        company: '',
-        departments: [],
-      }),
-      headers: { 'content-type': 'application/json' },
-    })
-
-    const response = await updateEmployee(request, {
-      params: Promise.resolve({ id: EMPLOYEE_ID }),
-    })
-    const body = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(models.Employee.findByIdAndUpdate).toHaveBeenCalledWith(
-      EMPLOYEE_ID,
-      expect.objectContaining({
-        reportsTo: null,
-        reportingManager: null,
-        assignedManager: null,
-        assignedTeamLead: null,
-        designation: null,
-        department: null,
-        company: null,
-        departments: [],
-      }),
-      { new: true, runValidators: true }
-    )
-    expect(body).toMatchObject({ success: true, message: 'Employee updated successfully' })
-  })
-
-  test('clearing the team lead reroutes saved approvals to the retained manager', async () => {
-    const { models, existingEmployee } = createModels()
-    const managerId = '111111111111111111111111'
-    existingEmployee.designationLevel = 2
-    existingEmployee.assignedManager = managerId
-    existingEmployee.assignedTeamLead = '222222222222222222222222'
-    existingEmployee.reportingManager = existingEmployee.assignedTeamLead
-    getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'admin-1', role: 'admin' }, tenant: { databaseName: 'talio_company_test' }, models })
-    const response = await updateEmployee(new Request(`http://localhost:3000/api/employees/${EMPLOYEE_ID}`, {
-      method: 'PUT', body: JSON.stringify({ assignedTeamLead: '' }),
-    }), { params: Promise.resolve({ id: EMPLOYEE_ID }) })
-    expect(response.status).toBe(200)
-    expect(models.Employee.findByIdAndUpdate).toHaveBeenCalledWith(EMPLOYEE_ID,
-      expect.objectContaining({ assignedTeamLead: null, reportingManager: managerId }),
-      { new: true, runValidators: true })
-  })
-
-  test('rejects a malformed relationship with a precise field error', async () => {
-    const { models } = createModels()
-    getAuthAndModels.mockResolvedValue({
-      success: true,
-      user: { _id: 'admin-1', role: 'admin' },
-      tenant: { databaseName: 'talio_company_test' },
-      models,
-    })
-
-    const request = new Request(`http://localhost:3000/api/employees/${EMPLOYEE_ID}`, {
-      method: 'PUT',
-      body: JSON.stringify({ assignedManager: 'not-an-object-id' }),
-      headers: { 'content-type': 'application/json' },
-    })
-
-    const response = await updateEmployee(request, {
-      params: Promise.resolve({ id: EMPLOYEE_ID }),
-    })
-    const body = await response.json()
-
-    expect(response.status).toBe(400)
-    expect(body).toEqual({ success: false, message: 'Invalid assigned manager' })
-    expect(models.Employee.findByIdAndUpdate).not.toHaveBeenCalled()
-  })
+const update = input => PUT(new Request(`https://talio.test/api/employees/${employeeId}`, { method: 'PUT', body: JSON.stringify(input) }), { params: Promise.resolve({ id: employeeId }) })
+test('empty optional relationships persist as null through the atomic employee/account writer', async () => {
+  const input = { reportsTo: '', reportingManager: '', assignedManager: '', assignedTeamLead: '', designation: '', department: '', company: '', departments: [] }
+  expect((await update(input)).status).toBe(200)
+  expect(mutateFirestoreEmployee).toHaveBeenCalledWith(expect.objectContaining({ employeeId, databaseName: 'talio_company_test', expectedDigest: expect.any(String), patch: expect.objectContaining(Object.fromEntries(Object.keys(input).map(key => [key, key === 'departments' ? [] : null]))) }))
+})
+test('clearing the team lead reroutes approvals to the retained manager', async () => {
+  await database.mutate('employees', employeeId, e => ({ ...e, designationLevel: 2, assignedManager: managerId, assignedTeamLead: '222222222222222222222222', reportingManager: '222222222222222222222222' }))
+  expect((await update({ assignedTeamLead: '' })).status).toBe(200)
+  expect(mutateFirestoreEmployee).toHaveBeenCalledWith(expect.objectContaining({ patch: expect.objectContaining({ assignedTeamLead: null, reportingManager: managerId }) }))
+})
+test('malformed relationships are rejected before any write', async () => {
+  const response = await update({ assignedManager: 'not-an-id' })
+  expect(response.status).toBe(400)
+  expect((await response.json()).message).toMatch(/assigned\s?manager/i)
+  expect(mutateFirestoreEmployee).not.toHaveBeenCalled()
 })

@@ -1,10 +1,12 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button, Skeleton } from '@heroui/react'
 import toast from '@/utils/toast'
-import { FaDownload, FaArrowLeft, FaPrint, FaEnvelope } from 'react-icons/fa'
+import { FaDownload, FaPrint, FaEnvelope } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
@@ -354,7 +356,7 @@ export default function PayslipDetailPage() {
             onClick={() => router.back()}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <FaArrowLeft className="w-5 h-5 text-gray-600" />
+            <BackIcon className="w-5 h-5 text-gray-600" />
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">

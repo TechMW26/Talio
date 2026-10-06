@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Notification'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
 
     const { duration } = await request.json()
     const userId = (auth.user._id || auth.user.id || auth.user.userId).toString()
-    const { User, Notification } = auth.models
+    if (duration !== undefined && (!Number.isFinite(duration) || duration < 0 || duration > 1440)) return NextResponse.json({ success: false, message: 'Invalid focus duration' }, { status: 400 })
 
     await sendPushToUser(userId, {
       title: '⏰ Focus Timer Complete!',
@@ -19,7 +19,7 @@ export async function POST(request) {
     }, {
       url: '/dashboard',
       type: 'system',
-      models: { User, Notification },
+      database: auth.database,
     })
 
     return NextResponse.json({ success: true })

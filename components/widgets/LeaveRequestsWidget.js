@@ -5,13 +5,19 @@ import widgetStyles from './WidgetDesign.module.css'
 import { useRouter } from 'next/navigation'
 import { FaCheck, FaTimes, FaCalendarCheck } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Avatar, ScrollShadow } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
 
 export default function LeaveRequestsWidget({
-  leaveRequests = [],
+  leaveRequests: suppliedRequests,
   onApprove,
   onReject
 }) {
   const router = useRouter()
+  const { data, error, mutate } = useAuthedSWR(
+    suppliedRequests === undefined ? '/api/dashboard/leave-requests' : null
+  )
+  const leaveRequests = suppliedRequests ?? data?.data ?? []
+  const loading = suppliedRequests === undefined && !data && !error
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -30,14 +36,28 @@ export default function LeaveRequestsWidget({
           variant="light"
           color="primary"
           size="sm"
-          onPress={() => router.push('/dashboard/leave/approvals')}
+          onPress={() => router.push(data?.view === 'recent' && suppliedRequests === undefined
+            ? '/dashboard/leave/approvals?status=all'
+            : '/dashboard/leave/approvals')}
         >
           View All
         </Button>
       </div>
 
+      {data?.view === 'recent' && suppliedRequests === undefined && leaveRequests.length > 0 && (
+        <p className="text-xs text-default-500 mb-3">Recent requests · no pending approvals</p>
+      )}
+
       <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
-        {leaveRequests.length === 0 ? (
+        {suppliedRequests === undefined && error && (
+          <div role="alert" className="text-sm text-default-500 py-4">
+            <p>Unable to load leave requests. Please retry.</p>
+            <Button size="sm" variant="flat" onPress={() => mutate()}>Retry</Button>
+          </div>
+        )}
+        {loading ? (
+          <p role="status" className="text-sm text-default-500 py-6">Loading leave requests…</p>
+        ) : leaveRequests.length === 0 && !error ? (
           <div className="flex flex-col items-center justify-center text-center py-6 flex-1">
             <img
               src="/assets/Leave-Request.png"
@@ -62,7 +82,7 @@ export default function LeaveRequestsWidget({
                         {request.employee?.firstName} {request.employee?.lastName}
                       </p>
                       <p className="text-xs text-default-500">
-                        {request.leaveType?.name} - {request.numberOfDays} day(s)
+                        {request.requestLabel || request.leaveType?.name || 'Leave'} - {request.numberOfDays} day(s)
                       </p>
                     </div>
                   </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { wordpressAuth, wordpressFeed, importWordpressJob, importWordpressApplication, syncError } from '@/lib/recruitment/wordpress.server'
+import { wordpressAuth, wordpressFeed, importWordpressJob, importWordpressApplication, syncError, WORDPRESS_COLLECTION } from '@/lib/recruitment/wordpress.server'
 import { prepareResume, receiveResumeChunk, completeResume, readCandidateResume } from '@/lib/recruitment/wordpressResume.server'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
       const { serializeJob } = await import('@/lib/recruitment/wordpress.server')
       const id = search.get('id')
       if (!/^[a-f0-9]{24}$/i.test(id || '')) throw syncError('Invalid job')
-      const job = await auth.models.JobPosting.findById(id).lean()
+      const job = await auth.store.get('jobpostings', id)
       if (!job) throw syncError('Job not found', 404)
       return json(serializeJob(job))
     }
@@ -43,7 +43,7 @@ export async function POST(request, { params }) {
     else if (input.action === 'resume-chunk') result = await receiveResumeChunk(auth, input)
     else if (input.action === 'resume-complete') result = await completeResume(auth, input)
     else if (input.action === 'checkpoint') {
-      await auth.models.WordPressRecruitmentIntegration.updateOne({ _id: 'wordpress' }, { $set: { lastSyncAt: new Date(), lastError: String(input.error || '').slice(0, 500) } })
+      await auth.store.mutate(WORDPRESS_COLLECTION, 'wordpress', current => ({ ...current, lastSyncAt: new Date(), lastError: String(input.error || '').slice(0, 500) }))
       result = { saved: true }
     } else throw syncError('Invalid sync action')
     return json(result)

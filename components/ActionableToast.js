@@ -66,6 +66,7 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
 
   // Handle action click
   const handleActionClick = useCallback(async (action) => {
+    if (loadingAction !== null) return
     // Handle view action - navigate and dismiss
     if (action.id === 'view') {
       if (notification.url) {
@@ -174,7 +175,7 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
         setSelectedAction(null)
       }
     }
-  }, [notification, router, handleDismiss, onAction, reason, showConfirmation])
+  }, [notification, router, handleDismiss, onAction, reason, showConfirmation, loadingAction])
 
   // Submit reason and execute action
   const handleReasonSubmit = useCallback((e) => {
@@ -203,11 +204,11 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
   // Get button style based on variant
   const getButtonStyle = (variant) => {
     const styles = {
-      primary: 'bg-primary text-primary-foreground hover:opacity-90',
-      secondary: 'border border-default-200 bg-transparent text-default-700 hover:bg-default-100',
-      success: 'bg-primary text-primary-foreground hover:opacity-90',
-      danger: 'border border-danger-200 bg-transparent text-danger-600 dark:text-danger-400 hover:bg-danger-50',
-      warning: 'border border-default-200 bg-transparent text-default-700 hover:bg-default-100'
+      primary: 'notice-button notice-button-primary',
+      secondary: 'notice-button',
+      success: 'notice-button notice-button-primary',
+      danger: 'notice-button notice-button-danger',
+      warning: 'notice-button'
     }
     return styles[variant] || styles.primary
   }
@@ -230,25 +231,26 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
       role="region"
       aria-labelledby={titleId}
       className={`
-        w-full bg-white dark:bg-zinc-950 rounded-2xl shadow-lg border border-gray-200 dark:border-zinc-800
+        talio-notification-card
         overflow-hidden
         transition-[transform,opacity] duration-200 motion-reduce:transition-none transform
         ${isVisible ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'}
       `}
     >
       {/* Header */}
-      <div className="px-4 pt-4 pb-2">
+      <div className="px-[18px] pt-[18px] pb-[10px]">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-default-100 flex-shrink-0">{getTypeIcon()}</span>
+            <span className="notice-icon">{getTypeIcon()}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 id={titleId} className="font-semibold text-gray-900 dark:text-zinc-100 text-sm leading-5">
+                <h3 id={titleId} className="notice-title">
                   {notification.title}
                 </h3>
                 {getPriorityBadge()}
               </div>
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+              <p className="notice-meta mt-1">
+                Action requested · {' '}
                 {notification.createdBy?.firstName 
                   ? `From ${notification.createdBy.firstName} ${notification.createdBy.lastName || ''}`
                   : formatTimeAgo(notification.createdAt)
@@ -260,7 +262,7 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
             <button
               onClick={notification.displaySettings?.dismissible === false ? handleSnooze : () => handleDismiss()}
               disabled={loadingAction !== null}
-              className="p-2 rounded-full hover:bg-default-100 transition-colors disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              className="notice-close"
               aria-label={notification.displaySettings?.dismissible === false ? 'Dismiss and remind me in 1 hour' : 'Dismiss notification'}
               title={notification.displaySettings?.dismissible === false ? 'Remind me in 1 hour' : 'Dismiss'}
             >
@@ -271,8 +273,8 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
       </div>
 
       {/* Body */}
-      <div className="px-4 py-3">
-        <p className="max-h-40 overflow-y-auto text-sm leading-6 text-gray-600 dark:text-zinc-300 whitespace-pre-wrap break-words">
+      <div>
+        <p className="notice-message">
           {notification.message}
         </p>
       </div>
@@ -355,7 +357,7 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
 
       {/* Actions */}
       {!showReasonInput && !showConfirmation && notification.actions && notification.actions.length > 0 && (
-        <div className="px-4 pb-3 pt-1">
+        <div className="notice-actions">
           <div className="flex flex-wrap gap-2 justify-end">
             {notification.actions.map((action) => (
               <button
@@ -379,7 +381,7 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
         </div>
       )}
 
-      {canSnooze && <div className="px-4 pb-3 flex justify-end">
+      {canSnooze && <div className="notice-reminder">
         <button type="button" onClick={handleSnooze} disabled={loadingAction !== null}
           className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs text-default-500 hover:text-default-800 hover:bg-default-100 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
           <FaRegClock aria-hidden="true" className="h-3 w-3" />
@@ -389,12 +391,12 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
 
       {/* View button if URL exists and no other actions */}
       {!showReasonInput && !showConfirmation && notification.url && (!notification.actions || notification.actions.length === 0) && (
-        <div className="px-4 pb-3 pt-1">
+        <div className="notice-actions">
           <div className="flex gap-2 justify-end">
             <button
-              onClick={handleDismiss}
+              onClick={() => handleDismiss()}
               disabled={loadingAction !== null || notification.displaySettings?.dismissible === false}
-              className="px-4 py-2 text-sm font-medium rounded-full text-default-600 hover:bg-default-100 disabled:opacity-40"
+              className="notice-button"
             >
               Dismiss
             </button>
@@ -404,7 +406,7 @@ export default function ActionableToast({ notification, onDismiss, onAction, onS
                 handleDismiss()
               }}
               disabled={loadingAction !== null}
-              className="px-4 py-2 text-sm font-medium rounded-full bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"
+              className="notice-button notice-button-primary"
             >
               View Details
             </button>

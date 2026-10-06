@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { sendNotificationToDevice } from '@/lib/firebaseNotification'
 
 /**
@@ -10,15 +10,14 @@ import { sendNotificationToDevice } from '@/lib/firebaseNotification'
 export async function POST(request) {
     try {
         // Get authenticated user
-        const auth = await getAuthAndModels(request, ['User']);
+        const auth = await getAuthAndDatabase(request);
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 });
         }
-        const { user, models } = auth;
-        const { User } = models;
+        const { user, database } = auth;
 
         const userId = user._id || user.userId;
-        const userRecord = await User.findById(userId);
+        const userRecord = await database.get('users', userId);
         
         if (!userRecord) {
             return NextResponse.json(
@@ -41,14 +40,6 @@ export async function POST(request) {
                 }
             });
         }
-
-        // Log all registered tokens for debugging
-        console.log(`📱 User ${userRecord.email} has ${fcmTokens.length} registered tokens:`);
-        fcmTokens.forEach((t, i) => {
-            console.log(`  ${i + 1}. Platform: ${t.platform}, Device: ${t.device}`);
-            console.log(`     Token preview: ${t.token.substring(0, 30)}...`);
-            console.log(`     Last used: ${t.lastUsed}`);
-        });
 
         // Prepare test notification
         const notification = {
@@ -75,7 +66,7 @@ export async function POST(request) {
                 results.push({
                     platform: tokenInfo.platform,
                     device: tokenInfo.device,
-                    tokenPreview: tokenInfo.token.substring(0, 20) + '...',
+                    tokenPreview: '[registered device]' ,
                     success: result.success,
                     messageId: result.messageId,
                     error: result.error
@@ -88,7 +79,7 @@ export async function POST(request) {
                 results.push({
                     platform: tokenInfo.platform,
                     device: tokenInfo.device,
-                    tokenPreview: tokenInfo.token.substring(0, 20) + '...',
+                    tokenPreview: '[registered device]' ,
                     success: false,
                     error: err.message
                 });
@@ -126,15 +117,14 @@ export async function POST(request) {
  */
 export async function GET(request) {
     try {
-        const auth = await getAuthAndModels(request, ['User']);
+        const auth = await getAuthAndDatabase(request);
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 });
         }
-        const { user, models } = auth;
-        const { User } = models;
+        const { user, database } = auth;
 
         const userId = user._id || user.userId;
-        const userRecord = await User.findById(userId);
+        const userRecord = await database.get('users', userId);
         
         if (!userRecord) {
             return NextResponse.json(
@@ -154,7 +144,7 @@ export async function GET(request) {
                 tokens: fcmTokens.map(t => ({
                     platform: t.platform,
                     device: t.device,
-                    tokenPreview: t.token.substring(0, 30) + '...',
+                    tokenPreview: '[registered device]',
                     isExpoToken: t.token.startsWith('ExponentPushToken'),
                     createdAt: t.createdAt,
                     lastUsed: t.lastUsed,

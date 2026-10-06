@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { dashboardAuth } from '@/lib/dashboardData.server'
+import { projectRecords, projectFilter as f, projectId as id } from '@/lib/projects.server'
+import { resolveTeamViewScope, scopedEmployeeRows } from '@/lib/teamViews.server'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 import { buildDirectReportsFilter } from '@/lib/teamScope'
 
@@ -9,174 +11,29 @@ export const dynamic = 'force-dynamic'
 // GET - Get Manager dashboard statistics
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'LeaveType', 'Attendance', 'Performance', 'Department', 'User'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models, tenant } = auth
-    const { Employee, Leave, LeaveType, Attendance, Performance, Department, User } = models
-
-    // Check if user has employee ID
-    if (!user.employeeId) {
-      // Return empty stats for users without employee records
-      return NextResponse.json({
-        success: true,
-        data: {
-          teamStrength: 0,
-          attendanceSummary: { present: 0, absent: 0, late: 0, halfDay: 0 },
-          presentToday: [],
-          inProgressToday: [],
-          onLeaveToday: [],
-          absentToday: [],
-          lateToday: [],
-          underperforming: [],
-          pendingLeaveApprovals: [],
-          performanceStats: { averageRating: 0, totalReviews: 0, excellentPerformers: 0, underPerformers: 0 },
-          recentActivities: [],
-          weeklyAttendance: [],
-          performanceTrend: []
-        },
-        message: 'No employee record linked to this user'
-      })
-    }
-
-    const todayKey = new Date().toISOString().slice(0, 10)
-    const cacheKey = buildCacheKey({
-      tenantId: tenant?.databaseName,
-      role: user.role,
-      userId: user._id || user.userId,
-      namespace: 'dashboard:manager-stats',
-      params: { date: todayKey }
-    })
-
-    const cached = await getCache(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
-    }
-
-    const [manager, userRecord] = await Promise.all([
-      Employee.findById(user.employeeId._id || user.employeeId).lean(),
-      User.findById(user._id || user.userId)
-        .select('isDepartmentHead headOfDepartments')
-        .lean(),
+    const auth = await dashboardAuth(request), { database, user } = auth
+    const scope = await resolveTeamViewScope(database, user, { organization: false })
+    const teamMembers = scope.members.filter(row => row.status === 'active'), teamMemberIds = teamMembers.map(id), employeeById = new Map(teamMembers.map(row => [id(row), { _id: row._id, firstName: row.firstName, lastName: row.lastName, employeeCode: row.employeeCode, department: row.department, reportingManager: row.reportingManager }]))
+    const today = new Date(), todayStart = new Date(today), todayEnd = new Date(today)
+    todayStart.setHours(0, 0, 0, 0); todayEnd.setHours(23, 59, 59, 999)
+    const weeklyStart = new Date(todayStart); weeklyStart.setDate(weeklyStart.getDate() - 6)
+    const performanceStart = new Date(today.getFullYear(), today.getMonth() - 5, 1), performanceEnd = todayEnd
+    const teamStrength = teamMembers.length, recentActivityStart = new Date(Date.now() - 7 * 86400000)
+    const [weekAttendance, performances, leaves, allPendingLeaves] = await Promise.all([
+      scopedEmployeeRows(database, 'attendances', teamMemberIds, [f('date', weeklyStart, '>='), f('date', todayEnd, '<=')]),
+      scopedEmployeeRows(database, 'performances', teamMemberIds, [f('isActive', true)]),
+      scopedEmployeeRows(database, 'leaves', teamMemberIds, [f('endDate', recentActivityStart, '>=')]),
+      scopedEmployeeRows(database, 'leaves', teamMemberIds.filter(value => value !== id(user.employeeId)), [f('status', 'pending')]),
     ])
-    if (!manager) {
-      return NextResponse.json({ success: false, message: 'Manager not found' }, { status: 404 })
-    }
-
-    // Get team members - support multi-department heads
-    let teamMembers = []
-    let teamMemberIds = []
-    let departmentIds = []
-
-    // First check User.headOfDepartments (supports multiple departments)
-    if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
-      departmentIds = userRecord.headOfDepartments.map(d => d.toString())
-    }
-
-    // Fallback: Check Department.head or Department.heads
-    if (departmentIds.length === 0) {
-      const headDepartments = await Department.find({
-        isActive: true,
-        $or: [
-          { head: manager._id },
-          { heads: manager._id }
-        ]
-      }).select('_id').lean()
-      departmentIds = headDepartments.map(d => d._id.toString())
-    }
-
-    if (departmentIds.length > 0) {
-      // If department head, get all employees in ALL departments they head
-      teamMembers = await Employee.find({
-        department: { $in: departmentIds },
-        status: 'active'
-      }).select('firstName lastName employeeCode department reportingManager').lean()
-    } else {
-      // Otherwise, get direct reportees (assignedManager / TL / reportsTo / reportingManager)
-      teamMembers = await Employee.find(
-        buildDirectReportsFilter(manager._id, { status: 'active' })
-      ).select('firstName lastName employeeCode department reportingManager').lean()
-    }
-
-    teamMemberIds = teamMembers.map(member => member._id)
-    const employeeById = new Map(teamMembers.map(member => [member._id.toString(), member]))
-
-    // Date calculations
-    const today = new Date()
-    const todayStart = new Date(today)
-    todayStart.setHours(0, 0, 0, 0)
-    const todayEnd = new Date(today)
-    todayEnd.setHours(23, 59, 59, 999)
-    const weeklyStart = new Date(todayStart)
-    weeklyStart.setDate(weeklyStart.getDate() - 6)
-    const performanceStart = new Date(today.getFullYear(), today.getMonth() - 5, 1)
-    const performanceEnd = new Date(todayEnd)
-
-    // 1. Team Strength
-    const teamStrength = teamMembers.length
-
-    const recentActivityStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    let [
-      onLeaveToday,
-      todayAttendanceRows,
-      underperforming,
-      pendingLeaveApprovals,
-      teamPerformance,
-      recentLeaves,
-      recentReviews,
-      weeklyAttendanceAgg,
-      performanceAgg,
-    ] = await Promise.all([
-      Leave.find({
-        employee: { $in: teamMemberIds }, status: 'approved',
-        startDate: { $lte: today }, endDate: { $gte: today }
-      }).select('employee status startDate endDate leaveType createdAt').lean(),
-      Attendance.find({
-        employee: { $in: teamMemberIds }, date: { $gte: todayStart, $lte: todayEnd }
-      }).select('employee status date checkIn').lean(),
-      Performance.find({
-        employee: { $in: teamMemberIds }, overallRating: { $lt: 3 }, isActive: true
-      }).select('employee overallRating createdAt').lean(),
-      Leave.find({
-        employee: { $in: teamMemberIds }, status: 'pending'
-      }).select('employee status startDate endDate leaveType createdAt').lean(),
-      Performance.aggregate([
-        { $match: { employee: { $in: teamMemberIds }, isActive: true } },
-        {
-          $group: {
-            _id: null,
-            averageRating: { $avg: '$overallRating' },
-            totalReviews: { $sum: 1 },
-            excellentPerformers: { $sum: { $cond: [{ $gte: ['$overallRating', 4] }, 1, 0] } },
-            underPerformers: { $sum: { $cond: [{ $lt: ['$overallRating', 3] }, 1, 0] } }
-          }
-        }
-      ]),
-      Leave.find({
-        employee: { $in: teamMemberIds }, createdAt: { $gte: recentActivityStart }
-      }).select('employee status startDate endDate leaveType createdAt').sort({ createdAt: -1 }).limit(5).lean(),
-      Performance.find({
-        employee: { $in: teamMemberIds }, createdAt: { $gte: recentActivityStart }
-      }).select('employee overallRating createdAt').sort({ createdAt: -1 }).limit(3).lean(),
-      Attendance.aggregate([
-        { $match: { employee: { $in: teamMemberIds }, date: { $gte: weeklyStart, $lte: todayEnd } } },
-        { $project: { status: 1, day: { $dateToString: { format: '%Y-%m-%d', date: '$date' } } } },
-        { $group: { _id: { day: '$day', status: '$status' }, count: { $sum: 1 } } }
-      ]),
-      Performance.aggregate([
-        {
-          $match: {
-            employee: { $in: teamMemberIds },
-            createdAt: { $gte: performanceStart, $lte: performanceEnd },
-            isActive: true
-          }
-        },
-        { $project: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' }, overallRating: 1 } },
-        { $group: { _id: { year: '$year', month: '$month' }, averageRating: { $avg: '$overallRating' } } }
-      ]),
-    ])
+    let onLeaveToday = leaves.filter(row => row.status === 'approved' && new Date(row.startDate) <= today && new Date(row.endDate) >= today)
+    const todayAttendanceRows = weekAttendance.filter(row => new Date(row.date) >= todayStart)
+    let underperforming = performances.filter(row => row.overallRating < 3), pendingLeaveApprovals = allPendingLeaves
+    const teamPerformance = [{ averageRating: performances.length ? performances.reduce((sum, row) => sum + (Number(row.overallRating) || 0), 0) / performances.length : 0, totalReviews: performances.length, excellentPerformers: performances.filter(row => row.overallRating >= 4).length, underPerformers: underperforming.length }]
+    let recentLeaves = leaves.filter(row => new Date(row.createdAt) >= recentActivityStart).sort((a,b) => +new Date(b.createdAt)-+new Date(a.createdAt)).slice(0,5), recentReviews = performances.filter(row => new Date(row.createdAt) >= recentActivityStart).sort((a,b) => +new Date(b.createdAt)-+new Date(a.createdAt)).slice(0,3)
+    const weeklyMap = new Map(), performanceMap = new Map()
+    for (const row of weekAttendance) { const date = new Date(row.date), day = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0'), key = day + ':' + row.status, value = weeklyMap.get(key) || { _id: { day, status: row.status }, count: 0 }; value.count++; weeklyMap.set(key,value) }
+    for (const row of performances.filter(row => new Date(row.createdAt) >= performanceStart && new Date(row.createdAt) <= performanceEnd)) { const date = new Date(row.createdAt), key = date.getFullYear() + '-' + (date.getMonth()+1), value = performanceMap.get(key) || { _id: { year: date.getFullYear(), month: date.getMonth()+1 }, sum: 0, count: 0 }; value.sum += Number(row.overallRating) || 0; value.count++; performanceMap.set(key,value) }
+    const weeklyAttendanceAgg = [...weeklyMap.values()], performanceAgg = [...performanceMap.values()].map(row => ({ _id: row._id, averageRating: row.sum/row.count }))
 
     // One indexed attendance read powers every today card and list. Previously
     // this endpoint scanned the same team/day range six times.
@@ -226,7 +83,7 @@ export async function GET(request) {
     ].map(id => id.toString()))
 
     const leaveTypes = leaveTypeIds.size > 0
-      ? await LeaveType.find({ _id: { $in: Array.from(leaveTypeIds) } }).select('name').lean()
+      ? await projectRecords(database, 'leavetypes', Array.from(leaveTypeIds))
       : []
 
     const leaveTypeById = new Map(leaveTypes.map(lt => [lt._id.toString(), lt]))
@@ -342,7 +199,7 @@ export async function GET(request) {
       data: stats
     }
 
-    void setCache(cacheKey, response, 5 * 60).catch(() => {})
+
 
     return NextResponse.json(response)
 

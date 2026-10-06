@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { dashboardAuth, dashboardEmployee } from '@/lib/dashboardData.server'
+import { projectRows, projectRecords, projectFilter as f } from '@/lib/projects.server'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 import { normalizeLeaveBalance } from '@/lib/leaveData'
 
@@ -9,48 +10,10 @@ export const dynamic = 'force-dynamic'
 // GET - Get employee dashboard statistics
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'LeaveBalance', 'Payroll', 'User', 'Performance', 'Task', 'TaskAssignee']);
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 });
-    }
-    const { user, models, tenant } = auth;
-    const { Attendance, LeaveBalance, Payroll, User, Performance, Task, TaskAssignee } = models;
-
-    const todayKey = new Date().toISOString().slice(0, 10)
-    const cacheKey = buildCacheKey({
-      tenantId: tenant?.databaseName,
-      role: user.role,
-      userId: user._id || user.userId,
-      namespace: 'dashboard:employee-stats',
-      params: { date: todayKey }
-    })
-
-    const cached = await getCache(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
-    }
-
-    // Only hydrate the profile on a cache miss.
-    const userWithEmployee = await User.findById(user._id || user.userId)
-      .populate({
-        path: 'employeeId',
-        populate: [
-          { path: 'designation', select: 'title code levelName' },
-          { path: 'department', select: 'name' }
-        ]
-      })
-      .lean();
-    if (!userWithEmployee) {
-      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
-    }
-
-    if (!userWithEmployee.employeeId) {
-      return NextResponse.json({ success: false, message: 'Employee profile not found' }, { status: 404 });
-    }
-
-    const employee = userWithEmployee.employeeId;
-
+    const auth = await dashboardAuth(request)
+    const { user, database, tenant } = auth
+    const employee = await dashboardEmployee(database, user.employeeId)
+    if (!employee) return NextResponse.json({ success: false, message: 'Employee profile not found' }, { status: 404 })
     const currentDate = new Date()
     const currentMonth = currentDate.getMonth() + 1
     const currentYear = currentDate.getFullYear()
@@ -102,32 +65,12 @@ export async function GET(request) {
       latestPerformance,
       assignedTaskRows,
     ] = await Promise.all([
-      Attendance.find({
-        employee: employee._id,
-        date: { $gte: lastMonthStart, $lte: currentMonthEnd }
-      }).select('date workHours').lean(),
-      LeaveBalance.find({
-        employee: employee._id,
-        year: { $in: Array.from(leaveYears) }
-      }).select('year totalDays usedDays remainingDays allocated used pending balance carriedForward').lean(),
-      Payroll.findOne({
-        employee: employee._id,
-        month: currentMonth,
-        year: currentYear
-      }).select('netSalary').lean(),
-      Payroll.findOne({
-        employee: employee._id,
-        month: lastMonth,
-        year: lastMonthYear
-      }).select('netSalary').lean(),
-      Performance.findOne({ employee: employee._id })
-        .sort({ createdAt: -1 })
-        .select('overallRating')
-        .lean(),
-      TaskAssignee.find({
-        user: employee._id,
-        assignmentStatus: { $in: ['pending', 'accepted'] },
-      }).select('task').lean(),
+      projectRows(database, 'attendances', [f('employee', employee._id), f('date', lastMonthStart, '>='), f('date', currentMonthEnd, '<=')]),
+      projectRows(database, 'leavebalances', [f('employee', employee._id), f('year', Array.from(leaveYears), 'in')]),
+      database.list('payrolls', { filters: [f('employee', employee._id), f('month', currentMonth), f('year', currentYear)], limit: 1 }).then(page => page.records[0] || null),
+      database.list('payrolls', { filters: [f('employee', employee._id), f('month', lastMonth), f('year', lastMonthYear)], limit: 1 }).then(page => page.records[0] || null),
+      database.list('performances', { filters: [f('employee', employee._id)], orderBy: [{ field: 'createdAt', direction: 'desc' }], limit: 1 }).then(page => page.records[0] || null),
+      projectRows(database, 'taskassignees', [f('user', employee._id), f('assignmentStatus', ['pending', 'accepted'], 'in')]),
     ])
 
     let totalHours = 0
@@ -160,12 +103,7 @@ export async function GET(request) {
 
     const totalLeaveBalance = leaveYearTotals[currentYear]?.totalBalance || 0
 
-    const pendingTaskCount = assignedTaskRows.length
-      ? await Task.countDocuments({
-          _id: { $in: assignedTaskRows.map((assignment) => assignment.task) },
-          status: { $in: ['todo', 'in-progress', 'review', 'blocked'] },
-        })
-      : 0
+    const pendingTaskCount = (await projectRecords(database, 'tasks', assignedTaskRows.map(row => row.task))).filter(row => !row.deletedAt && ['todo', 'in-progress', 'review', 'blocked'].includes(row.status)).length
 
     const last7Days = []
     for (let i = 6; i >= 0; i--) {
@@ -242,7 +180,7 @@ export async function GET(request) {
       }
     }
 
-    void setCache(cacheKey, response, 5 * 60).catch(() => {})
+
 
     return NextResponse.json(response)
 

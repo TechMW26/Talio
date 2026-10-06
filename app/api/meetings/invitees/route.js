@@ -1,45 +1,31 @@
+import { getMeetingDatabase, meetingFilter } from '@/lib/meetings/store.server'
+import { collectFirestorePages, readFirestoreReferences } from '@/lib/platform/firestoreQueries.server'
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 // GET - Get employees grouped by department for meeting invitations
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Department'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Employee, Department } = models
+    const database = await getMeetingDatabase(auth.tenant.databaseName)
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
 
     // Get all active departments
-    const departments = await Department.find({ isActive: { $ne: false } })
-      .select('name code')
-      .sort({ name: 1 })
-      .lean()
-
-    // Get all active employees
-    let employeeQuery = { status: { $in: ['active', 'probation', 'on_leave'] } }
-    
-    if (search) {
-      employeeQuery.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ]
-    }
-
-    const employees = await Employee.find(employeeQuery)
-      .select('firstName lastName email profilePicture department departments designation')
-      .populate('department', 'name code')
-      .populate('departments', 'name code')
-      .populate('designation', 'title')
-      .sort({ firstName: 1, lastName: 1 })
-      .lean()
+    const departments = (await collectFirestorePages(database, 'departments')).filter(row => row.isActive !== false).sort((a,b) => String(a.name).localeCompare(String(b.name)))
+    const filters = [meetingFilter('status', ['active', 'probation', 'on_leave'], 'in')]
+    if (search.trim()) filters.push(meetingFilter('searchGrams', search.trim().toLowerCase().slice(0, 3), 'array-contains'))
+    let rows = await collectFirestorePages(database, 'employees', { filters })
+    if (search.trim()) rows = rows.filter(row => [row.firstName, row.lastName, row.email].some(value => String(value || '').toLowerCase().includes(search.trim().toLowerCase())))
+    const departmentsById = new Map(departments.map(row => [row._id, { _id: row._id, name: row.name, code: row.code }]))
+    const designations = await readFirestoreReferences(database, 'designations', rows.map(row => row.designation).filter(Boolean))
+    const employees = rows.map(row => ({ ...row, department: departmentsById.get(String(row.department)), departments: (row.departments || []).map(id => departmentsById.get(String(id))).filter(Boolean), designation: designations.get(String(row.designation)) })).sort((a,b) => String(a.firstName).localeCompare(String(b.firstName)) || String(a.lastName).localeCompare(String(b.lastName)))
 
     // Group employees by department
     const departmentGroups = []

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
+import { getNativeAuthRepository } from '@/lib/platform/firestoreAuth.server';
 import { enqueueAnalysis } from '@/lib/productivityQueue';
 
 /**
@@ -12,33 +13,24 @@ import { enqueueAnalysis } from '@/lib/productivityQueue';
 export async function POST(request) {
     try {
         // Auth + models - need ProductivitySession to find un-analyzed sessions
-        const auth = await getAuthAndModels(request, ['ProductivitySession']);
+        const auth = await getAuthAndDatabase(request);
         if (!auth.success) {
             // Even if auth fails, the client should still clear local state
             return NextResponse.json({ success: true, message: 'Logged out' });
         }
 
-        const { user, models } = auth;
-        const { ProductivitySession } = models;
+        const { user } = auth;
         const userId = (user._id || user.userId).toString();
         const databaseName = auth.tenant?.databaseName || user.databaseName;
+        const repository = await getNativeAuthRepository(databaseName);
+        if (user.tokenId) await repository.revokeSession(user.tokenId);
 
         // Find un-analyzed sessions for this user that still have screenshots
         let enqueuedCount = 0;
         try {
-            const unanalyzedSessions = await ProductivitySession.find({
-                user: userId,
-                $or: [
-                    { 'analysis.isAnalyzed': { $ne: true } },
-                    { 'analysis.isAnalyzed': { $exists: false } },
-                ],
-                'screenshots.0': { $exists: true }, // Has at least one screenshot
-            })
-                .select('_id')
-                .lean();
+            const sessionIds = await repository.pendingProductivitySessions(userId);
 
-            if (unanalyzedSessions.length > 0) {
-                const sessionIds = unanalyzedSessions.map(s => s._id.toString());
+            if (sessionIds.length > 0) {
 
                 console.log(`[Logout] User ${userId} has ${sessionIds.length} un-analyzed sessions. Enqueuing for background analysis...`);
 

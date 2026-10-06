@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { SCREENSHOT_CAPTURE_INTERVAL_MINUTES } from '@/lib/productivitySessionRules';
 
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { User } = models
+    const { user, database } = auth
 
     const { interval } = await request.json();
 
@@ -31,11 +30,9 @@ export async function POST(request) {
     }
 
     // Update user's screenshot interval setting
-    await User.findByIdAndUpdate(user._id || user.userId, {
-      $set: {
-        'settings.screenshotInterval': interval,
-        'settings.screenshotIntervalUpdatedAt': new Date()
-      }
+    await database.mutate('users', String(user._id || user.userId), row => {
+      if (!row?.isActive || !['admin', 'department_head'].includes(row.role)) throw Object.assign(new Error('Access changed'), { status: 403 })
+      return { ...row, settings: { ...row.settings, screenshotInterval: interval, screenshotIntervalUpdatedAt: new Date() } }
     });
 
     return NextResponse.json({
@@ -56,14 +53,13 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { User } = models
+    const { user, database } = auth
 
-    const userRecord = await User.findById(user._id || user.userId).select('settings');
+    const userRecord = await database.get('users', String(user._id || user.userId));
     if (!userRecord) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }

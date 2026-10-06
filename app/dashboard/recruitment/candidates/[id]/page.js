@@ -1,5 +1,7 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Modal from '@/components/ui/HeroModal'
@@ -20,7 +22,7 @@ import { uploadAuthenticatedFile } from '@/lib/client/uploadFile';
 import { downloadDocumentFile } from '@/lib/client/documentFile';
 import { createOfferLetterFile } from '@/lib/client/offerLetter';
 import {
-  FaArrowLeft, FaEdit, FaTrash, FaUser, FaEnvelope, FaPhone,
+  FaEdit, FaTrash, FaUser, FaEnvelope, FaPhone,
   FaBriefcase, FaStar, FaCalendarAlt, FaDollarSign, FaClock,
   FaGraduationCap, FaPlus, FaChevronRight, FaFileAlt, FaExternalLinkAlt,
   FaUserCheck
@@ -247,7 +249,7 @@ export default function CandidateDetailPage() {
         <div className="flex md:justify-between md:items-start md:flex-row flex-col gap-4">
           <div className="flex items-start gap-3">
             <Button isIconOnly variant="light" size="sm" onPress={() => router.back()} className="mt-0.5">
-              <FaArrowLeft className="w-4 h-4" />
+              <BackIcon className="w-4 h-4" />
             </Button>
             <div>
               <div className="flex items-center flex-wrap gap-2">

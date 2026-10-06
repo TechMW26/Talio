@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import mongoose from 'mongoose'
 import { getTenantBySlug } from '@/lib/tenantContext'
-import { getTenantModels } from '@/lib/tenantModels'
+import { getAttendanceStore } from '@/lib/platform/firestoreAttendance.server'
 import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
 import { ingestMachinePunches } from '@/lib/attendanceMachines/ingestion.server'
 import { readMachineToken, verifyMachineToken } from '@/lib/attendanceMachines/machineSecurity.server'
@@ -38,7 +37,7 @@ export async function POST(request, { params }) {
     }
 
     const { tenantSlug, machineId } = await params
-    if (!mongoose.Types.ObjectId.isValid(machineId || '')) {
+    if (!/^[a-f\d]{24}$/i.test(machineId || '')) {
       return NextResponse.json({ success: false, message: 'Integration endpoint not found' }, { status: 404 })
     }
     const tenant = await getTenantBySlug(tenantSlug)
@@ -52,13 +51,8 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Attendance machine integrations are disabled' }, { status: 403 })
     }
 
-    const models = await getTenantModels(tenant.databaseName, [
-      'AttendanceMachine',
-      'AttendanceMachinePunch',
-      'Attendance',
-      'Employee',
-    ])
-    const machine = await models.AttendanceMachine.findById(machineId).select('+webhookTokenHash')
+    const database = await getAttendanceStore(tenant.databaseName)
+    const machine = await database.get('attendancemachines', machineId)
     if (!machine || machine.status === 'disabled') {
       return NextResponse.json({ success: false, message: 'Integration endpoint not found' }, { status: 404 })
     }
@@ -69,12 +63,12 @@ export async function POST(request, { params }) {
     }
 
     const payload = await readPayload(request)
-    const result = await ingestMachinePunches({ machine, payload, models })
-    machine.lastSeenAt = new Date()
-    machine.lastSyncAt = result.processed > 0 ? new Date() : machine.lastSyncAt
-    machine.lastError = result.rejected > 0 ? result.errors.slice(0, 3).join('; ').slice(0, 1000) : null
-    if (machine.status === 'error' && result.rejected === 0) machine.status = 'active'
-    await machine.save()
+    const result = await ingestMachinePunches({ machine, payload, database })
+    await database.mutate('attendancemachines', machineId, current => ({ ...current, lastSeenAt: new Date(),
+      lastSyncAt: result.processed > 0 ? new Date() : current.lastSyncAt,
+      lastError: result.rejected > 0 ? result.errors.slice(0, 3).join('; ').slice(0, 1000) : null,
+      status: current.status === 'error' && result.rejected === 0 ? 'active' : current.status,
+    }))
 
     return NextResponse.json({ success: true, data: result }, { status: result.rejected === result.received && result.received > 0 ? 422 : 200 })
   } catch (error) {

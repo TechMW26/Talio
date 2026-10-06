@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { retryPageError } from '@/lib/client/retryPageError'
 import { FaExclamationTriangle, FaHome, FaRedo } from 'react-icons/fa'
 
 export default function DashboardError({ error, reset }) {
@@ -40,7 +41,7 @@ export default function DashboardError({ error, reset }) {
         {/* Action Buttons */}
         <div className="space-y-3">
           <button
-            onClick={() => reset()}
+            onClick={() => retryPageError(error, reset)}
             className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
           >
             <FaRedo className="w-4 h-4" />

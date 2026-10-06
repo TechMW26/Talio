@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getCronAuthErrorResponse } from '@/lib/cronAuth'
 import { processExpiredMeetingsAcrossTenants } from '@/lib/meetingFinalizer'
-import { connectSuperadminDB } from '@/lib/superadminDb'
-import { withMongoLease } from '@/lib/platform/distributedLease'
+import { getFirestoreSystemDatabase } from '@/lib/platform/firestoreApplication.server'
+import { withFirestoreLease } from '@/lib/platform/firestoreLease.server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,9 +13,9 @@ export async function GET(request) {
   if (authError) return authError
 
   try {
-    const connection = await connectSuperadminDB()
-    const run = await withMongoLease(
-      connection.db.collection('system_locks'),
+    const database = await getFirestoreSystemDatabase()
+    const run = await withFirestoreLease(
+      database,
       'cron:finalize-meetings',
       { ttlMs: 10 * 60 * 1000 },
       () => processExpiredMeetingsAcrossTenants({ action: 'vercel-cron-finalize' }),

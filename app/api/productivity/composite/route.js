@@ -5,9 +5,9 @@
  * grid geometry, and a URL to fetch the stitched image bytes.
  */
 import { NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { getAuthAndModels } from '@/lib/auth';
-import { canViewUserScreenshots } from '@/lib/productivityPermissions';
+import { verifyTokenFromRequest } from '@/lib/auth';
+import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
+import { getScreenshotStore, findScreenshotComposite } from '@/lib/platform/firestoreScreenshots.server';
 import { getTodayDateString } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
@@ -15,13 +15,13 @@ export const runtime = 'nodejs';
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ScreenshotComposite']);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
-    const { user, models } = auth;
-    const { ScreenshotComposite } = models;
+    const { user } = auth;
+    const store = await getScreenshotStore(auth.tenant.databaseName);
 
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
@@ -33,19 +33,16 @@ export async function GET(request) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return NextResponse.json({ success: false, error: 'Invalid date' }, { status: 400 });
     }
-    if (targetUserId !== viewerId.toString() && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (!/^[a-f0-9]{24}$/i.test(targetUserId)) {
       return NextResponse.json({ success: false, error: 'Invalid userId' }, { status: 400 });
     }
 
-    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
+    const canView = await canViewTenantScreenshots(viewerId, targetUserId, viewerRole, auth.tenant.databaseName);
     if (!canView) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
 
-    const composite = await ScreenshotComposite.findOne({
-      user: targetUserId,
-      dateString: date,
-    }).lean();
+    const composite = await findScreenshotComposite(store, targetUserId, date);
 
     if (!composite) {
       return NextResponse.json({ success: true, composite: null });

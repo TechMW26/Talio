@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { generateSmartContent } from '@/lib/promptEngine'
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 // POST - Generate AI insights for performance data using Gemini API
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, [])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -100,6 +100,7 @@ Return ONLY the JSON object, nothing else.`
       const text = await generateSmartContent(performanceSummary, {
         userId: user._id || user.userId,
         feature: 'performance-insights',
+        databaseName: auth.tenant.databaseName,
         skipRefinement: true, // Structured prompt
         skipGuardrails: true // We want JSON
       });

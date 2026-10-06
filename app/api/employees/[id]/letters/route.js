@@ -1,19 +1,18 @@
 import { NextResponse } from 'next/server'
-import mongoose from 'mongoose'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { EMPLOYMENT_LETTER_ROLES } from '@/lib/hrms/employmentLetter'
-import { issueEmploymentLetter, loadEmploymentLetterContext } from '@/lib/hrms/employmentLetter.server'
+import { getEmploymentLetterDatabase, issueEmploymentLetter, loadEmploymentLetterContext } from '@/lib/hrms/employmentLetter.server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 async function authorize(request, params) {
   const { id } = await params
-  if (!mongoose.Types.ObjectId.isValid(id)) return { response: NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 }) }
-  const auth = await getAuthAndModels(request, ['Employee', 'User', 'Company', 'CompanySettings', 'SystemPreferences', 'Policy', 'Document'])
+  if (!/^[a-f\d]{24}$/i.test(id)) return { response: NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 }) }
+  const auth = await getAuthAndDatabase(request)
   if (!auth.success) return { response: NextResponse.json({ success: false, message: auth.message }, { status: 401 }) }
   if (!EMPLOYMENT_LETTER_ROLES.includes(auth.user.role)) return { response: NextResponse.json({ success: false, message: 'HR or admin access is required to issue letters' }, { status: 403 }) }
-  return { auth, id }
+  return { auth: { ...auth, database: await getEmploymentLetterDatabase(auth) }, id }
 }
 
 export async function GET(request, { params }) {
@@ -22,7 +21,13 @@ export async function GET(request, { params }) {
     if (response) return response
     const context = await loadEmploymentLetterContext(auth, id)
     const kind = new URL(request.url).searchParams.get('kind') === 'offer' ? 'offer' : 'appointment'
-    const latest = await auth.models.Document.findOne({ employee: id, 'generatedLetter.kind': kind, isActive: { $ne: false } }).select('generatedLetter fileUrl fileName emailDelivery').sort({ createdAt: -1 }).lean()
+    let latest = null, cursor
+    do {
+      const page = await auth.database.list('documents', { filters: [{ field: 'employee', operator: '==', value: id }, { field: 'generatedLetter.kind', operator: '==', value: kind }], orderBy: [{ field: 'createdAt', direction: 'desc' }], limit: 100, cursor })
+      const document = page.records.find(record => record.isActive !== false)
+      if (document) latest = { _id: document._id, generatedLetter: document.generatedLetter, fileUrl: document.fileUrl, fileName: document.fileName, emailDelivery: document.emailDelivery }
+      cursor = page.nextCursor
+    } while (!latest && cursor)
     return NextResponse.json({ success: true, data: { defaults: context.defaults, logo: context.logo, email: context.employee.email, latest } })
   } catch (error) {
     console.error('[EmploymentLetter] Load failed:', error.message)

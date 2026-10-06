@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { sendPasswordChangedEmail } from '@/lib/mailer'
-import { syncUserToBackup } from '@/lib/backupDb'
-import { compareStoredPassword } from '@/lib/passwordAuth'
 import { getTenantBySlug } from '@/lib/tenantContext'
-import { getTenantModels } from '@/lib/tenantModels'
+import { getNativePasswordRepository } from '@/lib/platform/firestorePassword.server'
 
 // GET - Validate token before showing reset form
 export async function GET(request, { params }) {
@@ -35,40 +33,11 @@ export async function GET(request, { params }) {
       )
     }
 
-    // Get tenant-specific models
-    const tenantModels = await getTenantModels(tenantInfo.databaseName, ['PasswordResetToken', 'User'])
-    const TenantPasswordResetToken = tenantModels.PasswordResetToken
-
-    // Hash the token to look it up
-    const tokenHash = TenantPasswordResetToken.hashToken(token)
-
-    const resetToken = await TenantPasswordResetToken.findOne({
-      tokenHash,
-    }).populate('user', 'email name')
-
-    if (!resetToken) {
-      return NextResponse.json(
-        { valid: false, error: 'Invalid or expired reset link' },
-        { status: 400 }
-      )
-    }
-
-    if (!resetToken.isValid()) {
-      return NextResponse.json(
-        { valid: false, error: 'This reset link has expired or already been used' },
-        { status: 400 }
-      )
-    }
-
-    if (!resetToken.user) {
-      return NextResponse.json(
-        { valid: false, error: 'User account not found' },
-        { status: 400 }
-      )
-    }
+    const passwords = await getNativePasswordRepository(tenantInfo.databaseName)
+    const { token: resetToken, user } = await passwords.validate(token)
 
     // Return masked email for display
-    const email = resetToken.user.email
+    const email = user.email
     const maskedEmail = email.replace(/(.{2})(.*)(@.*)/, '$1***$3')
 
     return NextResponse.json({
@@ -77,6 +46,7 @@ export async function GET(request, { params }) {
       expiresAt: resetToken.expiresAt,
     })
   } catch (error) {
+    if (error.code === 'INVALID_RESET') return NextResponse.json({ valid: false, error: error.message }, { status: 400 })
     console.error('[reset-password] Validation error:', error)
     return NextResponse.json(
       { valid: false, error: 'Something went wrong' },
@@ -127,14 +97,7 @@ export async function POST(request, { params }) {
       )
     }
 
-    // Get tenant-specific models
-    const tenantModels = await getTenantModels(tenantInfo.databaseName, [
-      'PasswordResetToken', 'User', 'Employee', 'UserSession'
-    ])
-    const TenantPasswordResetToken = tenantModels.PasswordResetToken
-    const TenantUser = tenantModels.User
-    const TenantEmployee = tenantModels.Employee
-    const TenantUserSession = tenantModels.UserSession
+    const passwords = await getNativePasswordRepository(tenantInfo.databaseName)
 
     // Validate password strength
     const passwordErrors = validatePassword(password)
@@ -145,102 +108,7 @@ export async function POST(request, { params }) {
       )
     }
 
-    // Hash the token to look it up
-    const tokenHash = TenantPasswordResetToken.hashToken(token)
-
-    const resetToken = await TenantPasswordResetToken.findOne({
-      tokenHash,
-    }).populate('user')
-
-    if (!resetToken) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid or expired reset link' },
-        { status: 400 }
-      )
-    }
-
-    if (!resetToken.isValid()) {
-      return NextResponse.json(
-        { success: false, error: 'This reset link has expired or already been used' },
-        { status: 400 }
-      )
-    }
-
-    if (!resetToken.user) {
-      return NextResponse.json(
-        { success: false, error: 'User account not found' },
-        { status: 400 }
-      )
-    }
-
-    // Fetch user with password field for comparison (password has select: false)
-    const user = await TenantUser.findById(resetToken.user._id).select('+password')
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'User account not found' },
-        { status: 400 }
-      )
-    }
-
-    if (!user.isActive) {
-      return NextResponse.json(
-        { success: false, error: 'User account is deactivated' },
-        { status: 400 }
-      )
-    }
-
-    // Check if new password is same as old password even when schema methods are unavailable.
-    const isSamePassword = await compareStoredPassword(password, user.password)
-    if (isSamePassword) {
-      return NextResponse.json(
-        { success: false, error: 'New password must be different from your current password' },
-        { status: 400 }
-      )
-    }
-
-    // Update user password (will be hashed by pre-save hook)
-    user.password = password
-    user.forcePasswordChange = false
-    // Clear the encrypted onboarding password - user has set their own password
-    user.encryptedOnboardingPassword = null
-    user.passwordChangedAt = new Date()
-
-    // Clear any legacy password reset fields
-    user.passwordResetToken = undefined
-    user.passwordResetExpires = undefined
-
-    await user.save()
-
-    // Sync updated password to backup database (fire-and-forget)
-    const userWithNewPassword = await TenantUser.findById(user._id).select('+password').lean()
-    const employee = await TenantEmployee.findById(user.employeeId).select('firstName lastName').lean()
-    syncUserToBackup({
-      userId: user._id,
-      email: user.email,
-      firstName: employee?.firstName || '',
-      lastName: employee?.lastName || '',
-      password: userWithNewPassword.password,
-      role: user.role,
-    }).catch(err => console.error('[Reset Password] Backup sync failed:', err))
-
-    // Mark token as used
-    resetToken.usedAt = new Date()
-    resetToken.usedFromIp = ipAddress
-    resetToken.usedUserAgent = userAgent
-    await resetToken.save()
-
-    // Invalidate all user sessions (security: password change should logout everywhere)
-    const revokedCount = await TenantUserSession.updateMany(
-      { user: user._id, isActive: true },
-      {
-        isActive: false,
-        revokedAt: new Date(),
-        revokedReason: 'password_change'
-      }
-    )
-
-    console.log(`[reset-password] Password reset for user ${user._id}, revoked ${revokedCount.modifiedCount} sessions`)
+    const user = await passwords.reset(token, password, { ipAddress, userAgent })
 
     // Get first name for email
     const firstName = user.name?.split(' ')[0] || 'there'
@@ -259,6 +127,7 @@ export async function POST(request, { params }) {
       message: 'Password has been reset successfully. Please log in with your new password.',
     })
   } catch (error) {
+    if (error.code === 'INVALID_RESET') return NextResponse.json({ success: false, error: error.message }, { status: 400 })
     console.error('[reset-password] Error:', error)
     return NextResponse.json(
       { success: false, error: 'Something went wrong. Please try again.' },

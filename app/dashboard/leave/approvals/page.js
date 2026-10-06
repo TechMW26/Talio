@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Suspense, useState, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Modal from '@/components/ui/HeroModal'
 import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 import toast from '@/utils/toast'
@@ -32,14 +33,23 @@ function ApprovalsSkeleton() {
 }
 
 export default function LeaveApprovalsPage() {
-  const [filter, setFilter] = useState('pending')
+  return <Suspense fallback={<ApprovalsSkeleton />}><LeaveApprovalsContent /></Suspense>
+}
+
+function LeaveApprovalsContent() {
+  const searchParams = useSearchParams()
+  const requestedStatus = searchParams.get('status')
+  const initialFilter = requestedStatus === 'all' ? ''
+    : ['pending', 'approved', 'rejected'].includes(requestedStatus) ? requestedStatus : 'pending'
+  const [selectedFilter, setFilter] = useState(null)
+  const filter = selectedFilter ?? initialFilter
   const [selectedLeave, setSelectedLeave] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [processingId, setProcessingId] = useState(null) // Track which leave is being processed
 
   // --- SWR Data Fetching ---
   const swrKey = `/api/leave?status=${filter}`
-  const { data: leavesRes, error, isLoading, isValidating, mutate: refreshLeaves } = useAuthedSWR(swrKey)
+  const { data: leavesRes, error, isLoading, isValidating, mutate: refreshLeaves } = useAuthedSWR(swrKey, { keepPreviousData: false })
   const leaves = leavesRes?.data || []
 
   // --- Mutations with optimistic UI ---

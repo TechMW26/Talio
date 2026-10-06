@@ -1,210 +1,55 @@
-function makeApproval({ project, legacyProjectHead, save = jest.fn().mockResolvedValue() }) {
-    return {
-        _id: 'approval-1',
-        project,
-        projectHead: legacyProjectHead,
-        status: 'pending',
-        save,
-    }
-}
-
-function makeSelectQuery(result) {
-    return {
-        select: jest.fn().mockResolvedValue(result),
-    }
-}
-
-describe('project completion approval permissions', () => {
-    beforeEach(() => {
-        jest.resetModules()
-    })
-
-    afterEach(() => {
-        jest.restoreAllMocks()
-    })
-
-    test('allows a secondary project head from projectHeads to approve completion', async () => {
-        const project = {
-            _id: 'project-1',
-            projectHead: 'legacy-head',
-            projectHeads: ['legacy-head', 'secondary-head'],
-            status: 'completed_pending_approval',
-            save: jest.fn().mockResolvedValue(),
-        }
-        const approval = makeApproval({ project, legacyProjectHead: 'legacy-head' })
-
-        const models = {
-            ProjectCompletionApproval: {
-                findById: jest.fn().mockReturnValue({
-                    populate: jest.fn().mockResolvedValue(approval),
-                }),
-            },
-            Project: {
-                findById: jest.fn().mockResolvedValue(project),
-            },
-            ProjectMember: {
-                findOne: jest.fn().mockReturnValue(makeSelectQuery(null)),
-            },
-            Task: {
-                find: jest.fn(),
-            },
-            ProjectTimelineEvent: {
-                create: jest.fn().mockResolvedValue({}),
-            },
-        }
-
-        const { respondToCompletionApproval } = require('@/lib/projectService')
-        const result = await respondToCompletionApproval(
-            'approval-1',
-            { _id: 'secondary-head' },
-            true,
-            'Looks good',
-            false,
-            models,
-        )
-
-        expect(result.project.status).toBe('completed')
-        expect(approval.status).toBe('approved')
-        expect(approval.respondedBy).toBe('secondary-head')
-        expect(approval.save).toHaveBeenCalled()
-        expect(project.save).toHaveBeenCalled()
-    })
-
-    test('allows an accepted head membership even when legacy projectHead differs', async () => {
-        const project = {
-            _id: 'project-1',
-            projectHead: 'legacy-head',
-            projectHeads: [],
-            status: 'completed_pending_approval',
-            save: jest.fn().mockResolvedValue(),
-        }
-        const approval = makeApproval({ project, legacyProjectHead: 'legacy-head' })
-
-        const models = {
-            ProjectCompletionApproval: {
-                findById: jest.fn().mockReturnValue({
-                    populate: jest.fn().mockResolvedValue(approval),
-                }),
-            },
-            Project: {
-                findById: jest.fn().mockResolvedValue(project),
-            },
-            ProjectMember: {
-                findOne: jest.fn().mockReturnValue(makeSelectQuery({ _id: 'membership-1' })),
-            },
-            Task: {
-                find: jest.fn(),
-            },
-            ProjectTimelineEvent: {
-                create: jest.fn().mockResolvedValue({}),
-            },
-        }
-
-        const { respondToCompletionApproval } = require('@/lib/projectService')
-        const result = await respondToCompletionApproval(
-            'approval-1',
-            { _id: 'membership-head' },
-            true,
-            '',
-            false,
-            models,
-        )
-
-        expect(result.project.status).toBe('completed')
-        expect(models.ProjectMember.findOne).toHaveBeenCalledWith({
-            project: project._id,
-            user: 'membership-head',
-            role: 'head',
-            invitationStatus: 'accepted',
-        })
-    })
-})
-
-describe('project completion approval API route', () => {
-    beforeEach(() => {
-        jest.resetModules()
-    })
-
-    afterEach(() => {
-        jest.restoreAllMocks()
-    })
-
-    test('permits a secondary project head to respond through the PUT route', async () => {
-        const respondToCompletionApproval = jest.fn().mockResolvedValue({
-            approval: { _id: 'approval-1' },
-            project: { _id: 'project-1' },
-        })
-
-        const models = {
-            Project: {
-                findById: jest.fn().mockResolvedValue({
-                    _id: 'project-1',
-                    projectHead: 'legacy-head',
-                    projectHeads: ['legacy-head', 'secondary-head'],
-                }),
-            },
-            ProjectMember: {
-                findOne: jest.fn().mockReturnValue(makeSelectQuery(null)),
-            },
-            User: {
-                findById: jest.fn().mockReturnValue(makeSelectQuery({
-                    _id: 'user-1',
-                    employeeId: 'secondary-head',
-                    role: 'employee',
-                })),
-            },
-            Employee: {
-                findById: jest.fn().mockResolvedValue({
-                    _id: 'secondary-head',
-                    firstName: 'Secondary',
-                    lastName: 'Head',
-                }),
-            },
-        }
-
-        jest.doMock('@/lib/auth', () => ({
-            getAuthAndModels: jest.fn().mockResolvedValue({
-                success: true,
-                user: { _id: 'user-1', role: 'employee' },
-                models,
-            }),
-        }))
-        jest.doMock('@/lib/projectService', () => ({
-            requestCompletionApproval: jest.fn(),
-            respondToCompletionApproval,
-            getProjectTaskStats: jest.fn(),
-        }))
-        jest.doMock('@/lib/projectNotifications', () => ({
-            notifyProjectCompletionRequested: jest.fn(),
-            notifyProjectApproved: jest.fn(),
-            notifyProjectRejected: jest.fn(),
-            getProjectMemberUserIds: jest.fn().mockResolvedValue([]),
-        }))
-
-        const { PUT } = require('@/app/api/projects/[projectId]/approval/route')
-        const request = new Request('http://localhost/api/projects/project-1/approval', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                approvalId: 'approval-1',
-                action: 'approve',
-                remark: 'Approved',
-            }),
-        })
-
-        const response = await PUT(request, { params: { projectId: 'project-1' } })
-        const body = await response.json()
-
-        expect(response.status).toBe(200)
-        expect(body.success).toBe(true)
-        expect(respondToCompletionApproval).toHaveBeenCalledWith(
-            'approval-1',
-            expect.objectContaining({ _id: 'secondary-head' }),
-            true,
-            'Approved',
-            undefined,
-            models,
-            { isAdmin: false },
-        )
-    })
+jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreTenantDatabase: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
+jest.mock('@/lib/projectNotifications', () => ({ notifyProjectApproved: jest.fn(), notifyProjectRejected: jest.fn(), getProjectMemberUserIds: jest.fn(async () => []) }))
+jest.mock('@/lib/projectEmailNotifications', () => ({}))
+jest.mock('next/server', () => ({ ...jest.requireActual('next/server'), after: jest.fn() }))
+import { Firestore } from 'firebase-admin/firestore'
+import { createFirestoreDatabase } from '@/lib/platform/firestoreStore.server'
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { PROJECT_STORE_OPTIONS } from '@/lib/projects.server'
+import { respondToCompletionApproval } from '@/lib/projectService'
+import { PUT } from '@/app/api/projects/[projectId]/approval/route'
+jest.setTimeout(60000)
+const suite = process.env.TALIO_FIRESTORE_EMULATOR_TEST === '1' ? describe : describe.skip
+suite('project completion approval permissions on native Firestore', () => {
+  let firestore, database
+  const projectId = 'aaaaaaaaaaaaaaaaaaaaaaaa', employeeId = 'bbbbbbbbbbbbbbbbbbbbbbbb', approvalId = 'cccccccccccccccccccccccc'
+  beforeAll(() => { if (process.env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8185') throw new Error('Isolated emulator required'); firestore = new Firestore({ projectId: 'demo-talio-firestore' }) })
+  beforeEach(async () => {
+    database = createFirestoreDatabase({ firestore, dataset: `test-completion-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, databaseName: 'talio_company_completion', ...PROJECT_STORE_OPTIONS })
+    getFirestoreTenantDatabase.mockResolvedValue(database)
+    await database.create('projects', { _id: projectId, name: 'Fixture', projectHead: 'legacy-head', projectHeads: ['legacy-head', employeeId], status: 'completed_pending_approval' })
+    await database.create('projectcompletionapprovals', { _id: approvalId, project: projectId, projectHead: 'legacy-head', status: 'pending' })
+    await database.create('employees', { _id: employeeId, firstName: 'Secondary', lastName: 'Head', status: 'active' })
+    getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user', userId: 'user', employeeId, role: 'employee' }, tenant: { databaseName: database.databaseName }, database })
+  })
+  afterAll(async () => { await firestore?.terminate() })
+  test('secondary projectHeads entry may approve and both records persist atomically', async () => {
+    const result = await respondToCompletionApproval(approvalId, { _id: employeeId }, true, 'Looks good', false, database)
+    expect(result.project.status).toBe('completed')
+    expect(await database.get('projectcompletionapprovals', approvalId)).toMatchObject({ status: 'approved', respondedBy: employeeId })
+    expect((await database.get('projects', projectId)).status).toBe('completed')
+  })
+  test('accepted head membership may approve even if old head fields differ', async () => {
+    await database.mutate('projects', projectId, row => ({ ...row, projectHeads: [] }))
+    await database.create('projectmembers', { _id: 'member', project: projectId, user: employeeId, role: 'head', invitationStatus: 'accepted' })
+    expect((await respondToCompletionApproval(approvalId, { _id: employeeId }, true, '', false, database)).approval.status).toBe('approved')
+  })
+  test('pending head invitation grants no approval authority and rolls back', async () => {
+    await database.mutate('projects', projectId, row => ({ ...row, projectHeads: [] }))
+    await database.create('projectmembers', { _id: 'member', project: projectId, user: employeeId, role: 'head', invitationStatus: 'pending' })
+    await expect(respondToCompletionApproval(approvalId, { _id: employeeId }, true, '', false, database)).rejects.toMatchObject({ status: 403 })
+    expect((await database.get('projectcompletionapprovals', approvalId)).status).toBe('pending')
+  })
+  test('PUT delegates validated project scope to native approval workflow', async () => {
+    const response = await PUT(new Request(`http://localhost/api/projects/${projectId}/approval`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approvalId, action: 'approve', remark: 'Approved' }) }), { params: Promise.resolve({ projectId }) })
+    expect(response.status).toBe(200); expect(await response.json()).toMatchObject({ success: true })
+    expect((await database.get('projectcompletionapprovals', approvalId)).respondedBy).toBe(employeeId)
+  })
+  test('simultaneous response is single use', async () => {
+    const results = await Promise.allSettled([true, false].map(approve => respondToCompletionApproval(approvalId, { _id: employeeId }, approve, '', false, database)))
+    expect(results.filter(row => row.status === 'fulfilled')).toHaveLength(1)
+    expect(await database.count('projecttimelineevents')).toBe(1)
+  })
 })

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { dashboardAuth, dashboardEmployee } from '@/lib/dashboardData.server';
+import { projectRows, projectRecords, projectFilter as f, projectId as id } from '@/lib/projects.server';
 import { generateContent } from '@/lib/gemini';
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse';
 import { formatDesignation, formatDepartments } from '@/lib/formatters';
@@ -13,25 +14,19 @@ import { normalizeLeaveBalance } from '@/lib/leaveData';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Attendance', 'Leave', 'LeaveBalance', 'LeaveType', 'Task', 'DailyGoal', 'Employee']);
+    const auth = await dashboardAuth(request);
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
     }
 
-    const { user, models } = auth;
-    const { Attendance, Leave, LeaveBalance, LeaveType, Task, DailyGoal, Employee } = models;
+    const { user, database } = auth;
 
     const employeeId = user.employeeId?._id || user.employeeId;
     const userId = user._id || user.userId;
     const now = new Date();
 
     const employeeProfile = employeeId
-      ? await Employee.findById(employeeId)
-        .populate('designation', 'title level levelName')
-        .populate('department', 'name')
-        .populate('departments', 'name')
-        .select('designation designationLevelName department departments manualKRIs aiGeneratedKRIs')
-        .lean()
+      ? await dashboardEmployee(database, employeeId)
       : null;
 
     const roleDesignation = employeeProfile ? formatDesignation(employeeProfile.designation, employeeProfile) : 'Not available';
@@ -50,36 +45,19 @@ export async function GET(request) {
 
     const [attendanceRecords, leaveBalances, recentLeaves, pendingTasks, dailyGoals] = await Promise.all([
       // Last 30 days attendance
-      Attendance.find({
-        employee: employeeId,
-        date: { $gte: thirtyDaysAgo },
-      }).select('date checkIn checkOut status totalHours lateMinutes').sort({ date: -1 }).lean(),
+      projectRows(database, 'attendances', [f('employee', id(employeeId)), f('date', thirtyDaysAgo, '>=')], { orderBy: [{ field: 'date', direction: 'desc' }] }),
 
       // Leave balances
-      LeaveBalance.find({ employee: employeeId })
-        .populate('leaveType', 'name')
-        .lean(),
+      projectRows(database, 'leavebalances', [f('employee', id(employeeId))]).then(rows => Promise.all(rows.map(async row => ({ ...row, leaveType: row.leaveType ? await database.get('leavetypes', id(row.leaveType)) : null })))),
 
       // Recent leave applications (last 30 days)
-      Leave.find({
-        employee: employeeId,
-        createdAt: { $gte: thirtyDaysAgo },
-      }).select('startDate endDate status leaveType reason').lean(),
+      projectRows(database, 'leaves', [f('employee', id(employeeId)), f('createdAt', thirtyDaysAgo, '>=')]),
 
       // Pending tasks
-      Task.find({
-        $or: [
-          { assignedTo: employeeId },
-          { assignees: employeeId },
-        ],
-        status: { $in: ['pending', 'in-progress', 'todo'] },
-      }).select('title dueDate priority status').sort({ dueDate: 1 }).limit(10).lean(),
+      projectRows(database, 'taskassignees', [f('user', id(employeeId)), f('assignmentStatus', ['pending', 'accepted'], 'in')]).then(rows => projectRecords(database, 'tasks', rows.map(row => row.task))).then(rows => rows.filter(row => !row.deletedAt && ['pending', 'in-progress', 'todo'].includes(row.status)).sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate)).slice(0, 10)),
 
       // Today's daily goals
-      DailyGoal.find({
-        employee: employeeId,
-        date: { $gte: todayStart },
-      }).select('title completed').lean(),
+      projectRows(database, 'dailygoals', [f('employee', id(employeeId)), f('date', todayStart, '>=')]),
     ]);
 
     // --- Compute metrics ---

@@ -1,256 +1,36 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels, hasRole } from '@/lib/auth'
-import {
-    validatePermissionsShape,
-    invalidatePermissionsCache,
-    normalizePermissionsShape,
-} from '@/lib/permissions'
-import { SYSTEM_ROLE_DEFINITIONS } from '@/lib/systemRoles'
-import { logRBACEvent, extractRequestMeta } from '@/lib/rbacAudit'
+import { getAuthAndDatabase, hasRole } from '@/lib/auth'
+import { ROLE_STORE_OPTIONS, getNativeRole, updateNativeRole, nativeRoleUsers, deleteNativeRole } from '@/lib/platform/firestoreRoles.server'
+import { invalidatePermissionsCache } from '@/lib/permissions'
 import { refreshAffectedUsers } from '@/lib/rbacSessionRefresh'
+import { logRBACEvent, extractRequestMeta } from '@/lib/rbacAudit'
 
-// GET /api/rbac/roles/[id] — get a single role
-export async function GET(request, { params }) {
-    try {
-        const { id } = await params
-        const auth = await getAuthAndModels(request, ['Role'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
-
-        if (!hasRole(user, ['admin', 'super_admin'])) {
-            return NextResponse.json(
-                { success: false, message: 'Only admins can view role details' },
-                { status: 403 }
-            )
-        }
-
-        const role = await models.Role.findById(id).lean()
-        if (!role) {
-            return NextResponse.json(
-                { success: false, message: 'Role not found' },
-                { status: 404 }
-            )
-        }
-
-        const fallbackPermissions = role.isSystemRole
-            ? SYSTEM_ROLE_DEFINITIONS[role.name]?.buildPermissions?.()
-            : null
-
-        return NextResponse.json({
-            success: true,
-            data: {
-                ...role,
-                permissions: normalizePermissionsShape(role.permissions, fallbackPermissions),
-            },
-        })
-    } catch (error) {
-        console.error('[RBAC] Get role error:', error)
-        return NextResponse.json(
-            { success: false, message: 'Failed to fetch role' },
-            { status: 500 }
-        )
+async function handler(request, params, method) {
+  try {
+    const { id } = await params
+    const auth = await getAuthAndDatabase(request, ROLE_STORE_OPTIONS)
+    if (!auth.success) return NextResponse.json({ message: auth.message }, { status: auth.status || 401 })
+    if (!hasRole(auth.user, ['admin', 'super_admin'])) return NextResponse.json({ success: false, message: 'Only admins can manage roles' }, { status: 403 })
+    const { database, user, tenant } = auth
+    const before = await getNativeRole(database, id)
+    if (!before) return NextResponse.json({ success: false, message: 'Role not found' }, { status: 404 })
+    if (method === 'GET') return NextResponse.json({ success: true, data: before })
+    let role, userIds
+    if (method === 'PUT') {
+      role = await updateNativeRole(database, id, await request.json())
+      userIds = (await nativeRoleUsers(database, id)).filter(user => user.isActive).map(user => String(user._id))
+      await invalidatePermissionsCache(tenant.databaseName, userIds)
+    } else {
+      const result = await deleteNativeRole(database, id)
+      role = result.role; userIds = result.userIds
     }
+    await refreshAffectedUsers({ databaseName: tenant.databaseName, database, userIds, initiatedBy: { userId: user._id, email: user.email, role: user.role },
+      message: method === 'PUT' ? 'Your role permissions were updated. Talio is applying the latest access.' : 'Your custom role was removed. Talio is applying the default access.',
+    })
+    await logRBACEvent(tenant.databaseName, { eventType: method === 'PUT' ? 'role_updated' : 'role_deleted', actorId: user._id, targetId: role._id, targetType: 'Role', metadata: { roleName: role.name, displayLabel: role.displayLabel, affectedUserCount: userIds.length }, ...extractRequestMeta(request) })
+    return NextResponse.json({ success: true, message: method === 'PUT' ? 'Role updated successfully' : 'Role deleted. Assigned users reverted to default permissions.', ...(method === 'PUT' ? { data: role } : {}) })
+  } catch (error) { return NextResponse.json({ success: false, message: error.status ? error.message : 'Role operation failed' }, { status: error.status || 500 }) }
 }
-
-// PUT /api/rbac/roles/[id] — update a role's permissions or metadata
-export async function PUT(request, { params }) {
-    try {
-        const { id } = await params
-        const auth = await getAuthAndModels(request, ['Role', 'User', 'ForceRefresh'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models, tenant } = auth
-
-        if (!hasRole(user, ['admin', 'super_admin'])) {
-            return NextResponse.json(
-                { success: false, message: 'Only admins can update roles' },
-                { status: 403 }
-            )
-        }
-
-        const role = await models.Role.findById(id)
-        if (!role) {
-            return NextResponse.json(
-                { success: false, message: 'Role not found' },
-                { status: 404 }
-            )
-        }
-
-        const data = await request.json()
-        const beforeSnapshot = {
-            displayLabel: role.displayLabel,
-            description: role.description,
-        }
-
-        // Update metadata
-        if (data.displayLabel) role.displayLabel = data.displayLabel.trim()
-        if (data.description !== undefined) role.description = data.description.trim()
-
-        // System roles: allow updating permissions but not name
-        if (role.isSystemRole && data.name && data.name !== role.name) {
-            return NextResponse.json(
-                { success: false, message: 'Cannot rename a system role' },
-                { status: 400 }
-            )
-        }
-
-        // Update permissions
-        if (data.permissions) {
-            const fallbackPermissions = role.isSystemRole
-                ? SYSTEM_ROLE_DEFINITIONS[role.name]?.buildPermissions?.()
-                : null
-            const normalizedPermissions = normalizePermissionsShape(
-                data.permissions,
-                fallbackPermissions
-            )
-            const validation = validatePermissionsShape(normalizedPermissions)
-            if (!validation.valid) {
-                return NextResponse.json(
-                    { success: false, message: 'Invalid permissions shape', errors: validation.errors },
-                    { status: 400 }
-                )
-            }
-            role.permissions = normalizedPermissions
-        }
-
-        await role.save()
-
-        // Invalidate permissions cache for all users assigned to this role
-        const affectedUsers = await models.User.find(
-            { roleId: role._id, isActive: true },
-            { _id: 1 }
-        ).lean()
-        const userIds = affectedUsers.map((u) => u._id.toString())
-        await invalidatePermissionsCache(tenant.databaseName, userIds)
-        await refreshAffectedUsers({
-            databaseName: tenant.databaseName,
-            userIds,
-            forceRefreshModel: models.ForceRefresh,
-            initiatedBy: {
-                userId: user._id?.toString?.() || user.userId,
-                email: user.email,
-                role: user.role,
-            },
-            message: `Permissions for ${role.displayLabel} were updated. Talio is applying the latest access in the background.`,
-        })
-
-        // Audit log
-        const meta = extractRequestMeta(request)
-        logRBACEvent(tenant.databaseName, {
-            eventType: 'role_updated',
-            actorId: user._id,
-            targetId: role._id,
-            targetType: 'Role',
-            metadata: {
-                before: beforeSnapshot,
-                after: { displayLabel: role.displayLabel, description: role.description },
-                permissionsChanged: !!data.permissions,
-                affectedUserCount: userIds.length,
-            },
-            ...meta,
-        }).catch(() => { })
-
-        return NextResponse.json({
-            success: true,
-            message: 'Role updated successfully',
-            data: role.toObject(),
-        })
-    } catch (error) {
-        console.error('[RBAC] Update role error:', error)
-        return NextResponse.json(
-            { success: false, message: error.message || 'Failed to update role' },
-            { status: 500 }
-        )
-    }
-}
-
-// DELETE /api/rbac/roles/[id] — delete a custom role
-export async function DELETE(request, { params }) {
-    try {
-        const { id } = await params
-        const auth = await getAuthAndModels(request, ['Role', 'User', 'ForceRefresh'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models, tenant } = auth
-
-        if (!hasRole(user, ['admin', 'super_admin'])) {
-            return NextResponse.json(
-                { success: false, message: 'Only admins can delete roles' },
-                { status: 403 }
-            )
-        }
-
-        const role = await models.Role.findById(id)
-        if (!role) {
-            return NextResponse.json(
-                { success: false, message: 'Role not found' },
-                { status: 404 }
-            )
-        }
-
-        if (role.isSystemRole) {
-            return NextResponse.json(
-                { success: false, message: 'System roles cannot be deleted' },
-                { status: 400 }
-            )
-        }
-
-        // Unassign users: set roleId to null, clear cache
-        const affectedUsers = await models.User.find(
-            { roleId: role._id, isActive: true },
-            { _id: 1 }
-        ).lean()
-        const userIds = affectedUsers.map((u) => u._id.toString())
-
-        if (userIds.length > 0) {
-            await models.User.updateMany(
-                { roleId: role._id },
-                { $set: { roleId: null, permissionsCache: null, cacheUpdatedAt: null } }
-            )
-
-            await refreshAffectedUsers({
-                databaseName: tenant.databaseName,
-                userIds,
-                forceRefreshModel: models.ForceRefresh,
-                initiatedBy: {
-                    userId: user._id?.toString?.() || user.userId,
-                    email: user.email,
-                    role: user.role,
-                },
-                message: `Your custom role ${role.displayLabel} was removed. Talio is applying the default access in the background.`,
-            })
-        }
-
-        await models.Role.deleteOne({ _id: role._id })
-
-        // Audit log
-        const meta = extractRequestMeta(request)
-        logRBACEvent(tenant.databaseName, {
-            eventType: 'role_deleted',
-            actorId: user._id,
-            targetId: role._id,
-            targetType: 'Role',
-            metadata: {
-                roleName: role.name,
-                displayLabel: role.displayLabel,
-                unassignedUserCount: userIds.length,
-            },
-            ...meta,
-        }).catch(() => { })
-
-        return NextResponse.json({
-            success: true,
-            message: `Role "${role.displayLabel}" deleted. ${userIds.length} user(s) reverted to default permissions.`,
-        })
-    } catch (error) {
-        console.error('[RBAC] Delete role error:', error)
-        return NextResponse.json(
-            { success: false, message: error.message || 'Failed to delete role' },
-            { status: 500 }
-        )
-    }
-}
+export const GET = (request, { params }) => handler(request, params, 'GET')
+export const PUT = (request, { params }) => handler(request, params, 'PUT')
+export const DELETE = (request, { params }) => handler(request, params, 'DELETE')

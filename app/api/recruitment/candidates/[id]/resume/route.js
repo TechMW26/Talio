@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { verifyTokenFromRequest } from '@/lib/auth'
 import { readCandidateResume } from '@/lib/recruitment/wordpressResume.server'
 export const dynamic = 'force-dynamic'
 export async function GET(request, { params }) {
   try {
-    const auth = await getAuthAndModels(request, ['Candidate'])
+    const auth = await verifyTokenFromRequest(request)
     if (!auth.success) return new NextResponse('Unauthorized', { status: 401 })
     if (!['admin', 'hr', 'manager', 'super_admin', 'superadmin'].includes(auth.user.role)) return new NextResponse('Forbidden', { status: 403 })
     const { id } = await params, result = await readCandidateResume(auth, id)

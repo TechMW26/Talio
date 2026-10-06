@@ -1,4 +1,4 @@
-import { MIRA_RESPONSE_GUIDELINES } from '@/lib/miraResponseGuidelines'
+import { MIRA_RESPONSE_GUIDELINES, MIRA_SELF_REFERENCE_POLICY } from '@/lib/miraResponseGuidelines'
 
 test('keeps routine voice and chat replies targeted without truncating requested detail', () => {
   expect(MIRA_RESPONSE_GUIDELINES).toContain('under 40 words by default')
@@ -178,8 +178,16 @@ test('Agent S receives the same language and clarification contract as chat', ()
   for (const entry of [messages[0], messages.at(-1)]) {
     expect(entry.content).toContain(MIRA_LANGUAGE_POLICY)
     expect(entry.content).toContain(MIRA_CLARIFICATION_POLICY)
+    expect(entry.content).toContain(MIRA_SELF_REFERENCE_POLICY)
     expect(entry.content).toContain('up to five distinct, evidence-based attempts')
     expect(entry.content).toContain('platform-appropriate documented keyboard shortcut')
     expect(entry.content).toContain('never request or reveal API keys')
   }
+})
+
+test('chat self-reference is feminine without changing quotations or other people', () => {
+  expect(MIRA_RESPONSE_GUIDELINES).toContain(MIRA_SELF_REFERENCE_POLICY)
+  expect(MIRA_SELF_REFERENCE_POLICY).toContain('main kar sakti hoon')
+  expect(MIRA_SELF_REFERENCE_POLICY).toContain('Do not copy masculine self-reference from prior assistant mistakes')
+  expect(MIRA_SELF_REFERENCE_POLICY).toContain('quotations, document text or references to other people')
 })

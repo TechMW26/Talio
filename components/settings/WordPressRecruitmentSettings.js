@@ -4,7 +4,7 @@ import { Button, Input, Select, SelectItem } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 
 export default function WordPressRecruitmentSettings() {
-  const { data, error, isLoading, mutate } = useAuthedSWR('/api/recruitment/wordpress', { refreshInterval: 30000 })
+  const { data, error, isLoading, mutate } = useAuthedSWR('/api/recruitment/wordpress', { refreshInterval: 0, revalidateOnFocus: true })
   const { data: departmentData } = useAuthedSWR('/api/departments')
   const status = data?.data, departments = departmentData?.data || []
   const [siteUrl, setSiteUrl] = useState('https://mushroomworldgroup.com'), [department, setDepartment] = useState('')

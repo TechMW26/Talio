@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
-import { getTenantModels } from '@/lib/tenantModels'
-import { syncUserToBackup } from '@/lib/backupDb'
+import { verifyTokenFromRequest } from '@/lib/auth'
+import { getNativeAuthRepository } from '@/lib/platform/firestoreAuth.server'
+import { getNativePasswordRepository } from '@/lib/platform/firestorePassword.server'
 import { compareStoredPassword } from '@/lib/passwordAuth'
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
 export async function POST(request) {
   try {
@@ -23,8 +21,9 @@ export async function POST(request) {
     // Verify the token
     let payload
     try {
-      const verified = await jwtVerify(token, JWT_SECRET)
-      payload = verified.payload
+      const auth = await verifyTokenFromRequest(request)
+      if (!auth.success) throw new Error('Invalid session')
+      payload = auth.user
     } catch (error) {
       return NextResponse.json(
         { success: false, message: 'Invalid or expired token' },
@@ -48,7 +47,8 @@ export async function POST(request) {
     }
 
     // Get tenant-specific models
-    const { User, Employee } = await getTenantModels(payload.databaseName, ['User', 'Employee'])
+    const repository = await getNativeAuthRepository(payload.databaseName)
+    const passwords = await getNativePasswordRepository(payload.databaseName)
 
     // Get request body
     const body = await request.json().catch(() => ({}))
@@ -78,7 +78,7 @@ export async function POST(request) {
     }
 
     // Find user with password field (isActive and forcePasswordChange are included by default)
-    const user = await User.findById(payload.userId).select('+password')
+    let user = await repository.database.get('users', String(payload.userId))
 
     if (!user) {
       return NextResponse.json(
@@ -104,38 +104,14 @@ export async function POST(request) {
       )
     }
 
-    // Update password and set forcePasswordChange to false
-    user.password = newPassword // Will be hashed by pre-save hook
-    user.forcePasswordChange = false
-    // Clear the encrypted onboarding password - user has set their own password
-    user.encryptedOnboardingPassword = null
-    await user.save()
-
-    // Sync updated password to backup database (fire-and-forget)
-    const userWithNewPassword = await User.findById(user._id).select('+password').lean()
-    const empData = user.employeeId
-      ? await Employee.findById(user.employeeId).select('firstName lastName').lean()
-      : null
-    syncUserToBackup({
-      userId: user._id,
-      email: user.email,
-      firstName: empData?.firstName || '',
-      lastName: empData?.lastName || '',
-      password: userWithNewPassword.password,
-      role: user.role,
-    }).catch(err => console.error('[Change Password] Backup sync failed:', err))
-
-    // Refresh user data to get profileCompletion
-    const updatedUser = await User.findById(user._id).select('profileCompletion')
+    user = await passwords.change(user._id, currentPassword, newPassword)
+    const updatedUser = user
 
     // Fetch employee data for response
     let employeeData = null
     if (user.employeeId) {
       try {
-        employeeData = await Employee.findById(user.employeeId)
-          .populate('designation')
-          .populate('department')
-          .lean()
+        employeeData = await repository.getEmployee(user.employeeId)
       } catch (error) {
         console.error('Error fetching employee data:', error)
       }
@@ -200,6 +176,7 @@ export async function POST(request) {
     })
 
   } catch (error) {
+    if (error.code === 'INVALID_RESET') return NextResponse.json({ success: false, message: error.message }, { status: 400 })
     // Enhanced error logging with context
     const errorContext = {
       timestamp: new Date().toISOString(),
@@ -213,13 +190,13 @@ export async function POST(request) {
     let errorMessage = 'Failed to change password'
     let errorCode = 'CHANGE_PASSWORD_ERROR'
 
-    if (error.name === 'MongoNetworkError' || error.message?.includes('ETIMEOUT')) {
+    if ([4, 14].includes(error.code) || error.message?.includes('ETIMEOUT')) {
       errorMessage = 'Database connection issue. Please try again.'
       errorCode = 'DB_CONNECTION_ERROR'
     } else if (error.name === 'ValidationError') {
       errorMessage = 'Invalid password format'
       errorCode = 'VALIDATION_ERROR'
-    } else if (error.name === 'MongoServerError' && error.code === 11000) {
+    } else if (error.code === 'ALREADY_EXISTS') {
       errorMessage = 'A conflict occurred. Please try again.'
       errorCode = 'DB_CONFLICT_ERROR'
     }
@@ -249,8 +226,9 @@ export async function GET(request) {
     // Verify the token
     let payload
     try {
-      const verified = await jwtVerify(token, JWT_SECRET)
-      payload = verified.payload
+      const auth = await verifyTokenFromRequest(request)
+      if (!auth.success) throw new Error('Invalid session')
+      payload = auth.user
     } catch (error) {
       return NextResponse.json(
         { success: false, message: 'Invalid token' },
@@ -267,9 +245,8 @@ export async function GET(request) {
     }
 
     // Get tenant-specific User model
-    const { User } = await getTenantModels(payload.databaseName, ['User'])
-
-    const user = await User.findById(payload.userId).select('forcePasswordChange isActive')
+    const repository = await getNativeAuthRepository(payload.databaseName)
+    const user = await repository.database.get('users', String(payload.userId))
 
     if (!user) {
       return NextResponse.json(
@@ -298,7 +275,7 @@ export async function GET(request) {
     let errorMessage = 'Failed to check password change status'
     let errorCode = 'CHECK_PASSWORD_STATUS_ERROR'
 
-    if (error.name === 'MongoNetworkError' || error.message?.includes('ETIMEOUT')) {
+    if ([4, 14].includes(error.code) || error.message?.includes('ETIMEOUT')) {
       errorMessage = 'Database connection issue. Please try again.'
       errorCode = 'DB_CONNECTION_ERROR'
     }

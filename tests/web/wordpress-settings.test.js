@@ -21,6 +21,7 @@ beforeEach(() => {
 test('requires department, creates a scoped connection and shows the credential only after success', async () => {
   fetch.mockResolvedValue({ ok: true, json: async () => ({ success: true, data: { token: 'one-time-secret' } }) })
   render(<WordPressRecruitmentSettings />)
+  expect(useAuthedSWR).toHaveBeenCalledWith('/api/recruitment/wordpress', expect.objectContaining({ refreshInterval: 0, revalidateOnFocus: true }))
   expect(screen.getByRole('button', { name: 'Create connection' })).toBeDisabled()
   expect(screen.queryByLabelText('One-time connection token')).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Default department for website jobs'), { target: { value: 'department1' } })

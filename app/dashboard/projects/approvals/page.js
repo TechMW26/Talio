@@ -1,12 +1,14 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import Modal from '@/components/ui/HeroModal'
 import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
 import {
-  FaArrowLeft, FaCheck, FaTimes, FaTrash, FaProjectDiagram,
+  FaCheck, FaTimes, FaTrash, FaProjectDiagram,
   FaClock, FaCheckCircle, FaTimesCircle, FaFilter,
   FaExclamationTriangle, FaTasks, FaUser, FaCalendarAlt, FaEye
 } from 'react-icons/fa'
@@ -222,7 +224,7 @@ export default function ApprovalsPage() {
             onPress={() => router.push('/dashboard/projects')}
             className="mr-4"
           >
-            <FaArrowLeft className="text-default-600" />
+            <BackIcon className="text-default-600" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-default-800">Request Approvals</h1>

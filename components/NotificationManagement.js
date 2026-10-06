@@ -775,7 +775,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment, isDepartmentHead 
       </div>
 
       {scheduledNotifications.map((notification) => (
-        <div key={notification._id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div key={notification._id} className="talio-notification-card p-5">
           <div className="flex justify-between items-start gap-4">
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-gray-900">{notification.title}</h4>
@@ -1394,7 +1394,7 @@ function RecurringNotificationsTab({ userRole, userDepartment, isDepartmentHead 
       {recurringNotifications.length > 0 && (
         <div className="space-y-4">
           {recurringNotifications.map((notification) => (
-            <div key={notification._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div key={notification._id} className="talio-notification-card p-5 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
@@ -1526,7 +1526,7 @@ function NotificationHistoryTab({ userRole, userDepartment, isDepartmentHead }) 
       </div>
 
       {history.map((notification) => (
-        <div key={notification._id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div key={notification._id} className="talio-notification-card p-5">
           <div className="flex justify-between items-start gap-4">
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-gray-900">{notification.title}</h4>

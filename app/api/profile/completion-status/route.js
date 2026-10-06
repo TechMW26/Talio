@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getProfileStore } from '@/lib/platform/firestoreProfile.server'
 import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 export const dynamic = 'force-dynamic'
 
@@ -10,12 +11,12 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models, tenant } = auth
-    const { User, Employee } = models
+    const { user: authUser, tenant } = auth
+    const store = await getProfileStore(tenant.databaseName)
 
     // Check Redis cache (5 min TTL - profile completion rarely changes mid-session)
     const profileCacheKey = buildCacheKey({
@@ -29,9 +30,7 @@ export async function GET(request) {
       return NextResponse.json(cachedProfile)
     }
 
-    const user = await User.findById(authUser._id)
-      .select('employeeId isActive profileCompletion suspensionReason suspendedAt')
-      .lean()
+    const user = await store.get('users', authUser._id || authUser.userId)
 
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
@@ -70,9 +69,7 @@ export async function GET(request) {
     let filledPersonalFields = []
 
     if (user.employeeId) {
-      const employee = await Employee.findById(user.employeeId)
-        .select('firstName lastName email phone dateOfBirth gender address bloodGroup')
-        .lean()
+      const employee = await store.get('employees', user.employeeId)
 
       if (employee) {
         // Check each mandatory field individually
@@ -212,14 +209,14 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models, tenant } = auth
-    const { User, Employee } = models
+    const { user: authUser, tenant } = auth
+    const store = await getProfileStore(tenant.databaseName)
 
-    const user = await User.findById(authUser._id || authUser.userId)
+    const user = await store.get('users', authUser._id || authUser.userId)
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
@@ -236,9 +233,7 @@ export async function POST(request) {
         }, { status: 400 })
       }
 
-      const employee = await Employee.findById(user.employeeId)
-        .select('firstName lastName email phone dateOfBirth address')
-        .lean()
+      const employee = await store.get('employees', user.employeeId)
 
       if (!employee) {
         return NextResponse.json({
@@ -265,20 +260,16 @@ export async function POST(request) {
       }
 
       // Update completion status
-      const completedFields = user.profileCompletion?.completedFields || {}
-      const updateData = {
-        'profileCompletion.completedFields.personalInfo': true
-      }
-
-      // Update overall status
-      if (completedFields.aadhaarUploaded && completedFields.ocrVerified) {
-        updateData['profileCompletion.status'] = 'complete'
-        updateData['profileCompletion.completedAt'] = new Date()
-      } else if (completedFields.aadhaarUploaded) {
-        updateData['profileCompletion.status'] = 'partially_complete'
-      }
-
-      await User.findByIdAndUpdate(authUser._id || authUser.userId, { $set: updateData })
+      await store.mutate('users', user._id, current => {
+        if (!current) throw new Error('User not found')
+        const profileCompletion = { ...current.profileCompletion }
+        profileCompletion.completedFields = { ...profileCompletion.completedFields, personalInfo: true }
+        if (profileCompletion.completedFields.aadhaarUploaded && profileCompletion.completedFields.ocrVerified) {
+          profileCompletion.status = 'complete'
+          profileCompletion.completedAt = new Date()
+        } else profileCompletion.status = 'partially_complete'
+        return { ...current, profileCompletion, updatedAt: new Date() }
+      })
 
       // Bust the profile completion cache for this user
       const bustKey = buildCachePattern({

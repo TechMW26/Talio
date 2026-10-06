@@ -19,15 +19,16 @@ describe('directory service query hardening', () => {
 })
 
 test('directory pages remain tenant-scoped and include probation/on-leave employees', async () => {
-  const chain = { select: jest.fn().mockReturnThis(), populate: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(), skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([{ _id: 'employee-101', firstName: 'Last', status: 'probation' }]) }
-  const Employee = { find: jest.fn(() => chain) }
-  const User = {
-    findById: jest.fn(() => ({ select: () => ({ lean: async () => ({ employeeId: 'self' }) }) })),
-    find: jest.fn(() => ({ select: () => ({ lean: async () => [] }) })),
+  const database = {
+    databaseName: 'tenant-a',
+    get: jest.fn(async () => ({ employeeId: 'self' })),
+    getMany: jest.fn(async () => []),
+    list: jest.fn(async (collection, options) => collection === 'employees'
+      ? { records: options.cursor ? [{ _id: 'employee-101', firstName: 'Last', status: 'probation' }] : Array.from({ length: 100 }, (_, index) => ({ _id: `employee-${index}`, firstName: `Name${index}`, status: 'active' })), nextCursor: options.cursor ? null : 'next-page' }
+      : { records: [] }),
   }
-  const rows = await listDirectory({ Employee, User, tenantId: 'tenant-a', currentUserId: 'user-a', page: 2, limit: 100 })
-  expect(Employee.find).toHaveBeenCalledWith({ status: { $in: ['active', 'probation', 'on_leave'] }, _id: { $ne: 'self' } })
-  expect(chain.skip).toHaveBeenCalledWith(100)
+  const rows = await listDirectory({ database, tenantId: 'tenant-a', currentUserId: 'user-a', page: 2, limit: 100 })
+  expect(database.list).toHaveBeenCalledWith('employees', expect.objectContaining({ filters: [{ field: 'status', operator: 'in', value: ['active', 'probation', 'on_leave'] }], cursor: 'next-page' }))
   expect(rows[0]._id).toBe('employee-101')
   const { buildCacheKey } = require('@/lib/cache')
   expect(buildCacheKey).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-a', userId: 'user-a', params: expect.objectContaining({ safePage: 2 }) }))

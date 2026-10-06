@@ -1,74 +1,38 @@
-jest.mock('../../lib/cache.js', () => ({
-    buildCachePattern: jest.fn((params) => JSON.stringify(params)),
-    clearCachePattern: jest.fn().mockResolvedValue(undefined),
-}))
+jest.mock('@/lib/cache', () => ({ buildCachePattern: jest.fn(params => JSON.stringify(params)), clearCachePattern: jest.fn(async () => {}) }))
+jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreTenantDatabase: jest.fn() }))
+import { clearCachePattern } from '@/lib/cache'
+import { refreshAffectedUsers } from '@/lib/rbacSessionRefresh'
 
-const { clearCachePattern } = require('../../lib/cache.js')
-const { createTestSocketServer, createTestClient } = require('../helpers/socketHelper')
-const { refreshAffectedUsers } = require('../../lib/rbacSessionRefresh.js')
-
-describe('refreshAffectedUsers()', () => {
-    let io
-    let httpServer
-    let port
-    let onlineSocket
-
-    beforeAll(async () => {
-        ({ io, httpServer, port } = await createTestSocketServer())
-    })
-
-    afterAll(async () => {
-        onlineSocket?.disconnect()
-        io.close()
-        await new Promise((resolve) => httpServer.close(resolve))
-    })
-
-    beforeEach(async () => {
-        jest.clearAllMocks()
-        onlineSocket = await createTestClient(port, 'online-user')
-    })
-
-    afterEach(() => {
-        onlineSocket?.disconnect()
-        onlineSocket = null
-    })
-
-    test('emits force-refresh to connected users and only queues offline users', async () => {
-        const forceRefreshModel = {
-            insertMany: jest.fn().mockResolvedValue(undefined),
-        }
-
-        const refreshEvent = new Promise((resolve) => {
-            onlineSocket.once('force-refresh', resolve)
-        })
-
-        const resultPromise = refreshAffectedUsers({
-            databaseName: 'talio_company_mushroom_world_group',
-            userIds: ['online-user', 'offline-user'],
-            initiatedBy: { userId: 'admin-1', email: 'taliohrms@gmail.com', role: 'admin' },
-            message: 'Your access role was updated to Senior MIS Executive. Talio is applying the latest access in the background.',
-            forceRefreshModel,
-        })
-
-        const [payload, result] = await Promise.all([refreshEvent, resultPromise])
-
-        expect(payload).toMatchObject({
-            type: 'force-refresh',
-            hard: false,
-            message: 'Your access role was updated to Senior MIS Executive. Talio is applying the latest access in the background.',
-            initiatedBy: { userId: 'admin-1', email: 'taliohrms@gmail.com', role: 'admin' },
-        })
-        expect(result).toEqual({
-            affectedUserIds: ['online-user', 'offline-user'],
-            queuedCount: 1,
-        })
-        expect(forceRefreshModel.insertMany).toHaveBeenCalledWith([
-            expect.objectContaining({
-                userId: 'offline-user',
-                consumed: false,
-                hard: false,
-            }),
-        ])
-        expect(clearCachePattern).toHaveBeenCalledTimes(8)
-    })
+describe('native RBAC session refresh delivery', () => {
+  let previousIo, previousLocal, database, tx, emit
+  beforeEach(() => {
+    jest.clearAllMocks()
+    previousIo = global.io; previousLocal = process.env.TALIO_LOCAL_ACCEPTANCE
+    delete process.env.TALIO_LOCAL_ACCEPTANCE
+    tx = { create: jest.fn(async () => {}) }
+    database = { transaction: jest.fn(async fn => fn(tx)) }
+    emit = jest.fn()
+    global.io = { to: jest.fn(() => ({ emit })), sockets: { adapter: { rooms: new Map([['user:online-user', new Set(['connection'])]]) } } }
+  })
+  afterEach(() => {
+    global.io = previousIo
+    if (previousLocal === undefined) delete process.env.TALIO_LOCAL_ACCEPTANCE
+    else process.env.TALIO_LOCAL_ACCEPTANCE = previousLocal
+  })
+  test('publishes with explicit tenant scope and durably queues offline recipients', async () => {
+    const result = await refreshAffectedUsers({ databaseName: 'talio_company_one', database, userIds: ['online-user', 'offline-user', 'offline-user'], initiatedBy: { userId: 'admin' } })
+    expect(global.io.to).toHaveBeenCalledWith('user:online-user', 'talio_company_one')
+    expect(global.io.to).toHaveBeenCalledWith('user:offline-user', 'talio_company_one')
+    expect(emit).toHaveBeenCalledWith('force-refresh', expect.objectContaining({ hard: false, initiatedBy: { userId: 'admin' } }))
+    expect(tx.create).toHaveBeenCalledTimes(1)
+    expect(tx.create).toHaveBeenCalledWith('forcerefreshes', expect.objectContaining({ userId: 'offline-user', consumed: false, hard: false }))
+    expect(result).toEqual({ affectedUserIds: ['online-user', 'offline-user'], queuedCount: 1 })
+    expect(clearCachePattern).toHaveBeenCalledTimes(8)
+  })
+  test('local acceptance keeps durable intents but suppresses external realtime delivery', async () => {
+    process.env.TALIO_LOCAL_ACCEPTANCE = '1'
+    await refreshAffectedUsers({ databaseName: 'talio_company_one', database, userIds: ['online-user'] })
+    expect(global.io.to).not.toHaveBeenCalled()
+    expect(tx.create).toHaveBeenCalledWith('forcerefreshes', expect.objectContaining({ userId: 'online-user' }))
+  })
 })

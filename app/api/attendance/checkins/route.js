@@ -1,148 +1,26 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-
-// Mark this route as dynamic
+import { getAuthAndDatabase } from '@/lib/auth'
+import { ATTENDANCE_DATABASE_OPTIONS, listAttendanceRecords, populateAttendanceEmployee, attendanceError } from '@/lib/platform/firestoreAttendance.server'
+import { getAttendanceDayRange } from '@/lib/attendanceAutoCheckout'
 export const dynamic = 'force-dynamic'
-
-const isValidDateString = (value) => {
-  if (!value) return false
-  const parsed = new Date(value)
-  return !Number.isNaN(parsed.getTime())
-}
-
-// GET - Get employee check-ins for a specific date (Admin only)
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { Attendance, Employee } = models
-
-    // Only admin can view all employee check-ins
-    if (user.role !== 'admin') {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const dateParam = searchParams.get('date')
-
-    if (dateParam && !isValidDateString(dateParam)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid date format' },
-        { status: 400 }
-      )
-    }
-
-    // Default to today if no date provided
-    const targetDate = dateParam ? new Date(dateParam) : new Date()
-    targetDate.setHours(0, 0, 0, 0)
-
-    const nextDay = new Date(targetDate)
-    nextDay.setDate(nextDay.getDate() + 1)
-
-    // Get all employees
-    const allEmployees = await Employee.find({ status: 'active' })
-      .populate('department', 'name')
-      .populate('company', 'timezone')
-      .select('employeeCode firstName lastName email department company')
-
-    // Get attendance records for the date
-    const attendanceRecords = await Attendance.find({
-      date: {
-        $gte: targetDate,
-        $lt: nextDay
-      }
-    }).populate({
-      path: 'employee',
-      select: 'employeeCode firstName lastName email department company',
-      populate: { path: 'company', select: 'timezone' }
-    })
-
-    // Create a map of employee attendance
-    const attendanceMap = new Map()
-    attendanceRecords.forEach(record => {
-      if (record.employee) {
-        attendanceMap.set(record.employee._id.toString(), record)
-      }
-    })
-
-    // Create complete check-in data including absent employees
-    const checkinData = allEmployees.map(employee => {
-      const attendance = attendanceMap.get(employee._id.toString())
-
-      if (attendance) {
-        return {
-          _id: attendance._id,
-          employee: {
-            _id: employee._id,
-            employeeCode: employee.employeeCode,
-            firstName: employee.firstName,
-            lastName: employee.lastName,
-            email: employee.email,
-            department: employee.department,
-            companyTimezone: employee.company?.timezone || 'Asia/Kolkata'
-          },
-          date: attendance.date,
-          checkInTime: attendance.checkIn,
-          checkOutTime: attendance.checkOut,
-          checkInStatus: attendance.checkInStatus,
-          checkOutStatus: attendance.checkOutStatus,
-          status: attendance.status,
-          workHours: attendance.workHours,
-          notes: attendance.notes,
-          location: attendance.location // Include location data
-        }
-      } else {
-        // Employee is absent
-        return {
-          _id: `absent-${employee._id}`,
-          employee: {
-            _id: employee._id,
-            employeeCode: employee.employeeCode,
-            firstName: employee.firstName,
-            lastName: employee.lastName,
-            email: employee.email,
-            department: employee.department,
-            companyTimezone: employee.company?.timezone || 'Asia/Kolkata'
-          },
-          date: targetDate,
-          checkInTime: null,
-          checkOutTime: null,
-          checkInStatus: null,
-          checkOutStatus: null,
-          status: 'absent',
-          workHours: 0,
-          notes: 'No attendance record'
-        }
-      }
-    })
-
-    // Sort by status (in-progress first, then present, then half-day, then absent)
-    checkinData.sort((a, b) => {
-      const statusOrder = { 'in-progress': 1, 'present': 2, 'half-day': 3, 'absent': 4 }
-      return statusOrder[a.status] - statusOrder[b.status]
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: checkinData,
-      summary: {
-        total: checkinData.length,
-        present: checkinData.filter(c => c.status === 'present').length,
-        inProgress: checkinData.filter(c => c.status === 'in-progress').length,
-        absent: checkinData.filter(c => c.status === 'absent').length,
-        halfDay: checkinData.filter(c => c.status === 'half-day').length,
-        date: targetDate.toISOString()
-      }
-    })
-  } catch (error) {
-    console.error('Get check-ins error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch check-ins' },
-      { status: 500 }
-    )
-  }
+    const auth = await getAuthAndDatabase(request, ATTENDANCE_DATABASE_OPTIONS)
+    if (!auth.success) throw attendanceError(auth.message, 401)
+    if (auth.user.role !== 'admin') throw attendanceError('Access denied', 403)
+    const value = new URL(request.url).searchParams.get('date'), date = value ? new Date(value) : new Date()
+    if (Number.isNaN(+date)) throw attendanceError('Invalid date')
+    const range = getAttendanceDayRange(date, 'Asia/Kolkata')
+    const [employees, records] = await Promise.all([listAttendanceRecords(auth.database, 'employees', [{ field: 'status', operator: '==', value: 'active' }]), listAttendanceRecords(auth.database, 'attendances', [{ field: 'date', operator: '>=', value: range.start }, { field: 'date', operator: '<=', value: range.end }])])
+    const map = new Map(records.map(r => [r.employee, r]))
+    const data = await Promise.all(employees.map(async employee => {
+      const e = await populateAttendanceEmployee(auth.database, employee), record = map.get(e._id)
+      return { _id: record?._id || 'absent-' + e._id, employee: { _id: e._id, employeeCode: e.employeeCode, firstName: e.firstName, lastName: e.lastName, email: e.email, department: e.department ? { _id: e.department._id, name: e.department.name } : null, companyTimezone: e.company?.timezone || 'Asia/Kolkata' },
+        date: record?.date || range.start, checkInTime: record?.checkIn || null, checkOutTime: record?.checkOut || null, checkInStatus: record?.checkInStatus || null, checkOutStatus: record?.checkOutStatus || null,
+        status: record?.status || 'absent', workHours: record?.workHours || 0, notes: record?.notes || (record ? '' : 'No attendance record'), ...(record?.location ? { location: record.location } : {}) }
+    }))
+    const priority = { 'in-progress': 1, present: 2, 'half-day': 3, absent: 4 }
+    data.sort((a,b) => (priority[a.status] || 5) - (priority[b.status] || 5))
+    return NextResponse.json({ success: true, data, summary: { total: data.length, present: data.filter(r=>r.status === 'present').length, inProgress: data.filter(r=>r.status === 'in-progress').length, absent: data.filter(r=>r.status === 'absent').length, halfDay: data.filter(r=>r.status === 'half-day').length, date: range.start.toISOString() } })
+  } catch(error) { return NextResponse.json({ success: false, message: error.message }, { status: error.status || 500 }) }
 }

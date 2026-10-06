@@ -1,12 +1,13 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAILoading } from '@/contexts/AILoadingContext';
 import {
   FaInbox, FaPaperPlane, FaFile, FaTrash, FaStar, FaSearch,
   FaTimes, FaEnvelope, FaReply,
-  FaForward, FaPaperclip, FaChevronLeft,
-  FaRegStar,
+  FaForward, FaPaperclip, FaRegStar,
   FaRegEnvelope, FaRegEnvelopeOpen, FaAngleLeft, FaAngleRight,
   FaExpandAlt, FaCompressAlt, FaMinus, FaBold, FaItalic,
   FaUnderline, FaListUl, FaListOl, FaQuoteRight, FaStrikethrough,
@@ -1774,7 +1775,7 @@ export default function MailPage() {
                     onClick={() => setSelectedEmail(null)}
                     className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded mr-2"
                   >
-                    <FaChevronLeft className="text-gray-600 dark:text-zinc-400" />
+                    <BackIcon />
                   </button>
                   <button
                     onClick={(e) => archiveEmail(selectedEmail, e)}

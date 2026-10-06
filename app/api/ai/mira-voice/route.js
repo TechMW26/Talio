@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { splitMiraSpeech } from '@/lib/miraSpeechChunks'
 import { DEFAULT_MIRA_VOICE_ID, isMiraVoiceId, sanitizeMiraPreferences } from '@/lib/miraVoices'
@@ -10,7 +10,7 @@ export const maxDuration = 60
 // A fixed provider/voice prevents clients from turning this into an open proxy.
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) return NextResponse.json({ message: 'Authentication required' }, { status: auth.status || 401 })
     const payload = await request.json()
     const { text, voiceId: requestedVoiceId } = payload || {}
@@ -23,7 +23,7 @@ export async function POST(request) {
     const bucket = await rateLimit('MIRA_VOICE', `${auth.tenant.databaseName}:${auth.user._id}`)
     if (!bucket.allowed) return NextResponse.json({ message: 'Please wait before requesting more speech.' }, { status: 429, headers: { 'Retry-After': String(bucket.retryAfterSeconds) } })
     const key = process.env.ELEVENLABS_API_KEY
-    const profile = await auth.models.User.findById(auth.user._id).select('miraPreferences').lean()
+    const profile = await auth.database.get('users', auth.user._id)
     const preferences = sanitizeMiraPreferences(profile?.miraPreferences)
     // User choice takes precedence; the new MIRA ID is the fallback even when
     // a deployment still has a legacy ELEVENLABS_VOICE_ID environment value.
@@ -32,8 +32,7 @@ export async function POST(request) {
     const controller = new AbortController()
     const signal = AbortSignal.any([request.signal, controller.signal, AbortSignal.timeout(55000)])
     const chunks = splitMiraSpeech(text)
-    const model = ['eleven_v3_conversational', 'eleven_flash_v2_5', 'eleven_multilingual_v2'].includes(process.env.MIRA_TTS_MODEL)
-      ? process.env.MIRA_TTS_MODEL : 'eleven_v3_conversational'
+    const model = 'eleven_v4'
     // Let the multilingual provider detect language. Script is not language:
     // Devanagari also includes Marathi, Nepali and other non-Hindi languages.
     const generate = chunk => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, {
@@ -41,7 +40,7 @@ export async function POST(request) {
       headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
       signal,
       body: JSON.stringify({ text: chunk, model_id: model, apply_text_normalization: 'on',
-        voice_settings: { stability: model.startsWith('eleven_v3') ? 0.5 : 0.45, similarity_boost: 0.75, use_speaker_boost: false } }),
+        voice_settings: { stability: 0.5, similarity_boost: 0.75, use_speaker_boost: false } }),
     })
     const upstream = await generate(chunks[0])
     if (!upstream.ok || !upstream.body) return NextResponse.json({ message: 'Voice service is temporarily unavailable. Your reply is still in chat.' }, { status: 502 })

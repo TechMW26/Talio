@@ -2,23 +2,19 @@ import { apiError, apiSuccess, getPagination, withTenantApi } from '@/lib/api/ro
 import { checkTenantFeatureAccess } from '@/lib/companyFeatures.server'
 import { HRMS_MODULE_KEYS } from '@/lib/hrms/moduleRegistry'
 import {
-  buildWorkflowVisibilityFilter,
   createWorkflow,
 } from '@/lib/hrms/workflowService.server'
+import { getWorkflowStore, listVisibleWorkflows, populateWorkflow } from '@/lib/hrms/workflowStore.server'
 
 const WORKFLOW_STATUSES = new Set(['draft', 'submitted', 'approved', 'rejected', 'in_progress', 'completed', 'cancelled'])
 
 export const dynamic = 'force-dynamic'
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 export const GET = withTenantApi({
-  models: ['HrmsWorkflow', 'HrmsWorkflowEvent', 'User', 'Employee'],
+  firestore: {},
   features: { anyOf: HRMS_MODULE_KEYS },
   errorMessage: 'Failed to load HRMS workflows',
-}, async ({ request, auth, models }) => {
+}, async ({ request, auth }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, skip } = getPagination(searchParams)
   const requestedModule = searchParams.get('module')
@@ -27,39 +23,24 @@ export const GET = withTenantApi({
   }
 
   const enabledModules = HRMS_MODULE_KEYS.filter((key) => auth.companyFeatures[key] === true)
-  const query = {
-    ...buildWorkflowVisibilityFilter(auth.user),
-    module: requestedModule || { $in: enabledModules },
-  }
+  if (requestedModule && !enabledModules.includes(requestedModule)) return apiError('This workflow module is disabled', { status: 403, code: 'FEATURE_DISABLED' })
+  const database = await getWorkflowStore(auth)
   const status = searchParams.get('status')
   if (status && !WORKFLOW_STATUSES.has(status)) {
     return apiError('Unknown workflow status', { status: 400, code: 'VALIDATION_ERROR' })
   }
-  if (status) query.status = status
   const search = String(searchParams.get('q') || '').trim().slice(0, 100)
-  if (search) {
-    const matcher = { $regex: escapeRegex(search), $options: 'i' }
-    query.$and = [...(query.$and || []), { $or: [{ title: matcher }, { caseNumber: matcher }] }]
-  }
-
-  const [items, total] = await Promise.all([
-    models.HrmsWorkflow.find(query)
-      .populate('subjectEmployee', 'firstName lastName employeeCode profilePicture')
-      .populate('owner', 'email role employeeId')
-      .sort({ createdAt: -1, _id: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-    models.HrmsWorkflow.countDocuments(query),
-  ])
+  const matches = await listVisibleWorkflows(database, auth.user, { modules: requestedModule ? [requestedModule] : enabledModules, status, search })
+  const total = matches.length
+  const items = await Promise.all(matches.slice(skip, skip + limit).map(workflow => populateWorkflow(database, workflow)))
 
   return apiSuccess(items, { meta: { page, limit, total, pages: Math.ceil(total / limit) } })
 })
 
 export const POST = withTenantApi({
-  models: ['HrmsWorkflow', 'HrmsWorkflowEvent', 'User', 'Employee'],
+  firestore: {},
   errorMessage: 'Failed to create HRMS workflow',
-}, async ({ request, auth, models }) => {
+}, async ({ request, auth }) => {
   const body = await request.json()
   if (!HRMS_MODULE_KEYS.includes(body.module)) {
     return apiError('Unknown HRMS module', { status: 400, code: 'VALIDATION_ERROR' })
@@ -68,8 +49,7 @@ export const POST = withTenantApi({
   if (!access.success) return apiError(access.message, { status: access.status, code: access.code })
 
   const result = await createWorkflow({
-    Workflow: models.HrmsWorkflow,
-    Event: models.HrmsWorkflowEvent,
+    database: await getWorkflowStore(auth),
     actor: auth.user,
     payload: body,
   })

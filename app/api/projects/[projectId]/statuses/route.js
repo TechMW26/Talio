@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { PROJECT_STORE_OPTIONS, projectFilter as f, projectRows } from '@/lib/projects.server'
 import { checkProjectAccess, createTimelineEvent } from '@/lib/projectService'
 import {
   DEFAULT_TASK_STATUSES,
@@ -13,27 +14,26 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request, { params }) {
   try {
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User'])
+    const auth = await getAuthAndDatabase(request, PROJECT_STORE_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Project, User } = models
+    const { user, database } = auth
     const { projectId } = await params
 
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    const userRecord = await database.get('users', String(user._id || user.userId))
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    const project = await Project.findById(projectId).select('taskStatuses projectHead projectHeads')
+    const project = await database.get('projects', projectId)
     if (!project) {
       return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
     }
 
     const isAdmin = ['admin', 'hr'].includes(userRecord.role || user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'view', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'view', database)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -51,27 +51,26 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'User', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndDatabase(request, PROJECT_STORE_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Project, Task, User } = models
+    const { user, database } = auth
     const { projectId } = await params
 
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    const userRecord = await database.get('users', String(user._id || user.userId))
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    const project = await Project.findById(projectId)
+    const project = await database.get('projects', projectId)
     if (!project) {
       return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
     }
 
     const isAdmin = ['admin', 'hr'].includes(userRecord.role || user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'manage', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'manage', database)
       if (!hasAccess) {
         return NextResponse.json({
           success: false,
@@ -82,7 +81,7 @@ export async function PUT(request, { params }) {
 
     const body = await request.json()
     const incoming = Array.isArray(body?.statuses) ? body.statuses : null
-    if (!incoming) {
+    if (!incoming || incoming.length > 50 || incoming.some(status => !status || typeof status !== 'object')) {
       return NextResponse.json({ success: false, message: 'A "statuses" array is required' }, { status: 400 })
     }
 
@@ -133,10 +132,7 @@ export async function PUT(request, { params }) {
       .filter(key => !finalStatuses.some(s => s.key === key))
 
     if (removedKeys.length > 0) {
-      const tasksUsingRemoved = await Task.countDocuments({
-        project: projectId,
-        status: { $in: removedKeys }
-      })
+      const tasksUsingRemoved = (await projectRows(database, 'tasks', [f('project', projectId)])).filter(task => removedKeys.includes(task.status)).length
       if (tasksUsingRemoved > 0) {
         return NextResponse.json({
           success: false,
@@ -145,8 +141,7 @@ export async function PUT(request, { params }) {
       }
     }
 
-    project.taskStatuses = finalStatuses
-    await project.save()
+    await database.mutate('projects', projectId, current => ({ ...current, taskStatuses: finalStatuses, updatedAt: new Date() }))
 
     createTimelineEvent({
       project: projectId,
@@ -154,7 +149,7 @@ export async function PUT(request, { params }) {
       createdBy: userRecord.employeeId,
       description: 'Task statuses were updated',
       metadata: { taskStatuses: finalStatuses }
-    }, models).catch(console.error)
+    }, database).catch(console.error)
 
     return NextResponse.json({
       success: true,

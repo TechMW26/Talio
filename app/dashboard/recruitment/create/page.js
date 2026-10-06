@@ -1,5 +1,7 @@
 'use client';
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -7,7 +9,7 @@ import {
   Card, CardBody, CardHeader, Skeleton
 } from '@heroui/react';
 import toast from '@/utils/toast';
-import { FaArrowLeft, FaSave, FaPlus, FaTimes } from 'react-icons/fa';
+import { FaSave, FaPlus, FaTimes } from 'react-icons/fa';
 import { HiOutlineSparkles } from 'react-icons/hi2';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import useApiMutation from '@/hooks/useApiMutation';
@@ -127,7 +129,7 @@ export default function CreateJobPage() {
         <div className="flex md:justify-between md:items-center md:flex-row flex-col gap-4">
           <div className="flex items-center gap-3">
             <Button isIconOnly variant="light" size="sm" onPress={() => router.push('/dashboard/recruitment')}>
-              <FaArrowLeft className="w-4 h-4" />
+              <BackIcon className="w-4 h-4" />
             </Button>
             <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Create Job Posting</h1>
           </div>

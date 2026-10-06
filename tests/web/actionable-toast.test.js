@@ -27,3 +27,12 @@ test('rejection still requires remarks', () => {
   expect(screen.getByRole('textbox', { name: 'Please provide a reason' })).toBeRequired()
   expect(onAction).not.toHaveBeenCalled()
 })
+
+test('confirmation remains explicit before a decision is submitted', async () => {
+  const onAction = jest.fn().mockResolvedValue({ success: true })
+  render(<ActionableToast notification={{ title: 'Approval', message: 'Review this request', actions: [{ id: 'approve', label: 'Approve', requiresConfirmation: true }] }} onAction={onAction} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+  expect(onAction).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+  await waitFor(() => expect(onAction).toHaveBeenCalledWith('approve', null, false))
+})

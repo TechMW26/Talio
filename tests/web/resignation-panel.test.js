@@ -15,6 +15,7 @@ beforeEach(() => {
 })
 test('submission requires explicit acknowledgement and posts the entered reason', async () => {
   render(<ResignationPanel />)
+  expect(useAuthedSWR).toHaveBeenCalledWith('/api/resignations', { refreshInterval: 60000, revalidateOnFocus: true })
   fireEvent.click(screen.getByText('Submit resignation'))
   expect(screen.getByText('Submit to HR')).toBeDisabled()
   fireEvent.change(screen.getByLabelText('Reason for resignation'), { target: { value: 'Personal relocation' } })
@@ -22,6 +23,7 @@ test('submission requires explicit acknowledgement and posts the entered reason'
   fireEvent.click(screen.getByText('Submit to HR'))
   await waitFor(() => expect(execute).toHaveBeenCalledWith('/api/resignations', { action: 'submit', reason: 'Personal relocation' }))
   expect(await screen.findByRole('status')).toHaveTextContent('Saved')
+  expect(mutate).toHaveBeenCalled()
 })
 test('dashboard keeps summary cards visible on every view and separates the primary action from navigation', () => {
   render(<ResignationPanel dashboard initialView="reviews" />)

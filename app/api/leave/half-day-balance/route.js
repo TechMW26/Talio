@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { LEAVE_STORE_OPTIONS, freshLeaveActor, halfDayFilters } from '@/lib/leaveRequests.server'
+import { validateLeaveYear } from '@/lib/leaveBalances.server'
+import { readOrUpdateCompanySettings } from '@/lib/companySettings.server'
 import { getHalfDayLimit, normalizeHalfDayPolicy } from '@/lib/halfDayPolicy'
 
 export const dynamic = 'force-dynamic'
@@ -13,21 +16,19 @@ function yearBounds(year) {
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Leave', 'CompanySettings'])
+    const auth = await getAuthAndDatabase(request, LEAVE_STORE_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
 
-    const { user, models } = auth
-    const { User, Employee, Leave, CompanySettings } = models
+    const { user, database } = auth
     const { searchParams } = new URL(request.url)
     const year = Number(searchParams.get('year')) || new Date().getUTCFullYear()
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId role').lean()
-    const settings = await CompanySettings.findOne().select('leave.halfDayPolicy').lean()
+    validateLeaveYear(year)
+    const userRecord = await freshLeaveActor(database, user)
+    const settings = (await database.list('companysettings', { limit: 1 })).records[0]
     const policy = normalizeHalfDayPolicy(settings?.leave?.halfDayPolicy)
-    const employee = await Employee.findById(userRecord?.employeeId || user.employeeId)
-      .select('designationLevel designationLevelName')
-      .lean()
+    const employee = userRecord.employeeId ? await database.get('employees', String(userRecord.employeeId)) : null
 
     if (!employee) {
       if (searchParams.get('includePolicy') === '1' && ['admin', 'hr'].includes(userRecord?.role || user.role)) {
@@ -40,18 +41,8 @@ export async function GET(request) {
     const { start, end } = yearBounds(year)
 
     const [approved, pending] = await Promise.all([
-      Leave.countDocuments({
-        employee: employee._id,
-        isHalfDay: true,
-        status: 'approved',
-        startDate: { $gte: start, $lt: end },
-      }),
-      Leave.countDocuments({
-        employee: employee._id,
-        isHalfDay: true,
-        status: 'pending',
-        startDate: { $gte: start, $lt: end },
-      }),
+      database.count('leaves', halfDayFilters(employee._id, year, 'approved')),
+      database.count('leaves', halfDayFilters(employee._id, year, 'pending')),
     ])
 
     return NextResponse.json({
@@ -77,7 +68,7 @@ export async function GET(request) {
 
 export async function PUT(request) {
   try {
-    const auth = await getAuthAndModels(request, ['CompanySettings'])
+    const auth = await getAuthAndDatabase(request, LEAVE_STORE_OPTIONS)
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -86,11 +77,7 @@ export async function PUT(request) {
     }
 
     const policy = normalizeHalfDayPolicy(await request.json())
-    const settings = await auth.models.CompanySettings.findOneAndUpdate(
-      {},
-      { $set: { 'leave.halfDayPolicy': policy } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    ).lean()
+    const settings = await readOrUpdateCompanySettings(auth.database, { leave: { halfDayPolicy: policy } })
 
     return NextResponse.json({
       success: true,

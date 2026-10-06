@@ -14,7 +14,7 @@ jest.mock('next/server', () => {
   return { NextResponse: MockNextResponse };
 });
 
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }));
+jest.mock('@/lib/whiteboards.server', () => ({ getWhiteboardContext: jest.fn(), assertWhiteboardAccess: jest.fn(() => 'owner'), saveWhiteboardAnalysis: jest.fn() }));
 jest.mock('@/lib/promptEngine', () => ({ generateSmartContent: jest.fn() }));
 jest.mock('@/lib/gemini', () => ({
   generateContent: jest.fn(),
@@ -22,13 +22,14 @@ jest.mock('@/lib/gemini', () => ({
 }));
 jest.mock('@/lib/imageCompression', () => ({ compressScreenshot: jest.fn() }));
 
-const { getAuthAndModels } = require('@/lib/auth');
+const { getWhiteboardContext, saveWhiteboardAnalysis } = require('@/lib/whiteboards.server');
 const { generateSmartContent } = require('@/lib/promptEngine');
 const { POST } = require('@/app/api/whiteboard/[id]/analyze/route');
 
 describe('whiteboard AI route', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    saveWhiteboardAnalysis.mockResolvedValue(undefined);
   });
 
   test.each(['mindmap', 'flowchart', 'planning', 'ideas', 'eventcircuit', 'adaptive'].flatMap(template => [1, 0].map(matched => [template, matched])))('plots %s atomically and handles concurrent edits (matched %s)', async (templateType, matchedCount) => {
@@ -36,37 +37,27 @@ describe('whiteboard AI route', () => {
     const whiteboard = {
       _id: 'board-1', updatedAt: new Date('2026-09-23'), pages: [{ objects: [existing] }],
       aiAnalysis: { messages: [], agentContent: { generations: [] } },
-      getUserPermission: () => 'owner', markModified: jest.fn(),
     };
-    const Whiteboard = { findById: jest.fn().mockResolvedValue(whiteboard), updateOne: jest.fn().mockResolvedValue({ matchedCount }) };
-    getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'user-1' }, models: { Whiteboard } });
+    getWhiteboardContext.mockResolvedValue({ userId: 'user-1', store: { get: jest.fn().mockResolvedValue(whiteboard) } });
+    if (!matchedCount) saveWhiteboardAnalysis.mockRejectedValue(Object.assign(new Error('Concurrent edit'), { status: 409 }));
     const response = await POST(new Request('http://localhost/api/whiteboard/board-1/analyze', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'plot-from-content', templateType, preparedContent: { title: 'A plan', sections: [{ id: 's1', title: 'Start', items: ['Begin'] }], diagram: { layout: 'grid', edges: [] } } }),
     }), { params: Promise.resolve({ id: 'board-1' }) });
     expect(response.status).toBe(matchedCount ? 200 : 409);
-    expect(Whiteboard.updateOne).toHaveBeenCalledTimes(1);
-    const [filter, update] = Whiteboard.updateOne.mock.calls[0];
-    expect(filter.updatedAt).toEqual(whiteboard.updatedAt);
-    expect(update.$set['pages.0.objects']).toContainEqual(existing);
-    expect(update.$set['pages.0.objects'].length).toBeGreaterThan(1);
-    expect(update.$push).toBeUndefined();
+    expect(saveWhiteboardAnalysis).toHaveBeenCalledTimes(1);
+    const [, update] = saveWhiteboardAnalysis.mock.calls[0];
+    expect(update.updatedAt).toEqual(whiteboard.updatedAt);
+    expect(update.pages[0].objects).toContainEqual(existing);
+    expect(update.pages[0].objects.length).toBeGreaterThan(1);
   });
 
   test('prepares usable content from malformed model JSON without retrying', async () => {
     const whiteboard = {
       pages: [{ id: 'page-1', objects: [] }],
       aiAnalysis: { summary: '', messages: [], notes: [], keyPoints: [] },
-      getUserPermission: jest.fn(() => 'owner'),
-      save: jest.fn().mockResolvedValue(undefined),
     };
-    const Whiteboard = { findById: jest.fn().mockResolvedValue(whiteboard) };
-
-    getAuthAndModels.mockResolvedValue({
-      success: true,
-      user: { _id: 'user-1' },
-      models: { Whiteboard },
-    });
+    getWhiteboardContext.mockResolvedValue({ userId: 'user-1', store: { get: jest.fn().mockResolvedValue(whiteboard) } });
     generateSmartContent.mockResolvedValue(
       '{"title":"Hiring map" "sections":[{"title":"Interview","items":["Use the "structured scorecard" method" "Record evidence"]}],"conclusion":"Proceed"}',
     );
@@ -86,7 +77,7 @@ describe('whiteboard AI route', () => {
     ]);
     expect(generateSmartContent).toHaveBeenCalledTimes(1);
     expect(generateSmartContent).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ timeoutMs: 45000, maxAttempts: 1, thinking: false }));
-    expect(whiteboard.save).toHaveBeenCalledTimes(1);
+    expect(saveWhiteboardAnalysis).toHaveBeenCalledTimes(1);
   });
 
   test('restructures only the requested active page', async () => {
@@ -96,16 +87,8 @@ describe('whiteboard AI route', () => {
         { id: 'page-2', objects: [{ id: 'second', type: 'text', text: 'Move me', x: 13, y: 29 }] },
       ],
       aiAnalysis: { summary: '', messages: [], notes: [], keyPoints: [] },
-      getUserPermission: jest.fn(() => 'owner'),
-      save: jest.fn().mockResolvedValue(undefined),
     };
-    const Whiteboard = { findById: jest.fn().mockResolvedValue(whiteboard) };
-
-    getAuthAndModels.mockResolvedValue({
-      success: true,
-      user: { _id: 'user-1' },
-      models: { Whiteboard },
-    });
+    getWhiteboardContext.mockResolvedValue({ userId: 'user-1', store: { get: jest.fn().mockResolvedValue(whiteboard) } });
     generateSmartContent.mockResolvedValue('[{"id":"second","type":"text","text":"Move me","x":40,"y":60}]');
 
     const response = await POST(new Request('http://localhost/api/whiteboard/board-1/analyze', {

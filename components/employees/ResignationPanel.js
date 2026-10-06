@@ -42,7 +42,7 @@ function RequestCard({ record, busy, onAction, canManageExits, onUpdated }) {
 }
 
 export default function ResignationPanel({ requestId, initialView = 'mine', dashboard = false }) {
-  const { data, error, isLoading, mutate } = useAuthedSWR('/api/resignations', { refreshInterval: 15000 })
+  const { data, error, isLoading, mutate } = useAuthedSWR('/api/resignations', { refreshInterval: 60000, revalidateOnFocus: true })
   const [view, setView] = useState(initialView)
   useEffect(() => { setView(['overview', 'mine', 'reviews', 'offboarding', 'completed'].includes(initialView) ? initialView : 'overview') }, [initialView])
   const [composing, setComposing] = useState(false)

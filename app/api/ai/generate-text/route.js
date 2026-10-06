@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { generateContent, getAIAvailability } from '@/lib/gemini';
 
 function mapAIErrorToResponse(error) {
@@ -69,7 +69,7 @@ function mapAIErrorToResponse(error) {
  */
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, []);
+    const auth = await getAuthAndDatabase(request);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }

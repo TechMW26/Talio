@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
 import crypto from 'crypto'
 import { getTenantByEmail, checkServiceStatus } from '@/lib/tenantContext'
-import { getTenantModels } from '@/lib/tenantModels'
+import { getNativeAuthRepository, parseSessionUserAgent } from '@/lib/platform/firestoreAuth.server'
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
+import { verifyTokenFromRequest } from '@/lib/auth'
+import { collectFirestorePages } from '@/lib/platform/firestoreQueries.server'
 
 // Mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -116,6 +119,7 @@ export async function GET(request) {
     }
 
     const googleUser = await userInfoResponse.json()
+    if (googleUser.verified_email !== true || typeof googleUser.email !== 'string') return NextResponse.redirect(new URL('/login?error=unverified_email', baseUrl))
     console.log('✅ Google user info received:', googleUser.email)
 
     // ============================================
@@ -142,18 +146,11 @@ export async function GET(request) {
     
     console.log(`[Google Login] User ${googleUser.email} belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`);
     
-    // Get tenant-specific models
-    const tenantModels = await getTenantModels(tenantInfo.databaseName, [
-      'User', 'Employee', 'UserSession'
-    ]);
-    
-    const TenantUser = tenantModels.User;
-    const TenantEmployee = tenantModels.Employee;
-    const TenantUserSession = tenantModels.UserSession;
+    const repository = await getNativeAuthRepository(tenantInfo.databaseName)
     console.log('✅ Connected to tenant database')
 
     // Check if user exists in database
-    let user = await TenantUser.findOne({ email: googleUser.email })
+    let user = await repository.findUser(googleUser.email)
     console.log('User found in database:', user ? 'Yes' : 'No')
 
     // Only allow login if user exists in database
@@ -174,11 +171,7 @@ export async function GET(request) {
     let employeeData = null
     if (user.employeeId) {
       try {
-        employeeData = await TenantEmployee.findById(user.employeeId)
-          .populate('designation')
-          .populate('department')
-          .populate('reportingManager', 'firstName lastName email')
-          .lean()
+        employeeData = await repository.getEmployee(user.employeeId)
         console.log('✅ Employee data fetched:', employeeData?.firstName, employeeData?.lastName)
       } catch (error) {
         console.error('⚠️ Error fetching employee data:', error)
@@ -186,18 +179,13 @@ export async function GET(request) {
     }
 
     // Update last login and clear forcePasswordChange (Google OAuth users don't need to change password)
-    try {
-      await TenantUser.updateOne(
-        { _id: user._id },
-        { $set: { lastLogin: new Date(), forcePasswordChange: false } },
-        { timestamps: false }
-      )
-      console.log('✅ Last login updated, forcePasswordChange cleared')
-    } catch (error) {
-      console.error('⚠️ Failed to update lastLogin:', error)
-    }
+    user = await repository.database.mutate('users', user._id, current => {
+      if (!current.isActive) throw new Error('Account is deactivated')
+      return { ...current, lastLogin: new Date(), forcePasswordChange: false }
+    })
 
     // Create JWT token with tenant info
+    if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required')
     const secret = new TextEncoder().encode(process.env.JWT_SECRET)
     
     // Generate unique token ID for session tracking
@@ -208,6 +196,7 @@ export async function GET(request) {
       email: user.email,
       role: user.role,
       tokenId, // Include tokenId for session management
+      authVersion: Number(user.authVersion) || 0,
       // Include tenant info for multi-tenant support
       databaseName: tenantInfo.databaseName,
       companySlug: tenantInfo.companySlug,
@@ -225,27 +214,16 @@ export async function GET(request) {
     const forwarded = request.headers.get('x-forwarded-for')
     const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'Unknown'
 
-    // Create UserSession record (fire and forget)
-    ;(async () => {
-      try {
-        const deviceInfo = TenantUserSession.parseUserAgent ? TenantUserSession.parseUserAgent(userAgent) : { browser: userAgent }
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-
-        await TenantUserSession.create({
+    await repository.createSession({
           user: user._id,
+          authVersion: Number(user.authVersion) || 0,
           tokenId,
-          deviceInfo,
+          deviceInfo: parseSessionUserAgent(userAgent),
           userAgent,
           ipAddress,
-          expiresAt,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           lastActivityAt: new Date(),
         })
-
-        console.log(`[Google OAuth] Session created for user ${user._id} with tokenId ${tokenId}`)
-      } catch (sessionError) {
-        console.error('Failed to create user session:', sessionError)
-      }
-    })()
 
     // Prepare user data for response (similar to login API)
     // IMPORTANT: employeeId is stored as an object with _id for frontend compatibility
@@ -314,7 +292,6 @@ export async function GET(request) {
        // Redirect to custom protocol - encode user data as base64 to avoid URL encoding issues
        const userBase64 = Buffer.from(JSON.stringify(userData)).toString('base64');
        const redirectUrl = `talio://auth?token=${encodeURIComponent(token)}&user=${encodeURIComponent(userBase64)}`;
-       console.log('🖥️ Redirect URL:', redirectUrl);
        return NextResponse.redirect(redirectUrl);
     }
 
@@ -373,27 +350,19 @@ async function handleMailCallback(request, code, error, mailState, baseUrl) {
     }
 
     // Check if state is not too old (10 minutes max for mail)
-    if (Date.now() - mailState.timestamp > 10 * 60 * 1000) {
+    const stateCookie = request.cookies.get('talio-mail-oauth-state')?.value
+    const receivedState = new URL(request.url).searchParams.get('state')
+    if (!stateCookie || stateCookie !== receivedState || !mailState.nonce || !Number.isFinite(mailState.timestamp) || mailState.timestamp > Date.now() || Date.now() - mailState.timestamp > 10 * 60 * 1000) {
       console.error('📧 State token expired')
       return NextResponse.redirect(new URL('/dashboard/mail?error=expired', baseUrl))
     }
 
-    // Get tenant from the state (added during OAuth flow) or from superadmin lookup
-    let databaseName = mailState.databaseName;
-    if (!databaseName) {
-      // Fallback: lookup user's tenant from superadmin DB
-      const { getTenantByUserId } = await import('@/lib/tenantContext');
-      const tenantInfo = await getTenantByUserId(mailState.userId);
-      if (!tenantInfo) {
-        console.error('📧 User not found in tenant mappings:', mailState.userId);
-        return NextResponse.redirect(new URL('/dashboard/mail?error=unauthorized', baseUrl));
-      }
-      databaseName = tenantInfo.databaseName;
+    const auth = await verifyTokenFromRequest(request)
+    if (!auth.success || String(auth.user._id) !== String(mailState.userId) || (mailState.databaseName && auth.tenant.databaseName !== mailState.databaseName)) {
+      return NextResponse.redirect(new URL('/dashboard/mail?error=unauthorized', baseUrl))
     }
-
-    // Get tenant-specific EmailAccount model
-    const tenantModels = await getTenantModels(databaseName, ['EmailAccount']);
-    const TenantEmailAccount = tenantModels.EmailAccount;
+    const database = await getFirestoreTenantDatabase(auth.tenant.databaseName, { queryFields: { emailaccounts: ['user'] }, constraints: { emailaccounts: [{ fields: ['user', 'email'] }] } })
+    if (process.env.TALIO_LOCAL_ACCEPTANCE === '1') return NextResponse.redirect(new URL('/dashboard/mail?error=local_acceptance_external_access_disabled', baseUrl))
 
     const redirectUri = `${baseUrl}/api/auth/google/callback`
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
@@ -441,27 +410,29 @@ async function handleMailCallback(request, code, error, mailState, baseUrl) {
     const googleUser = await userInfoResponse.json()
     console.log('📧 Google user email:', googleUser.email)
 
-    // Save or update email account in tenant DB
-    await TenantEmailAccount.findOneAndUpdate(
-      { user: mailState.userId },
-      {
-        user: mailState.userId,
+    const accounts = await collectFirestorePages(database, 'emailaccounts', { filters: [{ field: 'user', operator: '==', value: String(auth.user._id) }] })
+    const existing = accounts.find(account => account.email === googleUser.email)
+    const values = {
+        user: String(auth.user._id),
         email: googleUser.email,
         provider: 'gmail',
         accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+        ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
+        tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
         isConnected: true,
         lastSynced: new Date(),
-        syncError: null
-      },
-      { upsert: true, new: true }
-    )
+        syncError: null,
+        updatedAt: new Date(),
+    }
+    if (existing) await database.mutate('emailaccounts', existing._id, current => ({ ...current, ...values }))
+    else await database.create('emailaccounts', { _id: crypto.randomBytes(12).toString('hex'), ...values, createdAt: new Date(), isPrimary: false, cachedEmails: [], unreadCount: 0, spamCount: 0, settings: { syncEnabled: true, notificationsEnabled: true, signature: '', autoSyncInterval: 5 } })
 
     console.log('📧 Email account saved successfully for:', googleUser.email)
 
     // Redirect back to mail page with success
-    return NextResponse.redirect(new URL('/dashboard/mail?connected=true', baseUrl))
+    const response = NextResponse.redirect(new URL('/dashboard/mail?connected=true', baseUrl))
+    response.cookies.set('talio-mail-oauth-state', '', { httpOnly: true, maxAge: 0, path: '/api/auth/google/callback' })
+    return response
 
   } catch (error) {
     console.error('📧 Mail OAuth callback error:', error)

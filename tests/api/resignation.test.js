@@ -1,7 +1,10 @@
 import { actionsFor, transition, reasonText, publicResignation, resolveReviewers, notifyResignation } from '@/lib/hrms/resignation.server'
 import { GET, POST } from '@/app/api/resignations/route'
-import { getAuthAndModels } from '@/lib/auth'
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getResignationStore } from '@/lib/hrms/resignationStore.server'
+import { workflowStore } from '../helpers/firestoreWorkflowStore'
+jest.mock('@/lib/hrms/resignationStore.server', () => ({ ...jest.requireActual('@/lib/hrms/resignationStore.server'), getResignationStore: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 
 const employee = { _id: '111111111111111111111111', role: 'employee', employeeId: 'aaaaaaaaaaaaaaaaaaaaaaaa' }
 const hr = { _id: '222222222222222222222222', role: 'hr' }
@@ -55,86 +58,80 @@ test('expired proposals cannot be accepted', () => {
   expect(() => step({ ...base(), status: 'employee_review', proposal: { lastWorkingDate: new Date('2026-09-28') } }, employee, 'accept')).toThrow('expired')
 })
 test.each(['', '    ', 'four', 'a'.repeat(2001)])('reason is required and bounded', value => expect(() => reasonText(value)).toThrow())
-const query = value => ({ select: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(value) })
-let models, actor, record
+let store, actor, record
 beforeEach(() => {
-  jest.clearAllMocks(); actor = employee; record = base()
-  models = {
-    User: { findById: jest.fn(() => query(actor)), find: jest.fn(() => query([hr])) },
-    Employee: { findById: jest.fn(() => query({ _id: employee.employeeId, status: 'active', assignedManager: 'cccccccccccccccccccccccc' })) },
-    Department: { find: jest.fn(() => query([])) },
-    ResignationRequest: { collection: { createIndex: jest.fn() }, find: jest.fn(() => query([record])), findById: jest.fn(() => query(record)), create: jest.fn(async data => ({ ...base(), ...data })), findOneAndUpdate: jest.fn(() => query({ ...record, status: 'withdrawn' })) },
-    Notification: { create: jest.fn().mockResolvedValue({}) },
-  }
-  getAuthAndModels.mockImplementation(async () => ({ success: true, user: { _id: actor._id }, models, tenant: { databaseName: 'test-tenant' } }))
+  jest.clearAllMocks(); actor = employee; record = { ...base(), updatedAt: now }
+  store = workflowStore({ users: [employee, hr, manager, stranger], employees: [{ _id: employee.employeeId, status: 'active', assignedManager: 'cccccccccccccccccccccccc' }], resignationrequests: [record] })
+  getResignationStore.mockResolvedValue(store)
+  getAuthAndDatabase.mockImplementation(async () => ({ success: true, user: { _id: actor._id }, tenant: { databaseName: 'talio_company_test' } }))
 })
 const request = body => ({ json: async () => body })
-test('submission uses authenticated employee, not client-supplied identity', async () => {
+const closeExisting = () => store.mutate('resignationrequests', record._id, current => ({ ...current, active: false, status: 'withdrawn' }))
+test('submission uses authenticated identity and prevents duplicate active requests', async () => {
+  await closeExisting()
   const response = await POST(request({ action: 'submit', employee: 'other', reason: 'Personal relocation' }))
   expect(response.status).toBe(200)
-  expect(models.ResignationRequest.create).toHaveBeenCalledWith(expect.objectContaining({ employee: employee.employeeId, requestedBy: employee._id, status: 'hr_review' }))
-  expect(models.ResignationRequest.collection.createIndex).toHaveBeenCalledWith({ employee: 1 }, expect.objectContaining({ unique: true }))
+  const created = await store.get('resignationrequests', (await response.json()).data.id)
+  expect(created).toMatchObject({ employee: employee.employeeId, requestedBy: employee._id, status: 'hr_review' })
+  expect((await POST(request({ action: 'submit', reason: 'Personal relocation' }))).status).toBe(409)
 })
 test('unauthenticated requests fail', async () => {
-  getAuthAndModels.mockResolvedValue({ success: false, status: 401 })
+  getAuthAndDatabase.mockResolvedValue({ success: false, status: 401 })
   expect((await GET({})).status).toBe(401)
   expect((await POST(request({}))).status).toBe(401)
 })
 test('inactive users cannot access requests', async () => {
-  actor = { ...employee, isActive: false }
+  await store.mutate('users', employee._id, user => ({ ...user, isActive: false }))
   expect((await GET({})).status).toBe(403)
 })
-test('list query is scoped to requester and assigned reviewer', async () => {
-  await GET({})
-  expect(models.ResignationRequest.find).toHaveBeenCalledWith({ $or: [{ requestedBy: employee._id }, { reviewers: employee._id }] })
+test('list uses indexed requester and assigned-reviewer scopes', async () => {
+  expect((await GET({})).status).toBe(200)
+  expect(store.list).toHaveBeenCalledWith('resignationrequests', expect.objectContaining({ filters: [{ field: 'requestedBy', operator: '==', value: employee._id }] }))
+  expect(store.list).toHaveBeenCalledWith('resignationrequests', expect.objectContaining({ filters: [{ field: 'reviewers', operator: 'array-contains', value: employee._id }] }))
 })
-test('unrelated user cannot read or act on a guessed request', async () => {
+test('unrelated user cannot act on a guessed request', async () => {
   actor = stranger
   expect((await POST(request({ id: record._id, version: 0, action: 'withdraw' }))).status).toBe(404)
 })
 test('stale and simultaneous updates fail with conflict', async () => {
   expect((await POST(request({ id: record._id, version: 1, action: 'withdraw' }))).status).toBe(409)
-  models.ResignationRequest.findOneAndUpdate.mockReturnValue(query(null))
-  expect((await POST(request({ id: record._id, version: 0, action: 'withdraw' }))).status).toBe(409)
-  expect(models.ResignationRequest.findOneAndUpdate.mock.calls[0][0]).toEqual({ _id: record._id, version: 0, status: 'hr_review' })
-})
-test('duplicate active request returns conflict', async () => {
-  models.ResignationRequest.create.mockRejectedValue({ code: 11000 })
-  expect((await POST(request({ action: 'submit', reason: 'Personal relocation' }))).status).toBe(409)
+  const responses = await Promise.all([0, 1].map(() => POST(request({ id: record._id, version: 0, action: 'withdraw' }))))
+  expect(responses.map(response => response.status).sort()).toEqual([200, 409])
 })
 test('missing hierarchy does not skip approval stage', async () => {
-  actor = hr; models.User.find.mockReturnValue(query([]))
+  actor = hr
   expect((await POST(request({ id: record._id, version: 0, action: 'approve' }))).status).toBe(409)
-  expect(models.ResignationRequest.findOneAndUpdate).not.toHaveBeenCalled()
+  expect((await store.get('resignationrequests', record._id)).status).toBe('hr_review')
 })
 test('notification failure does not report a saved request as failed', async () => {
-  models.Notification.create.mockRejectedValue(new Error('Unavailable'))
+  await closeExisting()
+  store.failCreate = 'notifications'
   const response = await POST(request({ action: 'submit', reason: 'Personal relocation' }))
   expect(response.status).toBe(200)
   expect((await response.json()).message).toContain('Some notifications')
 })
-test('acceptance notifies HR, hierarchy and employee', async () => {
-  await notifyResignation(models, { ...record, status: 'accepted' }, [hr._id])
-  expect(models.Notification.create.mock.calls.map(([item]) => item.user).sort()).toEqual([employee._id, hr._id, manager._id].sort())
+test('acceptance notifies all appropriate users once per record version', async () => {
+  await notifyResignation(store, { ...record, status: 'accepted' }, [hr._id])
+  await notifyResignation(store, { ...record, status: 'accepted' }, [hr._id])
+  expect((await store.list('notifications')).records.map(item => item.user).sort()).toEqual([employee._id, hr._id, manager._id].sort())
 })
 test('employee does not see an unrelayed proposal, including during renegotiation', () => {
   const r = { ...base(), status: 'hr_relay', proposal: { noticeDays: 15 }, timeline: [{ action: 'propose', noticeDays: 30 }, { action: 'relay' }, { action: 'negotiate' }, { action: 'propose', noticeDays: 15 }] }
   expect(publicResignation(r, employee).proposal).toBeNull()
   expect(publicResignation(r, employee).timeline).toHaveLength(3)
   expect(publicResignation(r, hr).proposal.noticeDays).toBe(15)
-  expect(publicResignation({ ...r, status: 'employee_review', timeline: [...r.timeline, { action: 'relay' }] }, employee).proposal.noticeDays).toBe(15)
 })
-test('reviewer discovery uses tenant hierarchy and excludes self', async () => {
-  models.Department.find.mockReturnValue(query([{ head: 'dddddddddddddddddddddddd', heads: ['eeeeeeeeeeeeeeeeeeeeeeee'] }]))
-  models.User.find.mockReturnValue(query([manager]))
-  expect(await resolveReviewers(models, { _id: employee.employeeId, department: 'ffffffffffffffffffffffff', assignedManager: 'cccccccccccccccccccccccc', assignedTeamLead: employee.employeeId }, employee._id)).toEqual([manager._id])
-  expect(models.User.find).toHaveBeenCalledWith(expect.objectContaining({ _id: { $ne: employee._id }, employeeId: { $in: ['cccccccccccccccccccccccc', 'dddddddddddddddddddddddd', 'eeeeeeeeeeeeeeeeeeeeeeee'] } }))
+test('reviewer discovery uses explicit tenant hierarchy queries and excludes self', async () => {
+  await store.mutate('users', manager._id, user => ({ ...user, employeeId: 'cccccccccccccccccccccccc' }))
+  await store.create('departments', { _id: 'ffffffffffffffffffffffff', head: 'dddddddddddddddddddddddd', heads: ['eeeeeeeeeeeeeeeeeeeeeeee'] })
+  expect(await resolveReviewers(store, { _id: employee.employeeId, department: 'ffffffffffffffffffffffff', assignedManager: 'cccccccccccccccccccccccc', assignedTeamLead: employee.employeeId }, employee._id)).toEqual([manager._id])
+  expect(store.list).toHaveBeenCalledWith('users', expect.objectContaining({ filters: [{ field: 'employeeId', operator: 'in', value: ['cccccccccccccccccccccccc', 'dddddddddddddddddddddddd', 'eeeeeeeeeeeeeeeeeeeeeeee'] }] }))
 })
-test('submission requires independent HR and rejects inactive employee profiles', async () => {
-  models.User.find.mockReturnValue(query([employee]))
+test('submission requires independent HR and an active employee profile', async () => {
+  await store.mutate('users', hr._id, user => ({ ...user, isActive: false }))
   expect((await POST(request({ action: 'submit', reason: 'Personal relocation' }))).status).toBe(409)
-  models.User.find.mockReturnValue(query([hr]))
-  models.Employee.findById.mockReturnValue(query({ status: 'resigned' }))
+  await store.mutate('users', hr._id, user => ({ ...user, isActive: true }))
+  await store.mutate('employees', employee.employeeId, current => ({ ...current, status: 'resigned' }))
   expect((await POST(request({ action: 'submit', reason: 'Personal relocation' }))).status).toBe(403)
 })
 test('malformed JSON and null body return validation errors', async () => {

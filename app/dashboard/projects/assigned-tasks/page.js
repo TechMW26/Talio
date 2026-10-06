@@ -1,5 +1,7 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { fetchCompleteEmployeeResponse } from '@/lib/client/employeePages'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -588,7 +590,7 @@ export default function AssignedTasksPage() {
             variant="light"
             onPress={() => router.push('/dashboard/projects')}
           >
-            <FaArrowLeft className="text-default-600" />
+            <BackIcon className="text-default-600" />
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-default-800">Assigned Tasks</h1>

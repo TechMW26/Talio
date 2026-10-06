@@ -421,7 +421,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
       ) : (
         <div className="space-y-4">
           {notifications.map((notification) => (
-            <div key={notification._id} className="border border-gray-200 rounded-lg p-4">
+            <div key={notification._id} className="talio-notification-card p-5">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -737,7 +737,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
       ) : (
         <div className="space-y-4">
           {notifications.map((notification) => (
-            <div key={notification._id} className="border border-gray-200 rounded-lg p-4">
+            <div key={notification._id} className="talio-notification-card p-5">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -1146,7 +1146,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
           {notifications.map((notification, index) => (
             <div
               key={notification._id || index}
-              className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+              className="talio-notification-card p-5 hover:bg-gray-50 cursor-pointer transition-colors"
               onClick={() => setSelectedNotification(notification)}
             >
               <div className="flex justify-between items-start">

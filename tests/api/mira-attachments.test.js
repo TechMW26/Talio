@@ -1,7 +1,7 @@
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn() }))
 jest.mock('@/lib/ai/aiProviderManager', () => ({ generateVisionContent: jest.fn() }))
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { generateVisionContent } from '@/lib/ai/aiProviderManager'
 import { POST } from '@/app/api/ai/mira-attachments/route'
@@ -12,11 +12,11 @@ const request = (name, contents) => ({
 })
 beforeEach(() => {
   jest.clearAllMocks()
-  getAuthAndModels.mockResolvedValue({ success: true, tenant: { databaseName: 'tenant' }, user: { _id: 'owner' } })
+  getAuthAndDatabase.mockResolvedValue({ success: true, tenant: { databaseName: 'tenant' }, user: { _id: 'owner' } })
   rateLimit.mockResolvedValue({ allowed: true })
 })
 test('requires authentication before file processing', async () => {
-  getAuthAndModels.mockResolvedValue({ success: false })
+  getAuthAndDatabase.mockResolvedValue({ success: false })
   expect((await POST(request('a.txt', 'hello'))).status).toBe(401)
   expect(rateLimit).not.toHaveBeenCalled()
 })

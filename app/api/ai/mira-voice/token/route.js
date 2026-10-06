@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request)
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) return NextResponse.json({ message: 'Authentication required' }, { status: auth.status || 401 })
     const bucket = await rateLimit('MIRA_VOICE', `${auth.tenant.databaseName}:${auth.user._id}:recognition`)
     if (!bucket.allowed) return NextResponse.json({ message: 'Please wait before restarting voice.' }, { status: 429 })

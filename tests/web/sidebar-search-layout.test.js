@@ -16,4 +16,8 @@ describe('sidebar search layout', () => {
   test.each(sidebarSources)('keeps clear space below the search field', (source) => {
     expect(source).toMatch(/talio-sidebar-search[^"\n]*\bmb-5\b/)
   })
+
+  test.each(sidebarSources)('assigns the search boundary to its wrapper', source => {
+    expect(source).toMatch(/<label data-search-container className="talio-sidebar-search/)
+  })
 })

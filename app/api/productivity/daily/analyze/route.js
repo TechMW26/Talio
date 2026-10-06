@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
-import mongoose from 'mongoose';
-import { canViewUserScreenshots } from '@/lib/productivityPermissions';
+import { verifyTokenFromRequest } from '@/lib/auth';
+import { canViewTenantScreenshots } from '@/lib/productivityPermissions';
 import {
   runDailyAnalysis,
-  DAILY_ANALYSIS_REQUIRED_MODELS,
 } from '@/lib/dailyAnalysisRunner';
 import { getTodayDateString } from '@/lib/timezone';
 
@@ -23,7 +21,7 @@ export const maxDuration = 300;
  */
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, DAILY_ANALYSIS_REQUIRED_MODELS);
+    const auth = await verifyTokenFromRequest(request);
     if (!auth.success) {
       return NextResponse.json(
         { success: false, error: auth.message || 'Authentication failed' },
@@ -31,7 +29,7 @@ export async function POST(request) {
       );
     }
 
-    const { user, models, tenant } = auth;
+    const { user, tenant } = auth;
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
     if (!viewerId) {
@@ -45,11 +43,11 @@ export async function POST(request) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return NextResponse.json({ success: false, error: 'Invalid date (expected YYYY-MM-DD)' }, { status: 400 });
     }
-    if (targetUserId !== viewerId.toString() && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+    if (!/^[a-f\d]{24}$/i.test(targetUserId)) {
       return NextResponse.json({ success: false, error: 'Invalid userId' }, { status: 400 });
     }
 
-    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
+    const canView = await canViewTenantScreenshots(viewerId, targetUserId, viewerRole, tenant.databaseName);
     if (!canView) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
@@ -57,7 +55,6 @@ export async function POST(request) {
     const result = await runDailyAnalysis({
       userId: targetUserId,
       dateString: date,
-      models,
       tenant,
       trigger: 'manual',
       forceReanalyze: true,

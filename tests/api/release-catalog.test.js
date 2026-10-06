@@ -21,6 +21,10 @@ const release = {
 }
 
 describe('serverless desktop release catalog', () => {
+  test('does not allow an Origin header to poison cached download links', () => {
+    const request = new Request('https://app.talio.in/api/latest-release', { headers: { Origin: 'https://untrusted.test' } })
+    expect(buildPublicReleaseMetadata(release, request, {}).download_url).toBe('https://app.talio.in/download/latest')
+  })
   test('normalizes platform aliases and rejects unknown platforms', () => {
     expect(getCanonicalPlatform('mac')).toBe('mac-arm64')
     expect(getCanonicalPlatform('WIN')).toBe('windows')

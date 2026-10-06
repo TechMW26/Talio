@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 import vercelConfig from '@/vercel.json'
 
 export async function GET(request) {
     try {
         // Get authenticated user
-        const auth = await getAuthAndModels(request, [])
+        const auth = await getAuthAndDatabase(request)
         if (!auth.success) {
             return NextResponse.json(
                 { success: false, message: auth.message },

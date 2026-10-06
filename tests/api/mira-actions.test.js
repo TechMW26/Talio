@@ -1,12 +1,14 @@
+jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreTenantDatabase: jest.fn() }))
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
 jest.mock('next/server', () => ({ NextResponse: { json: (body, options = {}) => new Response(JSON.stringify(body), options) } }))
 jest.mock('@/lib/permissions', () => ({ requirePermission: jest.fn() }))
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ verifyTokenFromRequest: jest.fn() }))
 jest.mock('@/app/api/tasks/create/route', () => ({ POST: jest.fn() }))
 jest.mock('@/app/api/projects/route', () => ({ POST: jest.fn() }))
 jest.mock('@/app/api/chat/route', () => ({ POST: jest.fn() }))
 jest.mock('@/app/api/chat/[chatId]/messages/route', () => ({ POST: jest.fn() }))
 import { requirePermission } from '@/lib/permissions'
-import { getAuthAndModels } from '@/lib/auth'
+import { verifyTokenFromRequest } from '@/lib/auth'
 import { POST } from '@/app/api/ai/mira-actions/route'
 import { prepareMiraAction, validateMiraAction } from '@/lib/miraActions'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
@@ -18,12 +20,18 @@ import { POST as sendChatMessage } from '@/app/api/chat/[chatId]/messages/route'
 
 const action = { type: 'create_task', fields: { title: 'Review draft', assignees: ['me'] } }
 const run = body => POST(new Request('https://talio.test/api/ai/mira-actions', { method: 'POST', body: JSON.stringify(body) }))
-beforeEach(() => jest.clearAllMocks())
+const context = { databaseName: 'tenant' }
+let people, store
+beforeEach(() => {
+  jest.clearAllMocks(); people = [];
+  store = { get: jest.fn(async () => ({ _id: 'own', status: 'active' })), getMany: jest.fn(async () => []), create: jest.fn(async (_, value) => value), list: jest.fn(async name => ({ records: name === 'employees' ? people : [], nextCursor: null })) };
+  getFirestoreTenantDatabase.mockResolvedValue(store);
+})
 test.each([undefined, []])('new tasks and projects default missing ownership to the authenticated creator: %s', async owners => {
   const user = { employeeId: { _id: 'creator' } }
-  const task = await prepareMiraAction({ type: 'create_task', fields: { title: 'Draft', ...(owners ? { assignees: owners } : {}) } }, user, {})
+  const task = await prepareMiraAction({ type: 'create_task', fields: { title: 'Draft', ...(owners ? { assignees: owners } : {}) } }, user, context)
   expect(task.body.assigneeIds).toEqual(['creator'])
-  const project = await prepareMiraAction({ type: 'create_project', fields: { name: 'Launch', startDate: '2026-09-27', endDate: '2026-10-01', ...(owners ? { heads: owners } : {}) } }, user, {})
+  const project = await prepareMiraAction({ type: 'create_project', fields: { name: 'Launch', startDate: '2026-09-27', endDate: '2026-10-01', ...(owners ? { heads: owners } : {}) } }, user, context)
   expect(project.body.projectHeadIds).toEqual(['creator'])
 })
 test('explicit owners survive validation; malformed ownership and reassignment never default silently', () => {
@@ -34,11 +42,12 @@ test('explicit owners survive validation; malformed ownership and reassignment n
 })
 test('personal reminder targets only the authenticated user and persists its due time', async () => {
   const create = jest.fn(async () => ({ _id: 'reminder' }))
-  getAuthAndModels.mockResolvedValue({ success: true, user: { userId: 'self', employeeId: 'employee', role: 'employee' }, models: { ScheduledNotification: { create } } })
+  store.create = create
+  verifyTokenFromRequest.mockResolvedValue({ success: true, user: { userId: 'self', employeeId: 'employee', role: 'employee' }, tenant: context })
   const scheduledFor = new Date(Date.now() + 1200000).toISOString()
   const result = await (await run({ confirmed: true, action: { type: 'schedule_reminder', fields: { message: 'Drink water', scheduledFor, timezone: 'Asia/Kolkata', targetUsers: ['other'] } } })).json()
   expect(result.success).toBe(true)
-  expect(create).toHaveBeenCalledWith(expect.objectContaining({ targetUsers: ['self'], scheduledFor: new Date(scheduledFor), status: 'pending' }))
+  expect(create).toHaveBeenCalledWith('schedulednotifications', expect.objectContaining({ targetUsers: ['self'], scheduledFor: new Date(scheduledFor), status: 'pending' }))
 })
 test('reminders reject past times, missing offsets and invalid timezones', () => {
   const fields = { message: 'Test', scheduledFor: new Date(Date.now() + 120000).toISOString(), timezone: 'Asia/Kolkata' }
@@ -47,7 +56,7 @@ test('reminders reject past times, missing offsets and invalid timezones', () =>
   }
 })
 test('project creation preserves the new record identity for opening and follow-ups', async () => {
-  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own', role: 'admin' }, models: {} }))
+  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own', role: 'admin' }, tenant: context }))
   const id = '507f1f77bcf86cd799439011'
   createProject.mockResolvedValue(new Response(JSON.stringify({ success: true, data: { _id: id } })))
   const result = await (await run({ confirmed: true, action: { type: 'create_project', fields: { name: 'Test', startDate: '2026-09-24', endDate: '2026-10-01', heads: ['me'] } } })).json()
@@ -59,7 +68,7 @@ test('rejects incomplete actions, unknown operations and invalid meeting dates',
   expect(validateMiraAction({ type: 'create_meeting', fields: { title: 'Review', agenda: 'Plan', invitees: ['me'], type: 'online', scheduledStart: '2026-01-01T10:00:00Z', scheduledEnd: '2026-01-01T09:00:00Z' } }).error).toBeTruthy()
 })
 test('never forwards generated operators or arbitrary fields to existing APIs', async () => {
-  const result = await prepareMiraAction({ ...action, fields: { ...action.fields, role: 'admin', url: 'https://attacker.test', $where: 'bad' } }, { employeeId: 'own' }, {})
+  const result = await prepareMiraAction({ ...action, fields: { ...action.fields, role: 'admin', url: 'https://attacker.test', $where: 'bad' } }, { employeeId: 'own' }, context)
   expect(result.path).toBe('/api/tasks/create')
   expect(result.body.assigneeIds).toEqual(['own'])
   expect(result.body).not.toHaveProperty('role')
@@ -72,14 +81,14 @@ test('denied permissions block preparation and execution', async () => {
   expect((await result.json()).message).toContain('access level')
 })
 test('unconfirmed actions only return a preview', async () => {
-  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own' }, models: {} }))
+  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own' }, tenant: context }))
   const response = await run({ action })
   expect((await response.json()).preview).toEqual(action)
   expect(requirePermission).toHaveBeenCalledWith('tasks', 'create')
   expect(createTask).not.toHaveBeenCalled()
 })
 test('confirmed writes delegate to the existing authenticated API and report success only after it succeeds', async () => {
-  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own' }, models: {} }))
+  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own' }, tenant: context }))
   createTask.mockResolvedValueOnce(new Response(JSON.stringify({ success: true, message: 'Task created' })))
   const result = await (await run({ action, confirmed: true })).json()
   expect(result).toMatchObject({ success: true, page: 'tasks', message: 'Task created' })
@@ -88,11 +97,9 @@ test('confirmed writes delegate to the existing authenticated API and report suc
   expect((await run({ action, confirmed: true })).status).toBe(403)
 })
 test('employee names are resolved within tenant and reporting scope; ambiguity fails closed', async () => {
-  const lean = jest.fn().mockResolvedValue([{ _id: 'a' }, { _id: 'b' }])
-  const find = jest.fn(() => ({ select: () => ({ populate: () => ({ limit: () => ({ lean }) }) }) }))
-  await expect(prepareMiraAction({ ...action, fields: { ...action.fields, assignees: ['Same Name'] } }, { employeeId: 'own', role: 'employee' }, { Employee: { find } })).rejects.toThrow('Choose the person')
-  expect(JSON.stringify(find.mock.calls[0][0])).toContain('reportingManager')
-  expect(JSON.stringify(find.mock.calls[0][0])).toContain('own')
+  people = [{ _id: 'a', status: 'active', firstName: 'Same', lastName: 'Name' }, { _id: 'b', status: 'active', firstName: 'Same', lastName: 'Name' }]
+  await expect(prepareMiraAction({ ...action, fields: { ...action.fields, assignees: ['Same Name'] } }, { employeeId: 'own', role: 'employee' }, context)).rejects.toThrow('Choose the person')
+  expect(store.list).toHaveBeenCalledWith('employees', expect.objectContaining({ filters: expect.arrayContaining([{ field: 'reportingManager', operator: '==', value: 'own' }]) }))
 })
 test('navigation and generated JSON are bounded and cannot inject links', () => {
   expect(miraNavigationPath('tasks')).toBe('/dashboard/projects/my-tasks')
@@ -104,10 +111,8 @@ test('navigation and generated JSON are bounded and cannot inject links', () => 
 
 test('creates a missing direct conversation then sends through the authenticated message route', async () => {
   const person = { _id: 'bbbbbbbbbbbbbbbbbbbbbbbb', firstName: 'Sahil', lastName: 'Sahu', employeeCode: 'U22' }
-  const query = { select: jest.fn().mockReturnThis(), populate: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([person]) }
-  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'aaaaaaaaaaaaaaaaaaaaaaaa', role: 'employee' }, models: {
-    Employee: { find: () => query }, Chat: { findOne: () => ({ select: () => ({ lean: async () => null }) }) },
-  } }))
+  people = [{ ...person, status: 'active' }]
+  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'aaaaaaaaaaaaaaaaaaaaaaaa', role: 'employee' }, tenant: context }))
   createChat.mockResolvedValue(new Response(JSON.stringify({ success: true, data: { _id: 'cccccccccccccccccccccccc' } })))
   sendChatMessage.mockResolvedValue(new Response(JSON.stringify({ success: true, message: 'Message sent' })))
   const result = await (await run({ action: { type: 'send_message', fields: { recipient: 'Sahil', content: 'Hello' } }, confirmed: true })).json()
@@ -118,11 +123,11 @@ test('creates a missing direct conversation then sends through the authenticated
 })
 
 test('ambiguous people return choices before any side effect', async () => {
-  const query = { select: jest.fn().mockReturnThis(), populate: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([
-    { _id: 'bbbbbbbbbbbbbbbbbbbbbbbb', firstName: 'Sahil', lastName: 'Sahu' },
-    { _id: 'cccccccccccccccccccccccc', firstName: 'Sahil', lastName: 'Sharma' },
-  ]) }
-  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own', role: 'admin' }, models: { Employee: { find: () => query } } }))
+  people = [
+    { _id: 'bbbbbbbbbbbbbbbbbbbbbbbb', status: 'active', firstName: 'Sahil', lastName: 'Sahu' },
+    { _id: 'cccccccccccccccccccccccc', status: 'active', firstName: 'Sahil', lastName: 'Sharma' },
+  ]
+  requirePermission.mockReturnValue(async () => ({ user: { employeeId: 'own', role: 'admin' }, tenant: context }))
   const response = await run({ action: { type: 'send_message', fields: { recipient: 'Sahil', content: 'Hello' } }, confirmed: true })
   expect(response.status).toBe(409)
   expect((await response.json()).resolution.candidates).toHaveLength(2)

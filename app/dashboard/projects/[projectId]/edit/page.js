@@ -1,9 +1,11 @@
 'use client'
 
+import BackIcon from '@/components/ui/BackIcon'
+
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaArrowLeft, FaSave, FaTrash, FaPlus, FaTimes, FaUsers, FaArchive, FaChevronDown, FaChevronRight, FaCheckSquare } from 'react-icons/fa'
+import { FaSave, FaTrash, FaPlus, FaTimes, FaUsers, FaArchive, FaChevronDown, FaChevronRight, FaCheckSquare } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import { Button, Select, SelectItem, Skeleton } from '@heroui/react'
 import Portal from '@/components/ui/Portal'
@@ -255,7 +257,7 @@ export default function EditProjectPage() {
             onClick={() => router.push(`/dashboard/projects/${projectId}`)}
             className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <FaArrowLeft className="text-gray-600" />
+            <BackIcon className="text-gray-600" />
           </button>
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Edit Project</h1>

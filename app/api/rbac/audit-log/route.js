@@ -1,71 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels, hasRole } from '@/lib/auth'
-
-// GET /api/rbac/audit-log — list recent RBAC audit events
+import { getAuthAndDatabase, hasRole } from '@/lib/auth'
+import { readAdminPage } from '@/lib/platform/firestoreSuperadmin.server'
 export async function GET(request) {
-    try {
-        const auth = await getAuthAndModels(request, ['RBACAuditLog', 'User'])
-        if (!auth.success) {
-            return NextResponse.json({ message: auth.message }, { status: 401 })
-        }
-        const { user, models } = auth
-
-        if (!hasRole(user, ['admin', 'super_admin'])) {
-            return NextResponse.json(
-                { success: false, message: 'Only admins can view audit logs' },
-                { status: 403 }
-            )
-        }
-
-        const { searchParams } = new URL(request.url)
-        const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-        const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10)))
-        const eventType = searchParams.get('eventType')
-
-        const filter = {}
-        if (eventType) {
-            filter.eventType = eventType
-        }
-
-        const [logs, total] = await Promise.all([
-            models.RBACAuditLog.find(filter)
-                .sort({ createdAt: -1 })
-                .skip((page - 1) * limit)
-                .limit(limit)
-                .lean(),
-            models.RBACAuditLog.countDocuments(filter),
-        ])
-
-        // Resolve actor names
-        const actorIds = [...new Set(logs.filter((l) => l.actorId).map((l) => l.actorId.toString()))]
-        const actors = actorIds.length
-            ? await models.User.find({ _id: { $in: actorIds } }, { _id: 1, email: 1 }).lean()
-            : []
-        const actorMap = {}
-        for (const a of actors) {
-            actorMap[a._id.toString()] = a.email
-        }
-
-        const enrichedLogs = logs.map((log) => ({
-            ...log,
-            actorEmail: log.actorId ? actorMap[log.actorId.toString()] || 'Unknown' : 'System',
-        }))
-
-        return NextResponse.json({
-            success: true,
-            data: enrichedLogs,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            },
-        })
-    } catch (error) {
-        console.error('[RBAC] Audit log error:', error)
-        return NextResponse.json(
-            { success: false, message: 'Failed to fetch audit logs' },
-            { status: 500 }
-        )
-    }
+  try {
+    const auth = await getAuthAndDatabase(request, { queryFields: { rbacauditlogs: ['createdAt', 'eventType'] } })
+    if (!auth.success) return NextResponse.json({ message: auth.message }, { status: auth.status || 401 })
+    if (!hasRole(auth.user, ['admin', 'super_admin'])) return NextResponse.json({ success: false, message: 'Only admins can view audit logs' }, { status: 403 })
+    const query = new URL(request.url).searchParams, page = Math.max(1, parseInt(query.get('page')) || 1), limit = Math.min(100, Math.max(1, parseInt(query.get('limit')) || 50))
+    const filters = query.get('eventType') ? [{ field: 'eventType', operator: '==', value: query.get('eventType') }] : []
+    const [result, total] = await Promise.all([
+      readAdminPage(auth.database, 'rbacauditlogs', { filters, orderBy: [{ field: 'createdAt', direction: 'desc' }], skip: (page - 1) * limit, limit, cursor: query.get('cursor') }),
+      auth.database.count('rbacauditlogs', filters),
+    ])
+    const ids = [...new Set(result.records.map(row => row.actorId).filter(Boolean).map(String))]
+    const actors = await auth.database.getMany('users', ids)
+    const emails = new Map(actors.filter(Boolean).map(user => [String(user._id), user.email]))
+    return NextResponse.json({ success: true, data: result.records.map(log => ({ ...log, actorEmail: log.actorId ? emails.get(String(log.actorId)) || 'Unknown' : 'System' })), pagination: { page, limit, total, totalPages: Math.ceil(total / limit), nextCursor: result.nextCursor } })
+  } catch (error) { return NextResponse.json({ success: false, message: 'Failed to fetch audit logs' }, { status: error.status || 500 }) }
 }

@@ -1,223 +1,32 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import mongoose from 'mongoose'
-
-// Helper to validate MongoDB ObjectId
-const isValidObjectId = (id) => {
-    return mongoose.Types.ObjectId.isValid(id) &&
-        (new mongoose.Types.ObjectId(id)).toString() === id
-}
-
-const isValidDateString = (value) => {
-    if (!value) return false
-    const parsed = new Date(value)
-    return !Number.isNaN(parsed.getTime())
-}
-
+import { getAuthAndDatabase } from '@/lib/auth'
+import { ATTENDANCE_DATABASE_OPTIONS, attendanceError } from '@/lib/platform/firestoreAttendance.server'
+import { getProductivityVisibility, queryProductivityByIds } from '@/lib/platform/firestoreProductivityView.server'
+import { getStartOfDayInTimezone, getEndOfDayInTimezone } from '@/lib/timezone'
 export const dynamic = 'force-dynamic'
-
-/**
- * GET /api/attendance/audit
- * 
- * Get audit information about attendance records, specifically system-generated absences.
- * This endpoint is useful for admins to review auto-marked absent records.
- * 
- * Query params:
- *   - date: Specific date (YYYY-MM-DD)
- *   - startDate, endDate: Date range
- *   - source: Filter by source (system_auto_absent, system_backfill, user_checkin, etc.)
- *   - onlySystemGenerated: Only show system-generated records (true/false)
- *   - employeeId: Filter by specific employee
- *   - page: Page number (default: 1)
- *   - limit: Records per page (default: 50)
- */
 export async function GET(request) {
-    try {
-        // Get authenticated user and tenant-specific models
-        const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User'])
-        if (!auth.success) {
-            return NextResponse.json(
-                { success: false, message: auth.message },
-                { status: 401 }
-            )
-        }
-        const { user, models } = auth
-        const { Attendance, Employee, User } = models
-
-        if (!['admin', 'hr', 'manager'].includes(user.role)) {
-            return NextResponse.json(
-                { success: false, message: 'Admin, HR, or Manager access required' },
-                { status: 403 }
-            )
-        }
-
-        const { searchParams } = new URL(request.url)
-        const date = searchParams.get('date')
-        const startDate = searchParams.get('startDate')
-        const endDate = searchParams.get('endDate')
-        const source = searchParams.get('source')
-        const onlySystemGenerated = searchParams.get('onlySystemGenerated') === 'true'
-        const employeeId = searchParams.get('employeeId')
-        const page = parseInt(searchParams.get('page')) || 1
-        const limit = Math.min(parseInt(searchParams.get('limit')) || 50, 200)
-
-        if (date && !isValidDateString(date)) {
-            return NextResponse.json(
-                { success: false, message: 'Invalid date format' },
-                { status: 400 }
-            )
-        }
-
-        if (startDate && !isValidDateString(startDate)) {
-            return NextResponse.json(
-                { success: false, message: 'Invalid startDate format' },
-                { status: 400 }
-            )
-        }
-
-        if (endDate && !isValidDateString(endDate)) {
-            return NextResponse.json(
-                { success: false, message: 'Invalid endDate format' },
-                { status: 400 }
-            )
-        }
-
-        if (employeeId && !isValidObjectId(employeeId)) {
-            return NextResponse.json(
-                { success: false, message: 'Invalid employee ID' },
-                { status: 400 }
-            )
-        }
-
-        // Build query
-        const query = {}
-
-        // Date filters
-        if (date) {
-            const dayStart = new Date(date)
-            dayStart.setHours(0, 0, 0, 0)
-            const dayEnd = new Date(dayStart)
-            dayEnd.setDate(dayEnd.getDate() + 1)
-            query.date = { $gte: dayStart, $lt: dayEnd }
-        } else if (startDate || endDate) {
-            query.date = {}
-            if (startDate) {
-                const start = new Date(startDate)
-                start.setHours(0, 0, 0, 0)
-                query.date.$gte = start
-            }
-            if (endDate) {
-                const end = new Date(endDate)
-                end.setHours(23, 59, 59, 999)
-                query.date.$lte = end
-            }
-        }
-
-        // Source filter
-        if (source) {
-            query.source = source
-        }
-
-        // System generated filter
-        if (onlySystemGenerated) {
-            query.$or = [
-                { createdBySystem: true },
-                { source: { $in: ['system_auto_absent', 'system_backfill'] } }
-            ]
-        }
-
-        // Employee filter
-        if (employeeId) {
-            query.employee = employeeId
-        }
-
-        // Get total count
-        const totalCount = await Attendance.countDocuments(query)
-
-        // Get records with pagination
-        const records = await Attendance.find(query)
-            .populate({
-                path: 'employee',
-                select: 'firstName lastName email employeeCode'
-            })
-            .populate({
-                path: 'createdBy',
-                select: 'email'
-            })
-            .populate({
-                path: 'lastModifiedBy',
-                select: 'email'
-            })
-            .sort({ date: -1, createdAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .lean()
-
-        // Get summary stats
-        const stats = await Attendance.aggregate([
-            { $match: query },
-            {
-                $group: {
-                    _id: '$source',
-                    count: { $sum: 1 }
-                }
-            }
-        ])
-
-        const sourceBreakdown = stats.reduce((acc, curr) => {
-            acc[curr._id || 'unknown'] = curr.count
-            return acc
-        }, {})
-
-        // Format records for response
-        const formattedRecords = records.map(record => ({
-            _id: record._id,
-            date: record.date,
-            employee: record.employee ? {
-                _id: record.employee._id,
-                name: `${record.employee.firstName} ${record.employee.lastName}`,
-                email: record.employee.email,
-                employeeCode: record.employee.employeeCode
-            } : null,
-            status: record.status,
-            checkIn: record.checkIn,
-            checkOut: record.checkOut,
-            workHours: record.workHours,
-            statusReason: record.statusReason,
-            remarks: record.remarks,
-            // Audit fields
-            source: record.source || 'user_checkin',
-            isSystemGenerated: record.createdBySystem ||
-                ['system_auto_absent', 'system_backfill'].includes(record.source),
-            isManualEntry: record.isManualEntry,
-            createdBy: record.createdBy?.email,
-            lastModifiedBy: record.lastModifiedBy?.email,
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt
-        }))
-
-        return NextResponse.json({
-            success: true,
-            data: {
-                records: formattedRecords,
-                pagination: {
-                    page,
-                    limit,
-                    total: totalCount,
-                    totalPages: Math.ceil(totalCount / limit)
-                },
-                summary: {
-                    total: totalCount,
-                    bySource: sourceBreakdown
-                }
-            }
-        })
-
-    } catch (error) {
-        console.error('Attendance audit API error:', error)
-        return NextResponse.json(
-            { success: false, message: error.message },
-            { status: 500 }
-        )
-    }
+  try {
+    const auth = await getAuthAndDatabase(request, ATTENDANCE_DATABASE_OPTIONS)
+    if (!auth.success) throw attendanceError(auth.message, 401)
+    if (!['admin','hr','manager'].includes(auth.user.role)) throw attendanceError('Admin, HR, or Manager access required', 403)
+    const { database, user } = auth, params = new URL(request.url).searchParams, employeeId = params.get('employeeId')
+    const date = params.get('date'), start = date || params.get('startDate'), end = date || params.get('endDate')
+    if ([start,end].some(v => v && Number.isNaN(+new Date(v)))) throw attendanceError('Invalid date')
+    if (employeeId && !/^[a-f0-9]{24}$/.test(employeeId)) throw attendanceError('Invalid employee ID')
+    const startDate = getStartOfDayInTimezone(start || new Date(Date.now()-31*86400000), 'Asia/Kolkata'), endDate = getEndOfDayInTimezone(end || new Date(), 'Asia/Kolkata')
+    if (endDate < startDate || endDate-startDate > 366*86400000) throw attendanceError('Select a date range of at most one year')
+    const { employees: visible } = await getProductivityVisibility(database, user, { includeSelf: true })
+    const employees = visible.filter(e=>!employeeId || e._id === employeeId), employeeMap = new Map(employees.map(e=>[e._id,e]))
+    const all = await queryProductivityByIds(database, 'attendances', 'employee', employees.map(e=>e._id), [{ field: 'date', operator: '>=', value: startDate }, { field: 'date', operator: '<=', value: endDate }])
+    const isSystem = record => record.createdBySystem || ['system_auto_absent','system_backfill'].includes(record.source)
+    const source = params.get('source'), systemOnly = params.get('onlySystemGenerated') === 'true'
+    const records = all.filter(r=>(!source || r.source === source) && (!systemOnly || isSystem(r))).sort((a,b)=>new Date(b.date)-new Date(a.date) || new Date(b.createdAt)-new Date(a.createdAt))
+    const page = Math.max(1, parseInt(params.get('page'),10) || 1), limit = Math.min(200, Math.max(1, parseInt(params.get('limit'),10) || 50)), bySource = {}
+    for (const record of records) bySource[record.source || 'unknown'] = (bySource[record.source || 'unknown'] || 0) + 1
+    const selected = await Promise.all(records.slice((page-1)*limit,page*limit).map(async r => {
+      const e = employeeMap.get(r.employee), creator = r.createdBy ? await database.get('users', String(r.createdBy)) : null, updater = r.lastModifiedBy ? await database.get('users', String(r.lastModifiedBy)) : null
+      return { _id:r._id, date:r.date, employee:e?{_id:e._id,name:[e.firstName,e.lastName].filter(Boolean).join(' '),email:e.email,employeeCode:e.employeeCode}:null,status:r.status,checkIn:r.checkIn,checkOut:r.checkOut,workHours:r.workHours,statusReason:r.statusReason,remarks:r.remarks,source:r.source||'user_checkin',isSystemGenerated:Boolean(isSystem(r)),isManualEntry:r.isManualEntry,createdBy:creator?.email,lastModifiedBy:updater?.email,createdAt:r.createdAt,updatedAt:r.updatedAt }
+    }))
+    return NextResponse.json({ success:true,data:{records:selected,pagination:{page,limit,total:records.length,totalPages:Math.ceil(records.length/limit)},summary:{total:records.length,bySource}} })
+  } catch(error) { return NextResponse.json({ success:false,message:error.message },{status:error.status||500}) }
 }

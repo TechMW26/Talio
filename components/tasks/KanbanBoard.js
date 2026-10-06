@@ -1,344 +1,153 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { FaClock, FaExclamationTriangle, FaTasks, FaProjectDiagram, FaGripVertical } from 'react-icons/fa'
-import { HiOutlineXMark } from 'react-icons/hi2'
+import { useState, useId, useRef, useEffect, Fragment } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { FaClock, FaFlag, FaEllipsisH } from 'react-icons/fa'
+import styles from './KanbanBoard.module.css'
 
-// Default status columns - used when no project-specific statusColumns prop
-// is passed (e.g. the cross-project "My Tasks"/"Assigned Tasks" boards).
-const DEFAULT_STATUS_COLUMNS = [
-  { id: 'todo', label: 'To Do', color: 'bg-gray-100', headerColor: 'text-gray-700' },
-  { id: 'in-progress', label: 'In Progress', color: 'bg-blue-50', headerColor: 'text-blue-700' },
-  { id: 'review', label: 'Review', color: 'bg-purple-50', headerColor: 'text-purple-700' },
-  { id: 'completed', label: 'Completed', color: 'bg-green-50', headerColor: 'text-green-700' }
+// Fernly kanban geometry, © 2026 Hasib (OVERSHOOT), adapted for Talio.
+// Persistence, confirmations and authorization remain with existing callers.
+const DEFAULT_COLUMNS = [
+  { id: 'todo', label: 'To Do', color: '#94a3b8' },
+  { id: 'in-progress', label: 'In Progress', color: '#60a5fa' },
+  { id: 'review', label: 'Review', color: '#a78bfa' },
+  { id: 'completed', label: 'Completed', color: '#34d399' },
 ]
 
-const priorityColors = {
-  low: 'bg-gray-100 text-gray-700',
-  medium: 'bg-blue-100 text-blue-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700'
+export function canMoveTask(task, enabled) {
+  const pending = task.assignmentStatus === 'pending' || task.assignees?.some(a => a.assignmentStatus === 'pending')
+  return Boolean(enabled && !task.subtasks?.length && !(pending && !task.assignees?.some(a => a.assignmentStatus === 'accepted')))
 }
+const dateLabel = date => date && !Number.isNaN(new Date(date).getTime()) ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null
 
-// Project colors for visual differentiation (when showing multiple projects)
-const projectColors = [
-  { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100' },
-  { bg: 'bg-green-50', border: 'border-l-green-500', text: 'text-green-700', badge: 'bg-green-100' },
-  { bg: 'bg-purple-50', border: 'border-l-purple-500', text: 'text-purple-700', badge: 'bg-purple-100' },
-  { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100' },
-  { bg: 'bg-pink-50', border: 'border-l-pink-500', text: 'text-pink-700', badge: 'bg-pink-100' },
-  { bg: 'bg-teal-50', border: 'border-l-teal-500', text: 'text-teal-700', badge: 'bg-teal-100' },
-  { bg: 'bg-indigo-50', border: 'border-l-indigo-500', text: 'text-indigo-700', badge: 'bg-indigo-100' },
-  { bg: 'bg-yellow-50', border: 'border-l-yellow-500', text: 'text-yellow-700', badge: 'bg-yellow-100' },
-]
-
-// Get consistent color for a project based on its ID
-const getProjectColor = (projectId) => {
-  if (!projectId) return projectColors[0]
-  let hash = 0
-  const id = projectId.toString()
-  for (let i = 0; i < id.length; i++) {
-    hash = ((hash << 5) - hash) + id.charCodeAt(i)
-    hash = hash & hash
-  }
-  return projectColors[Math.abs(hash) % projectColors.length]
-}
-
-const formatDate = (date) => {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric'
-  })
-}
-
-/**
- * Kanban Board Component
- * 
- * @param {Array} tasks - Array of task objects
- * @param {Function} onTaskClick - Callback when task is clicked
- * @param {Function} onStatusChange - Callback when task status changes via drag-drop (taskId, newStatus)
- * @param {boolean} showProject - Whether to show project badges (for multi-project views)
- * @param {boolean} enableDragDrop - Whether drag-drop is enabled (disabled for tasks with subtasks)
- * @param {Function} onProjectClick - Callback when project badge is clicked
- */
-export default function KanbanBoard({
-  tasks = [],
-  onTaskClick,
-  onStatusChange,
-  showProject = false,
-  enableDragDrop = true,
-  onProjectClick,
-  // Optional: a project's own ordered, configurable status list
-  // (see lib/taskStatusConfig.js), shaped as [{ id/key, label, color, headerColor }].
-  // Falls back to the original fixed 4-column board when not provided.
-  statusColumns
-}) {
-  const STATUS_COLUMNS = (Array.isArray(statusColumns) && statusColumns.length > 0)
-    ? statusColumns
-    : DEFAULT_STATUS_COLUMNS
-
+export default function KanbanBoard({ tasks = [], onTaskClick, onStatusChange, showProject = false, enableDragDrop = true, onProjectClick, statusColumns }) {
+  const colors = { gray: '#94a3b8', blue: '#60a5fa', purple: '#a78bfa', green: '#34d399', orange: '#fb923c', red: '#f87171', amber: '#fbbf24', indigo: '#818cf8', pink: '#f472b6', teal: '#2dd4bf' }
+  const COLUMNS = statusColumns?.length ? statusColumns.map(column => ({ ...column, id: column.id || column.key, color: colors[column.color] || (column.color?.startsWith('#') ? column.color : '#94a3b8') })) : DEFAULT_COLUMNS
   const [draggedTask, setDraggedTask] = useState(null)
-  const [dragOverColumn, setDragOverColumn] = useState(null)
-
-  // Group tasks by status
-  const tasksByStatus = STATUS_COLUMNS.reduce((acc, col) => {
-    acc[col.id] = tasks.filter(t => t.status === col.id)
-    return acc
-  }, {})
-
-  // Drag handlers
-  const handleDragStart = useCallback((e, task) => {
-    // Only allow drag for tasks WITHOUT subtasks
-    if (task.subtasks && task.subtasks.length > 0) {
-      e.preventDefault()
-      return
+  const [overColumn, setOverColumn] = useState(null)
+  const [moveMenu, setMoveMenu] = useState(null)
+  const [slot, setSlot] = useState(null)
+  const [order, setOrder] = useState([])
+  const dragCleanup = useRef(null)
+  const suppressClick = useRef(false)
+  const boardRef = useRef(null)
+  useEffect(() => () => dragCleanup.current?.(), [])
+  const reduced = useReducedMotion()
+  const boardId = useId()
+  const grouped = Object.fromEntries(COLUMNS.map(column => [column.id, tasks.filter(task => task.status === column.id || (column.id === 'review' && !COLUMNS.some(c => c.id === 'completed-pending-approval') && task.status === 'completed-pending-approval')).sort((a, b) => {
+    const ai = order.indexOf(a._id), bi = order.indexOf(b._id)
+    return (ai < 0 ? tasks.indexOf(a) : ai) - (bi < 0 ? tasks.indexOf(b) : bi)
+  })]))
+  const startPointerDrag = (event, task) => {
+    if (event.button !== 0 || event.pointerType === 'touch' || event.target.closest('button') || !canMoveTask(task, enableDragDrop) || !onStatusChange) return
+    const el = event.currentTarget, rect = el.getBoundingClientRect()
+    const start = { x: event.clientX, y: event.clientY }
+    let ghost, target, timer
+    const cursor = document.body.style.cursor
+    const cleanup = () => {
+      window.removeEventListener('pointermove', pointerMove)
+      window.removeEventListener('pointerup', pointerUp)
+      window.removeEventListener('pointercancel', cancel)
+      window.removeEventListener('keydown', escape)
+      clearTimeout(timer); ghost?.remove(); document.body.style.cursor = cursor
     }
-    setDraggedTask(task)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', task._id)
-    // Add drag styling after a brief delay
-    setTimeout(() => {
-      e.target.classList.add('opacity-50')
-    }, 0)
-  }, [])
-
-  const handleDragEnd = useCallback((e) => {
-    e.target.classList.remove('opacity-50')
-    setDraggedTask(null)
-    setDragOverColumn(null)
-  }, [])
-
-  const handleDragOver = useCallback((e, status) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverColumn(status)
-  }, [])
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverColumn(null)
-  }, [])
-
-  const handleDrop = useCallback((e, newStatus) => {
-    e.preventDefault()
-    setDragOverColumn(null)
-    
-    if (draggedTask && draggedTask.status !== newStatus && onStatusChange) {
-      onStatusChange(draggedTask, newStatus)
+    const reset = () => { cleanup(); setDraggedTask(null); setOverColumn(null); setSlot(null); dragCleanup.current = null }
+    const pointerMove = ev => {
+      if (!ghost) {
+        if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 6) return
+        ghost = el.cloneNode(true); ghost.classList.add(styles.ghost)
+        ghost.removeAttribute('tabindex'); ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true
+        Object.assign(ghost.style, { width: `${rect.width}px`, left: `${rect.left}px`, top: `${rect.top}px` })
+        document.body.append(ghost); document.body.style.cursor = 'grabbing'
+        setMoveMenu(null); setDraggedTask(task); suppressClick.current = true
+      }
+      ghost.style.transform = `translate(${ev.clientX - start.x}px, ${ev.clientY - start.y}px) rotate(${reduced ? 0 : 2.5}deg) scale(${reduced ? 1 : 1.04})`
+      const column = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-kanban-column]')
+      if (!column || !boardRef.current?.contains(column)) { target = null; setSlot(null); setOverColumn(null); return }
+      const siblings = [...column.querySelectorAll('[data-task-id]')].filter(card => card.dataset.taskId !== task._id)
+      const before = siblings.find(card => { const b = card.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2 })
+      target = { column: column.dataset.kanbanColumn, before: before?.dataset.taskId || null, height: rect.height }
+      setOverColumn(target.column)
+      setSlot(previous => previous?.column === target.column && previous?.before === target.before ? previous : target)
     }
-    setDraggedTask(null)
-  }, [draggedTask, onStatusChange])
-
-  // Render a single task card
-  const renderTaskCard = (task) => {
-    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed'
-    const hasSubtasks = task.subtasks && task.subtasks.length > 0
-    const hasRejectedAssignee = task.assignees?.some(a => a.assignmentStatus === 'rejected')
-    const needsReassignment = hasRejectedAssignee && !task.assignees?.some(a => a.assignmentStatus === 'accepted')
-    const wasRecentlyRejected = task.lastRejectedAt && 
-      (new Date() - new Date(task.lastRejectedAt)) < 24 * 60 * 60 * 1000
-    const rejectionCount = task.rejectionCount || 0
-    const projectColor = showProject ? getProjectColor(task.project?._id) : null
-    
-    // Check if task is pending acceptance (not yet accepted by any assignee)
-    const isPendingAcceptance = task.assignmentStatus === 'pending' || 
-      task.assignees?.some(a => a.assignmentStatus === 'pending')
-    const hasAcceptedAssignee = task.assignees?.some(a => a.assignmentStatus === 'accepted')
-    const isNotAccepted = isPendingAcceptance && !hasAcceptedAssignee
-    
-    // Can only drag tasks without subtasks AND that have been accepted
-    const canDrag = enableDragDrop && !hasSubtasks && !isNotAccepted
-
-    // Card styling based on whether it has subtasks
-    const cardBgClass = hasSubtasks 
-      ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800' // Tasks with subtasks
-      : isNotAccepted
-        ? 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800' // Pending acceptance
-        : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700' // Tasks without subtasks
-
-    return (
-      <div
-        key={task._id}
-        draggable={canDrag}
-        onDragStart={(e) => handleDragStart(e, task)}
-        onDragEnd={handleDragEnd}
-        onClick={() => onTaskClick?.(task)}
-        className={`rounded-lg shadow-sm border transition-all p-3 ${cardBgClass} ${
-          canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
-        } ${
-          wasRecentlyRejected
-            ? 'border-red-400 border-2 bg-red-50 hover:shadow-md hover:border-red-500'
-            : needsReassignment 
-              ? 'border-orange-400 border-2 bg-orange-50 hover:shadow-md hover:border-orange-500' 
-              : 'hover:shadow-md hover:border-primary-200'
-        } ${showProject && projectColor ? `border-l-4 ${projectColor.border}` : ''}`}
-      >
-        {/* Drag handle indicator for draggable cards */}
-        {canDrag && (
-          <div className="flex items-center gap-1 text-gray-400 text-xs mb-2">
-            <FaGripVertical className="w-3 h-3" />
-            <span>Drag to move</span>
-          </div>
-        )}
-
-        {/* Pending acceptance indicator */}
-        {isNotAccepted && !hasSubtasks && (
-          <div className="flex items-center gap-1 text-yellow-700 text-xs font-medium mb-2 bg-yellow-100 px-2 py-1 rounded-md">
-            <FaClock className="w-3 h-3" />
-            <span>Pending acceptance</span>
-          </div>
-        )}
-
-        {/* Auto-managed indicator for tasks with subtasks */}
-        {hasSubtasks && (
-          <div className="flex items-center gap-1 text-purple-600 text-xs font-medium mb-2 bg-purple-100 px-2 py-1 rounded-md">
-            <FaTasks className="w-3 h-3" />
-            <span>Auto-managed ({task.progressPercentage || 0}%)</span>
-          </div>
-        )}
-
-        {/* Rejection indicator */}
-        {wasRecentlyRejected && (
-          <div className="flex items-center gap-1 text-red-600 text-xs font-medium mb-2 bg-red-100 px-2 py-1 rounded-md">
-            <HiOutlineXMark className="w-3 h-3" />
-            <span>Rejected{rejectionCount > 1 ? ` (${rejectionCount}x)` : ''}</span>
-            {task.lastRejectionReason && (
-              <span className="text-red-500 truncate max-w-[150px]" title={task.lastRejectionReason}>
-                : {task.lastRejectionReason}
-              </span>
-            )}
-          </div>
-        )}
-        
-        {needsReassignment && !wasRecentlyRejected && (
-          <div className="flex items-center gap-1 text-orange-600 text-xs font-medium mb-2">
-            <FaExclamationTriangle className="w-3 h-3" />
-            <span>Needs Reassignment</span>
-          </div>
-        )}
-
-        <h5 className="font-medium text-gray-800 text-sm">{task.title}</h5>
-        
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <span className={`px-2 py-0.5 rounded text-xs ${priorityColors[task.priority]}`}>
-            {task.priority}
-          </span>
-          {task.dueDate && (
-            <span className={`text-xs ${isOverdue ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
-              {formatDate(task.dueDate)}
-            </span>
-          )}
-          {isOverdue && (
-            <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Overdue</span>
-          )}
-          {task.estimatedHours && (
-            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded flex items-center gap-1">
-              <FaClock className="w-2 h-2" />
-              {task.estimatedHours >= 8 ? `${Math.floor(task.estimatedHours / 8)}d ${task.estimatedHours % 8}h` : `${task.estimatedHours}h`}
-            </span>
-          )}
-          {hasSubtasks && (
-            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
-              {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks
-            </span>
-          )}
-        </div>
-
-        {/* Project badge */}
-        {showProject && task.project && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onProjectClick?.(task.project._id || task.project)
-            }}
-            className={`mt-2 flex items-center gap-1 px-2 py-0.5 rounded text-xs ${projectColor?.badge} ${projectColor?.text} hover:opacity-80`}
-          >
-            <FaProjectDiagram className="w-2.5 h-2.5" />
-            {task.project?.name || 'Project'}
-          </button>
-        )}
-
-        {/* Task Progress Bar - based on subtasks */}
-        {hasSubtasks && (
-          <div className="mt-2">
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
-              <div
-                className={`h-1.5 rounded-full transition-all ${
-                  task.progressPercentage === 100 ? 'bg-green-500' :
-                  task.progressPercentage >= 50 ? 'bg-blue-500' :
-                  'bg-orange-500'
-                }`}
-                style={{ width: `${task.progressPercentage || 0}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Assignees */}
-        {task.assignees && task.assignees.length > 0 && (
-          <div className="flex -space-x-2 mt-2">
-            {task.assignees.slice(0, 3).map(a => (
-              <div
-                key={a._id}
-                className={`w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-xs overflow-hidden ${
-                  a.assignmentStatus === 'pending' 
-                    ? 'bg-yellow-400 text-yellow-900' 
-                    : a.assignmentStatus === 'rejected'
-                    ? 'bg-red-400 text-white'
-                    : 'bg-primary-500 text-white'
-                }`}
-                title={`${a.user?.firstName || ''} ${a.user?.lastName || ''} (${a.assignmentStatus})`}
-              >
-                {a.user?.profilePicture ? (
-                  <img src={a.user.profilePicture} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span>{a.user?.firstName?.[0] || '?'}</span>
-                )}
-              </div>
-            ))}
-            {task.assignees.length > 3 && (
-              <div className="w-6 h-6 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-gray-600 text-xs">
-                +{task.assignees.length - 3}
-              </div>
-            )}
-          </div>
-        )}
-
-        {task.assignees?.some(a => a.assignmentStatus === 'pending') && (
-          <p className="text-xs text-yellow-600 mt-1 flex items-center">
-            <FaClock className="mr-1 w-3 h-3" />
-            Awaiting acceptance
-          </p>
-        )}
-      </div>
-    )
+    const cancel = () => { reset(); setTimeout(() => { suppressClick.current = false }, 0) }
+    const escape = ev => { if (ev.key === 'Escape') cancel() }
+    const pointerUp = () => {
+      if (!ghost) { reset(); return }
+      window.removeEventListener('pointermove', pointerMove)
+      window.removeEventListener('pointerup', pointerUp)
+      const landing = target && boardRef.current?.querySelector('[data-drop-slot]')
+      const destination = landing?.getBoundingClientRect() || rect
+      ghost.style.transitionDuration = reduced ? '0s' : '.35s'
+      ghost.style.transform = `translate(${destination.left - rect.left}px, ${destination.top - rect.top}px) rotate(0deg) scale(1)`
+      const drop = target
+      timer = setTimeout(() => {
+        reset(); suppressClick.current = false
+        if (!drop) return
+        const ids = tasks.map(t => t._id).filter(id => id !== task._id)
+        const index = drop.before ? ids.indexOf(drop.before) : ids.length
+        ids.splice(index < 0 ? ids.length : index, 0, task._id); setOrder(ids)
+        if (task.status !== drop.column) onStatusChange(task, drop.column)
+      }, reduced ? 0 : 350)
+    }
+    dragCleanup.current?.(); dragCleanup.current = cleanup
+    window.addEventListener('pointermove', pointerMove)
+    window.addEventListener('pointerup', pointerUp)
+    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('keydown', escape)
   }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {STATUS_COLUMNS.map(column => (
-        <div 
-          key={column.id} 
-          className={`rounded-lg p-4 transition-all ${column.color} ${
-            dragOverColumn === column.id ? 'ring-2 ring-primary-400 ring-offset-2' : ''
-          }`}
-          onDragOver={(e) => handleDragOver(e, column.id)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, column.id)}
-        >
-          <h4 className={`font-medium mb-3 flex items-center justify-between ${column.headerColor}`}>
-            <span>{column.label}</span>
-            <span className="bg-white px-2 py-1 rounded text-sm text-gray-600">
-              {tasksByStatus[column.id]?.length || 0}
-            </span>
-          </h4>
-          <div className="space-y-3 min-h-[100px]">
-            {tasksByStatus[column.id]?.map(task => renderTaskCard(task))}
-            {tasksByStatus[column.id]?.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">No tasks</p>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+  const placeholder = (column, before) => slot?.column === column && slot.before === before
+    ? <motion.div key="drop-slot" layout={!reduced} data-drop-slot className={styles.dropSlot} style={{ height: slot.height }} role="status" aria-label="Drop task here">Drop here</motion.div> : null
+  const move = (task, status) => {
+    setMoveMenu(null); setDraggedTask(null); setOverColumn(null)
+    if (canMoveTask(task, enableDragDrop) && task.status !== status) onStatusChange?.(task, status)
+  }
+  return <div ref={boardRef} className={styles.board} aria-label="Task kanban board">
+    {COLUMNS.map(column => <section key={column.id} data-kanban-column={column.id} className={`${styles.column} ${overColumn === column.id ? styles.over : ''}`} aria-labelledby={`${boardId}-${column.id}`}
+      onDragOver={event => { if (draggedTask) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setOverColumn(column.id) } }}
+      onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOverColumn(null) }}
+      onDrop={event => { event.preventDefault(); if (draggedTask) move(draggedTask, column.id) }}>
+      <header className={styles.columnHead}><span className={styles.dot} style={{ background: column.color }} /><h4 id={`${boardId}-${column.id}`}>{column.label}</h4><span className={styles.count}>{grouped[column.id].length}</span></header>
+      <div className={styles.list}>
+        {grouped[column.id].map(task => {
+          const hasSubtasks = Boolean(task.subtasks?.length)
+          const movable = canMoveTask(task, enableDragDrop) && Boolean(onStatusChange)
+          const pending = (task.assignmentStatus === 'pending' || task.assignees?.some(a => a.assignmentStatus === 'pending')) && !task.assignees?.some(a => a.assignmentStatus === 'accepted')
+          const reassignment = task.assignees?.some(a => a.assignmentStatus === 'rejected') && !task.assignees?.some(a => a.assignmentStatus === 'accepted')
+          const recentlyRejected = task.lastRejectedAt && Date.now() - new Date(task.lastRejectedAt).getTime() < 86400000
+          const due = dateLabel(task.dueDate)
+          const overdue = due && new Date(task.dueDate) < new Date() && task.status !== 'completed'
+          const progress = Math.min(100, Math.max(0, Number(task.progressPercentage) || 0))
+          return <Fragment key={task._id}>{placeholder(column.id, task._id)}<motion.div layout={!reduced} style={slot && draggedTask?._id === task._id ? { display: 'none' } : undefined} initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduced ? 0 : .25, ease: 'easeOut' }}><article
+            data-task-id={task._id} onPointerDown={event => startPointerDrag(event, task)}
+            className={`${styles.card} ${task.status === 'completed' ? styles.done : ''} ${draggedTask?._id === task._id ? styles.dragging : ''}`}
+            tabIndex={0} aria-label={`${task.title}, ${column.label}`} draggable={movable}
+            onDragStart={event => { if (dragCleanup.current || !movable) { event.preventDefault(); return } setMoveMenu(null); setDraggedTask(task); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', task._id) }}
+            onDragEnd={() => { setDraggedTask(null); setOverColumn(null) }}
+            onClick={() => { if (!suppressClick.current) onTaskClick?.(task) }}
+            onKeyDown={event => { if (event.target === event.currentTarget && ['Enter', ' '].includes(event.key)) { event.preventDefault(); onTaskClick?.(task) } if (event.key === 'Escape') setMoveMenu(null) }}>
+            <div className={styles.top}>
+              {showProject && task.project ? <button className={styles.tag} onClick={event => { event.stopPropagation(); onProjectClick?.(task.project._id || task.project) }} title={task.project.name}>{task.project.name || 'Project'}</button> : <span className={styles.tag}>{hasSubtasks ? `${task.subtasks.length} subtasks` : 'Task'}</span>}
+              <span className={styles.priority} data-priority={task.priority}><FaFlag aria-hidden="true" />{task.priority || 'Normal'}</span>
+              {movable && <button className={styles.menuTrigger} aria-label={`Move ${task.title}`} aria-expanded={moveMenu === task._id} onClick={event => { event.stopPropagation(); setMoveMenu(moveMenu === task._id ? null : task._id) }}><FaEllipsisH /></button>}
+            </div>
+            {moveMenu === task._id && <div className={styles.menu} aria-label={`Move ${task.title} to`} onClick={event => event.stopPropagation()}><p>Move to</p>{COLUMNS.map(destination => <button key={destination.id} disabled={destination.id === column.id} onClick={() => move(task, destination.id)}><span className={styles.dot} style={{ background: destination.color }} />{destination.label}</button>)}</div>}
+            <h5 className={styles.title}>{task.title}</h5>
+            {pending && <p className={styles.notice}>Pending acceptance</p>}
+            {hasSubtasks && <><p className={styles.notice}>Auto-managed · {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length} subtasks · {progress}%</p><div className={styles.meter} role="progressbar" aria-label="Subtask progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div></>}
+            {recentlyRejected && <p className={styles.warning} title={task.lastRejectionReason}>Rejected{task.rejectionCount > 1 ? ` (${task.rejectionCount}x)` : ''}{task.lastRejectionReason ? `: ${task.lastRejectionReason}` : ''}</p>}
+            {reassignment && !recentlyRejected && <p className={styles.warning}>Needs reassignment</p>}
+            <footer className={styles.foot}>
+              {due && <span className={overdue ? styles.warning : ''}><FaClock aria-hidden="true" />{due}{overdue ? ' · Overdue' : ''}</span>}
+              {task.estimatedHours > 0 && <span title="Estimated time">{task.estimatedHours >= 8 ? `${Math.floor(task.estimatedHours / 8)}d ${task.estimatedHours % 8}h` : `${task.estimatedHours}h`}</span>}
+              <div className={styles.avatars}>{task.assignees?.slice(0, 3).map((assignee, index) => <span key={assignee._id || index} className={styles.avatar} data-status={assignee.assignmentStatus} title={`${assignee.user?.firstName || ''} ${assignee.user?.lastName || ''} (${assignee.assignmentStatus || 'assigned'})`}>{assignee.user?.profilePicture ? <img src={assignee.user.profilePicture} alt={assignee.user.firstName || 'Assignee'} loading="lazy" /> : assignee.user?.firstName?.[0] || '?'}</span>)}{task.assignees?.length > 3 && <span className={styles.avatar}>+{task.assignees.length - 3}</span>}</div>
+            </footer>
+            {task.assignees?.some(a => a.assignmentStatus === 'pending') && !pending && <p className={styles.notice}>Awaiting acceptance</p>}
+          </article></motion.div></Fragment>
+        })}
+        {placeholder(column.id, null)}
+        {!grouped[column.id].length && slot?.column !== column.id && <p className={styles.empty}>{draggedTask ? 'Drop task here' : 'No tasks here yet'}</p>}
+      </div>
+    </section>)}
+  </div>
 }

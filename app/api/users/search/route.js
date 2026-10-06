@@ -1,19 +1,16 @@
 import { NextResponse } from 'next/server'
 import { withTenantApi } from '@/lib/api/route'
-import { listDirectory } from '@/lib/services/directoryService.server'
+import { listDirectory, DIRECTORY_STORE_OPTIONS } from '@/lib/services/directoryService.server'
 
 // Compatibility endpoint. New consumers should use GET /api/directory.
 export const GET = withTenantApi({
-  models: ['Employee', 'User', 'Designation', 'Department'],
+  firestore: DIRECTORY_STORE_OPTIONS,
   features: { allOf: ['employees'] },
   errorMessage: 'Failed to search users',
-}, async ({ request, auth, models }) => {
+}, async ({ request, auth, database }) => {
   const { searchParams } = new URL(request.url)
   const items = await listDirectory({
-    Employee: models.Employee,
-    User: models.User,
-    Department: models.Department,
-    Designation: models.Designation,
+    database,
     tenantId: auth.tenant.databaseName,
     currentUserId: auth.user.id || auth.user._id,
     query: searchParams.get('q') || '',

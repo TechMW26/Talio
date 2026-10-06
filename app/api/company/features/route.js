@@ -8,14 +8,14 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth';
+import { getAuthAndDatabase } from '@/lib/auth';
 import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server';
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request);
+    const auth = await getAuthAndDatabase(request);
 
     if (!auth.success) {
       return NextResponse.json(

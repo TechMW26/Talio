@@ -16,7 +16,7 @@ export async function GET(request) {
         }
 
         return NextResponse.json(metadata, {
-            headers: { 'Cache-Control': 'no-store' },
+            headers: { 'Cache-Control': 'public, max-age=0, must-revalidate', 'Vercel-CDN-Cache-Control': 'max-age=60' },
         });
     } catch (error) {
         console.error('[LatestReleaseAPI] Failed to read metadata:', error.message);

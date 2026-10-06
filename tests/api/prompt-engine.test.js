@@ -23,22 +23,8 @@ describe('prompt engine', () => {
     })
 
     test('can skip stored AI context and context persistence for whiteboard flows', async () => {
-        const connectDBMock = jest.fn()
-        const findMock = jest.fn()
-        const createMock = jest.fn()
-
-        jest.doMock('@/lib/mongodb', () => ({
-            __esModule: true,
-            default: connectDBMock
-        }))
-
-        jest.doMock('@/models/AIContext', () => ({
-            __esModule: true,
-            default: {
-                find: findMock,
-                create: createMock
-            }
-        }))
+        const databaseMock = jest.fn()
+        jest.doMock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreTenantDatabase: databaseMock }))
 
         const { generateSmartContent } = require('@/lib/promptEngine')
 
@@ -55,8 +41,6 @@ describe('prompt engine', () => {
         expect(global.fetch).toHaveBeenCalledTimes(1)
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
         expect(body.messages[0].content).toBe('Prepare a flowchart')
-        expect(connectDBMock).not.toHaveBeenCalled()
-        expect(findMock).not.toHaveBeenCalled()
-        expect(createMock).not.toHaveBeenCalled()
+        expect(databaseMock).not.toHaveBeenCalled()
     })
 })

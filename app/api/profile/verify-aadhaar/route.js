@@ -1,66 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { getProfileStore, getProfileRecords, saveAadhaarVerification, invalidateProfile } from '@/lib/platform/firestoreProfile.server'
 import { generateVisionContent } from '@/lib/gemini'
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 import { compressScreenshot } from '@/lib/imageCompression'
-import fs from 'fs/promises'
-import path from 'path'
-import { getImage, getImageInfo } from '@/lib/gridfs'
+import { readProfileDocumentImage } from '@/lib/platform/profileDocumentImage.server'
 
 export const dynamic = 'force-dynamic'
-
-/**
- * Helper function to determine if a URL is remote or local
- */
-function isRemoteUrl(url) {
-  return url && (url.startsWith('http://') || url.startsWith('https://'))
-}
-
-/**
- * Helper function to fetch image as base64 from URL or local path
- */
-async function fetchImageData(document) {
-  const url = document?.url
-  const gridFsId = document?.fileId || /^\/api\/images\/([a-f\d]{24})$/i.exec(String(url || ''))?.[1]
-
-  if (gridFsId) {
-    const [buffer, info] = await Promise.all([getImage(gridFsId), getImageInfo(gridFsId)])
-    return {
-      base64: buffer.toString('base64'),
-      mimeType: info?.contentType || 'image/webp',
-    }
-  }
-
-  if (isRemoteUrl(url)) {
-    // Fetch from remote URL
-    const response = await fetch(url)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)
-    }
-    const arrayBuffer = await response.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    return {
-      base64: buffer.toString('base64'),
-      mimeType: response.headers.get('content-type') || getMimeType(url),
-    }
-  } else {
-    // Read from local file path
-    const filePath = path.join(process.cwd(), String(url || '').replace(/^\/+/, ''))
-    const buffer = await fs.readFile(filePath)
-    return { base64: buffer.toString('base64'), mimeType: getMimeType(url) }
-  }
-}
-
-/**
- * Helper function to determine mime type from URL
- */
-function getMimeType(url) {
-  const lowerUrl = url.toLowerCase()
-  if (lowerUrl.includes('.png')) return 'image/png'
-  if (lowerUrl.includes('.webp')) return 'image/webp'
-  if (lowerUrl.includes('.gif')) return 'image/gif'
-  return 'image/jpeg' // Default to JPEG
-}
 
 /**
  * Downscale/compress an uploaded document image before OCR so large photos
@@ -91,14 +37,13 @@ async function compressForOCR(imageData) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models } = auth
-    const { User, Employee } = models
-
-    const user = await User.findById(authUser._id || authUser.userId)
+    const { user: authUser } = auth
+    const store = await getProfileStore(auth.tenant.databaseName)
+    const { user, employee } = await getProfileRecords(store, authUser._id || authUser.userId)
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
@@ -117,14 +62,6 @@ export async function POST(request) {
     }
 
     // Get employee data for comparison
-    let employee = user.employeeId
-      ? await Employee.findById(user.employeeId).select('firstName lastName dateOfBirth address').lean()
-      : null
-    if (!employee) {
-      employee = await Employee.findOne({ userId: user._id })
-        .select('firstName lastName dateOfBirth address')
-        .lean()
-    }
 
     if (!employee) {
       return NextResponse.json({
@@ -135,18 +72,16 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // Fetch image data (works for both remote URLs and local paths)
+    // Read verified tenant media or retained ImageKit references.
     let frontImageData, backImageData
 
     try {
       console.log('[OCR] Fetching Aadhaar images...')
-      console.log('[OCR] Front URL:', frontUrl)
-      console.log('[OCR] Back URL:', backUrl)
 
       // Fetch images in parallel
       const [frontData, backData] = await Promise.all([
-        fetchImageData(user.profileCompletion.aadhaarFront),
-        fetchImageData(user.profileCompletion.aadhaarBack)
+        readProfileDocumentImage(user.profileCompletion.aadhaarFront, auth.tenant.databaseName),
+        readProfileDocumentImage(user.profileCompletion.aadhaarBack, auth.tenant.databaseName)
       ])
 
       frontImageData = frontData
@@ -201,13 +136,8 @@ Important:
       console.error('[OCR] Gemini Vision error:', error)
 
       // Update verification status to failed
-      await User.findByIdAndUpdate(authUser._id || authUser.userId, {
-        $set: {
-          'profileCompletion.ocrVerification.status': 'failed',
-          'profileCompletion.ocrVerification.verifiedAt': new Date(),
-          'profileCompletion.ocrVerification.failureReason': 'OCR_PROCESSING_FAILED'
-        }
-      })
+      await saveAadhaarVerification(store, user, { status: 'failed', verifiedAt: new Date(), failureReason: 'OCR_PROCESSING_FAILED' })
+      await invalidateProfile(auth.tenant.databaseName, user._id)
 
       return NextResponse.json({
         success: false,
@@ -222,14 +152,8 @@ Important:
     if (!ocrResult.isValid) {
       const validationIssues = ocrResult.validationIssues || ['Document does not appear to be a valid Aadhaar card']
 
-      await User.findByIdAndUpdate(authUser._id || authUser.userId, {
-        $set: {
-          'profileCompletion.ocrVerification.status': 'failed',
-          'profileCompletion.ocrVerification.verifiedAt': new Date(),
-          'profileCompletion.ocrVerification.failureReason': 'INVALID_DOCUMENT',
-          'profileCompletion.ocrVerification.validationIssues': validationIssues
-        }
-      })
+      await saveAadhaarVerification(store, user, { status: 'failed', verifiedAt: new Date(), failureReason: 'INVALID_DOCUMENT', validationIssues })
+      await invalidateProfile(auth.tenant.databaseName, user._id)
 
       return NextResponse.json({
         success: false,
@@ -287,46 +211,21 @@ Important:
     const isComplete = verificationStatus === 'verified'
 
     // Update user's OCR verification status
-    const updateData = {
-      'profileCompletion.ocrVerification.status': verificationStatus,
-      'profileCompletion.ocrVerification.extractedData': {
+    const verification = {
+      status: verificationStatus,
+      extractedData: {
         name: ocrResult.name,
         dateOfBirth: ocrResult.dateOfBirth,
         aadhaarNumber: ocrResult.aadhaarNumber,
         address: ocrResult.address
       },
-      'profileCompletion.ocrVerification.mismatches': mismatches,
-      'profileCompletion.ocrVerification.suggestions': suggestions,
-      'profileCompletion.ocrVerification.verifiedAt': new Date(),
-      'profileCompletion.ocrVerification.confidence': ocrResult.confidence,
-      'profileCompletion.completedFields.ocrVerified': isComplete
+      mismatches, suggestions, verifiedAt: new Date(), confidence: ocrResult.confidence,
     }
 
-    // Update overall profile completion status if verified
-    if (isComplete && user.profileCompletion?.completedFields?.personalInfo &&
-      user.profileCompletion?.completedFields?.aadhaarUploaded) {
-      updateData['profileCompletion.status'] = 'complete'
-      updateData['profileCompletion.completedAt'] = new Date()
-    } else if (user.profileCompletion?.completedFields?.aadhaarUploaded) {
-      updateData['profileCompletion.status'] = 'partially_complete'
-    }
-
-    await User.findByIdAndUpdate(authUser._id || authUser.userId, { $set: updateData })
-
-    // Auto-fill address from Aadhaar OCR if employee address is missing
-    let addressAutoFilled = false
-    if (ocrResult.address && !profileAddress) {
-      try {
-        await Employee.findByIdAndUpdate(employee._id, {
-          $set: { 'address.fullAddress': ocrResult.address }
-        })
-        addressAutoFilled = true
-        console.log('[OCR] Auto-filled address from Aadhaar for employee:', user.employeeId)
-      } catch (addressError) {
-        console.error('[OCR] Failed to auto-fill address:', addressError)
-        // Don't fail the verification if address update fails
-      }
-    }
+    const { addressAutoFilled } = await saveAadhaarVerification(store, user, verification, {
+      employeeId: employee._id, address: !profileAddress ? ocrResult.address : undefined,
+    })
+    await invalidateProfile(auth.tenant.databaseName, user._id)
 
     // Prepare response
     if (mismatches.length > 0) {
@@ -377,7 +276,7 @@ Important:
     return NextResponse.json({
       success: false,
       message: 'Failed to verify Aadhaar document'
-    }, { status: 500 })
+    }, { status: error.status || 500 })
   }
 }
 
@@ -483,16 +382,13 @@ function formatDateForComparison(date) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndDatabase(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models } = auth
-    const { User } = models
-
-    const user = await User.findById(authUser._id || authUser.userId)
-      .select('profileCompletion.ocrVerification')
-      .lean()
+    const { user: authUser } = auth
+    const store = await getProfileStore(auth.tenant.databaseName)
+    const user = await store.get('users', authUser._id || authUser.userId)
 
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })

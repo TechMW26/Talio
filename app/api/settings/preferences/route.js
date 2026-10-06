@@ -1,134 +1,58 @@
 import { NextResponse } from 'next/server'
-import { getAuthAndModels } from '@/lib/auth'
-import { uploadImage, deleteImage } from '@/lib/gridfs'
+import { getAuthAndDatabase } from '@/lib/auth'
+import { uploadImage, deleteImage } from '@/lib/mediaStorage'
+import { processImage } from '@/lib/imagePipeline'
+import { getPreferencesStore, getPreferences, validatePreferences } from '@/lib/platform/firestorePreferences.server'
 
 export const dynamic = 'force-dynamic'
-
-
-// GET - Get system preferences
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['SystemPreferences'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-    const { models } = auth
-    const { SystemPreferences } = models
-
-    // Get system preferences (there should be only one document)
-    let preferences = await SystemPreferences.findOne()
-
-    if (!preferences) {
-      // Create default preferences if none exist
-      preferences = new SystemPreferences({
-        currency: 'INR',
-        currencySymbol: '₹',
-        timeFormat: '12',
-        timezone: 'Asia/Kolkata',
-        workingDaysPerWeek: 5,
-        workingHoursPerDay: 8,
-        weekStartsOn: 'monday',
-        defaultLeaveYear: new Date().getFullYear(),
-        leaveCarryForward: true,
-        maxCarryForwardDays: 10,
-        lateThresholdMinutes: 15,
-        halfDayThresholdHours: 4,
-        autoMarkAbsent: true,
-        emailNotifications: true,
-        leaveApprovalNotifications: true,
-        attendanceReminders: true,
-        dateFormat: 'DD/MM/YYYY',
-        companyName: 'Your Company',
-        companyAddress: '',
-        companyPhone: '',
-        companyEmail: '',
-      })
-      await preferences.save()
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: preferences
-    })
+    const auth = await getAuthAndDatabase(request)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    return NextResponse.json({ success: true, data: await getPreferences(await getPreferencesStore(auth.tenant.databaseName)) })
   } catch (error) {
-    console.error('Get preferences error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch preferences' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, message: 'Failed to fetch preferences' }, { status: 500 })
   }
 }
 
-// PUT - Update system preferences (Admin only)
 export async function PUT(request) {
+  let uploaded, databaseName, committed = false
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['SystemPreferences'])
-    if (!auth.success) {
-      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { SystemPreferences } = models
-
-    // Only admin can update preferences
-    if (user.role !== 'admin') {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-
+    const auth = await getAuthAndDatabase(request)
+    if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    if (auth.user.role !== 'admin') return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    databaseName = auth.tenant.databaseName
+    const store = await getPreferencesStore(databaseName)
+    const previous = await getPreferences(store)
     const body = await request.json()
-
-    // Find existing preferences or create new one
-    let preferences = await SystemPreferences.findOne()
-
-    // Handle companyLogo upload to GridFS if it's base64
-    if (body.companyLogo && body.companyLogo.startsWith('data:image/')) {
-      try {
-        // Delete old logo from GridFS if exists
-        if (preferences?.companyLogoFileId) {
-          await deleteImage(preferences.companyLogoFileId).catch(() => { });
-        }
-
-        const base64Data = body.companyLogo.replace(/^data:image\/\w+;base64,/, '')
-        const imageBuffer = Buffer.from(base64Data, 'base64')
-
-        const gridfsResult = await uploadImage(imageBuffer, {
-          category: 'settings',
-          contentType: 'image/webp',
-          originalName: `company_logo_${Date.now()}.webp`,
-        })
-        body.companyLogo = gridfsResult.url
-        body.companyLogoFileId = String(gridfsResult._id)
-        console.log(`[SystemPreferences] Company logo uploaded to GridFS`)
-      } catch (imgError) {
-        console.error('[SystemPreferences] GridFS logo upload failed:', imgError.message)
-      }
+    const changes = validatePreferences(body)
+    if (body.companyLogo?.startsWith('data:image/')) {
+      if (!/^data:image\/(png|jpeg|jpg|webp|gif);base64,/.test(body.companyLogo)) throw Object.assign(new Error('Unsupported logo format'), { status: 400 })
+      const buffer = Buffer.from(body.companyLogo.split(',')[1], 'base64')
+      if (!buffer.length || buffer.length > 10 * 1024 * 1024) throw Object.assign(new Error('Logo must be at most 10 MB'), { status: 400 })
+      const image = await processImage(buffer, { type: 'logo' })
+      uploaded = await uploadImage(image.buffer, { databaseName, category: 'settings', contentType: image.mimeType, originalName: `company-logo.${image.format}`, userId: String(auth.user._id || auth.user.userId) })
+      changes.companyLogo = uploaded.url
+      changes.companyLogoFileId = String(uploaded._id)
+    } else if (body.companyLogo === '') {
+      changes.companyLogo = ''; changes.companyLogoFileId = ''
+    } else if (body.companyLogo !== undefined && body.companyLogo !== previous.companyLogo) {
+      throw Object.assign(new Error('Upload a logo image instead of supplying a storage URL'), { status: 400 })
     }
-
-    if (preferences) {
-      // Update existing preferences
-      Object.keys(body).forEach(key => {
-        if (body[key] !== undefined) {
-          preferences[key] = body[key]
-        }
-      })
-      await preferences.save()
-    } else {
-      // Create new preferences
-      preferences = new SystemPreferences(body)
-      await preferences.save()
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Preferences updated successfully',
-      data: preferences
+    let previousFileId
+    const preferences = await store.transaction(async tx => {
+      const current = await tx.get('systempreferences', previous._id)
+      previousFileId = current?.companyLogoFileId
+      const next = { ...(current || previous), ...changes, updatedAt: new Date() }
+      if (current) await tx.replace('systempreferences', next)
+      else await tx.create('systempreferences', { ...next, createdAt: new Date() })
+      return next
     })
+    committed = true
+    if ('companyLogo' in changes && previousFileId && previousFileId !== preferences.companyLogoFileId) await deleteImage(previousFileId, { databaseName }).catch(() => {})
+    return NextResponse.json({ success: true, message: 'Preferences updated successfully', data: preferences })
   } catch (error) {
-    console.error('Update preferences error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to update preferences' },
-      { status: 500 }
-    )
+    if (uploaded && !committed) await deleteImage(uploaded._id, { databaseName }).catch(() => {})
+    return NextResponse.json({ success: false, message: error.status ? error.message : 'Failed to update preferences' }, { status: error.status || 500 })
   }
 }

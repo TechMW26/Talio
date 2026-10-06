@@ -1279,7 +1279,7 @@ html.dark .toggle-btn {
    Compact two-level hierarchy based on established shell navigation patterns. */
 .talio-sidebar-shell {
   border-right: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  background: color-mix(in srgb, var(--color-bg-sidebar) 96%, var(--color-bg-main));
+  background: var(--color-bg-sidebar);
 }
 
 .talio-sidebar-header {

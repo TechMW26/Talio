@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
+import { verifyTokenFromRequest } from '@/lib/auth'
 import { canReadDocumentUpload } from '@/lib/documentAccess.server'
 import {
   buildTenantRootPrefix,
   getBlobAccessMode,
+  getBlobStreamLength,
   getTenantBlob,
 } from '@/lib/platform/blobStorage.server'
 
@@ -24,9 +25,13 @@ export async function GET(request, { params }) {
     return new NextResponse('Forbidden', { status: 403 })
   }
   const [category, ownerId] = pathname.slice(tenantPrefix.length).split('/')
+  // Repository-owned media must use its dedicated record/recipient ACL. A
+  // known Blob pathname alone never authorizes access to personal media.
+  if (['images', 'screenshots', 'meetingAudio', 'recruitmentResumes', 'resume-parts', 'mira-images', 'call-alerts'].includes(category)) {
+    return new NextResponse('Forbidden', { status: 403 })
+  }
   if (category === 'documents') {
-    const documentAuth = await getAuthAndModels(request, ['Document', 'User'])
-    if (!await canReadDocumentUpload(documentAuth, { fileId: pathname, ownerId })) return new NextResponse('Forbidden', { status: 403 })
+    if (!await canReadDocumentUpload(auth, { fileId: pathname, ownerId })) return new NextResponse('Forbidden', { status: 403 })
   }
 
   try {
@@ -40,10 +45,11 @@ export async function GET(request, { params }) {
       return new NextResponse(null, { status: 304, headers: { ETag: result.blob.etag } })
     }
 
+    const streamLength = getBlobStreamLength(result)
     return new NextResponse(result.stream, {
       headers: {
         'Content-Type': result.blob.contentType || 'application/octet-stream',
-        'Content-Length': String(result.blob.size),
+        ...(streamLength === null ? {} : { 'Content-Length': String(streamLength) }),
         'Content-Disposition': result.blob.contentDisposition || 'inline',
         'Cache-Control': 'private, max-age=300, must-revalidate',
         ETag: result.blob.etag,

@@ -1,13 +1,14 @@
 import { SCREENSHOT_CAPTURE_INTERVAL_MS, isEarlySessionCapture, getNextAllowedCaptureTime } from '@/lib/productivitySessionRules'
 import { GET, POST } from '@/app/api/settings/screenshot-interval/route'
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndDatabase } from '@/lib/auth'
 jest.mock('next/server', () => ({ NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) } }))
-jest.mock('@/lib/auth', () => ({ getAuthAndModels: jest.fn() }))
+jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('electron', () => ({ screen: {} }), { virtual: true })
-jest.mock('node-fetch', () => jest.fn())
+jest.mock(require.resolve('node-fetch', { paths: [require('path').resolve(__dirname, '../../desktop-app/src')] }), () => jest.fn())
 jest.mock('../../desktop-app/src/logger', () => ({ log: jest.fn() }))
 jest.mock('../../desktop-app/src/offlineQueue', () => ({ initialize: jest.fn(), reset: jest.fn() }))
 const service = require('../../desktop-app/src/screenshotService')
+const desktopFetch = require(require.resolve('node-fetch', { paths: [require('path').resolve(__dirname, '../../desktop-app/src')] }))
 
 test('server policy requires exactly four minutes between scheduled captures', () => {
   const date = new Date('2026-09-26T08:00:00Z')
@@ -18,8 +19,9 @@ test('server policy requires exactly four minutes between scheduled captures', (
 })
 
 test('old saved per-user settings cannot override the fixed policy', async () => {
-  const update = jest.fn()
-  getAuthAndModels.mockResolvedValue({ success: true, user: { _id: 'u', role: 'admin' }, models: { User: { findById: () => ({ select: async () => ({ settings: { screenshotInterval: 30 } }) }), findByIdAndUpdate: update } } })
+  const row = { _id: 'u', role: 'admin', isActive: true, settings: { screenshotInterval: 30 } }
+  const update = jest.fn(async (_collection, _id, change) => change(row))
+  getAuthAndDatabase.mockResolvedValue({ success: true, user: row, database: { get: jest.fn(async () => row), mutate: update } })
   expect((await (await GET({})).json()).interval).toBe(4)
   expect((await POST({ json: async () => ({ interval: 3 }) })).status).toBe(400)
   expect(update).not.toHaveBeenCalled()
@@ -43,6 +45,7 @@ test('desktop timer fires every four minutes, not three', () => {
 })
 
 test('restarts cannot capture early and existing clock-in and permission guards remain active', async () => {
+  desktopFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true, data: { screenshotsEnabled: true } }) })
   jest.useFakeTimers()
   service.userRole = 'employee'; service.isClockedIn = true; service.isCapturing = true
   service.lastScheduledCaptureAt = null
@@ -63,4 +66,16 @@ test('restarts cannot capture early and existing clock-in and permission guards 
     await service.captureScreen('session_start')
     expect(service.getDesktopSources).toHaveBeenCalledTimes(2)
   } finally { service.stop(); size.mockRestore(); jest.useRealTimers() }
+})
+
+test('disabled policy and network failures never capture pixels', async () => {
+  service.userRole = 'employee'; service.isClockedIn = true; service.isCapturing = true
+  service.getDesktopSources = jest.fn()
+  const fetch = desktopFetch
+  fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: { screenshotsEnabled: false } }) })
+  await service.captureScreen('automatic')
+  fetch.mockRejectedValueOnce(new Error('offline'))
+  await service.captureScreen('automatic')
+  expect(service.getDesktopSources).not.toHaveBeenCalled()
+  service.stop()
 })

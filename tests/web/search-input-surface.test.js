@@ -8,7 +8,8 @@ test('search fields and HeroUI inner inputs let their container surface show thr
   expect(block).toContain('[placeholder*="search" i]')
   expect(block).toContain('[data-slot="input-wrapper"] input')
   expect(block).toContain('background: transparent !important')
-  expect(block).not.toContain('outline: none')
+  expect(block).toContain('[data-search-container]:has(input:focus-visible)')
+  expect(block).toContain('outline: 2px solid')
   expect(block).not.toContain('color:')
 })
 

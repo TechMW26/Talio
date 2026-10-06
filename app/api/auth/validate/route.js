@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
-import { getTenantModel } from '@/lib/tenantModels'
+import { verifyTokenFromRequest } from '@/lib/auth'
+import { getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
 import { resolveUserPermissions } from '@/lib/permissions'
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
 export async function GET(request) {
   try {
@@ -20,7 +18,9 @@ export async function GET(request) {
     const token = authHeader.split(' ')[1]
 
     // Verify the token
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const auth = await verifyTokenFromRequest(request)
+    if (!auth.success) return NextResponse.json({ valid: false, message: auth.message }, { status: 401 })
+    const payload = auth.user
 
     if (!payload || !payload.userId) {
       return NextResponse.json(
@@ -37,13 +37,8 @@ export async function GET(request) {
       )
     }
 
-    // Get tenant-specific User model
-    const User = await getTenantModel(payload.databaseName, 'User')
-
-    // Check if user still exists and is active
-    const user = await User.findById(payload.userId)
-      .select('isActive email forcePasswordChange employeeId role roleId permissionsCache cacheUpdatedAt isDepartmentHead headOfDepartments')
-      .lean()
+    const database = await getFirestoreTenantDatabase(payload.databaseName)
+    const user = await database.get('users', String(payload.userId))
 
     if (!user) {
       return NextResponse.json(
@@ -64,6 +59,7 @@ export async function GET(request) {
       permissions = await resolveUserPermissions(user, payload.databaseName)
     } catch (permissionError) {
       console.error('[Auth Validate] Failed to resolve permissions:', permissionError.message)
+      return NextResponse.json({ valid: false, message: 'Unable to verify account permissions' }, { status: 503 })
     }
 
     // Create response
