@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndDatabase } from '@/lib/auth';
 import { MAIL_ACCOUNT_OPTIONS, listMailAccounts, getMailAccount, updateMailAccount, disconnectMailAccount, getAuthenticatedMailClient } from '@/lib/mailAccounts.server';
 import { google } from 'googleapis';
+import { emitSidebarCountsUpdated } from '@/lib/eventBus';
 
 // Production URL and redirect URI - must match Google Cloud Console
 const PRODUCTION_URL = 'https://app.talio.in';
@@ -257,6 +258,8 @@ export async function GET(request) {
 
     // Sort all emails by date (newest first)
     allEmails.sort((a, b) => new Date(b.date) - new Date(a.date));
+    emitSidebarCountsUpdated({}, [String(user._id || user.userId)], auth.tenant.databaseName)
+      .catch(error => console.error('[Mail] Sidebar refresh failed:', error.message));
 
     return NextResponse.json({
       emails: allEmails,
