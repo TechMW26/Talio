@@ -4,8 +4,7 @@
     "name": " / auth / callback",
     "controls": [],
     "sources": [
-      "app/auth/callback/page.js",
-      "components/ui/Loader.js"
+      "app\\auth\\callback\\page.js"
     ]
   },
   {
@@ -21,8 +20,7 @@
       "New Password"
     ],
     "sources": [
-      "app/auth/change-password/page.js",
-      "components/ui/Loader.js"
+      "app\\auth\\change-password\\page.js"
     ]
   },
   {
@@ -36,7 +34,7 @@
       "text-default-700 font-semibold"
     ],
     "sources": [
-      "app/auth/forgot-password/page.js"
+      "app\\auth\\forgot-password\\page.js"
     ]
   },
   {
@@ -56,8 +54,7 @@
       "••••••••"
     ],
     "sources": [
-      "app/auth/reset-password/[token]/page.js",
-      "components/ui/Loader.js"
+      "app\\auth\\reset-password\\[token]\\page.js"
     ]
   },
   {
@@ -69,7 +66,6 @@
       "By Department",
       "Checked In",
       "Checked In Today",
-      "Connection Error",
       "Error Loading Data",
       "Live Users",
       "Logged In",
@@ -78,16 +74,11 @@
       "Refresh Dept",
       "Refresh Selected ( )",
       "Refresh this user",
-      "Retry",
       "Search by name, email, or department...",
-      "Something went wrong",
-      "Total Employees",
-      "Try Again"
+      "Total Employees"
     ],
     "sources": [
-      "app/dashboard/admin/live-users/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\admin\\live-users\\page.js"
     ]
   },
   {
@@ -110,8 +101,7 @@
       "Target Audience *"
     ],
     "sources": [
-      "app/dashboard/announcements/create/page.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\announcements\\create\\page.js"
     ]
   },
   {
@@ -119,20 +109,11 @@
     "name": "Announcements",
     "controls": [
       "Announcements",
-      "Connection Error",
       "Delete Announcement",
-      "Delete announcement",
-      "Retry",
-      "Something went wrong",
-      "Try Again"
+      "Delete announcement"
     ],
     "sources": [
-      "app/dashboard/announcements/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/heroui/Button.js",
-      "components/ui/heroui/Modal.js"
+      "app\\dashboard\\announcements\\page.js"
     ]
   },
   {
@@ -146,7 +127,7 @@
       "Update to v"
     ],
     "sources": [
-      "app/dashboard/app-info/page.js"
+      "app\\dashboard\\app-info\\page.js"
     ]
   },
   {
@@ -168,7 +149,6 @@
       "Cancel",
       "Close asset details",
       "Close bulk import",
-      "Connection Error",
       "Description",
       "Done",
       "Edit or Reassign",
@@ -176,12 +156,9 @@
       "Processor, RAM, Storage, etc.",
       "Purchase Date",
       "Purchase Price",
-      "Retry",
       "Search by name or employee code",
-      "Something went wrong",
       "Specifications",
       "Total Assets",
-      "Try Again",
       "UIN",
       "Under Maintenance",
       "View",
@@ -189,13 +166,7 @@
       "status"
     ],
     "sources": [
-      "app/dashboard/assets/page.js",
-      "components/assets/AssetTrackingFields.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js",
-      "components/ui/heroui/SearchableSelect.js"
+      "app\\dashboard\\assets\\page.js"
     ]
   },
   {
@@ -204,21 +175,15 @@
     "controls": [
       "Absent",
       "Check-ins for",
-      "Connection Error",
       "Employee Check-ins",
       "Export",
       "In Progress",
       "Present",
-      "Retry",
       "Search by employee name or code...",
-      "Something went wrong",
-      "Total Employees",
-      "Try Again"
+      "Total Employees"
     ],
     "sources": [
-      "app/dashboard/attendance/checkins/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\attendance\\checkins\\page.js"
     ]
   },
   {
@@ -243,7 +208,6 @@
       "Monthly Summary",
       "My Attendance -",
       "My Correction Requests",
-      "Overtime Check",
       "Pending Correction Approvals",
       "Please explain why this correction is needed...",
       "Reason *",
@@ -254,17 +218,10 @@
       "Request Regularisation",
       "Requested Status",
       "Today&apos;s Attendance",
-      "Why did you miss clocking in/out?",
-      "Your shift ended at"
+      "Why did you miss clocking in/out?"
     ],
     "sources": [
-      "app/dashboard/attendance/page.js",
-      "components/OvertimePrompt.js",
-      "components/attendance/LocationAccessStatus.js",
-      "components/ui/HeroModal.js",
-      "components/ui/Loader.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js"
+      "app\\dashboard\\attendance\\page.js"
     ]
   },
   {
@@ -273,7 +230,6 @@
     "controls": [
       "Access Restricted",
       "Attendance Report & Analytics",
-      "Connection Error",
       "Daily Punches",
       "Date Range",
       "Department",
@@ -283,57 +239,41 @@
       "Export CSV",
       "Export Excel",
       "Overview",
-      "Retry",
       "Search by name, code, or department...",
       "Shrinkage Analysis",
       "Shrinkage Breakdown",
-      "Something went wrong",
-      "Start Date",
-      "Try Again"
+      "Start Date"
     ],
     "sources": [
-      "app/dashboard/attendance/report/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\attendance\\report\\page.js"
     ]
   },
   {
     "route": "/dashboard/attendance/team",
     "name": "Team Attendance",
     "controls": [
-      "Connection Error",
       "Department Filter",
       "Filter by department",
       "Filter by team",
       "Monthly Summary",
       "Next employee page",
       "Previous employee page",
-      "Retry",
       "Search employees by name or code...",
-      "Something went wrong",
-      "Team Filter",
-      "Try Again"
+      "Team Filter"
     ],
     "sources": [
-      "app/dashboard/attendance/team/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\attendance\\team\\page.js"
     ]
   },
   {
     "route": "/dashboard/calendar",
     "name": "General Calendar",
     "controls": [
-      "Connection Error",
       "Failed to load calendar data",
-      "General Calendar",
-      "Retry",
-      "Something went wrong",
-      "Try Again"
+      "General Calendar"
     ],
     "sources": [
-      "app/dashboard/calendar/page.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\calendar\\page.js"
     ]
   },
   {
@@ -358,10 +298,7 @@
       "🗑️"
     ],
     "sources": [
-      "app/dashboard/chat/page.js",
-      "components/UnreadBadge.js",
-      "components/chat/MemberAvatar.js",
-      "components/ui/HeroModal.js"
+      "app\\dashboard\\chat\\page.js"
     ]
   },
   {
@@ -371,7 +308,6 @@
       "Active Departments",
       "Add Department",
       "Cancel",
-      "Connection Error",
       "Delete Department",
       "Delete Team",
       "Department Code",
@@ -382,11 +318,9 @@
       "Description",
       "Edit Department",
       "Edit Team",
-      "Retry",
       "Search and add department heads...",
       "Search leaders...",
       "Search members...",
-      "Something went wrong",
       "Team",
       "Team Code *",
       "Team Leaders",
@@ -396,21 +330,13 @@
       "Total Departments",
       "Total Employees",
       "Total Teams",
-      "Try Again",
       "e.g., ENG",
       "e.g., ENG-FE",
       "e.g., Engineering",
       "e.g., Frontend Squad"
     ],
     "sources": [
-      "app/dashboard/departments/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js",
-      "components/ui/heroui/Button.js",
-      "components/ui/heroui/Modal.js"
+      "app\\dashboard\\departments\\page.js"
     ]
   },
   {
@@ -421,23 +347,15 @@
       "Add Designation",
       "All Designations",
       "Cancel",
-      "Connection Error",
       "Description",
       "Designations",
-      "Retry",
       "Role description",
-      "Something went wrong",
       "Title *",
       "Total Designations",
-      "Try Again",
       "e.g., Software Engineer"
     ],
     "sources": [
-      "app/dashboard/designations/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js"
+      "app\\dashboard\\designations\\page.js"
     ]
   },
   {
@@ -446,50 +364,21 @@
     "controls": [
       "Cancel",
       "Close",
-      "Company documents",
       "Company-wide document",
-      "Connection Error",
-      "Document folders",
       "Document scope",
       "Documents",
-      "Documents grid",
       "Download",
       "Download original file",
       "Enter document name",
-      "Explain why this verification must be reviewed again",
       "File *",
-      "Load more",
       "Loading documents",
       "My documents",
-      "My onboarding documents",
-      "Reopen verification",
-      "Request changes",
-      "Retry",
       "Retry preview",
-      "Search by name or employee code…",
-      "Search document folders",
       "Select Category",
-      "Something went wrong",
-      "Try Again",
-      "Upload Document",
-      "View",
-      "View file",
-      "— Documents"
+      "Upload Document"
     ],
     "sources": [
-      "app/dashboard/documents/page.js",
-      "components/employees/DocumentFolders.js",
-      "components/employees/DocumentFolders.module.css",
-      "components/employees/DocumentGrid.js",
-      "components/employees/DocumentThumbnail.js",
-      "components/employees/EmployeeOnboardingDocuments.js",
-      "components/employees/FolderDocumentSurface.js",
-      "components/employees/FolderDocumentSurface.module.css",
-      "components/employees/OnboardingVerificationModal.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\documents\\page.js"
     ]
   },
   {
@@ -498,111 +387,27 @@
     "controls": [
       "AI Suggested KRIs",
       "About",
-      "Access revoked",
-      "Active remote support session",
       "Add",
       "Add a key responsibility…",
-      "Add component",
       "Appraisals",
-      "Asset clearance progress",
       "Back",
       "Bank Details",
-      "Begin notice and clearance",
-      "Calculation basis and approval notes",
-      "Cancel",
-      "Choose displays",
-      "Close",
-      "Complete offboarding",
-      "Connection Error",
       "Contact & Personal",
-      "Currency",
-      "Decline",
-      "Describe the support needed",
-      "Done",
-      "Download PDF",
       "Edit",
       "Emergency Contact",
-      "Employee lifecycle",
       "Employment",
-      "Exit interview",
-      "Explain why this verification must be reviewed again",
-      "Extend",
-      "FY 2026-27 / H1 2026",
-      "Full & final settlement",
-      "Full and final",
-      "Include a performance improvement plan",
       "KPI name",
       "KRI · KPI",
-      "Last working date",
-      "Letter type",
       "Manual KPIs",
       "Manual KRIs",
-      "Measurable goals and support to be provided",
-      "New appraisal recommendation",
       "Notes",
-      "Onboarding checklist",
-      "Onboarding progress",
-      "Outcome",
       "Overview",
-      "PIP goals",
-      "PIP review date",
-      "Performance appraisals",
-      "Prepare offer / appointment letter",
-      "Probation and confirmation",
-      "Proposed appraisal percentage",
-      "Raise appraisal request",
-      "Reason for recommendation",
-      "Reason for support request",
-      "Reason or notes",
-      "Remote support",
-      "Remote support with MIRA",
-      "Remove",
-      "Reopen verification",
-      "Request approval",
-      "Request changes",
-      "Request confirmation",
-      "Required reason for extension",
-      "Resignation date",
-      "Retry",
-      "Return condition",
-      "Review period",
-      "Save &amp; send email",
       "Save KRIs &amp; KPIs",
-      "Save settlement",
-      "Send",
-      "Send a command to the employee’s MIRA…",
-      "Separation and offboarding",
-      "Settlement date",
-      "Settlement notes",
-      "Shared display",
-      "Something went wrong",
-      "Start offboarding",
-      "Start sharing selected screen",
-      "Stop session",
-      "Stop sharing screens",
-      "Summarize the business rationale and impact…",
-      "Supporting performance pointers (one per line)",
       "Target",
-      "Try Again",
-      "Unit",
-      "Use employee details",
-      "View",
-      "View file",
-      "e.g. 8"
+      "Unit"
     ],
     "sources": [
-      "app/dashboard/employees/[id]/page.js",
-      "components/employees/EmployeeLifecyclePanel.js",
-      "components/employees/EmploymentLetterEditor.js",
-      "components/employees/OffboardingAssetChecklistModal.js",
-      "components/employees/OnboardingVerificationModal.js",
-      "components/employees/SettlementEditor.js",
-      "components/performance/PerformanceAppraisalPanel.js",
-      "components/remoteSupport/RemoteSupportAdminPanel.js",
-      "components/remoteSupport/RemoteSupportSessionView.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js"
+      "app\\dashboard\\employees\\[id]\\page.js"
     ]
   },
   {
@@ -616,8 +421,6 @@
       "5000",
       "50000",
       "800",
-      "AI Column Detection ( )",
-      "AI Detected Columns ( )",
       "Access Denied",
       "Add New Employee",
       "Assigned Manager",
@@ -626,8 +429,6 @@
       "Basic Salary",
       "Calculated probation review date",
       "Cancel",
-      "Change file",
-      "Clear selection",
       "Company",
       "Conveyance",
       "Date of Birth",
@@ -645,19 +446,14 @@
       "Enter login password",
       "Enter policy number",
       "Executive escalation",
-      "Existing Employees Updated ( )",
-      "Failed to Import ( )",
       "First Name",
       "Gender",
       "Go to Dashboard",
       "Gross Salary (Monthly)",
       "HRA",
-      "Import Complete",
-      "Import More",
       "Last Name",
       "Level",
       "Medical",
-      "New Employees Created ( )",
       "Notice period",
       "Onboarding plan",
       "PF Number",
@@ -667,17 +463,12 @@
       "Policy Provider",
       "Probation duration",
       "Probation review date",
-      "Remove",
-      "Remove selected",
-      "Remove this row",
       "Reports To",
       "Select Company",
       "Select Designation",
       "Select Gender",
       "Select Level",
       "Select Role",
-      "Select all rows",
-      "Smart Bulk Import",
       "Special Allowance",
       "UAN Number",
       "User Role",
@@ -691,10 +482,7 @@
       "📧 Login Credentials"
     ],
     "sources": [
-      "app/dashboard/employees/add/page.js",
-      "components/employees/BulkImportEmployees.js",
-      "components/ui/Loader.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\employees\\add\\page.js"
     ]
   },
   {
@@ -768,8 +556,7 @@
       "🏥 Corporate Health Insurance"
     ],
     "sources": [
-      "app/dashboard/employees/edit/[id]/page.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\employees\\edit\\[id]\\page.js"
     ]
   },
   {
@@ -778,27 +565,19 @@
     "controls": [
       "Cancel",
       "Clear filters",
-      "Connection Error",
       "Employee Email Address",
       "Failed",
       "Onboarding Emails",
       "Pending",
       "Queue all failed emails for automatic retry with rate limit protection",
-      "Retry",
       "Search by name, email, or employee code...",
       "Send Email",
       "Send Onboarding Email",
       "Sent",
-      "Something went wrong",
-      "Try Again",
       "employee@company.com"
     ],
     "sources": [
-      "app/dashboard/employees/onboarding-emails/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\employees\\onboarding-emails\\page.js"
     ]
   },
   {
@@ -819,7 +598,6 @@
       "Clear",
       "Clear Selection",
       "Clear filters to see all employees",
-      "Connection Error",
       "Current Workforce",
       "Edit Employee",
       "Employee Status",
@@ -842,20 +620,13 @@
       "Previous",
       "Probation",
       "Resigned",
-      "Retry",
       "Search by name, email, or employee code...",
-      "Something went wrong",
       "Sort by",
       "Terminated",
-      "Try Again",
       "View Details"
     ],
     "sources": [
-      "app/dashboard/employees/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\employees\\page.js"
     ]
   },
   {
@@ -863,22 +634,16 @@
     "name": "User Passwords",
     "controls": [
       "All",
-      "Connection Error",
       "Copy",
       "Copy All",
       "Passwords are encrypted at rest",
-      "Retry",
       "Search by name, email...",
-      "Something went wrong",
-      "Try Again",
       "User Passwords",
       "With Password",
       "Without Password"
     ],
     "sources": [
-      "app/dashboard/employees/user-passwords/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\employees\\user-passwords\\page.js"
     ]
   },
   {
@@ -886,17 +651,10 @@
     "name": "Approvals",
     "controls": [
       "-",
-      "Connection Error",
-      "Expense Approvals",
-      "Retry",
-      "Something went wrong",
-      "Try Again"
+      "Expense Approvals"
     ],
     "sources": [
-      "app/dashboard/expenses/approvals/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\expenses\\approvals\\page.js"
     ]
   },
   {
@@ -907,7 +665,6 @@
       "Amount",
       "Approved",
       "Cancel",
-      "Connection Error",
       "Date",
       "Description",
       "Enter expense details",
@@ -915,21 +672,13 @@
       "My Expenses",
       "Pending",
       "Rejected",
-      "Retry",
       "Select Category",
-      "Something went wrong",
       "Submit Expense",
       "Total Expenses",
-      "Try Again",
       "category"
     ],
     "sources": [
-      "app/dashboard/expenses/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js"
+      "app\\dashboard\\expenses\\page.js"
     ]
   },
   {
@@ -945,8 +694,7 @@
       "🗑️ Clear FCM Tokens from Database"
     ],
     "sources": [
-      "app/dashboard/fcm-diagnostic/page.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\fcm-diagnostic\\page.js"
     ]
   },
   {
@@ -955,21 +703,15 @@
     "controls": [
       "Back to Tickets",
       "Category",
-      "Connection Error",
       "Discussion",
       "Priority",
-      "Retry",
-      "Something went wrong",
       "Ticket Details",
-      "Try Again",
       "Type your reply...",
       "Update Status",
       "Update status"
     ],
     "sources": [
-      "app/dashboard/helpdesk/[id]/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\helpdesk\\[id]\\page.js"
     ]
   },
   {
@@ -979,25 +721,17 @@
       "Add a comment...",
       "Cancel",
       "Comments ( )",
-      "Connection Error",
       "Export report",
       "Helpdesk Management",
       "In Progress",
       "Open",
       "Resolved",
-      "Retry",
-      "Something went wrong",
       "Ticket:",
       "Total Tickets",
-      "Try Again",
       "Unassigned"
     ],
     "sources": [
-      "app/dashboard/helpdesk/manage/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\helpdesk\\manage\\page.js"
     ]
   },
   {
@@ -1006,7 +740,6 @@
     "controls": [
       "Brief description of the issue",
       "Cancel",
-      "Connection Error",
       "Create Ticket",
       "Description *",
       "Detailed description of the issue",
@@ -1015,18 +748,11 @@
       "My Tickets",
       "Open",
       "Resolved",
-      "Retry",
       "Select Category",
-      "Something went wrong",
-      "Total Tickets",
-      "Try Again"
+      "Total Tickets"
     ],
     "sources": [
-      "app/dashboard/helpdesk/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\helpdesk\\page.js"
     ]
   },
   {
@@ -1038,7 +764,7 @@
       "⊙ Find Me"
     ],
     "sources": [
-      "app/dashboard/hierarchy/page.js"
+      "app\\dashboard\\hierarchy\\page.js"
     ]
   },
   {
@@ -1048,26 +774,18 @@
       "Add Holiday",
       "Calendar View",
       "Cancel",
-      "Connection Error",
       "Holiday description",
       "Holidays",
       "List View",
       "Public Holidays",
-      "Retry",
       "Select Locations (Countries)",
-      "Something went wrong",
       "Today",
       "Total Holidays",
-      "Try Again",
       "Upcoming Holidays",
       "e.g., New Year's Day"
     ],
     "sources": [
-      "app/dashboard/holidays/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\holidays\\page.js"
     ]
   },
   {
@@ -1075,7 +793,7 @@
     "name": "hrms",
     "controls": [],
     "sources": [
-      "app/dashboard/hrms/page.js"
+      "app\\dashboard\\hrms\\page.js"
     ]
   },
   {
@@ -1089,9 +807,7 @@
       "✕"
     ],
     "sources": [
-      "app/dashboard/learning/certificates/page.js",
-      "components/ui/Loader.js",
-      "components/ui/ModalPortal.js"
+      "app\\dashboard\\learning\\certificates\\page.js"
     ]
   },
   {
@@ -1113,8 +829,7 @@
       "Time Management Mastery"
     ],
     "sources": [
-      "app/dashboard/learning/courses/page.js",
-      "components/ui/Loader.js"
+      "app\\dashboard\\learning\\courses\\page.js"
     ]
   },
   {
@@ -1135,7 +850,7 @@
       "Total Courses"
     ],
     "sources": [
-      "app/dashboard/learning/page.js"
+      "app\\dashboard\\learning\\page.js"
     ]
   },
   {
@@ -1155,8 +870,7 @@
       "View Certificate"
     ],
     "sources": [
-      "app/dashboard/learning/trainings/page.js",
-      "components/ui/Loader.js"
+      "app\\dashboard\\learning\\trainings\\page.js"
     ]
   },
   {
@@ -1167,24 +881,16 @@
       "Add First Leave Type",
       "Add Leave Type",
       "Cancel",
-      "Connection Error",
       "Leave Types",
       "Leave type description",
       "Paid Leaves",
-      "Retry",
-      "Something went wrong",
       "Total Days",
       "Total Leave Types",
-      "Try Again",
       "e.g., CL",
       "e.g., Casual Leave"
     ],
     "sources": [
-      "app/dashboard/leave-types/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\leave-types\\page.js"
     ]
   },
   {
@@ -1200,7 +906,6 @@
       "Bulk Import",
       "Cancel",
       "Clear search",
-      "Connection Error",
       "Employee Leave Balances -",
       "Employee balance pages",
       "Enter number of days",
@@ -1211,23 +916,16 @@
       "Next",
       "Pending Allocations",
       "Previous",
-      "Retry",
       "Search employee leave balances",
       "Search name or employee code…",
       "Select Employee",
       "Select Leave Type",
       "Select Year",
-      "Something went wrong",
       "Total Allocations",
-      "Total Employees",
-      "Try Again"
+      "Total Employees"
     ],
     "sources": [
-      "app/dashboard/leave/allocations/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\leave\\allocations\\page.js"
     ]
   },
   {
@@ -1237,20 +935,13 @@
       "Any important work handover instructions...",
       "Apply for Leave",
       "Cancel",
-      "Connection Error",
       "Contact number during leave",
       "Leave Balance",
       "Please provide a detailed reason for your leave...",
-      "Quick Tips",
-      "Retry",
-      "Something went wrong",
-      "Try Again"
+      "Quick Tips"
     ],
     "sources": [
-      "app/dashboard/leave/apply/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\leave\\apply\\page.js"
     ]
   },
   {
@@ -1260,30 +951,21 @@
       "All",
       "Approved",
       "Close",
-      "Connection Error",
       "Failed to load leave approvals",
       "Leave Approvals",
       "Leave Request Details",
       "Pending",
       "Rejected",
-      "Retry",
-      "Something went wrong",
-      "Total Requests",
-      "Try Again"
+      "Total Requests"
     ],
     "sources": [
-      "app/dashboard/leave/approvals/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\leave\\approvals\\page.js"
     ]
   },
   {
     "route": "/dashboard/leave/balance",
     "name": "My Leave Balance",
     "controls": [
-      "Connection Error",
       "Leave Balance",
       "Leave Balance Details",
       "Leave Balance by Type",
@@ -1291,37 +973,22 @@
       "Monthly Leave Usage",
       "Recent Leave History",
       "Remaining Balance",
-      "Retry",
       "Select Year",
-      "Something went wrong",
       "Total Allocated",
-      "Total Used",
-      "Try Again"
+      "Total Used"
     ],
     "sources": [
-      "app/dashboard/leave/balance/page.js",
-      "components/charts/CustomTooltip.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\leave\\balance\\page.js"
     ]
   },
   {
     "route": "/dashboard/leave/early-leave",
     "name": "Early Leave",
     "controls": [
-      "Connection Error",
-      "Early Leave",
-      "New request",
-      "Request history",
-      "Retry",
-      "Something went wrong",
-      "Try Again"
+      "Early Leave"
     ],
     "sources": [
-      "app/dashboard/leave/early-leave/page.js",
-      "components/leave/SpecialRequestPage.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\leave\\early-leave\\page.js"
     ]
   },
   {
@@ -1331,23 +998,15 @@
       "Apply Leave",
       "Apply for Leave",
       "Cancel",
-      "Connection Error",
       "Enter reason for leave",
       "Failed to load leave data",
       "Leave Management",
       "My Leave Requests",
       "My Requests",
-      "Retry",
-      "Select Leave Type",
-      "Something went wrong",
-      "Try Again"
+      "Select Leave Type"
     ],
     "sources": [
-      "app/dashboard/leave/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\leave\\page.js"
     ]
   },
   {
@@ -1360,7 +1019,6 @@
       "Approved",
       "Approved By",
       "Close",
-      "Connection Error",
       "Duration",
       "End Date",
       "Leave Request Details",
@@ -1370,38 +1028,23 @@
       "Reason",
       "Rejected",
       "Rejection Reason",
-      "Retry",
-      "Something went wrong",
       "Start Date",
       "Status",
       "Total Requests",
-      "Try Again",
       "View"
     ],
     "sources": [
-      "app/dashboard/leave/requests/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js"
+      "app\\dashboard\\leave\\requests\\page.js"
     ]
   },
   {
     "route": "/dashboard/leave/work-from-home",
     "name": "Work From Home",
     "controls": [
-      "Connection Error",
-      "New request",
-      "Request history",
-      "Retry",
-      "Something went wrong",
-      "Try Again",
       "Work From Home"
     ],
     "sources": [
-      "app/dashboard/leave/work-from-home/page.js",
-      "components/leave/SpecialRequestPage.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\leave\\work-from-home\\page.js"
     ]
   },
   {
@@ -1471,32 +1114,15 @@
       "e.g. Write a polite decline to the meeting invitation for next Tuesday..."
     ],
     "sources": [
-      "app/dashboard/mail/page.js"
+      "app\\dashboard\\mail\\page.js"
     ]
   },
   {
     "route": "/dashboard/manpower-requests",
     "name": "Manpower Requests",
-    "controls": [
-      "Approve & publish",
-      "Business case &amp; job requirements",
-      "Cancel",
-      "Manpower Requests",
-      "Manpower request list",
-      "New manpower request",
-      "New request",
-      "Next",
-      "Previous",
-      "Refresh",
-      "Reject",
-      "Rejection reason",
-      "Request pages",
-      "Request status",
-      "Role, headcount &amp; budget"
-    ],
+    "controls": [],
     "sources": [
-      "app/dashboard/manpower-requests/page.js",
-      "components/recruitment/ManpowerRequests.js"
+      "app\\dashboard\\manpower-requests\\page.js"
     ]
   },
   {
@@ -1508,115 +1134,45 @@
       "Agenda",
       "Allow guests to join with a shareable link",
       "Cancel",
-      "Connection Error",
       "Copy",
       "Decisions",
       "Decline",
       "Decline Meeting",
       "Delete",
-      "Description",
       "Edit meeting",
       "Follow Ups",
       "Guest meeting link",
       "Invitees ( )",
       "Key Contributions",
       "Key Points",
-      "Location",
       "Maybe",
       "Meeting not found",
-      "Meeting title",
       "Mira Notes Timeline",
       "Next Steps",
-      "One meeting at a time",
       "Organizer",
-      "Priority",
       "Reason for declining...",
-      "Retry",
-      "Return to meeting",
-      "Save changes",
       "Session Summary",
-      "Something went wrong",
-      "Stay here",
-      "Transcript History",
-      "Try Again"
+      "Transcript History"
     ],
     "sources": [
-      "app/dashboard/meetings/[id]/page.js",
-      "app/dashboard/meetings/components/EditMeetingModal.js",
-      "app/dashboard/meetings/components/MeetingJoinLink.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\meetings\\[id]\\page.js"
     ]
   },
   {
     "route": "/dashboard/meetings",
     "name": "Meetings",
     "controls": [
-      "Accept",
-      "Agenda Items (Optional)",
-      "Agenda item title",
       "All Meetings",
-      "Cancel",
-      "Clear all",
-      "Connection Error",
-      "Days of week *",
-      "Decline",
-      "Decline Meeting",
-      "Description",
-      "Duration *",
-      "Edit meeting",
       "Error loading meetings",
-      "Fri",
-      "Location",
-      "Location *",
-      "Meeting Time *",
-      "Meeting Title *",
-      "Meeting Type",
-      "Meeting agenda and objectives...",
-      "Meeting title",
       "Meetings",
-      "Min",
-      "Mon",
       "No meetings found",
-      "One meeting at a time",
       "Pending Invitations ( )",
-      "Priority",
-      "Reason for declining...",
-      "Repeat *",
-      "Repeat every *",
-      "Retry",
-      "Return to meeting",
-      "Sat",
-      "Save changes",
       "Schedule Meeting",
-      "Search employees...",
       "Search meetings...",
-      "Series End *",
-      "Series Start *",
-      "Something went wrong",
-      "Start Date & Time *",
-      "Stay here",
-      "Sun",
-      "Thu",
-      "Today's Meetings ( )",
-      "Try Again",
-      "Tue",
-      "Wed",
-      "e.g., Conference Room A, 3rd Floor",
-      "e.g., Weekly Team Standup"
+      "Today's Meetings ( )"
     ],
     "sources": [
-      "app/dashboard/meetings/components/CreateMeetingModal.js",
-      "app/dashboard/meetings/components/EditMeetingModal.js",
-      "app/dashboard/meetings/components/MeetingCard.js",
-      "app/dashboard/meetings/components/MeetingJoinLink.js",
-      "app/dashboard/meetings/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/Loader.js"
+      "app\\dashboard\\meetings\\page.js"
     ]
   },
   {
@@ -1624,65 +1180,36 @@
     "name": "meetings / room / [roomId]",
     "controls": [],
     "sources": [
-      "app/dashboard/meetings/room/[roomId]/page.js"
+      "app\\dashboard\\meetings\\room\\[roomId]\\page.js"
     ]
   },
   {
     "route": "/dashboard",
     "name": "Dashboard",
-    "controls": [
-      "Active Today",
-      "Completed Tasks",
-      "Late Today",
-      "On Leave",
-      "Open Positions",
-      "Pending Approvals",
-      "Pending Tasks",
-      "Present Today",
-      "Team Size",
-      "Today's work hours",
-      "Total Employees"
-    ],
+    "controls": [],
     "sources": [
-      "app/dashboard/page.js",
-      "components/dashboard/index.js",
-      "components/dashboards/UnifiedDashboard.js",
-      "components/widgets/AttendanceHeaderSummary.js",
-      "components/widgets/index.js"
+      "app\\dashboard\\page.js"
     ]
   },
   {
     "route": "/dashboard/payroll/generate",
     "name": "Generate Payroll",
     "controls": [
-      "Absent",
-      "Attendance Correction -",
+      "Back to Selection",
       "Clear Filters",
-      "Done",
       "Filters",
       "Generate Payroll",
-      "Half Day",
-      "Holiday",
-      "Late",
       "No Department",
-      "On Leave",
       "Payroll Period",
       "Payroll Preview -",
       "Pending Leave Requests",
-      "Present",
       "Refresh",
       "Salary Calculation Method",
       "Search by name, code, email, department...",
-      "Select Employees",
-      "WFH",
-      "← Back to Selection"
+      "Select Employees"
     ],
     "sources": [
-      "app/dashboard/payroll/generate/page.js",
-      "components/payroll/AttendanceCorrectionModal.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/heroui/index.js"
+      "app\\dashboard\\payroll\\generate\\page.js"
     ]
   },
   {
@@ -1733,9 +1260,7 @@
       "Yes Bank"
     ],
     "sources": [
-      "app/dashboard/payroll/page.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/heroui/index.js"
+      "app\\dashboard\\payroll\\page.js"
     ]
   },
   {
@@ -1743,90 +1268,45 @@
     "name": "payroll / payslips / [id]",
     "controls": [
       "ATTENDANCE SUMMARY",
-      "Connection Error",
       "DEDUCTIONS",
       "EARNINGS",
       "Go Back",
-      "Retry",
       "SALARY SLIP",
-      "Salary Slip -",
-      "Something went wrong",
-      "Try Again"
+      "Salary Slip -"
     ],
     "sources": [
-      "app/dashboard/payroll/payslips/[id]/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\payroll\\payslips\\[id]\\page.js"
     ]
   },
   {
     "route": "/dashboard/payroll/payslips",
     "name": "Payslips",
     "controls": [
-      "Active",
-      "Approved",
-      "Cancelled",
-      "Connection Error",
-      "Data table",
       "Deductions",
-      "Draft",
       "Earnings",
       "Employee Details",
-      "Failed",
-      "Inactive",
       "My Payslips",
       "Net Salary",
-      "Paid",
       "Payslip -",
       "Payslips for",
       "Payslips table",
-      "Pending",
-      "Processing",
-      "Rejected",
-      "Retry",
-      "Something went wrong",
       "Total Payslips",
-      "Try Again",
       "YTD Deductions",
       "YTD Gross",
-      "YTD Net Pay",
-      "text-default-600 font-medium text-sm",
-      "text-default-700 text-sm"
+      "YTD Net Pay"
     ],
     "sources": [
-      "app/dashboard/payroll/payslips/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/heroui/Button.js",
-      "components/ui/heroui/Card.js",
-      "components/ui/heroui/Input.js",
-      "components/ui/heroui/Modal.js",
-      "components/ui/heroui/Table.js"
+      "app\\dashboard\\payroll\\payslips\\page.js"
     ]
   },
   {
     "route": "/dashboard/performance/appraisals",
     "name": "performance / appraisals",
     "controls": [
-      "Appraisal requests",
-      "Cancel",
-      "Decline",
-      "FY 2026-27 / H1 2026",
-      "New appraisal recommendation",
-      "Outcome",
-      "Performance appraisals",
-      "Proposed appraisal percentage",
-      "Raise appraisal request",
-      "Reason for recommendation",
-      "Review period",
-      "Summarize the business rationale and impact…",
-      "Supporting performance pointers (one per line)",
-      "e.g. 8"
+      "Appraisal requests"
     ],
     "sources": [
-      "app/dashboard/performance/appraisals/page.js",
-      "components/performance/PerformanceAppraisalPanel.js"
+      "app\\dashboard\\performance\\appraisals\\page.js"
     ]
   },
   {
@@ -1856,8 +1336,7 @@
       "What areas need improvement?"
     ],
     "sources": [
-      "app/dashboard/performance/create/page.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\performance\\create\\page.js"
     ]
   },
   {
@@ -1879,7 +1358,7 @@
       "Updates History"
     ],
     "sources": [
-      "app/dashboard/performance/goals/[id]/page.js"
+      "app\\dashboard\\performance\\goals\\[id]\\page.js"
     ]
   },
   {
@@ -1910,8 +1389,7 @@
       "status"
     ],
     "sources": [
-      "app/dashboard/performance/goals/create/page.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\performance\\goals\\create\\page.js"
     ]
   },
   {
@@ -1942,8 +1420,7 @@
       "status"
     ],
     "sources": [
-      "app/dashboard/performance/goals/edit/[id]/page.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\performance\\goals\\edit\\[id]\\page.js"
     ]
   },
   {
@@ -1953,7 +1430,6 @@
       "%",
       "Cancelled",
       "Completed",
-      "Connection Error",
       "Create Goal",
       "Delete",
       "Edit",
@@ -1968,16 +1444,11 @@
       "Pending",
       "Performance Goals",
       "Refresh",
-      "Retry",
       "Search...",
-      "Something went wrong",
-      "Try Again",
       "View"
     ],
     "sources": [
-      "app/dashboard/performance/goals/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\performance\\goals\\page.js"
     ]
   },
   {
@@ -1986,7 +1457,6 @@
     "controls": [
       "Add Goal",
       "Below Expectations",
-      "Connection Error",
       "Exceeds Expectations",
       "Exceptional",
       "Failed to load performance data",
@@ -2005,22 +1475,17 @@
       "Overview",
       "Recent Feedback",
       "Recent Goals",
-      "Retry",
       "Reviews",
       "Reviews & Feedback ( )",
       "Set New Goal",
       "Set Your First Goal",
       "Set your first goal",
-      "Something went wrong",
       "Tabs",
-      "Try Again",
       "View All",
       "View Details"
     ],
     "sources": [
-      "app/dashboard/performance/my-performance/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\performance\\my-performance\\page.js"
     ]
   },
   {
@@ -2031,23 +1496,17 @@
       "Average Rating",
       "Comments:",
       "Completed Goals",
-      "Connection Error",
       "Employee Ratings",
       "Goals & Objectives",
       "Pending Reviews",
       "Performance Management",
       "Performance Reports",
       "Performance Reviews",
-      "Retry",
-      "Something went wrong",
       "Strengths:",
-      "Total Reviews",
-      "Try Again"
+      "Total Reviews"
     ],
     "sources": [
-      "app/dashboard/performance/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\performance\\page.js"
     ]
   },
   {
@@ -2055,25 +1514,19 @@
     "name": "Employee Ratings",
     "controls": [
       "Average Rating",
-      "Connection Error",
       "Employee Ratings",
       "Filter by category",
       "Filter by department",
       "Filter by team",
       "High Performers",
       "No ratings found",
-      "Retry",
       "Search employees...",
-      "Something went wrong",
       "This Month",
       "Total Reviews",
-      "Try Again",
       "View Profile"
     ],
     "sources": [
-      "app/dashboard/performance/ratings/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\performance\\ratings\\page.js"
     ]
   },
   {
@@ -2083,7 +1536,6 @@
       "AI Productivity Scores (Top 10)",
       "Attendance",
       "Attendance by Day of Week",
-      "Connection Error",
       "Department",
       "Department Analysis",
       "Department Attendance",
@@ -2099,25 +1551,19 @@
       "Performance Overview",
       "Performance Reports & Analytics",
       "Rating Distribution",
-      "Retry",
       "Search by name, code, or department...",
       "Select department",
       "Select team",
-      "Something went wrong",
       "Start Date",
       "Task Status Distribution",
       "Tasks",
       "Tasks by Priority",
       "Team",
       "Top Performers (Attendance)",
-      "Top Skills Analysis",
-      "Try Again"
+      "Top Skills Analysis"
     ],
     "sources": [
-      "app/dashboard/performance/reports/page.js",
-      "components/charts/CustomTooltip.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\performance\\reports\\page.js"
     ]
   },
   {
@@ -2132,24 +1578,16 @@
       "Choose one or more departments",
       "Close",
       "Company Policies",
-      "Connection Error",
       "Failed to load policies",
       "Full policy content...",
       "Pending Acknowledgments",
       "Policies",
-      "Retry",
       "Select Category",
-      "Something went wrong",
       "Total Policies",
-      "Try Again",
       "e.g., Work From Home Policy"
     ],
     "sources": [
-      "app/dashboard/policies/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\policies\\page.js"
     ]
   },
   {
@@ -2157,7 +1595,6 @@
     "name": "Productivity",
     "controls": [
       "Achievements",
-      "Analyzed Mosaic ( )",
       "Areas for Improvement",
       "Back to team",
       "Close",
@@ -2178,9 +1615,7 @@
       "Team"
     ],
     "sources": [
-      "app/dashboard/productivity/page.js",
-      "components/productivity/AnalyzedComposite.js",
-      "components/ui/HeroModal.js"
+      "app\\dashboard\\productivity\\page.js"
     ]
   },
   {
@@ -2188,8 +1623,6 @@
     "name": "profile",
     "controls": [
       "90°",
-      "Aadhaar Verification",
-      "Active Sessions",
       "Brightness",
       "Cancel",
       "Continue",
@@ -2208,8 +1641,6 @@
       "Rotation",
       "Saturation",
       "Tell a little bit about yourself, your expertise, and how you contribute.",
-      "Use Aadhaar Value",
-      "Use Address",
       "Use this address",
       "Use this date",
       "Zoom",
@@ -2218,14 +1649,7 @@
       "e.g., Spouse, Parent, Sibling"
     ],
     "sources": [
-      "app/dashboard/profile/page.js",
-      "components/AadhaarVerificationSection.js",
-      "components/ActiveSessionsSection.js",
-      "components/ModalPortal.js",
-      "components/TiltWrapper.js",
-      "components/ui/HeroModal.js",
-      "components/ui/Loader.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\profile\\page.js"
     ]
   },
   {
@@ -2253,9 +1677,7 @@
       "Team Members"
     ],
     "sources": [
-      "app/dashboard/projects/[projectId]/edit/page.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/Portal.js"
+      "app\\dashboard\\projects\\[projectId]\\edit\\page.js"
     ]
   },
   {
@@ -2275,17 +1697,14 @@
       "Assign To",
       "Assigned To",
       "Attachments",
-      "Blockers & Bottlenecks",
       "Cancel",
       "Color",
       "Complete",
-      "Completed",
       "Confirm Change",
       "Content",
       "Create New Note",
       "Create New Task",
       "Create the first note",
-      "Daily Task Completion (Last 30 Days)",
       "Days",
       "Delete",
       "Describe the task...",
@@ -2296,9 +1715,7 @@
       "Enter task title",
       "Enter task title...",
       "Enter the reason for this status change...",
-      "Generate Smart Insights",
       "Hours",
-      "Immediate Actions",
       "In Progress",
       "Mark Complete",
       "Members",
@@ -2314,11 +1731,7 @@
       "Post",
       "Previous month",
       "Priority",
-      "Progress",
-      "Progress Overview",
-      "Project Completion Forecast",
       "Project sections",
-      "Quick Wins",
       "Reason Required",
       "Reason for change",
       "Reason for deletion request...",
@@ -2326,7 +1739,6 @@
       "Reassign",
       "Reassign Task",
       "Reassign To",
-      "Refresh Insights",
       "Refresh activity",
       "Reject",
       "Reject Project Invitation",
@@ -2334,46 +1746,25 @@
       "Retry",
       "Review",
       "Review Rejected",
-      "Risk Radar",
       "Save",
       "Search activity...",
       "Select a team member",
       "Set Your ETA",
-      "Smart Insights",
-      "Subtask Progress",
       "Subtask title...",
       "Subtasks",
       "Subtasks ( / )",
-      "Task Burndown",
       "Task Details",
-      "Task Insights",
-      "Task Priority Distribution",
-      "Task Progress",
-      "Task Status Distribution",
       "Task Title",
       "Task Title *",
       "Tasks",
-      "Team Analytics",
-      "Team Member Analysis",
-      "Team Task Distribution",
-      "This Week's Focus",
-      "Time Elapsed",
-      "Time vs Task Progress",
       "Title (optional)",
       "To Do",
       "Unpin",
       "Visibility",
-      "Workload Distribution",
       "Write your note..."
     ],
     "sources": [
-      "app/dashboard/projects/[projectId]/page.js",
-      "components/projects/ProjectOverview.js",
-      "components/tasks/KanbanBoard.js",
-      "components/tasks/SubtaskCompletionButton.js",
-      "components/ui/Loader.js",
-      "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "app\\dashboard\\projects\\[projectId]\\page.js"
     ]
   },
   {
@@ -2396,45 +1787,32 @@
       "To Do"
     ],
     "sources": [
-      "app/dashboard/projects/approvals/page.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "app\\dashboard\\projects\\approvals\\page.js"
     ]
   },
   {
     "route": "/dashboard/projects/assigned-tasks",
     "name": "Assigned Tasks",
     "controls": [
-      "0",
       "Active Tasks",
       "Add Subtask",
       "Add User",
       "Add Users to Task",
-      "Add a subtask...",
-      "Assign New Task",
       "Assign Task",
-      "Assign To",
       "Assigned Tasks",
       "Assignees",
       "Attachments",
       "Awaiting Acceptance",
       "Cancel",
       "Completed",
-      "Days",
       "Delete",
       "Delete Task",
       "Deletion Request",
-      "Describe the task...",
       "Description",
       "Due Date",
       "Edit Task",
       "Enter subtask title...",
-      "Enter task title",
       "Filters",
-      "Hours",
-      "In Progress",
       "Kanban View",
       "List View",
       "Next month",
@@ -2452,23 +1830,17 @@
       "Reassign",
       "Reassign Task",
       "Respond",
-      "Review",
-      "Search employees...",
       "Search tasks...",
       "Select New Assignee",
       "Select Team Members",
       "Select a team member...",
-      "Set Your ETA",
       "Status",
       "Status filter",
       "Subtask Title *",
-      "Subtasks",
       "Subtasks ( / )",
       "Switch to list view to review",
       "Task Details",
-      "Task Title",
       "Title *",
-      "To Do",
       "Update Status",
       "View Project",
       "Why are you changing this task&apos;s status?",
@@ -2477,15 +1849,7 @@
       "task(s) pending deletion approval"
     ],
     "sources": [
-      "app/dashboard/projects/assigned-tasks/page.js",
-      "components/tasks/CreateTaskModal.js",
-      "components/tasks/KanbanBoard.js",
-      "components/tasks/SubtaskCompletionButton.js",
-      "components/ui/HeroModal.js",
-      "components/ui/Loader.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "app\\dashboard\\projects\\assigned-tasks\\page.js"
     ]
   },
   {
@@ -2517,11 +1881,7 @@
       "e.g., frontend, urgent, Q1"
     ],
     "sources": [
-      "app/dashboard/projects/create/page.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "app\\dashboard\\projects\\create\\page.js"
     ]
   },
   {
@@ -2533,27 +1893,20 @@
       "Add Comment",
       "Add a subtask...",
       "All Tasks",
-      "Assign New Task",
       "Assign Task",
-      "Assign To",
       "Assignees",
       "Attachments",
       "Cancel",
-      "Completed",
       "Days",
       "Delete Task",
       "Delete subtask",
       "Delete task",
-      "Describe the task...",
       "Description",
-      "Due Date",
       "Due Today ( )",
-      "Enter task title",
       "Filter by Priority",
       "Filter by Project",
       "Filter by Status",
       "Hours",
-      "In Progress",
       "Kanban View",
       "List View",
       "My Tasks",
@@ -2562,36 +1915,20 @@
       "Overdue ( )",
       "Pending Acceptance ( )",
       "Previous month",
-      "Priority",
       "Progress",
-      "Project",
       "Reason for rejection...",
       "Reject",
       "Reject Assignment",
-      "Review",
-      "Search employees...",
       "Search tasks...",
       "Set Estimated Time",
-      "Set Your ETA",
-      "Subtasks",
       "Subtasks ( / )",
       "Switch to List View to Accept/Reject",
       "Task Details",
-      "Task Title",
-      "To Do",
       "Update Status",
       "View Project"
     ],
     "sources": [
-      "app/dashboard/projects/my-tasks/page.js",
-      "components/tasks/CreateTaskModal.js",
-      "components/tasks/KanbanBoard.js",
-      "components/tasks/SubtaskCompletionButton.js",
-      "components/ui/HeroModal.js",
-      "components/ui/Loader.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js",
-      "components/ui/Portal.js"
+      "app\\dashboard\\projects\\my-tasks\\page.js"
     ]
   },
   {
@@ -2601,68 +1938,31 @@
       "Active",
       "Archived",
       "Completed",
-      "Connection Error",
       "Create Project",
       "No projects found",
       "Projects",
-      "Retry",
-      "Search projects...",
-      "Something went wrong",
-      "Try Again"
+      "Search projects..."
     ],
     "sources": [
-      "app/dashboard/projects/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\projects\\page.js"
     ]
   },
   {
     "route": "/dashboard/rbac/roles",
     "name": "Role Management",
     "controls": [
-      "Access Denied",
-      "All",
-      "All Events",
-      "Assign to User",
       "Assign users",
       "Audit Log",
-      "Brief description of this role...",
-      "Cancel",
-      "Clear",
-      "Close modal",
       "Create Custom Role",
       "Create Role",
       "Delete role",
       "Edit role",
-      "Filter by event",
-      "Go Back",
-      "Go to Dashboard",
-      "Next",
       "No roles configured",
-      "None",
-      "Permission Denied",
-      "Previous",
-      "RBAC Audit Log",
-      "Role Created",
-      "Role Deleted",
       "Role Management",
-      "Role Updated",
-      "Search users by name or email...",
-      "Seed System Roles",
-      "User Role Changed",
-      "Your Access Level:",
-      "e.g. Sales Manager",
-      "e.g. sales_manager"
+      "Seed System Roles"
     ],
     "sources": [
-      "app/dashboard/rbac/roles/page.js",
-      "components/RoleBasedAccess.js",
-      "components/rbac/AuditLogPanel.js",
-      "components/rbac/RoleAssignModal.js",
-      "components/rbac/RoleBuilder.js",
-      "components/ui/Loader.js",
-      "components/ui/Modal.js"
+      "app\\dashboard\\rbac\\roles\\page.js"
     ]
   },
   {
@@ -2676,7 +1976,6 @@
       "Candidate CV / resume",
       "Candidate Pipeline",
       "Close",
-      "Connection Error",
       "Job Description",
       "Job Information",
       "Publish",
@@ -2688,20 +1987,13 @@
       "Required Skills",
       "Requirements",
       "Responsibilities",
-      "Retry",
-      "Something went wrong",
       "Status Actions",
-      "Try Again",
       "View All",
       "View Candidates ( )",
       "View Interviews"
     ],
     "sources": [
-      "app/dashboard/recruitment/[id]/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\recruitment\\[id]\\page.js"
     ]
   },
   {
@@ -2711,7 +2003,6 @@
       "Avg Time to Hire",
       "Back to Recruitment",
       "Candidate Sources",
-      "Connection Error",
       "Conversion Rate",
       "Hired",
       "Hiring by Department",
@@ -2721,16 +2012,11 @@
       "Open Jobs",
       "Pipeline Breakdown",
       "Recruitment Analytics",
-      "Retry",
-      "Something went wrong",
       "Total Candidates",
-      "Total Jobs",
-      "Try Again"
+      "Total Jobs"
     ],
     "sources": [
-      "app/dashboard/recruitment/analytics/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\recruitment\\analytics\\page.js"
     ]
   },
   {
@@ -2746,7 +2032,6 @@
       "Candidate Not Found",
       "Change Candidate Stage",
       "Change Stage",
-      "Connection Error",
       "Convert to Employee",
       "Delete",
       "Equipment and access",
@@ -2761,23 +2046,16 @@
       "Rate Candidate",
       "Reason for stage change...",
       "Resume",
-      "Retry",
       "Search or select reporting manager",
       "Skills",
-      "Something went wrong",
       "Stage History",
       "Tags",
-      "Try Again",
       "Update Rating",
       "Update Stage",
       "e.g., EMP-001"
     ],
     "sources": [
-      "app/dashboard/recruitment/candidates/[id]/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\recruitment\\candidates\\[id]\\page.js"
     ]
   },
   {
@@ -2788,20 +2066,14 @@
       "All Sources",
       "All Stages",
       "Candidates",
-      "Connection Error",
       "Failed to load candidates",
       "List",
       "No candidates found",
       "Pipeline",
-      "Retry",
-      "Search candidates...",
-      "Something went wrong",
-      "Try Again"
+      "Search candidates..."
     ],
     "sources": [
-      "app/dashboard/recruitment/candidates/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\recruitment\\candidates\\page.js"
     ]
   },
   {
@@ -2830,7 +2102,7 @@
       "e.g. Senior Software Engineer"
     ],
     "sources": [
-      "app/dashboard/recruitment/create/page.js"
+      "app\\dashboard\\recruitment\\create\\page.js"
     ]
   },
   {
@@ -2859,7 +2131,7 @@
       "e.g. Senior Software Engineer"
     ],
     "sources": [
-      "app/dashboard/recruitment/edit/[id]/page.js"
+      "app\\dashboard\\recruitment\\edit\\[id]\\page.js"
     ]
   },
   {
@@ -2873,26 +2145,18 @@
       "Areas of improvement...",
       "Cancel",
       "Candidate's strengths...",
-      "Connection Error",
       "Failed to load interviews",
       "Feedback",
       "Interviews",
       "No interviews found",
       "Office / Room name",
-      "Retry",
       "Schedule Interview",
-      "Something went wrong",
       "Submit Feedback",
-      "Try Again",
       "e.g., Technical Interview Round 1",
       "https://meet.google.com/..."
     ],
     "sources": [
-      "app/dashboard/recruitment/interviews/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\recruitment\\interviews\\page.js"
     ]
   },
   {
@@ -2903,7 +2167,6 @@
       "All Status",
       "Analytics",
       "Candidates",
-      "Connection Error",
       "Create Job",
       "Employment Type",
       "Hired",
@@ -2912,42 +2175,20 @@
       "No job postings found",
       "Open Positions",
       "Recruitment",
-      "Retry",
       "Search jobs...",
-      "Something went wrong",
       "Total Candidates",
-      "Total Jobs",
-      "Try Again"
+      "Total Jobs"
     ],
     "sources": [
-      "app/dashboard/recruitment/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\recruitment\\page.js"
     ]
   },
   {
     "route": "/dashboard/recruitment/requisitions",
     "name": "Manpower Requests",
-    "controls": [
-      "Approve & publish",
-      "Business case &amp; job requirements",
-      "Cancel",
-      "Manpower Requests",
-      "Manpower request list",
-      "New manpower request",
-      "New request",
-      "Next",
-      "Previous",
-      "Refresh",
-      "Reject",
-      "Rejection reason",
-      "Request pages",
-      "Request status",
-      "Role, headcount &amp; budget"
-    ],
+    "controls": [],
     "sources": [
-      "app/dashboard/recruitment/requisitions/page.js",
-      "components/recruitment/ManpowerRequests.js"
+      "app\\dashboard\\recruitment\\requisitions\\page.js"
     ]
   },
   {
@@ -2968,101 +2209,32 @@
       "Select Type"
     ],
     "sources": [
-      "app/dashboard/reports/page.js",
-      "components/mobile/MobileComponents.js",
-      "components/ui/Loader.js"
+      "app\\dashboard\\reports\\page.js"
     ]
   },
   {
     "route": "/dashboard/resignations",
     "name": "Resignations & Exits",
-    "controls": [
-      "Add component",
-      "Asset clearance progress",
-      "Calculation basis and approval notes",
-      "Cancel",
-      "Currency",
-      "Done",
-      "Download relieving &amp; F&amp;F PDF",
-      "Full & final settlement",
-      "Full-and-final settlement &amp; exit",
-      "I understand this submits a formal resignation request to HR.",
-      "New resignation request",
-      "Notice period (calendar days)",
-      "Notice start date",
-      "Payment / recovery reference (or zero-balance explanation)",
-      "Refresh requests",
-      "Refresh status",
-      "Remove",
-      "Resignation dashboard",
-      "Resignation requests",
-      "Resignation views",
-      "Resignations &amp; Exits",
-      "Retry",
-      "Return condition",
-      "Review asset returns",
-      "Save settlement",
-      "Send documents by email",
-      "Settlement date",
-      "Settlement notes",
-      "Start F&amp;F / offboarding",
-      "Submit resignation"
-    ],
+    "controls": [],
     "sources": [
-      "app/dashboard/resignations/page.js",
-      "components/employees/OffboardingAssetChecklistModal.js",
-      "components/employees/ResignationExitPanel.js",
-      "components/employees/ResignationPanel.js",
-      "components/employees/SettlementEditor.js",
-      "components/ui/HeroModal.js"
+      "app\\dashboard\\resignations\\page.js"
     ]
   },
   {
     "route": "/dashboard/sandbox",
     "name": "Ideas",
     "controls": [
-      "Add a comment...",
       "All Ideas",
-      "Cancel",
-      "Category",
-      "Comments ( )",
-      "Connection Error",
-      "Cost",
-      "Delete",
-      "Describe your idea...",
-      "Description *",
-      "Enter your idea title...",
-      "Env",
-      "Environment",
       "Filters",
       "Ideas Sandbox",
-      "Learn",
       "My Ideas",
       "New Idea",
       "No ideas found",
-      "Office",
-      "Other",
-      "Process",
-      "Product",
-      "Retry",
-      "Safety",
       "Search ideas...",
-      "Service",
-      "Share an Idea",
-      "Something went wrong",
-      "Tech",
-      "Title *",
-      "Training",
-      "Try Again",
-      "Workplace"
+      "Share an Idea"
     ],
     "sources": [
-      "app/dashboard/sandbox/components/CreateIdeaModal.js",
-      "app/dashboard/sandbox/components/IdeaCard.js",
-      "app/dashboard/sandbox/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/Loader.js"
+      "app\\dashboard\\sandbox\\page.js"
     ]
   },
   {
@@ -3075,10 +2247,8 @@
       "Break Timings",
       "Break name (e.g., Lunch Break)",
       "Cancel",
-      "Connection Error",
       "Delete",
       "Description",
-      "Drag to set geofence center",
       "Edit",
       "End Time",
       "Failed to load geofence locations",
@@ -3092,20 +2262,12 @@
       "Optional description",
       "Primary Location",
       "Radius (meters)",
-      "Retry",
-      "Something went wrong",
       "Start Time",
-      "Try Again",
-      "Use current location",
       "e.g., Main Office, Branch Office",
       "×"
     ],
     "sources": [
-      "app/dashboard/settings/geofence-locations/page.js",
-      "components/GeofenceMap.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/ModalPortal.js"
+      "app\\dashboard\\settings\\geofence-locations\\page.js"
     ]
   },
   {
@@ -3160,10 +2322,7 @@
       "Type"
     ],
     "sources": [
-      "app/dashboard/settings/notifications/page.js",
-      "components/ui/Loader.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/ModalPortal.js"
+      "app\\dashboard\\settings\\notifications\\page.js"
     ]
   },
   {
@@ -3174,9 +2333,7 @@
       "100",
       "10001",
       "123 Main Street",
-      "192.168.1.50",
       "28.6139",
-      "4370",
       "77.2090",
       "Absent Day Deduction",
       "Absent Threshold (min)",
@@ -3190,14 +2347,10 @@
       "Add Leave Type",
       "Add Location",
       "Add Your First Location",
-      "Add machine",
-      "Add the first machine",
-      "Add useful context such as your role, projects, terminology, or preferences…",
       "Add your redirect URL exactly",
       "Address",
       "Associate the correct company page",
       "Attendance machines",
-      "Attendance machines could not be loaded",
       "Attendance-Based Deductions",
       "Break name (e.g., Lunch Break)",
       "Brief description of the company",
@@ -3213,12 +2366,9 @@
       "Company Name",
       "Company Name *",
       "Company Settings",
-      "Company orientation modules",
       "Connected At",
       "Connection",
       "Copy Client ID and Client Secret",
-      "Copy URL",
-      "Copy token",
       "Country",
       "Currency",
       "Deduction Type",
@@ -3226,9 +2376,7 @@
       "Departments",
       "Description",
       "Designations",
-      "Disable connection",
       "Discard changes",
-      "Done",
       "ESI (Employee State Insurance)",
       "ESI Percentage (%)",
       "Edit",
@@ -3240,7 +2388,6 @@
       "End Time",
       "Engineering",
       "Enter company name",
-      "Example: Keep routine answers concise and use my team's project naming conventions.",
       "Fixed Amount (₹)",
       "Full Day Hours",
       "Full address (auto-filled from map)",
@@ -3252,14 +2399,11 @@
       "Half Day Hours",
       "Half-Day Deduction",
       "Half-day days",
-      "Head office, Gate 1",
       "Holidays",
       "How To Grab The Credentials",
       "Human Resources",
-      "Import CSV",
       "Independence Day",
       "Induction & orientation",
-      "Induction presentation",
       "Last Sync",
       "Late Arrival Deduction",
       "Late Threshold (min)",
@@ -3269,38 +2413,28 @@
       "Login",
       "Longitude",
       "MIRA",
-      "MIRA voice",
-      "Main entrance",
       "Minimum Hours",
-      "My knowledge for MIRA",
       "NY",
       "New Year&apos;s Day",
       "New York",
-      "Next",
       "No companies found",
       "No companies yet",
-      "No machines configured",
       "Notification Settings",
       "Notifications",
       "Open LinkedIn Developers",
-      "Optional but recommended",
       "Optional description for this location",
       "Organisation",
-      "Organisation default",
       "Overtime Settings",
       "PF Percentage (%)",
       "Paid Time Off",
       "Payroll",
       "Payroll Settings",
-      "Personal instructions",
       "Phone",
       "Present days",
-      "Previous",
       "Primary Location",
       "Professional Tax",
       "Professional setup for your current env-based LinkedIn flow",
       "Provident Fund (PF)",
-      "Publish induction",
       "Push Notifications",
       "Radius (meters)",
       "Rate Multiplier",
@@ -3310,15 +2444,10 @@
       "Required .env Keys",
       "Required GPS accuracy",
       "Reset",
-      "Retry",
-      "Rotate token",
       "Sales",
       "Save Changes",
-      "Search providers, protocols, or models",
       "Search settings",
       "Select a Company",
-      "Select or enter a model",
-      "Selected",
       "Settings",
       "Settings sections",
       "Sick Leave",
@@ -3333,11 +2462,8 @@
       "Timezone *",
       "Token Health",
       "United States",
-      "Upload induction PDF or PowerPoint (.pptx), up to 25 MB / 100 pages",
       "Value",
       "Website",
-      "Withdraw presentation",
-      "WordPress careers sync",
       "Work locations",
       "Working Days *",
       "Working Days Per Month",
@@ -3345,24 +2471,14 @@
       "company@example.com",
       "e.g., ACME",
       "e.g., Main Office, Branch 1",
-      "https://api.vendor.example",
       "https://www.example.com",
-      "· Induction & orientation",
       "✏️",
       "✕",
       "📊 Settings Summary",
       "🗑️"
     ],
     "sources": [
-      "app/dashboard/settings/page.js",
-      "components/induction/PresentationReader.js",
-      "components/settings/AttendanceMachinesSettings.js",
-      "components/settings/InductionSettings.js",
-      "components/settings/MiraSettings.js",
-      "components/settings/WordPressRecruitmentSettings.js",
-      "components/ui/HeroModal.js",
-      "components/ui/LoadingButton.js",
-      "components/ui/heroui/SearchableSelect.js"
+      "app\\dashboard\\settings\\page.js"
     ]
   },
   {
@@ -3373,198 +2489,43 @@
       "Attendance Settings",
       "Company Address",
       "Company Information",
-      "Connection Error",
       "Currency Settings",
       "Failed to load preferences",
-      "Retry",
-      "Something went wrong",
       "System Preferences",
       "Time & Date Settings",
-      "Try Again",
       "Work Settings",
       "Your Company Name",
       "info@company.com",
       "₹"
     ],
     "sources": [
-      "app/dashboard/settings/preferences/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\settings\\preferences\\page.js"
     ]
   },
   {
     "route": "/dashboard/talioboard/[id]",
     "name": "talioboard / [id]",
     "controls": [
-      "Aa",
-      "Add Page",
-      "Agent Mode",
-      "Agent workspace",
-      "Analyse Your Canvas",
-      "Arrow Color",
-      "Arrow Type",
-      "Back",
       "Back to boards",
-      "Be as detailed as you'd like. The more context you provide, the better the result...",
-      "Board File (.tboard)",
-      "Bold",
-      "Border Radius",
       "Cancel",
-      "Canvas conversation",
-      "Caveat",
-      "Center to drawing",
-      "Change",
-      "Clean up layout: align elements, fix spacing, straighten lines",
-      "Clear history",
-      "Close Agent Mode",
-      "Close canvas chat",
-      "Color",
-      "Connection Error",
-      "Copy (Cmd+C)",
-      "Curved",
-      "Curved Arrow",
-      "Dancing Script",
-      "Dashed",
-      "Dashed Line",
-      "Delete",
-      "Delete (Del)",
-      "Delete Page",
-      "Describe a change to your plan…",
-      "Diamond (D)",
-      "Dotted",
-      "Dotted Line",
-      "Duplicate",
-      "Duplicate (Cmd+D)",
-      "Edit",
-      "Elbow",
-      "Elbow/Flowchart Arrow",
-      "Ellipse (O)",
-      "Eraser Size",
-      "Event Circuit",
       "Exit (Esc)",
-      "Fill Color",
-      "Flowchart",
-      "Font Size",
-      "Font Style",
-      "Font Weight",
-      "Generation History",
-      "Group (Cmd+G)",
-      "Hexagon",
-      "Highlighter Width",
-      "Ideas",
-      "Indie Flower",
-      "JPG",
-      "Key Points",
-      "Line Style",
-      "MIRA",
-      "MIRA agent workspace",
-      "MIRA canvas chat",
-      "MIRA · Agent Mode",
-      "Make Notes",
-      "Message MIRA Agent",
-      "Message MIRA about your canvas",
-      "Message MIRA about your canvas…",
-      "Mindmap",
-      "Minimize",
-      "Mira",
-      "New",
-      "New Generation",
-      "New generation",
-      "Normal",
-      "OK",
-      "Opacity",
-      "PDF",
-      "PNG",
-      "Paste (Cmd+V)",
-      "Patrick Hand",
-      "Pentagon",
-      "Planning",
-      "Poppins",
-      "Re-analyse",
-      "Recent Generations",
-      "Rectangle (R)",
-      "Redo (Cmd+Y)",
-      "Regenerate All",
       "Rename board",
-      "Restructure",
-      "Retry",
-      "Rotation",
-      "SVG",
       "Save",
       "Search for users...",
-      "Send (Ctrl+Enter)",
-      "Send changes to MIRA",
-      "Shadows Into Light",
-      "Shapes",
       "Share",
       "Share board",
-      "Shared with",
-      "Solid",
-      "Solid Line",
-      "Something went wrong",
-      "Star",
-      "Start Plotting",
-      "Straight",
-      "Straight Arrow",
-      "Stroke Color",
-      "Stroke Width",
-      "Suggestions",
-      "Text Color",
-      "Transparent",
-      "Transparent Colors",
-      "Triangle",
-      "Try Again",
-      "Type here...",
-      "Type something...",
-      "Undo (Cmd+Z)",
-      "Ungroup (Cmd+Shift+G)",
-      "Update Plot",
-      "View all →",
-      "View history",
-      "What would you like to create?"
+      "Shared with"
     ],
     "sources": [
-      "app/dashboard/talioboard/[id]/page.js",
-      "components/ui/AIActivityBeam.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/Loader.js",
-      "components/ui/MiraLoadingOverlay.js",
-      "components/ui/MiraPet.js",
-      "components/ui/ModalPortal.js",
-      "components/whiteboard/MiraAgentSidebar.js",
-      "components/whiteboard/WhiteboardCanvas.js"
+      "app\\dashboard\\talioboard\\[id]\\page.js"
     ]
   },
   {
     "route": "/dashboard/talioboard",
     "name": "TalioBoard",
-    "controls": [
-      "Board name",
-      "Cancel",
-      "Connection Error",
-      "Create Board",
-      "Create board",
-      "Create new board",
-      "Delete",
-      "Error loading boards",
-      "My Boards ( )",
-      "New Board",
-      "Rename",
-      "Rename board",
-      "Retry",
-      "Save",
-      "Search boards...",
-      "Share",
-      "Share board",
-      "Shared with me ( )",
-      "Something went wrong",
-      "TalioBoard",
-      "Try Again"
-    ],
+    "controls": [],
     "sources": [
-      "app/dashboard/talioboard/page.js",
-      "components/ui/ErrorBoundary.js",
-      "components/whiteboard/WhiteboardDashboard.js"
+      "app\\dashboard\\talioboard\\page.js"
     ]
   },
   {
@@ -3575,18 +2536,11 @@
       "All My Departments",
       "All Teams",
       "Approve",
-      "Connection Error",
       "Geofencing Monitoring",
-      "Reject",
-      "Retry",
-      "Something went wrong",
-      "Try Again"
+      "Reject"
     ],
     "sources": [
-      "app/dashboard/team/geofencing/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\team\\geofencing\\page.js"
     ]
   },
   {
@@ -3599,7 +2553,6 @@
       "Blocked",
       "Category",
       "Completed",
-      "Connection Error",
       "Content",
       "Enter your review, remark, or feedback...",
       "Go Back",
@@ -3607,66 +2560,47 @@
       "Member Not Found",
       "Pending",
       "Rating",
-      "Retry",
       "Review",
       "Reviews & Remarks",
-      "Something went wrong",
       "Task Statistics",
       "Tasks",
       "Todo",
       "Total",
-      "Try Again",
       "Type"
     ],
     "sources": [
-      "app/dashboard/team/members/[id]/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/Loader.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\team\\members\\[id]\\page.js"
     ]
   },
   {
     "route": "/dashboard/team/members",
     "name": "team / members",
     "controls": [
-      "Connection Error",
       "Department Filter",
       "No Team Members Found",
-      "Retry",
       "Search by name, employee code, or email...",
-      "Something went wrong",
       "Team Filter",
       "Team Members",
-      "Try Again",
       "View Details & Reviews"
     ],
     "sources": [
-      "app/dashboard/team/members/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\team\\members\\page.js"
     ]
   },
   {
     "route": "/dashboard/team/my-teams",
     "name": "team / my teams",
     "controls": [
-      "Connection Error",
       "Cross Department",
       "My Teams",
       "No Members Found",
       "No Teams Found",
-      "Retry",
       "Search by name, employee code, or email...",
-      "Something went wrong",
       "Team Leader",
-      "Try Again",
       "View Details"
     ],
     "sources": [
-      "app/dashboard/team/my-teams/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\team\\my-teams\\page.js"
     ]
   },
   {
@@ -3678,87 +2612,35 @@
       "All My Departments",
       "All Teams",
       "Attendance Regularisation",
-      "Connection Error",
       "Current Record",
       "Error loading regularisation data",
       "Filter by status",
       "No Requests Found",
       "Reason",
       "Requested Changes",
-      "Retry",
-      "Reviewer Comments",
-      "Something went wrong",
-      "Try Again"
+      "Reviewer Comments"
     ],
     "sources": [
-      "app/dashboard/team/regularisation/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js",
-      "components/ui/LoadingButton.js"
+      "app\\dashboard\\team\\regularisation\\page.js"
     ]
   },
   {
     "route": "/dashboard/todo",
     "name": "To-Do",
     "controls": [
-      "#6366f1",
-      "1 day before",
-      "1 hour before",
-      "15 minutes before",
-      "30 minutes before",
       "Add Category",
       "Add To-do",
-      "Add description...",
-      "Add subtask...",
-      "At time of due date",
-      "Brief description...",
-      "By Priority",
-      "Cancel",
       "Categories",
-      "Category",
-      "Close to-do analytics",
-      "Completion by priority",
-      "Create New To-do",
-      "Create To-do",
-      "Delete",
-      "Description",
-      "Due Date",
-      "Enter to-do title",
       "Filter category",
-      "High",
-      "Low",
-      "Medium",
-      "No Priority",
       "No project tasks",
-      "Priority",
       "Search to-dos...",
-      "Select category",
-      "Select priority",
       "Sort by",
       "Start task (move to In Progress)",
-      "Subtasks ( / )",
-      "Tags",
       "To-Do's",
-      "To-do Analytics",
-      "To-do Details",
-      "To-dos Completed (Last 7 Days)",
-      "Urgent",
-      "View Analytics",
-      "Weekly completions",
-      "e.g., Work, Personal, Shopping",
-      "work, urgent, follow-up"
+      "View Analytics"
     ],
     "sources": [
-      "app/dashboard/todo/components/AnalyticsPanel.js",
-      "app/dashboard/todo/components/AnalyticsPanel.module.css",
-      "app/dashboard/todo/components/CategoryModal.js",
-      "app/dashboard/todo/components/CreateTodoModal.js",
-      "app/dashboard/todo/components/TodoDetailPanel.js",
-      "app/dashboard/todo/page.js",
-      "components/tasks/SubtaskCompletionButton.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/HeroModal.js",
-      "components/ui/Loader.js"
+      "app\\dashboard\\todo\\page.js"
     ]
   },
   {
@@ -3766,17 +2648,11 @@
     "name": "users",
     "controls": [
       "All Users",
-      "Connection Error",
       "Copy password",
-      "Retry",
-      "Something went wrong",
-      "Try Again",
       "Users Management"
     ],
     "sources": [
-      "app/dashboard/users/page.js",
-      "components/ui/BackgroundRefreshIndicator.js",
-      "components/ui/ErrorBoundary.js"
+      "app\\dashboard\\users\\page.js"
     ]
   },
   {
@@ -3789,7 +2665,7 @@
       "Task API Debug"
     ],
     "sources": [
-      "app/debug/tasks/page.js"
+      "app\\debug\\tasks\\page.js"
     ]
   },
   {
@@ -3805,7 +2681,7 @@
       "Talio"
     ],
     "sources": [
-      "app/download/page.js"
+      "app\\download\\page.js"
     ]
   },
   {
@@ -3819,74 +2695,17 @@
       "Your name"
     ],
     "sources": [
-      "app/join/[guestLink]/page.js",
-      "components/ui/Loader.js"
+      "app\\join\\[guestLink]\\page.js"
     ]
   },
   {
     "route": "/join/[guestLink]/room",
     "name": " / join / [guestLink] / room",
     "controls": [
-      "Add people",
-      "Applause",
-      "Camera preview",
-      "Cancel",
-      "Celebrate",
-      "Close panel",
-      "Close transcript",
-      "Continue without camera",
-      "Copy link",
-      "Dismiss media warning",
-      "Enable meeting audio &amp; video",
-      "Ending meeting...",
-      "Expand Talio Meet",
-      "Expand Talio Meet picture in picture",
-      "Guest meeting link",
-      "Heart",
-      "Invite",
-      "Laugh",
-      "Leave meeting",
-      "Meeting notes",
-      "Meeting reactions",
-      "Message everyone",
-      "Minimise meeting",
-      "Minimise picture in picture",
-      "Minimise picture in picture to bubble",
-      "Minimise to bubble",
-      "Next participants",
-      "Open participants",
-      "Participant pages",
-      "Preview camera &amp; microphone",
-      "Previous participants",
-      "Reactions",
-      "Restore meeting",
-      "Return to",
-      "Return to join page",
-      "Search by name, email, role, or department",
-      "Search employees",
-      "Send message",
-      "Surprised",
-      "Talio Meet compact picture in picture",
-      "Thumbs up",
-      "Transcript History",
-      "Try camera again",
-      "←",
-      "← Back to home",
-      "→"
+      "Return to join page"
     ],
     "sources": [
-      "app/dashboard/meetings/components/AddMeetingParticipantsModal.js",
-      "app/dashboard/meetings/components/MeetingNotetakerPanel.js",
-      "app/join/[guestLink]/room/page.js",
-      "components/meetings/ManagedMeetingRoomSession.js",
-      "components/meetings/MeetingMedia.js",
-      "components/meetings/MeetingReactionOverlay.js",
-      "components/meetings/MeetingReactionPicker.js",
-      "components/meetings/MeetingVisualIcons.js",
-      "components/meetings/ParticipantGrid.js",
-      "components/ui/AIActivityBeam.js",
-      "components/ui/HeroModal.js",
-      "components/ui/Loader.js"
+      "app\\join\\[guestLink]\\room\\page.js"
     ]
   },
   {
@@ -3905,8 +2724,7 @@
       "text-default-600 text-sm"
     ],
     "sources": [
-      "app/login/page.js",
-      "components/ui/HeroModal.js"
+      "app\\login\\page.js"
     ]
   },
   {
@@ -3918,8 +2736,7 @@
       "💡 Quick Tips:"
     ],
     "sources": [
-      "app/offline/page.js",
-      "components/ui/Loader.js"
+      "app\\offline\\page.js"
     ]
   },
   {
@@ -3929,8 +2746,7 @@
       "Clear Cache & Session"
     ],
     "sources": [
-      "app/page.js",
-      "components/ui/Loader.js"
+      "app\\page.js"
     ]
   },
   {
@@ -3947,7 +2763,7 @@
       "macOS"
     ],
     "sources": [
-      "app/resources/page.js"
+      "app\\resources\\page.js"
     ]
   },
   {
@@ -3970,7 +2786,7 @@
       "john@yourcompany.com"
     ],
     "sources": [
-      "app/setup/[code]/page.js"
+      "app\\setup\\[code]\\page.js"
     ]
   },
   {
@@ -3993,8 +2809,7 @@
       "admin@company.com"
     ],
     "sources": [
-      "app/setup/page.js",
-      "components/ui/Loader.js"
+      "app\\setup\\page.js"
     ]
   },
   {
@@ -4009,7 +2824,7 @@
       "User Statistics by Company"
     ],
     "sources": [
-      "app/superadmin/analytics/page.js"
+      "app\\superadmin\\analytics\\page.js"
     ]
   },
   {
@@ -4047,7 +2862,6 @@
       "Feature Sets",
       "Features",
       "First Name *",
-      "HRMS Workflow Modules",
       "John",
       "Last Name",
       "MIRA AI Token Allocation",
@@ -4098,10 +2912,7 @@
       "admin@company.com"
     ],
     "sources": [
-      "app/superadmin/companies/[id]/page.js",
-      "components/superadmin/HrmsModuleControls.js",
-      "components/ui/Loader.js",
-      "components/ui/ModalPortal.js"
+      "app\\superadmin\\companies\\[id]\\page.js"
     ]
   },
   {
@@ -4144,7 +2955,6 @@
       "Features",
       "GST Number",
       "Generate",
-      "HRMS Workflow Modules",
       "INV-2024-001",
       "India",
       "Industry",
@@ -4194,8 +3004,7 @@
       "subscription.billingCycle"
     ],
     "sources": [
-      "app/superadmin/companies/new/page.js",
-      "components/superadmin/HrmsModuleControls.js"
+      "app\\superadmin\\companies\\new\\page.js"
     ]
   },
   {
@@ -4211,7 +3020,7 @@
       "Subscription Filter"
     ],
     "sources": [
-      "app/superadmin/companies/page.js"
+      "app\\superadmin\\companies\\page.js"
     ]
   },
   {
@@ -4228,7 +3037,7 @@
       "Total Companies"
     ],
     "sources": [
-      "app/superadmin/dashboard/page.js"
+      "app\\superadmin\\dashboard\\page.js"
     ]
   },
   {
@@ -4251,8 +3060,7 @@
       "recipient@example.com"
     ],
     "sources": [
-      "app/superadmin/email/page.js",
-      "components/ui/Loader.js"
+      "app\\superadmin\\email\\page.js"
     ]
   },
   {
@@ -4266,7 +3074,7 @@
       "superadmin@talio.in"
     ],
     "sources": [
-      "app/superadmin/login/page.js"
+      "app\\superadmin\\login\\page.js"
     ]
   },
   {
@@ -4274,7 +3082,7 @@
     "name": " / superadmin",
     "controls": [],
     "sources": [
-      "app/superadmin/page.js"
+      "app\\superadmin\\page.js"
     ]
   },
   {
@@ -4288,7 +3096,7 @@
       "Reminders"
     ],
     "sources": [
-      "app/superadmin/reminders/page.js"
+      "app\\superadmin\\reminders\\page.js"
     ]
   },
   {
@@ -4341,7 +3149,7 @@
       "Unblock"
     ],
     "sources": [
-      "app/superadmin/security/page.js"
+      "app\\superadmin\\security\\page.js"
     ]
   }
 ]

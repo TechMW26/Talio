@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
+import { emitSidebarCountsUpdated } from '@/lib/eventBus'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,9 @@ const EMPTY_COUNTS = Object.freeze({
   expenses: 0,
   helpdesk: 0,
   notifications: 0,
+  mail: 0,
+  meetings: 0,
+  messages: 0,
 })
 
 // GET - Get pending counts for sidebar badges
@@ -20,7 +24,7 @@ export async function GET(request) {
   try {
     const auth = await getAuthAndModels(request, [
       'User', 'Employee', 'Department', 'ProjectMember', 'Leave', 'AttendanceCorrection',
-      'Expense', 'Helpdesk', 'Notification', 'TaskAssignee'
+      'Expense', 'Helpdesk', 'Notification', 'TaskAssignee', 'EmailAccount', 'Meeting', 'Chat'
     ])
 
     if (!auth.success) {
@@ -34,7 +38,7 @@ export async function GET(request) {
     const { user, models, tenant } = auth
     const {
       User, Employee, Department, ProjectMember, Leave, AttendanceCorrection,
-      Expense, Helpdesk, Notification, TaskAssignee
+      Expense, Helpdesk, Notification, TaskAssignee,EmailAccount, Meeting, Chat
     } = models
 
     // Check the cache before user/feature lookups.
@@ -75,8 +79,11 @@ export async function GET(request) {
 
     const counts = { ...EMPTY_COUNTS }
 
-    // 1-3. Base counts in parallel
-    const [projectCount, taskCount, notificationCount] = await Promise.all([
+       // 1-3. Base counts in parallel
+    const [
+      projectCount, taskCount, notificationCount,
+      mailAccounts, chatUnreadAgg, meetingsCount
+    ] = await Promise.all([
       companyFeatures?.projects === false
         ? Promise.resolve(0)
         : ProjectMember.countDocuments({
@@ -103,12 +110,52 @@ export async function GET(request) {
       }).catch((err) => {
         console.error('Error counting notifications:', err.message)
         return 0
+      }),
+      // Mail - sum of unreadCount across all connected mail accounts
+      EmailAccount.find({ user: user._id || user.userId })
+        .select('unreadCount')
+        .lean()
+        .catch((err) => {
+          console.error('Error counting mail unread:', err.message)
+          return []
+        }),
+      // Chat - unread messages across all conversations
+      Chat.aggregate([
+        { $match: { participants: employeeId } },
+        { $unwind: { path: '$messages', preserveNullAndEmptyArrays: false } },
+        {
+          $match: {
+            'messages.sender': { $ne: employeeId },
+            'messages.isRead.user': { $ne: employeeId }
+          }
+        },
+        { $count: 'totalUnread' }
+      ]).catch((err) => {
+        console.error('Error counting chat unread:', err.message)
+        return []
+      }),
+      // Meetings - upcoming scheduled meetings where user is organizer or invitee
+           // Meetings - invitations this employee has NOT yet responded to (accept/reject/maybe)
+      Meeting.countDocuments({
+        status: 'scheduled',
+        invitees: {
+          $elemMatch: {
+            employee: employeeId,
+            status: 'pending'
+          }
+        }
+      }).catch((err) => {
+        console.error('Error counting meetings:', err.message)
+        return 0
       })
     ])
 
     counts.projects = projectCount
     counts.tasks = taskCount
     counts.notifications = notificationCount
+    counts.mail = (mailAccounts || []).reduce((sum, a) => sum + (a.unreadCount || 0), 0)
+    counts.messages = chatUnreadAgg?.[0]?.totalUnread || 0
+    counts.meetings = meetingsCount
 
     // For managers, department heads, HR, and admins - count pending approvals.
     const isDeptHead = userRecord?.isDepartmentHead === true

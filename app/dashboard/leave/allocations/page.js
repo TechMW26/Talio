@@ -27,6 +27,7 @@ export default function LeaveAllocationsPage() {
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [employeePage, setEmployeePage] = useState(1)
   const [bulkMode, setBulkMode] = useState(false)
+    const [searchQuery, setSearchQuery] = useState('')
   const hierarchyLevels = ['Entry Level', 'Mid Level', 'Senior', 'Team Lead', 'Assistant Manager', 'Manager', 'C-Suite', 'Assistant Director', 'Director']
   const [halfDayPolicy, setHalfDayPolicy] = useState({
     defaultAnnualLimit: 12,
@@ -470,6 +471,11 @@ export default function LeaveAllocationsPage() {
               <FaUsers className="w-12 h-12 mx-auto mb-4 text-default-300" />
               <p>{employees.length ? 'No employees match your search.' : 'No employees found'}</p>
               {employeeSearch && <Button variant="light" className="mt-3" onPress={() => setEmployeeSearch('')}>Clear search</Button>}
+            </div>
+          ) : filteredEmployees.length === 0 ? (
+            <div className="p-8 text-center text-default-500">
+              <FaSearch className="w-12 h-12 mx-auto mb-4 text-default-300" />
+              <p>No employees match &quot;{searchQuery}&quot;</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
