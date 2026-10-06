@@ -7,7 +7,7 @@ import styles from './KanbanBoard.module.css'
 
 // Fernly kanban geometry, © 2026 Hasib (OVERSHOOT), adapted for Talio.
 // Persistence, confirmations and authorization remain with existing callers.
-const COLUMNS = [
+const DEFAULT_COLUMNS = [
   { id: 'todo', label: 'To Do', color: '#94a3b8' },
   { id: 'in-progress', label: 'In Progress', color: '#60a5fa' },
   { id: 'review', label: 'Review', color: '#a78bfa' },
@@ -20,7 +20,9 @@ export function canMoveTask(task, enabled) {
 }
 const dateLabel = date => date && !Number.isNaN(new Date(date).getTime()) ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null
 
-export default function KanbanBoard({ tasks = [], onTaskClick, onStatusChange, showProject = false, enableDragDrop = true, onProjectClick }) {
+export default function KanbanBoard({ tasks = [], onTaskClick, onStatusChange, showProject = false, enableDragDrop = true, onProjectClick, statusColumns }) {
+  const colors = { gray: '#94a3b8', blue: '#60a5fa', purple: '#a78bfa', green: '#34d399', orange: '#fb923c', red: '#f87171', amber: '#fbbf24', indigo: '#818cf8', pink: '#f472b6', teal: '#2dd4bf' }
+  const COLUMNS = statusColumns?.length ? statusColumns.map(column => ({ ...column, id: column.id || column.key, color: colors[column.color] || (column.color?.startsWith('#') ? column.color : '#94a3b8') })) : DEFAULT_COLUMNS
   const [draggedTask, setDraggedTask] = useState(null)
   const [overColumn, setOverColumn] = useState(null)
   const [moveMenu, setMoveMenu] = useState(null)
@@ -32,7 +34,7 @@ export default function KanbanBoard({ tasks = [], onTaskClick, onStatusChange, s
   useEffect(() => () => dragCleanup.current?.(), [])
   const reduced = useReducedMotion()
   const boardId = useId()
-  const grouped = Object.fromEntries(COLUMNS.map(column => [column.id, tasks.filter(task => task.status === column.id || (column.id === 'review' && task.status === 'completed-pending-approval')).sort((a, b) => {
+  const grouped = Object.fromEntries(COLUMNS.map(column => [column.id, tasks.filter(task => task.status === column.id || (column.id === 'review' && !COLUMNS.some(c => c.id === 'completed-pending-approval') && task.status === 'completed-pending-approval')).sort((a, b) => {
     const ai = order.indexOf(a._id), bi = order.indexOf(b._id)
     return (ai < 0 ? tasks.indexOf(a) : ai) - (bi < 0 ? tasks.indexOf(b) : bi)
   })]))
