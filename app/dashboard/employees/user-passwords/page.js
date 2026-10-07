@@ -1,9 +1,13 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
 
+
+import { Heading1 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Card, CardBody, Button, Skeleton, Input, Chip } from '@heroui/react'
+import { Card, CardBody, Button, Skeleton, Input, Chip } from '@/components/ui/fernly'
 import { getRoleDisplayLabel } from '@/hooks/useRoles'
 import {
   HiOutlineKey,
@@ -179,10 +183,10 @@ export default function UserPasswordsPage() {
             <BackIcon className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-2">
+            <Heading1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-2">
               User Passwords
               <HiOutlineShieldCheck className="w-5 h-5 text-success ml-1" title="Passwords are encrypted at rest" />
-            </h1>
+            </Heading1>
             <p className="text-theme-text-secondary mt-1">
               View onboarding credentials (encrypted at rest, audit-logged)
             </p>
@@ -193,39 +197,9 @@ export default function UserPasswordsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card shadow="sm" className="bg-default-50">
-          <CardBody className="flex flex-row items-center gap-4">
-            <div className="p-3 rounded-xl bg-primary/10">
-              <HiOutlineKey className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-default-800">{stats.total}</p>
-              <p className="text-sm text-default-500">Total Users</p>
-            </div>
-          </CardBody>
-        </Card>
-        <Card shadow="sm" className="bg-success-50">
-          <CardBody className="flex flex-row items-center gap-4">
-            <div className="p-3 rounded-xl bg-success/10">
-              <HiOutlineCheckCircle className="w-6 h-6 text-success" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-success">{stats.withPassword}</p>
-              <p className="text-sm text-default-500">With Password</p>
-            </div>
-          </CardBody>
-        </Card>
-        <Card shadow="sm" className="bg-danger-50">
-          <CardBody className="flex flex-row items-center gap-4">
-            <div className="p-3 rounded-xl bg-danger/10">
-              <HiOutlineXCircle className="w-6 h-6 text-danger" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-danger">{stats.withoutPassword}</p>
-              <p className="text-sm text-default-500">Without Password</p>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total Users</>} value={<>{stats.total}</>} />
+        <SummaryCard shadow="sm" label={<>With Password</>} value={<>{stats.withPassword}</>} />
+        <SummaryCard shadow="sm" label={<>Without Password</>} value={<>{stats.withoutPassword}</>} />
       </div>
 
       {/* Filters */}
@@ -279,7 +253,7 @@ export default function UserPasswordsPage() {
       <Card shadow="sm" className="overflow-hidden">
         <CardBody className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead>
                 <tr className="border-b border-default-200 bg-default-50">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-default-500 uppercase tracking-wider">
@@ -442,7 +416,7 @@ export default function UserPasswordsPage() {
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
 
           {/* Pagination */}

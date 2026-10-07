@@ -1,0 +1,57 @@
+.talio-login { --login-blue: var(--color-primary-600, #2563eb); --login-ink: var(--color-text-primary, #f4f4f5); min-height: 100svh; display: grid; place-items: center; padding: 24px; background: var(--color-bg-primary, #09090b); color: var(--login-ink); }
+.talio-login * { box-sizing: border-box; }
+.talio-login .card { width: min(820px, 100%); display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border-radius: 24px; border: 1px solid var(--color-border, #27272a); background: var(--color-bg-secondary, #18181b); box-shadow: 0 24px 70px #0003; }
+.talio-login .art { position: relative; min-height: 550px; overflow: hidden; background: linear-gradient(160deg, #172440, #0c101a); }
+.talio-login .art-brand { padding: 36px; display: grid; gap: 32px; color: #e4eaff; font-size: 28px; line-height: 1.3; letter-spacing: -.8px; }
+.talio-login .characters { display: block; position: absolute; width: 100%; height: auto; aspect-ratio: 248 / 183; left: 0; bottom: 0; overflow: visible; }
+    .talio-login .character { transition: transform .55s cubic-bezier(.22, 1, .36, 1); }
+    .talio-login .purple { transform-origin: 94px 183px; }
+    .talio-login .black { transform-origin: 155px 183px; }
+    .talio-login .yellow { transform-origin: 213px 183px; }
+    .talio-login .orange { transform-origin: 86px 183px; }
+    .talio-login .face { transition: opacity .18s; }
+    .talio-login .face.closed, .talio-login .face.shy { opacity: 0; }
+    .talio-login .eye-look { transition: transform .12s ease-out; }
+    .talio-login .card[data-mood="email"] .purple { transform: skewY(-3deg) rotate(-15deg); }
+    .talio-login .card[data-mood="email"] .black { transform: rotate(-4deg); }
+    .talio-login .card[data-mood="email"] .yellow { transform: rotate(4deg); }
+    .talio-login .card[data-mood="hidden"] .purple { transform: rotate(-7deg); }
+    .talio-login .card[data-mood="hidden"] .black { transform: rotate(-3deg); }
+    .talio-login .card[data-mood="hidden"] .face.open,
+    .talio-login .card[data-mood="revealed"] .face.open { opacity: 0; }
+    .talio-login .card[data-mood="hidden"] .face.closed { opacity: 1; }
+    .talio-login .card[data-mood="revealed"] .face.shy { opacity: 1; }
+    .talio-login .card[data-mood="revealed"] .purple { transform: rotate(-29deg); }
+    .talio-login .card[data-mood="revealed"] .black { transform: rotate(-7deg); }
+    .talio-login .card[data-mood="revealed"] .yellow { transform: rotate(-5deg); }
+
+.talio-login .form-side { min-width: 0; padding: 36px; }
+.talio-login { color: hsl(var(--heroui-foreground, 240 5% 96%)); background: hsl(var(--heroui-background, 240 10% 4%)); }
+.talio-login .card { background: hsl(var(--heroui-content1, 240 4% 10%)); }
+.talio-login .subtitle, .talio-login .signup, .talio-login .field-label, .talio-login .divider { color: hsl(var(--heroui-default-500, 240 5% 65%)); }
+.talio-login .intro { text-align: center; }
+.talio-login .talio-mark { width: 90px; height: 40px; object-fit: contain; margin: 0 auto 24px; }
+.talio-login h1 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 600; letter-spacing: -1px; }
+.talio-login .subtitle, .talio-login .signup { color: var(--color-text-secondary, #a1a1aa); font-size: 12px; line-height: 1.6; }
+.talio-login .subtitle { margin: 10px 0 30px; }
+.talio-login .field { display: block; margin-top: 24px; }
+.talio-login .field-label { display: block; font-size: 12px; margin-bottom: 8px; color: var(--color-text-secondary, #a1a1aa); }
+.talio-login .input-wrap { display: block; position: relative; border: 1px solid hsl(var(--heroui-default-200, 240 4% 25%)); border-radius: 12px; overflow: hidden; background: hsl(var(--heroui-content2, 240 4% 16%)); transition: border-color .2s, box-shadow .2s; }
+.talio-login .input-wrap:focus-within { border-color: var(--login-blue); }
+.talio-login .input-wrap input { display: block; min-width: 0; width: 100%; height: 48px; padding: 12px 14px; border: 0; border-radius: 11px; outline: 0; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 24px; }
+.talio-login .password-wrap input { padding-right: 52px; }
+.talio-login .reveal { position: absolute; right: 4px; top: 4px; width: 40px; height: 40px; display: grid; place-items: center; background: transparent; border: 0; border-radius: 8px; color: var(--color-text-secondary, #a1a1aa); cursor: pointer; }
+.talio-login .options { margin-top: 24px; font-size: 12px; }
+.talio-login .remember { display: flex; gap: 8px; align-items: center; }
+.talio-login .remember input { accent-color: var(--login-blue); width: 16px; height: 16px; }
+.talio-login .login, .talio-login .recovery { width: 100%; min-height: 44px; border: 0; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; transition: filter .2s, transform .2s; }
+.talio-login .login { margin-top: 22px; color: white; background: var(--login-blue); }
+.talio-login .recovery { color: inherit; background: var(--color-bg-tertiary, #27272a); }
+.talio-login .login:hover, .talio-login .recovery:hover { filter: brightness(1.15); }
+.talio-login .login:disabled { opacity: .65; cursor: wait; }
+.talio-login .divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; font-size: 11px; color: var(--color-text-secondary, #a1a1aa); }
+.talio-login .divider::before, .talio-login .divider::after { content: ''; height: 1px; flex: 1; background: var(--color-border, #3f3f46); }
+.talio-login .signup { margin: 22px 0 0; text-align: center; }
+.talio-login button:focus-visible, .talio-login a:focus-visible { outline: 2px solid var(--login-blue); outline-offset: 4px; }
+@media (max-width: 620px) { .talio-login { padding: 16px; } .talio-login .card { max-width: 400px; grid-template-columns: 1fr; } .talio-login .art { min-height: 0; aspect-ratio: 248 / 183; } .talio-login .art-brand { display: none; } .talio-login .form-side { padding: 28px; } }
+@media (prefers-reduced-motion: reduce) { .talio-login *, .talio-login *::before, .talio-login *::after { transition: none !important; } }

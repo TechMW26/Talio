@@ -1,12 +1,15 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { NativeButton, Heading1, Heading2, NativeInput, Heading3, NativeTextarea } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaStar, FaSave } from 'react-icons/fa'
-import { Select, SelectItem, Input, Button, Skeleton } from '@heroui/react'
+import { Select, SelectItem, Input, Button, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -77,7 +80,7 @@ export default function CreatePerformanceReviewPage() {
     return (
       <div className="flex items-center space-x-2">
         {[1, 2, 3, 4, 5].map((star) => (
-          <button
+          <NativeButton
             key={star}
             type="button"
             onClick={() => handleRatingChange(category, star)}
@@ -87,7 +90,7 @@ export default function CreatePerformanceReviewPage() {
               className={`text-2xl ${star <= value ? 'text-yellow-400' : 'text-gray-300'
                 }`}
             />
-          </button>
+          </NativeButton>
         ))}
         <span className="text-sm text-gray-600 ml-2">{value}/5</span>
       </div>
@@ -99,24 +102,24 @@ export default function CreatePerformanceReviewPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Create Performance Review</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">Create Performance Review</Heading1>
           <p className="text-gray-600 mt-1">Evaluate employee performance</p>
         </div>
-        <button
+        <NativeButton
           onClick={() => router.push('/dashboard/performance')}
           className="btn-secondary flex items-center space-x-2"
         >
           <BackIcon />
           <span>Back</span>
-        </button>
+        </NativeButton>
       </div>
 
       {/* Form */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <Surface className="bg-white rounded-lg shadow-md p-6">
         <form onSubmit={handleSubmit}>
           {/* Employee Selection */}
           <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Employee Information</h2>
+            <Heading2 className="text-xl font-bold text-gray-800 mb-4">Employee Information</Heading2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Select
@@ -138,7 +141,7 @@ export default function CreatePerformanceReviewPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Review Period Start *
                 </label>
-                <input
+                <NativeInput
                   type="date"
                   required
                   value={formData.reviewPeriod.startDate}
@@ -156,7 +159,7 @@ export default function CreatePerformanceReviewPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Review Period End *
                 </label>
-                <input
+                <NativeInput
                   type="date"
                   required
                   value={formData.reviewPeriod.endDate}
@@ -174,11 +177,11 @@ export default function CreatePerformanceReviewPage() {
 
           {/* Performance Ratings */}
           <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Performance Ratings</h2>
+            <Heading2 className="text-xl font-bold text-gray-800 mb-4">Performance Ratings</Heading2>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <h3 className="font-medium text-gray-800">Quality of Work</h3>
+                  <Heading3 className="font-medium text-gray-800">Quality of Work</Heading3>
                   <p className="text-sm text-gray-600">Accuracy and thoroughness</p>
                 </div>
                 <RatingStars category="quality" value={formData.ratings.quality} />
@@ -186,7 +189,7 @@ export default function CreatePerformanceReviewPage() {
 
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <h3 className="font-medium text-gray-800">Productivity</h3>
+                  <Heading3 className="font-medium text-gray-800">Productivity</Heading3>
                   <p className="text-sm text-gray-600">Efficiency and output</p>
                 </div>
                 <RatingStars category="productivity" value={formData.ratings.productivity} />
@@ -194,7 +197,7 @@ export default function CreatePerformanceReviewPage() {
 
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <h3 className="font-medium text-gray-800">Communication</h3>
+                  <Heading3 className="font-medium text-gray-800">Communication</Heading3>
                   <p className="text-sm text-gray-600">Clarity and effectiveness</p>
                 </div>
                 <RatingStars category="communication" value={formData.ratings.communication} />
@@ -202,7 +205,7 @@ export default function CreatePerformanceReviewPage() {
 
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <h3 className="font-medium text-gray-800">Teamwork</h3>
+                  <Heading3 className="font-medium text-gray-800">Teamwork</Heading3>
                   <p className="text-sm text-gray-600">Collaboration and cooperation</p>
                 </div>
                 <RatingStars category="teamwork" value={formData.ratings.teamwork} />
@@ -210,7 +213,7 @@ export default function CreatePerformanceReviewPage() {
 
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <h3 className="font-medium text-gray-800">Initiative</h3>
+                  <Heading3 className="font-medium text-gray-800">Initiative</Heading3>
                   <p className="text-sm text-gray-600">Proactiveness and innovation</p>
                 </div>
                 <RatingStars category="initiative" value={formData.ratings.initiative} />
@@ -220,13 +223,13 @@ export default function CreatePerformanceReviewPage() {
 
           {/* Feedback */}
           <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Detailed Feedback</h2>
+            <Heading2 className="text-xl font-bold text-gray-800 mb-4">Detailed Feedback</Heading2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Strengths
                 </label>
-                <textarea
+                <NativeTextarea
                   rows="3"
                   value={formData.strengths}
                   onChange={(e) => setFormData({ ...formData, strengths: e.target.value })}
@@ -239,7 +242,7 @@ export default function CreatePerformanceReviewPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Areas of Improvement
                 </label>
-                <textarea
+                <NativeTextarea
                   rows="3"
                   value={formData.areasOfImprovement}
                   onChange={(e) =>
@@ -254,7 +257,7 @@ export default function CreatePerformanceReviewPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Goals for Next Period
                 </label>
-                <textarea
+                <NativeTextarea
                   rows="3"
                   value={formData.goals}
                   onChange={(e) => setFormData({ ...formData, goals: e.target.value })}
@@ -267,7 +270,7 @@ export default function CreatePerformanceReviewPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Additional Comments
                 </label>
-                <textarea
+                <NativeTextarea
                   rows="4"
                   value={formData.comments}
                   onChange={(e) => setFormData({ ...formData, comments: e.target.value })}
@@ -298,7 +301,7 @@ export default function CreatePerformanceReviewPage() {
             </LoadingButton>
           </div>
         </form>
-      </div>
+      </Surface>
     </div>
   )
 }

@@ -9,7 +9,7 @@ import {
   Switch as HeroSwitch,
   Radio as HeroRadio,
   RadioGroup as HeroRadioGroup,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import { cn } from '@/utils/cn'
 
 /**

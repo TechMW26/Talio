@@ -1,7 +1,11 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading2, NativeButton } from '@/components/ui/fernly/native'
 import { useState } from 'react'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 import { FaUser, FaEye, FaEyeSlash, FaCopy } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -35,7 +39,7 @@ export default function UsersPage() {
           <Skeleton className="h-8 w-48 rounded-lg mb-2" />
           <Skeleton className="h-4 w-72 rounded-lg" />
         </div>
-        <div className="bg-white rounded-lg shadow-md p-4 space-y-4">
+        <Surface className="bg-white rounded-lg shadow-md p-4 space-y-4">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="flex items-center gap-4 py-2">
               <Skeleton className="w-10 h-10 rounded-full" />
@@ -45,7 +49,7 @@ export default function UsersPage() {
               <Skeleton className="h-5 w-16 rounded-full" />
             </div>
           ))}
-        </div>
+        </Surface>
       </div>
     )
   }
@@ -62,7 +66,7 @@ export default function UsersPage() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Users Management</h1>
+        <Heading1 className="text-3xl font-bold text-gray-800">Users Management</Heading1>
         <p className="text-gray-600 mt-1 flex items-center gap-2">
           View all users and their login credentials
           <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -70,13 +74,13 @@ export default function UsersPage() {
       </div>
 
       {/* Users Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <Surface className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">All Users</h2>
+          <Heading2 className="text-xl font-semibold text-gray-800">All Users</Heading2>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <NativeTable className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -130,20 +134,20 @@ export default function UsersPage() {
                       <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
                         {showPasswords[user._id] ? user.password : '••••••••'}
                       </span>
-                      <button
+                      <NativeButton
                         onClick={() => togglePasswordVisibility(user._id)}
                         className="text-gray-500 hover:text-gray-700"
                         title={showPasswords[user._id] ? 'Hide password' : 'Show password'}
                       >
                         {showPasswords[user._id] ? <FaEyeSlash /> : <FaEye />}
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => copyPassword(user.password)}
                         className="text-blue-500 hover:text-blue-700"
                         title="Copy password"
                       >
                         <FaCopy />
-                      </button>
+                      </NativeButton>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -170,9 +174,9 @@ export default function UsersPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </NativeTable>
         </div>
-      </div>
+      </Surface>
 
 
     </div>

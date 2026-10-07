@@ -1,5 +1,8 @@
 'use client';
+import { NativeTable } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react';
@@ -7,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import {
   Button, Chip, Input, Select, SelectItem, Pagination, Tooltip,
   Card, CardBody, CardHeader, Skeleton
-} from '@heroui/react';
+} from '@/components/ui/fernly';
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
@@ -113,7 +116,7 @@ export default function CandidatesPage() {
               <BackIcon className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Candidates</h1>
+              <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Candidates</Heading1>
               <p className="text-sm text-default-500 mt-0.5">
                 Manage all candidates across job postings
                 <BackgroundRefreshIndicator isValidating={isValidating} />
@@ -123,7 +126,7 @@ export default function CandidatesPage() {
           <div className="flex gap-2 ml-10 md:ml-0">
             <Card shadow="sm" className="p-0.5">
               <CardBody className="p-0 flex flex-row">
-                <button
+                <NativeButton
                   type="button"
                   aria-pressed={viewMode === 'list'}
                   onClick={() => setViewMode('list')}
@@ -131,8 +134,8 @@ export default function CandidatesPage() {
                     }`}
                 >
                   List
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   type="button"
                   aria-pressed={viewMode === 'pipeline'}
                   onClick={() => setViewMode('pipeline')}
@@ -140,7 +143,7 @@ export default function CandidatesPage() {
                     }`}
                 >
                   Pipeline
-                </button>
+                </NativeButton>
               </CardBody>
             </Card>
           </div>
@@ -198,7 +201,7 @@ export default function CandidatesPage() {
                   <Card shadow="sm" className="bg-default-50">
                     <CardBody className="p-3">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-default-700 capitalize">{stage}</h3>
+                        <Heading3 className="text-sm font-semibold text-default-700 capitalize">{stage}</Heading3>
                         <Chip size="sm" variant="flat" color={STAGE_COLOR[stage]}>
                           {groupedByStage[stage]?.length || 0}
                         </Chip>
@@ -256,7 +259,7 @@ export default function CandidatesPage() {
                   <div className="w-16 h-16 rounded-full bg-default-100 flex items-center justify-center mx-auto mb-4">
                     <FaUsers className="w-7 h-7 text-default-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-default-700 mb-1">No candidates found</h3>
+                  <Heading3 className="text-lg font-semibold text-default-700 mb-1">No candidates found</Heading3>
                   <p className="text-sm text-default-500">
                     {filters.search || filters.stage || filters.source || filters.jobPosting
                       ? 'Try adjusting your filters'
@@ -271,7 +274,7 @@ export default function CandidatesPage() {
                   <Card shadow="sm">
                     <CardBody className="p-0">
                       <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <NativeTable className="w-full">
                           <thead className="bg-default-50 border-b border-default-200">
                             <tr>
                               <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Candidate</th>
@@ -326,7 +329,7 @@ export default function CandidatesPage() {
                               </tr>
                             ))}
                           </tbody>
-                        </table>
+                        </NativeTable>
                       </div>
                     </CardBody>
                   </Card>

@@ -1,14 +1,14 @@
 'use client'
 
 import useAuthedSWR from '@/hooks/useAuthedSWR'
-import { FaCalendarCheck, FaCalendarTimes, FaClock, FaExclamationTriangle } from 'react-icons/fa'
+import { Heading3 } from '@/components/ui/fernly/native'
 import styles from './AttendanceSummaryWidget.module.css'
 
 const METRICS = [
-  { key: 'presentDays', label: 'Present', icon: FaCalendarCheck, color: '39, 234, 179', caption: 'Showing up makes a difference' },
-  { key: 'absentDays', label: 'Absent', icon: FaCalendarTimes, color: '255, 113, 131', caption: 'People matter always' },
-  { key: 'lateDays', label: 'Late', icon: FaExclamationTriangle, color: '255, 204, 70', caption: 'A little earlier goes a long way' },
-  { key: 'avgHours', label: 'Avg Hours', icon: FaClock, color: '104, 174, 255', caption: 'Time fuels great things' },
+  { key: 'presentDays', label: 'Present', caption: 'Days attended' },
+  { key: 'absentDays', label: 'Absent', caption: 'Recorded absences' },
+  { key: 'lateDays', label: 'Late', caption: 'Late check-ins' },
+  { key: 'avgHours', label: 'Avg Hours', caption: 'Per working day' },
 ]
 
 export default function AttendanceSummaryWidget({ employeeId }) {
@@ -17,22 +17,22 @@ export default function AttendanceSummaryWidget({ employeeId }) {
     { refreshInterval: 0 }
   )
   const summary = data?.data
+  const recordedDays = Number(summary?.presentDays || 0) + Number(summary?.absentDays || 0)
+  const presence = recordedDays > 0 ? Math.round(Number(summary.presentDays || 0) / recordedDays * 100) : null
   const month = new Date().toLocaleString('en-IN', { month: 'long', timeZone: 'Asia/Kolkata' })
   return (
     <section className={styles.panel} aria-label="Attendance summary" aria-busy={isLoading}>
       <header className={styles.header}>
-        <h3>Attendance <span>· {month}</span></h3>
-        <div className={styles.message}><FaCalendarCheck aria-hidden="true" /><p>A healthier workplace<br />builds brighter tomorrows.</p></div>
+        <div><p className={styles.eyebrow}>YOUR MONTH AT A GLANCE</p><Heading3>Attendance</Heading3></div>
+        <span className={styles.month}>{month}</span>
       </header>
       {error ? <p role="alert" className={styles.empty}>Unable to load attendance summary.</p> : <>
         {!isLoading && !summary && <p className={styles.empty}>Attendance data is not available yet.</p>}
         <div className={styles.grid}>
-          {METRICS.map(({ key, label, icon: Icon, color, caption }) => {
+          {METRICS.map(({ key, label, caption }) => {
             const raw = summary?.[key]
             const value = raw == null ? '–' : `${raw}${key === 'avgHours' ? 'h' : ''}`
-            return <div key={key} className={styles.card} style={{ '--metric': color }}>
-              <div className={styles.dots} aria-hidden="true" />
-              {key === 'avgHours' ? <div className={styles.bars} aria-hidden="true">{[30, 48, 70, 95].map(height => <i key={height} style={{ height: `${height}%` }} />)}</div> : <Icon className={styles.watermark} aria-hidden="true" />}
+            return <div key={key} className={styles.card} data-metric={key}>
               <div className={styles.content}>
                 {isLoading ? <span className={styles.skeleton} aria-label={`Loading ${label}`} /> : <p className={styles.value}>{value}</p>}
                 <p className={styles.label}>{label}</p>
@@ -41,6 +41,11 @@ export default function AttendanceSummaryWidget({ employeeId }) {
             </div>
           })}
         </div>
+        {!isLoading && summary && <footer className={styles.insight}>
+          <div><span>Recorded presence</span><strong>{presence == null ? '—' : `${presence}%`}</strong></div>
+          {presence != null && <div className={styles.track} role="meter" aria-label="Recorded presence" aria-valuemin={0} aria-valuemax={100} aria-valuenow={presence}><i style={{ width: `${presence}%` }} /></div>}
+          <p>{recordedDays ? 'Present days as a share of present and absent records. Late check-ins can overlap with present days.' : 'Your attendance insights will appear when records are available.'}</p>
+        </footer>}
       </>}
     </section>
   )

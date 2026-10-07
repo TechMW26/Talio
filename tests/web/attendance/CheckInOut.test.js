@@ -173,11 +173,6 @@ jest.mock('@/hooks/useRealtimeDashboard', () => ({
     },
 }))
 
-// ── CallAlertButton ──
-jest.mock('@/components/CallAlertButton', () => ({
-    __esModule: true,
-    default: () => null,
-}))
 
 // ── CustomizableDashboard — renders widgetComponents values so we can test real widgets ──
 jest.mock('@/components/dashboard', () => ({
@@ -235,7 +230,7 @@ jest.mock('@/components/widgets', () => {
         'ProjectTasksWidgetWrapper', 'AttendanceSummaryWidget', 'TeamAttendanceWidget',
         'EmployeeDirectoryWidget', 'LeaveBalanceWidget', 'QuickActionsWidget',
         'AnnouncementsWidget', 'HolidaysWidget', 'GoalsWidget', 'BirthdayWidget',
-        'RecentActivitiesWidget', 'TodayTasksWidget', 'LearningProgressWidget',
+        'RecentActivitiesWidget', 'TodayTasksWidget',
         'RecentActivityWidget', 'MyAssetsWidget', 'MyExpensesWidget',
         'MyHelpdeskWidget', 'PoliciesWidget', 'RoleNewsWidget',
     ]

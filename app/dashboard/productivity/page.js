@@ -1,9 +1,12 @@
 'use client'
+import { SummaryCard as StatCard, Surface } from '@/components/ui/fernly'
 
+
+import { NativeButton, Heading3, NativeInput, Heading1, Heading2 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button,
   Tabs,
@@ -11,7 +14,7 @@ import {
   Skeleton,
   ModalContent,
   ModalBody,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import {
   HiOutlineSparkles,
   HiOutlineChevronLeft,
@@ -55,26 +58,13 @@ function ScorePill({ score, label = 'Score' }) {
   )
 }
 
-function StatCard({ icon: Icon, label, value, iconBg = 'bg-blue-100', iconText = 'text-blue-600' }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${iconBg}`}>
-          <Icon className={`w-5 h-5 ${iconText}`} />
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-gray-800">{value}</p>
-          <p className="text-sm text-gray-500">{label}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
+
 
 function ScreenshotTile({ shot, onClick }) {
   return (
-    <button
+    <NativeButton
       type="button"
+      data-shape="card"
       onClick={onClick}
       className="group relative aspect-video overflow-hidden rounded-xl border border-gray-100 bg-gray-50 shadow-sm transition hover:shadow-md hover:border-indigo-300"
     >
@@ -93,17 +83,17 @@ function ScreenshotTile({ shot, onClick }) {
           <span className="rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Pending</span>
         )}
       </div>
-    </button>
+    </NativeButton>
   )
 }
 
 function ScreenshotGrid({ screenshots, emptyHint, onPick }) {
   if (screenshots.length === 0) {
     return (
-      <div className="text-center py-10 bg-white rounded-xl shadow-sm border border-dashed border-gray-200">
+      <Surface className="text-center py-10 bg-white rounded-xl shadow-sm border border-dashed border-gray-200">
         <HiOutlinePhoto className="w-10 h-10 mx-auto text-gray-300 mb-2" />
         <p className="text-sm text-gray-500">{emptyHint}</p>
-      </div>
+      </Surface>
     )
   }
   return (
@@ -302,14 +292,14 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
   const genuineWork = oa.genuineWorkPercentage
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Header — flat (no gradient) */}
       <div className="p-5 border-b border-gray-100">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <Heading3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               {analysis.sessionTitle || 'MIRA Daily Analysis'}
-            </h3>
+            </Heading3>
             {lastAnalyzedAt ? (
               <p className="mt-0.5 text-xs text-gray-500">
                 Last analyzed {new Date(lastAnalyzedAt).toLocaleString()}
@@ -468,7 +458,7 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
           </div>
         ) : null}
       </div>
-    </div>
+    </Surface>
   )
 }
 
@@ -524,19 +514,19 @@ function Lightbox({ shots, index, onClose, onIndexChange }) {
                   <span className="text-xs text-white/70 ml-1">{safeIndex + 1} / {total}</span>
                 ) : null}
               </div>
-              <button
+              <NativeButton
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
                 className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70 backdrop-blur transition"
               >
                 <HiOutlineXMark className="w-5 h-5" />
-              </button>
+              </NativeButton>
             </div>
 
             {/* Prev arrow */}
             {total > 1 ? (
-              <button
+              <NativeButton
                 type="button"
                 onClick={goPrev}
                 disabled={safeIndex === 0}
@@ -544,12 +534,12 @@ function Lightbox({ shots, index, onClose, onIndexChange }) {
                 className="absolute left-4 z-20 rounded-full bg-black/50 p-3 text-white hover:bg-black/70 backdrop-blur transition disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <HiOutlineChevronLeft className="w-6 h-6" />
-              </button>
+              </NativeButton>
             ) : null}
 
             {/* Next arrow */}
             {total > 1 ? (
-              <button
+              <NativeButton
                 type="button"
                 onClick={goNext}
                 disabled={safeIndex === total - 1}
@@ -557,7 +547,7 @@ function Lightbox({ shots, index, onClose, onIndexChange }) {
                 className="absolute right-4 z-20 rounded-full bg-black/50 p-3 text-white hover:bg-black/70 backdrop-blur transition disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <HiOutlineChevronRight className="w-6 h-6" />
-              </button>
+              </NativeButton>
             ) : null}
 
             {/* Image */}
@@ -760,7 +750,7 @@ export default function ProductivityPage() {
   const renderTeamGrid = () => (
     <div className="space-y-4">
       {/* Filters / search bar — matches meetings filter card */}
-      <div className="bg-white rounded-lg shadow-md p-4">
+      <Surface className="bg-white rounded-lg shadow-md p-4">
         <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
           <div className="flex items-center gap-2 text-gray-600">
             <HiOutlineUsers className="w-5 h-5 text-indigo-600" />
@@ -770,7 +760,7 @@ export default function ProductivityPage() {
           </div>
           <div className="input-with-icon md:w-80">
             <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-            <input
+            <NativeInput
               type="text"
               value={teamSearch}
               onChange={(e) => setTeamSearch(e.target.value)}
@@ -779,24 +769,24 @@ export default function ProductivityPage() {
             />
           </div>
         </div>
-      </div>
+      </Surface>
 
       {teamLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <Surface key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
               <Skeleton className="h-4 w-3/4 rounded" />
               <Skeleton className="h-3 w-1/2 rounded" />
               <Skeleton className="h-3 w-2/3 rounded" />
-            </div>
+            </Surface>
           ))}
         </div>
       ) : teamMembers.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+        <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
           <HiOutlineUsers className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-800 mb-2">No team members found</h3>
+          <Heading3 className="text-lg font-medium text-gray-800 mb-2">No team members found</Heading3>
           <p className="text-gray-500">Try adjusting your search or pick a different date.</p>
-        </div>
+        </Surface>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {teamMembers.map((m) => {
@@ -805,10 +795,11 @@ export default function ProductivityPage() {
             const analyzed = memberStats.analyzedCaptures ?? memberStats.analyzedScreenshots ?? 0
             const score = memberStats.score ?? memberStats.avgScore ?? null
             return (
-              <button
+              <NativeButton
                 key={m.userId || m._id}
                 type="button"
                 onClick={() => setSelectedTeamUserId(m.userId || m._id)}
+                data-shape="card"
                 className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 text-left transition hover:shadow-md hover:border-indigo-200"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -828,7 +819,7 @@ export default function ProductivityPage() {
                     <HiOutlineSparkles className="w-4 h-4" /> {analyzed} analyzed
                   </span>
                 </div>
-              </button>
+              </NativeButton>
             )
           })}
         </div>
@@ -845,9 +836,9 @@ export default function ProductivityPage() {
       {/* Header — matches meetings page header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <Heading1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             Productivity
-          </h1>
+          </Heading1>
           <p className="text-gray-600 mt-1">
             Screenshots from your work day, analyzed by MIRA.
           </p>
@@ -855,25 +846,25 @@ export default function ProductivityPage() {
 
         {/* Date picker bar (right side, like the "Schedule Meeting" CTA position) */}
         <div className="flex items-center gap-2">
-          <button
+          <NativeButton
             type="button"
             onClick={() => changeDate(-1)}
             aria-label="Previous day"
             className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
           >
             <HiOutlineChevronLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+          </NativeButton>
+          <Surface className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
             <HiOutlineCalendarDays className="w-4 h-4 text-gray-500" />
-            <input
+            <NativeInput
               type="date"
               value={selectedDate}
               max={today}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="bg-transparent text-sm text-gray-700 focus:outline-none"
             />
-          </div>
-          <button
+          </Surface>
+          <NativeButton
             type="button"
             onClick={() => changeDate(1)}
             disabled={isFutureDisabled}
@@ -881,7 +872,7 @@ export default function ProductivityPage() {
             className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
           >
             <HiOutlineChevronRight className="w-5 h-5 text-gray-600" />
-          </button>
+          </NativeButton>
         </div>
       </div>
 
@@ -919,7 +910,7 @@ export default function ProductivityPage() {
 
       {/* Tabs */}
       {canViewTeam ? (
-        <div className="bg-white rounded-lg shadow-md p-2 mb-6">
+        <Surface className="bg-white rounded-lg shadow-md p-2 mb-6">
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={(k) => { setActiveTab(k); setSelectedTeamUserId(null); }}
@@ -928,15 +919,15 @@ export default function ProductivityPage() {
             <Tab key="my" title={(<span className="flex items-center gap-1.5"><HiOutlineUser className="w-4 h-4" /> My Day</span>)} />
             <Tab key="team" title={(<span className="flex items-center gap-1.5"><HiOutlineUsers className="w-4 h-4" /> Team</span>)} />
           </Tabs>
-        </div>
+        </Surface>
       ) : null}
 
       {/* Team grid (when in team tab and no member selected) */}
       {activeTab === 'team' && !selectedTeamUserId ? (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <Heading2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
             Team
-          </h2>
+          </Heading2>
           {renderTeamGrid()}
         </div>
       ) : null}
@@ -959,7 +950,7 @@ export default function ProductivityPage() {
       {showDailyBody ? (
         <div className="space-y-6">
           {/* Action bar — sits in a meetings-style filter card */}
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <Surface className="bg-white rounded-lg shadow-md p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="text-sm text-gray-600">
                 {dailyRes?.user ? (
@@ -975,14 +966,14 @@ export default function ProductivityPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <NativeButton
                   type="button"
                   onClick={() => mutateDaily()}
                   className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
                   aria-label="Refresh"
                 >
                   <HiOutlineArrowPath className={`w-5 h-5 text-gray-600 ${dailyValidating && !dailyLoading ? 'animate-spin' : ''}`} />
-                </button>
+                </NativeButton>
                 <Button
                   color="primary"
                   onPress={handleAnalyze}
@@ -998,16 +989,16 @@ export default function ProductivityPage() {
                 </Button>
               </div>
             </div>
-          </div>
+          </Surface>
 
           {/* Loading skeleton */}
           {dailyLoading ? (
             <div className="space-y-4">
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
+              <Surface className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
                 <Skeleton className="h-5 w-1/3 rounded" />
                 <Skeleton className="h-4 w-2/3 rounded" />
                 <Skeleton className="h-3 w-full rounded" />
-              </div>
+              </Surface>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {[...Array(10)].map((_, i) => (
                   <Skeleton key={i} className="aspect-video rounded-xl" />
@@ -1030,9 +1021,9 @@ export default function ProductivityPage() {
               {/* Pending captures */}
               {pendingShots.length > 0 ? (
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <Heading2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
                     Pending Captures ({pendingShots.length})
-                  </h2>
+                  </Heading2>
                   <ScreenshotGrid
                     screenshots={pendingShots}
                     emptyHint="No pending captures."
@@ -1043,13 +1034,13 @@ export default function ProductivityPage() {
 
               {/* Truly empty */}
               {screenshots.length === 0 && !analysis ? (
-                <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+                <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
                   <HiOutlinePhoto className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">No captures for this day</h3>
+                  <Heading3 className="text-lg font-medium text-gray-800 mb-2">No captures for this day</Heading3>
                   <p className="text-gray-500">
                     Screenshots are captured every 4 minutes during your company&apos;s office hours.
                   </p>
-                </div>
+                </Surface>
               ) : null}
             </>
           )}

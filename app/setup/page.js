@@ -392,7 +392,7 @@ export default function SetupPage() {
 
         {/* Footer */}
         <p className="text-center text-sm text-gray-500 mt-6">
-          Talio - Workforce Management Platform
+          Talio - Organisational Super Intelligence
         </p>
       </div>
     </div>

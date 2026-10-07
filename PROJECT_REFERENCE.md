@@ -25,7 +25,7 @@ Talio is a **multi-tenant Human Resource Management System (HRMS)** with workfor
 | Email        | Nodemailer **7.0.7** (SMTP)                   |
 | Monitoring   | Vercel runtime and function logs              |
 | Testing      | Jest **30.3.0** + @swc/jest + mongodb-memory-server |
-| Container    | Docker multi-stage (Debian Bookworm) + nginx + certbot |
+| Deployment   | Native Next.js on Vercel Fluid Compute; see `docs/NATIVE_VERCEL_DEPLOYMENT.md` |
 
 ---
 
@@ -39,7 +39,6 @@ Talio is a **multi-tenant Human Resource Management System (HRMS)** with workfor
 | npm           | 10.x (bundled)      | Comes with Node 20                                  |
 | MongoDB       | 7.x (Atlas or local)| [MongoDB Atlas](https://cloud.mongodb.com) or `mongod` |
 | Redis         | 6.x+                | [Redis Cloud](https://redis.com) or `redis-server`  |
-| Docker        | 24.x+ (optional)    | `apt-get install docker.io docker-compose-v2`       |
 | Git           | any recent          | `apt-get install git`                               |
 
 ### 2.2 Environment Variables
@@ -98,14 +97,13 @@ npm run dev
 # Socket.IO on /api/socketio
 ```
 
-### 2.4 Docker Setup
+### 2.4 Native Setup
 
 ```bash
-# Build and start all services (app + nginx + certbot)
-docker compose up -d --build
-
-# Check health
-docker compose ps
+# Build and start the Next.js server
+npm ci --legacy-peer-deps
+npm run build
+npm start
 curl http://localhost:3000/api/health
 ```
 
@@ -291,9 +289,8 @@ erDiagram
 
 | Source         | Destination                            | Format                 |
 |----------------|----------------------------------------|------------------------|
-| App server     | `stdout` / Docker `json-file` driver   | `[boot]`, `[AUTH]`, `[Socket.IO]` prefixes |
+| App server     | Standard output / Vercel runtime logs | Application logs |
 | Nginx          | `/var/log/nginx/access.log`, `error.log` | Standard combined format |
-| Docker         | JSON file logs (10MB max, 3 files)     | `docker logs talio-app` |
 | Slow APIs      | `stdout` — `🐌 SLOW API [Xms]`        | Warns if >2 seconds    |
 | Vercel         | Runtime and function logs              | Errors + performance   |
 
@@ -301,7 +298,7 @@ erDiagram
 
 | Endpoint             | Method | Purpose                          | Response            |
 |----------------------|--------|----------------------------------|---------------------|
-| `/api/health`        | GET    | Docker healthcheck (liveness)    | `{"status":"ok"}`   |
+| `/api/health`        | GET    | Deployment health check (liveness) | `{"status":"ok"}` |
 | `/api/health`        | HEAD   | Lightweight probe                | 200 (no body)       |
 | `/api/health?detailed=true` | GET | Full check (MongoDB + Redis) | Extended status     |
 | `/api/redis-status`  | GET    | Redis connectivity                | `{"redis":"connected"}` |
@@ -413,8 +410,6 @@ API Route → emailQueueCron (in-process) → /api/cron/process-email-queue
 | `app/layout.js`                   | Root layout (fonts, providers, splash)              |
 | `app/page.js`                     | Root page (auth check → redirect)                   |
 | `components/`                     | 80+ React components                               |
-| `docker-compose.yml`              | Docker services: app + nginx + certbot              |
-| `Dockerfile`                      | 4-stage Docker build (deps → prod-deps → builder → runner) |
 | `nginx/nginx.conf`                | Nginx main config (gzip, rate limiting)             |
 | `jest.config.js`                  | 2-project Jest config (server + web)                |
 | `scripts/seed.js`                 | Development seed data                               |

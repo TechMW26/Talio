@@ -1,5 +1,6 @@
 import { Inter, Montserrat } from 'next/font/google'
 import './globals.css'
+import './dashboard/dashboard-layout.css'
 import '../styles/notifications.css'
 import '../styles/mobile-responsive.css'
 import '../styles/mobile-fix.css'
@@ -37,8 +38,8 @@ const inter = Inter({
 // when the whiteboard feature is used to avoid blocking initial page render
 
 export const metadata = {
-  title: 'Talio - Workforce Management Platform',
-  description: 'Complete solution for managing employees, attendance, productivity, and more',
+  title: 'Talio - Organisational Super Intelligence',
+  description: 'Talio - Organisational Super Intelligence. People, productivity and collaboration in one workspace.',
   icons: {
     icon: [
       { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },

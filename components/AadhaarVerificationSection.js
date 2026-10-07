@@ -1,5 +1,7 @@
 'use client'
 
+
+import UploadButton from '@/components/ui/UploadButton'
 import { useState, useRef, useEffect } from 'react'
 import {
   FaIdCard,
@@ -373,7 +375,7 @@ export default function AadhaarVerificationSection({
                       >
                         <FaEye className="w-4 h-4" />
                       </button>
-                      <button
+                      <UploadButton label="Upload file"
                         onClick={(e) => {
                           e.stopPropagation()
                           frontInputRef.current?.click()
@@ -381,7 +383,7 @@ export default function AadhaarVerificationSection({
                         className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
                       >
                         <FaCamera className="w-4 h-4" />
-                      </button>
+                      </UploadButton>
                     </div>
                   </div>
                 )}
@@ -403,7 +405,7 @@ export default function AadhaarVerificationSection({
                   {uploadingFront ? 'Uploading...' : 'Aadhaar Front'}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Click to upload
+                  <UploadButton label="Upload Aadhaar front" busy={uploadingFront} onClick={event => { event.stopPropagation(); frontInputRef.current?.click() }} />
                 </p>
               </div>
             )}
@@ -457,7 +459,7 @@ export default function AadhaarVerificationSection({
                       >
                         <FaEye className="w-4 h-4" />
                       </button>
-                      <button
+                      <UploadButton label="Upload file"
                         onClick={(e) => {
                           e.stopPropagation()
                           backInputRef.current?.click()
@@ -465,7 +467,7 @@ export default function AadhaarVerificationSection({
                         className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
                       >
                         <FaCamera className="w-4 h-4" />
-                      </button>
+                      </UploadButton>
                     </div>
                   </div>
                 )}
@@ -487,7 +489,7 @@ export default function AadhaarVerificationSection({
                   {uploadingBack ? 'Uploading...' : 'Aadhaar Back'}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Click to upload
+                  <UploadButton label="Upload Aadhaar back" busy={uploadingBack} onClick={event => { event.stopPropagation(); backInputRef.current?.click() }} />
                 </p>
               </div>
             )}

@@ -1,6 +1,6 @@
 'use client'
 
-import { Button as HeroButton } from '@heroui/react'
+import { Button as HeroButton } from '@/components/ui/fernly'
 import { cn } from '@/utils/cn'
 
 /**

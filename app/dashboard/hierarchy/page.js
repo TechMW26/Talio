@@ -1,5 +1,7 @@
 'use client';
 
+
+import { NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
@@ -804,7 +806,7 @@ export default function HierarchyPage() {
               <div style={{ marginTop: 8, color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 13, lineHeight: 1.5 }}>
                 {error.message || 'The hierarchy data could not be loaded. Please try again.'}
               </div>
-              <button
+              <NativeButton
                 type="button"
                 onClick={() => mutate()}
                 style={{
@@ -821,7 +823,7 @@ export default function HierarchyPage() {
                 }}
               >
                 Retry
-              </button>
+              </NativeButton>
             </div>
           </div>
         )}
@@ -893,7 +895,7 @@ export default function HierarchyPage() {
           }}
         >
           <div style={{ position: 'relative' }}>
-            <input
+            <NativeInput
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -929,7 +931,7 @@ export default function HierarchyPage() {
                 }}
               >
                 {suggestions.map((n, idx) => (
-                  <button
+                  <NativeButton
                     key={n.id}
                     onClick={() => selectSuggestion(n)}
                     style={{
@@ -947,13 +949,13 @@ export default function HierarchyPage() {
                     <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b' }}>
                       {n.designation} • L{n.level}{n.department ? ` • ${n.department}` : ''}
                     </div>
-                  </button>
+                  </NativeButton>
                 ))}
               </div>
             )}
           </div>
 
-          <button
+          <NativeButton
             onClick={() => viewerId && focusNode(viewerId)}
             disabled={!viewerId}
             style={{
@@ -973,7 +975,7 @@ export default function HierarchyPage() {
             }}
           >
             ⊙ Find Me
-          </button>
+          </NativeButton>
         </div>
 
         <div
@@ -992,7 +994,7 @@ export default function HierarchyPage() {
             { l: '⊡', f: fitToScreen },
             { l: '−', f: () => setScale((s) => Math.max(0.18, s / 1.2)) },
           ].map(({ l, f }) => (
-            <button
+            <NativeButton
               key={l}
               onClick={f}
               style={{
@@ -1008,7 +1010,7 @@ export default function HierarchyPage() {
               }}
             >
               {l}
-            </button>
+            </NativeButton>
           ))}
           <div style={{ textAlign: 'center', fontSize: 10, color: isDarkMode ? '#64748b' : '#475569' }}>{Math.round(scale * 100)}%</div>
         </div>

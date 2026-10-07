@@ -1,9 +1,14 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
+import { FernlyMetricCard } from '@/components/charts/FernlyCharts'
+import FernlyMotion from '@/components/ui/FernlyMotion'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { Card, CardBody, Button, Chip, Skeleton, Progress } from '@heroui/react'
+import { Card, CardBody, Button, Chip, Skeleton, Progress } from '@/components/ui/fernly'
 import {
   HiOutlineRectangleStack,
   HiOutlinePlus,
@@ -134,13 +139,13 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="page-container">
+    <FernlyMotion className="page-container">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-default-800 flex items-center gap-2">
+          <Heading1 className="text-2xl font-bold text-default-800 flex items-center gap-2">
             Projects
-          </h1>
+          </Heading1>
           <p className="text-default-500 mt-1 flex items-center gap-2">
             Manage and track your projects
             <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -157,51 +162,12 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* Stats Cards */}
+      {/* Current filtered-project totals; no fabricated historical samples. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.total}</p>
-                <p className="text-sm text-default-500">Total</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.active}</p>
-                <p className="text-sm text-default-500">Active</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.completed}</p>
-                <p className="text-sm text-default-500">Completed</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.overdue}</p>
-                <p className="text-sm text-default-500">Overdue</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <FernlyMetricCard label="Total projects" value={stats.total} note="Current project filter" />
+        <FernlyMetricCard label="Active projects" value={stats.active} note="Planned, ongoing and pending" />
+        <FernlyMetricCard label="Completed projects" value={stats.completed} note="Completed and approved" />
+        <FernlyMetricCard label="Overdue projects" value={stats.overdue} note="Review outstanding deadlines" />
       </div>
 
       {/* Filters and Search */}
@@ -211,7 +177,7 @@ export default function ProjectsPage() {
             {/* Search */}
             <div className="input-with-icon flex-1">
               <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-              <input
+              <NativeInput
                 type="text"
                 placeholder="Search projects..."
                 value={search}
@@ -268,9 +234,9 @@ export default function ProjectsPage() {
         <Card shadow="sm" className="text-center py-12">
           <CardBody className="flex flex-col items-center">
             <HiOutlineRectangleStack className="w-16 h-16 text-default-300 mb-4" />
-            <h3 className="text-lg font-medium text-default-800 mb-2">
+            <Heading3 className="text-lg font-medium text-default-800 mb-2">
               No projects found
-            </h3>
+            </Heading3>
             <p className="text-default-500 mb-4">
               {search ? 'Try adjusting your search' : 'Create your first project to get started'}
             </p>
@@ -319,7 +285,7 @@ export default function ProjectsPage() {
             }
 
             return (
-              <div
+              <Surface
                 key={project._id}
                 onClick={() => router.push(`/dashboard/projects/${project._id}`)}
                 className={`bg-content1 rounded-xl shadow-sm border-2 hover:shadow-md transition-shadow cursor-pointer overflow-hidden flex flex-col ${getStatusBorderColor()}`}
@@ -327,9 +293,9 @@ export default function ProjectsPage() {
                 {/* Project Header */}
                 <div className="p-5 flex-1">
                   <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-default-800 line-clamp-1">
+                    <Heading3 className="text-lg font-semibold text-default-800 line-clamp-1">
                       {project.name}
-                    </h3>
+                    </Heading3>
                     <Chip color={priorityColors[project.priority]} variant="flat" size="sm">
                       {project.priority}
                     </Chip>
@@ -367,10 +333,10 @@ export default function ProjectsPage() {
                   {/* Task Stats */}
                   {project.taskStats && (
                     <div className="grid grid-cols-3 gap-2 mb-4">
-                      <div className="text-center p-2 bg-default-50 rounded-lg">
+                      <Surface className="text-center p-2 bg-default-50 rounded-lg">
                         <p className="text-lg font-bold text-default-800">{project.taskStats.total}</p>
                         <p className="text-xs text-default-500">Tasks</p>
-                      </div>
+                      </Surface>
                       <div className="text-center p-2 bg-success-50 rounded-lg">
                         <p className="text-lg font-bold text-success">{project.taskStats.completed}</p>
                         <p className="text-xs text-default-500">Done</p>
@@ -478,11 +444,11 @@ export default function ProjectsPage() {
                     </div>
                   </div>
                 )}
-              </div>
+              </Surface>
             )
           })}
         </div>
       )}
-    </div>
+    </FernlyMotion>
   )
 }

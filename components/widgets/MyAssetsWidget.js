@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { FaLaptop, FaBarcode } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { getEmployeeId } from '@/utils/userHelper'
-import { Card, CardBody, Chip, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Chip, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 import { formatAssetStatus, getAssetDisplayDetails } from '@/utils/assetData'
 
 export default function MyAssetsWidget({ user, initialData }) {

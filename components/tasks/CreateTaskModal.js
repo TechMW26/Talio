@@ -1,7 +1,9 @@
 'use client'
 
+
+import UploadButton from '@/components/ui/UploadButton'
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Button, Select, SelectItem } from '@heroui/react'
+import { Button, Select, SelectItem } from '@/components/ui/fernly'
 import { FaTimes, FaPlus, FaProjectDiagram } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import ModalPortal from '@/components/ui/ModalPortal'
@@ -446,14 +448,14 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
                     className="hidden"
                     onChange={(e) => handleAttachmentUpload(e.target.files)}
                   />
-                  <button
+                  <UploadButton busy={uploadingAttachments} label="Upload file"
                     type="button"
                     onClick={() => attachmentInputRef.current?.click()}
                     disabled={uploadingAttachments}
                     className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm disabled:opacity-50"
                   >
                     {uploadingAttachments ? 'Uploading...' : 'Add Attachments'}
-                  </button>
+                  </UploadButton>
                   <span className="text-xs text-gray-500">Any file type &bull; Max 10MB each</span>
                 </div>
 

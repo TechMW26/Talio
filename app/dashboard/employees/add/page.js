@@ -1,11 +1,15 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaSave, FaTimes, FaChevronDown, FaCheck, FaTimes as FaX, FaUserPlus, FaFileUpload, FaExclamationTriangle } from 'react-icons/fa'
 import BulkImportEmployees from '@/components/employees/BulkImportEmployees'
-import { Card, CardBody, Button, Select, SelectItem } from '@heroui/react'
+import { Card, CardBody, Button, Select, SelectItem } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -370,7 +374,7 @@ export default function AddEmployeePage() {
           <div className="bg-danger-50 rounded-full p-6 mb-6">
             <FaExclamationTriangle className="w-16 h-16 text-danger" />
           </div>
-          <h1 className="text-2xl font-bold text-default-800 mb-2">Access Denied</h1>
+          <Heading1 className="text-2xl font-bold text-default-800 mb-2">Access Denied</Heading1>
           <p className="text-default-500 text-center max-w-md mb-6">
             You don't have permission to add employees.
             This page is restricted to Admin and HR users only.
@@ -390,36 +394,13 @@ export default function AddEmployeePage() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-default-800">Add New Employee</h1>
+        <Heading1 className="text-3xl font-bold text-default-800">Add New Employee</Heading1>
         <p className="text-default-500 mt-1">Create a single employee or bulk import from Excel</p>
       </div>
 
       {/* Tabs */}
       <div className="mb-6">
-        <div className="flex border-b border-default-200">
-          <button
-            type="button"
-            onClick={() => setActiveTab('single')}
-            className={`px-6 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'single'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
-              }`}
-          >
-            <FaUserPlus />
-            <span>Single Employee</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('bulk')}
-            className={`px-6 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'bulk'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
-              }`}
-          >
-            <FaFileUpload />
-            <span>Bulk Import</span>
-          </button>
-        </div>
+        <Tabs aria-label="Employee creation method" selectedKey={activeTab} onSelectionChange={setActiveTab}><Tab key="single" title={<span className="flex items-center gap-2"><FaUserPlus aria-hidden="true" />Single Employee</span>} /><Tab key="bulk" title={<span className="flex items-center gap-2"><FaFileUpload aria-hidden="true" />Bulk Import</span>} /></Tabs>
       </div>
 
       {/* Bulk Import Tab Content */}
@@ -442,7 +423,7 @@ export default function AddEmployeePage() {
                   <label className="block text-sm font-medium text-default-700 mb-2">
                     Employee Code <span className="text-danger">*</span>
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     name="employeeCode"
                     value={formData.employeeCode}
@@ -460,7 +441,7 @@ export default function AddEmployeePage() {
                     <label className="block text-sm font-medium text-default-700 mb-2">
                       First Name <span className="text-danger">*</span>
                     </label>
-                    <input
+                    <NativeInput
                       type="text"
                       name="firstName"
                       value={formData.firstName}
@@ -476,7 +457,7 @@ export default function AddEmployeePage() {
                     <label className="block text-sm font-medium text-default-700 mb-2">
                       Last Name <span className="text-danger">*</span>
                     </label>
-                    <input
+                    <NativeInput
                       type="text"
                       name="lastName"
                       value={formData.lastName}
@@ -493,7 +474,7 @@ export default function AddEmployeePage() {
                   <label className="block text-sm font-medium text-default-700 mb-2">
                     Email <span className="text-danger">*</span>
                   </label>
-                  <input
+                  <NativeInput
                     type="email"
                     name="email"
                     value={formData.email}
@@ -509,7 +490,7 @@ export default function AddEmployeePage() {
                   <label className="block text-sm font-medium text-default-700 mb-2">
                     Phone <span className="text-danger">*</span>
                   </label>
-                  <input
+                  <NativeInput
                     type="tel"
                     name="phone"
                     value={formData.phone}
@@ -553,7 +534,7 @@ export default function AddEmployeePage() {
                   <label className="block text-sm font-medium text-default-700 mb-2">
                     Date of Birth
                   </label>
-                  <input
+                  <NativeInput
                     type="date"
                     name="dateOfBirth"
                     value={formData.dateOfBirth}
@@ -567,7 +548,7 @@ export default function AddEmployeePage() {
                   <label className="block text-sm font-medium text-default-700 mb-2">
                     Date of Joining <span className="text-danger">*</span>
                   </label>
-                  <input
+                  <NativeInput
                     type="date"
                     name="dateOfJoining"
                     value={formData.dateOfJoining}
@@ -594,13 +575,13 @@ export default function AddEmployeePage() {
                             className="inline-flex items-center gap-1 px-3 py-1 bg-primary-100 text-primary rounded-full text-sm"
                           >
                             {dept.name}
-                            <button
+                            <NativeButton
                               type="button"
                               onClick={() => removeDepartment(deptId)}
                               className="ml-1 text-primary hover:text-primary-700"
                             >
                               <FaX className="w-3 h-3" />
-                            </button>
+                            </NativeButton>
                           </span>
                         ) : null
                       })}
@@ -609,7 +590,7 @@ export default function AddEmployeePage() {
 
                   {/* Dropdown Button */}
                   <div className="relative">
-                    <button
+                    <NativeButton
                       type="button"
                       onClick={() => setShowDeptDropdown(!showDeptDropdown)}
                       className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 focus:ring-2 focus:ring-primary focus:border-primary text-left flex items-center justify-between"
@@ -620,11 +601,11 @@ export default function AddEmployeePage() {
                           : 'Select Departments'}
                       </span>
                       <FaChevronDown className={`text-default-400 transition-transform ${showDeptDropdown ? 'rotate-180' : ''}`} />
-                    </button>
+                    </NativeButton>
 
                     {/* Dropdown List */}
                     {showDeptDropdown && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-default-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <Surface className="absolute z-50 w-full mt-1 bg-white border border-default-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                         {departments.length === 0 ? (
                           <div className="px-4 py-2 text-default-500 text-sm">No departments available</div>
                         ) : (
@@ -633,7 +614,7 @@ export default function AddEmployeePage() {
                               key={dept._id}
                               className="flex items-center px-4 py-2 hover:bg-default-50 cursor-pointer"
                             >
-                              <input
+                              <NativeInput
                                 type="checkbox"
                                 checked={formData.departments?.includes(dept._id) || false}
                                 onChange={() => handleDepartmentToggle(dept._id)}
@@ -646,7 +627,7 @@ export default function AddEmployeePage() {
                             </label>
                           ))
                         )}
-                      </div>
+                      </Surface>
                     )}
                   </div>
                 </div>
@@ -909,7 +890,7 @@ export default function AddEmployeePage() {
                   <label className="block text-sm font-medium text-default-700 mb-2">
                     Password <span className="text-danger">*</span>
                   </label>
-                  <input
+                  <NativeInput
                     type="password"
                     name="password"
                     value={formData.password}
@@ -966,7 +947,7 @@ export default function AddEmployeePage() {
 
               <div className="mt-8 border-t border-default-200 pt-6">
                 <div className="mb-5">
-                  <h3 className="text-lg font-semibold text-default-800">Employment lifecycle</h3>
+                  <Heading3 className="text-lg font-semibold text-default-800">Employment lifecycle</Heading3>
                   <p className="mt-1 text-sm text-default-500">These choices automatically start the employee’s onboarding, probation and future exit workflow.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -1002,7 +983,7 @@ export default function AddEmployeePage() {
                   </div>
 
                   <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3">
-                    <input
+                    <NativeInput
                       type="checkbox"
                       checked={formData.probationApplicable}
                       onChange={(event) => setFormData((prev) => ({ ...prev, probationApplicable: event.target.checked }))}
@@ -1029,19 +1010,19 @@ export default function AddEmployeePage() {
                       </div>
                       <div>
                         <label className="mb-2 block text-sm font-medium text-default-700">Probation review date</label>
-                        <input value={probationReviewDate} readOnly className="w-full rounded-lg border border-default-200 bg-default-100 px-4 py-2 text-default-700" aria-label="Calculated probation review date" />
+                        <NativeInput value={probationReviewDate} readOnly className="w-full rounded-lg border border-default-200 bg-default-100 px-4 py-2 text-default-700" aria-label="Calculated probation review date" />
                         <p className="mt-1 text-xs text-default-500">Calculated from the joining date</p>
                       </div>
                     </>
                   )}
 
                   <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3">
-                    <input type="checkbox" checked={formData.backgroundVerificationRequired} onChange={(event) => setFormData((prev) => ({ ...prev, backgroundVerificationRequired: event.target.checked }))} className="h-4 w-4 rounded border-default-300 text-primary focus:ring-primary" />
+                    <NativeInput type="checkbox" checked={formData.backgroundVerificationRequired} onChange={(event) => setFormData((prev) => ({ ...prev, backgroundVerificationRequired: event.target.checked }))} className="h-4 w-4 rounded border-default-300 text-primary focus:ring-primary" />
                     <span><span className="block text-sm font-medium text-default-800">Background verification</span><span className="text-xs text-default-500">Add it to onboarding</span></span>
                   </label>
 
                   <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3">
-                    <input type="checkbox" checked={formData.assetProvisioningRequired} onChange={(event) => setFormData((prev) => ({ ...prev, assetProvisioningRequired: event.target.checked }))} className="h-4 w-4 rounded border-default-300 text-primary focus:ring-primary" />
+                    <NativeInput type="checkbox" checked={formData.assetProvisioningRequired} onChange={(event) => setFormData((prev) => ({ ...prev, assetProvisioningRequired: event.target.checked }))} className="h-4 w-4 rounded border-default-300 text-primary focus:ring-primary" />
                     <span><span className="block text-sm font-medium text-default-800">Equipment and access</span><span className="text-xs text-default-500">Create provisioning tasks</span></span>
                   </label>
                 </div>
@@ -1049,10 +1030,10 @@ export default function AddEmployeePage() {
 
               {/* Salary & Statutory Section */}
               <div className="mt-8 border-t border-default-200 pt-6">
-                <h3 className="text-lg font-semibold text-default-800 mb-4 flex items-center gap-2">
+                <Heading3 className="text-lg font-semibold text-default-800 mb-4 flex items-center gap-2">
                   💰 Salary & Statutory Details
                   <span className="text-sm font-normal text-default-500">(Optional - can be added later)</span>
-                </h3>
+                </Heading3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Gross Salary */}
@@ -1062,7 +1043,7 @@ export default function AddEmployeePage() {
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.salary.grossSalary}
                         onChange={(e) => handleGrossSalaryChange(e.target.value)}
@@ -1080,7 +1061,7 @@ export default function AddEmployeePage() {
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.salary.basic}
                         onChange={(e) => handleSalaryComponentChange('basic', e.target.value)}
@@ -1097,7 +1078,7 @@ export default function AddEmployeePage() {
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.salary.hra}
                         onChange={(e) => handleSalaryComponentChange('hra', e.target.value)}
@@ -1114,7 +1095,7 @@ export default function AddEmployeePage() {
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.salary.conveyance}
                         onChange={(e) => handleSalaryComponentChange('conveyance', e.target.value)}
@@ -1131,7 +1112,7 @@ export default function AddEmployeePage() {
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.salary.medical}
                         onChange={(e) => handleSalaryComponentChange('medical', e.target.value)}
@@ -1148,7 +1129,7 @@ export default function AddEmployeePage() {
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.salary.special}
                         onChange={(e) => handleSalaryComponentChange('special', e.target.value)}
@@ -1189,13 +1170,13 @@ export default function AddEmployeePage() {
                 {/* PF & ESI Section */}
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* PF Enrollment */}
-                  <div className="p-4 bg-default-50 rounded-lg border border-default-200">
+                  <Surface className="p-4 bg-default-50 rounded-lg border border-default-200">
                     <div className="flex items-center justify-between mb-4">
                       <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                         🏦 Provident Fund (PF)
                       </label>
                       <div className="flex items-center gap-2">
-                        <button
+                        <NativeButton
                           type="button"
                           onClick={() => setFormData({
                             ...formData,
@@ -1208,7 +1189,7 @@ export default function AddEmployeePage() {
                             style={{ transform: formData.pfEnrollment.enrolled ? 'translateX(20px)' : 'translateX(0)' }}
                             className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                           />
-                        </button>
+                        </NativeButton>
                         <span className="text-sm text-default-600">{formData.pfEnrollment.enrolled ? 'Enrolled' : 'Not Enrolled'}</span>
                       </div>
                     </div>
@@ -1218,7 +1199,7 @@ export default function AddEmployeePage() {
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs text-default-600 mb-1">PF Number</label>
-                            <input
+                            <NativeInput
                               type="text"
                               value={formData.pfEnrollment.pfNumber}
                               onChange={(e) => setFormData({
@@ -1231,7 +1212,7 @@ export default function AddEmployeePage() {
                           </div>
                           <div>
                             <label className="block text-xs text-default-600 mb-1">UAN Number</label>
-                            <input
+                            <NativeInput
                               type="text"
                               value={formData.pfEnrollment.uanNumber}
                               onChange={(e) => setFormData({
@@ -1246,7 +1227,7 @@ export default function AddEmployeePage() {
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs text-default-600 mb-1">Employee Contribution %</label>
-                            <input
+                            <NativeInput
                               type="number"
                               value={formData.pfEnrollment.employeeContribution}
                               onChange={(e) => setFormData({
@@ -1260,7 +1241,7 @@ export default function AddEmployeePage() {
                           </div>
                           <div>
                             <label className="block text-xs text-default-600 mb-1">Employer Contribution %</label>
-                            <input
+                            <NativeInput
                               type="number"
                               value={formData.pfEnrollment.employerContribution}
                               onChange={(e) => setFormData({
@@ -1275,16 +1256,16 @@ export default function AddEmployeePage() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </Surface>
 
                   {/* ESI Enrollment */}
-                  <div className="p-4 bg-default-50 rounded-lg border border-default-200">
+                  <Surface className="p-4 bg-default-50 rounded-lg border border-default-200">
                     <div className="flex items-center justify-between mb-4">
                       <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                         🏥 ESI (Employee State Insurance)
                       </label>
                       <div className="flex items-center gap-2">
-                        <button
+                        <NativeButton
                           type="button"
                           onClick={() => setFormData({
                             ...formData,
@@ -1297,7 +1278,7 @@ export default function AddEmployeePage() {
                             style={{ transform: formData.esiEnrollment.enrolled ? 'translateX(20px)' : 'translateX(0)' }}
                             className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                           />
-                        </button>
+                        </NativeButton>
                         <span className="text-sm text-default-600">{formData.esiEnrollment.enrolled ? 'Enrolled' : 'Not Enrolled'}</span>
                       </div>
                     </div>
@@ -1305,7 +1286,7 @@ export default function AddEmployeePage() {
                     {formData.esiEnrollment.enrolled && (
                       <div>
                         <label className="block text-xs text-default-600 mb-1">ESI Number</label>
-                        <input
+                        <NativeInput
                           type="text"
                           value={formData.esiEnrollment.esiNumber}
                           onChange={(e) => setFormData({
@@ -1318,17 +1299,17 @@ export default function AddEmployeePage() {
                         <p className="text-xs text-default-500 mt-1">Applicable for gross ≤ ₹21,000</p>
                       </div>
                     )}
-                  </div>
+                  </Surface>
                 </div>
 
                 {/* Professional Tax */}
-                <div className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
+                <Surface className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                       📋 Professional Tax
                     </label>
                     <div className="flex items-center gap-4">
-                      <button
+                      <NativeButton
                         type="button"
                         onClick={() => setFormData({
                           ...formData,
@@ -1341,11 +1322,11 @@ export default function AddEmployeePage() {
                           style={{ transform: formData.professionalTax.applicable ? 'translateX(20px)' : 'translateX(0)' }}
                           className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                         />
-                      </button>
+                      </NativeButton>
                       {formData.professionalTax.applicable && (
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-default-600">₹</span>
-                          <input
+                          <NativeInput
                             type="number"
                             value={formData.professionalTax.amount}
                             onChange={(e) => setFormData({
@@ -1359,16 +1340,16 @@ export default function AddEmployeePage() {
                       )}
                     </div>
                   </div>
-                </div>
+                </Surface>
 
                 {/* Corporate Health Insurance */}
-                <div className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
+                <Surface className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                       🏥 Corporate Health Insurance
                     </label>
                     <div className="flex items-center gap-2">
-                      <button
+                      <NativeButton
                         type="button"
                         onClick={() => setFormData({
                           ...formData,
@@ -1381,7 +1362,7 @@ export default function AddEmployeePage() {
                           style={{ transform: formData.healthInsurance.enrolled ? 'translateX(20px)' : 'translateX(0)' }}
                           className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                         />
-                      </button>
+                      </NativeButton>
                       <span className="text-sm text-default-600">{formData.healthInsurance.enrolled ? 'Enrolled' : 'Not Enrolled'}</span>
                     </div>
                   </div>
@@ -1389,7 +1370,7 @@ export default function AddEmployeePage() {
                     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs text-default-600 mb-1">Policy Provider</label>
-                        <input
+                        <NativeInput
                           type="text"
                           value={formData.healthInsurance.provider || ''}
                           onChange={(e) => setFormData({
@@ -1402,7 +1383,7 @@ export default function AddEmployeePage() {
                       </div>
                       <div>
                         <label className="block text-xs text-default-600 mb-1">Policy Number</label>
-                        <input
+                        <NativeInput
                           type="text"
                           value={formData.healthInsurance.policyNumber}
                           onChange={(e) => setFormData({
@@ -1415,14 +1396,14 @@ export default function AddEmployeePage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </Surface>
               </div>
 
               {/* Login Credentials Info */}
               <div className="mt-6 p-4 bg-primary-50 border border-primary-200 rounded-lg">
-                <h3 className="text-sm font-semibold text-primary-800 mb-2">
+                <Heading3 className="text-sm font-semibold text-primary-800 mb-2">
                   📧 Login Credentials
-                </h3>
+                </Heading3>
                 <p className="text-sm text-primary-700">
                   A user account will be automatically created with the email and password provided above.
                   The employee can use these credentials to login and mark attendance.

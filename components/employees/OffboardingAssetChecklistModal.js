@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button,
   Chip,
@@ -11,7 +11,7 @@ import {
   ModalHeader,
   Progress,
   Skeleton,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import { FaBox, FaCheck, FaExclamationTriangle, FaUndoAlt } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import toast from '@/utils/toast'

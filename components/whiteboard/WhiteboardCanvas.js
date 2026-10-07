@@ -1,4 +1,5 @@
 'use client';
+import UploadButton from '@/components/ui/UploadButton';
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import MiraLoadingOverlay from '@/components/ui/MiraLoadingOverlay';
@@ -3967,15 +3968,7 @@ const WhiteboardCanvas = forwardRef(({
               <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
               <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
                 <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Import</div>
-                <button
-                  onClick={importTboard}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 text-sm"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  Board File (.tboard)
-                </button>
+                <UploadButton onClick={importTboard} label="Board file (.tboard)" />
 
                 <div className="my-2 border-t border-gray-100"></div>
 

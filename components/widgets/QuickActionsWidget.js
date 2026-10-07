@@ -3,7 +3,7 @@
 import widgetStyles from './WidgetDesign.module.css'
 
 import { useRouter } from 'next/navigation'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/fernly'
 import { FaUser, FaCalendar, FaDollarSign, FaTasks, FaFileAlt, FaPlane } from 'react-icons/fa'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 

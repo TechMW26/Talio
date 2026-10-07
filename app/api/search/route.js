@@ -103,8 +103,6 @@ function buildMenuItemsForUser(user, permissions) {
   if (isDepartmentHead) {
     const teamSubmenu = [
       { name: 'Team Members', path: '/dashboard/team/members' },
-      { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-      { name: 'Team Goals', path: '/dashboard/performance/goals' },
       { name: 'Performance Reports', path: '/dashboard/performance/reports' },
       { name: 'Geofencing', path: '/dashboard/team/geofencing' }
     ]
@@ -148,8 +146,6 @@ function buildMenuItemsForUser(user, permissions) {
     const teamSubmenu = [
       { name: 'My Teams', path: '/dashboard/team/my-teams' },
       { name: 'Team Members', path: '/dashboard/team/members' },
-      { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-      { name: 'Team Goals', path: '/dashboard/performance/goals' },
       { name: 'Performance Reports', path: '/dashboard/performance/reports' },
     ]
     const teamMenuItem = {

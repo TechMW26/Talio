@@ -7,6 +7,9 @@ import { getMenuItemsForRole, withManpowerRequests } from '@/utils/roleBasedMenu
 jest.mock('@/hooks/useAuthedSWR', () => ({ __esModule: true, default: jest.fn() }))
 jest.mock('@/hooks/useApiMutation', () => ({ __esModule: true, default: jest.fn() }))
 let execute, mutate, data
+const originalResizeObserver = global.ResizeObserver
+beforeAll(() => { global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } })
+afterAll(() => { global.ResizeObserver = originalResizeObserver })
 const record = () => ({ _id: 'r1', status: 'pending', canReview: true, createdAt: '2026-09-29T00:00:00Z', department: { name: 'Engineering' }, employee: { firstName: 'Test', lastName: 'Manager' }, justification: 'Additional delivery capacity', job: { jobTitle: 'Engineer', numberOfPositions: 2, location: 'Bhopal', workMode: 'hybrid', employmentType: 'full-time', educationLevel: 'bachelor', experience: { min: 2, max: 5 }, salaryRange: { min: 500000, max: 900000, currency: 'INR' }, requirements: ['Experience'], responsibilities: ['Build'], skills: ['JavaScript'], benefits: [] } })
 beforeEach(() => {
   execute = jest.fn().mockResolvedValue({ success: true, message: 'Saved' }); mutate = jest.fn()
@@ -53,7 +56,7 @@ test('dashboard cards show server counts and filtering resets pagination', () =>
   expect(useAuthedSWR).toHaveBeenLastCalledWith('/api/recruitment/requisitions?page=2&status=all', expect.any(Object))
   fireEvent.click(screen.getByRole('button', { name: 'View approved' }))
   expect(useAuthedSWR).toHaveBeenLastCalledWith('/api/recruitment/requisitions?page=1&status=approved', expect.any(Object))
-  expect(screen.getByRole('button', { name: 'Approved', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('tab', { name: 'Approved', exact: true })).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByText('No approved requests.')).toBeInTheDocument()
 })
 test('loading and failed requests do not display misleading zero counts or enable creation', () => {

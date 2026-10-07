@@ -9,8 +9,8 @@ import {
     FaExternalLinkAlt
 } from 'react-icons/fa'
 import { HiOutlineNewspaper } from 'react-icons/hi2'
-import Modal from '@/components/ui/HeroModal'
-import { Button, Skeleton, ScrollShadow, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Button, Skeleton, ScrollShadow, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@/components/ui/fernly'
 
 // Category icons and colors matching other widgets
 const CATEGORY_CONFIG = {
@@ -217,7 +217,7 @@ export default function RoleNewsWidget() {
                                 <button data-widget-card=""
                                     key={index}
                                     onClick={() => openArticle(item)}
-                                    className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors group border border-default-100 hover:bg-default-50 text-left cursor-pointer"
+                                    className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors group border border-default-100  text-left cursor-pointer"
                                 >
                                     {/* Icon */}
                                     <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center flex-shrink-0`}>
@@ -226,7 +226,7 @@ export default function RoleNewsWidget() {
 
                                     {/* Content */}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-default-900 line-clamp-2 group-hover:text-primary-600 transition-colors">
+                                        <p className="text-sm font-semibold text-default-900 line-clamp-2  transition-colors">
                                             {item.title}
                                         </p>
                                         <div className="flex items-center gap-2 mt-1">

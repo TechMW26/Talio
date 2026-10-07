@@ -1,13 +1,18 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { Surface, SummaryCard } from '@/components/ui/fernly'
+import calendar from '@/components/ui/fernly/calendar.module.css'
 
+
+import { Heading1, Heading2, NativeButton, Heading3, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import toast from '@/utils/toast'
 import { FaClock, FaSignInAlt, FaSignOutAlt, FaCalendarAlt, FaEdit, FaCheck, FaTimes, FaExclamationCircle, FaPlus, FaChevronLeft, FaChevronRight, FaList, FaTh, FaMapMarkerAlt } from 'react-icons/fa'
 import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
 import useLocationCapture, { getAttendanceLocationOptions } from '@/hooks/useLocationCapture'
 import { useSocket } from '@/contexts/SocketContext'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, CardHeader, CardFooter, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Select, SelectItem } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, CardHeader, CardFooter, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Select, SelectItem } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -803,7 +808,7 @@ export default function AttendancePage() {
       {/* Header */}
       <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Attendance</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Attendance</Heading1>
           <p className="text-sm sm:text-base text-default-500 mt-1">Track your attendance and work hours</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -843,7 +848,7 @@ export default function AttendancePage() {
       {showPendingApprovals && pendingCorrections.length > 0 && (
         <Card className="mb-4 sm:mb-6 border border-secondary-200 bg-secondary-50">
           <CardHeader className="pb-2">
-            <h2 className="text-lg sm:text-xl font-semibold text-secondary-800">Pending Correction Approvals</h2>
+            <Heading2 className="text-lg sm:text-xl font-semibold text-secondary-800">Pending Correction Approvals</Heading2>
           </CardHeader>
           <CardBody className="space-y-4">
             {pendingCorrections.map((correction) => {
@@ -917,7 +922,7 @@ export default function AttendancePage() {
       {showMyCorrections && (
         <Card className="mb-4 sm:mb-6 border border-primary-200 bg-primary-50">
           <CardHeader className="pb-2">
-            <h2 className="text-lg sm:text-xl font-semibold text-primary-800">My Correction Requests</h2>
+            <Heading2 className="text-lg sm:text-xl font-semibold text-primary-800">My Correction Requests</Heading2>
           </CardHeader>
           <CardBody>
             {myCorrections.length === 0 ? (
@@ -970,7 +975,7 @@ export default function AttendancePage() {
           </div>
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div className="w-full lg:w-auto">
-              <h2 className="text-lg sm:text-xl font-semibold text-default-800 mb-3">Today&apos;s Attendance</h2>
+              <Heading2 className="text-lg sm:text-xl font-semibold text-default-800 mb-3">Today&apos;s Attendance</Heading2>
               <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 text-sm sm:text-base text-default-600">
                 <div className="flex items-center gap-2">
                   <FaClock className="text-primary w-4 h-4" />
@@ -1046,7 +1051,7 @@ export default function AttendancePage() {
         <CardBody>
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
             <div>
-              <h2 className="text-lg sm:text-xl font-semibold text-default-800">My Attendance - {user?.firstName} {user?.lastName}</h2>
+              <Heading2 className="text-lg sm:text-xl font-semibold text-default-800">My Attendance - {user?.firstName} {user?.lastName}</Heading2>
               <p className="text-xs sm:text-sm text-default-500 mt-1">Click on any day to edit or report missing entry</p>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
@@ -1098,7 +1103,7 @@ export default function AttendancePage() {
           </div>
 
           {/* Status Legend */}
-          <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-default-50 rounded-lg">
+          <Surface className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-default-50 rounded-lg">
             <div className="flex items-center gap-1.5 sm:gap-2">
               <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-success-100 border border-success-400"></div>
               <span className="text-[10px] sm:text-xs text-default-600">Present</span>
@@ -1131,7 +1136,7 @@ export default function AttendancePage() {
               <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-default-100 border border-default-300"></div>
               <span className="text-[10px] sm:text-xs text-default-600">No Record</span>
             </div>
-          </div>
+          </Surface>
 
           {attendanceLoadError ? (
             <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger">
@@ -1143,9 +1148,9 @@ export default function AttendancePage() {
           ) : viewMode === 'calendar' ? (
             /* Calendar View */
             <div className="overflow-x-auto overflow-y-visible">
-              <div className="min-w-[700px] p-2">
+              <div className="min-w-0 p-2">
                 {/* Day Headers */}
-                <div className="grid grid-cols-7 gap-1 mb-2">
+                <div className={calendar.week}>
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                     <div key={day} className="text-center text-xs sm:text-sm font-semibold text-default-500 py-2">
                       {day}
@@ -1154,7 +1159,7 @@ export default function AttendancePage() {
                 </div>
 
                 {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-1">
+                <div className={calendar.grid}>
                   {calendarData.map((dayData, index) => {
                     const pendingCorrection = dayData.day ? getPendingCorrectionForDay(dayData) : null
                     const hasPending = !!pendingCorrection
@@ -1247,7 +1252,7 @@ export default function AttendancePage() {
 
                         {/* Edit button for regularisation - show on hover */}
                         {dayData.isCurrentMonth && dayData.record && !isHoliday && (
-                          <button
+                          <NativeButton
                             onClick={(e) => {
                               e.stopPropagation()
                               // Pass dayData.date for accurate timezone handling
@@ -1257,7 +1262,7 @@ export default function AttendancePage() {
                             title="Request Regularisation"
                           >
                             <FaEdit className="w-2 h-2 sm:w-3 sm:h-3 text-primary" />
-                          </button>
+                          </NativeButton>
                         )}
 
                         {/* Pending correction indicator */}
@@ -1271,7 +1276,7 @@ export default function AttendancePage() {
 
                         {/* Add button for missing entry - show on hover for past working dates without records */}
                         {shouldShowAsAbsent && (
-                          <button
+                          <NativeButton
                             onClick={(e) => {
                               e.stopPropagation()
                               const d = dayData.date
@@ -1289,7 +1294,7 @@ export default function AttendancePage() {
                             title="Add Missing Entry"
                           >
                             <FaPlus className="w-2 h-2 sm:w-3 sm:h-3 text-success" />
-                          </button>
+                          </NativeButton>
                         )}
 
                         {/* Holiday Name */}
@@ -1322,7 +1327,7 @@ export default function AttendancePage() {
           ) : (
             /* List View */
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <NativeTable className="w-full">
                 <thead className="bg-default-50 border-b border-divider">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Date</th>
@@ -1422,46 +1427,18 @@ export default function AttendancePage() {
                     })
                   )}
                 </tbody>
-              </table>
+              </NativeTable>
             </div>
           )}
 
           {/* Monthly Summary */}
           <div className="mt-6 pt-6 border-t border-divider">
-            <h3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</h3>
+            <Heading3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</Heading3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="bg-success-50">
-                <CardBody className="text-center py-4">
-                  <p className="text-2xl font-bold text-success">
-                    {attendance.filter(r => r.status === 'present').length}
-                  </p>
-                  <p className="text-sm text-success-700">Present Days</p>
-                </CardBody>
-              </Card>
-              <Card className="bg-danger-50">
-                <CardBody className="text-center py-4">
-                  <p className="text-2xl font-bold text-danger">
-                    {attendance.filter(r => r.status === 'absent').length}
-                  </p>
-                  <p className="text-sm text-danger-700">Absent Days</p>
-                </CardBody>
-              </Card>
-              <Card className="bg-warning-50">
-                <CardBody className="text-center py-4">
-                  <p className="text-2xl font-bold text-warning">
-                    {attendance.filter(r => r.status === 'late').length}
-                  </p>
-                  <p className="text-sm text-warning-700">Late Days</p>
-                </CardBody>
-              </Card>
-              <Card className="bg-warning-50">
-                <CardBody className="text-center py-4">
-                  <p className="text-2xl font-bold text-warning">
-                    {attendance.filter(r => r.status === 'half-day').length}
-                  </p>
-                  <p className="text-sm text-warning-700">Half Days</p>
-                </CardBody>
-              </Card>
+              <SummaryCard  label={<>Present Days</>} value={<>{attendance.filter(r => r.status === 'present').length}</>} />
+              <SummaryCard  label={<>Absent Days</>} value={<>{attendance.filter(r => r.status === 'absent').length}</>} />
+              <SummaryCard  label={<>Late Days</>} value={<>{attendance.filter(r => r.status === 'late').length}</>} />
+              <SummaryCard  label={<>Half Days</>} value={<>{attendance.filter(r => r.status === 'half-day').length}</>} />
             </div>
           </div>
         </CardBody>
@@ -1563,7 +1540,7 @@ export default function AttendancePage() {
               {['check-in', 'both'].includes(correctionForm.correctionType) && (
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-1">Correct Check-In Time</label>
-                  <input
+                  <NativeInput
                     type="time"
                     value={correctionForm.requestedCheckIn}
                     onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckIn: e.target.value })}
@@ -1575,7 +1552,7 @@ export default function AttendancePage() {
               {['check-out', 'both'].includes(correctionForm.correctionType) && (
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-1">Correct Check-Out Time</label>
-                  <input
+                  <NativeInput
                     type="time"
                     value={correctionForm.requestedCheckOut}
                     onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckOut: e.target.value })}
@@ -1602,7 +1579,7 @@ export default function AttendancePage() {
 
               <div>
                 <label className="block text-sm font-medium text-default-700 mb-1">Reason for Correction *</label>
-                <textarea
+                <NativeTextarea
                   value={correctionForm.reason}
                   onChange={(e) => setCorrectionForm({ ...correctionForm, reason: e.target.value })}
                   placeholder="Please explain why this correction is needed..."
@@ -1667,7 +1644,7 @@ export default function AttendancePage() {
               ) : (
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-1">Date *</label>
-                  <input
+                  <NativeInput
                     type="date"
                     value={missingEntryForm.date}
                     onChange={(e) => setMissingEntryForm({ ...missingEntryForm, date: e.target.value })}
@@ -1679,7 +1656,7 @@ export default function AttendancePage() {
 
               <div>
                 <label className="block text-sm font-medium text-default-700 mb-1">Check-In Time</label>
-                <input
+                <NativeInput
                   type="time"
                   value={missingEntryForm.checkIn}
                   onChange={(e) => setMissingEntryForm({ ...missingEntryForm, checkIn: e.target.value })}
@@ -1689,7 +1666,7 @@ export default function AttendancePage() {
 
               <div>
                 <label className="block text-sm font-medium text-default-700 mb-1">Check-Out Time</label>
-                <input
+                <NativeInput
                   type="time"
                   value={missingEntryForm.checkOut}
                   onChange={(e) => setMissingEntryForm({ ...missingEntryForm, checkOut: e.target.value })}
@@ -1699,7 +1676,7 @@ export default function AttendancePage() {
 
               <div>
                 <label className="block text-sm font-medium text-default-700 mb-1">Reason *</label>
-                <textarea
+                <NativeTextarea
                   value={missingEntryForm.reason}
                   onChange={(e) => setMissingEntryForm({ ...missingEntryForm, reason: e.target.value })}
                   placeholder="Why did you miss clocking in/out?"
@@ -1792,9 +1769,9 @@ export default function AttendancePage() {
                   </CardBody>
                 </Card>
               ) : (
-                <div className="text-center py-4 text-default-500 italic bg-default-50 rounded-lg">
+                <Surface className="text-center py-4 text-default-500 italic bg-default-50 rounded-lg">
                   No description available for this holiday.
-                </div>
+                </Surface>
               )}
 
               <div className="flex gap-2 pt-2">

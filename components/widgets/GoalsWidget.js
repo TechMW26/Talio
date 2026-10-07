@@ -4,7 +4,7 @@ import widgetStyles from './WidgetDesign.module.css'
 
 import { useState, useEffect } from 'react'
 import { FaBullseye, FaCheckCircle, FaHourglassHalf, FaExclamationTriangle } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Chip, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function GoalsWidget({ userId }) {
     const [goals, setGoals] = useState([])
@@ -66,15 +66,7 @@ export default function GoalsWidget({ userId }) {
         <div className={`${widgetStyles.surface} p-4 sm:p-6 flex-1 flex flex-col h-full`}>
             <div className="flex items-center justify-between mb-4">
                 <h3 className={`${widgetStyles.title} text-base sm:text-lg font-bold text-default-900`}>My Goals</h3>
-                <Button
-                    variant="light"
-                    color="primary"
-                    size="sm"
-                    as="a"
-                    href="/dashboard/performance/goals"
-                >
-                    View All
-                </Button>
+
             </div>
 
             {/* Stats Grid */}
@@ -112,7 +104,7 @@ export default function GoalsWidget({ userId }) {
                         <FaBullseye className="w-7 h-7 text-primary-400" />
                     </div>
                     <p className="text-sm text-default-500">No goals set yet</p>
-                    <p className="text-xs text-default-400 mt-1">Visit Performance section to create goals</p>
+                    <p className="text-xs text-default-400 mt-1">Assigned goals will appear here</p>
                 </div>
             ) : (
                 <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">

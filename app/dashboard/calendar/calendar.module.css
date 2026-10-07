@@ -1,0 +1,50 @@
+.page { color: var(--color-text-primary); }
+.heading, .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.heading { margin-bottom: 24px; }
+.heading h1 { font-size: 30px; font-weight: 600; letter-spacing: -.04em; }
+.heading p, .muted { color: var(--color-text-secondary); font-size: 13px; }
+.layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); grid-template-areas: 'month events' 'month next'; grid-template-rows: auto 1fr; }
+.card { background: var(--color-bg-card, #171717); border: 1px solid var(--color-border, #303030); border-radius: 24px; padding: 22px; min-width: 0; }
+.month { grid-area: month; }
+.events { grid-area: events; }
+.next { grid-area: next; max-height: 480px; overflow-y: auto; }
+.card h2 { font-size: 22px; font-weight: 600; letter-spacing: -.03em; }
+.nav { display: flex; gap: 6px; align-items: center; }
+.nav button { border-radius: 999px; padding: 9px 13px; background: var(--color-bg-hover, #252525); font-size: 13px; }
+.nav button:focus-visible, .day:focus-visible, .upcoming:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+.week, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.week { margin: 18px 0 8px; font-size: 11px; text-transform: uppercase; text-align: center; color: var(--color-text-secondary); }
+.grid { grid-auto-rows: minmax(84px, 1fr); }
+.day { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px; border-radius: 14px; background: var(--color-bg-hover, #242424); text-align: left; min-width: 0; transition: background .2s, box-shadow .2s; }
+.day:hover { background: #2563eb20; }
+.day[aria-pressed=true] { box-shadow: inset 0 0 0 2px #3b82f6; }
+.number { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font-size: 14px; font-weight: 600; }
+.today .number { background: #2563eb; color: white; }
+.eventTag { color: #93b4fa; background: #2563eb20; padding: 2px 6px; font-size: 11px; border-radius: 6px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eyebrow { color: #3b82f6; text-transform: uppercase; font-size: 12px; letter-spacing: .06em; }
+.agenda { display: grid; gap: 10px; margin-top: 18px; }
+.agenda li { padding: 12px; border-radius: 14px; background: var(--color-bg-hover, #242424); box-shadow: inset 4px 0 #3b82f6; font-size: 14px; overflow-wrap: anywhere; }
+.agenda small { display: block; color: var(--color-text-secondary); font-size: 12px; margin-top: 4px; }
+.upcoming { display: flex; gap: 12px; align-items: center; width: 100%; padding: 9px 0; text-align: left; font-size: 14px; }
+.dateBadge { flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: #2563eb20; color: #93b4fa; }
+.upcoming small { display: block; color: var(--color-text-secondary); font-size: 11px; }
+.empty { padding: 22px 0; font-size: 13px; color: var(--color-text-secondary); }
+/* Fill the dashboard's available content area, rather than guessing its header height. */
+@media(min-width:1001px) {
+  :global(main.dashboard-page-canvas):has(.page) { min-height: 0; }
+  :global(main.dashboard-page-canvas):has(.page) > div:first-child { height: 100%; }
+  :global(main.dashboard-page-canvas):has(.page) > div:last-child { display: none; }
+  :global(.dashboard-route-stage):has(.page),
+  :global(.dashboard-route-page):has(.page) { height: 100%; }
+  .page { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; }
+  .heading, .page > .empty { flex: none; }
+  .layout { flex: 1; min-height: 0; grid-template-rows: minmax(150px, .4fr) minmax(0, 1fr); }
+  .month { display: flex; flex-direction: column; min-height: 0; }
+  .toolbar, .week { flex: none; }
+  .grid { flex: 1; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+  .day { min-height: 0; overflow: hidden; }
+  .number { flex-shrink: 0; }
+  .events, .next { min-height: 0; max-height: none; overflow-y: auto; }
+}
+@media(max-width:1000px) { .layout { grid-template-columns: minmax(0,1fr); grid-template-areas: 'month' 'events' 'next'; } }
+@media(max-width:600px) { .page { padding: 12px; } .card { padding: 14px; } .day { padding: 3px; } .eventTag { font-size: 9px; } .grid { grid-auto-rows: minmax(70px,1fr); gap: 3px; } }

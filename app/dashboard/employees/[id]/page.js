@@ -1,5 +1,8 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, Heading2, NativeInput } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -29,7 +32,7 @@ import {
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import { formatDesignation, formatDepartments } from '@/lib/formatters'
 import { formatEmployeeAddress } from '@/lib/employeeAddress'
-import { Button, Chip, Skeleton, Tooltip } from '@heroui/react'
+import { Button, Chip, Skeleton, Tooltip } from '@/components/ui/fernly'
 import EmployeeLifecyclePanel from '@/components/employees/EmployeeLifecyclePanel'
 import PerformanceAppraisalPanel from '@/components/performance/PerformanceAppraisalPanel'
 import RemoteSupportAdminPanel from '@/components/remoteSupport/RemoteSupportAdminPanel'
@@ -44,9 +47,9 @@ function StatTile({ icon: Icon, label, value, accent = 'sky' }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br ${accents[accent]} p-4`}>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-white/70 dark:bg-zinc-900/70 flex items-center justify-center">
+        <Surface className="w-10 h-10 rounded-xl bg-white/70 dark:bg-zinc-900/70 flex items-center justify-center">
           <Icon className="w-5 h-5" />
-        </div>
+        </Surface>
         <div>
           <p className="text-[11px] uppercase tracking-wider opacity-70 font-semibold">{label}</p>
           <p className="text-base font-bold text-slate-800 dark:text-zinc-100">{value}</p>
@@ -257,9 +260,9 @@ export default function EmployeeDetailPage() {
           </div>
 
           <div className="ml-0 sm:ml-44 mt-20 sm:mt-2">
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-zinc-50">
+            <Heading1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-zinc-50">
               {employee.firstName} {employee.lastName}
-            </h1>
+            </Heading1>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-slate-600 dark:text-zinc-300">
                 {formatDesignation(employee.designation, employee) || 'No designation'}
@@ -312,29 +315,29 @@ export default function EmployeeDetailPage() {
 
       {/* Tabs */}
       <div className="mt-6 flex items-center gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-zinc-900 w-fit">
-        <button
+        <NativeButton
           type="button"
           onClick={() => setActiveTab('overview')}
           className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'overview' ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow' : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'}`}
         >
           Overview
-        </button>
-        <button
+        </NativeButton>
+        <NativeButton
           type="button"
           onClick={() => setActiveTab('kri-kpi')}
           className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'kri-kpi' ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow' : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'}`}
         >
           <HiOutlineSparkles className="w-4 h-4" />
           KRI · KPI
-        </button>
+        </NativeButton>
         {showAppraisalsTab && (
-          <button
+          <NativeButton
             type="button"
             onClick={() => setActiveTab('appraisals')}
             className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'appraisals' ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow' : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'}`}
           >
             Appraisals
-          </button>
+          </NativeButton>
         )}
       </div>
 
@@ -344,7 +347,7 @@ export default function EmployeeDetailPage() {
           {/* Bio */}
           <div className="lg:col-span-2 rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 sm:p-8 relative overflow-hidden">
             <FaQuoteLeft className="absolute top-4 right-4 w-12 h-12 text-slate-100 dark:text-zinc-800" />
-            <h2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-3">About</h2>
+            <Heading2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-3">About</Heading2>
             <p className="text-base leading-relaxed text-slate-700 dark:text-zinc-200 whitespace-pre-line">
               {employee.bio || `${employee.firstName} hasn’t added a bio yet. Once added it will appear here as a quick introduction.`}
             </p>
@@ -352,7 +355,7 @@ export default function EmployeeDetailPage() {
 
           {/* Personal info card */}
           <div className="rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
-            <h2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-2">Contact & Personal</h2>
+            <Heading2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-2">Contact & Personal</Heading2>
             <InfoRow icon={FaEnvelope} label="Email" value={employee.email} />
             <InfoRow icon={FaPhone} label="Phone" value={employee.phone} />
             <InfoRow icon={FaCalendarAlt} label="Date of Birth" value={employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : null} />
@@ -361,7 +364,7 @@ export default function EmployeeDetailPage() {
 
           {/* Employment info card */}
           <div className="rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
-            <h2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-2">Employment</h2>
+            <Heading2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-2">Employment</Heading2>
             <InfoRow icon={FaBriefcase} label="Designation" value={formatDesignation(employee.designation, employee)} />
             <InfoRow icon={FaBuilding} label="Department(s)" value={formatDepartments(employee)} />
             <InfoRow icon={FaCalendarAlt} label="Joined On" value={employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString() : null} />
@@ -372,7 +375,7 @@ export default function EmployeeDetailPage() {
           {/* Emergency */}
           {employee.emergencyContact && (
             <div className="rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
-              <h2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-2">Emergency Contact</h2>
+              <Heading2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-2">Emergency Contact</Heading2>
               <InfoRow icon={FaUserFriends} label="Name" value={employee.emergencyContact.name} />
               <InfoRow icon={FaUserFriends} label="Relationship" value={employee.emergencyContact.relationship} />
               <InfoRow icon={FaPhone} label="Phone" value={employee.emergencyContact.phone} />
@@ -382,7 +385,7 @@ export default function EmployeeDetailPage() {
           {/* Bank details */}
           {employee.bankDetails && (
             <div className="rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
-              <h2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-2">Bank Details</h2>
+              <Heading2 className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-zinc-500 mb-2">Bank Details</Heading2>
               <InfoRow icon={FaBuilding} label="Bank Name" value={employee.bankDetails.bankName} />
               <InfoRow icon={FaIdBadge} label="Account No." value={employee.bankDetails.accountNumber} />
               <InfoRow icon={FaIdBadge} label="IFSC" value={employee.bankDetails.ifscCode} />
@@ -396,9 +399,9 @@ export default function EmployeeDetailPage() {
           {/* Manual KRIs */}
           <div className="rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
+              <Heading2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
                 Manual KRIs
-              </h2>
+              </Heading2>
               {canManageKriKpi && (
                 <Button
                   size="sm"
@@ -416,7 +419,7 @@ export default function EmployeeDetailPage() {
               )}
             </div>
             {canManageKriKpi && (
-              <input
+              <NativeInput
                 value={newKri}
                 onChange={(e) => setNewKri(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm mb-3"
@@ -432,13 +435,13 @@ export default function EmployeeDetailPage() {
                   <p className="text-sm text-slate-800 dark:text-zinc-200 flex-1">{kri}</p>
                   {canManageKriKpi && (
                     <Tooltip content="Remove" placement="top">
-                      <button
+                      <NativeButton
                         type="button"
                         onClick={() => setManualKRIs((prev) => prev.filter((_, i) => i !== idx))}
                         className="text-rose-500 hover:text-rose-700 text-xs"
                       >
                         <FaTrash />
-                      </button>
+                      </NativeButton>
                     </Tooltip>
                   )}
                 </div>
@@ -452,9 +455,9 @@ export default function EmployeeDetailPage() {
           {/* Manual KPIs */}
           <div className="rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
+              <Heading2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
                 Manual KPIs
-              </h2>
+              </Heading2>
               {canManageKriKpi && (
                 <Button
                   size="sm"
@@ -473,10 +476,10 @@ export default function EmployeeDetailPage() {
             </div>
             {canManageKriKpi && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                <input value={newKpi.name} onChange={(e) => setNewKpi((p) => ({ ...p, name: e.target.value }))} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm" placeholder="KPI name" />
-                <input value={newKpi.target} onChange={(e) => setNewKpi((p) => ({ ...p, target: e.target.value }))} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm" placeholder="Target" />
-                <input value={newKpi.unit} onChange={(e) => setNewKpi((p) => ({ ...p, unit: e.target.value }))} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm" placeholder="Unit" />
-                <input value={newKpi.notes} onChange={(e) => setNewKpi((p) => ({ ...p, notes: e.target.value }))} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm" placeholder="Notes" />
+                <NativeInput value={newKpi.name} onChange={(e) => setNewKpi((p) => ({ ...p, name: e.target.value }))} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm" placeholder="KPI name" />
+                <NativeInput value={newKpi.target} onChange={(e) => setNewKpi((p) => ({ ...p, target: e.target.value }))} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm" placeholder="Target" />
+                <NativeInput value={newKpi.unit} onChange={(e) => setNewKpi((p) => ({ ...p, unit: e.target.value }))} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm" placeholder="Unit" />
+                <NativeInput value={newKpi.notes} onChange={(e) => setNewKpi((p) => ({ ...p, notes: e.target.value }))} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-sm" placeholder="Notes" />
               </div>
             )}
             <div className="space-y-2">
@@ -495,13 +498,13 @@ export default function EmployeeDetailPage() {
                     </div>
                     {canManageKriKpi && (
                       <Tooltip content="Remove" placement="top">
-                        <button
+                        <NativeButton
                           type="button"
                           onClick={() => setManualKPIs((prev) => prev.filter((_, i) => i !== idx))}
                           className="text-rose-500 hover:text-rose-700 text-xs"
                         >
                           <FaTrash />
-                        </button>
+                        </NativeButton>
                       </Tooltip>
                     )}
                   </div>
@@ -515,9 +518,9 @@ export default function EmployeeDetailPage() {
 
           {/* AI suggested */}
           <div className="xl:col-span-2 rounded-3xl border border-slate-200/60 dark:border-zinc-800 bg-gradient-to-br from-indigo-50/60 to-fuchsia-50/40 dark:from-indigo-950/30 dark:to-fuchsia-950/20 p-6">
-            <h2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2 mb-4">
+            <Heading2 className="text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2 mb-4">
               AI Suggested KRIs
-            </h2>
+            </Heading2>
             {aiGeneratedKRIs.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-zinc-400">
                 No AI-generated responsibilities yet. They will be created automatically when this employee is added or promoted.
@@ -525,7 +528,7 @@ export default function EmployeeDetailPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {aiGeneratedKRIs.map((kri, idx) => (
-                  <div
+                  <Surface
                     key={`${kri.title}-${idx}`}
                     className="p-4 rounded-2xl bg-white/80 dark:bg-zinc-900/80 border border-white/60 dark:border-zinc-800/60 backdrop-blur"
                   >
@@ -536,7 +539,7 @@ export default function EmployeeDetailPage() {
                       </Chip>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">{kri.description}</p>
-                  </div>
+                  </Surface>
                 ))}
               </div>
             )}

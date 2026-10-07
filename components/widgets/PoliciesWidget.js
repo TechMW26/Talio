@@ -4,7 +4,7 @@ import widgetStyles from './WidgetDesign.module.css'
 import { useState, useEffect } from 'react'
 import { FaFileContract } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
-import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function PoliciesWidget({ initialData }) {
   const router = useRouter()

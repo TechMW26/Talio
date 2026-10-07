@@ -34,7 +34,6 @@ import {
   clearAllSessionCaches
 } from '@/utils/sessionCache'
 import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebAccessRestriction'
-import CallAlertReceiver from '@/components/CallAlertReceiver'
 import { markClientDataChanged } from '@/lib/clientDataSync'
 
 // Keep non-critical dashboard features out of the initial route bundle. They
@@ -384,7 +383,6 @@ export default function DashboardLayout({ children }) {
                   <InAppNotificationProvider>
                     <ActionableToastProvider>
                       {children}
-                      <CallAlertReceiver />
                     </ActionableToastProvider>
                   </InAppNotificationProvider>
                 </ChatWidgetProvider>
@@ -413,7 +411,7 @@ export default function DashboardLayout({ children }) {
                     {/* Route progress bar - slim top bar during navigation */}
 
                     {/* Main Layout Container - Flex Row */}
-                    <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
+                    <div className="dashboard-floating-shell flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
 
                       {/* Sidebar - Static on Desktop, Fixed on Mobile */}
                       <Sidebar
@@ -433,7 +431,7 @@ export default function DashboardLayout({ children }) {
 
                         {/* Main Content Area - Scrollable */}
                         <main ref={mainRef} className={`dashboard-page-canvas z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white md:bg-transparent' : ''}`}>
-                          <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
+                          <div className="dashboard-content-frame">
                             <ErrorBoundaryWithRetry>
                               <DashboardRouteTransition>
                                 {children}
@@ -477,8 +475,6 @@ export default function DashboardLayout({ children }) {
                         profileStatus={profileCompletionStatus}
                       />
 
-                      {/* Call Alert Receiver - Global alert listener */}
-                      <CallAlertReceiver />
 
                       {/* Web Push Notification Prompt */}
                       <WebPushPrompt />

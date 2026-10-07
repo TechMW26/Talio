@@ -7,7 +7,8 @@ import { mutateFirestoreEmployee } from '@/lib/platform/firestoreEmployeeAccount
 import { recordDigest } from '@/lib/platform/firestoreCodec.cjs'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 import { uploadImage, deleteImage } from '@/lib/mediaStorage'
-import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
+import { getImageMetadata, isValidImage } from '@/lib/imageOptimization'
+import { DEFAULT_PHOTO_VIEWPORT } from '@/lib/profilePhotoViewport'
 import { generateAndStoreKRIsKPIs } from '@/lib/kriGenerator'
 
 export const dynamic = 'force-dynamic'
@@ -50,9 +51,13 @@ async function update(request, params, partial = false) {
       if (!match || match[2].length > 14 * 1024 * 1024) throw Object.assign(new Error('Choose a PNG, JPEG, WebP or GIF image smaller than 10 MB'), { status: 400 })
       const bytes = Buffer.from(match[2], 'base64')
       if (!bytes.length || bytes.length > 10 * 1024 * 1024 || !await isValidImage(bytes)) throw Object.assign(new Error('Invalid profile image'), { status: 400 })
-      const { buffer } = await optimizeImage(bytes, { type: 'avatar', format: 'webp', quality: 85 })
-      upload = await uploadImage(buffer, { databaseName, category: 'profile', contentType: 'image/webp', originalName: `profile_${id}.webp`, employeeId: id, userId: String(auth.user._id || auth.user.userId) })
-      patch = { ...patch, profilePicture: upload.url, profilePictureFileId: String(upload._id) }
+      // Keep source pixels and dimensions intact. Avatar framing is metadata,
+      // never a canvas export, mask, thumbnail or destructive resize.
+      const metadata = await getImageMetadata(bytes)
+      const format = metadata?.format
+      if (!['png', 'jpeg', 'webp', 'gif'].includes(format)) throw Object.assign(new Error('Unsupported profile image'), { status: 400 })
+      upload = await uploadImage(bytes, { databaseName, category: 'profile', contentType: `image/${format}`, originalName: `profile_${id}.${format}`, employeeId: id, userId: String(auth.user._id || auth.user.userId) })
+      patch = { ...patch, profilePicture: upload.url, profilePictureFileId: String(upload._id), profilePictureViewport: patch.profilePictureViewport || { ...DEFAULT_PHOTO_VIEWPORT } }
     }
     const result = await mutateFirestoreEmployee({ actor: auth.user, databaseName, employeeId: id, expectedDigest: recordDigest(current), patch, systemRole: partial ? undefined : input.systemRole })
     committed = true

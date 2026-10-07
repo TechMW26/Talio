@@ -1,5 +1,9 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading2, NativeButton, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { fetchCompleteEmployeeResponse } from '@/lib/client/employeePages'
@@ -27,7 +31,7 @@ import {
   PageLoader,
   KPICard,
 } from '@/components/ui/heroui'
-import { Input, Checkbox, Button, Divider, Chip, Progress, Tooltip } from '@heroui/react'
+import { Input, Checkbox, Button, Divider, Chip, Progress, Tooltip } from '@/components/ui/fernly'
 import AttendanceCorrectionModal from '@/components/payroll/AttendanceCorrectionModal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -802,7 +806,7 @@ export default function GeneratePayrollPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Generate Payroll</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-foreground">Generate Payroll</Heading1>
           <p className="text-default-500 mt-1">Generate salary with attendance-based calculations</p>
         </div>
         <SecondaryButton
@@ -819,41 +823,41 @@ export default function GeneratePayrollPage() {
           <HRMSCardBody className="p-6">
             <div className="flex items-center mb-4">
               <FaInfoCircle className="text-success-600 mr-2" />
-              <h2 className="text-lg font-bold text-foreground">Salary Calculation Method</h2>
+              <Heading2 className="text-lg font-bold text-foreground">Salary Calculation Method</Heading2>
               <Chip size="sm" color="success" variant="flat" className="ml-3">
                 Addition-Based (Simplified)
               </Chip>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 text-sm">
-              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+              <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase mb-1">Working Days/Month</p>
                 <p className="font-semibold text-foreground">{payrollConfig.workingDaysPerMonth || 26}</p>
-              </div>
-              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase mb-1">Full Day Threshold</p>
                 <p className="font-semibold text-foreground">{companySettings.fullDayThreshold || 7.5} hrs</p>
-              </div>
-              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase mb-1">Holidays This Month</p>
                 <p className="font-semibold text-success-600">{holidayData.length} days</p>
-              </div>
+              </Surface>
               {payrollConfig.pfEnabled && (
-                <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                   <p className="text-xs text-default-500 uppercase mb-1">PF Deduction</p>
                   <p className="font-semibold text-foreground">{payrollConfig.pfPercentage || 12}%</p>
-                </div>
+                </Surface>
               )}
               {payrollConfig.professionalTax?.enabled && (
-                <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                   <p className="text-xs text-default-500 uppercase mb-1">Professional Tax</p>
                   <p className="font-semibold text-foreground">{formatCurrency(payrollConfig.professionalTax.amount || 200)}</p>
-                </div>
+                </Surface>
               )}
             </div>
 
             {/* Salary Calculation Rules */}
-            <div className="mt-4 p-4 bg-content1 rounded-lg">
+            <Surface className="mt-4 p-4 bg-content1 rounded-lg">
               <p className="text-sm font-medium text-foreground mb-3">How Salary is Calculated:</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -878,7 +882,7 @@ export default function GeneratePayrollPage() {
               <div className="mt-3 p-2 bg-success-50 rounded text-xs text-success-700">
                 <strong>Formula:</strong> Per-Day Salary = Gross Salary ÷ Working Days (rounded up) | Net Salary = (Per-Day × Paid Days) - Statutory Deductions
               </div>
-            </div>
+            </Surface>
           </HRMSCardBody>
         </HRMSCard>
       )}
@@ -886,7 +890,7 @@ export default function GeneratePayrollPage() {
       {/* Payroll Period */}
       <HRMSCard>
         <HRMSCardHeader>
-          <h2 className="text-xl font-bold text-foreground">Payroll Period</h2>
+          <Heading2 className="text-xl font-bold text-foreground">Payroll Period</Heading2>
         </HRMSCardHeader>
         <Divider />
         <HRMSCardBody>
@@ -937,7 +941,7 @@ export default function GeneratePayrollPage() {
           {/* Header with Search and Filters */}
           <HRMSCardHeader className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center gap-4 flex-wrap">
-              <h2 className="text-xl font-semibold text-foreground">Select Employees</h2>
+              <Heading2 className="text-xl font-semibold text-foreground">Select Employees</Heading2>
               <Chip size="sm" variant="flat" color="default">
                 {selectedEmployees.length} of {filteredEmployees.length} selected
               </Chip>
@@ -972,7 +976,7 @@ export default function GeneratePayrollPage() {
           <HRMSCardBody>
             {/* Filters Section */}
             {showFilters && (
-              <div className="mb-4 p-4 bg-default-50 rounded-lg">
+              <Surface className="mb-4 p-4 bg-default-50 rounded-lg">
                 <div className="flex flex-col md:flex-row gap-4">
                   {/* Search Box */}
                   <div className="flex-1">
@@ -985,12 +989,12 @@ export default function GeneratePayrollPage() {
                       size="sm"
                       startContent={<FaSearch className="text-default-400 w-4 h-4" />}
                       endContent={searchQuery && (
-                        <button
+                        <NativeButton
                           onClick={() => setSearchQuery('')}
                           className="text-default-400 hover:text-default-600"
                         >
                           <FaTimes className="w-3 h-3" />
-                        </button>
+                        </NativeButton>
                       )}
                       variant="bordered"
                       classNames={{
@@ -1027,7 +1031,7 @@ export default function GeneratePayrollPage() {
                     </div>
                   )}
                 </div>
-              </div>
+              </Surface>
             )}
 
             {/* Department-Based Employee List */}
@@ -1069,23 +1073,23 @@ export default function GeneratePayrollPage() {
                         <span className="text-xs text-gray-500">
                           {dept.employees.filter(e => selectedEmployees.includes(e._id)).length} selected
                         </span>
-                        <button
+                        <NativeButton
                           onClick={(e) => { e.stopPropagation(); handleSelectDepartment(dept.id, dept.employees); }}
                           className="text-xs px-3 py-1 bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
                         >
                           {dept.employees.every(e => selectedEmployees.includes(e._id)) ? 'Deselect All' : 'Select All'}
-                        </button>
+                        </NativeButton>
                       </div>
                     </div>
 
                     {/* Employees in Department */}
                     {isExpanded && (
                       <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <NativeTable className="w-full text-sm">
                           <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
                               <th className="px-4 py-2 text-left w-10">
-                                <input
+                                <NativeInput
                                   type="checkbox"
                                   checked={dept.employees.every(e => selectedEmployees.includes(e._id))}
                                   onChange={() => handleSelectDepartment(dept.id, dept.employees)}
@@ -1112,7 +1116,7 @@ export default function GeneratePayrollPage() {
                               return (
                                 <tr key={employee._id} className="hover:bg-gray-50">
                                   <td className="px-4 py-3">
-                                    <input
+                                    <NativeInput
                                       type="checkbox"
                                       checked={selectedEmployees.includes(employee._id)}
                                       onChange={() => handleSelectEmployee(employee._id)}
@@ -1133,7 +1137,7 @@ export default function GeneratePayrollPage() {
                                         <div className="text-xs text-gray-500">{employee.employeeCode} • {employee.designation?.title || 'N/A'}</div>
                                       </div>
                                       <Tooltip content="Edit Attendance">
-                                        <button
+                                        <NativeButton
                                           onClick={(e) => {
                                             e.stopPropagation()
                                             handleOpenCorrectionModal(employee)
@@ -1141,7 +1145,7 @@ export default function GeneratePayrollPage() {
                                           className="p-1.5 text-default-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
                                         >
                                           <FaEdit size={14} />
-                                        </button>
+                                        </NativeButton>
                                       </Tooltip>
                                     </div>
                                   </td>
@@ -1169,7 +1173,7 @@ export default function GeneratePayrollPage() {
                               )
                             })}
                           </tbody>
-                        </table>
+                        </NativeTable>
                       </div>
                     )}
                     </div>
@@ -1192,39 +1196,39 @@ export default function GeneratePayrollPage() {
       ) : (
         <HRMSCard>
           <HRMSCardHeader className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-foreground">
+            <Heading2 className="text-xl font-semibold text-foreground">
               Payroll Preview - {new Date(formData.year, formData.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
-            </h2>
+            </Heading2>
             <Button variant="light" onPress={() => setShowPreview(false)}><BackIcon className="mr-2 h-4 w-4" /> Back to Selection</Button>
           </HRMSCardHeader>
           <Divider />
           <HRMSCardBody className="p-0">
             {/* Summary Cards - Simplified Addition-Based */}
             <div className="grid gap-4 p-4 bg-default-50 border-b border-default-200 grid-cols-2 md:grid-cols-5">
-              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+              <Surface className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Working Days</p>
                 <p className="text-xl font-bold text-foreground">{payrollConfig.workingDaysPerMonth || 26}</p>
-              </div>
-              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Total Paid Days</p>
                 <p className="text-xl font-bold text-primary">{summaryTotals.totalPaidDays}</p>
-              </div>
-              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Earned Salary</p>
                 <p className="text-xl font-bold text-success">{formatCurrency(summaryTotals.earnedSalary)}</p>
-              </div>
-              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Total Deductions</p>
                 <p className="text-xl font-bold text-red-600">{formatCurrency(summaryTotals.totalDeductions)}</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-green-200">
+              </Surface>
+              <Surface className="bg-white p-4 rounded-lg shadow-sm border-2 border-green-200">
                 <p className="text-xs text-green-600 uppercase">Net Payable</p>
                 <p className="text-xl font-bold text-green-600">{formatCurrency(summaryTotals.netSalary)}</p>
-              </div>
+              </Surface>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <NativeTable className="w-full text-xs">
                 <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
                     <th className="px-3 py-3 text-left font-semibold text-gray-700 sticky left-0 bg-gray-100 min-w-[180px]">Employee</th>
@@ -1291,7 +1295,7 @@ export default function GeneratePayrollPage() {
                     <td className="px-3 py-3 text-right font-bold text-green-700 bg-green-200">{formatCurrency(summaryTotals.netSalary)}</td>
                   </tr>
                 </tfoot>
-              </table>
+              </NativeTable>
             </div>
 
             {/* Pending Leaves Warning Section */}
@@ -1300,13 +1304,13 @@ export default function GeneratePayrollPage() {
                 <div className="flex items-start space-x-3">
                   <FaExclamationCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-semibold text-yellow-800">Pending Leave Requests</h3>
+                    <Heading3 className="text-sm font-semibold text-yellow-800">Pending Leave Requests</Heading3>
                     <p className="text-xs text-yellow-700 mt-1 mb-2">
                       The following employees have pending leave requests for this period. Please approve or reject before finalizing payroll.
                     </p>
                     <div className="space-y-2">
                       {selectedEmployeesPendingLeaves.map((warning, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-content1 rounded-lg px-3 py-2 border border-warning-200">
+                        <Surface key={idx} className="flex items-center justify-between bg-content1 rounded-lg px-3 py-2 border border-warning-200">
                           <div>
                             <span className="font-medium text-foreground">{warning.employeeName}</span>
                             <span className="text-default-500 text-xs ml-2">({warning.employeeCode})</span>
@@ -1317,7 +1321,7 @@ export default function GeneratePayrollPage() {
                               {new Date(warning.startDate).toLocaleDateString()} - {new Date(warning.endDate).toLocaleDateString()}
                             </span>
                           </div>
-                        </div>
+                        </Surface>
                       ))}
                     </div>
                   </div>

@@ -1,7 +1,10 @@
 'use client'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
-import { Button, Input, Select, SelectItem, Skeleton } from '@heroui/react'
+import { Button, Input, Select, SelectItem, Skeleton } from '@/components/ui/fernly'
 
 import {
   HiOutlineListBullet,
@@ -289,9 +292,9 @@ export default function TodoPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">
+          <Heading1 className="text-2xl font-bold text-gray-800">
             To-Do's
-          </h1>
+          </Heading1>
           <p className="text-gray-600 mt-1">
             Manage your personal to-dos and stay organized
           </p>
@@ -320,50 +323,15 @@ export default function TodoPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{(analytics?.summary?.total || 0) + projectTasks.length}</p>
-              <p className="text-sm text-gray-500">Total</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Total</>} value={<>{(analytics?.summary?.total || 0) + projectTasks.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{(analytics?.summary?.pending || 0) + projectTasks.length}</p>
-              <p className="text-sm text-gray-500">Pending</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Pending</>} value={<>{(analytics?.summary?.pending || 0) + projectTasks.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{projectTasks.length}</p>
-              <p className="text-sm text-gray-500">Project Tasks</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Project Tasks</>} value={<>{projectTasks.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{analytics?.summary?.completed || 0}</p>
-              <p className="text-sm text-gray-500">Completed</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Completed</>} value={<>{analytics?.summary?.completed || 0}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{analytics?.summary?.productivityScore || 0}%</p>
-              <p className="text-sm text-gray-500">Score</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Score</>} value={<>{analytics?.summary?.productivityScore || 0}%</>} />
       </div>
 
       {/* Analytics Panel */}
@@ -375,10 +343,10 @@ export default function TodoPage() {
       <div className="flex gap-6">
         {/* Sidebar - Categories */}
         <div className="hidden md:block w-64 flex-shrink-0">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sticky top-4">
+          <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sticky top-4">
             {/* Quick filters */}
             <div className="space-y-1 mb-4">
-              <button
+              <NativeButton
                 onClick={() => setActiveTab('all')}
                 className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'all'
                   ? 'bg-indigo-50 text-indigo-700'
@@ -387,9 +355,9 @@ export default function TodoPage() {
               >
                 <span className="flex-1 text-left font-medium">All To-dos</span>
                 <span className="text-sm text-gray-500">{(analytics?.summary?.total || 0) + projectTasks.length}</span>
-              </button>
+              </NativeButton>
 
-              <button
+              <NativeButton
                 onClick={() => setActiveTab('today')}
                 className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'today'
                   ? 'bg-indigo-50 text-indigo-700'
@@ -397,9 +365,9 @@ export default function TodoPage() {
                   }`}
               >
                 <span className="flex-1 text-left font-medium">Today</span>
-              </button>
+              </NativeButton>
 
-              <button
+              <NativeButton
                 onClick={() => setActiveTab('upcoming')}
                 className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'upcoming'
                   ? 'bg-indigo-50 text-indigo-700'
@@ -407,10 +375,10 @@ export default function TodoPage() {
                   }`}
               >
                 <span className="flex-1 text-left font-medium">Upcoming</span>
-              </button>
+              </NativeButton>
 
               {analytics?.summary?.overdue > 0 && (
-                <button
+                <NativeButton
                   onClick={() => setActiveTab('overdue')}
                   className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'overdue'
                     ? 'bg-red-50 text-red-700'
@@ -421,10 +389,10 @@ export default function TodoPage() {
                   <span className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
                     {analytics?.summary?.overdue}
                   </span>
-                </button>
+                </NativeButton>
               )}
 
-              <button
+              <NativeButton
                 onClick={() => setActiveTab('completed')}
                 className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'completed'
                   ? 'bg-green-50 text-green-700'
@@ -432,7 +400,7 @@ export default function TodoPage() {
                   }`}
               >
                 <span className="flex-1 text-left font-medium">Completed</span>
-              </button>
+              </NativeButton>
             </div>
 
             {/* Divider */}
@@ -440,7 +408,7 @@ export default function TodoPage() {
 
             {/* Categories */}
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Categories</h3>
+              <Heading3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Categories</Heading3>
               <Button
                 isIconOnly
                 size="sm"
@@ -457,7 +425,7 @@ export default function TodoPage() {
 
             <div className="space-y-1">
               {categories.map(category => (
-                <button
+                <NativeButton
                   key={category._id}
                   onClick={() => setActiveTab(category._id)}
                   className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors group ${activeTab === category._id
@@ -470,7 +438,7 @@ export default function TodoPage() {
                     style={{ backgroundColor: category.color }}
                   ></div>
                   <span className="flex-1 text-left font-medium truncate">{category.name}</span>
-                  <button
+                  <NativeButton
                     onClick={(e) => {
                       e.stopPropagation()
                       setEditingCategory(category)
@@ -479,8 +447,8 @@ export default function TodoPage() {
                     className="p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <HiOutlinePencil className="w-3.5 h-3.5" />
-                  </button>
-                </button>
+                  </NativeButton>
+                </NativeButton>
               ))}
 
               {categories.length === 0 && (
@@ -492,7 +460,7 @@ export default function TodoPage() {
             {projectTasks.length > 0 && (
               <>
                 <div className="border-t border-gray-200 my-4"></div>
-                <button
+                <NativeButton
                   onClick={() => setActiveTab('project-tasks')}
                   className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'project-tasks'
                     ? 'bg-purple-50 text-purple-700'
@@ -503,16 +471,16 @@ export default function TodoPage() {
                   <span className="text-sm bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
                     {projectTasks.length}
                   </span>
-                </button>
+                </NativeButton>
               </>
             )}
-          </div>
+          </Surface>
         </div>
 
         {/* Main Todo List */}
         <div className="flex-1 min-w-0">
           {/* Search and Filters */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+          <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search */}
               <div className="flex-1">
@@ -568,13 +536,13 @@ export default function TodoPage() {
                 ))}
               </Select>
             </div>
-          </div>
+          </Surface>
 
           {/* Todo List */}
           {loading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
+                <Surface key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
                   <div className="flex items-center gap-3">
                     <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
                     <div className="flex-1">
@@ -582,26 +550,26 @@ export default function TodoPage() {
                       <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                     </div>
                   </div>
-                </div>
+                </Surface>
               ))}
             </div>
           ) : activeTab === 'project-tasks' ? (
             // Project Tasks View
             projectTasks.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
-                <h3 className="text-lg font-medium text-gray-800 mb-2">No project tasks</h3>
+              <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+                <Heading3 className="text-lg font-medium text-gray-800 mb-2">No project tasks</Heading3>
                 <p className="text-gray-500">You don't have any project tasks assigned to you in todo status.</p>
-              </div>
+              </Surface>
             ) : (
               <div className="space-y-2">
                 {projectTasks.map(task => (
-                  <div
+                  <Surface
                     key={task._id}
                     className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
                   >
                     <div className="flex items-start gap-3">
                       {/* Start button */}
-                      <button
+                      <NativeButton
                         onClick={(e) => advanceProjectTaskStatus(task._id, e)}
                         disabled={advancingTaskId === task._id}
                         className={`w-8 h-8 rounded-lg flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${advancingTaskId === task._id
@@ -615,12 +583,12 @@ export default function TodoPage() {
                         ) : (
                           <HiOutlinePlay className="w-4 h-4" />
                         )}
-                      </button>
+                      </NativeButton>
 
                       {/* Task content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-gray-800">{task.title}</h3>
+                          <Heading3 className="font-medium text-gray-800">{task.title}</Heading3>
                           {task.priority && (
                             <span className={`px-2 py-0.5 text-xs font-medium rounded ${getPriorityColor(task.priority)}`}>
                               {task.priority}
@@ -666,15 +634,15 @@ export default function TodoPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </Surface>
                 ))}
               </div>
             )
           ) : combinedTodos.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-medium text-gray-800 mb-2">
+            <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+              <Heading3 className="text-lg font-medium text-gray-800 mb-2">
                 {activeTab === 'completed' ? 'No completed to-dos' : 'No to-dos yet'}
-              </h3>
+              </Heading3>
               <p className="text-gray-500 mb-4">
                 {activeTab === 'completed'
                   ? 'Complete some to-dos to see them here'
@@ -690,11 +658,11 @@ export default function TodoPage() {
                   Add To-do
                 </Button>
               )}
-            </div>
+            </Surface>
           ) : (
             <div className="space-y-2">
               {combinedTodos.map(todo => (
-                <div
+                <Surface
                   key={todo._id}
                   onClick={() => !todo.isProjectTask && setSelectedTodo(todo)}
                   className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow ${!todo.isProjectTask ? 'cursor-pointer' : ''
@@ -704,7 +672,7 @@ export default function TodoPage() {
                   <div className="flex items-start gap-3">
                     {/* Checkbox for personal todo OR Start button for project task */}
                     {todo.isProjectTask ? (
-                      <button
+                      <NativeButton
                         onClick={(e) => advanceProjectTaskStatus(todo._id, e)}
                         disabled={advancingTaskId === todo._id}
                         className={`w-8 h-8 rounded-lg flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${advancingTaskId === todo._id
@@ -718,9 +686,9 @@ export default function TodoPage() {
                         ) : (
                           <HiOutlinePlay className="w-4 h-4" />
                         )}
-                      </button>
+                      </NativeButton>
                     ) : (
-                      <button
+                      <NativeButton
                         onClick={(e) => toggleComplete(todo._id, e)}
                         className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${todo.status === 'completed'
                           ? 'bg-green-500 border-green-500 text-white'
@@ -730,18 +698,18 @@ export default function TodoPage() {
                         {todo.status === 'completed' && (
                           <HiOutlineCheck className="w-3 h-3" />
                         )}
-                      </button>
+                      </NativeButton>
                     )}
 
                     {/* Todo content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-medium ${todo.status === 'completed'
+                        <Heading3 className={`font-medium ${todo.status === 'completed'
                           ? 'text-gray-400 line-through'
                           : 'text-gray-800'
                           }`}>
                           {todo.title}
-                        </h3>
+                        </Heading3>
                         {todo.priority && (
                           <span className={`px-2 py-0.5 text-xs font-medium rounded ${getPriorityColor(todo.priority)}`}>
                             {todo.priority}
@@ -812,7 +780,7 @@ export default function TodoPage() {
 
                     {/* Actions - only for personal todos */}
                     {!todo.isProjectTask && (
-                      <button
+                      <NativeButton
                         onClick={(e) => {
                           e.stopPropagation()
                           deleteTodo(todo._id)
@@ -820,10 +788,10 @@ export default function TodoPage() {
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <HiOutlineTrash className="w-4 h-4" />
-                      </button>
+                      </NativeButton>
                     )}
                   </div>
-                </div>
+                </Surface>
               ))}
             </div>
           )}

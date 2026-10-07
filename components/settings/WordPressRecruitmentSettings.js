@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Button, Input, Select, SelectItem } from '@heroui/react'
+import { Button, Input, Select, SelectItem } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 
 export default function WordPressRecruitmentSettings() {

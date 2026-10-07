@@ -19,7 +19,6 @@ import ProjectTasksWidget from './ProjectTasksWidget'
 import DraggableDashboard from '@/components/dashboard/DraggableDashboard'
 import DraggableKPIGrid from '@/components/dashboard/DraggableKPIGrid'
 import { CustomizableDashboard } from '@/components/dashboard'
-import CallAlertButton from '@/components/CallAlertButton'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import {
   CheckInOutWidget,
@@ -597,10 +596,6 @@ export default function AdminDashboard({ user }) {
 
   return (
     <div className="page-container">
-      {/* Call Alert Button - Fixed position for easy access */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <CallAlertButton user={user} />
-      </div>
 
       <CustomizableDashboard
         userId={user?._id || 'admin'}

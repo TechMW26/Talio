@@ -1,4 +1,5 @@
 'use client'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 import { useEffect, useRef, useState } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -85,7 +86,7 @@ export default function ResignationPanel({ requestId, initialView = 'mine', dash
     </header>
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{stats.map(([label, count, tab, Icon, tone]) => <button key={tab} aria-label={`View ${label.toLowerCase()}`} type="button" className="group rounded-2xl border border-default-200 bg-content1 p-4 text-left transition-colors hover:border-default-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:p-5" onClick={() => setView(tab)}><div className="flex items-center justify-between gap-2"><span className="text-sm text-default-500">{label}</span><span className={`rounded-xl p-2 ${tone}`}><Icon className="h-5 w-5" aria-hidden="true" /></span></div><div className="mt-3 flex items-end justify-between"><strong className="text-3xl font-semibold tabular-nums">{isLoading || error ? '—' : count}</strong><HiOutlineArrowRight aria-hidden="true" className="h-4 w-4 text-default-400 group-hover:text-foreground" /></div></button>)}</div>
     <div className="rounded-2xl border border-default-200 bg-content1">
-    <nav aria-label="Resignation views" className="flex gap-5 overflow-x-auto border-b border-default-200 px-5">{Object.entries({ overview: 'Overview', mine: 'My requests', reviews: `Review inbox (${pending.length})`, offboarding: `F&F / Offboarding (${offboarding.length})`, completed: `Completed (${completed.length})` }).map(([key, label]) => <button key={key} type="button" className={`shrink-0 border-b-2 px-1 py-4 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${view === key ? 'border-primary text-foreground' : 'border-transparent text-default-500 hover:text-foreground'}`} aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>)}</nav>
+    <Tabs aria-label="Resignation views" selectedKey={view} onSelectionChange={setView} className="px-5">{Object.entries({ overview: 'Overview', mine: 'My requests', reviews: 'Review inbox (' + pending.length + ')', offboarding: 'F&F / Offboarding (' + offboarding.length + ')', completed: 'Completed (' + completed.length + ')' }).map(([key, label]) => <Tab key={key} title={label} />)}</Tabs>
     <div className="space-y-5 p-5 sm:p-6"><div><h2 className="text-lg font-semibold">{viewTitles[view]}</h2><p className="mt-1 text-xs text-default-500">{view === 'mine' ? 'Track your request and discuss your proposed notice period with HR.' : 'Showing requests you are authorised to view.'}</p></div>
     {isLoading && <p role="status">Loading resignation requests…</p>}
     {error && <p role="alert">Unable to load requests. <button className={button} onClick={() => mutate()}>Retry</button></p>}

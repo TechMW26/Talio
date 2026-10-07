@@ -1,13 +1,40 @@
 /* Fernly graph geometry adapted for Talio. No selectors escape the chart. */
 .chart { font-family: inherit; }
+.analytics { min-width: 0; }
+.analyticsHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.analyticsHeader h3 { font-size: 24px; font-weight: 600; letter-spacing: -.04em; margin: 0; color: var(--color-text-primary); }
+.analyticsHeader h4 { font-size: 18px; font-weight: 500; margin: 0; color: var(--color-text-primary); }
+.analyticsHeader p { font-size: 13px; color: var(--color-text-secondary); margin: 6px 0 0; }
+.periodSwitch { display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: var(--color-bg-card, #171717); border: 1px solid var(--color-border, #303030); }
+.periodSwitch button { border: 0; background: transparent; color: var(--color-text-secondary); padding: 10px 14px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+.periodSwitch button[aria-pressed="true"] { background: #2563eb; color: white; }
+.periodSwitch button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.metricGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+.metricCard, .trendCard { background: var(--color-bg-card, #171717); border: 1px solid var(--color-border, #303030); border-radius: 24px; box-shadow: 0 4px 14px #00000006; }
+.metricCard { display: flex; flex-direction: column; min-width: 0; min-height: 168px; overflow: hidden; padding: 22px; }
+.metricCard h4 { margin: 0; font-size: 14px; font-weight: 500; color: var(--color-text-secondary); }
+.metricCard > strong { margin-top: 10px; font-size: clamp(30px, 2.6vw, 40px); font-weight: 600; letter-spacing: -.04em; line-height: 1; color: var(--color-text-primary); }
+.metricDelta, .metricNote { font-size: 12px; color: var(--color-text-secondary); margin: 8px 0 12px; }
+.metricDelta { color: #3b82f6; }
+.metricDelta span { color: var(--color-text-secondary); }
+.spark { display: block; flex-shrink: 0; margin: auto -22px -22px; width: calc(100% + 44px); height: 46px; }
+.sparkLine { fill: none; stroke: #3b82f6; stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.sparkArea { fill: #3b82f619; stroke: none; }
+.trendCard { padding: 22px; min-width: 0; }
+.trendPlot { height: 260px; min-width: 0; }
+.trendLegend { display: flex; gap: 16px; font-size: 12px; color: var(--color-text-secondary); }
+.trendLegend span::before { content: ''; display: inline-block; width: 16px; margin-right: 7px; vertical-align: middle; border-top: 2px solid #3b82f6; }
+.trendLegend span + span::before { border-top: 2px dashed var(--color-text-secondary); }
+@media (max-width: 520px) { .metricGrid { grid-template-columns: minmax(0, 1fr); } .trendCard { padding: 16px; } }
 .chart :global(.recharts-legend-item-text) { color: var(--color-text-secondary, #a3a3a3) !important; font-size: 12px; }
 .chart :global(.recharts-tooltip-wrapper) { outline: none; z-index: 10; }
 .chart :global(.recharts-tooltip-wrapper) > div { border-radius: 14px !important; box-shadow: 0 12px 32px #0006 !important; }
 .chart :global(.recharts-cartesian-axis-tick-value) { font-size: 11px; fill: var(--color-text-secondary, #a3a3a3); }
 .chart :global(.recharts-line-curve) { stroke-linecap: round; }
-.distribution { display: grid; grid-template-columns: minmax(0, 1fr) 160px; align-items: center; gap: 24px; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--color-border, #303030); }
+.distribution { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); align-items: center; gap: 24px; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--color-border, #303030); }
 .plot { min-width: 0; }
 .barsScroll { min-width: 0; width: 100%; overflow-x: auto; padding-top: 32px; }
+.distributionTip { min-height: 42px; padding: 0 8px 12px; font-size: 12px; color: var(--color-text-primary); overflow-wrap: anywhere; }
 .bars { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: clamp(8px, 1.4vw, 16px); list-style: none; padding: 0 8px; margin: 0; }
 .bars li { display: grid; grid-template-rows: 180px auto; gap: 12px; min-width: 0; }
 .barSpace { position: relative; display: flex; align-items: flex-end; }
@@ -15,18 +42,28 @@
 .pill:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
 .pillFill { position: absolute; inset: 0; border-radius: inherit; background: var(--tone); animation: pillRise .85s cubic-bezier(.16, 1, .3, 1) both; animation-delay: var(--delay); }
 .planned .pillFill { background: repeating-linear-gradient(-45deg, #7494cd 0 2.4px, transparent 2.4px 8px); box-shadow: inset 0 0 0 1.5px #7494cd59; }
-.pill:hover .pillFill { filter: brightness(1.08); }
+.barsFullHeight { flex: 1; min-height: 220px; display: flex; flex-direction: column; padding-top: 0; }
+.barsFullHeight .distributionTip { flex: none; }
+.barsFullHeight .bars { flex: 1; min-height: 0; }
+.barsFullHeight .bars li { grid-template-rows: minmax(0, 1fr) auto; }
 .barLabel { text-align: center; font-size: 11px; color: var(--color-text-secondary, #a3a3a3); overflow-wrap: anywhere; }
 .barTip { position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; padding: 3px 8px; border-radius: 7px; font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--color-text-primary); background: var(--color-bg-card, #171717); box-shadow: 0 0 0 1px var(--color-border, #303030), 0 6px 16px -8px #0009; pointer-events: none; }
 .barTip::after { content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 10px; background: #7494cd; }
 @keyframes pillRise { from { transform: translateY(101%); } to { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .pillFill { animation: none; } }
 .empty { min-height: 210px; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--color-text-secondary); font-size: 13px; background: repeating-linear-gradient(to top, transparent 0, transparent 50px, #ffffff08 51px, transparent 52px); }
-.completion { position: relative; text-align: center; }
-.completion svg { width: 160px; max-width: 100%; }
-.completion > div { position: absolute; top: 52px; width: 100%; display: grid; }
-.completion strong { font-size: 26px; line-height: 1.2; letter-spacing: -.04em; color: var(--color-text-primary); }
-.completion span, .completion p { font-size: 11px; color: var(--color-text-secondary); }
-.completion p { margin-top: 8px; }
-@media (max-width: 600px) { .distribution { grid-template-columns: minmax(0, 1fr); } .completion { width: 160px; margin: auto; } }
+.gaugeWrap { width: 100%; min-width: 0; max-width: 340px; margin-inline: auto; container-type: inline-size; }
+.gauge { position: relative; display: grid; place-items: end center; margin: 18px auto 0; width: min(100%, 300px); }
+.gaugeSvg { display: block; width: 100%; height: auto; overflow: visible; }
+.gaugeTrack, .gaugeSegment { stroke-width: 44; stroke-linecap: round; fill: none; }
+.gaugeTrack { stroke: var(--color-border, #303030); }
+.gaugeRead { position: absolute; inset-inline: 0; bottom: 0; display: grid; justify-items: center; text-align: center; }
+.gaugeRead strong { font-size: clamp(24px, 15cqi, 54px); font-weight: 600; letter-spacing: -.05em; line-height: 1; color: var(--color-text-primary, #fafafa); }
+.gaugeRead span { margin-top: 4px; max-width: 65%; font-size: clamp(9px, 4cqi, 13.5px); line-height: 1.2; color: var(--color-text-secondary, #a3a3a3); }
+.gaugeLegend { list-style: none; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; margin: 22px 0 0; font-size: 12px; color: var(--color-text-secondary, #a3a3a3); }
+.gaugeLegend li { display: inline-flex; align-items: center; gap: 6px; }
+.gaugeLegend i { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; }
+.gaugePending { background: repeating-linear-gradient(-45deg, var(--color-text-secondary, #a3a3a3) 0 2px, transparent 2px 5px); }
+.gaugeCaption { text-align: center; margin: 12px 0 0; font-size: 12px; color: var(--color-text-secondary, #a3a3a3); }
+@media (max-width: 700px) { .distribution { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .chart * { animation: none !important; transition: none !important; } }

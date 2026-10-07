@@ -8,7 +8,7 @@ import {
   FaCalendarAlt, FaHourglassHalf, FaArrowUp, FaArrowDown
 } from 'react-icons/fa'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from '@/components/charts/FernlyCharts'
-import { Select, SelectItem, Button } from '@heroui/react'
+import { Select, SelectItem, Button } from '@/components/ui/fernly'
 import CustomTooltip, { CustomPieTooltip } from '@/components/charts/CustomTooltip'
 import Loader from '@/components/ui/Loader'
 

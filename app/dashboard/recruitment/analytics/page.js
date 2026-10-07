@@ -1,9 +1,13 @@
 'use client';
+import { SummaryCard } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useRouter } from 'next/navigation';
-import { Button, Chip, Card, CardBody, CardHeader, Skeleton } from '@heroui/react';
+import { Button, Chip, Card, CardBody, CardHeader, Skeleton } from '@/components/ui/fernly';
 import toast from '@/utils/toast';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import { DataErrorState } from '@/components/ui/ErrorBoundary';
@@ -54,7 +58,7 @@ export default function RecruitmentAnalyticsPage() {
       <div className="page-container">
         <Card shadow="sm">
           <CardBody className="p-8 sm:p-12 text-center">
-            <h1 className="text-2xl font-bold text-default-800 mb-2">No Analytics Data</h1>
+            <Heading1 className="text-2xl font-bold text-default-800 mb-2">No Analytics Data</Heading1>
             <Button color="primary" onPress={() => router.push('/dashboard/recruitment')}>
               Back to Recruitment
             </Button>
@@ -75,7 +79,7 @@ export default function RecruitmentAnalyticsPage() {
             <BackIcon className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment Analytics</h1>
+            <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment Analytics</Heading1>
             <p className="text-sm text-default-500">Overview of your hiring metrics</p>
           </div>
           <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -91,15 +95,7 @@ export default function RecruitmentAnalyticsPage() {
             { label: 'Conversion Rate', value: `${overview.conversionRate}%`, icon: FaPercentage, iconColor: 'text-warning', bgColor: 'bg-warning-50' },
             { label: 'Avg Time to Hire', value: `${overview.avgTimeToHire}d`, icon: FaClock, iconColor: 'text-secondary', bgColor: 'bg-secondary-50' },
           ].map((metric) => (
-            <Card key={metric.label} shadow="sm">
-              <CardBody className="p-3 sm:p-4">
-                <div className={`w-9 h-9 rounded-lg ${metric.bgColor} flex items-center justify-center mb-3`}>
-                  <metric.icon className={`w-4 h-4 ${metric.iconColor}`} />
-                </div>
-                <p className="text-2xl font-bold text-default-800">{metric.value}</p>
-                <p className="text-xs text-default-500 mt-0.5">{metric.label}</p>
-              </CardBody>
-            </Card>
+            <SummaryCard key={metric.label} shadow="sm" label={<>{metric.label}</>} value={<>{metric.value}</>} />
           ))}
         </div>
 
@@ -107,7 +103,7 @@ export default function RecruitmentAnalyticsPage() {
           {/* Pipeline Breakdown */}
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Pipeline Breakdown</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Pipeline Breakdown</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               {pipeline?.length > 0 ? (
@@ -142,19 +138,19 @@ export default function RecruitmentAnalyticsPage() {
           {/* Source Breakdown */}
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Candidate Sources</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Candidate Sources</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               {sources?.length > 0 ? (
                 <div className="space-y-3">
                   {sources.map((source) => (
-                    <div key={source._id} className="flex items-center justify-between p-2.5 bg-default-50 rounded-lg">
+                    <Surface key={source._id} className="flex items-center justify-between p-2.5 bg-default-50 rounded-lg">
                       <span className="text-sm text-default-700 capitalize">{source._id || 'Unknown'}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-default-800">{source.count}</span>
                         <span className="text-xs text-default-400">({source.hired || 0} hired)</span>
                       </div>
-                    </div>
+                    </Surface>
                   ))}
                 </div>
               ) : (
@@ -166,19 +162,19 @@ export default function RecruitmentAnalyticsPage() {
           {/* Department Hiring */}
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Hiring by Department</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Hiring by Department</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               {departments?.length > 0 ? (
                 <div className="space-y-3">
                   {departments.map((dept) => (
-                    <div key={dept._id} className="flex items-center justify-between p-2.5 bg-default-50 rounded-lg">
+                    <Surface key={dept._id} className="flex items-center justify-between p-2.5 bg-default-50 rounded-lg">
                       <span className="text-sm text-default-700">{dept.departmentName || dept._id}</span>
                       <div className="flex items-center gap-3">
                         <Chip size="sm" variant="flat" color="primary">{dept.totalJobs} jobs</Chip>
                         <Chip size="sm" variant="flat" color="success">{dept.totalHired} hired</Chip>
                       </div>
-                    </div>
+                    </Surface>
                   ))}
                 </div>
               ) : (
@@ -190,7 +186,7 @@ export default function RecruitmentAnalyticsPage() {
           {/* Interview Stats */}
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Interview Statistics</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Interview Statistics</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               {interviewStats ? (
@@ -225,7 +221,7 @@ export default function RecruitmentAnalyticsPage() {
         {overview.offerAcceptanceRate !== undefined && (
           <Card shadow="sm">
             <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-              <h3 className="text-base font-semibold text-default-800">Offer Metrics</h3>
+              <Heading3 className="text-base font-semibold text-default-800">Offer Metrics</Heading3>
             </CardHeader>
             <CardBody className="p-4 sm:p-5">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

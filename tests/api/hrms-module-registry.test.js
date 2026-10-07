@@ -8,7 +8,7 @@ import { ALL_FEATURE_KEYS, getApiFeatureRule, getFeaturesForPlan, mergeCompanyFe
 
 describe('HRMS module registry', () => {
   test('defines every gap-analysis workflow stage exactly once', () => {
-    expect(HRMS_MODULE_KEYS).toHaveLength(31)
+    expect(HRMS_MODULE_KEYS).toHaveLength(30)
     expect(new Set(HRMS_MODULE_KEYS).size).toBe(HRMS_MODULE_KEYS.length)
     expect(HRMS_MODULE_KEYS).toEqual(expect.arrayContaining([
       'manpowerPlanning', 'mrfWorkflow', 'recruitment', 'onboarding', 'attendanceMachines',

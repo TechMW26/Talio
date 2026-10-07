@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Select, SelectItem } from '@heroui/react'
+import { Select, SelectItem } from '@/components/ui/fernly'
 import {
   HiOutlineCamera,
   HiOutlinePhoto,

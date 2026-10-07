@@ -1,10 +1,13 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { NativeButton, Heading1, Heading2, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Button, Skeleton } from '@heroui/react'
+import { Button, Skeleton } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaDownload, FaPrint, FaEnvelope } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -352,16 +355,16 @@ export default function PayslipDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <button
+          <NativeButton
             onClick={() => router.back()}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <BackIcon className="w-5 h-5 text-gray-600" />
-          </button>
+          </NativeButton>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">
+            <Heading1 className="text-2xl font-bold text-gray-800">
               Salary Slip - {getMonthName(payroll.month)} {payroll.year}
-            </h1>
+            </Heading1>
             <p className="text-gray-600">
               {employee.firstName} {employee.lastName} ({employee.employeeCode})
             </p>
@@ -380,7 +383,7 @@ export default function PayslipDetailPage() {
       </div>
 
       {/* Payslip Preview */}
-      <div ref={payslipRef} className="bg-white rounded-lg shadow-lg overflow-hidden max-w-4xl mx-auto">
+      <Surface ref={payslipRef} className="bg-white rounded-lg shadow-lg overflow-hidden max-w-4xl mx-auto">
         {/* Company Header - Use employee's assigned company */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
           <div className="flex items-center justify-between">
@@ -392,15 +395,15 @@ export default function PayslipDetailPage() {
                   className="h-12 max-w-[120px] object-contain bg-white rounded p-1"
                 />
               ) : (
-                <h2 className="text-2xl font-bold">{employee.company?.name || companySettings?.companyName || 'Company'}</h2>
+                <Heading2 className="text-2xl font-bold">{employee.company?.name || companySettings?.companyName || 'Company'}</Heading2>
               )}
               {/* Show company name alongside logo */}
               {(employee.company?.logo || companySettings?.companyLogo) && (
-                <h2 className="text-xl font-bold">{employee.company?.name || companySettings?.companyName || 'Company'}</h2>
+                <Heading2 className="text-xl font-bold">{employee.company?.name || companySettings?.companyName || 'Company'}</Heading2>
               )}
             </div>
             <div className="text-right">
-              <h3 className="text-xl font-semibold">SALARY SLIP</h3>
+              <Heading3 className="text-xl font-semibold">SALARY SLIP</Heading3>
               <p className="opacity-90">{getMonthName(payroll.month)} {payroll.year}</p>
             </div>
           </div>
@@ -445,9 +448,9 @@ export default function PayslipDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Earnings */}
             <div className="bg-green-50 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-green-800 mb-4 border-b border-green-200 pb-2">
+              <Heading3 className="text-lg font-semibold text-green-800 mb-4 border-b border-green-200 pb-2">
                 EARNINGS
-              </h3>
+              </Heading3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Basic Salary</span>
@@ -490,9 +493,9 @@ export default function PayslipDetailPage() {
 
             {/* Deductions */}
             <div className="bg-red-50 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-red-800 mb-4 border-b border-red-200 pb-2">
+              <Heading3 className="text-lg font-semibold text-red-800 mb-4 border-b border-red-200 pb-2">
                 DEDUCTIONS
-              </h3>
+              </Heading3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Provident Fund (PF)</span>
@@ -545,7 +548,7 @@ export default function PayslipDetailPage() {
           {/* Attendance Summary */}
           {(payroll.workingDays || payroll.presentDays) && (
             <div className="mt-6 bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">ATTENDANCE SUMMARY</h3>
+              <Heading3 className="text-sm font-semibold text-gray-700 mb-3">ATTENDANCE SUMMARY</Heading3>
               <div className="grid grid-cols-4 gap-4 text-center text-sm">
                 <div>
                   <p className="text-gray-500">Working Days</p>
@@ -573,7 +576,7 @@ export default function PayslipDetailPage() {
           <p>This is a system-generated salary slip. For any queries, please contact HR.</p>
           <p className="mt-1">Generated on: {new Date().toLocaleDateString('en-IN')}</p>
         </div>
-      </div>
+      </Surface>
     </div>
   )
 }

@@ -1,5 +1,8 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { NativeButton, Heading1, NativeInput, NativeTextarea, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -7,7 +10,7 @@ import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaSave, FaTrash, FaPlus, FaTimes, FaUsers, FaArchive, FaChevronDown, FaChevronRight, FaCheckSquare } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
-import { Button, Select, SelectItem, Skeleton } from '@heroui/react'
+import { Button, Select, SelectItem, Skeleton } from '@/components/ui/fernly'
 import Portal from '@/components/ui/Portal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -253,36 +256,36 @@ export default function EditProjectPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
-          <button
+          <NativeButton
             onClick={() => router.push(`/dashboard/projects/${projectId}`)}
             className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <BackIcon className="text-gray-600" />
-          </button>
+          </NativeButton>
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Edit Project</h1>
+            <Heading1 className="text-3xl font-bold text-gray-800">Edit Project</Heading1>
             <p className="text-gray-600">{project.name}</p>
           </div>
         </div>
 
         <div className="flex gap-2">
           {canManage && project.status !== 'archived' && (
-            <button
+            <NativeButton
               onClick={handleArchiveProject}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center"
             >
               <FaArchive className="mr-2" />
               Archive
-            </button>
+            </NativeButton>
           )}
           {canManage && (
-            <button
+            <NativeButton
               onClick={handleDeleteProject}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center"
             >
               <FaTrash className="mr-2" />
               Delete
-            </button>
+            </NativeButton>
           )}
         </div>
       </div>
@@ -296,7 +299,7 @@ export default function EditProjectPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Project Name <span className="text-red-500">*</span>
                 </label>
-                <input
+                <NativeInput
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
@@ -339,7 +342,7 @@ export default function EditProjectPage() {
                     {generatingDescription ? 'Writing...' : 'AI Write'}
                   </Button>
                 </div>
-                <textarea
+                <NativeTextarea
                   value={form.description}
                   onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
                   rows={4}
@@ -386,7 +389,7 @@ export default function EditProjectPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Start Date <span className="text-red-500">*</span>
                   </label>
-                  <input
+                  <NativeInput
                     type="date"
                     value={form.startDate}
                     onChange={(e) => setForm(prev => ({ ...prev, startDate: e.target.value }))}
@@ -399,7 +402,7 @@ export default function EditProjectPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     End Date <span className="text-red-500">*</span>
                   </label>
-                  <input
+                  <NativeInput
                     type="date"
                     value={form.endDate}
                     onChange={(e) => setForm(prev => ({ ...prev, endDate: e.target.value }))}
@@ -415,13 +418,13 @@ export default function EditProjectPage() {
                   <label className="block text-sm font-medium text-gray-700">
                     Project Heads <span className="text-red-500">*</span>
                   </label>
-                  <button
+                  <NativeButton
                     type="button"
                     onClick={() => setShowHeadSearch(true)}
                     className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
                   >
                     <FaPlus className="w-3 h-3" /> Add Head
-                  </button>
+                  </NativeButton>
                 </div>
 
                 {form.projectHeadIds.length === 0 ? (
@@ -448,7 +451,7 @@ export default function EditProjectPage() {
                               <p className="text-xs text-gray-500">{head.department?.name || 'No Dept'}</p>
                             </div>
                           </div>
-                          <button
+                          <NativeButton
                             type="button"
                             onClick={() => setForm(prev => ({
                               ...prev,
@@ -457,7 +460,7 @@ export default function EditProjectPage() {
                             className="p-1 text-red-500 hover:bg-red-50 rounded"
                           >
                             <FaTimes className="w-3 h-3" />
-                          </button>
+                          </NativeButton>
                         </div>
                       )
                     })}
@@ -489,16 +492,16 @@ export default function EditProjectPage() {
 
         {/* Members Panel */}
         <div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <Surface className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-black">Team Members</h3>
+              <Heading3 className="text-lg font-semibold text-gray-800 dark:text-black">Team Members</Heading3>
               {canManage && (
-                <button
+                <NativeButton
                   onClick={() => setShowAddMemberModal(true)}
                   className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg"
                 >
                   <FaPlus />
-                </button>
+                </NativeButton>
               )}
             </div>
 
@@ -526,12 +529,12 @@ export default function EditProjectPage() {
                   </div>
 
                   {canManage && member.role !== 'head' && (
-                    <button
+                    <NativeButton
                       onClick={() => handleRemoveMember(member._id)}
                       className="p-1 text-red-500 hover:bg-red-50 rounded"
                     >
                       <FaTimes className="w-3 h-3" />
-                    </button>
+                    </NativeButton>
                   )}
                 </div>
               ))}
@@ -540,7 +543,7 @@ export default function EditProjectPage() {
                 <p className="text-sm text-gray-500 text-center py-4">No members added yet</p>
               )}
             </div>
-          </div>
+          </Surface>
         </div>
       </div>
 
@@ -548,22 +551,22 @@ export default function EditProjectPage() {
       {showAddMemberModal && (
         <Portal>
           <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <Surface className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
               <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <FaUsers className="text-primary-500" />
-                  <h3 className="text-lg font-semibold">Add Team Members</h3>
+                  <Heading3 className="text-lg font-semibold">Add Team Members</Heading3>
                 </div>
-                <button
+                <NativeButton
                   onClick={() => { setShowAddMemberModal(false); setSelectedNewMembers([]); setMemberSearch('') }}
                   className="p-2 hover:bg-gray-100 rounded-lg"
                 >
                   <FaTimes />
-                </button>
+                </NativeButton>
               </div>
 
               <div className="px-4 pt-3 pb-2 border-b border-gray-200 flex-shrink-0">
-                <input
+                <NativeInput
                   type="text"
                   value={memberSearch}
                   onChange={(e) => setMemberSearch(e.target.value)}
@@ -597,7 +600,7 @@ export default function EditProjectPage() {
                               {deptEmployees.length}
                             </span>
                           </div>
-                          <button
+                          <NativeButton
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -617,7 +620,7 @@ export default function EditProjectPage() {
                           >
                             <FaCheckSquare className={`w-3 h-3 ${allSelected ? 'text-primary-600' : someSelected ? 'text-blue-500' : 'text-gray-400'}`} />
                             {allSelected ? 'Deselect All' : 'Select All'}
-                          </button>
+                          </NativeButton>
                         </div>
 
                         {isExpanded && (
@@ -627,7 +630,7 @@ export default function EditProjectPage() {
                                 key={emp._id}
                                 className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
                               >
-                                <input
+                                <NativeInput
                                   type="checkbox"
                                   checked={selectedNewMembers.includes(emp._id)}
                                   onChange={(e) => {
@@ -680,7 +683,7 @@ export default function EditProjectPage() {
                   {`Add ${selectedNewMembers.length} Member${selectedNewMembers.length !== 1 ? 's' : ''}`}
                 </LoadingButton>
               </div>
-            </div>
+            </Surface>
           </div>
         </Portal>
       )}
@@ -689,10 +692,10 @@ export default function EditProjectPage() {
       {showHeadSearch && (
         <Portal>
           <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <Surface className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
               <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-                <h3 className="text-lg font-semibold text-gray-800">Add Project Head</h3>
-                <button
+                <Heading3 className="text-lg font-semibold text-gray-800">Add Project Head</Heading3>
+                <NativeButton
                   onClick={() => {
                     setShowHeadSearch(false)
                     setSearchHead('')
@@ -700,11 +703,11 @@ export default function EditProjectPage() {
                   className="p-2 hover:bg-gray-100 rounded-lg"
                 >
                   <FaTimes />
-                </button>
+                </NativeButton>
               </div>
 
               <div className="p-4 border-b border-gray-200">
-                <input
+                <NativeInput
                   type="text"
                   value={searchHead}
                   onChange={(e) => setSearchHead(e.target.value)}
@@ -762,7 +765,7 @@ export default function EditProjectPage() {
                             {isExpanded && (
                               <div className="p-2 space-y-1 bg-white">
                                 {deptEmployees.map(emp => (
-                                  <button
+                                  <NativeButton
                                     key={emp._id}
                                     type="button"
                                     onClick={() => {
@@ -788,7 +791,7 @@ export default function EditProjectPage() {
                                         {emp.email}
                                       </p>
                                     </div>
-                                  </button>
+                                  </NativeButton>
                                 ))}
                               </div>
                             )}
@@ -799,7 +802,7 @@ export default function EditProjectPage() {
                   )
                 })()}
               </div>
-            </div>
+            </Surface>
           </div>
         </Portal>
       )}

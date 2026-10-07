@@ -1,7 +1,10 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
-import { Skeleton, Select, SelectItem } from '@heroui/react'
+import { Skeleton, Select, SelectItem } from '@/components/ui/fernly'
 import { FaMapMarkerAlt, FaCheck, FaTimes, FaClock, FaUser, FaFilter, FaBuilding, FaUserFriends } from 'react-icons/fa'
 import { toast } from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -125,9 +128,9 @@ export default function GeofencingPage() {
     <div className="p-3 sm:p-6 pb-20 md:pb-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
+        <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
           Geofencing Monitoring
-        </h1>
+        </Heading1>
         <p className="text-gray-600 mt-1">Track employee locations and manage out-of-premises requests</p>
       </div>
 
@@ -149,7 +152,7 @@ export default function GeofencingPage() {
       )}
 
       {/* Filter Tabs */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <Surface className="bg-white rounded-lg shadow-md p-4 mb-6">
         {/* Department & Team Filters */}
         <div className="flex flex-wrap items-end gap-3 mb-4">
           {/* Department filter - admin/HR */}
@@ -214,7 +217,7 @@ export default function GeofencingPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {['all', 'pending', 'approved', 'rejected'].map(status => (
-            <button
+            <NativeButton
               key={status}
               onClick={() => setFilter(status)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === status
@@ -223,24 +226,24 @@ export default function GeofencingPage() {
                 }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
+            </NativeButton>
           ))}
         </div>
-      </div>
+      </Surface>
 
       {/* Logs List */}
       <div className="space-y-4">
         {logs.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <Surface className="bg-white rounded-lg shadow-md p-8 text-center">
             <FaMapMarkerAlt className="text-gray-300 text-5xl mx-auto mb-4" />
             <p className="text-gray-600">No geofencing logs found</p>
             <p className="text-sm text-gray-500 mt-2">
               Logs will appear here when employees are tracked outside the geofence
             </p>
-          </div>
+          </Surface>
         ) : (
           logs.map(log => (
-            <div key={log._id} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <Surface key={log._id} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 {/* Employee Info */}
                 <div className="flex items-start gap-3 flex-1">
@@ -256,9 +259,9 @@ export default function GeofencingPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900">
+                    <Heading3 className="font-semibold text-gray-900">
                       {log.employee?.firstName} {log.employee?.lastName}
-                    </h3>
+                    </Heading3>
                     <p className="text-sm text-gray-600">{log.employee?.employeeCode}</p>
                     {log.department && (
                       <p className="text-xs text-gray-500 mt-1">{log.department.name}</p>
@@ -342,7 +345,7 @@ export default function GeofencingPage() {
                       {/* Approval Buttons */}
                       {log.outOfPremisesRequest.status === 'pending' && (
                         <div className="flex flex-col gap-2">
-                          <button
+                          <NativeButton
                             onClick={() => {
                               const comments = prompt('Add comments (optional):')
                               handleApproval(log._id, 'approved', comments || '')
@@ -350,8 +353,8 @@ export default function GeofencingPage() {
                             className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2 text-sm"
                           >
                             <FaCheck /> Approve
-                          </button>
-                          <button
+                          </NativeButton>
+                          <NativeButton
                             onClick={() => {
                               const comments = prompt('Reason for rejection:')
                               if (comments) {
@@ -361,14 +364,14 @@ export default function GeofencingPage() {
                             className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
                           >
                             <FaTimes /> Reject
-                          </button>
+                          </NativeButton>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
               )}
-            </div>
+            </Surface>
           ))
         )}
       </div>

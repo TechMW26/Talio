@@ -36,7 +36,7 @@ function SidebarBadge({ count }) {
 }
 
 
-export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartmentHead = false, isTeamLeader = false, companyFeatures = null }) {
+export default function IconStrip({ onExpandClick, isHidden = false, sidebarCounts = {}, isDepartmentHead = false, isTeamLeader = false, companyFeatures = null }) {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -92,8 +92,6 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     if (isDepartmentHead) {
       const teamSubmenu = [
         { name: 'Team Members', path: '/dashboard/team/members' },
-        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-        { name: 'Team Goals', path: '/dashboard/performance/goals' },
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
         { name: 'Geofencing', path: '/dashboard/team/geofencing' }
       ]
@@ -293,7 +291,11 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
       {/* Icon Strip - Always visible on desktop */}
       <aside
         data-vt-sidebar
-        className="hidden lg:flex fixed inset-y-0 left-0 z-[8] flex-col h-screen w-[4.5rem] shadow-[0_4px_16px_rgba(15,23,42,0.08)]"
+        data-open={!isHidden}
+        inert={isHidden || undefined}
+        aria-hidden={isHidden}
+        aria-label="Compact navigation"
+        className="talio-floating-rail hidden lg:flex fixed z-[100] flex-col"
         style={{
           backgroundColor: 'var(--color-bg-sidebar)'
         }}
@@ -313,6 +315,8 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
           <Tooltip content="Expand Menu" placement="right" delay={200} closeDelay={0}>
             <button
               onClick={() => onExpandClick(null)}
+              data-sidebar-expand
+              aria-label="Expand menu"
               className="w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 hover:bg-black/10 dark:hover:bg-white/10"
               style={{ backgroundColor: 'var(--color-primary-100)' }}
             >

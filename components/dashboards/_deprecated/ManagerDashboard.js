@@ -11,7 +11,6 @@ import { formatDesignation } from '@/lib/formatters'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getEmployeeId } from '@/utils/userHelper'
 import { CustomizableDashboard } from '@/components/dashboard'
-import CallAlertButton from '@/components/CallAlertButton'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import {
   CheckInOutWidget,
@@ -438,7 +437,7 @@ export default function ManagerDashboard({ user }) {
         icon: FaExclamationCircle,
         color: 'bg-red-500',
         trend: 'down',
-        href: '/dashboard/performance/ratings'
+        href: '/dashboard/team/members'
       },
     ]
   }
@@ -491,7 +490,7 @@ export default function ManagerDashboard({ user }) {
       <QuickActionsWidget
         actions={[
           { name: 'Review Leaves', icon: 'FaCalendarAlt', href: '/dashboard/leave/approvals', color: 'blue' },
-          { name: 'Team Ratings', icon: 'FaChartLine', href: '/dashboard/performance/ratings', color: 'purple' },
+          { name: 'Team Ratings', icon: 'FaChartLine', href: '/dashboard/team/members', color: 'purple' },
           { name: 'Create Review', icon: 'FaAward', href: '/dashboard/performance/create', color: 'green' },
           { name: 'Mark Attendance', icon: 'FaClock', href: '/dashboard/attendance', color: 'red' },
         ]}
@@ -557,10 +556,6 @@ export default function ManagerDashboard({ user }) {
 
   return (
     <div className="page-container">
-      {/* Call Alert Button - Fixed position for easy access */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <CallAlertButton user={user} />
-      </div>
 
       <CustomizableDashboard
         userId={user?._id || 'manager'}

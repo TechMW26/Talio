@@ -1,4 +1,4 @@
-import { groupDashboardWidgets, isWideDashboardWidget, balanceDashboardWidgets } from '@/lib/dashboardSections'
+import { groupDashboardWidgets, isWideDashboardWidget, balanceDashboardWidgets, paginateDashboardWidgets } from '@/lib/dashboardSections'
 
 test('every selected widget appears once, including unknown future widgets', () => {
   const widgets = ['salary-slip', 'today-tasks', 'announcements', 'quick-glance', 'check-in-out', 'future-widget'].map(id => ({ id }))
@@ -24,14 +24,15 @@ test('profile and punch row and team attendance span both grid cells', () => {
   expect(isWideDashboardWidget('attendance-summary')).toBe(false)
 })
 
-test('attendance is below full-width team attendance with tasks alongside', () => {
+test('attendance is ordered and tasks stay in Work', () => {
   const widgets = ['today-tasks', 'attendance-summary', 'check-in-out', 'team-attendance'].map(id => ({ id }))
-  expect(groupDashboardWidgets(widgets)[0].widgets.map(w => w.id)).toEqual(['check-in-out', 'team-attendance', 'attendance-summary', 'today-tasks'])
+  expect(groupDashboardWidgets(widgets)[0].widgets.map(w => w.id)).toEqual(['check-in-out', 'team-attendance', 'attendance-summary'])
+  expect(groupDashboardWidgets(widgets)[1].widgets.map(w => w.id)).toEqual(['today-tasks'])
 })
 
-test('adds an available task fallback only beside monthly attendance', () => {
+test('does not inject duplicate task fallback widgets into attendance', () => {
   const task = { id: 'today-tasks' }
-  expect(groupDashboardWidgets([{ id: 'attendance-summary' }], task)[0].widgets).toEqual([{ id: 'attendance-summary' }, task])
+  expect(groupDashboardWidgets([{ id: 'attendance-summary' }], task)[0].widgets).toEqual([{ id: 'attendance-summary' }])
   expect(groupDashboardWidgets([{ id: 'team-attendance' }], task)[0].widgets).toEqual([{ id: 'team-attendance' }])
 })
 
@@ -42,4 +43,13 @@ test('balances odd sections with available related widgets without duplicates', 
   expect(balanced.map(w => w.id)).toEqual([...widgets.map(w => w.id), 'active-projects'])
   expect(balanceDashboardWidgets(balanced, candidates)).toEqual(balanced)
   expect(balanceDashboardWidgets(widgets, [])).toEqual(widgets)
+})
+
+test('bounded slides preserve every widget exactly once and account for wide rows', () => {
+  const widgets = ['check-in-out', 'team-attendance', 'attendance-summary', 'today-tasks', 'quick-glance', 'leave-balance', 'future'].map(id => ({ id }))
+  const pages = paginateDashboardWidgets(widgets)
+  expect(pages.flat()).toEqual(widgets)
+  expect(pages).toHaveLength(5)
+  for (const page of pages) expect(page.reduce((cells, widget) => cells + (isWideDashboardWidget(widget.id) ? 2 : 1), 0)).toBeLessThanOrEqual(2)
+  expect(paginateDashboardWidgets([])).toEqual([])
 })

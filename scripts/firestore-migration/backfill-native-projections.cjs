@@ -21,7 +21,7 @@ async function run() {
     assertIsolated(catalog, policy, true)
     if (write) await invalidateAcceptance(firestore, root, policy)
     const report = { dataset, write, collections: {} }
-    for (const tenant of catalog.tenants) for (const name of ['employees', 'hrmsworkflows', 'meetings', 'projects', 'tasks', 'policies', 'departments', 'designations', 'onboardingemails', 'projectemailnotificationlogs', 'whiteboards', 'jobpostings', 'candidates', 'performanceappraisals', 'holidays', 'announcements', 'suggestions', 'callalerts', 'assets', 'documents']) {
+    for (const tenant of catalog.tenants) for (const name of ['employees', 'hrmsworkflows', 'meetings', 'projects', 'tasks', 'policies', 'departments', 'designations', 'onboardingemails', 'projectemailnotificationlogs', 'whiteboards', 'jobpostings', 'candidates', 'performanceappraisals', 'holidays', 'announcements', 'suggestions', 'assets', 'documents']) {
       const counts = report.collections[name] ||= { scanned: 0, changed: 0, verified: 0 }
       const collection = root.collection('databases').doc(tenant.databaseName).collection('collections').doc(name).collection('records')
       let after

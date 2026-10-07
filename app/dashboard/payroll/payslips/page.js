@@ -1,10 +1,13 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading3, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { FaMoneyBillWave, FaDownload, FaEye, FaCalendarAlt, FaFilter, FaTimes } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import { useDisclosure, Divider, Chip, Skeleton } from '@heroui/react'
+import { useDisclosure, Divider, Chip, Skeleton } from '@/components/ui/fernly'
 import { HRMSCard, HRMSCardHeader, HRMSCardBody, KPICard } from '@/components/ui/heroui/Card'
 import { HRMSSelect, HRMSSelectItem } from '@/components/ui/heroui/Input'
 import { PrimaryButton, SecondaryButton, GhostButton } from '@/components/ui/heroui/Button'
@@ -103,10 +106,10 @@ Generated on: ${new Date().toLocaleDateString()}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl shadow-sm p-4">
+            <Surface key={i} className="bg-white rounded-xl shadow-sm p-4">
               <Skeleton className="h-4 w-24 rounded mb-3" />
               <Skeleton className="h-7 w-20 rounded" />
-            </div>
+            </Surface>
           ))}
         </div>
         <HRMSCard>
@@ -144,7 +147,7 @@ Generated on: ${new Date().toLocaleDateString()}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Payslips</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-foreground">My Payslips</Heading1>
           <p className="text-default-500 mt-1">View and download your salary statements <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" /></p>
         </div>
         <div className="flex items-center gap-4">
@@ -193,7 +196,7 @@ Generated on: ${new Date().toLocaleDateString()}
       {/* Payslips List */}
       <HRMSCard>
         <HRMSCardHeader>
-          <h3 className="text-lg font-semibold text-foreground">Payslips for {selectedYear}</h3>
+          <Heading3 className="text-lg font-semibold text-foreground">Payslips for {selectedYear}</Heading3>
         </HRMSCardHeader>
         <Divider />
         <HRMSCardBody className="p-0">
@@ -268,15 +271,15 @@ Generated on: ${new Date().toLocaleDateString()}
           {selectedPayslip && (
             <>
               <HRMSModalHeader>
-                <h2 className="text-xl font-bold text-foreground">
+                <Heading2 className="text-xl font-bold text-foreground">
                   Payslip - {getMonthName(selectedPayslip.month)} {selectedPayslip.year}
-                </h2>
+                </Heading2>
               </HRMSModalHeader>
               <HRMSModalBody>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Employee Details */}
-                  <div className="bg-default-50 p-6 rounded-lg">
-                    <h3 className="text-lg font-semibold text-foreground mb-4">Employee Details</h3>
+                  <Surface className="bg-default-50 p-6 rounded-lg">
+                    <Heading3 className="text-lg font-semibold text-foreground mb-4">Employee Details</Heading3>
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-default-500">Name:</span>
@@ -295,11 +298,11 @@ Generated on: ${new Date().toLocaleDateString()}
                         <span className="font-medium text-foreground">{user?.employeeId?.designation?.name || 'N/A'}</span>
                       </div>
                     </div>
-                  </div>
+                  </Surface>
 
                   {/* Earnings */}
                   <div className="bg-success-50 p-6 rounded-lg">
-                    <h3 className="text-lg font-semibold text-foreground mb-4">Earnings</h3>
+                    <Heading3 className="text-lg font-semibold text-foreground mb-4">Earnings</Heading3>
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-default-600">Basic Salary:</span>
@@ -331,7 +334,7 @@ Generated on: ${new Date().toLocaleDateString()}
 
                   {/* Deductions */}
                   <div className="bg-danger-50 p-6 rounded-lg">
-                    <h3 className="text-lg font-semibold text-foreground mb-4">Deductions</h3>
+                    <Heading3 className="text-lg font-semibold text-foreground mb-4">Deductions</Heading3>
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-default-600">Tax:</span>
@@ -359,7 +362,7 @@ Generated on: ${new Date().toLocaleDateString()}
 
                   {/* Net Salary */}
                   <div className="bg-primary-50 p-6 rounded-lg">
-                    <h3 className="text-lg font-semibold text-foreground mb-4">Net Salary</h3>
+                    <Heading3 className="text-lg font-semibold text-foreground mb-4">Net Salary</Heading3>
                     <div className="text-center">
                       <div className="text-3xl font-bold text-primary">
                         {formatCurrency(selectedPayslip.netSalary)}

@@ -1,4 +1,5 @@
 'use client'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 import { useState, useEffect } from 'react'
 import { FaBell, FaClock, FaRedo, FaPaperPlane, FaUsers, FaBuilding, FaUserTag, FaCalendar, FaTrash, FaEdit, FaPause, FaPlay, FaHistory, FaCheck, FaTimes, FaChevronDown, FaSync } from 'react-icons/fa'
@@ -150,25 +151,7 @@ export default function NotificationManagement() {
       {/* Tabs */}
       <div className="mb-6">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-4 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="hidden sm:inline">{tab.name}</span>
-                  <span className="sm:hidden">{tab.name.split(' ')[0]}</span>
-                </button>
-              )
-            })}
-          </nav>
+          <Tabs aria-label="Notification management sections" selectedKey={activeTab} onSelectionChange={setActiveTab}>{tabs.map(tab => <Tab key={tab.id} title={<span className="flex items-center gap-2"><tab.icon className="w-4 h-4" aria-hidden="true" /><span className="hidden sm:inline">{tab.name}</span><span className="sm:hidden">{tab.name.split(' ')[0]}</span></span>} />)}</Tabs>
         </div>
       </div>
 

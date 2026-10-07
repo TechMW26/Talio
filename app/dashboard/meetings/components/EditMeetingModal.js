@@ -1,8 +1,10 @@
 'use client'
 
+
+import { NativeInput, NativeTextarea, NativeSelect } from '@/components/ui/fernly/native'
 import { useEffect, useMemo, useState } from 'react'
-import Modal from '@/components/ui/HeroModal'
-import { Button, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Button, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/fernly'
 import { HiOutlineCalendarDays, HiOutlineClock, HiOutlinePencilSquare } from 'react-icons/hi2'
 import { getDateTimePartsInTimezone, IST_TIMEZONE, parseDateTimeInTimezone } from '@/lib/timezone'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -99,7 +101,7 @@ export default function EditMeetingModal({ isOpen, meeting, onClose, onSuccess }
           <ModalBody className="gap-5">
             <label className="grid gap-2 text-sm font-medium text-default-700">
               Meeting title <span className="sr-only">required</span>
-              <input
+              <NativeInput
                 value={formData.title}
                 onChange={(event) => updateField('title', event.target.value)}
                 maxLength={200}
@@ -110,7 +112,7 @@ export default function EditMeetingModal({ isOpen, meeting, onClose, onSuccess }
 
             <label className="grid gap-2 text-sm font-medium text-default-700">
               Description
-              <textarea
+              <NativeTextarea
                 value={formData.description}
                 onChange={(event) => updateField('description', event.target.value)}
                 maxLength={4000}
@@ -122,7 +124,7 @@ export default function EditMeetingModal({ isOpen, meeting, onClose, onSuccess }
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium text-default-700">
                 <span className="flex items-center gap-2"><HiOutlineCalendarDays className="h-4 w-4" /> Start date and time</span>
-                <input
+                <NativeInput
                   type="datetime-local"
                   value={formData.scheduledStart}
                   onChange={(event) => updateField('scheduledStart', event.target.value)}
@@ -133,7 +135,7 @@ export default function EditMeetingModal({ isOpen, meeting, onClose, onSuccess }
 
               <label className="grid gap-2 text-sm font-medium text-default-700">
                 <span className="flex items-center gap-2"><HiOutlineClock className="h-4 w-4" /> Duration in minutes</span>
-                <input
+                <NativeInput
                   type="number"
                   min="5"
                   max="1440"
@@ -155,7 +157,7 @@ export default function EditMeetingModal({ isOpen, meeting, onClose, onSuccess }
             {meeting?.type === 'offline' && (
               <label className="grid gap-2 text-sm font-medium text-default-700">
                 Location
-                <input
+                <NativeInput
                   value={formData.location}
                   onChange={(event) => updateField('location', event.target.value)}
                   maxLength={500}
@@ -167,7 +169,7 @@ export default function EditMeetingModal({ isOpen, meeting, onClose, onSuccess }
 
             <label className="grid gap-2 text-sm font-medium text-default-700">
               Priority
-              <select
+              <NativeSelect
                 value={formData.priority}
                 onChange={(event) => updateField('priority', event.target.value)}
                 className="min-h-12 rounded-xl border border-default-300 bg-content1 px-4 text-base text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -176,7 +178,7 @@ export default function EditMeetingModal({ isOpen, meeting, onClose, onSuccess }
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
                 <option value="urgent">Urgent</option>
-              </select>
+              </NativeSelect>
             </label>
           </ModalBody>
           <ModalFooter>

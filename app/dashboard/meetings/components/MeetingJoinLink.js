@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Modal from '@/components/ui/HeroModal'
-import { Button, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Button, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/fernly'
 import { HiOutlineExclamationTriangle, HiOutlinePlayCircle } from 'react-icons/hi2'
 import { useMeetingSession } from '@/contexts/MeetingSessionContext'
 

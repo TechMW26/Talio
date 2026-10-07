@@ -32,8 +32,9 @@ test('frameless widgets retain the drag indicator and handle', () => {
   expect(getByTitle('Drag to reorder')).toBeTruthy()
 })
 
-test('dashboard cards use frameless wrappers without a competing clipping radius', () => {
+test('fixed dashboard cards use plain wrappers without sortable hooks', () => {
   const source = fs.readFileSync(path.join(process.cwd(), 'components/dashboard/CustomizableDashboard.js'), 'utf8')
-  expect(source).toMatch(/\sframeless\s/)
+  expect(source).not.toContain('DraggableWidget')
+  expect(source).toContain('dashboard-widget-enter')
   expect(source).not.toContain('rounded-[18px] overflow-hidden')
 })

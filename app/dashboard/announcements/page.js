@@ -1,10 +1,13 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 import { FaPlus, FaBullhorn, FaCalendarAlt, FaExclamationTriangle, FaUsers, FaEdit, FaTrash } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
@@ -117,20 +120,20 @@ export default function AnnouncementsPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col gap-                3 sm:gap-4 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Announcements</h1>
+          <Heading1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Announcements</Heading1>
           <p className="text-sm sm:text-base text-gray-600 mt-1">
             Company-wide announcements and updates
             <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
           </p>
         </div>
         {canManageAnnouncements() && (
-          <button
+          <NativeButton
             onClick={() => router.push('/dashboard/announcements/create')}
             className="w-full md:w-auto px-4 py-2 text-sm sm:text-base bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center justify-center space-x-2"
           >
             <FaPlus className="w-3 h-3 sm:w-4 sm:h-4" />
             <span>New Announcement</span>
-          </button>
+          </NativeButton>
         )}
       </div>
 
@@ -141,7 +144,7 @@ export default function AnnouncementsPage() {
         ) : isLoading ? (
           <div className="space-y-3 sm:space-y-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md p-4 sm:p-6 space-y-3">
+              <Surface key={i} className="bg-white rounded-lg shadow-md p-4 sm:p-6 space-y-3">
                 <div className="flex items-center gap-3">
                   <Skeleton className="w-6 h-6 rounded" />
                   <Skeleton className="h-5 w-1/3 rounded-lg" />
@@ -153,13 +156,13 @@ export default function AnnouncementsPage() {
                   <Skeleton className="h-3 w-24 rounded-lg" />
                   <Skeleton className="h-3 w-32 rounded-lg" />
                 </div>
-              </div>
+              </Surface>
             ))}
           </div>
         ) : announcements.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-6 sm:p-8 text-center text-sm sm:text-base text-gray-500">
+          <Surface className="bg-white rounded-lg shadow-md p-6 sm:p-8 text-center text-sm sm:text-base text-gray-500">
             No announcements found
-          </div>
+          </Surface>
         ) : (
           announcements.map((announcement) => (
             <div
@@ -174,9 +177,9 @@ export default function AnnouncementsPage() {
                   <div className="flex items-center space-x-2 sm:space-x-3 mb-2 flex-wrap">
                     <FaBullhorn className={`text-base sm:text-xl flex-shrink-0 ${announcement.isDepartmentAnnouncement ? 'text-purple-600' : 'text-primary-500'
                       }`} />
-                    <h3 className="text-base sm:text-xl font-bold text-gray-800 break-words">
+                    <Heading3 className="text-base sm:text-xl font-bold text-gray-800 break-words">
                       {announcement.title}
-                    </h3>
+                    </Heading3>
                     <span className={`px-2 sm:px-3 py-0.5 sm:py-1 text-xs font-semibold rounded-full ${announcement.priority === 'high' ? 'bg-red-100 text-red-800' :
                       announcement.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-blue-100 text-blue-800'
@@ -225,7 +228,7 @@ export default function AnnouncementsPage() {
                     </span>
                   )}
                   {canManageAnnouncements() && (
-                    <button
+                    <NativeButton
                       onClick={() => handleDeleteClick(announcement._id)}
                       disabled={deletingId === announcement._id}
                       className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
@@ -239,7 +242,7 @@ export default function AnnouncementsPage() {
                       ) : (
                         <FaTrash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       )}
-                    </button>
+                    </NativeButton>
                   )}
                 </div>
               </div>

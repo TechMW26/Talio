@@ -1,5 +1,7 @@
 'use client'
 
+
+import UploadButton from '@/components/ui/UploadButton'
 import { useState, useRef } from 'react'
 import toast from '@/utils/toast'
 import { useAILoading } from '@/contexts/AILoadingContext'
@@ -374,12 +376,12 @@ export default function BulkImportEmployees() {
               </div>
             </div>
             <div className="flex justify-center gap-3">
-              <button
+              <UploadButton label="Upload file"
                 onClick={() => fileInputRef.current?.click()}
                 className="text-sm text-primary-600 hover:text-primary-700"
               >
                 Change file
-              </button>
+              </UploadButton>
               <button
                 onClick={handleClear}
                 className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"

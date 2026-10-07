@@ -255,6 +255,7 @@ export function syncUserData(employeeData) {
       lastName: employeeData.lastName,
       fullName: `${employeeData.firstName} ${employeeData.lastName}`,
       profilePicture: employeeData.profilePicture,
+      profilePictureViewport: employeeData.profilePictureViewport,
       designation: employeeData.designation,
       department: employeeData.department,
       employeeCode: employeeData.employeeCode,
@@ -272,6 +273,7 @@ export function syncUserData(employeeData) {
         designation: employeeData.designation,
         department: employeeData.department,
         profilePicture: employeeData.profilePicture,
+        profilePictureViewport: employeeData.profilePictureViewport,
         status: employeeData.status,
       }
     }

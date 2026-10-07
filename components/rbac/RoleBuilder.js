@@ -3,7 +3,7 @@
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Button, Input, Textarea, Switch, Chip } from '@heroui/react'
+import { Button, Input, Textarea, Switch, Chip } from '@/components/ui/fernly'
 import { FaSave, FaToggleOn, FaToggleOff } from 'react-icons/fa'
 import { toast } from '@/utils/toast'
 import useApiMutation from '@/hooks/useApiMutation'

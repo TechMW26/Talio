@@ -18,3 +18,33 @@ test('renders real chart values, bounded priority bars and category details', ()
   expect(screen.getByRole('progressbar', { name: 'urgent completion' })).toHaveAttribute('aria-valuenow', '50')
   expect(screen.getByText('By Category')).toBeInTheDocument()
 })
+
+test('compact layout retains every secondary metric without extra metric cards', () => {
+  render(<AnalyticsPanel analytics={{ summary: { highPriority: 3 }, analytics: { onTimeCompletions: 8, lateCompletions: 2, totalDueDateExtensions: 1 } }} />)
+  for (const label of ['Productivity Score', 'Completion Rate', 'On-time Completions', 'Avg Completion Time', 'On Time', 'Completed Late', 'High Priority Pending', 'Due Date Extensions']) {
+    expect(screen.getByText(label)).toBeInTheDocument()
+  }
+  expect(screen.getByText('On Time').previousSibling).toHaveTextContent('8')
+  expect(screen.getByText('High Priority Pending').previousSibling).toHaveTextContent('3')
+  expect(screen.getByRole('region', { name: 'To-do Analytics' })).toBeInTheDocument()
+})
+
+test('analytics is compact, theme-aware and reuses the shared Fernly card and chart', () => {
+  const fs = require('fs')
+  const source = fs.readFileSync('app/dashboard/todo/components/AnalyticsPanel.js', 'utf8')
+  const css = fs.readFileSync('app/dashboard/todo/components/AnalyticsPanel.module.css', 'utf8')
+  expect(source).toContain('<Card as="section" shadow="none"')
+  expect(source).toContain('<FernlyBars fillHeight')
+  expect(css).toContain('height: 156px')
+  expect(css).toContain('.plot > div { min-height: 0; padding-top: 24px; }')
+  expect(css).toContain('var(--color-bg-card, #171717)')
+  expect(css).toContain('@media (max-width: 640px)')
+  expect(css).not.toContain('gradient(')
+  expect(css).not.toContain(':hover')
+  expect(css).not.toContain('244px')
+})
+
+test('missing analytics does not render a misleading panel', () => {
+  const { container } = render(<AnalyticsPanel analytics={null} />)
+  expect(container).toBeEmptyDOMElement()
+})

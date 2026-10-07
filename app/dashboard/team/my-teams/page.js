@@ -1,10 +1,13 @@
 'use client'
+import { Surface, SummaryCard } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading3, NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Skeleton, Avatar, Chip } from '@heroui/react'
+import { Skeleton, Avatar, Chip } from '@/components/ui/fernly'
 import {
   FaUsers, FaSearch, FaEnvelope, FaPhone, FaCalendarAlt,
   FaBriefcase, FaChartLine, FaUserFriends, FaCrown, FaBuilding
@@ -123,12 +126,12 @@ export default function MyTeamsPage() {
     return (
       <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
         <div className="flex items-center mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Teams</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Teams</Heading1>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-8 text-center">
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No Teams Found</h3>
+        <Surface className="bg-white rounded-xl shadow-md p-8 text-center">
+          <Heading3 className="text-lg font-semibold text-gray-700 mb-2">No Teams Found</Heading3>
           <p className="text-gray-500">You are not leading any teams yet.</p>
-        </div>
+        </Surface>
       </div>
     )
   }
@@ -141,18 +144,18 @@ export default function MyTeamsPage() {
       <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
         {/* Back button + Header */}
         <div className="mb-6">
-          <button
+          <NativeButton
             onClick={handleBackToTeams}
             className="flex items-center text-primary-600 hover:text-primary-700 mb-3 transition-colors"
           >
             <BackIcon className="mr-2" />
             <span className="font-medium">Back to My Teams</span>
-          </button>
+          </NativeButton>
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                 {currentTeam?.teamName || selectedTeam?.teamName || 'Team'}
-              </h1>
+              </Heading1>
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 {(currentTeam?.department?.name || selectedTeam?.department?.name) && (
                   <span className="flex items-center gap-1">
@@ -170,10 +173,10 @@ export default function MyTeamsPage() {
 
         {/* Search */}
         {teamMembers.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <Surface className="bg-white rounded-lg shadow-md p-4 mb-6">
             <div className="input-with-icon">
               <FaSearch className="input-icon" />
-              <input
+              <NativeInput
                 type="text"
                 placeholder="Search by name, employee code, or email..."
                 value={searchTerm}
@@ -181,14 +184,14 @@ export default function MyTeamsPage() {
                 className="input input-search"
               />
             </div>
-          </div>
+          </Surface>
         )}
 
         {/* Members */}
         {teamDetailLoading && selectedTeamId !== ASSIGNED_TEAM_ID ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md p-6 space-y-3">
+              <Surface key={i} className="bg-white rounded-lg shadow-md p-6 space-y-3">
                 <div className="flex items-center gap-3">
                   <Skeleton className="w-12 h-12 rounded-full" />
                   <div>
@@ -198,21 +201,21 @@ export default function MyTeamsPage() {
                 </div>
                 <Skeleton className="h-3 w-3/4 rounded-lg" />
                 <Skeleton className="h-3 w-1/2 rounded-lg" />
-              </div>
+              </Surface>
             ))}
           </div>
         ) : filteredMembers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <Surface className="bg-white rounded-lg shadow-md p-8 text-center">
             <FaUsers className="text-gray-400 text-4xl mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">No Members Found</h3>
+            <Heading3 className="text-lg font-semibold text-gray-700 mb-2">No Members Found</Heading3>
             <p className="text-gray-600">
               {searchTerm ? 'Try adjusting your search' : 'This team has no members yet'}
             </p>
-          </div>
+          </Surface>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredMembers.map((member) => (
-              <div
+              <Surface
                 key={member._id}
                 onClick={() => router.push(`/dashboard/team/members/${member._id}`)}
                 className="bg-white rounded-lg shadow-md p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow"
@@ -238,9 +241,9 @@ export default function MyTeamsPage() {
                     )}
                   </div>
                   <div className="flex-1 ml-4">
-                    <h3 className="text-lg font-bold text-gray-900">
+                    <Heading3 className="text-lg font-bold text-gray-900">
                       {member.firstName} {member.lastName}
-                    </h3>
+                    </Heading3>
                     <p className="text-sm text-gray-600">{member.employeeCode}</p>
                     {member.isTeamLeader && (
                       <span className="inline-block mt-1 px-2 py-0.5 bg-primary-100 text-primary-800 text-xs rounded-full font-medium">
@@ -279,11 +282,11 @@ export default function MyTeamsPage() {
                 </div>
 
                 {/* View Details Button */}
-                <button className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center">
+                <NativeButton className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center">
                   <FaChartLine className="mr-2" />
                   View Details
-                </button>
-              </div>
+                </NativeButton>
+              </Surface>
             ))}
           </div>
         )}
@@ -299,7 +302,7 @@ export default function MyTeamsPage() {
         <div className="flex items-center mb-2">
           <HiOutlineUserGroup className="text-primary-500 mr-3 text-3xl" />
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Teams</h1>
+            <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Teams</Heading1>
             <p className="text-gray-600 text-sm sm:text-base">
               Select a team to view and manage its members
             </p>
@@ -309,22 +312,12 @@ export default function MyTeamsPage() {
       </div>
 
       {/* Summary */}
-      <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600 font-medium">Teams You Lead</p>
-            <p className="text-3xl font-bold text-gray-900">{displayTeams.length}</p>
-          </div>
-          <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center">
-            <FaUserFriends className="text-primary-500 text-2xl" />
-          </div>
-        </div>
-      </div>
+      <SummaryCard  className="mb-6" label={<>Teams You Lead</>} value={<>{displayTeams.length}</>} />
 
       {/* Team Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {displayTeams.map((team) => (
-          <div
+          <Surface
             key={team._id}
             onClick={() => handleTeamSelect(team._id)}
             className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-primary-300 group"
@@ -332,9 +325,9 @@ export default function MyTeamsPage() {
             {/* Team Color Header */}
             <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-t-xl p-4">
               <div className="flex items-center justify-between">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <Surface className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
                   <FaUserFriends className="text-white text-lg" />
-                </div>
+                </Surface>
                 {team.isCrossDepartment && (
                   <Chip size="sm" variant="flat" className="bg-white/20 text-white text-xs">
                     Cross-Dept
@@ -345,9 +338,9 @@ export default function MyTeamsPage() {
 
             {/* Team Details */}
             <div className="p-4 sm:p-5">
-              <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors">
+              <Heading3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors">
                 {team.teamName}
-              </h3>
+              </Heading3>
               <p className="text-sm text-gray-500 mb-3">{team.teamCode}</p>
 
               <div className="flex items-center justify-between">
@@ -372,7 +365,7 @@ export default function MyTeamsPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
     </div>

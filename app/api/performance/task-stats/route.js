@@ -1,6 +1,7 @@
 import { performanceDatabase, performanceEmployees, joinPerformanceEmployees, scopedPerformanceRecords, performanceDates, assertTeamStatisticsAccess, performanceLinkedRecords, filter } from '@/lib/performanceStore.server'
 import { collectFirestorePages, readFirestoreReferences } from '@/lib/platform/firestoreQueries.server'
 import { NextResponse } from 'next/server';
+import { completedTaskTrend } from '@/lib/client/reportTrends';
 import { getAuthAndDatabase } from '@/lib/auth';
 import { getDateTimePartsInTimezone, getTodayDateString } from '@/lib/timezone';
 
@@ -316,6 +317,7 @@ export async function GET(request) {
         priorityBreakdown,
         departmentBreakdown,
         employeeBreakdown,
+        dailyTrend: completedTaskTrend(tasks, startDate, endDate),
         dateRange: { startDate, endDate }
       }
     });

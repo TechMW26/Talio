@@ -1,7 +1,10 @@
 'use client'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, NativeInput, Heading2, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
@@ -137,70 +140,42 @@ export default function SandboxPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <Heading1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             Ideas Sandbox
-          </h1>
+          </Heading1>
           <p className="text-gray-600 mt-1 flex items-center gap-2">
             Share your innovative ideas with the team
             <BackgroundRefreshIndicator isValidating={isValidating} />
           </p>
         </div>
 
-        <button
+        <NativeButton
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-white text-black border border-gray-300 rounded-lg font-medium hover:bg-blue-600 hover:text-black hover:border-blue-600 transition-colors"
         >
           <HiOutlinePlus className="w-5 h-5" />
           New Idea
-        </button>
+        </NativeButton>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{ideas.length}</p>
-              <p className="text-sm text-gray-500">Total Ideas</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Total Ideas</>} value={<>{ideas.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{myIdeas.length}</p>
-              <p className="text-sm text-gray-500">My Ideas</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>My Ideas</>} value={<>{myIdeas.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{pinnedIdeas.length}</p>
-              <p className="text-sm text-gray-500">Pinned</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Pinned</>} value={<>{pinnedIdeas.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{totalVotes}</p>
-              <p className="text-sm text-gray-500">Total Votes</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Total Votes</>} value={<>{totalVotes}</>} />
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <Surface className="bg-white rounded-lg shadow-md p-4 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="input-with-icon flex-1">
             <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-            <input
+            <NativeInput
               type="text"
               placeholder="Search ideas..."
               value={searchQuery}
@@ -211,8 +186,8 @@ export default function SandboxPage() {
 
           {/* Filters */}
           <div className="flex flex-wrap gap-2">
-            <div className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
-              <button
+            <Surface className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
+              <NativeButton
                 onClick={() => setFilter(prev => ({ ...prev, tab: 'all' }))}
                 className={`px-4 py-2.5 text-sm font-medium transition-colors ${filter.tab === 'all'
                   ? 'bg-blue-600 text-white'
@@ -220,8 +195,8 @@ export default function SandboxPage() {
                   }`}
               >
                 All Ideas
-              </button>
-              <button
+              </NativeButton>
+              <NativeButton
                 onClick={() => setFilter(prev => ({ ...prev, tab: 'my' }))}
                 className={`px-4 py-2.5 text-sm font-medium transition-colors ${filter.tab === 'my'
                   ? 'bg-blue-600 text-white'
@@ -229,10 +204,10 @@ export default function SandboxPage() {
                   }`}
               >
                 My Ideas
-              </button>
-            </div>
+              </NativeButton>
+            </Surface>
 
-            <button
+            <NativeButton
               onClick={() => setFilter(prev => ({ ...prev, pinned: !prev.pinned }))}
               className={`px-4 py-2.5 border rounded-lg flex items-center gap-2 transition-colors ${filter.pinned
                 ? 'bg-blue-600 border-blue-600 text-white'
@@ -241,35 +216,35 @@ export default function SandboxPage() {
             >
               <HiOutlineFunnel className="w-4 h-4" />
               Filters
-            </button>
+            </NativeButton>
           </div>
         </div>
-      </div>
+      </Surface>
 
       {/* Ideas List */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">
+        <Heading2 className="text-lg font-semibold text-gray-800 mb-3">
           {filter.tab === 'my' ? 'My Ideas' : 'All Ideas'}
-        </h2>
+        </Heading2>
 
         {error ? (
           <DataErrorState message="Failed to load ideas" onRetry={() => refresh()} />
         ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
+              <Surface key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
                 <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
                 <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
                 <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-              </div>
+              </Surface>
             ))}
           </div>
         ) : ideas.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+          <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
             <HiOutlineLightBulb className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">
+            <Heading3 className="text-lg font-medium text-gray-800 mb-2">
               No ideas found
-            </h3>
+            </Heading3>
             <p className="text-gray-500 mb-4">
               {searchQuery ? 'Try adjusting your search' : 'Be the first to share an innovative idea!'}
             </p>
@@ -280,7 +255,7 @@ export default function SandboxPage() {
             >
               Share an Idea
             </Button>
-          </div>
+          </Surface>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {ideas.map(idea => (
@@ -307,23 +282,23 @@ export default function SandboxPage() {
         {/* Pagination */}
         {paginationData.pages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-6">
-            <button
+            <NativeButton
               onClick={() => setPage(p => p - 1)}
               disabled={page === 1}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
             >
               <HiOutlineChevronLeft className="w-5 h-5 text-gray-600" />
-            </button>
+            </NativeButton>
             <span className="text-sm text-gray-600">
               Page {page} of {paginationData.pages}
             </span>
-            <button
+            <NativeButton
               onClick={() => setPage(p => p + 1)}
               disabled={page === paginationData.pages}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
             >
               <HiOutlineChevronRight className="w-5 h-5 text-gray-600" />
-            </button>
+            </NativeButton>
           </div>
         )}
       </div>

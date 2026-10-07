@@ -1,7 +1,10 @@
 'use client'
 
+
+import { Heading1, Heading2, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import {
@@ -658,9 +661,9 @@ export default function PayrollPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-foreground">
             {isAdmin ? 'Process Payroll' : 'My Payroll'}
-          </h1>
+          </Heading1>
           <p className="text-sm sm:text-base text-default-500 mt-1">
             {isAdmin
               ? 'Manage and process employee payrolls'
@@ -898,9 +901,9 @@ export default function PayrollPage() {
       {/* Payroll Table */}
       <HRMSCard>
         <HRMSCardHeader className="flex justify-between items-center">
-          <h2 className="text-base sm:text-xl font-semibold text-foreground">
+          <Heading2 className="text-base sm:text-xl font-semibold text-foreground">
             {isAdmin ? `Payroll Records - ${getMonthName(selectedMonth)} ${selectedYear}` : 'Salary Slips'}
-          </h2>
+          </Heading2>
         </HRMSCardHeader>
         <Divider />
         <HRMSCardBody className="p-0">
@@ -957,7 +960,7 @@ export default function PayrollPage() {
                       {isAdmin && (
                         <TableCell>
                           <div className="font-medium text-foreground text-xs sm:text-sm">
-                            {payroll.employee?.firstName} {payroll.employee?.lastName}
+                            {payroll.employee?._id ? <Link href={`/dashboard/team/members/${encodeURIComponent(payroll.employee._id)}`} className="text-primary hover:underline">{payroll.employee.firstName} {payroll.employee.lastName}</Link> : 'Employee unavailable'}
                           </div>
                           <div className="text-xs text-default-400">
                             {payroll.employee?.employeeCode}
@@ -1072,7 +1075,7 @@ export default function PayrollPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Earnings Section */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-foreground border-b border-divider pb-2">Earnings</h3>
+                    <Heading3 className="text-lg font-semibold text-foreground border-b border-divider pb-2">Earnings</Heading3>
                     <HRMSInput
                       type="number"
                       label="Basic Salary"
@@ -1119,7 +1122,7 @@ export default function PayrollPage() {
 
                   {/* Deductions Section */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-foreground border-b border-divider pb-2">Deductions</h3>
+                    <Heading3 className="text-lg font-semibold text-foreground border-b border-divider pb-2">Deductions</Heading3>
                     <HRMSInput
                       type="number"
                       label="PF"
@@ -1198,7 +1201,7 @@ export default function PayrollPage() {
                 {/* Summary */}
                 <HRMSCard className="mt-6 bg-default-50">
                   <HRMSCardBody>
-                    <h3 className="text-lg font-semibold text-foreground mb-4">Summary</h3>
+                    <Heading3 className="text-lg font-semibold text-foreground mb-4">Summary</Heading3>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
                         <p className="text-sm text-default-500">Gross Salary</p>

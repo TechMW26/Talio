@@ -1,6 +1,6 @@
 'use client'
 
-import HeroModal from '@/components/ui/HeroModal'
+import { Modal as HeroModal } from '@/components/ui/fernly'
 import {
   ModalContent as HeroModalContent,
   ModalHeader as HeroModalHeader,

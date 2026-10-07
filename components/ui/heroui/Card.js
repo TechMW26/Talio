@@ -1,6 +1,7 @@
 'use client'
 
-import { Card as HeroCard, CardHeader as HeroCardHeader, CardBody as HeroCardBody, CardFooter as HeroCardFooter } from '@heroui/react'
+import { Card as HeroCard, SummaryCard } from '@/components/ui/fernly'
+import { CardHeader as HeroCardHeader, CardBody as HeroCardBody, CardFooter as HeroCardFooter } from '@heroui/react'
 import { cn } from '@/utils/cn'
 
 /**
@@ -97,79 +98,10 @@ export function KPICard({
   onClick,
   ...props 
 }) {
-  const colorStyles = {
-    primary: 'from-primary-500 to-primary-600',
-    secondary: 'from-secondary-500 to-secondary-600',
-    success: 'from-success-500 to-success-600',
-    warning: 'from-warning-500 to-warning-600',
-    danger: 'from-danger-500 to-danger-600',
-  }
-
-  const iconBgStyles = {
-    primary: 'bg-primary-100 text-primary-600',
-    secondary: 'bg-secondary-100 text-secondary-600',
-    success: 'bg-success-100 text-success-600',
-    warning: 'bg-warning-100 text-warning-600',
-    danger: 'bg-danger-100 text-danger-600',
-  }
-
-  // Render icon - handles both component references and JSX elements
-  const renderIcon = () => {
-    if (!icon) return null
-    
-    // Check if icon is a React element (JSX)
-    if (typeof icon === 'object' && icon.$$typeof) {
-      return icon
-    }
-    
-    // Otherwise, treat as a component reference
-    const IconComponent = icon
-    return <IconComponent className="w-6 h-6" />
-  }
-
-  return (
-    <HRMSCard 
-      className={cn('overflow-hidden', className)} 
-      isPressable={!!onClick}
-      onClick={onClick}
-      {...props}
-    >
-      <HRMSCardBody className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-default-500 mb-1">
-              {title}
-            </p>
-            <p className="text-2xl font-bold text-default-900">
-              {value}
-            </p>
-            {subtitle && (
-              <p className="text-xs text-default-400 mt-1">
-                {subtitle}
-              </p>
-            )}
-            {trend && (
-              <div className={cn(
-                'flex items-center gap-1 mt-2 text-xs font-medium',
-                trend === 'up' ? 'text-success-600' : 'text-danger-600'
-              )}>
-                <span>{trend === 'up' ? '↑' : '↓'}</span>
-                <span>{trendValue}</span>
-              </div>
-            )}
-          </div>
-          {icon && (
-            <div className={cn(
-              'p-3 rounded-xl',
-              iconBgStyles[color]
-            )}>
-              {renderIcon()}
-            </div>
-          )}
-        </div>
-      </HRMSCardBody>
-    </HRMSCard>
-  )
+  return <SummaryCard label={title} value={value} className={className} onClick={onClick} {...props}>
+    {subtitle && <p>{subtitle}</p>}
+    {trend && <p className={trend === 'up' ? 'text-success-600' : 'text-danger-600'}>{trend === 'up' ? '↑' : '↓'} {trendValue}</p>}
+  </SummaryCard>
 }
 
 /**

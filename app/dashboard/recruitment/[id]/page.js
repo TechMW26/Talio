@@ -1,15 +1,20 @@
 'use client';
+import { Surface } from '@/components/ui/fernly'
 
+
+
+import { UploadInput } from '@/components/ui/UploadButton'
+import { Heading1, Heading2, Heading3, NativeInput } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button, Chip, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Input, Select, SelectItem, useDisclosure, Divider, Card, CardBody,
   CardHeader, Skeleton, Tooltip
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
@@ -187,7 +192,7 @@ export default function JobDetailPage() {
             </Button>
             <div>
               <div className="flex items-center flex-wrap gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-default-800">{job.jobTitle}</h1>
+                <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">{job.jobTitle}</Heading1>
                 <Chip size="sm" variant="flat" color={STATUS_COLORS[job.status] || 'default'} className="capitalize">
                   {job.status}
                 </Chip>
@@ -239,7 +244,7 @@ export default function JobDetailPage() {
                 <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
                   <div className="flex items-center gap-2">
                     <FaChartBar className="w-4 h-4 text-primary" />
-                    <h2 className="text-base font-semibold text-default-800">Candidate Pipeline</h2>
+                    <Heading2 className="text-base font-semibold text-default-800">Candidate Pipeline</Heading2>
                     <Chip size="sm" variant="flat" color="primary">{job.candidateCount || 0} total</Chip>
                   </div>
                 </CardHeader>
@@ -249,10 +254,10 @@ export default function JobDetailPage() {
                       const count = job.pipeline[stage] || 0;
                       if (count === 0 && !['applied', 'screening', 'interview', 'offer', 'hired'].includes(stage)) return null;
                       return (
-                        <div key={stage} className="text-center p-2 sm:p-3 rounded-lg bg-default-50">
+                        <Surface key={stage} className="text-center p-2 sm:p-3 rounded-lg bg-default-50">
                           <p className="text-lg sm:text-xl font-bold text-default-800">{count}</p>
                           <Chip size="sm" variant="flat" color={STAGE_COLORS[stage]} className="capitalize mt-1">{stage}</Chip>
-                        </div>
+                        </Surface>
                       );
                     })}
                   </div>
@@ -264,7 +269,7 @@ export default function JobDetailPage() {
             {job.jobDescription && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-                  <h2 className="text-base font-semibold text-default-800">Job Description</h2>
+                  <Heading2 className="text-base font-semibold text-default-800">Job Description</Heading2>
                 </CardHeader>
                 <CardBody className="p-4 sm:p-5">
                   <p className="text-sm text-default-600 whitespace-pre-wrap leading-relaxed">{job.jobDescription}</p>
@@ -277,7 +282,7 @@ export default function JobDetailPage() {
               {job.requirements?.length > 0 && (
                 <Card shadow="sm">
                   <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-                    <h2 className="text-base font-semibold text-default-800">Requirements</h2>
+                    <Heading2 className="text-base font-semibold text-default-800">Requirements</Heading2>
                   </CardHeader>
                   <CardBody className="p-4 sm:p-5">
                     <ul className="space-y-2">
@@ -295,7 +300,7 @@ export default function JobDetailPage() {
               {job.responsibilities?.length > 0 && (
                 <Card shadow="sm">
                   <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
-                    <h2 className="text-base font-semibold text-default-800">Responsibilities</h2>
+                    <Heading2 className="text-base font-semibold text-default-800">Responsibilities</Heading2>
                   </CardHeader>
                   <CardBody className="p-4 sm:p-5">
                     <ul className="space-y-2">
@@ -315,7 +320,7 @@ export default function JobDetailPage() {
             {job.recentCandidates?.length > 0 && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3 flex justify-between items-center">
-                  <h2 className="text-base font-semibold text-default-800">Recent Candidates</h2>
+                  <Heading2 className="text-base font-semibold text-default-800">Recent Candidates</Heading2>
                   <Button size="sm" variant="light" color="primary" onPress={() => router.push(`/dashboard/recruitment/candidates?jobPosting=${params.id}`)}>
                     View All
                   </Button>
@@ -354,7 +359,7 @@ export default function JobDetailPage() {
             {canManage && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Status Actions</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Status Actions</Heading3>
                 </CardHeader>
                 <CardBody className="p-4">
                   <div className="flex flex-wrap gap-2">
@@ -378,7 +383,7 @@ export default function JobDetailPage() {
             {/* Job Information */}
             <Card shadow="sm">
               <CardHeader className="border-b border-default-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-default-700">Job Information</h3>
+                <Heading3 className="text-sm font-semibold text-default-700">Job Information</Heading3>
               </CardHeader>
               <CardBody className="p-4 space-y-3">
                 {job.numberOfPositions > 0 && (
@@ -440,7 +445,7 @@ export default function JobDetailPage() {
             {job.skills?.length > 0 && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Required Skills</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Required Skills</Heading3>
                 </CardHeader>
                 <CardBody className="p-4">
                   <div className="flex flex-wrap gap-1.5">
@@ -456,7 +461,7 @@ export default function JobDetailPage() {
             {job.benefits?.length > 0 && (
               <Card shadow="sm">
                 <CardHeader className="border-b border-default-200 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-default-700">Benefits</h3>
+                  <Heading3 className="text-sm font-semibold text-default-700">Benefits</Heading3>
                 </CardHeader>
                 <CardBody className="p-4">
                   <ul className="space-y-1.5">
@@ -474,7 +479,7 @@ export default function JobDetailPage() {
             {/* Quick Links */}
             <Card shadow="sm">
               <CardHeader className="border-b border-default-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-default-700">Quick Links</h3>
+                <Heading3 className="text-sm font-semibold text-default-700">Quick Links</Heading3>
               </CardHeader>
               <CardBody className="p-4 space-y-2">
                 <Button size="sm" variant="flat" fullWidth onPress={() => router.push(`/dashboard/recruitment/candidates?jobPosting=${params.id}`)} startContent={<FaUsers className="w-3.5 h-3.5" />}>
@@ -511,7 +516,7 @@ export default function JobDetailPage() {
                 </div>
                 <div className="sm:col-span-2 rounded-xl border border-default-200 p-3">
                   <label className="block text-sm font-medium text-default-700" htmlFor="candidate-resume">Candidate CV / resume</label>
-                  <input
+                  <UploadInput
                     id="candidate-resume"
                     type="file"
                     accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"

@@ -1,7 +1,10 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaEye, FaFileInvoiceDollar, FaUser } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
@@ -65,7 +68,7 @@ export default function ExpenseApprovalsPage() {
         </div>
         <div className="grid gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-200 space-y-3">
+            <Surface key={i} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-200 space-y-3">
               <div className="flex gap-3">
                 <Skeleton className="w-16 h-5 rounded" />
                 <Skeleton className="w-24 h-5 rounded" />
@@ -79,7 +82,7 @@ export default function ExpenseApprovalsPage() {
               </div>
               <Skeleton className="h-5 w-40 rounded-lg" />
               <Skeleton className="h-8 w-24 rounded-lg" />
-            </div>
+            </Surface>
           ))}
         </div>
       </div>
@@ -97,7 +100,7 @@ export default function ExpenseApprovalsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Expense Approvals</h1>
+        <Heading1 className="text-2xl font-bold text-gray-800">Expense Approvals</Heading1>
         <p className="text-gray-600 flex items-center gap-2">
           Review and approve employee expense claims
           <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -105,14 +108,14 @@ export default function ExpenseApprovalsPage() {
       </div>
 
       {expenses.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+        <Surface className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
           <FaFileInvoiceDollar className="mx-auto text-4xl mb-4 text-gray-300" />
           <p>No pending expense requests found.</p>
-        </div>
+        </Surface>
       ) : (
         <div className="grid gap-4">
           {expenses.map((expense) => (
-            <div key={expense._id} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-400">
+            <Surface key={expense._id} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-400">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
@@ -129,9 +132,9 @@ export default function ExpenseApprovalsPage() {
                       <FaUser />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-800">
+                      <Heading3 className="font-semibold text-gray-800">
                         {expense.employee?.firstName} {expense.employee?.lastName}
-                      </h3>
+                      </Heading3>
                       <p className="text-xs text-gray-500">{expense.employee?.employeeCode}</p>
                     </div>
                   </div>
@@ -171,7 +174,7 @@ export default function ExpenseApprovalsPage() {
                   </LoadingButton>
                 </div>
               </div>
-            </div>
+            </Surface>
           ))}
         </div>
       )}

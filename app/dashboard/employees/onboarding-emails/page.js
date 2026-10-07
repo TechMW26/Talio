@@ -1,9 +1,13 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Checkbox } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Checkbox } from '@/components/ui/fernly'
 import {
   HiOutlineEnvelope,
   HiOutlineCheckCircle,
@@ -283,9 +287,9 @@ export default function OnboardingEmailsPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-3">
+          <Heading1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-3">
             Onboarding Emails
-          </h1>
+          </Heading1>
           <p className="text-theme-text-secondary mt-1">
             Track and manage welcome emails sent to new employees
           </p>
@@ -319,7 +323,7 @@ export default function OnboardingEmailsPage() {
                 </p>
               </div>
             </div>
-            <button
+            <NativeButton
               onClick={handleToggleAutoSend}
               disabled={toggleAutoSendMutation.isLoading || user?.role !== 'admin'}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${autoSendEnabled ? 'bg-success' : 'bg-default-300'
@@ -330,7 +334,7 @@ export default function OnboardingEmailsPage() {
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoSendEnabled ? 'translate-x-6' : 'translate-x-1'
                   }`}
               />
-            </button>
+            </NativeButton>
           </div>
         </div>
       </div>
@@ -352,77 +356,13 @@ export default function OnboardingEmailsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card
-          shadow="sm"
-          isPressable
-          onPress={() => setStatusFilter('')}
-          className={`cursor-pointer transition-all ${statusFilter === ''
-            ? 'bg-secondary-50 border-secondary/30'
-            : 'border-default-200 hover:border-secondary/30'
-            }`}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-default-500 text-sm">Total</span>
-              <HiOutlineEnvelope className="w-5 h-5 text-secondary" />
-            </div>
-            <p className="text-2xl font-bold text-default-800 mt-1">{stats.total}</p>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" isPressable onPress={() => setStatusFilter('')} className="cursor-pointer" label={<>Total</>} value={<>{stats.total}</>} />
 
-        <Card
-          shadow="sm"
-          isPressable
-          onPress={() => setStatusFilter(statusFilter === 'sent' ? '' : 'sent')}
-          className={`cursor-pointer transition-all ${statusFilter === 'sent'
-            ? 'bg-success-50 border-success/30'
-            : 'border-default-200 hover:border-success/30'
-            }`}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-default-500 text-sm">Sent</span>
-              <HiOutlineCheckCircle className="w-5 h-5 text-success" />
-            </div>
-            <p className="text-2xl font-bold text-success mt-1">{stats.sent}</p>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" isPressable onPress={() => setStatusFilter(statusFilter === 'sent' ? '' : 'sent')} className="cursor-pointer" label={<>Sent</>} value={<>{stats.sent}</>} />
 
-        <Card
-          shadow="sm"
-          isPressable
-          onPress={() => setStatusFilter(statusFilter === 'failed' ? '' : 'failed')}
-          className={`cursor-pointer transition-all ${statusFilter === 'failed'
-            ? 'bg-danger-50 border-danger/30'
-            : 'border-default-200 hover:border-danger/30'
-            }`}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-default-500 text-sm">Failed</span>
-              <HiOutlineXCircle className="w-5 h-5 text-danger" />
-            </div>
-            <p className="text-2xl font-bold text-danger mt-1">{stats.failed}</p>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" isPressable onPress={() => setStatusFilter(statusFilter === 'failed' ? '' : 'failed')} className="cursor-pointer" label={<>Failed</>} value={<>{stats.failed}</>} />
 
-        <Card
-          shadow="sm"
-          isPressable
-          onPress={() => setStatusFilter(statusFilter === 'pending' ? '' : 'pending')}
-          className={`cursor-pointer transition-all ${statusFilter === 'pending'
-            ? 'bg-warning-50 border-warning/30'
-            : 'border-default-200 hover:border-warning/30'
-            }`}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-default-500 text-sm">Pending</span>
-              <HiOutlineClock className="w-5 h-5 text-warning" />
-            </div>
-            <p className="text-2xl font-bold text-warning mt-1">{stats.pending}</p>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" isPressable onPress={() => setStatusFilter(statusFilter === 'pending' ? '' : 'pending')} className="cursor-pointer" label={<>Pending</>} value={<>{stats.pending}</>} />
       </div>
 
       {/* Actions Bar */}
@@ -430,7 +370,7 @@ export default function OnboardingEmailsPage() {
         {/* Search */}
         <div className="input-with-icon flex-1">
           <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
-          <input
+          <NativeInput
             type="text"
             placeholder="Search by name, email, or employee code..."
             value={searchQuery}
@@ -491,11 +431,11 @@ export default function OnboardingEmailsPage() {
       <Card shadow="sm" className="overflow-hidden">
         <CardBody className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead>
                 <tr className="border-b border-default-200 bg-default-50">
                   <th className="px-4 py-3 text-left">
-                    <input
+                    <NativeInput
                       type="checkbox"
                       checked={selectAll}
                       onChange={handleSelectAll}
@@ -570,7 +510,7 @@ export default function OnboardingEmailsPage() {
                   emails.map((email) => (
                     <tr key={email._id} className="hover:bg-default-50 transition-colors">
                       <td className="px-4 py-3">
-                        <input
+                        <NativeInput
                           type="checkbox"
                           checked={selectedEmails.includes(email._id)}
                           onChange={() => handleSelectEmail(email._id)}
@@ -664,7 +604,7 @@ export default function OnboardingEmailsPage() {
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
 
           {/* Pagination */}
@@ -723,7 +663,7 @@ export default function OnboardingEmailsPage() {
                 <label className="block text-sm font-medium text-default-500 mb-2">
                   Employee Email Address
                 </label>
-                <input
+                <NativeInput
                   type="email"
                   value={sendEmailAddress}
                   onChange={(e) => setSendEmailAddress(e.target.value)}

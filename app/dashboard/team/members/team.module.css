@@ -1,6 +1,6 @@
 /* Team geometry adapted from Fernly, © 2026 Hasib (OVERSHOOT).
    Licensed source. Page-scoped, using Talio colours and typography. */
-.page { padding: 20px 0 32px; color: var(--color-text-primary); }
+.page { color: var(--color-text-primary); }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
 .header h1 { font-size: clamp(26px, 3vw, 34px); font-weight: 700; letter-spacing: -.035em; }
 .header p { margin-top: 6px; font-size: 14px; color: var(--color-text-secondary); }
@@ -49,3 +49,7 @@
 .skeleton p { margin-top: 18px; width: 65%; height: 16px; border-radius: 8px; background: var(--color-bg-hover); }
 @media (max-width: 640px) { .page { padding: 16px; } .header { align-items: stretch; flex-direction: column; gap: 16px; } .department, .search { width: 100%; max-width: none; } .toolbar { align-items: stretch; flex-direction: column; gap: 10px; } .grid { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .page *, .page *::before { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+.pagination { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 0; }
+.pagination button { border-radius: 999px; padding: 10px 24px; background: var(--color-primary, #2563eb); color: white; }
+.pagination button:disabled { opacity: .6; cursor: wait; }
+.pagination p { margin: 0; color: var(--color-danger, #f87171); }

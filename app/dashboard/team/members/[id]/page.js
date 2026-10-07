@@ -1,11 +1,15 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading3, NativeButton, Heading1, Heading2, NativeSelect, NativeTextarea } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { patchProfilePhotoResponse } from '@/lib/client/profilePhoto'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
-import { Select, SelectItem, Button, Skeleton, Card, CardBody, Chip } from '@heroui/react'
+import { Select, SelectItem, Button, Skeleton, Card, CardBody, Chip } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -20,13 +24,19 @@ import {
 } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
 import MemberOverview from './MemberOverview'
+import FernlyMotion from '@/components/ui/FernlyMotion'
 import MemberTaskList from './MemberTaskList'
 import MemberAttendance from './MemberAttendance'
+import MemberLifecycle from './MemberLifecycle'
+import MemberDetails from './MemberDetails'
+import MemberScreenshots from './MemberScreenshots'
+import EmployeeTabs from './EmployeeTabs'
 import styles from './member.module.css'
 
 export default function TeamMemberDetailsPage() {
   const router = useRouter()
   const params = useParams()
+  const [activeTab, setActiveTab] = useState('overview')
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [reviewForm, setReviewForm] = useState({
     type: 'review',
@@ -54,7 +64,7 @@ export default function TeamMemberDetailsPage() {
   }, [taskMonth, taskYear, taskStatus, taskProject, taskAssignedBy])
 
   const { data: tasksRes, isLoading: tasksLoading, error: tasksError, mutate: refreshTasks } = useAuthedSWR(
-    params.id ? `/api/team/members/${params.id}/tasks?${taskQueryString}` : null
+    params.id && activeTab === 'tasks' ? `/api/team/members/${params.id}/tasks?${taskQueryString}` : null
   )
   const memberTasks = tasksRes?.data?.tasks || []
   const monthStats = tasksRes?.data?.stats || {}
@@ -76,6 +86,23 @@ export default function TeamMemberDetailsPage() {
 
   const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/team/members/${params.id}` : null)
   const memberData = res?.data || null
+  useEffect(() => {
+    const applyPhoto = updatedUser => {
+      const ref = updatedUser?.employeeId
+      const employeeId = typeof ref === 'object' && ref ? ref._id || ref.id : ref
+      const photo = updatedUser?.profilePicture || (typeof ref === 'object' && ref?.profilePicture)
+      if (!photo || String(employeeId) !== String(params.id)) return
+      void refresh(cached => patchProfilePhotoResponse(cached, employeeId, photo), { revalidate: false })
+    }
+    const onUpdate = event => applyPhoto(event.detail)
+    const onStorage = event => {
+      if (event.key !== 'user' || !event.newValue) return
+      try { applyPhoto(JSON.parse(event.newValue)) } catch { /* Ignore malformed storage notifications. */ }
+    }
+    window.addEventListener('talio:user-updated', onUpdate)
+    window.addEventListener('storage', onStorage)
+    return () => { window.removeEventListener('talio:user-updated', onUpdate); window.removeEventListener('storage', onStorage) }
+  }, [params.id, refresh])
 
   const reviewMutation = useApiMutation({
     method: 'POST',
@@ -170,16 +197,16 @@ export default function TeamMemberDetailsPage() {
   if (!memberData) {
     return (
       <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <Surface className="bg-white rounded-lg shadow-md p-8 text-center">
           <FaExclamationCircle className="text-red-500 text-4xl mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Member Not Found</h3>
-          <button
+          <Heading3 className="text-lg font-semibold text-gray-700 mb-2">Member Not Found</Heading3>
+          <NativeButton
             onClick={() => router.back()}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Go Back
-          </button>
-        </div>
+          </NativeButton>
+        </Surface>
       </div>
     )
   }
@@ -190,39 +217,48 @@ export default function TeamMemberDetailsPage() {
   if (!employee) {
     return (
       <div className="p-6">
-        <button
+        <NativeButton
           onClick={() => router.back()}
           className="flex items-center text-blue-600 hover:text-blue-700 mb-4"
         >
           <BackIcon className="mr-2" />
           Go Back
-        </button>
+        </NativeButton>
         <p className="text-gray-600">Employee data not available</p>
       </div>
     )
   }
 
   return (
-    <div className={`${styles.page} px-4 py-4 sm:p-6 lg:p-8 pb-24 md:pb-6`}>
+    <FernlyMotion className={`${styles.page} ${styles.dashboard}`}>
       {/* Header */}
-      <div className={`${styles.hero} mb-6`}>
-        <button
+      <div className={styles.dashboardHeader}>
+        <NativeButton
           onClick={() => router.back()}
-          className="flex items-center text-blue-600 hover:text-blue-700 mb-4"
+          className={styles.backButton}
+          aria-label="Back to previous page"
+          title="Back to previous page"
         >
-          <BackIcon className="mr-2" />
-          Back to Team Members
-        </button>
+          <BackIcon aria-hidden="true" />
+        </NativeButton>
+        <div><Heading1>{employee.firstName} {employee.lastName}</Heading1><p>{employee.employeeCode} · {employee.department?.name || 'Department not recorded'} · {formatDesignation(employee.designation, employee)}</p></div>
+        <NativeButton onClick={() => refresh()} disabled={isValidating} aria-label="Refresh employee">↻</NativeButton>
       </div>
       <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
-      <MemberOverview employee={employee} stats={taskStats} />
+      <EmployeeTabs active={activeTab} onChange={setActiveTab} />
+      <div id={`employee-panel-${activeTab}`} role="tabpanel" aria-labelledby={`employee-tab-${activeTab}`} tabIndex={0} data-slide={activeTab} className={styles.slide} key={activeTab}>
+      {activeTab === 'overview' && <MemberOverview showHeading={false} onTasks={() => setActiveTab('tasks')} employee={employee} stats={taskStats} tasks={memberData.recentTasks || []} />}
+      {activeTab === 'profile' && <MemberDetails employee={employee} />}
+      {activeTab === 'assets' && <MemberDetails employee={employee} assetsOnly />}
+      {activeTab === 'lifecycle' && <MemberLifecycle key={employee._id} employeeId={employee._id} />}
+      {activeTab === 'screenshots' && <MemberScreenshots employee={employee} />}
 
       {/* Employee Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div hidden={!['overview', 'tasks', 'reviews'].includes(activeTab)} className={styles.legacyPanels}>
+        <div hidden={!['overview', 'tasks'].includes(activeTab)} className={styles.fillPanel}>
           {/* Basic Info */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Basic Information</h2>
+          <Surface hidden={activeTab !== 'overview'} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <Heading2 className="text-xl font-bold text-gray-900 mb-4">Basic Information</Heading2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-center text-gray-600">
                 <div>
@@ -268,32 +304,32 @@ export default function TeamMemberDetailsPage() {
                 </div>
               </div>
             )}
-          </div>
+          </Surface>
 
           {/* Member Tasks - Month Wise */}
-          <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-4 sm:p-6">
+          <Surface hidden={activeTab !== 'tasks'} id="member-tasks" data-fernly-element className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-4 sm:p-6">
             {/* Month Navigator */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 flex items-center">
+              <Heading2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 flex items-center">
                 Tasks
-              </h2>
+              </Heading2>
               <div className="flex items-center gap-2">
-                <button
+                <NativeButton
                   onClick={goToPrevMonth}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg text-gray-600 dark:text-zinc-400"
                 >
                   <FaChevronLeft className="w-3 h-3" />
-                </button>
+                </NativeButton>
                 <span className="text-sm font-medium text-gray-700 dark:text-zinc-300 min-w-[140px] text-center">
                   {monthLabel}
                 </span>
-                <button
+                <NativeButton
                   onClick={goToNextMonth}
                   disabled={isCurrentMonth}
                   className={`p-2 rounded-lg ${isCurrentMonth ? 'text-gray-300 dark:text-zinc-600 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-zinc-400'}`}
                 >
                   <FaChevronRight className="w-3 h-3" />
-                </button>
+                </NativeButton>
               </div>
             </div>
 
@@ -317,7 +353,7 @@ export default function TeamMemberDetailsPage() {
 
             {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-              <select
+              <NativeSelect
                 value={taskStatus}
                 onChange={e => setTaskStatus(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
@@ -328,9 +364,9 @@ export default function TeamMemberDetailsPage() {
                 <option value="review">Review</option>
                 <option value="completed">Completed</option>
                 <option value="blocked">Blocked</option>
-              </select>
+              </NativeSelect>
 
-              <select
+              <NativeSelect
                 value={taskProject}
                 onChange={e => setTaskProject(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
@@ -340,9 +376,9 @@ export default function TeamMemberDetailsPage() {
                 {filterOptions.projects.map(p => (
                   <option key={p._id} value={p._id}>{p.name}</option>
                 ))}
-              </select>
+              </NativeSelect>
 
-              <select
+              <NativeSelect
                 value={taskAssignedBy}
                 onChange={e => setTaskAssignedBy(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
@@ -351,7 +387,7 @@ export default function TeamMemberDetailsPage() {
                 {filterOptions.assigners.map(a => (
                   <option key={a._id} value={a._id}>{a.firstName} {a.lastName}</option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
 
             {/* Task List */}
@@ -366,24 +402,24 @@ export default function TeamMemberDetailsPage() {
             ) : (
               <MemberTaskList tasks={memberTasks} />
             )}
-          </div>
+          </Surface>
         </div>
 
         {/* Right Sidebar - Reviews */}
-        <div className="space-y-6">
+        <div hidden={activeTab !== 'reviews'} className={styles.fillPanel}>
           {/* Add Review Button */}
-          <button
+          <NativeButton
             onClick={() => setShowReviewForm(!showReviewForm)}
             className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center font-medium"
           >
             <FaComments className="mr-2" />
             {showReviewForm ? 'Cancel' : 'Add Review / Remark'}
-          </button>
+          </NativeButton>
 
           {/* Review Form */}
           {showReviewForm && (
-            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Add Review / Remark</h3>
+            <Surface className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+              <Heading3 className="text-lg font-bold text-gray-900 mb-4">Add Review / Remark</Heading3>
 
               {/* Type Selection */}
               <div className="mb-4">
@@ -424,7 +460,7 @@ export default function TeamMemberDetailsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <button
+                      <NativeButton
                         key={star}
                         type="button"
                         onClick={() => setReviewForm({ ...reviewForm, rating: star })}
@@ -434,7 +470,7 @@ export default function TeamMemberDetailsPage() {
                           className={`text-2xl ${star <= reviewForm.rating ? 'text-yellow-400' : 'text-gray-300'
                             }`}
                         />
-                      </button>
+                      </NativeButton>
                     ))}
                   </div>
                 </div>
@@ -443,7 +479,7 @@ export default function TeamMemberDetailsPage() {
               {/* Content */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
-                <textarea
+                <NativeTextarea
                   value={reviewForm.content}
                   onChange={(e) => setReviewForm({ ...reviewForm, content: e.target.value })}
                   rows={4}
@@ -462,12 +498,12 @@ export default function TeamMemberDetailsPage() {
                 <FaPaperPlane className="mr-2" />
                 Submit
               </LoadingButton>
-            </div>
+            </Surface>
           )}
 
           {/* Reviews History */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Reviews & Remarks</h3>
+          <Surface className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <Heading3 className="text-lg font-bold text-gray-900 mb-4">Reviews & Remarks</Heading3>
             {!employee.reviews || employee.reviews.length === 0 ? (
               <p className="text-gray-600 text-center py-4">No reviews yet</p>
             ) : (
@@ -497,11 +533,11 @@ export default function TeamMemberDetailsPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Surface>
         </div>
       </div>
-      <MemberAttendance key={employee._id} employee={employee} />
-    </div>
+      {activeTab === 'attendance' && <MemberAttendance key={employee._id} employee={employee} showProductivity={false} />}
+      </div>
+    </FernlyMotion>
   )
 }
-

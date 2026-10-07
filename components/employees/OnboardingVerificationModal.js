@@ -1,7 +1,9 @@
 'use client'
 
+
+import { UploadInput } from '@/components/ui/UploadButton'
 import { useEffect, useMemo, useState } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button,
   Chip,
@@ -11,7 +13,7 @@ import {
   ModalFooter,
   ModalHeader,
   Textarea,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import { FaCheck, FaFileAlt, FaLock, FaRedo, FaUpload } from 'react-icons/fa'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
 import {
@@ -246,7 +248,7 @@ export default function OnboardingVerificationModal({ isOpen, item, profilePhone
                         </span>
                         {existing && !selected && <FaCheck className="text-success" />}
                         {existing && <button type="button" className="text-xs text-primary" onClick={event => { event.preventDefault(); downloadDocumentFile(existing).catch(error => toast.error(error.message)) }}>View file</button>}
-                        <input
+                        <UploadInput
                           type="file"
                           disabled={isProcessing || Boolean(uploadingKey)}
                           className="sr-only"

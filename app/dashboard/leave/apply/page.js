@@ -1,9 +1,11 @@
 'use client'
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem, Checkbox } from '@heroui/react'
+import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCalendarAlt, FaPlus, FaCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
@@ -29,9 +31,6 @@ export default function ApplyLeavePage() {
     startDate: '',
     endDate: '',
     reason: '',
-    isHalfDay: false,
-    halfDayPeriod: 'morning', // morning or afternoon
-    workFromHome: false,
     emergencyContact: '',
     handoverNotes: '',
   })
@@ -42,31 +41,21 @@ export default function ApplyLeavePage() {
   const { data: leaveBalanceRes, error: leaveBalanceError, isLoading: leaveBalanceLoading, isValidating: leaveBalanceValidating, mutate: refreshBalance } = useAuthedSWR(
     employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${balanceYear}` : null
   )
-  const {
-    data: halfDayBalanceRes,
-    error: halfDayBalanceError,
-    isLoading: halfDayBalanceLoading,
-    isValidating: halfDayBalanceValidating,
-    mutate: refreshHalfDayBalance,
-  } = useAuthedSWR(
-    employeeId ? `/api/leave/half-day-balance?year=${balanceYear}` : null
-  )
 
   const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
   const leaveBalance = useMemo(
     () => normalizeLeaveBalances(leaveBalanceRes?.data || []),
     [leaveBalanceRes]
   )
-  const loading = leaveTypesLoading || leaveBalanceLoading || halfDayBalanceLoading
-  const isValidating = leaveTypesValidating || leaveBalanceValidating || halfDayBalanceValidating
-  const error = leaveTypesError || leaveBalanceError || halfDayBalanceError
+  const loading = leaveTypesLoading || leaveBalanceLoading
+  const isValidating = leaveTypesValidating || leaveBalanceValidating
+  const error = leaveTypesError || leaveBalanceError
 
   // Submit mutation
   const submitLeave = useApiMutation({
     method: 'POST',
     invalidateKeys: [
       employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${balanceYear}` : null,
-      employeeId ? `/api/leave/half-day-balance?year=${balanceYear}` : null,
       /^\/api\/leave/,
     ].filter(Boolean),
     onSuccess: () => {
@@ -76,9 +65,6 @@ export default function ApplyLeavePage() {
         startDate: '',
         endDate: '',
         reason: '',
-        isHalfDay: false,
-        halfDayPeriod: 'morning',
-        workFromHome: false,
         emergencyContact: '',
         handoverNotes: '',
       })
@@ -96,51 +82,17 @@ export default function ApplyLeavePage() {
   }, [employeeId, user])
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target
-
-    // If checking Half Day or Work From Home, clear the leave type
-    if (name === 'isHalfDay' && checked) {
-      setFormData(prev => ({
-        ...prev,
-        [name]: checked,
-        leaveType: '',
-        workFromHome: false
-      }))
-    } else if (name === 'workFromHome' && checked) {
-      setFormData(prev => ({
-        ...prev,
-        [name]: checked,
-        leaveType: '',
-        isHalfDay: false
-      }))
-    } else if (name === 'isHalfDay' && !checked) {
-      setFormData(prev => ({
-        ...prev,
-        [name]: checked
-      }))
-    } else if (name === 'workFromHome' && !checked) {
-      setFormData(prev => ({
-        ...prev,
-        [name]: checked
-      }))
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value,
-        ...(name === 'startDate' && prev.isHalfDay ? { endDate: value } : {}),
-      }))
-    }
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   const calculateDays = () => calculateLeaveDays(
     formData.startDate,
-    formData.endDate || formData.startDate,
-    formData.isHalfDay
+    formData.endDate,
+    false
   )
 
   const getAvailableBalance = () => {
-    if (formData.isHalfDay) return halfDayBalanceRes?.data?.remaining ?? 0
-    if (formData.workFromHome) return 'Unlimited'
     if (!formData.leaveType) return 0
     const balance = leaveBalance.find(balanceItem =>
       String(balanceItem.leaveType?._id || balanceItem.leaveType) === String(formData.leaveType)
@@ -154,7 +106,12 @@ export default function ApplyLeavePage() {
     const days = calculateDays()
     const availableBalance = getAvailableBalance()
 
-    // Validation
+    // Full-day leave requires a leave type; WFH and half-day have separate flows.
+    if (!formData.leaveType) {
+      toast.error('Please select a leave type')
+      return
+    }
+
     if (days === 0) {
       toast.error('Please select valid dates')
       return
@@ -164,15 +121,13 @@ export default function ApplyLeavePage() {
       toast.error(`Insufficient leave balance. Available: ${availableBalance} days`)
       return
     }
-    if (formData.isHalfDay && Number(availableBalance) < 1) {
-      toast.error('No half-day balance remains for the selected year')
-      return
-    }
 
 
     await submitLeave.execute('/api/leave', {
       ...formData,
-      requestType: formData.isHalfDay ? 'half_day' : formData.workFromHome ? 'work_from_home' : 'leave',
+      requestType: 'leave',
+      isHalfDay: false,
+      workFromHome: false,
       employee: employeeId,
       numberOfDays: days,
     })
@@ -187,7 +142,7 @@ export default function ApplyLeavePage() {
   }
 
   if (error) {
-    return <DataErrorState error={error} onRetry={() => { refreshBalance(); refreshHalfDayBalance() }} />
+    return <DataErrorState error={error} onRetry={() => refreshBalance()} />
   }
 
   if (loading) {
@@ -220,7 +175,7 @@ export default function ApplyLeavePage() {
           <BackIcon className="w-4 h-4 sm:w-5 sm:h-5" />
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-default-800 truncate">Apply for Leave</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800 truncate">Apply for Leave</Heading1>
           <p className="text-default-500 mt-1 text-sm sm:text-base">Submit your leave application for approval</p>
         </div>
       </div>
@@ -236,11 +191,10 @@ export default function ApplyLeavePage() {
                   <div>
                     <Select
                       label="Leave Type"
-                      placeholder={formData.isHalfDay || formData.workFromHome ? 'Not applicable for Half Day/WFH' : 'Select Leave Type'}
+                      placeholder="Select Leave Type"
                       selectedKeys={formData.leaveType ? [formData.leaveType] : []}
                       onSelectionChange={(keys) => setFormData({ ...formData, leaveType: Array.from(keys)[0] || '' })}
-                      isRequired={!formData.isHalfDay && !formData.workFromHome}
-                      isDisabled={formData.isHalfDay || formData.workFromHome}
+                      isRequired
                     >
                       {leaveTypes.map((type) => (
                         <SelectItem key={type._id} textValue={`${type.name} (${type.code})`}>
@@ -248,60 +202,7 @@ export default function ApplyLeavePage() {
                         </SelectItem>
                       ))}
                     </Select>
-                    {(formData.isHalfDay || formData.workFromHome) && (
-                      <p className="text-xs text-default-500 mt-1">
-                        Leave type is not required for {formData.isHalfDay ? 'Half Day' : 'Work From Home'} requests
-                      </p>
-                    )}
                   </div>
-
-                  {/* Half Day Option */}
-                  <Checkbox
-                    isSelected={formData.isHalfDay}
-                    onValueChange={(checked) => {
-                      if (checked) {
-                        setFormData(prev => ({
-                          ...prev,
-                          isHalfDay: true,
-                          leaveType: '',
-                          workFromHome: false,
-                          endDate: prev.startDate || prev.endDate,
-                        }))
-                      } else {
-                        setFormData(prev => ({ ...prev, isHalfDay: false }))
-                      }
-                    }}
-                    isDisabled={formData.workFromHome}
-                  >
-                    Half Day Leave
-                  </Checkbox>
-
-                  {/* Work From Home Option */}
-                  <Checkbox
-                    isSelected={formData.workFromHome}
-                    onValueChange={(checked) => {
-                      if (checked) {
-                        setFormData(prev => ({ ...prev, workFromHome: true, leaveType: '', isHalfDay: false }))
-                      } else {
-                        setFormData(prev => ({ ...prev, workFromHome: false }))
-                      }
-                    }}
-                    isDisabled={formData.isHalfDay}
-                  >
-                    Work From Home
-                  </Checkbox>
-
-                  {/* Half Day Period */}
-                  {formData.isHalfDay && (
-                    <Select
-                      label="Half Day Period"
-                      selectedKeys={[formData.halfDayPeriod]}
-                      onSelectionChange={(keys) => setFormData({ ...formData, halfDayPeriod: Array.from(keys)[0] })}
-                    >
-                      <SelectItem key="morning">Morning (First Half)</SelectItem>
-                      <SelectItem key="afternoon">Afternoon (Second Half)</SelectItem>
-                    </Select>
-                  )}
 
                   {/* Date Range */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -320,7 +221,6 @@ export default function ApplyLeavePage() {
                       value={formData.endDate}
                       onChange={handleChange}
                       min={formData.startDate || undefined}
-                      isDisabled={formData.isHalfDay}
                       isRequired
                     />
                   </div>
@@ -333,11 +233,7 @@ export default function ApplyLeavePage() {
                           Total Days: {calculateDays()} day{calculateDays() !== 1 ? 's' : ''}
                         </span>
                         <span className="text-sm text-primary-600">
-                          {formData.isHalfDay
-                            ? `Half Days Remaining: ${getAvailableBalance()}`
-                            : formData.workFromHome
-                              ? 'Balance: Not deducted'
-                              : `Available Balance: ${getAvailableBalance()} days`}
+                          {`Available Balance: ${getAvailableBalance()} days`}
                         </span>
                       </div>
                     </div>
@@ -400,7 +296,7 @@ export default function ApplyLeavePage() {
         <div className="lg:col-span-1">
           <Card shadow="sm">
             <CardBody className="p-6">
-              <h3 className="text-lg font-semibold text-default-800 mb-4">Leave Balance</h3>
+              <Heading3 className="text-lg font-semibold text-default-800 mb-4">Leave Balance</Heading3>
               {leaveBalance.length === 0 ? (
                 <p className="text-default-500 text-sm">No leave balance found</p>
               ) : (

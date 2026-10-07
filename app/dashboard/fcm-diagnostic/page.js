@@ -1,5 +1,8 @@
 'use client'
 
+import { NativeTable } from '@/components/ui/fernly'
+
+import { Heading1, Heading2, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useEffect, useState, useMemo } from 'react'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -126,11 +129,11 @@ export default function FCMDiagnosticPage() {
 
     return (
         <div style={{ padding: '20px', fontFamily: 'monospace' }}>
-            <h1>🔍 FCM Diagnostic Tool</h1>
+            <Heading1>🔍 FCM Diagnostic Tool</Heading1>
 
             <div style={{ background: '#f5f5f5', padding: '15px', marginTop: '20px', borderRadius: '8px' }}>
-                <h2>Status</h2>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <Heading2>Status</Heading2>
+                <NativeTable style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>
                         <tr>
                             <td style={{ padding: '8px', borderBottom: '1px solid #ddd' }}><strong>Android FCM Interface:</strong></td>
@@ -155,12 +158,12 @@ export default function FCMDiagnosticPage() {
                             <td style={{ padding: '8px', borderBottom: '1px solid #ddd' }}>{diagnostics.registrationStatus || 'Not registered'}</td>
                         </tr>
                     </tbody>
-                </table>
+                </NativeTable>
             </div>
 
             <div style={{ marginTop: '30px' }}>
-                <h2>Actions</h2>
-                <button
+                <Heading2>Actions</Heading2>
+                <NativeButton
                     onClick={forceRegisterToken}
                     disabled={registerMutation.isLoading}
                     style={{
@@ -175,9 +178,9 @@ export default function FCMDiagnosticPage() {
                     }}
                 >
                     {registerMutation.isLoading ? '\u23f3 Registering...' : '\ud83d\udcdd Register FCM Token'}
-                </button>
+                </NativeButton>
 
-                <button
+                <NativeButton
                     onClick={sendTestNotification}
                     disabled={testMutation.isLoading}
                     style={{
@@ -192,9 +195,9 @@ export default function FCMDiagnosticPage() {
                     }}
                 >
                     {testMutation.isLoading ? '\u23f3 Sending...' : '\ud83e\uddea Send Test Notification'}
-                </button>
+                </NativeButton>
 
-                <button
+                <NativeButton
                     onClick={checkFCMStatus}
                     style={{
                         padding: '12px 24px',
@@ -207,11 +210,11 @@ export default function FCMDiagnosticPage() {
                     }}
                 >
                     🔄 Refresh Status
-                </button>
+                </NativeButton>
             </div>
 
             <div style={{ marginTop: '30px', background: '#fff3cd', padding: '15px', borderRadius: '8px' }}>
-                <h3>⚠️ Troubleshooting Steps:</h3>
+                <Heading3>⚠️ Troubleshooting Steps:</Heading3>
                 <ol>
                     <li><strong>Check Notification Permission:</strong> Go to Android Settings → Apps → Talio → Notifications → Make sure "All Talio notifications" is ON</li>
                     <li><strong>Check Battery Optimization:</strong> Settings → Apps → Talio → Battery → Unrestricted</li>
@@ -222,9 +225,9 @@ export default function FCMDiagnosticPage() {
             </div>
 
             <div style={{ marginTop: '20px', background: '#f8d7da', padding: '15px', borderRadius: '8px' }}>
-                <h3>🗑️ Clear FCM Tokens from Database</h3>
+                <Heading3>🗑️ Clear FCM Tokens from Database</Heading3>
                 <p>If you want to start fresh, you can clear all FCM tokens and re-register.</p>
-                <button
+                <NativeButton
                     onClick={async () => {
                         if (!confirm('Are you sure you want to clear all FCM tokens? You will need to re-register.')) return
                         clearMutation.execute('/api/fcm/token', null, { method: 'DELETE' })
@@ -240,7 +243,7 @@ export default function FCMDiagnosticPage() {
                     }}
                 >
                     🗑️ Clear All FCM Tokens
-                </button>
+                </NativeButton>
             </div>
         </div>
     )

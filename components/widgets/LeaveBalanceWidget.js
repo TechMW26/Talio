@@ -4,7 +4,7 @@ import widgetStyles from './WidgetDesign.module.css'
 
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { FaCalendarAlt } from 'react-icons/fa'
-import { Card, CardBody, Progress, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Progress, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 import { normalizeLeaveBalances } from '@/lib/leaveData'
 
 export default function LeaveBalanceWidget({ employeeId, initialData }) {

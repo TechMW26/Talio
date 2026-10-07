@@ -1,5 +1,8 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
 
+
+import { Heading2, NativeButton, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { 
@@ -157,21 +160,21 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
       />
       
       {/* Modal */}
-      <div className="relative bg-white rounded-[30px] animate-modal-enter shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogSurface className="relative bg-white rounded-[30px] animate-modal-enter shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header - Compact */}
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
               <HiOutlineLightBulb className="w-4 h-4 text-amber-600" />
             </div>
-            <h2 className="text-base font-semibold text-gray-800">New Idea</h2>
+            <Heading2 className="text-base font-semibold text-gray-800">New Idea</Heading2>
           </div>
-          <button
+          <NativeButton
             onClick={onClose}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <HiOutlineXMark className="w-5 h-5 text-gray-500" />
-          </button>
+          </NativeButton>
         </div>
 
         {/* Body - Scrollable */}
@@ -180,7 +183,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
             {/* Title */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Title *</label>
-              <input
+              <NativeInput
                 type="text"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -195,7 +198,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
               <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
               <div className="grid grid-cols-5 gap-1.5">
                 {CATEGORIES.map(({ value, label, Icon }) => (
-                  <button
+                  <NativeButton
                     key={value}
                     type="button"
                     onClick={() => setFormData({ ...formData, category: value })}
@@ -207,7 +210,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
                   >
                     <Icon className={`w-4 h-4 mx-auto mb-0.5 ${formData.category === value ? 'text-white' : 'text-gray-500'}`} />
                     <span className="text-[10px] leading-tight block">{label}</span>
-                  </button>
+                  </NativeButton>
                 ))}
               </div>
             </div>
@@ -216,7 +219,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-medium text-gray-600">Description *</label>
-                <button
+                <NativeButton
                   type="button"
                   onClick={handleAiExpand}
                   disabled={aiExpanding || !formData.title.trim()}
@@ -228,9 +231,9 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
                     <HiOutlineSparkles className="w-2.5 h-2.5" />
                   )}
                   <span>AI Expand</span>
-                </button>
+                </NativeButton>
               </div>
-              <textarea
+              <NativeTextarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Describe your idea..."
@@ -249,7 +252,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
                 <HiOutlineEyeSlash className="w-4 h-4 text-gray-500" />
                 <span className="text-xs font-medium text-gray-700">Anonymous</span>
               </div>
-              <button
+              <NativeButton
                 type="button"
                 onClick={() => setFormData({ ...formData, isAnonymous: !formData.isAnonymous })}
                 className={`toggle-switch ${formData.isAnonymous ? 'active' : ''}`}
@@ -260,14 +263,14 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
 
         {/* Footer - Compact */}
         <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
-          <button
+          <NativeButton
             type="button"
             onClick={onClose}
             className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </NativeButton>
+          <NativeButton
             onClick={handleSubmit}
             disabled={submitting || !formData.title.trim() || !formData.description.trim()}
             className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -280,9 +283,9 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
             ) : (
               'Submit'
             )}
-          </button>
+          </NativeButton>
         </div>
-      </div>
+      </DialogSurface>
     </div>
   )
 

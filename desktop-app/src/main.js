@@ -2086,12 +2086,6 @@ function handleAuthentication(data) {
     }
   });
 
-  socketHandler.on('callAlert', function (data) {
-    showNotification('📞 Incoming Call', (data.callerName || 'Someone') + ' is calling you', { urgency: 'critical', url: data.url });
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('call-alert', data);
-    }
-  });
 
   // Forward attendance updates to the renderer so the webview refreshes its UI
   socketHandler.on('attendanceUpdate', function (data) {

@@ -1,28 +1,35 @@
 /* Explicitly opt-in widget surfaces. Never target app-wide cards or portals. */
 .surface, .profile {
   container-type: inline-size;
-  color: #f3f5fa;
-  background: #18181b !important;
-  border: 1px solid #27272a;
-  border-radius: 22px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-card) !important;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
   min-width: 0;
   height: 100%;
   box-shadow: none;
 }
-.surface { padding: 20px !important; }
+.surface { padding: 22px !important; min-height: 0; overflow: auto; }
 .metricsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.statGrid { flex: 1 0 auto; }
+.statCard { min-height: 130px; text-align: left; }
+.statBody { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; padding: 18px !important; }
+.statHead { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; }
+.statHead > span { width: 30px; height: 30px; border: 1px solid var(--color-border); border-radius: 50%; display: grid; place-items: center; flex: none; color: #93b4fa; }
+.statValue { font-size: clamp(30px, 6cqi, 48px); line-height: 1; letter-spacing: -.04em; font-weight: 500; }
+.statNote { font-size: 11px; color: var(--color-text-secondary); }
 .quickActionsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @container (max-width: 440px) { .quickActionsGrid { grid-template-columns: minmax(0, 1fr); } }
 .statIcon { position: absolute; right: 12px; bottom: 10px; opacity: .12; pointer-events: none; }
 .statIcon svg { width: 36px; height: 36px; color: rgb(var(--widget-accent)); }
 @container (min-width: 680px) { .metricsGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.title, .surface [data-widget-heading] { color: #f3f5fa !important; font-size: clamp(18px, 3.6cqi, 28px) !important; font-weight: 750; letter-spacing: -.025em; line-height: 1.25; }
+.title, .surface [data-widget-heading] { color: var(--color-text-primary) !important; font-size: 22px !important; font-weight: 500; letter-spacing: -.02em; line-height: 1.25; }
 .surface [data-widget-card] {
   --widget-accent: 104, 174, 255;
   border-radius: 18px;
-  border: 1px solid #343a45 !important;
-  background: linear-gradient(115deg, #242831, #1d2027) !important;
-  color: #edf1f8;
+  border: 1px solid var(--color-border) !important;
+  background: var(--color-bg-main) !important;
+  color: var(--color-text-primary);
   box-shadow: none;
   min-width: 0;
   isolation: isolate;
@@ -31,18 +38,14 @@
 .surface [data-widget-tone] {
   position: relative;
   overflow: hidden;
-  border-color: rgba(var(--widget-accent), .45) !important;
-  background: linear-gradient(135deg, rgba(var(--widget-accent), .18), rgba(var(--widget-accent), .025) 75%) !important;
+  border-color: var(--color-border) !important;
+  background: var(--color-bg-main) !important;
 }
-.surface [data-widget-tone="success"] { --widget-accent: 39, 234, 179; }
-.surface [data-widget-tone="danger"] { --widget-accent: 255, 113, 131; }
-.surface [data-widget-tone="warning"] { --widget-accent: 255, 204, 70; }
-.surface [data-widget-tone="secondary"] { --widget-accent: 180, 154, 255; }
+.surface [data-widget-tone="success"], .surface [data-widget-tone="danger"], .surface [data-widget-tone="warning"], .surface [data-widget-tone="secondary"] { --widget-accent: 147, 180, 250; }
 .surface [data-widget-tone="default"] { --widget-accent: 169, 184, 205; }
 .surface [data-widget-tone] :is(h3, :global(p.text-lg)) { color: rgb(var(--widget-accent)) !important; font-size: clamp(24px, 5cqi, 38px); font-variant-numeric: tabular-nums; }
 .surface :global(.text-default-900), .surface :global(.text-default-800), .surface :global(.text-default-700) { color: #edf1f8; }
 .surface :global(.text-default-600), .surface :global(.text-default-500), .surface :global(.text-default-400) { color: #a9b8cd; }
-.surface [data-widget-card][data-hover="true"] { border-color: #62748f !important; }
 .surface :is(button, a):focus-visible { outline: 2px solid #68aeff; outline-offset: 3px; }
 .surface > div:first-child > button { border: 1px solid #394454; border-radius: 18px; background: #20242b; color: #edf1f8; }
 @container (max-width: 360px) {

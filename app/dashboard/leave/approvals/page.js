@@ -1,9 +1,14 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading3, NativeButton, Heading2 } from '@/components/ui/fernly/native'
 import { Suspense, useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaEye, FaFilter } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
@@ -122,7 +127,7 @@ function LeaveApprovalsContent() {
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-default-800">Leave Approvals</h1>
+            <Heading1 className="text-3xl font-bold text-default-800">Leave Approvals</Heading1>
             <BackgroundRefreshIndicator isValidating={isValidating} />
           </div>
           <p className="text-default-500 mt-1">Review and approve leave requests</p>
@@ -131,94 +136,19 @@ function LeaveApprovalsContent() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card shadow="sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-default-600">Pending</h3>
-              <FaFilter className="text-warning" />
-            </div>
-            <div className="text-3xl font-bold text-default-800">
-              {leaves.filter(l => l.status === 'pending').length}
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Pending</>} value={<>{leaves.filter(l => l.status === 'pending').length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-default-600">Approved</h3>
-              <FaCheck className="text-success" />
-            </div>
-            <div className="text-3xl font-bold text-default-800">
-              {leaves.filter(l => l.status === 'approved').length}
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Approved</>} value={<>{leaves.filter(l => l.status === 'approved').length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-default-600">Rejected</h3>
-              <FaTimes className="text-danger" />
-            </div>
-            <div className="text-3xl font-bold text-default-800">
-              {leaves.filter(l => l.status === 'rejected').length}
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Rejected</>} value={<>{leaves.filter(l => l.status === 'rejected').length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-default-600">Total Requests</h3>
-              <FaFilter className="text-primary" />
-            </div>
-            <div className="text-3xl font-bold text-default-800">{leaves.length}</div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total Requests</>} value={<>{leaves.length}</>} />
       </div>
 
       {/* Filter Tabs */}
       <Card shadow="sm" className="mb-6">
         <CardBody className="p-0">
-          <div className="flex border-b border-default-200">
-            <button
-              onClick={() => setFilter('pending')}
-              className={`px-6 py-3 font-medium ${filter === 'pending'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-default-600 hover:text-default-800'
-                }`}
-            >
-              Pending
-            </button>
-            <button
-              onClick={() => setFilter('approved')}
-              className={`px-6 py-3 font-medium ${filter === 'approved'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-default-600 hover:text-default-800'
-                }`}
-            >
-              Approved
-            </button>
-            <button
-              onClick={() => setFilter('rejected')}
-              className={`px-6 py-3 font-medium ${filter === 'rejected'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-default-600 hover:text-default-800'
-                }`}
-            >
-              Rejected
-            </button>
-            <button
-              onClick={() => setFilter('')}
-              className={`px-6 py-3 font-medium ${filter === ''
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-default-600 hover:text-default-800'
-                }`}
-            >
-              All
-            </button>
-          </div>
+          <Tabs aria-label="Leave approval status" selectedKey={filter || 'all'} onSelectionChange={key => setFilter(key === 'all' ? '' : String(key))} className="w-full p-2"><Tab key="pending" title="Pending" /><Tab key="approved" title="Approved" /><Tab key="rejected" title="Rejected" /><Tab key="all" title="All" /></Tabs>
         </CardBody>
       </Card>
 
@@ -226,7 +156,7 @@ function LeaveApprovalsContent() {
       <Card shadow="sm">
         <CardBody className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead className="bg-default-50 border-b border-default-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -334,7 +264,7 @@ function LeaveApprovalsContent() {
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         </CardBody>
       </Card>
@@ -345,7 +275,7 @@ function LeaveApprovalsContent() {
           {(onClose) => (
             <>
               <ModalHeader>
-                <h2 className="text-xl font-bold text-default-800">Leave Request Details</h2>
+                <Heading2 className="text-xl font-bold text-default-800">Leave Request Details</Heading2>
               </ModalHeader>
               <ModalBody>
                 <div className="space-y-4 mb-6">

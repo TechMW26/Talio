@@ -62,6 +62,18 @@ export default function SlidingSidebar({
   const { toggleWidget, openWidget } = useChatWidget()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
   const sidebarRef = useRef(null)
+  const wasOpenRef = useRef(false)
+
+  useEffect(() => {
+    const shouldFocus = isOpen || wasOpenRef.current
+    wasOpenRef.current = isOpen
+    if (!shouldFocus) return
+    const frame = requestAnimationFrame(() => {
+      const target = isOpen ? sidebarRef.current?.querySelector('button') : document.querySelector('[data-sidebar-expand]')
+      target?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [isOpen])
   const menuItemRefs = useRef({})
   const scrollContainerRef = useRef(null)
 
@@ -177,8 +189,6 @@ export default function SlidingSidebar({
     if (isDepartmentHead) {
       const teamSubmenu = [
         { name: 'Team Members', path: '/dashboard/team/members' },
-        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-        { name: 'Team Goals', path: '/dashboard/performance/goals' },
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
         { name: 'Geofencing', path: '/dashboard/team/geofencing' }
       ]
@@ -331,7 +341,7 @@ export default function SlidingSidebar({
       {/* Overlay for clicking outside to close */}
       {isOpen && (
         <div
-          className="hidden lg:block fixed inset-0 z-[49] bg-black/20 backdrop-blur-[10px]"
+          className="hidden lg:block fixed inset-0 z-[110] bg-black/20 backdrop-blur-[10px]"
           onClick={() => {
             setIsOpen(false)
             setActiveSubmenu(null)
@@ -342,12 +352,21 @@ export default function SlidingSidebar({
       {/* Sliding Sidebar - starts off screen, slides in when open - overlaps icon strip */}
       <aside
         ref={sidebarRef}
+        data-open={isOpen}
+        inert={!isOpen || undefined}
+        aria-hidden={!isOpen}
+        aria-label="Expanded navigation"
+        onKeyDown={event => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            setIsOpen(false)
+            setActiveSubmenu(null)
+          }
+        }}
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
         className={`
-          talio-sidebar-shell hidden lg:flex fixed inset-y-0 left-0 z-[70] flex-col h-screen w-[18rem] shadow-[0_12px_32px_rgba(15,23,42,0.12)]
-          transition-transform duration-300 ease-out
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          talio-sidebar-shell talio-floating-expanded hidden lg:flex fixed z-[120] flex-col
         `}
         style={{
           backgroundColor: 'var(--color-bg-sidebar)',

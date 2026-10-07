@@ -27,6 +27,7 @@ export async function GET(request, { params }) {
   const [category, ownerId] = pathname.slice(tenantPrefix.length).split('/')
   // Repository-owned media must use its dedicated record/recipient ACL. A
   // known Blob pathname alone never authorizes access to personal media.
+  // Retired alert media must remain blocked here; removing the feature is not permission to expose old private files.
   if (['images', 'screenshots', 'meetingAudio', 'recruitmentResumes', 'resume-parts', 'mira-images', 'call-alerts'].includes(category)) {
     return new NextResponse('Forbidden', { status: 403 })
   }

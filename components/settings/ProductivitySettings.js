@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Button, Switch } from '@heroui/react'
+import { Button, Switch } from '@/components/ui/fernly'
 import { productivitySettingsRequest } from '@/lib/client/productivitySettings'
 
 export default function ProductivitySettings() {

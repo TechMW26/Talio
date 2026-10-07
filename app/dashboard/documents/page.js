@@ -1,12 +1,17 @@
 'use client'
+import { SummaryCard } from '@/components/ui/fernly'
 
+
+
+import { UploadInput } from '@/components/ui/UploadButton'
+import { Heading1, Heading3, Heading2, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes, FaUpload } from 'react-icons/fa'
 import { getEmployeeId } from '@/utils/userHelper'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Skeleton } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -231,7 +236,7 @@ export default function DocumentsPage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Documents</h1>
+          <Heading1 className="text-3xl font-bold text-gray-800">Documents</Heading1>
           <p className="text-gray-600 mt-1">{canManageDocuments ? 'Manage employee and company documents' : 'Manage your documents and files'} <BackgroundRefreshIndicator isValidating={isValidating} /></p>
         </div>
         <Button
@@ -250,21 +255,14 @@ export default function DocumentsPage() {
       {organisationView ? <p className="text-sm text-default-500 mb-6">Organisation documents · Employee files remain restricted to authorised Admin and HR users.</p> : <EmployeeOnboardingDocuments onSubmitted={refreshDocuments} />}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {['Identity', 'Personal', 'Employment', 'Tax', 'Other'].map((category) => (
-          <div key={category} className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-sm font-medium text-gray-600">{category}</h3>
-            </div>
-            <div className="text-3xl font-bold text-gray-800">
-              {documents.filter(d => d.category === category.toLowerCase()).length}
-            </div>
-          </div>
+          <SummaryCard key={category} label={<>{category}</>} value={<>{documents.filter(d => d.category === category.toLowerCase()).length}</>} />
         ))}
       </div>
 
       {/* Employee folders and document cards */}
       {organisationView && employeeOptionsError && <DataErrorState message="Could not load the employee directory" onRetry={() => refreshEmployees()} />}
       {organisationView ? <DocumentFolders folders={folders} loading={isLoading || employeesLoading} onOpen={(id, element) => { folderSource.current = element; setSelectedFolderId(id) }} /> : <section aria-label="My documents" className="space-y-4">
-        <h2 className="text-xl font-semibold">My documents</h2>
+        <Heading2 className="text-xl font-semibold">My documents</Heading2>
         {isLoading ? <div aria-label="Loading documents" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(id => <Skeleton key={id} className="h-64 rounded-2xl" />)}</div> : <DocumentGrid documents={documents} canManage={canManageDocuments} onPreview={doc => { setPreviewDoc(doc); setShowPreview(true) }} onDownload={downloadDocument} onDelete={handleDelete} />}
       </section>}
       {selectedFolder && <FolderDocumentSurface key={selectedFolder.id} folder={selectedFolder} sourceElement={folderSource.current} onClose={() => setSelectedFolderId(null)} canManage={canManageDocuments} onPreview={doc => { setPreviewDoc(doc); setShowPreview(true) }} onDownload={downloadDocument} onDelete={handleDelete} />}
@@ -322,7 +320,7 @@ export default function DocumentsPage() {
                   <div>
                     <label className="text-sm font-medium text-default-700 mb-2 block">File *</label>
                     <div className="relative">
-                      <input
+                      <UploadInput
                         ref={fileInputRef}
                         type="file"
                         className="w-full p-2 border border-default-200 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"

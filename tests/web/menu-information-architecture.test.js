@@ -75,6 +75,18 @@ describe('menu information architecture', () => {
     }
   })
 
+  test.each(Object.keys(roleBasedMenus))('does not expose employee creation as a separate menu entry for %s', role => {
+    const sections = buildNavigationSections(roleBasedMenus[role])
+    const paths = sections.flatMap(section => section.submenu?.map(item => item.path) || [section.path])
+    expect(paths).not.toContain('/dashboard/employees/add')
+  })
+
+  test('employee creation remains available from the directory instead of the menu', () => {
+    const fs = require('fs')
+    expect(fs.existsSync('app/dashboard/employees/add/page.js')).toBe(true)
+    expect(fs.readFileSync('app/dashboard/employees/page.js', 'utf8')).toContain("router.push('/dashboard/employees/add')")
+  })
+
   test('uses a unique icon for every top-level destination and sidebar action', () => {
     const completeMenu = [
       { name: 'Dashboard', path: '/dashboard', icon },

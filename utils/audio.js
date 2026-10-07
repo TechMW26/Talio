@@ -1,6 +1,6 @@
 /**
  * Robust Audio utility for notification sounds
- * Uses Web Audio API (same pattern as CallAlertReceiver) with localStorage caching
+ * Uses Web Audio API with localStorage caching
  * for instant playback on first load
  */
 
@@ -20,7 +20,7 @@ const SOUNDS = {
   alert: UI_SOUNDS.alert,
 }
 
-// Global AudioContext instance (same pattern as CallAlertReceiver)
+// Global AudioContext instance
 let audioContextInstance = null
 let audioContextUnlocked = false
 
@@ -172,7 +172,7 @@ async function fetchAndCacheAudio(key, url) {
 }
 
 /**
- * Play audio using Web Audio API (same pattern as CallAlertReceiver)
+ * Play audio using Web Audio API
  */
 async function playWithWebAudio(key, volume = 0.7) {
   const ctx = getAudioContext()

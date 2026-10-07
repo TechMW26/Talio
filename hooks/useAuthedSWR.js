@@ -1,6 +1,7 @@
 'use client'
 
 import useSWR from 'swr'
+import useSWRInfinite from 'swr/infinite'
 import { clearAllSessionCaches } from '@/utils/sessionCache'
 import { collectEmployeePages, isCompleteEmployeeList } from '@/lib/client/employeePages'
 
@@ -154,6 +155,16 @@ export function useAuthedSWRStatic(key, options = {}) {
     dedupingInterval: 5000,
     shouldRetryOnError: false,
     keepPreviousData: true,
+    ...options,
+  })
+}
+
+export function useAuthedSWRInfinite(getKey, options = {}) {
+  return useSWRInfinite(getKey, authedFetcher, {
+    revalidateOnFocus: false,
+    revalidateFirstPage: false,
+    shouldRetryOnError: false,
+    dedupingInterval: 5000,
     ...options,
   })
 }

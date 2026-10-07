@@ -1,25 +1,22 @@
-.panel { container-type: inline-size; height: 100%; padding: 20px; border: 1px solid #27272a; border-radius: 22px; background: #18181b; color: #f3f5fa; }
-.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; background: transparent !important; }
-.header h3 { font-size: clamp(18px, 3.5cqi, 28px); font-weight: 750; line-height: 1.25; margin: 0; }
-.header h3 span { color: #a9b8d1; font-weight: 500; }
-.message { display: flex; gap: 12px; align-items: center; color: #98a8bf; font-size: 11px; line-height: 1.5; flex-shrink: 0; }
-.message svg { width: 30px; height: 30px; padding: 6px; border: 1px solid #293747; border-radius: 9px; }
-.message p { border-left: 1px solid #293747; padding-left: 12px; margin: 0; }
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.card { position: relative; isolation: isolate; overflow: hidden; min-width: 0; min-height: 142px; display: flex; align-items: flex-start; gap: 12px; padding: 20px 18px; border-radius: 14px; border: 1px solid rgba(var(--metric), .28); background: rgba(var(--metric), .055); box-shadow: none; }
-.content { position: relative; z-index: 1; min-width: 0; }
-.value { margin: 0; font-size: clamp(28px, 6cqi, 42px); font-weight: 650; line-height: 1; letter-spacing: -.035em; color: rgb(var(--metric)); overflow-wrap: anywhere; }
-.label { margin: 10px 0 0; color: #c6d1e3; font-size: clamp(14px, 2.8cqi, 21px); font-weight: 600; }
-.caption { max-width: 190px; margin: 8px 0 0; color: #9eadc2; font-size: 11px; line-height: 1.5; }
-.dots { position: absolute; top: 16px; right: 14px; width: 48px; height: 32px; background: radial-gradient(circle, rgba(var(--metric), .3) 1.5px, transparent 2px) 0 0 / 12px 10px; }
-.watermark { position: absolute; right: 12px; bottom: 16px; width: 65px; height: 65px; color: rgba(var(--metric), .1); z-index: -1; }
-.bars { position: absolute; right: 14px; bottom: 12px; height: 70px; display: flex; align-items: flex-end; gap: 6px; opacity: .2; z-index: -1; }
-.bars i { width: 13px; border-radius: 3px; background: rgb(var(--metric)); }
-.empty { color: #a9b8d1; font-size: 13px; padding: 12px 0; }
-.skeleton { display: block; width: 65px; height: 48px; border-radius: 8px; background: rgba(var(--metric), .12); }
-@container (max-width: 620px) { .message { display: none; } .card { gap: 12px; padding: 18px 14px; } }
-@container (max-width: 390px) { .card { flex-direction: column; gap: 10px; min-height: 170px; padding: 14px; } .caption { letter-spacing: .08em; font-size: 8px; } .grid { gap: 10px; } .dots { display: none; } }
-.dots, .watermark, .bars, .message { display: none; }
-.header { margin-bottom: 20px; }
-.header h3 { font-size: 20px; font-weight: 650; }
-.label { font-size: 16px; }
+/* Fernly stat/card geometry; actual attendance observations, Talio tokens. */
+.panel { container-type: inline-size; height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 18px; padding: 22px; border: 1px solid var(--color-border); border-radius: 20px; background: var(--color-bg-card); color: var(--color-text-primary); overflow: auto; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; }
+.eyebrow { font-size: 10px; letter-spacing: .12em; color: var(--color-text-secondary); margin: 0 0 6px; }
+.header h3 { font-size: 22px; font-weight: 500; letter-spacing: -.02em; margin: 0; }
+.month { padding: 7px 12px; border: 1px solid var(--color-border); border-radius: 999px; font-size: 11px; color: var(--color-text-secondary); }
+.grid { flex: 1 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.card { min-width: 0; padding: 18px; border-radius: 18px; border: 1px solid var(--color-border); background: var(--color-bg-main); display: flex; flex-direction: column; justify-content: center; }
+.card[data-metric="presentDays"] { background: linear-gradient(135deg, #193d78, #102140); border-color: #315a95; color: #fff; }
+.content { min-width: 0; }
+.value { margin: 0; font-size: clamp(28px, 6cqi, 48px); font-weight: 600; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.label { margin: 10px 0 0; font-size: 14px; font-weight: 500; }
+.caption { margin: 5px 0 0; font-size: 11px; line-height: 1.5; color: var(--color-text-secondary); }
+.card[data-metric="presentDays"] .caption { color: #b9ceef; }
+.insight { flex: none; border-top: 1px solid var(--color-border); padding-top: 16px; }
+.insight > div:first-child { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; }
+.insight strong { font-size: 20px; font-weight: 500; }
+.track { height: 8px; margin: 12px 0; border-radius: 999px; background: var(--color-border); overflow: hidden; }
+.track i { display: block; height: 100%; background: #2563eb; border-radius: inherit; }
+.insight p, .empty { font-size: 11px; line-height: 1.5; color: var(--color-text-secondary); }
+.skeleton { display: block; width: 65px; height: 36px; border-radius: 8px; background: var(--color-border); }
+@container (max-width: 340px) { .card { padding: 12px; } .header { align-items: flex-start; flex-wrap: wrap; } }

@@ -8,6 +8,7 @@ jest.mock('@/hooks/useAuthedSWR', () => ({ __esModule: true, default: jest.fn() 
 jest.mock('@/hooks/useApiMutation', () => ({ __esModule: true, default: jest.fn() }))
 jest.mock('@/components/employees/OffboardingAssetChecklistModal', () => ({ __esModule: true, default: () => null }))
 let data, execute, mutate
+beforeAll(() => { global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } })
 beforeEach(() => {
   data = { status: 'accepted', version: 7, employeeId: 'employee', started: true, canManage: true, assets: { total: 0, cleared: 0, complete: true }, settlement: { date: '2026-09-29', savedAt: '2026-09-29', currency: 'INR', netAmount: 100, items: [{ label: 'Salary', amount: 100, type: 'earning' }] } }
   execute = jest.fn().mockResolvedValue({ success: true, message: 'Saved' }); mutate = jest.fn()
@@ -50,7 +51,7 @@ test('dedicated overview has approval, offboarding and completed dashboard tabs'
   useAuthedSWR.mockReturnValue({ data: { data: [], canSubmit: true }, mutate })
   render(<ResignationPanel initialView="overview" />)
   expect(screen.getByText('Needs your action')).toBeInTheDocument()
-  fireEvent.click(screen.getByText('My requests', { selector: 'button' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'My requests' }))
   expect(screen.getByText('Submit resignation')).toBeInTheDocument()
   expect(screen.getByText('F&F / Offboarding (0)')).toBeInTheDocument()
 })

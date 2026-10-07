@@ -1,5 +1,8 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading3, NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import { useState } from 'react'
 import {
   HiOutlineChatBubbleLeft,
@@ -151,7 +154,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
   const voteScore = (idea.likes || 0) - (idea.dislikes || 0)
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border transition-all ${idea.isPinned
+    <Surface className={`bg-white rounded-xl shadow-sm border transition-all ${idea.isPinned
         ? 'border-amber-300 ring-1 ring-amber-200'
         : 'border-gray-100 hover:shadow-md'
       }`}>
@@ -171,9 +174,9 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
               <categoryInfo.Icon className="w-4 h-4 text-gray-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-800 line-clamp-2 mb-1">
+              <Heading3 className="font-semibold text-gray-800 line-clamp-2 mb-1">
                 {idea.title}
-              </h3>
+              </Heading3>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusStyle}`}>
                   {statusLabel}
@@ -188,7 +191,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
           {/* Actions */}
           <div className="flex items-center gap-1">
             {isAdmin && (
-              <button
+              <NativeButton
                 onClick={() => onPin(idea._id)}
                 className={`p-1.5 rounded-lg transition-colors ${idea.isPinned
                     ? 'text-amber-600 bg-amber-50'
@@ -197,16 +200,16 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
                 title={idea.isPinned ? 'Unpin' : 'Pin'}
               >
                 <FaThumbtack className="w-3.5 h-3.5" />
-              </button>
+              </NativeButton>
             )}
             {idea.isOwner && (
-              <button
+              <NativeButton
                 onClick={() => onDelete(idea._id)}
                 className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                 title="Delete"
               >
                 <HiOutlineTrash className="w-4 h-4" />
-              </button>
+              </NativeButton>
             )}
           </div>
         </div>
@@ -248,7 +251,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
         <div className="flex items-center justify-between">
           {/* Vote buttons */}
           <div className="flex items-center gap-1 bg-gray-50 rounded-full px-1 py-0.5">
-            <button
+            <NativeButton
               onClick={() => onVote(idea._id, idea.userVote === 'upvote' ? 'remove' : 'upvote')}
               className={`p-1.5 rounded-full transition-colors ${idea.userVote === 'upvote'
                   ? 'bg-green-100 text-green-600'
@@ -256,12 +259,12 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
                 }`}
             >
               <HiOutlineHandThumbUp className="w-4 h-4" />
-            </button>
+            </NativeButton>
             <span className={`text-sm font-medium min-w-[20px] text-center ${voteScore > 0 ? 'text-green-600' : voteScore < 0 ? 'text-red-600' : 'text-gray-600'
               }`}>
               {voteScore}
             </span>
-            <button
+            <NativeButton
               onClick={() => onVote(idea._id, idea.userVote === 'downvote' ? 'remove' : 'downvote')}
               className={`p-1.5 rounded-full transition-colors ${idea.userVote === 'downvote'
                   ? 'bg-red-100 text-red-600'
@@ -269,20 +272,20 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
                 }`}
             >
               <HiOutlineHandThumbDown className="w-4 h-4" />
-            </button>
+            </NativeButton>
           </div>
 
           {/* Comments and Expand */}
           <div className="flex items-center gap-2">
-            <button
+            <NativeButton
               onClick={handleExpand}
               className="flex items-center gap-1 text-gray-500 hover:text-blue-600 transition-colors"
             >
               <HiOutlineChatBubbleLeft className="w-4 h-4" />
               <span className="text-sm">{localCommentsCount}</span>
-            </button>
+            </NativeButton>
 
-            <button
+            <NativeButton
               onClick={handleExpand}
               className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
             >
@@ -291,7 +294,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
               ) : (
                 <HiOutlineChevronDown className="w-4 h-4 text-gray-400" />
               )}
-            </button>
+            </NativeButton>
           </div>
         </div>
 
@@ -343,7 +346,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
 
             {/* Add Comment */}
             <div className="flex gap-2">
-              <input
+              <NativeInput
                 type="text"
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
@@ -356,7 +359,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
                   }
                 }}
               />
-              <button
+              <NativeButton
                 onClick={handleAddComment}
                 disabled={submittingComment || !newComment.trim()}
                 className="px-3 py-2 bg-blue-600 text-black rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -366,11 +369,11 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
                 ) : (
                   <FaPaperPlane className="w-4 h-4" />
                 )}
-              </button>
+              </NativeButton>
             </div>
           </div>
         )}
       </div>
-    </div>
+    </Surface>
   )
 }

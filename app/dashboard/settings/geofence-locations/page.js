@@ -1,8 +1,12 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, Heading3, Heading2, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import { FaMapMarkerAlt, FaPlus, FaEdit, FaTrash, FaStar, FaRegStar, FaClock } from 'react-icons/fa'
-import { Skeleton } from '@heroui/react'
+import { Skeleton } from '@/components/ui/fernly'
 import GeofenceMap from '@/components/GeofenceMap'
 import ModalPortal from '@/components/ui/ModalPortal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -184,12 +188,12 @@ export default function GeofenceLocationsPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white rounded-lg border-2 border-gray-200 p-4 space-y-3">
+            <Surface key={i} className="bg-white rounded-lg border-2 border-gray-200 p-4 space-y-3">
               <Skeleton className="h-6 w-40 rounded-lg" />
               <Skeleton className="h-4 w-full rounded-lg" />
               <Skeleton className="h-4 w-3/4 rounded-lg" />
               <Skeleton className="h-4 w-1/2 rounded-lg" />
-            </div>
+            </Surface>
           ))}
         </div>
       </div>
@@ -205,23 +209,23 @@ export default function GeofenceLocationsPage() {
       <BackgroundRefreshIndicator isValidating={isValidating} />
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <Heading1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             Geofence Locations
-          </h1>
+          </Heading1>
           <p className="text-gray-600 mt-1">Manage multiple office locations and geofence boundaries</p>
         </div>
-        <button
+        <NativeButton
           onClick={() => handleOpenModal()}
           className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
         >
           <FaPlus /> Add Location
-        </button>
+        </NativeButton>
       </div>
 
       {/* Locations List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {locations.map(location => (
-          <div
+          <Surface
             key={location._id}
             className={`bg-white rounded-lg border-2 p-4 ${location.isPrimary ? 'border-primary-500' : 'border-gray-200'
               }`}
@@ -229,7 +233,7 @@ export default function GeofenceLocationsPage() {
             <div className="flex justify-between items-start mb-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-gray-900">{location.name}</h3>
+                  <Heading3 className="text-lg font-semibold text-gray-900">{location.name}</Heading3>
                   {location.isPrimary && (
                     <FaStar className="text-yellow-500" title="Primary Location" />
                   )}
@@ -239,21 +243,21 @@ export default function GeofenceLocationsPage() {
                 )}
               </div>
               <div className="flex gap-2">
-                <button
+                <NativeButton
                   onClick={() => handleOpenModal(location)}
                   className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   title="Edit"
                 >
                   <FaEdit />
-                </button>
+                </NativeButton>
                 {!location.isPrimary && (
-                  <button
+                  <NativeButton
                     onClick={() => handleDelete(location._id)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     title="Delete"
                   >
                     <FaTrash />
-                  </button>
+                  </NativeButton>
                 )}
               </div>
             </div>
@@ -288,7 +292,7 @@ export default function GeofenceLocationsPage() {
                 )}
               </div>
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
 
@@ -303,17 +307,17 @@ export default function GeofenceLocationsPage() {
       {/* Modal */}
       <ModalPortal isOpen={showModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900">
+              <Heading2 className="text-xl font-bold text-gray-900">
                 {editingLocation ? 'Edit Location' : 'Add New Location'}
-              </h2>
-              <button
+              </Heading2>
+              <NativeButton
                 onClick={() => setShowModal(false)}
                 className="text-gray-500 hover:text-gray-700 text-2xl"
               >
                 ×
-              </button>
+              </NativeButton>
             </div>
 
             <form onSubmit={handleSave} className="p-6 space-y-6">
@@ -323,7 +327,7 @@ export default function GeofenceLocationsPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Location Name *
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     required
                     value={formData.name}
@@ -336,7 +340,7 @@ export default function GeofenceLocationsPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Address
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -350,7 +354,7 @@ export default function GeofenceLocationsPage() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Description
                 </label>
-                <textarea
+                <NativeTextarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -378,7 +382,7 @@ export default function GeofenceLocationsPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Latitude
                   </label>
-                  <input
+                  <NativeInput
                     type="number"
                     step="any"
                     value={formData.center.latitude}
@@ -393,7 +397,7 @@ export default function GeofenceLocationsPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Longitude
                   </label>
-                  <input
+                  <NativeInput
                     type="number"
                     step="any"
                     value={formData.center.longitude}
@@ -408,7 +412,7 @@ export default function GeofenceLocationsPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Radius (meters)
                   </label>
-                  <input
+                  <NativeInput
                     type="number"
                     min="10"
                     value={formData.radius}
@@ -421,7 +425,7 @@ export default function GeofenceLocationsPage() {
               {/* Settings */}
               <div className="space-y-3">
                 <label className="flex items-center gap-3">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     checked={formData.isPrimary}
                     onChange={(e) => setFormData({ ...formData, isPrimary: e.target.checked })}
@@ -430,7 +434,7 @@ export default function GeofenceLocationsPage() {
                   <span className="text-sm font-medium text-gray-700">Set as Primary Location</span>
                 </label>
                 <label className="flex items-center gap-3">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     checked={formData.strictMode}
                     onChange={(e) => setFormData({ ...formData, strictMode: e.target.checked })}
@@ -439,7 +443,7 @@ export default function GeofenceLocationsPage() {
                   <span className="text-sm font-medium text-gray-700">Strict Mode (require check-in within geofence)</span>
                 </label>
                 <label className="flex items-center gap-3">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
@@ -453,36 +457,36 @@ export default function GeofenceLocationsPage() {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <label className="text-sm font-semibold text-gray-700">Break Timings</label>
-                  <button
+                  <NativeButton
                     type="button"
                     onClick={addBreakTiming}
                     className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
                   >
                     <FaPlus /> Add Break
-                  </button>
+                  </NativeButton>
                 </div>
                 {formData.breakTimings.map((breakTiming, index) => (
                   <div key={index} className="bg-gray-50 p-4 rounded-lg mb-3">
                     <div className="flex justify-between items-start mb-3">
-                      <input
+                      <NativeInput
                         type="text"
                         value={breakTiming.name}
                         onChange={(e) => updateBreakTiming(index, 'name', e.target.value)}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg mr-2"
                         placeholder="Break name (e.g., Lunch Break)"
                       />
-                      <button
+                      <NativeButton
                         type="button"
                         onClick={() => removeBreakTiming(index)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                       >
                         <FaTrash />
-                      </button>
+                      </NativeButton>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">Start Time</label>
-                        <input
+                        <NativeInput
                           type="time"
                           value={breakTiming.startTime}
                           onChange={(e) => updateBreakTiming(index, 'startTime', e.target.value)}
@@ -491,7 +495,7 @@ export default function GeofenceLocationsPage() {
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">End Time</label>
-                        <input
+                        <NativeInput
                           type="time"
                           value={breakTiming.endTime}
                           onChange={(e) => updateBreakTiming(index, 'endTime', e.target.value)}
@@ -505,22 +509,22 @@ export default function GeofenceLocationsPage() {
 
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
+                <NativeButton
                   type="button"
                   onClick={() => setShowModal(false)}
                   className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   type="submit"
                   className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600"
                 >
                   {editingLocation ? 'Update' : 'Create'} Location
-                </button>
+                </NativeButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>

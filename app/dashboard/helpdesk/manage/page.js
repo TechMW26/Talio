@@ -1,5 +1,10 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, NativeButton, Heading2, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
@@ -7,8 +12,8 @@ import {
   FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle,
   FaUser, FaArrowRight, FaComment, FaTimes, FaChevronDown
 } from 'react-icons/fa'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Skeleton } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -162,43 +167,29 @@ export default function HelpdeskManagePage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Helpdesk Management</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-900">Helpdesk Management</Heading1>
           <p className="text-sm text-gray-600 mt-1">Manage and respond to support tickets <BackgroundRefreshIndicator isValidating={isValidating} position="inline" /></p>
         </div>
-        <button
+        <NativeButton
           onClick={() => router.push('/dashboard/helpdesk')}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
         >
           <FaTicketAlt className="w-4 h-4" />
           <span>My Tickets</span>
-        </button>
+        </NativeButton>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
-          <div
-            key={index}
-            className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-pointer transition-all hover:shadow-md ${filter === stat.filter ? 'ring-2 ring-blue-500' : ''}`}
-            onClick={() => setFilter(stat.filter || 'all')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</p>
-              </div>
-              <div className={`p-3 rounded-xl ${stat.bgColor}`}>
-                <stat.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.iconColor}`} />
-              </div>
-            </div>
-          </div>
+          <SummaryCard key={index} onClick={() => setFilter(stat.filter || 'all')} className="cursor-pointer" label={<>{stat.label}</>} value={<>{stat.value}</>} />
         ))}
       </div>
 
       {/* Filter Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-2">
         {['all', 'open', 'in-progress', 'resolved', 'closed'].map(f => (
-          <button
+          <NativeButton
             key={f}
             onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${filter === f
@@ -207,7 +198,7 @@ export default function HelpdeskManagePage() {
               }`}
           >
             {f === 'all' ? 'All Tickets' : f.charAt(0).toUpperCase() + f.slice(1).replace('-', ' ')}
-          </button>
+          </NativeButton>
         ))}
       </div>
 
@@ -221,12 +212,12 @@ export default function HelpdeskManagePage() {
         </Select>
         <Button variant="flat" onPress={exportReport} isDisabled={isLoading || !filteredTickets.length}>Export report</Button>
       </div>
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <Surface className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">
+          <Heading2 className="text-xl font-semibold text-gray-800">
             {filter === 'all' ? 'All Tickets' : `${filter.charAt(0).toUpperCase() + filter.slice(1).replace('-', ' ')} Tickets`}
             <span className="ml-2 text-sm font-normal text-gray-500">({filteredTickets.length})</span>
-          </h2>
+          </Heading2>
         </div>
 
         {isLoading ? (
@@ -247,7 +238,7 @@ export default function HelpdeskManagePage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -331,22 +322,22 @@ export default function HelpdeskManagePage() {
                         {ticket?.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <button
+                        <NativeButton
                           onClick={() => handleViewTicket(ticket)}
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
                         >
                           <span>Manage</span>
                           <FaArrowRight className="w-3 h-3" />
-                        </button>
+                        </NativeButton>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         )}
-      </div>
+      </Surface>
 
       {/* Ticket Detail Modal */}
       <Modal isOpen={showDetailModal} onOpenChange={setShowDetailModal} size="2xl" scrollBehavior="inside">
@@ -361,7 +352,7 @@ export default function HelpdeskManagePage() {
                 <ModalBody className="space-y-6">
                   {/* Ticket Info */}
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-lg text-gray-900 mb-2">{selectedTicket.subject}</h3>
+                    <Heading3 className="font-semibold text-lg text-gray-900 mb-2">{selectedTicket.subject}</Heading3>
                     <p className="text-gray-600 mb-4">{selectedTicket.description}</p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>

@@ -61,7 +61,7 @@ The migration is idempotent. It fills missing canonical module flags, repairs en
 
 ## HRMS lifecycle and module controls
 
-The canonical lifecycle is manpower planning → MRF → recruitment → interview → offer → pre-joining → background verification → onboarding → employee profile → attendance → leave/WFH → payroll/PF/ESIC → performance/KRA/KPI → learning → exit → F&F → experience letter → alumni.
+The canonical lifecycle is manpower planning → MRF → recruitment → interview → offer → pre-joining → background verification → onboarding → employee profile → attendance → leave/WFH → payroll/PF/ESIC → performance/KRA/KPI → exit → F&F → experience letter → alumni.
 
 Super Admin can enable modules per tenant. Enabling a module enables its prerequisites; disabling a prerequisite disables dependants. Every API request is checked against the same registry used by the sidebar and workflow UI. POSH and disciplinary cases are confidential, all transitions use optimistic concurrency, and every transition creates an audit event.
 

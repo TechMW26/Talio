@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Button, Input, Checkbox, Chip } from '@heroui/react'
+import { Button, Input, Checkbox, Chip } from '@/components/ui/fernly'
 import { FaTimes, FaSearch, FaCheck } from 'react-icons/fa'
 import { toast } from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'

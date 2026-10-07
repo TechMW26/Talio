@@ -1,14 +1,16 @@
 'use client';
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   Button, Chip, Input, Select, SelectItem, Pagination, ModalContent, ModalHeader, ModalBody, ModalFooter,
   useDisclosure, Textarea, Card, CardBody, CardHeader, Skeleton, Tooltip
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
@@ -202,7 +204,7 @@ export default function InterviewsPage() {
               <BackIcon className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Interviews</h1>
+              <Heading1 className="text-2xl sm:text-3xl font-bold text-default-800">Interviews</Heading1>
               <p className="text-sm text-default-500 mt-0.5">
                 Schedule and manage candidate interviews
                 <BackgroundRefreshIndicator isValidating={isValidating} />
@@ -252,7 +254,7 @@ export default function InterviewsPage() {
               <div className="w-16 h-16 rounded-full bg-default-100 flex items-center justify-center mx-auto mb-4">
                 <FaCalendarAlt className="w-7 h-7 text-default-400" />
               </div>
-              <h3 className="text-lg font-semibold text-default-700 mb-1">No interviews found</h3>
+              <Heading3 className="text-lg font-semibold text-default-700 mb-1">No interviews found</Heading3>
               <p className="text-sm text-default-500">
                 {filters.status || filters.jobPosting
                   ? 'Try adjusting your filters'
@@ -264,7 +266,7 @@ export default function InterviewsPage() {
           <div className="space-y-6">
             {Object.entries(grouped).map(([date, dateInterviews]) => (
               <div key={date}>
-                <h3 className="text-sm font-semibold text-default-500 mb-3">{date}</h3>
+                <Heading3 className="text-sm font-semibold text-default-500 mb-3">{date}</Heading3>
                 <div className="space-y-3">
                   {dateInterviews.map((interview) => {
                     const TypeIcon = TYPE_ICON[interview.type] || FaCalendarAlt;

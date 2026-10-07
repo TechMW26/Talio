@@ -1,0 +1,51 @@
+/* Fernly card geometry, pill navigation and quiet surfaces, using Talio tokens.
+   Scoped to the own-profile content; never changes the shell or Mira. */
+.page { color: hsl(var(--heroui-foreground)); padding-bottom: 32px; }
+.frame { width: 100%; min-width: 0; }
+.heading { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 18px; }
+.eyebrow, .subtitle { color: hsl(var(--heroui-default-500)); font-size: 14px; line-height: 1.6; }
+.eyebrow { margin-bottom: 8px; }
+.subtitle { margin-top: 10px; }
+.headerActions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
+.exitLink { padding: 10px 16px; border-radius: 999px; border: 1px solid hsl(var(--heroui-default-200)); background: var(--color-bg-card); font-size: 12px; white-space: nowrap; }
+.exitLink:hover { background: hsl(var(--heroui-content2)); }
+.layout { display: grid; grid-template-columns: 300px minmax(0, 1fr) minmax(270px, 320px); align-items: start; gap: 24px; }
+.responsibilities { min-width: 0; position: sticky; top: 24px; max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain; border-radius: 20px; }
+.responsibilities h4 { font-weight: 500; line-height: 1.5; }
+.details { min-width: 0; border-radius: 20px; background: var(--color-bg-card, hsl(var(--heroui-content1))); border: 1px solid hsl(var(--heroui-default-200)); box-shadow: 0 8px 24px -12px rgb(19 26 21 / .1); }
+.identity { min-width: 0; position: sticky; top: 24px; overflow: visible; z-index: 10; pointer-events: none; }
+/* The SVG ribbon extends up behind the page heading and shell. Only the card
+   receives pointer events, leaving controls underneath the scene usable. */
+.lanyard { position: relative; width: 100%; height: 650px; margin-top: -90px; overflow: visible; }
+.content { min-width: 0; display: grid; gap: 24px; }
+.content > * { animation: profile-enter .35s ease both; }
+.details { padding: 22px; }
+.details h3 { color: hsl(var(--heroui-foreground)); font-size: 19px; font-weight: 500; letter-spacing: -.02em; }
+.details > div > div > p { color: hsl(var(--heroui-default-500)); }
+/* Existing data/edit branches share one field presentation. Verification badges
+   keep their semantic success/warning colours; only the old rainbow tiles change. */
+.details > :global(.grid) { gap: 12px; }
+.details > :global(.grid) > div { min-width: 0; padding: 18px; border-radius: 16px; border-color: hsl(var(--heroui-default-200)) !important; background: hsl(var(--heroui-content2) / .55) !important; box-shadow: none; }
+.details > :global(.grid) > div > :global(.rounded-full) { width: 36px; height: 36px; border-radius: 12px; background: rgb(37 99 235 / .12); color: #6092ff; box-shadow: none; }
+.details > :global(.grid) > div > :global(.rounded-full) svg { color: inherit; font-size: 14px; }
+.page .details :global(.uppercase) { color: hsl(var(--heroui-default-500)) !important; font-size: 10px; letter-spacing: .08em; }
+.details p:global(.text-blue-700\/70) { color: hsl(var(--heroui-default-500)) !important; }
+.details p:global(.font-semibold) { color: hsl(var(--heroui-foreground)); font-weight: 500; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.details p:global(.truncate) { white-space: normal; overflow: visible; text-overflow: clip; }
+.details input, .details select, .details textarea { background: hsl(var(--heroui-content1)); border-color: hsl(var(--heroui-default-300)); color: hsl(var(--heroui-foreground)); }
+.details input:focus-visible, .details select:focus-visible, .details textarea:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.bottomActions { display: flex; justify-content: flex-end; padding: 8px 0; }
+@keyframes profile-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 1200px) { .layout { grid-template-columns: 280px minmax(0, 1fr); gap: 18px; } .responsibilities { grid-column: 2; position: relative; top: auto; max-height: none; } .identity { grid-row: span 2; } .details > :global(.grid) { grid-template-columns: minmax(0, 1fr); } .details > :global(.grid) > div { grid-column: auto; } }
+@media (max-width: 800px) {
+  .heading { align-items: flex-start; flex-direction: column; gap: 18px; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .identity { position: relative; top: auto; width: 100%; max-width: 440px; justify-self: center; }
+  .identity { grid-row: auto; }
+  .responsibilities { grid-column: auto; }
+  .headerActions { justify-content: flex-start; }
+  .details { padding: 18px; }
+}
+@media (max-width: 768px) { .lanyard { height: 560px; margin-top: -60px; } }
+@media (max-width: 480px) { .lanyard { height: 510px; } }
+@media (prefers-reduced-motion: reduce) { .content > * { animation: none; } }

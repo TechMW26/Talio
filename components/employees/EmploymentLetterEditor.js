@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button, Input, Textarea } from '@heroui/react'
+import { Button, Input, Textarea } from '@/components/ui/fernly'
 import { LETTER_FIELDS, employmentLetterParagraphs, validateEmploymentLetter } from '@/lib/hrms/employmentLetter'
 import { requestEmploymentLetter } from '@/lib/client/employmentLetter'
 import { downloadDocumentFile, fetchDocumentFile } from '@/lib/client/documentFile'

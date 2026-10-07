@@ -4,7 +4,7 @@ import widgetStyles from './WidgetDesign.module.css'
 
 import { useState, useEffect } from 'react'
 import { FaHistory, FaClock, FaArrowRight, FaArrowLeft, FaCoffee, FaSignOutAlt, FaSignInAlt } from 'react-icons/fa'
-import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function RecentActivityWidget({ limit = 6 }) {
     const [activities, setActivities] = useState([])

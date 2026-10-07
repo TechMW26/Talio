@@ -3,22 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import LoginForm from './LoginForm'
 import toast from '@/utils/toast'
-import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaExclamationTriangle, FaRedoAlt } from 'react-icons/fa'
+import { FaEnvelope, FaLock, FaExclamationTriangle, FaRedoAlt } from 'react-icons/fa'
 import { resetRedirectFlag } from '@/utils/userHelper'
 import { resetAuthRedirectFlag } from '@/hooks/useAuthedSWR'
 import Modal from '@/components/ui/HeroModal'
 import {
-  Card,
-  CardBody,
-  CardFooter,
   Button,
-  Checkbox,
   Spinner,
-  Divider,
-  Link as HeroLink,
   ModalContent,
-  ModalHeader,
   ModalBody,
   ModalFooter,
 } from '@heroui/react'
@@ -357,140 +351,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#09090b] dark:from-transparent dark:via-transparent dark:to-transparent">
-      {/* Decorative background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-200 dark:bg-primary-500/10 rounded-full blur-3xl opacity-30" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-200 dark:bg-secondary-500/10 rounded-full blur-3xl opacity-30" />
-      </div>
-
-      {/* Login Form - Centered */}
-      <div className="min-h-screen flex items-center justify-center px-4 py-8 relative z-10">
-        <div className="w-full max-w-md">
-          <Card 
-            className="shadow-2xl border border-default-100 dark:border-zinc-700/50 bg-white/80 dark:bg-[#18181b]/90 backdrop-blur-xl"
-            radius="lg"
-          >
-            <CardBody className="p-8 md:p-10">
-              {/* Logo and Title */}
-              <div className="text-center mb-8">
-                <div className="flex justify-center mb-5">
-                  <img
-                    src="/logo.png"
-                    alt="Talio Logo"
-                    className="h-12 w-auto object-contain"
-                  />
-                </div>
-                <h1 className="text-2xl font-bold text-default-900 mb-1">Welcome Back</h1>
-                <p className="text-default-500 text-sm">Sign in to continue to Talio</p>
-              </div>
-
-              <form className="space-y-5" onSubmit={handleSubmit}>
-                {/* Email Field */}
-                <div>
-                  <label className="block text-sm font-semibold text-default-700 mb-1.5">
-                    Email Address<span className="text-danger-500">*</span>
-                  </label>
-                  <div className="input-with-icon">
-                    <FaEnvelope className="input-icon" />
-                    <input
-                      type="email"
-                      name="email"
-                      placeholder="name@company.com"
-                      value={formData.email}
-                      onChange={handleChange}
-                      autoComplete="email"
-                      required
-                      className="input input-search"
-                    />
-                  </div>
-                </div>
-
-                {/* Password Field */}
-                <div className="pt-2">
-                  <label className="block text-sm font-semibold text-default-700 mb-1.5">
-                    Password<span className="text-danger-500">*</span>
-                  </label>
-                  <div className="input-with-icon" style={{ position: 'relative' }}>
-                    <FaLock className="input-icon" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      name="password"
-                      placeholder="Enter your password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      autoComplete="current-password"
-                      required
-                      className="input input-search"
-                      style={{ paddingRight: '2.5rem' }}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 focus:outline-none z-10"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <FaEyeSlash className="text-default-400 hover:text-default-600 transition-colors" />
-                      ) : (
-                        <FaEye className="text-default-400 hover:text-default-600 transition-colors" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Remember & Forgot */}
-                <div className="flex items-center justify-between">
-                  <Checkbox
-                    size="sm"
-                    isSelected={rememberMe}
-                    onValueChange={setRememberMe}
-                    classNames={{
-                      label: "text-default-600 text-sm",
-                    }}
-                  >
-                    Remember me
-                  </Checkbox>
-                  <Link 
-                    href="/auth/forgot-password" 
-                    className="text-primary-600 hover:text-primary-700 text-sm font-medium transition-colors"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-
-                {/* Sign In Button */}
-                <Button
-                  type="submit"
-                  color="primary"
-                  size="lg"
-                  radius="lg"
-                  isLoading={loading}
-                  isDisabled={loading}
-                  className="w-full font-semibold shadow-lg shadow-primary-500/30 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700"
-                  spinner={<Spinner size="sm" color="white" />}
-                >
-                  {loading ? 'Signing in...' : 'Sign in'}
-                </Button>
-              </form>
-            </CardBody>
-
-            <Divider />
-
-            {/* Footer */}
-            <CardFooter className="justify-center py-4 bg-default-50/50 dark:bg-zinc-800/50">
-              <p className="text-default-500 text-xs">
-                Powered by <span className="text-primary-600 dark:text-primary-400 font-semibold">Talio</span>
-              </p>
-            </CardFooter>
-          </Card>
-
-          {/* Optional: Link to sign up or help */}
-          <p className="text-center mt-6 text-default-500 text-sm">
-            Need help? Contact your{' '}
-            <span className="text-primary-600 font-medium">administrator</span>
-          </p>
-        </div>
-      </div>
+    <div>
+      <LoginForm
+        formData={formData} handleChange={handleChange} handleSubmit={handleSubmit}
+        showPassword={showPassword} setShowPassword={setShowPassword}
+        loading={loading} rememberMe={rememberMe} setRememberMe={setRememberMe}
+      />
 
       {/* Login Error Modal */}
       <Modal 

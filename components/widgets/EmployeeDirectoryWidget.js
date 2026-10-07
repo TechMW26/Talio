@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaSearch, FaUser } from 'react-icons/fa'
 import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
-import { Card, CardBody, Button, Input, Avatar, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Input, Avatar, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function EmployeeDirectoryWidget() {
   const router = useRouter()

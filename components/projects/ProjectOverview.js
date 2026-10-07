@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { 
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
-  Legend, ResponsiveContainer, RadialBarChart, RadialBar, PolarAngleAxis
+  Legend, ResponsiveContainer, FernlyGauge, FernlyCompletionAnalytics
 } from '@/components/charts/FernlyCharts'
 import {
   FaChartLine, FaUsers, FaTasks, FaCalendarAlt, FaClock,
@@ -320,49 +320,8 @@ export default function ProjectOverview({ projectId }) {
               <h3 className="text-xl font-bold text-gray-900 mb-4">
                 Progress Overview
               </h3>
-              <div className="w-full overflow-hidden" style={{ height: '120px' }}>
-                <ResponsiveContainer width="100%" height={240}>
-                  <RadialBarChart 
-                    cx="50%" 
-                    cy="50%" 
-                    innerRadius="60%" 
-                    outerRadius="90%" 
-                    barSize={28}
-                    data={[{ 
-                      name: 'Progress', 
-                      value: project.completionPercentage || 0, 
-                      fill: (project.completionPercentage || 0) >= 75 ? '#10B981' : 
-                            (project.completionPercentage || 0) >= 50 ? '#3B82F6' : 
-                            (project.completionPercentage || 0) >= 25 ? '#F59E0B' : '#EF4444'
-                    }]}
-                    startAngle={180}
-                    endAngle={0}
-                  >
-                    <PolarAngleAxis 
-                      type="number" 
-                      domain={[0, 100]} 
-                      angleAxisId={0} 
-                      tick={false}
-                    />
-                    <RadialBar 
-                      background={{ fill: '#E5E7EB' }}
-                      dataKey="value" 
-                      cornerRadius={14}
-                      angleAxisId={0}
-                    />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="text-center mt-2">
-                <p className={`text-5xl font-black ${
-                  (project.completionPercentage || 0) >= 75 ? 'text-green-600' : 
-                  (project.completionPercentage || 0) >= 50 ? 'text-blue-600' : 
-                  (project.completionPercentage || 0) >= 25 ? 'text-amber-600' : 'text-red-600'
-                }`}>
-                  {project.completionPercentage || 0}%
-                </p>
-                <p className="text-sm font-semibold text-gray-600">Complete</p>
-              </div>
+              <FernlyGauge value={project.completionPercentage || 0} label="Complete"
+                inProgress={taskAnalytics.total ? (taskAnalytics.statusDistribution['in-progress'] || 0) / taskAnalytics.total * 100 : 0} />
               <div className="mt-6 grid grid-cols-2 gap-4 text-center">
                 <div className="bg-green-50 rounded-xl p-4 border border-green-100">
                   <p className="text-2xl font-black text-green-600">{taskAnalytics.statusDistribution.completed}</p>
@@ -662,44 +621,7 @@ export default function ProjectOverview({ projectId }) {
             </div>
           </div>
 
-          {/* Daily Progress */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Daily Task Completion (Last 30 Days)
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={taskAnalytics.dailyProgress || []} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="progressGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={colors.success} stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor={colors.success} stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
-                    tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { day: 'numeric' })}
-                    tick={{ fill: '#374151', fontWeight: 600, fontSize: 11 }}
-                  />
-                  <YAxis tick={{ fill: '#374151', fontWeight: 600 }} />
-                  <Tooltip 
-                    labelFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    content={<ChartTooltip />}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="completed" 
-                    stroke={colors.success} 
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#progressGradient)" 
-                    name="Tasks Completed"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <FernlyCompletionAnalytics data={taskAnalytics.dailyProgress || []} />
 
           {/* Subtask Progress */}
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -784,20 +706,7 @@ export default function ProjectOverview({ projectId }) {
                 {/* Health Score Gauge */}
                 <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
                   <div className="text-center">
-                    <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full border-4 ${
-                      (aiInsights.healthScore || 0) >= 80 ? 'border-green-500 bg-green-50' :
-                      (aiInsights.healthScore || 0) >= 60 ? 'border-blue-500 bg-blue-50' :
-                      (aiInsights.healthScore || 0) >= 40 ? 'border-amber-500 bg-amber-50' :
-                      'border-red-500 bg-red-50'
-                    }`}>
-                      <span className={`text-2xl font-black ${
-                        (aiInsights.healthScore || 0) >= 80 ? 'text-green-600' :
-                        (aiInsights.healthScore || 0) >= 60 ? 'text-blue-600' :
-                        (aiInsights.healthScore || 0) >= 40 ? 'text-amber-600' :
-                        'text-red-600'
-                      }`}>{aiInsights.healthScore || 0}</span>
-                    </div>
-                    <p className="mt-2 text-sm font-bold text-gray-700">Health Score</p>
+                    <FernlyGauge value={aiInsights.healthScore || 0} label="Health Score" color="auto" showLegend={false} valueText={aiInsights.healthScore || 0} />
                     <p className={`text-xs font-semibold uppercase ${
                       aiInsights.healthStatus === 'good' ? 'text-green-600' :
                       aiInsights.healthStatus === 'warning' ? 'text-amber-600' :

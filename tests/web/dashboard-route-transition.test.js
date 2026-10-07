@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import DashboardRouteTransition from '@/components/ui/DashboardRouteTransition'
 
 const fs = require('fs')
@@ -16,6 +16,32 @@ jest.mock('@/contexts/PageTransitionContext', () => ({
 }))
 
 describe('DashboardRouteTransition', () => {
+  test('homepage opts into viewport sizing, while document pages retain scrolling', () => {
+    const view = render(<DashboardRouteTransition><section>Home</section></DashboardRouteTransition>)
+    expect(view.container.querySelector('.dashboard-route-page')).toHaveAttribute('data-page-sizing', 'viewport')
+    mockPathname = '/dashboard/documents'
+    view.rerender(<DashboardRouteTransition><section>Documents</section></DashboardRouteTransition>)
+    expect(view.container.querySelector('.dashboard-route-page')).toHaveAttribute('data-page-sizing', 'document')
+  })
+  test.each([false, true])('loaded content animates without remounting; reduced motion=%s', async reduced => {
+    const original = window.matchMedia, originalAnimate = Element.prototype.animate
+    window.matchMedia = () => ({ matches: reduced, addEventListener() {}, removeEventListener() {} })
+    const animate = jest.fn(() => ({ cancel: jest.fn() }))
+    Element.prototype.animate = animate
+    try {
+      const { rerender, unmount } = render(<DashboardRouteTransition><section><div data-page-skeleton="true" /></section></DashboardRouteTransition>)
+      rerender(<DashboardRouteTransition><section><h1>Loaded content</h1></section></DashboardRouteTransition>)
+      await waitFor(() => expect(screen.getByText('Loaded content')).toBeVisible())
+      if (!reduced) await waitFor(() => expect(animate).toHaveBeenCalled())
+      else expect(animate).not.toHaveBeenCalled()
+      unmount()
+    } finally { window.matchMedia = original; Element.prototype.animate = originalAnimate }
+  })
+  test('employee dashboards opt into shared viewport sizing', () => {
+    mockPathname = '/dashboard/team/members/abc'
+    const { container } = render(<DashboardRouteTransition><section>Employee</section></DashboardRouteTransition>)
+    expect(container.querySelector('.dashboard-route-page')).toHaveAttribute('data-page-sizing', 'viewport')
+  })
   beforeEach(() => {
     mockIsNavigating = false
     mockPathname = '/dashboard'

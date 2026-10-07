@@ -183,14 +183,6 @@ There is **no separate `Role` or `Permission` model** in the codebase. Access co
 | `/dashboard/helpdesk/[id]` | Ticket details | All roles |
 | `/dashboard/helpdesk/manage` | Manage tickets | Admin, HR |
 
-#### Learning & Development
-| Route | Purpose | Current Access |
-|-------|---------|----------------|
-| `/dashboard/learning` | Learning dashboard | All roles |
-| `/dashboard/learning/courses` | Browse courses | All roles |
-| `/dashboard/learning/trainings` | My trainings | All roles |
-| `/dashboard/learning/certificates` | Certificates | All roles |
-
 #### Chat & Communication
 | Route | Purpose | Current Access |
 |-------|---------|----------------|
@@ -247,7 +239,7 @@ There is **no separate `Role` or `Permission` model** in the codebase. Access co
 | `/api/setup/check` | GET | Setup status check |
 | `/api/setup/create-admin` | POST | First admin creation |
 | `/api/setup/tenant` | GET, POST | Tenant setup |
-| `/api/health` | GET | Docker health check |
+| `/api/health` | GET | Deployment health check |
 | `/api/redis-status` | GET, POST | Redis check |
 | `/api/desktop/min-version` | GET | Desktop min version |
 | `/api/assetlinks` | GET | Android deep links |
@@ -510,7 +502,6 @@ There is **no separate `Role` or `Permission` model** in the codebase. Access co
 | `/api/user/heartbeat` | POST, GET | Any |
 | `/api/user/check-refresh` | GET | Any |
 | `/api/assets` | GET, POST | **Admin/HR** manage |
-| `/api/learning/*` | Various | All view / **Admin/HR** manage |
 | `/api/helpdesk` | GET, POST | Any |
 | `/api/helpdesk/[id]` | GET, PUT | Any (manage: Admin/HR) |
 | `/api/teams` | GET, POST | **Admin/HR/DeptHead/DeptManager** create |
@@ -533,14 +524,14 @@ There is **no separate `Role` or `Permission` model** in the codebase. Access co
 - Work: Projects (All/My Tasks/Assigned/Approvals/Create), Attendance & Leaves (full set), Productivity
 - People: Employees (All/Add/Onboarding/Depts/Designations/Passwords), Live Users, Performance (full), Recruitment (full)
 - Finance: Payroll (Process/Generate/Payslips), Expenses (My/Approvals)
-- Resources: Documents, Assets, Helpdesk, Policies, Ideas, Learning (Courses/Trainings/Certificates)
+- Resources: Documents, Assets, Helpdesk, Policies, Ideas
 - Company: Announcements (All/Create), Holidays, Calendar
 
 **Manager:**
 - Main: Dashboard, Chat, Mail, Meetings, To-Do's, TalioBoard
 - Work: Projects (full), Attendance & Leaves (personal + approvals)
 - Finance: Payslips, Expenses (My/Approvals)
-- Resources: Documents, Assets, Policies, Learning (Trainings/Certificates), Helpdesk, Ideas
+- Resources: Documents, Assets, Policies, Helpdesk, Ideas
 - Company: Announcements (view), Calendar
 
 **Department Head:**
@@ -552,7 +543,7 @@ There is **no separate `Role` or `Permission` model** in the codebase. Access co
 - Main: Dashboard, Chat, Mail, Meetings, To-Do's, TalioBoard
 - Work: Projects (My Projects/My Tasks/Assigned/Approvals/Create), Attendance (personal), Leave (personal)
 - Finance: Payslips, Expenses (My/Approvals)
-- Resources: Documents, Assets, Policies, Learning (Trainings/Certificates), Helpdesk, Ideas
+- Resources: Documents, Assets, Policies, Helpdesk, Ideas
 - Company: Announcements (view), Calendar
 
 ### 5.2 Client-Side Route Permissions (RoleBasedAccess.js)

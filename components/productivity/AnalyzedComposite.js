@@ -15,8 +15,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Modal from '@/components/ui/HeroModal'
-import { ModalContent, ModalBody } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { ModalContent, ModalBody } from '@/components/ui/fernly'
 import { HiOutlineXMark, HiOutlinePhoto } from 'react-icons/hi2'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 

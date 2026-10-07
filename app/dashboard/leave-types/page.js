@@ -1,10 +1,13 @@
 'use client'
+import { SummaryCard } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading3, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaTrash, FaUmbrella } from 'react-icons/fa'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Switch } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Switch } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -103,7 +106,7 @@ export default function LeaveTypesPage() {
       {/* Header */}
       < div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0" >
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-default-900">Leave Types</h1>
+          <Heading1 className="text-2xl sm:text-3xl font-bold text-default-900">Leave Types</Heading1>
           <p className="text-default-500 mt-1 text-sm sm:text-base flex items-center gap-2">
             Configure different types of leaves
             <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
@@ -121,45 +124,11 @@ export default function LeaveTypesPage() {
 
       {/* Stats Card */}
       < div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" >
-        <Card shadow="sm">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-default-500">Total Leave Types</h3>
-              <div className="text-3xl font-bold text-default-900 mt-1">{leaveTypes.length}</div>
-            </div>
-            <div className="bg-primary-100 p-3 rounded-xl">
-              <FaUmbrella className="text-primary-500 h-6 w-6" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total Leave Types</>} value={<>{leaveTypes.length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-default-500">Paid Leaves</h3>
-              <div className="text-3xl font-bold text-success-600 mt-1">
-                {leaveTypes.filter(t => t.isPaid).length}
-              </div>
-            </div>
-            <div className="bg-success-100 p-3 rounded-xl">
-              <FaUmbrella className="text-success-500 h-6 w-6" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Paid Leaves</>} value={<>{leaveTypes.filter(t => t.isPaid).length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-default-500">Total Days</h3>
-              <div className="text-3xl font-bold text-primary-600 mt-1">
-                {leaveTypes.reduce((sum, t) => sum + (t.maxDaysPerYear || 0), 0)}
-              </div>
-            </div>
-            <div className="bg-primary-100 p-3 rounded-xl">
-              <FaUmbrella className="text-primary-500 h-6 w-6" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total Days</>} value={<>{leaveTypes.reduce((sum, t) => sum + (t.maxDaysPerYear || 0), 0)}</>} />
       </div >
 
       {/* Leave Types Grid */}
@@ -227,7 +196,7 @@ export default function LeaveTypesPage() {
                         <FaUmbrella className="text-primary-500 text-xl" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-default-900">{type.name}</h3>
+                        <Heading3 className="text-lg font-bold text-default-900">{type.name}</Heading3>
                         {type.code && (
                           <p className="text-sm text-default-500">{type.code}</p>
                         )}
@@ -297,9 +266,9 @@ export default function LeaveTypesPage() {
         <ModalContent>
           <form onSubmit={handleSubmit}>
             <ModalHeader className="flex flex-col gap-1">
-              <h2 className="text-xl font-bold">
+              <Heading2 className="text-xl font-bold">
                 {editingType ? 'Edit Leave Type' : 'Add Leave Type'}
-              </h2>
+              </Heading2>
             </ModalHeader>
             <ModalBody>
               <div className="space-y-4">

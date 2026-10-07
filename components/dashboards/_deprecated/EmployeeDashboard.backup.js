@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import {
   FaClock, FaCalendarAlt, FaMoneyBillWave, FaFileAlt,
-  FaArrowUp, FaArrowDown, FaGraduationCap, FaAward,
+  FaArrowUp, FaArrowDown, FaAward,
   FaCheckCircle, FaExclamationCircle, FaUser, FaBullhorn,
   FaExclamationTriangle, FaGift, FaSignInAlt, FaSignOutAlt
 } from 'react-icons/fa'
@@ -559,14 +559,6 @@ export default function EmployeeDashboard({ user: userProp }) {
       trend: dashboardStats.stats.pendingTasks.trend
     },
     {
-      title: 'Completed Courses',
-      value: `${dashboardStats.stats.completedCourses.value}`,
-      change: `${dashboardStats.stats.completedCourses.change >= 0 ? '+' : ''}${dashboardStats.stats.completedCourses.change}`,
-      icon: FaGraduationCap,
-      color: 'bg-indigo-500',
-      trend: dashboardStats.stats.completedCourses.trend
-    },
-    {
       title: 'Performance Score',
       value: `${dashboardStats.stats.performanceScore.value}%`,
       change: `${dashboardStats.stats.performanceScore.change >= 0 ? '+' : ''}${dashboardStats.stats.performanceScore.change}%`,
@@ -968,7 +960,7 @@ export default function EmployeeDashboard({ user: userProp }) {
       component: <ProjectTasksWidget limit={5} showPendingAcceptance={true} />
     },
     {
-      id: 'tasks-learning',
+      id: 'today-tasks',
       component: (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
           <div style={{ backgroundColor: 'var(--color-bg-card)' }} className="rounded-lg p-3 sm:p-6">
@@ -1012,36 +1004,7 @@ export default function EmployeeDashboard({ user: userProp }) {
             </div>
           </div>
 
-          <div style={{ backgroundColor: 'var(--color-bg-card)' }} className="rounded-lg p-3 sm:p-6">
-            <h3 className="text-sm sm:text-base font-bold text-gray-800 mb-4">Learning Progress</h3>
-            <div className="space-y-4">
-              {[
-                { course: 'React Advanced Concepts', progress: 100, status: 'Completed' },
-                { course: 'Node.js Best Practices', progress: 75, status: 'In Progress' },
-                { course: 'Database Optimization', progress: 45, status: 'In Progress' },
-                { course: 'DevOps Fundamentals', progress: 0, status: 'Not Started' },
-              ].map((course, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-1 sm:space-y-0">
-                    <h4 className="text-xs sm:text-sm font-medium text-gray-900 truncate pr-2">{course.course}</h4>
-                    <span className={`px-2 py-1 text-xs rounded-full self-start sm:self-auto ${course.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                      course.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                      {course.status}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${course.progress === 100 ? 'bg-green-600' : 'bg-blue-600'
-                        }`}
-                      style={{ width: `${course.progress}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-gray-500">{course.progress}% complete</p>
-                </div>
-              ))}
-            </div>
-          </div>
+
         </div>
       )
     }

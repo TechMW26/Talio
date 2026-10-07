@@ -1,0 +1,54 @@
+/* Fernly segmented-control, card and page entrance geometry in Talio tokens. */
+.page, .dashboard { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.page { gap: 12px; }
+.dashboard { flex: 1; }
+:global(main.dashboard-page-canvas):has(.page) { overflow: hidden; min-height: 0; }
+:global(main.dashboard-page-canvas):has(.page) > div:first-child,
+:global(.dashboard-route-stage):has(.page), :global(.dashboard-route-page):has(.page) { height: 100%; min-height: 0; }
+:global(main.dashboard-page-canvas):has(.page) > div:not(:first-child) { display: none; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 18px; flex: none; margin-bottom: 8px; }
+.header > div:first-child { min-width: 0; }
+.header h1 { margin: 4px 0; }
+.eyebrow, .panelHeader p { font-size: 12px; color: var(--color-text-secondary); }
+.attendanceSummary { font-size: 12px; margin-top: 6px; }
+.workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: minmax(0, 1fr); align-items: stretch; gap: 22px; }
+.main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.tabs { position: relative; isolation: isolate; display: flex; gap: 2px; padding: 5px; border-radius: 999px; background: var(--color-bg-card); border: 1px solid var(--color-border); flex: none; overflow-x: auto; scrollbar-width: none; }
+.tabs button { position: relative; flex: 1 0 auto; height: 40px; padding: 0 18px; background: transparent; color: var(--color-text-secondary); font-size: 12px; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: white; }
+.tabs button > span:not(.pill) { position: relative; z-index: 1; }
+.pill { position: absolute; inset: 0; border-radius: 999px; background: #2563eb; z-index: 0; }
+.panelHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; flex: none; padding: 16px 2px 14px; }
+.panelHeader h2 { font-size: 18px; margin-bottom: 4px; }
+.panelHeader > div:first-child { min-width: 0; }
+.pagination { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: 0 1 auto; min-width: 0; max-width: 100%; margin-left: auto; }
+.pagination button { width: 36px; min-width: 36px; height: 36px; padding: 0; display: grid; place-items: center; background: var(--color-bg-card); border: 1px solid var(--color-border); flex-shrink: 0; }
+.pagination button svg { width: 16px; height: 16px; }
+.pagination span { font-size: 11px; color: var(--color-text-secondary); white-space: nowrap; }
+.pagination button:disabled { opacity: .35; }
+.pagePills { display: flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; max-width: none; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
+.pagePills button { width: auto; padding: 0 14px; font-size: 11px; white-space: nowrap; }
+.pagePills button[aria-current="page"] { background: #2563eb; color: white; border-color: #2563eb; }
+.slide { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 18px; padding: 0; animation: home-slide-in .35s cubic-bezier(.22,1,.36,1) both; }
+.slide[data-cells="1"], .slide[data-cells="2"] { grid-template-rows: minmax(0, 1fr); }
+.slide[data-cells="1"] { grid-template-columns: minmax(0, 1fr); }
+.widget { min-height: 0; min-width: 0; overflow: hidden; border-radius: 20px; }
+.wide { grid-column: 1 / -1; }
+.widget > div:last-child, .widgetContent { height: 100%; min-height: 0; }
+.widgetContent { overflow: auto; overscroll-behavior: contain; container-type: size; }
+.widgetContent:global([data-scrollable-widget="true"]) { height: 100%; min-height: 0; max-height: none; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.widgetContent > :is(section, article, [data-slot="base"]) { min-height: 100%; }
+.tools { min-width: 0; min-height: 0; overflow: hidden; border-radius: 20px; border: 1px solid var(--color-border); background: var(--color-bg-card); }
+.tools > div { height: 100%; }
+.tools [aria-label="Scrollable quick tools"] { flex: 1; overflow-y: auto; }
+.empty { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: var(--color-bg-card); border-radius: 20px; }
+.empty button { padding: 12px 20px; }
+.loading { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.loading > div { border-radius: 20px; background: var(--color-bg-card); animation: home-skeleton 1.4s ease-in-out infinite alternate; }
+@keyframes home-slide-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes home-skeleton { from { opacity: .5; } to { opacity: 1; } }
+@media (max-width: 1100px) { .workspace { grid-template-columns: minmax(0, 1fr) 240px; gap: 14px; } .header { align-items: flex-start; } }
+@media (max-width: 767px) { .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 180px; gap: 12px; } .header { gap: 10px; } .slide { gap: 10px; } .panelHeader p { display: none; } .panelHeader { padding: 10px 2px; } .tabs button { height: 34px; padding: 0 12px; } }
+@media (prefers-reduced-motion: reduce) { .slide, .loading > div { animation: none; } }
+@media (max-width: 767px) { .pagination { gap: 6px; } }
+@media (max-width: 767px) { .slide { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(240px, 1fr); overflow-y: auto; scroll-snap-type: y proximity; } .widget { scroll-snap-align: start; } }

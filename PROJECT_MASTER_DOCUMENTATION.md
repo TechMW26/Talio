@@ -115,8 +115,8 @@ MAYA has been upgraded with **COMPLETE ACTION CAPABILITIES** - she can now perfo
 
 ### 📋 Prerequisites
 *   **OS**: Ubuntu 20.04/22.04 LTS
-*   **Runtime**: Node.js 18+, Docker, Docker Compose
-*   **Database**: MongoDB Atlas or Local
+*   **Runtime**: Node.js 22 on native Vercel Fluid Compute
+*   **Database**: Firebase Firestore (server credentials configured in Vercel)
 
 ### 🚀 Quick Deployment
 ```bash
@@ -126,17 +126,19 @@ cd talio
 
 # 2. Configure .env
 cp .env.example .env
-# Edit MONGODB_URI, JWT_SECRET, NEXTAUTH_URL
+# Configure Firestore, JWT_SECRET and managed-service settings
 
-# 3. Start with Docker
-docker-compose up -d --build
+# 3. Validate and build natively
+npm ci --legacy-peer-deps
+npm run release:check
+npm run build
 ```
 
 ### 🔧 Manual Start
 ```bash
 npm install
 npm run build
-npm run start # Runs 'node server.js'
+npm run start # Runs Next.js production server
 ```
 
 ---

@@ -1,10 +1,16 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
+
+
+import { UploadInput } from '@/components/ui/UploadButton'
+import { NativeButton, Heading3, NativeSelect, NativeInput, Heading2, NativeTextarea } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Select, SelectItem, Button, Skeleton } from '@heroui/react'
+import { Select, SelectItem, Button, Skeleton, Card } from '@/components/ui/fernly'
 import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch, FaMicrophone } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
@@ -14,6 +20,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
 import { saveCompanySettings, validateCompanyLogo } from '@/lib/client/companySettings'
+import SettingsWorkspace from '@/components/settings/SettingsWorkspace'
 import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
 import MiraSettings from '@/components/settings/MiraSettings'
 import InductionSettings from '@/components/settings/InductionSettings'
@@ -39,14 +46,14 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
   if (selectedCompany) {
     return (
       <div className="mb-6">
-        <button
+        <NativeButton
           onClick={onBack}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
         >
           <BackIcon className="w-5 h-5" />
           <span>Back to Companies</span>
-        </button>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+        </NativeButton>
+        <Card className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
           <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
             {selectedCompany.logo ? (
               <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-full h-full object-contain" />
@@ -55,10 +62,10 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
             )}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-800">{selectedCompany.name}</h3>
+            <Heading3 className="font-semibold text-gray-800">{selectedCompany.name}</Heading3>
             <p className="text-sm text-gray-500">{selectedCompany.code}</p>
           </div>
-        </div>
+        </Card>
       </div>
     )
   }
@@ -66,21 +73,22 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
   return (
     <div>
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Select a Company</h3>
+        <Heading3 className="text-lg font-semibold text-gray-800 mb-2">Select a Company</Heading3>
         <p className="text-gray-600 text-sm">Choose a company to configure its settings</p>
       </div>
 
       {companies.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
+        <Card className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
           <FaBuilding className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-800">No companies found</h3>
+          <Heading3 className="text-lg font-medium text-gray-800">No companies found</Heading3>
           <p className="text-gray-500 mt-2">Create a company first in the Company Settings tab.</p>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {companies.map((company) => (
-            <button
+            <NativeButton
               key={company._id}
+              data-shape="card"
               onClick={() => onSelect(company)}
               className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-blue-200 transition-all text-left group overflow-hidden"
             >
@@ -97,7 +105,7 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
                   <p className="text-sm text-gray-500 uppercase">{company.code}</p>
                 </div>
               </div>
-            </button>
+            </NativeButton>
           ))}
         </div>
       )}
@@ -108,7 +116,6 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('company')
-  const [settingsQuery, setSettingsQuery] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -156,19 +163,6 @@ export default function SettingsPage() {
     return baseTabs
   }, [userRole, isDepartmentHead, isFeatureEnabled])
 
-  const visibleTabs = useMemo(() => {
-    const query = settingsQuery.trim().toLocaleLowerCase()
-    if (!query) return tabs
-    return tabs.filter((tab) => [tab.name, tab.description, tab.group]
-      .some((value) => value?.toLocaleLowerCase().includes(query)))
-  }, [settingsQuery, tabs])
-
-  const groupedTabs = useMemo(() => visibleTabs.reduce((groups, tab) => {
-    if (!groups[tab.group]) groups[tab.group] = []
-    groups[tab.group].push(tab)
-    return groups
-  }, {}), [visibleTabs])
-
   const selectTab = (tabId) => {
     setActiveTab(tabId)
     if (typeof window === 'undefined') return
@@ -185,12 +179,8 @@ export default function SettingsPage() {
 
     if (requestedTab && tabs.some((tab) => tab.id === requestedTab)) {
       setActiveTab(requestedTab)
-    } else if (userRole === 'admin' || userRole === 'hr') {
-      setActiveTab('company')
-    } else if (userRole === 'department_head' || isDepartmentHead) {
-      setActiveTab('notifications')
     } else {
-      setActiveTab(tabs[0]?.id || null)
+      setActiveTab(tabs.some((tab) => tab.id === 'company') ? 'company' : tabs[0]?.id)
     }
   }, [userRole, isDepartmentHead, tabs])
 
@@ -231,17 +221,11 @@ export default function SettingsPage() {
     window.history.replaceState({}, '', nextUrl)
   }, [mounted])
 
-  // Show loading state while detecting device
+  // Match the menu/content layout while the client session becomes available.
   if (!mounted) {
     return (
-      <div className="page-container">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <Skeleton className="h-8 w-40 rounded-lg mb-2" />
-            <Skeleton className="h-4 w-56 rounded-lg" />
-          </div>
-        </div>
-        <Skeleton className="h-12 w-full rounded-xl mb-6" />
+      <div className="page-container grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] gap-7">
+        <Skeleton className="h-40 md:h-96 w-full rounded-xl" />
         <Skeleton className="h-96 w-full rounded-xl" />
       </div>
     )
@@ -249,84 +233,7 @@ export default function SettingsPage() {
 
   return (
     <div className="page-container talio-settings-page">
-      {/* Header */}
-      <div className="page-header mb-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-600">Workspace controls</p>
-          <h1 className="page-title mt-1">Settings</h1>
-          <p className="page-subtitle">Manage organisation policies, integrations, and your preferences.</p>
-        </div>
-      </div>
-
-      <div className="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <label className="talio-surface block lg:hidden">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-default-400">Settings section</span>
-          <select
-            value={activeTab}
-            onChange={(event) => selectTab(event.target.value)}
-            className="w-full rounded-xl border border-default-200 bg-default-50 px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-primary-500"
-          >
-            {tabs.map((tab) => <option key={tab.id} value={tab.id}>{tab.name}</option>)}
-          </select>
-        </label>
-
-        <aside className="talio-surface hidden lg:sticky lg:top-5 lg:block">
-          <label className="flex items-center gap-2 rounded-xl border border-default-200 bg-default-50 px-3 py-2.5">
-            <FaSearch className="h-3.5 w-3.5 flex-shrink-0 text-default-400" />
-            <input
-              value={settingsQuery}
-              onChange={(event) => setSettingsQuery(event.target.value)}
-              placeholder="Search settings"
-              aria-label="Search settings"
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-default-400"
-            />
-          </label>
-
-          <nav className="mt-4 space-y-4" aria-label="Settings sections">
-            {Object.entries(groupedTabs).map(([group, groupTabs]) => (
-              <div key={group}>
-                <p className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-default-400">{group}</p>
-                <div className="space-y-1">
-                  {groupTabs.map((tab) => {
-                    const Icon = tab.icon
-                    const selected = activeTab === tab.id
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => selectTab(tab.id)}
-                        aria-current={selected ? 'page' : undefined}
-                        className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${selected ? 'bg-primary-500 text-primary-foreground' : 'text-foreground hover:bg-default-100'}`}
-                      >
-                        <span className="flex items-start gap-3">
-                          <Icon className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'text-primary-foreground' : 'text-primary-500'}`} />
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold">{tab.name}</span>
-                            <span className={`mt-0.5 block text-xs leading-4 ${selected ? 'text-primary-foreground opacity-80' : 'text-default-500'}`}>{tab.description}</span>
-                          </span>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          {visibleTabs.length === 0 && (
-            <div className="py-8 text-center">
-              <p className="text-sm font-medium text-foreground">No settings found</p>
-              <button type="button" onClick={() => setSettingsQuery('')} className="mt-2 text-xs font-semibold text-primary-600">Clear search</button>
-            </div>
-          )}
-        </aside>
-
-        {/* Content */}
-        <section className="talio-surface min-w-0" aria-live="polite">
-          <div className="mb-6 border-b border-default-200 pb-4">
-            <h2 className="text-xl font-bold text-foreground">{tabs.find((tab) => tab.id === activeTab)?.name}</h2>
-            <p className="mt-1 text-sm text-default-500">{tabs.find((tab) => tab.id === activeTab)?.description}</p>
-          </div>
+      <SettingsWorkspace tabs={tabs} activeTab={activeTab} onSelect={selectTab}>
           {activeTab === 'company' && <CompanySettingsTab />}
           {activeTab === 'recruitment' && <div className="space-y-6"><WordPressRecruitmentSettings /><RecruitmentSettingsTab /></div>}
           {activeTab === 'geofencing' && <GeofencingTab />}
@@ -336,8 +243,7 @@ export default function SettingsPage() {
           {activeTab === 'mira' && <MiraSettings />}
           {activeTab === 'induction' && <InductionSettings />}
           {activeTab === 'productivity' && userRole === 'admin' && <ProductivitySettings />}
-        </section>
-      </div>
+      </SettingsWorkspace>
     </div>
   )
 }
@@ -511,10 +417,10 @@ function RecruitmentSettingsTab() {
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h2 className={`text-xl font-bold flex items-center gap-2 ${titleClass}`}>
+        <Heading2 className={`text-xl font-bold flex items-center gap-2 ${titleClass}`}>
           <FaBriefcase className="text-sky-600" />
           Recruitment Integrations
-        </h2>
+        </Heading2>
         <p className={`mt-1 ${bodyClass}`}>Connect LinkedIn, monitor sync health, and keep setup instructions visible for the current env-based flow.</p>
       </div>
 
@@ -532,7 +438,7 @@ function RecruitmentSettingsTab() {
                 LinkedIn Direct
               </div>
               <div>
-                <h3 className={`text-2xl font-semibold ${titleClass}`}>Professional setup for your current env-based LinkedIn flow</h3>
+                <Heading3 className={`text-2xl font-semibold ${titleClass}`}>Professional setup for your current env-based LinkedIn flow</Heading3>
                 <p className={`mt-2 max-w-2xl text-sm ${bodyClass}`}>
                   The current implementation uses server environment variables. This panel shows the health of the connection, the exact keys you need, and the steps your team should follow to obtain them.
                 </p>
@@ -553,23 +459,23 @@ function RecruitmentSettingsTab() {
                 Connect once the env keys are filled correctly. Disconnect only clears the stored LinkedIn tokens for this tenant.
               </p>
               <div className="mt-5 flex flex-col gap-3">
-                <button
+                <NativeButton
                   type="button"
                   onClick={handleConnect}
                   disabled={isConnecting}
                   className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
                 >
                   {isConnecting ? 'Redirecting to LinkedIn...' : status.isConnected ? 'Reconnect LinkedIn' : 'Connect LinkedIn'}
-                </button>
+                </NativeButton>
 
-                <button
+                <NativeButton
                   type="button"
                   onClick={handleDisconnect}
                   disabled={!status.isConnected || disconnectMutation.isLoading}
                   className={`inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${isDarkMode ? 'border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900 disabled:text-slate-500' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:text-gray-400'}`}
                 >
                   {disconnectMutation.isLoading ? 'Disconnecting...' : 'Disconnect LinkedIn'}
-                </button>
+                </NativeButton>
               </div>
 
               <div className={`mt-5 rounded-xl p-4 text-sm ${isDarkMode ? 'border border-slate-800 bg-slate-950 text-slate-400' : 'border border-slate-200 bg-white text-gray-600'}`}>
@@ -604,7 +510,7 @@ function RecruitmentSettingsTab() {
         <div className={`rounded-[28px] p-6 sm:p-8 ${sectionClass}`}>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className={`text-lg font-semibold ${titleClass}`}>Required .env Keys</h3>
+              <Heading3 className={`text-lg font-semibold ${titleClass}`}>Required .env Keys</Heading3>
               <p className={`mt-1 text-sm ${bodyClass}`}>Copy these keys into your server env for the current LinkedIn setup.</p>
             </div>
             <div className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
@@ -636,7 +542,7 @@ function RecruitmentSettingsTab() {
         </div>
 
         <div className={`rounded-[28px] p-6 sm:p-8 ${sectionClass}`}>
-          <h3 className={`text-lg font-semibold ${titleClass}`}>How To Grab The Credentials</h3>
+          <Heading3 className={`text-lg font-semibold ${titleClass}`}>How To Grab The Credentials</Heading3>
           <p className={`mt-1 text-sm ${bodyClass}`}>Give these steps to the person who owns the company LinkedIn app or page access.</p>
 
           <div className="mt-5 space-y-4">
@@ -889,9 +795,9 @@ function CompanySettingsTab() {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <Heading2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             Company Settings
-          </h2>
+          </Heading2>
           <p className="text-gray-600 mt-1">Manage your companies and their individual settings</p>
         </div>
         <Button
@@ -905,9 +811,9 @@ function CompanySettingsTab() {
 
       {/* Companies Grid */}
       {companies.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
+        <Card className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
           <FaBuilding className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-800">No companies yet</h3>
+          <Heading3 className="mt-4 text-lg font-medium text-gray-800">No companies yet</Heading3>
           <p className="mt-2 text-sm text-gray-500">Get started by adding your first company.</p>
           <Button
             onPress={() => handleOpenModal()}
@@ -916,11 +822,11 @@ function CompanySettingsTab() {
           >
             Add Company
           </Button>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {companies.map((company) => (
-            <div
+            <Card
               key={company._id}
               className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer overflow-hidden"
               onClick={() => handleOpenModal(company)}
@@ -937,7 +843,7 @@ function CompanySettingsTab() {
 
                 {/* Company Info */}
                 <div className="flex-1 min-w-0 overflow-hidden">
-                  <h3 className="font-semibold text-lg truncate text-gray-800">{company.name}</h3>
+                  <Heading3 className="font-semibold text-lg truncate text-gray-800">{company.name}</Heading3>
                   <p className="text-sm text-gray-500 uppercase">{company.code}</p>
                   {company.description && (
                     <p className="text-sm text-gray-600 mt-1 line-clamp-2">{company.description}</p>
@@ -963,7 +869,7 @@ function CompanySettingsTab() {
 
               {/* Actions */}
               <div className="mt-4 flex gap-2">
-                <button
+                <NativeButton
                   onClick={(e) => {
                     e.stopPropagation()
                     handleOpenModal(company)
@@ -971,8 +877,8 @@ function CompanySettingsTab() {
                   className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
                 >
                   Edit Settings
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   onClick={(e) => {
                     e.stopPropagation()
                     handleDeleteCompany(company._id)
@@ -980,9 +886,9 @@ function CompanySettingsTab() {
                   className="px-3 py-2 text-sm font-medium rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                 >
                   Delete
-                </button>
+                </NativeButton>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -993,14 +899,14 @@ function CompanySettingsTab() {
           <div className="modal-backdrop" />
           <div className="modal-container modal-4xl">
             <div className="modal-header">
-              <h2 className="modal-title">
+              <Heading2 className="modal-title">
                 {editingCompany ? 'Edit Company Settings' : 'Add New Company'}
-              </h2>
-              <button onClick={handleCloseModal} className="modal-close-btn">
+              </Heading2>
+              <NativeButton onClick={handleCloseModal} className="modal-close-btn">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
+              </NativeButton>
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -1012,15 +918,15 @@ function CompanySettingsTab() {
                     <span>Company Logo</span>
                   </div>
                   <div className="flex items-center gap-6">
-                    <div className="w-24 h-24 border-2 border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                    <Surface className="w-24 h-24 border-2 border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center">
                       {logoPreview ? (
                         <img src={logoPreview} alt="Company Logo" className="max-w-full max-h-full object-contain" />
                       ) : (
                         <FaBuilding className="w-8 h-8 text-gray-400" />
                       )}
-                    </div>
+                    </Surface>
                     <div className="flex-1">
-                      <input
+                      <UploadInput
                         type="file"
                         accept=".svg,.webp,.png,.jpg,.jpeg,.gif,image/svg+xml,image/png,image/jpeg,image/webp,image/gif"
                         disabled={saving}
@@ -1034,13 +940,13 @@ function CompanySettingsTab() {
 
                 {/* Company Basic Info */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                  <Heading3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
                     <span>Company Information</span>
-                  </h3>
+                  </Heading3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Company Name *</label>
-                      <input
+                      <NativeInput
                         type="text"
                         value={formData.name}
                         onChange={(e) => handleInputChange('name', e.target.value)}
@@ -1051,7 +957,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Company Code *</label>
-                      <input
+                      <NativeInput
                         type="text"
                         value={formData.code}
                         onChange={(e) => handleInputChange('code', e.target.value.toUpperCase())}
@@ -1063,7 +969,7 @@ function CompanySettingsTab() {
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Description</label>
-                      <textarea
+                      <NativeTextarea
                         value={formData.description}
                         onChange={(e) => handleInputChange('description', e.target.value)}
                         rows={2}
@@ -1073,7 +979,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Email</label>
-                      <input
+                      <NativeInput
                         type="email"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
@@ -1083,7 +989,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Phone</label>
-                      <input
+                      <NativeInput
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
@@ -1093,7 +999,7 @@ function CompanySettingsTab() {
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Website</label>
-                      <input
+                      <NativeInput
                         type="url"
                         value={formData.website}
                         onChange={(e) => handleInputChange('website', e.target.value)}
@@ -1103,7 +1009,7 @@ function CompanySettingsTab() {
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Timezone *</label>
-                      <select
+                      <NativeSelect
                         value={formData.timezone || 'Asia/Kolkata'}
                         onChange={(e) => {
                           console.log('Timezone changed to:', e.target.value);
@@ -1131,7 +1037,7 @@ function CompanySettingsTab() {
                               <option key={tz} value={tz}>{tz}</option>
                             ))}
                         </optgroup>
-                      </select>
+                      </NativeSelect>
                       <p className="text-xs text-gray-500 mt-1">All attendance records and notifications will use this timezone.</p>
                     </div>
                   </div>
@@ -1139,13 +1045,13 @@ function CompanySettingsTab() {
 
                 {/* Company Address */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                  <Heading3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
                     <span>Company Address</span>
-                  </h3>
+                  </Heading3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Street Address</label>
-                      <input
+                      <NativeInput
                         type="text"
                         value={formData.address.street}
                         onChange={(e) => handleAddressChange('street', e.target.value)}
@@ -1155,7 +1061,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">City</label>
-                      <input
+                      <NativeInput
                         type="text"
                         value={formData.address.city}
                         onChange={(e) => handleAddressChange('city', e.target.value)}
@@ -1165,7 +1071,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">State / Province</label>
-                      <input
+                      <NativeInput
                         type="text"
                         value={formData.address.state}
                         onChange={(e) => handleAddressChange('state', e.target.value)}
@@ -1175,7 +1081,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Country</label>
-                      <input
+                      <NativeInput
                         type="text"
                         value={formData.address.country}
                         onChange={(e) => handleAddressChange('country', e.target.value)}
@@ -1185,7 +1091,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Zip / Postal Code</label>
-                      <input
+                      <NativeInput
                         type="text"
                         value={formData.address.zipCode}
                         onChange={(e) => handleAddressChange('zipCode', e.target.value)}
@@ -1198,15 +1104,15 @@ function CompanySettingsTab() {
 
                 {/* Working Hours & Attendance Settings */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                  <Heading3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
                     <span>Working Hours & Attendance Settings</span>
-                  </h3>
+                  </Heading3>
 
                   {/* Check-in/Check-out Times */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Check-in Time *</label>
-                      <input
+                      <NativeInput
                         type="time"
                         value={formData.workingHours.checkInTime}
                         onChange={(e) => handleWorkingHoursChange('checkInTime', e.target.value)}
@@ -1217,7 +1123,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Check-out Time *</label>
-                      <input
+                      <NativeInput
                         type="time"
                         value={formData.workingHours.checkOutTime}
                         onChange={(e) => handleWorkingHoursChange('checkOutTime', e.target.value)}
@@ -1232,7 +1138,7 @@ function CompanySettingsTab() {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Late Threshold (min)</label>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.workingHours.lateThresholdMinutes}
                         onChange={(e) => handleWorkingHoursChange('lateThresholdMinutes', parseInt(e.target.value) || 15)}
@@ -1244,7 +1150,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Absent Threshold (min)</label>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.workingHours.absentThresholdMinutes}
                         onChange={(e) => handleWorkingHoursChange('absentThresholdMinutes', parseInt(e.target.value) || 60)}
@@ -1256,7 +1162,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Half Day Hours</label>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.workingHours.halfDayHours}
                         onChange={(e) => handleWorkingHoursChange('halfDayHours', parseFloat(e.target.value) || 4)}
@@ -1269,7 +1175,7 @@ function CompanySettingsTab() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Full Day Hours</label>
-                      <input
+                      <NativeInput
                         type="number"
                         value={formData.workingHours.fullDayHours}
                         onChange={(e) => handleWorkingHoursChange('fullDayHours', parseFloat(e.target.value) || 8)}
@@ -1288,7 +1194,7 @@ function CompanySettingsTab() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
                         <label key={day} className="flex items-center space-x-2 cursor-pointer group">
-                          <input
+                          <NativeInput
                             type="checkbox"
                             checked={formData.workingHours.workingDays?.includes(day)}
                             onChange={(e) => handleWorkingDaysChange(day, e.target.checked)}
@@ -1305,13 +1211,13 @@ function CompanySettingsTab() {
 
               {/* Form Actions */}
               <div className="modal-footer">
-                <button
+                <NativeButton
                   type="button"
                   onClick={handleCloseModal}
                   className="px-6 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
-                </button>
+                </NativeButton>
                 <LoadingButton
                   type="submit"
                   isLoading={saving}
@@ -1554,12 +1460,12 @@ function GeofenceLocationsManager({ companyId }) {
   }
 
   return (
-    <div className="bg-white rounded-lg">
+    <Card className="bg-white rounded-lg">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <Heading3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <span>Office Locations</span>
-          </h3>
+          </Heading3>
           <p className="text-sm text-gray-600 mt-1">Manage multiple office locations. Employees can check in from any configured location.</p>
         </div>
         <Button
@@ -1600,21 +1506,21 @@ function GeofenceLocationsManager({ companyId }) {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <button
+                  <NativeButton
                     onClick={() => handleOpenModal(location)}
                     className="text-blue-600 hover:text-blue-800"
                     title="Edit"
                   >
                     ✏️
-                  </button>
+                  </NativeButton>
                   {!location.isPrimary && (
-                    <button
+                    <NativeButton
                       onClick={() => handleDelete(location._id)}
                       className="text-red-600 hover:text-red-800"
                       title="Delete"
                     >
                       🗑️
-                    </button>
+                    </NativeButton>
                   )}
                 </div>
               </div>
@@ -1651,16 +1557,16 @@ function GeofenceLocationsManager({ companyId }) {
             setEditingLocation(null)
           }}
         >
-          <div
+          <DialogSurface
             className="rounded-[30px] animate-modal-enter shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col bg-white border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
-              <h3 className="text-xl font-bold flex items-center gap-3 text-gray-900">
+              <Heading3 className="text-xl font-bold flex items-center gap-3 text-gray-900">
                 {editingLocation ? 'Edit Location' : 'Add New Location'}
-              </h3>
-              <button
+              </Heading3>
+              <NativeButton
                 onClick={() => {
                   setShowModal(false)
                   setEditingLocation(null)
@@ -1668,7 +1574,7 @@ function GeofenceLocationsManager({ companyId }) {
                 className="p-2 rounded-lg transition-all hover:rotate-90 hover:bg-red-100 text-gray-500 bg-gray-100"
               >
                 <span className="text-xl">✕</span>
-              </button>
+              </NativeButton>
             </div>
 
             <div className="p-6 space-y-5 overflow-y-auto flex-1 bg-white">
@@ -1678,7 +1584,7 @@ function GeofenceLocationsManager({ companyId }) {
                   <label className="block text-sm font-semibold mb-2 text-gray-900">
                     Location Name <span className="text-red-500">*</span>
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -1690,7 +1596,7 @@ function GeofenceLocationsManager({ companyId }) {
                   <label className="block text-sm font-semibold mb-2 text-gray-900">
                     Address
                   </label>
-                  <input
+                  <NativeInput
                     type="text"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -1705,7 +1611,7 @@ function GeofenceLocationsManager({ companyId }) {
                 <label className="block text-sm font-semibold mb-2 text-gray-900">
                   Description
                 </label>
-                <textarea
+                <NativeTextarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg text-sm transition-all focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 resize-none bg-gray-50 border border-gray-300 text-gray-900 outline-none"
@@ -1724,7 +1630,7 @@ function GeofenceLocationsManager({ companyId }) {
                     <label className="block text-xs font-medium mb-1.5 text-gray-500">
                       Latitude
                     </label>
-                    <input
+                    <NativeInput
                       type="number"
                       step="any"
                       value={formData.center.latitude}
@@ -1740,7 +1646,7 @@ function GeofenceLocationsManager({ companyId }) {
                     <label className="block text-xs font-medium mb-1.5 text-gray-500">
                       Longitude
                     </label>
-                    <input
+                    <NativeInput
                       type="number"
                       step="any"
                       value={formData.center.longitude}
@@ -1756,7 +1662,7 @@ function GeofenceLocationsManager({ companyId }) {
                     <label className="block text-xs font-medium mb-1.5 text-gray-500">
                       Radius (meters)
                     </label>
-                    <input
+                    <NativeInput
                       type="number"
                       min="10"
                       step="10"
@@ -1787,7 +1693,7 @@ function GeofenceLocationsManager({ companyId }) {
               {/* Options - Compact */}
               <div className="flex flex-wrap gap-6 p-4 rounded-lg bg-gray-100">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
@@ -1799,7 +1705,7 @@ function GeofenceLocationsManager({ companyId }) {
                 </label>
 
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     checked={formData.isPrimary}
                     onChange={(e) => setFormData({ ...formData, isPrimary: e.target.checked })}
@@ -1811,7 +1717,7 @@ function GeofenceLocationsManager({ companyId }) {
                 </label>
 
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     checked={formData.strictMode}
                     onChange={(e) => setFormData({ ...formData, strictMode: e.target.checked })}
@@ -1826,7 +1732,7 @@ function GeofenceLocationsManager({ companyId }) {
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
-              <button
+              <NativeButton
                 onClick={() => {
                   setShowModal(false)
                   setEditingLocation(null)
@@ -1834,19 +1740,19 @@ function GeofenceLocationsManager({ companyId }) {
                 className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all hover:scale-105 hover:bg-gray-100 bg-white text-gray-500 border border-gray-300"
               >
                 Cancel
-              </button>
-              <button
+              </NativeButton>
+              <NativeButton
                 onClick={handleSave}
                 className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 hover:bg-blue-600 shadow-lg bg-blue-500"
               >
                 {editingLocation ? '✓ Update Location' : '+ Add Location'}
-              </button>
+              </NativeButton>
             </div>
-          </div>
+          </DialogSurface>
         </div>,
         document.body
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -1977,9 +1883,9 @@ function GeofencingTab() {
     return (
       <div>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <Heading2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             Geofencing Settings
-          </h2>
+          </Heading2>
           <p className="text-gray-600 mt-1">Configure location tracking and office premises boundaries per company</p>
         </div>
         <CompanySelector
@@ -2002,16 +1908,16 @@ function GeofencingTab() {
         loading={false}
       />
 
-      <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+      <Heading2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
         <span>Geofencing Settings</span>
-      </h2>
+      </Heading2>
       <p className="text-gray-600 mb-6">Configure location tracking and office premises boundaries</p>
 
       <form onSubmit={handleSave} className="space-y-8">
         {/* Enable Geofencing */}
         <div className="bg-blue-50 dark:bg-blue-950/30 border-2 border-primary-200 dark:border-primary-800 rounded-lg p-6">
           <label className="flex items-start space-x-4 cursor-pointer group">
-            <input
+            <NativeInput
               type="checkbox"
               name="enabled"
               defaultChecked={settings?.geofence?.enabled}
@@ -2028,13 +1934,13 @@ function GeofencingTab() {
         <GeofenceLocationsManager companyId={selectedCompany._id} />
 
         {/* Geofence Options */}
-        <div className="bg-white rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <Card className="bg-white rounded-lg">
+          <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <span>Geofence Enforcement Options</span>
-          </h3>
+          </Heading3>
           <div className="space-y-4">
             <label className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors group">
-              <input
+              <NativeInput
                 type="checkbox"
                 name="strictMode"
                 defaultChecked={settings?.geofence?.strictMode}
@@ -2047,7 +1953,7 @@ function GeofencingTab() {
             </label>
 
             <label className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors group">
-              <input
+              <NativeInput
                 type="checkbox"
                 name="notifyOnExit"
                 defaultChecked={settings?.geofence?.notifyOnExit}
@@ -2060,7 +1966,7 @@ function GeofencingTab() {
             </label>
 
             <label className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors group">
-              <input
+              <NativeInput
                 type="checkbox"
                 name="requireApproval"
                 defaultChecked={settings?.geofence?.requireApproval}
@@ -2080,7 +1986,7 @@ function GeofencingTab() {
                 In strict mode, readings less accurate than this are rejected.
               </p>
               <div className="flex items-center gap-3 max-w-sm">
-                <input
+                <NativeInput
                   id="maxAccuracyMeters"
                   name="maxAccuracyMeters"
                   type="number"
@@ -2094,24 +2000,24 @@ function GeofencingTab() {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Break Timings */}
-        <div className="bg-white rounded-lg">
+        <Card className="bg-white rounded-lg">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Heading3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <span>Break Timings</span>
-              </h3>
+              </Heading3>
               <p className="text-sm text-gray-600 mt-1">Configure break times when geofencing tracking is paused</p>
             </div>
-            <button
+            <NativeButton
               type="button"
               onClick={addBreakTiming}
               className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-primary-600 transition-colors flex items-center gap-2"
             >
               <span>+</span> Add Break
-            </button>
+            </NativeButton>
           </div>
 
           {breakTimings.length === 0 ? (
@@ -2125,7 +2031,7 @@ function GeofencingTab() {
               {breakTimings.map((breakTiming, index) => (
                 <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <div className="flex justify-between items-start mb-3">
-                    <input
+                    <NativeInput
                       type="text"
                       value={breakTiming.name}
                       onChange={(e) => updateBreakTiming(index, 'name', e.target.value)}
@@ -2133,7 +2039,7 @@ function GeofencingTab() {
                       placeholder="Break name (e.g., Lunch Break)"
                     />
                     <label className="flex items-center gap-2 mr-2">
-                      <input
+                      <NativeInput
                         type="checkbox"
                         checked={breakTiming.isActive}
                         onChange={(e) => updateBreakTiming(index, 'isActive', e.target.checked)}
@@ -2141,20 +2047,20 @@ function GeofencingTab() {
                       />
                       <span className="text-sm text-gray-700">Active</span>
                     </label>
-                    <button
+                    <NativeButton
                       type="button"
                       onClick={() => removeBreakTiming(index)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Remove"
                     >
                       ✕
-                    </button>
+                    </NativeButton>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1.5">Start Time</label>
-                      <input
+                      <NativeInput
                         type="time"
                         value={breakTiming.startTime}
                         onChange={(e) => updateBreakTiming(index, 'startTime', e.target.value)}
@@ -2163,7 +2069,7 @@ function GeofencingTab() {
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1.5">End Time</label>
-                      <input
+                      <NativeInput
                         type="time"
                         value={breakTiming.endTime}
                         onChange={(e) => updateBreakTiming(index, 'endTime', e.target.value)}
@@ -2176,7 +2082,7 @@ function GeofencingTab() {
                     <label className="block text-xs text-gray-600 mb-2">Active Days</label>
                     <div className="flex flex-wrap gap-2">
                       {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
-                        <button
+                        <NativeButton
                           key={day}
                           type="button"
                           onClick={() => toggleBreakDay(index, day)}
@@ -2186,7 +2092,7 @@ function GeofencingTab() {
                             }`}
                         >
                           {day.charAt(0).toUpperCase() + day.slice(1, 3)}
-                        </button>
+                        </NativeButton>
                       ))}
                     </div>
                   </div>
@@ -2194,7 +2100,7 @@ function GeofencingTab() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
 
         <div className="flex justify-end pt-4 border-t border-gray-200">
           <LoadingButton
@@ -2216,7 +2122,7 @@ function DepartmentsTab() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Departments</h2>
+        <Heading2 className="text-xl sm:text-2xl font-bold text-gray-800">Departments</Heading2>
         <Button color="primary" size="sm" className="w-full sm:w-auto">Add Department</Button>
       </div>
       <div className="text-gray-600">
@@ -2224,24 +2130,24 @@ function DepartmentsTab() {
         <div className="space-y-2 sm:space-y-3">
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Engineering</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">Engineering</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">50 employees</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Human Resources</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">Human Resources</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">10 employees</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Sales</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">Sales</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">25 employees</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
         </div>
       </div>
@@ -2253,7 +2159,7 @@ function DesignationsTab() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Designations</h2>
+        <Heading2 className="text-xl sm:text-2xl font-bold text-gray-800">Designations</Heading2>
         <Button color="primary" size="sm" className="w-full sm:w-auto">Add Designation</Button>
       </div>
       <div className="text-gray-600">
@@ -2261,17 +2167,17 @@ function DesignationsTab() {
         <div className="space-y-2 sm:space-y-3">
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Software Engineer</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">Software Engineer</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">Engineering Department</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">HR Manager</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">HR Manager</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">Human Resources Department</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
         </div>
       </div>
@@ -2283,7 +2189,7 @@ function HolidaysTab() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Holidays</h2>
+        <Heading2 className="text-xl sm:text-2xl font-bold text-gray-800">Holidays</Heading2>
         <Button color="primary" size="sm" className="w-full sm:w-auto">Add Holiday</Button>
       </div>
       <div className="text-gray-600">
@@ -2291,17 +2197,17 @@ function HolidaysTab() {
         <div className="space-y-2 sm:space-y-3">
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">New Year&apos;s Day</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">New Year&apos;s Day</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">January 1, 2025</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Independence Day</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">Independence Day</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">July 4, 2025</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
         </div>
       </div>
@@ -2313,7 +2219,7 @@ function LeaveTypesTab() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Leave Types</h2>
+        <Heading2 className="text-xl sm:text-2xl font-bold text-gray-800">Leave Types</Heading2>
         <Button color="primary" size="sm" className="w-full sm:w-auto">Add Leave Type</Button>
       </div>
       <div className="text-gray-600">
@@ -2321,24 +2227,24 @@ function LeaveTypesTab() {
         <div className="space-y-2 sm:space-y-3">
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Casual Leave</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">Casual Leave</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">12 days per year</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Sick Leave</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">Sick Leave</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">10 days per year</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
           <div className="p-3 sm:p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Paid Time Off</h3>
+              <Heading3 className="font-semibold text-sm sm:text-base">Paid Time Off</Heading3>
               <p className="text-xs sm:text-sm text-gray-500">15 days per year</p>
             </div>
-            <button className="text-primary-500 hover:text-primary-700 text-sm">Edit</button>
+            <NativeButton className="text-primary-500 hover:text-primary-700 text-sm">Edit</NativeButton>
           </div>
         </div>
       </div>
@@ -2349,13 +2255,13 @@ function LeaveTypesTab() {
 function GeneralTab() {
   return (
     <div>
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">General Settings</h2>
+      <Heading2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">General Settings</Heading2>
       <div className="space-y-4 sm:space-y-6">
         <div>
           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
             Company Name
           </label>
-          <input
+          <NativeInput
             type="text"
             defaultValue="My Company"
             className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -2366,7 +2272,7 @@ function GeneralTab() {
           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
             Company Email
           </label>
-          <input
+          <NativeInput
             type="email"
             defaultValue="info@company.com"
             className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -2538,9 +2444,9 @@ function PayrollSettingsTab() {
     return (
       <div>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <Heading2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             Payroll Settings
-          </h2>
+          </Heading2>
           <p className="text-gray-600 mt-1">Configure payroll deductions and statutory compliance per company</p>
         </div>
         <CompanySelector
@@ -2565,23 +2471,23 @@ function PayrollSettingsTab() {
         loading={false}
       />
 
-      <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+      <Heading2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
         <span>Payroll Settings</span>
-      </h2>
+      </Heading2>
       <p className="text-gray-600 mb-6">Configure salary deductions, overtime rules, and statutory compliance</p>
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* General Settings */}
-        <div className="bg-white rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <Card className="bg-white rounded-lg">
+          <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             General Settings
-          </h3>
+          </Heading3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Working Days Per Month
               </label>
-              <input
+              <NativeInput
                 type="number"
                 name="workingDaysPerMonth"
                 defaultValue={payroll.workingDaysPerMonth || 26}
@@ -2592,13 +2498,13 @@ function PayrollSettingsTab() {
               <p className="text-xs text-gray-500 mt-1">Used to calculate daily salary rate</p>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Attendance-Based Deductions */}
-        <div className="bg-white rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <Card className="bg-white rounded-lg">
+          <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             Attendance-Based Deductions
-          </h3>
+          </Heading3>
 
           {/* Late Deduction */}
           <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -2608,7 +2514,7 @@ function PayrollSettingsTab() {
                 <p className="text-sm text-gray-600">Deduct from salary when employee arrives late</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input
+                <NativeInput
                   type="checkbox"
                   name="lateDeductionEnabled"
                   defaultChecked={payroll.lateDeduction?.enabled !== false}
@@ -2620,7 +2526,7 @@ function PayrollSettingsTab() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Deduction Type</label>
-                <select
+                <NativeSelect
                   name="lateDeductionType"
                   defaultValue={payroll.lateDeduction?.type || 'fixed'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -2628,11 +2534,11 @@ function PayrollSettingsTab() {
                   <option value="fixed">Fixed Amount (₹)</option>
                   <option value="percentage">Percentage of Salary (%)</option>
                   <option value="per-day-salary">% of Daily Salary</option>
-                </select>
+                </NativeSelect>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
-                <input
+                <NativeInput
                   type="number"
                   name="lateDeductionValue"
                   defaultValue={payroll.lateDeduction?.value || 100}
@@ -2643,7 +2549,7 @@ function PayrollSettingsTab() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Grace Lates/Month</label>
-                <input
+                <NativeInput
                   type="number"
                   name="graceLatesPerMonth"
                   defaultValue={payroll.lateDeduction?.graceLatesPerMonth || 3}
@@ -2664,7 +2570,7 @@ function PayrollSettingsTab() {
                 <p className="text-sm text-gray-600">Deduct when employee works less than full day hours</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input
+                <NativeInput
                   type="checkbox"
                   name="halfDayDeductionEnabled"
                   defaultChecked={payroll.halfDayDeduction?.enabled !== false}
@@ -2676,7 +2582,7 @@ function PayrollSettingsTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Deduction Type</label>
-                <select
+                <NativeSelect
                   name="halfDayDeductionType"
                   defaultValue={payroll.halfDayDeduction?.type || 'half-day-salary'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -2684,11 +2590,11 @@ function PayrollSettingsTab() {
                   <option value="fixed">Fixed Amount (₹)</option>
                   <option value="percentage">Percentage of Monthly Salary (%)</option>
                   <option value="half-day-salary">% of Daily Salary (50% = half day)</option>
-                </select>
+                </NativeSelect>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
-                <input
+                <NativeInput
                   type="number"
                   name="halfDayDeductionValue"
                   defaultValue={payroll.halfDayDeduction?.value || 50}
@@ -2708,7 +2614,7 @@ function PayrollSettingsTab() {
                 <p className="text-sm text-gray-600">Deduct when employee is absent without approved leave</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input
+                <NativeInput
                   type="checkbox"
                   name="absentDeductionEnabled"
                   defaultChecked={payroll.absentDeduction?.enabled !== false}
@@ -2720,7 +2626,7 @@ function PayrollSettingsTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Deduction Type</label>
-                <select
+                <NativeSelect
                   name="absentDeductionType"
                   defaultValue={payroll.absentDeduction?.type || 'full-day-salary'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -2728,11 +2634,11 @@ function PayrollSettingsTab() {
                   <option value="fixed">Fixed Amount (₹)</option>
                   <option value="percentage">Percentage of Monthly Salary (%)</option>
                   <option value="full-day-salary">% of Daily Salary (100% = full day)</option>
-                </select>
+                </NativeSelect>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
-                <input
+                <NativeInput
                   type="number"
                   name="absentDeductionValue"
                   defaultValue={payroll.absentDeduction?.value || 100}
@@ -2743,13 +2649,13 @@ function PayrollSettingsTab() {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Overtime Settings */}
-        <div className="bg-white rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <Card className="bg-white rounded-lg">
+          <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             Overtime Settings
-          </h3>
+          </Heading3>
           <div className="p-4 bg-green-50 rounded-lg border border-green-200">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -2757,7 +2663,7 @@ function PayrollSettingsTab() {
                 <p className="text-sm text-gray-600">Pay extra for hours worked beyond regular shift</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input
+                <NativeInput
                   type="checkbox"
                   name="overtimeEnabled"
                   defaultChecked={payroll.overtime?.enabled !== false}
@@ -2769,7 +2675,7 @@ function PayrollSettingsTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rate Multiplier</label>
-                <input
+                <NativeInput
                   type="number"
                   name="overtimeRateMultiplier"
                   defaultValue={payroll.overtime?.rateMultiplier || 1.5}
@@ -2782,7 +2688,7 @@ function PayrollSettingsTab() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Hours</label>
-                <input
+                <NativeInput
                   type="number"
                   name="minHoursForOvertime"
                   defaultValue={payroll.overtime?.minHoursForOvertime || 1}
@@ -2795,13 +2701,13 @@ function PayrollSettingsTab() {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Statutory Deductions */}
-        <div className="bg-white rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <Card className="bg-white rounded-lg">
+          <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             Statutory Deductions
-          </h3>
+          </Heading3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* PF */}
@@ -2809,7 +2715,7 @@ function PayrollSettingsTab() {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-gray-900">Provident Fund (PF)</h4>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     name="pfEnabled"
                     defaultChecked={payroll.pfEnabled !== false}
@@ -2820,7 +2726,7 @@ function PayrollSettingsTab() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">PF Percentage (%)</label>
-                <input
+                <NativeInput
                   type="number"
                   name="pfPercentage"
                   defaultValue={payroll.pfPercentage || 12}
@@ -2837,7 +2743,7 @@ function PayrollSettingsTab() {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-gray-900">ESI (Employee State Insurance)</h4>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     name="esiEnabled"
                     defaultChecked={payroll.esiEnabled !== false}
@@ -2848,7 +2754,7 @@ function PayrollSettingsTab() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ESI Percentage (%)</label>
-                <input
+                <NativeInput
                   type="number"
                   name="esiPercentage"
                   defaultValue={payroll.esiPercentage || 0.75}
@@ -2865,7 +2771,7 @@ function PayrollSettingsTab() {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-gray-900">Professional Tax</h4>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     name="professionalTaxEnabled"
                     defaultChecked={payroll.professionalTax?.enabled !== false}
@@ -2876,7 +2782,7 @@ function PayrollSettingsTab() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Amount (₹)</label>
-                <input
+                <NativeInput
                   type="number"
                   name="professionalTaxAmount"
                   defaultValue={payroll.professionalTax?.amount || 200}
@@ -2892,7 +2798,7 @@ function PayrollSettingsTab() {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-gray-900">TDS (Tax Deducted at Source)</h4>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input
+                  <NativeInput
                     type="checkbox"
                     name="tdsEnabled"
                     defaultChecked={payroll.tdsEnabled !== false}
@@ -2903,7 +2809,7 @@ function PayrollSettingsTab() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">TDS Percentage (%)</label>
-                <input
+                <NativeInput
                   type="number"
                   name="tdsPercentage"
                   defaultValue={payroll.tdsPercentage || 10}
@@ -2915,28 +2821,28 @@ function PayrollSettingsTab() {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Summary Preview */}
         <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-6 border border-blue-200 dark:border-blue-800">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Settings Summary</h3>
+          <Heading3 className="text-lg font-semibold text-gray-900 mb-4">Settings Summary</Heading3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="bg-white p-3 rounded-lg">
+            <Surface className="bg-white p-3 rounded-lg">
               <p className="text-gray-500">Working Days</p>
               <p className="font-semibold text-gray-900">{payroll.workingDaysPerMonth || 26} days/month</p>
-            </div>
-            <div className="bg-white p-3 rounded-lg">
+            </Surface>
+            <Surface className="bg-white p-3 rounded-lg">
               <p className="text-gray-500">Grace Lates</p>
               <p className="font-semibold text-gray-900">{payroll.lateDeduction?.graceLatesPerMonth || 3} per month</p>
-            </div>
-            <div className="bg-white p-3 rounded-lg">
+            </Surface>
+            <Surface className="bg-white p-3 rounded-lg">
               <p className="text-gray-500">Overtime Rate</p>
               <p className="font-semibold text-gray-900">{payroll.overtime?.rateMultiplier || 1.5}x</p>
-            </div>
-            <div className="bg-white p-3 rounded-lg">
+            </Surface>
+            <Surface className="bg-white p-3 rounded-lg">
               <p className="text-gray-500">PF Rate</p>
               <p className="font-semibold text-gray-900">{payroll.pfPercentage || 12}%</p>
-            </div>
+            </Surface>
           </div>
         </div>
 
@@ -3125,9 +3031,9 @@ function NotificationsTab() {
     return (
       <div>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <Heading2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             Notification Settings
-          </h2>
+          </Heading2>
           <p className="text-gray-600 mt-1">Configure email and push notification preferences per company</p>
         </div>
         <CompanySelector
@@ -3195,20 +3101,20 @@ function NotificationsTab() {
                 You have unsaved changes
               </p>
             </div>
-            <button
+            <NativeButton
               type="button"
               onClick={handleReset}
               className="text-sm font-medium text-amber-800 hover:text-amber-900 underline"
             >
               Discard changes
-            </button>
+            </NativeButton>
           </div>
         </div>
       )}
 
       <form onSubmit={handleSave} className="space-y-4">
-        <div className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200 shadow-sm">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Email Notifications</h2>
+        <Card className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200 shadow-sm">
+          <Heading2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Email Notifications</Heading2>
           <p className="text-sm text-gray-600 mb-6">
             Choose which activities should send emails to employees.
           </p>
@@ -3223,7 +3129,7 @@ function NotificationsTab() {
                 </p>
               </div>
               <label className="inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
-                <input
+                <NativeInput
                   type="checkbox"
                   className="sr-only peer"
                   checked={emailNotificationsEnabled}
@@ -3261,7 +3167,7 @@ function NotificationsTab() {
                       <p className="text-xs text-gray-500 mt-0.5">{event.description}</p>
                     </div>
                     <label className={`inline-flex items-center ml-4 flex-shrink-0 ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                      <input
+                      <NativeInput
                         type="checkbox"
                         className="sr-only"
                         checked={isEnabled}
@@ -3304,7 +3210,7 @@ function NotificationsTab() {
                       <p className="text-xs text-gray-500 mt-0.5">{event.description}</p>
                     </div>
                     <label className={`inline-flex items-center ml-4 flex-shrink-0 ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                      <input
+                      <NativeInput
                         type="checkbox"
                         className="sr-only"
                         checked={isEnabled}
@@ -3341,7 +3247,7 @@ function NotificationsTab() {
                       <p className="text-xs text-gray-500 mt-0.5">{event.description}</p>
                     </div>
                     <label className={`inline-flex items-center ml-4 flex-shrink-0 ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                      <input
+                      <NativeInput
                         type="checkbox"
                         className="sr-only"
                         checked={isEnabled}
@@ -3365,18 +3271,18 @@ function NotificationsTab() {
               })}
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Action buttons */}
         <div className="flex items-center justify-between gap-3">
-          <button
+          <NativeButton
             type="button"
             onClick={handleReset}
             disabled={!hasChanges || saving}
             className="px-4 py-2.5 rounded-lg text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Reset
-          </button>
+          </NativeButton>
           <LoadingButton
             type="submit"
             isLoading={saving}
@@ -3389,10 +3295,10 @@ function NotificationsTab() {
         </div>
       </form>
 
-      <div className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200 shadow-sm">
-        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Push Notifications</h2>
+      <Card className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200 shadow-sm">
+        <Heading2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Push Notifications</Heading2>
         <NotificationManagement />
-      </div>
+      </Card>
     </div>
   )
 }

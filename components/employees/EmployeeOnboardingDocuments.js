@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Button, Chip, Skeleton } from '@heroui/react'
+import { Button, Chip, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import OnboardingVerificationModal from './OnboardingVerificationModal'
 import toast from '@/utils/toast'

@@ -25,7 +25,6 @@ export { default as RecentActivitiesWidget } from './RecentActivitiesWidget'
 // New widgets for Employee/HR/Manager dashboards
 export { default as HolidaysWidget } from './HolidaysWidget'
 export { default as TodayTasksWidget } from './TodayTasksWidget'
-export { default as LearningProgressWidget } from './LearningProgressWidget'
 export { default as RecentActivityWidget } from './RecentActivityWidget'
 export { default as MyAssetsWidget } from './MyAssetsWidget'
 export { default as MyExpensesWidget } from './MyExpensesWidget'

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Avatar, Button, Input, Skeleton } from '@heroui/react'
+import { Avatar, Button, Input, Skeleton } from '@/components/ui/fernly'
 import { FaSearch } from 'react-icons/fa'
 import DocumentThumbnail from './DocumentThumbnail'
 import styles from './DocumentFolders.module.css'

@@ -1,5 +1,11 @@
 'use client';
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
+
+
+import UploadButton from '@/components/ui/UploadButton'
+import { Heading1, Heading2, NativeButton, NativeInput, Heading3, NativeTextarea, NativeSelect } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -13,7 +19,7 @@ import {
   FaUnderline, FaListUl, FaListOl, FaQuoteRight, FaStrikethrough,
   FaLink, FaSmile, FaChevronDown, FaChevronRight, FaMagic
 } from 'react-icons/fa';
-import { Skeleton, Button, Tooltip } from '@heroui/react';
+import { Skeleton, Button, Tooltip } from '@/components/ui/fernly';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import {
   MdRefresh, MdMoreVert, MdArchive, MdDelete,
@@ -1050,14 +1056,14 @@ export default function MailPage() {
         {/* Skeleton stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+            <Surface key={i} className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
               <Skeleton className="h-3 w-16 rounded mb-2" />
               <Skeleton className="h-7 w-10 rounded" />
-            </div>
+            </Surface>
           ))}
         </div>
         {/* Skeleton toolbar */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md dark:shadow-none p-4 mb-6">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-lg shadow-md dark:shadow-none p-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="flex gap-2">
               {[...Array(5)].map((_, i) => (
@@ -1067,9 +1073,9 @@ export default function MailPage() {
             <div className="flex-1" />
             <Skeleton className="h-10 w-64 rounded-full" />
           </div>
-        </div>
+        </Surface>
         {/* Skeleton email list */}
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100">
               <Skeleton className="w-5 h-5 rounded" />
@@ -1079,7 +1085,7 @@ export default function MailPage() {
               <Skeleton className="h-3 w-16 rounded" />
             </div>
           ))}
-        </div>
+        </Surface>
       </div>
     );
   }
@@ -1091,9 +1097,9 @@ export default function MailPage() {
       return (
         <div className="page-container">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</h1>
+            <Heading1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</Heading1>
           </div>
-          <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
+          <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
             <div className="text-center max-w-md px-4">
               <div className="mb-8">
                 <div className="w-20 h-20 mx-auto bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
@@ -1101,9 +1107,9 @@ export default function MailPage() {
                 </div>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-zinc-100 mb-2">
+              <Heading2 className="text-2xl font-bold text-gray-800 dark:text-zinc-100 mb-2">
                 Connect Your Email
-              </h2>
+              </Heading2>
               <p className="text-gray-600 dark:text-zinc-400 mb-4 text-sm">
                 To connect your Gmail account, you need to sign in through your web browser.
               </p>
@@ -1131,14 +1137,14 @@ export default function MailPage() {
                 After connecting in your browser, return here and refresh the page.
               </p>
 
-              <button
+              <NativeButton
                 onClick={() => refreshConnection()}
                 className="mt-3 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
               >
                 I&apos;ve connected my email - Refresh
-              </button>
+              </NativeButton>
             </div>
-          </div>
+          </Surface>
         </div>
       );
     }
@@ -1147,9 +1153,9 @@ export default function MailPage() {
     return (
       <div className="page-container">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</h1>
+          <Heading1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</Heading1>
         </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
           <div className="text-center max-w-md">
             <div className="mb-8">
               <div className="w-20 h-20 mx-auto bg-red-50 dark:bg-red-900/30 rounded-2xl flex items-center justify-center">
@@ -1157,14 +1163,14 @@ export default function MailPage() {
               </div>
             </div>
 
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-zinc-100 mb-2">
+            <Heading2 className="text-2xl font-bold text-gray-800 dark:text-zinc-100 mb-2">
               Welcome to Mail
-            </h2>
+            </Heading2>
             <p className="text-gray-600 dark:text-zinc-400 mb-8 text-sm">
               Connect your Gmail account to access your emails directly from Talio
             </p>
 
-            <button
+            <NativeButton
               onClick={connectEmail}
               disabled={connectingEmail}
               className="inline-flex items-center gap-3 bg-white dark:bg-zinc-700 border border-gray-300 dark:border-zinc-600 text-gray-700 dark:text-zinc-200 px-8 py-3 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-zinc-600 hover:shadow-md transition-all disabled:opacity-50 text-base"
@@ -1182,14 +1188,14 @@ export default function MailPage() {
                   Sign in with Google
                 </>
               )}
-            </button>
+            </NativeButton>
 
             <p className="text-xs text-gray-500 dark:text-zinc-500 mt-6">
               We&apos;ll only access your emails with your permission.<br />
               You can disconnect at any time.
             </p>
           </div>
-        </div>
+        </Surface>
       </div>
     );
   }
@@ -1199,7 +1205,7 @@ export default function MailPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</h1>
+          <Heading1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</Heading1>
           {showAllAccounts && (
             <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full font-medium">
               All Accounts
@@ -1209,20 +1215,20 @@ export default function MailPage() {
         <div className="flex items-center gap-3">
           {/* Account Switcher */}
           <div className="relative">
-            <button
+            <NativeButton
               onClick={() => setShowAccountSwitcher(!showAccountSwitcher)}
               className="flex items-center gap-2 text-sm text-gray-600 dark:text-zinc-300 hover:text-gray-800 dark:hover:text-slate-100 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-600 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
             >
               <span className="truncate max-w-[180px]">{showAllAccounts ? 'All Accounts' : connectedEmail}</span>
               <MdKeyboardArrowDown className={`transition-transform ${showAccountSwitcher ? 'rotate-180' : ''}`} />
-            </button>
+            </NativeButton>
 
             {/* Account Switcher Dropdown */}
             {showAccountSwitcher && (
-              <div className="absolute top-full right-0 mt-2 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-700 py-2 z-50 min-w-[260px]">
+              <Surface className="absolute top-full right-0 mt-2 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-700 py-2 z-50 min-w-[260px]">
                 <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Switch Account</div>
 
-                <button
+                <NativeButton
                   onClick={viewAllAccountsEmails}
                   className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${showAllAccounts ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
                 >
@@ -1232,12 +1238,12 @@ export default function MailPage() {
                     <p className="text-xs text-gray-500 dark:text-zinc-400">View all emails together</p>
                   </div>
                   {showAllAccounts && <span className="text-blue-600">✓</span>}
-                </button>
+                </NativeButton>
 
                 <div className="border-t border-gray-200 dark:border-zinc-700 my-1"></div>
 
                 {accounts.map(account => (
-                  <button
+                  <NativeButton
                     key={account.id}
                     onClick={() => switchAccount(account.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${activeAccountId === account.id && !showAllAccounts ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
@@ -1256,28 +1262,28 @@ export default function MailPage() {
                       </p>
                     </div>
                     {activeAccountId === account.id && !showAllAccounts && <span className="text-blue-600">✓</span>}
-                  </button>
+                  </NativeButton>
                 ))}
 
                 <div className="border-t border-gray-200 dark:border-zinc-700 my-1"></div>
 
-                <button
+                <NativeButton
                   onClick={() => { setShowAccountSwitcher(false); connectEmail(); }}
                   className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors text-blue-600"
                 >
                   <span className="text-lg">+</span>
                   <span className="text-sm">Add another account</span>
-                </button>
+                </NativeButton>
 
                 <div className="border-t border-gray-200 dark:border-zinc-700 my-1"></div>
 
-                <button
+                <NativeButton
                   onClick={() => { setShowAccountSwitcher(false); disconnectEmail(); }}
                   className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors text-red-600"
                 >
                   <span className="text-sm">Disconnect {showAllAccounts ? 'all accounts' : 'this account'}</span>
-                </button>
-              </div>
+                </NativeButton>
+              </Surface>
             )}
           </div>
 
@@ -1293,38 +1299,38 @@ export default function MailPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 flex-shrink-0">
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
           <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineEnvelope className="text-sm" />
             Unread
           </div>
           <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{unreadCount || 0}</p>
-        </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+        </Surface>
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
           <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineStar className="text-sm" />
             Starred
           </div>
           <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.starred?.total || 0}</p>
-        </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+        </Surface>
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
           <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <MdLabelImportant className="text-sm" />
             Important
           </div>
           <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.important?.total || 0}</p>
-        </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+        </Surface>
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
           <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineClock className="text-sm" />
             Snoozed
           </div>
           <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.snoozed?.total || 0}</p>
-        </div>
+        </Surface>
       </div>
 
       {/* Toolbar - Folder Pills + Search */}
-      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-3 mb-4 flex-shrink-0">
+      <Surface className="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-3 mb-4 flex-shrink-0">
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           {/* Folder pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 flex-shrink-0 scrollbar-hide">
@@ -1334,7 +1340,7 @@ export default function MailPage() {
               const count = folderCounts[folder.id];
               const displayCount = folder.id === 'inbox' ? count?.unread : count?.total;
               return (
-                <button
+                <NativeButton
                   key={folder.id}
                   onClick={() => handleFolderChange(folder.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
@@ -1350,18 +1356,18 @@ export default function MailPage() {
                       {displayCount > 999 ? '999+' : displayCount}
                     </span>
                   )}
-                </button>
+                </NativeButton>
               );
             })}
 
             {/* More folders toggle */}
-            <button
+            <NativeButton
               onClick={() => setShowMoreFolders(!showMoreFolders)}
               className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 whitespace-nowrap"
             >
               {showMoreFolders ? <FaChevronDown className="text-xs" /> : <FaChevronRight className="text-xs" />}
               More
-            </button>
+            </NativeButton>
           </div>
 
           {/* More folders row */}
@@ -1373,7 +1379,7 @@ export default function MailPage() {
                 const count = folderCounts[folder.id];
                 const displayCount = count?.total || 0;
                 return (
-                  <button
+                  <NativeButton
                     key={folder.id}
                     onClick={() => handleFolderChange(folder.id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
@@ -1389,23 +1395,23 @@ export default function MailPage() {
                         {displayCount > 999 ? '999+' : displayCount}
                       </span>
                     )}
-                  </button>
+                  </NativeButton>
                 );
               })}
-              <button
+              <NativeButton
                 onClick={() => setShowCategoriesModal(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 whitespace-nowrap"
               >
                 <MdCategory className="text-base" />
                 Categories
-              </button>
-              <button
+              </NativeButton>
+              <NativeButton
                 onClick={() => setShowLabelsModal(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 whitespace-nowrap"
               >
                 <MdSettings className="text-base" />
                 Labels
-              </button>
+              </NativeButton>
             </div>
           )}
 
@@ -1415,7 +1421,7 @@ export default function MailPage() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="relative">
               <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-              <input
+              <NativeInput
                 type="text"
                 placeholder="Search mail..."
                 value={searchQuery}
@@ -1425,23 +1431,23 @@ export default function MailPage() {
                 className="w-full md:w-64 pl-9 pr-8 py-2 bg-gray-50 dark:bg-zinc-700/50 hover:bg-gray-100 dark:hover:bg-zinc-700 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500 rounded-full text-sm text-gray-900 dark:text-zinc-100 outline-none transition-colors border border-gray-200 dark:border-zinc-600 focus:border-blue-300 dark:focus:border-blue-500 dark:placeholder:text-slate-400"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <NativeButton onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <FaTimes className="text-xs" />
-                </button>
+                </NativeButton>
               )}
             </div>
             <Tooltip content="Refresh">
-              <button
+              <NativeButton
                 onClick={syncEmails}
                 disabled={syncing}
                 className="p-2 text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full transition-colors"
               >
                 <HiOutlineArrowPath className={`text-lg ${syncing ? 'animate-spin' : ''}`} />
-              </button>
+              </NativeButton>
             </Tooltip>
           </div>
         </div>
-      </div>
+      </Surface>
 
       {/* Mobile Bottom Nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-800 border-t border-gray-200 dark:border-zinc-700 z-40 flex justify-around py-2 shadow-lg">
@@ -1449,7 +1455,7 @@ export default function MailPage() {
           const Icon = folder.icon;
           const isActive = selectedFolder === folder.id;
           return (
-            <button
+            <NativeButton
               key={folder.id}
               onClick={() => handleFolderChange(folder.id)}
               className={`flex flex-col items-center p-2 rounded-lg relative ${isActive ? 'text-blue-600' : 'text-gray-600 dark:text-zinc-400'}`}
@@ -1466,27 +1472,27 @@ export default function MailPage() {
                   {spamCount > 9 ? '9+' : spamCount}
                 </span>
               )}
-            </button>
+            </NativeButton>
           );
         })}
-        <button
+        <NativeButton
           onClick={() => setShowCompose(true)}
           className="flex flex-col items-center p-2 rounded-lg text-blue-600"
         >
           <HiOutlinePencilSquare className="text-xl" />
           <span className="text-xs mt-1">Compose</span>
-        </button>
+        </NativeButton>
       </div>
 
       {/* Email List & Detail Card */}
-      <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden flex flex-1 min-h-0 mb-2">
+      <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden flex flex-1 min-h-0 mb-2">
           {/* Email List */}
           <div className={`${selectedEmail ? 'hidden lg:flex' : 'flex'} flex-col w-full lg:w-[400px] xl:w-[450px] flex-shrink-0 border-r border-gray-200 dark:border-zinc-700`}>
             {/* Toolbar */}
             <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
               {/* Selection checkbox */}
               <div className="relative">
-                <button
+                <NativeButton
                   onClick={() => {
                     if (selectedEmails.size === 0) {
                       selectAllEmails();
@@ -1506,7 +1512,7 @@ export default function MailPage() {
                   ) : (
                     <MdIndeterminateCheckBox className="text-xl text-blue-600" />
                   )}
-                </button>
+                </NativeButton>
               </div>
 
               <div className="h-5 w-px bg-gray-300 mx-1"></div>
@@ -1514,50 +1520,50 @@ export default function MailPage() {
               {/* Bulk actions - show when emails are selected */}
               {selectedEmails.size > 0 ? (
                 <>
-                  <button
+                  <NativeButton
                     onClick={bulkArchive}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Archive"
                   >
                     <MdArchive className="text-xl text-gray-600 dark:text-zinc-400" />
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     onClick={bulkDelete}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title={selectedFolder === 'trash' ? 'Move to Inbox' : 'Delete'}
                   >
                     <MdDelete className="text-xl text-gray-600 dark:text-zinc-400" />
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     onClick={bulkMarkRead}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Mark as read"
                   >
                     <FaRegEnvelopeOpen className="text-lg text-gray-600 dark:text-zinc-400" />
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     onClick={bulkMarkUnread}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Mark as unread"
                   >
                     <FaRegEnvelope className="text-lg text-gray-600 dark:text-zinc-400" />
-                  </button>
+                  </NativeButton>
                   <span className="text-xs text-gray-600 dark:text-zinc-400 ml-2">
                     {selectedEmails.size} selected
                   </span>
                 </>
               ) : (
                 <>
-                  <button
+                  <NativeButton
                     onClick={syncEmails}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Refresh"
                   >
                     <MdRefresh className={`text-xl text-gray-600 dark:text-zinc-400 ${syncing ? 'animate-spin' : ''}`} />
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded">
+                  </NativeButton>
+                  <NativeButton className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded">
                     <MdMoreVert className="text-xl text-gray-600 dark:text-zinc-400" />
-                  </button>
+                  </NativeButton>
                 </>
               )}
 
@@ -1571,12 +1577,12 @@ export default function MailPage() {
               <span className="text-xs text-gray-500 dark:text-zinc-400 px-2">
                 {filteredEmails.length > 0 ? `1-${filteredEmails.length}` : '0'}
               </span>
-              <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded opacity-50" disabled>
+              <NativeButton className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded opacity-50" disabled>
                 <FaAngleLeft className="text-gray-600 dark:text-zinc-400" />
-              </button>
-              <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded opacity-50" disabled>
+              </NativeButton>
+              <NativeButton className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded opacity-50" disabled>
                 <FaAngleRight className="text-gray-600 dark:text-zinc-400" />
-              </button>
+              </NativeButton>
             </div>
 
             {/* Email List */}
@@ -1597,20 +1603,20 @@ export default function MailPage() {
                       >
                         Enable Gmail API
                       </a>
-                      <button
+                      <NativeButton
                         onClick={syncEmails}
                         className="ml-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
                       >
                         Try Again
-                      </button>
+                      </NativeButton>
                     </div>
                   ) : (
-                    <button
+                    <NativeButton
                       onClick={syncEmails}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       Try Again
-                    </button>
+                    </NativeButton>
                   )}
                 </div>
               ) : loadingEmails && emails.length === 0 ? (
@@ -1645,7 +1651,7 @@ export default function MailPage() {
                       }`}
                     >
                       {/* Checkbox */}
-                      <button
+                      <NativeButton
                         onClick={(e) => toggleEmailSelection(email, e)}
                         className={`p-1 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded transition-opacity hidden sm:block flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                       >
@@ -1654,10 +1660,10 @@ export default function MailPage() {
                         ) : (
                           <MdCheckBoxOutlineBlank className="text-lg text-gray-400" />
                         )}
-                      </button>
+                      </NativeButton>
 
                       {/* Star */}
-                      <button
+                      <NativeButton
                         onClick={(e) => toggleStar(email, e)}
                         className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded flex-shrink-0"
                       >
@@ -1666,10 +1672,10 @@ export default function MailPage() {
                         ) : (
                           <MdStarBorder className="text-lg text-gray-300 group-hover:text-gray-500" />
                         )}
-                      </button>
+                      </NativeButton>
 
                       {/* Important marker */}
-                      <button
+                      <NativeButton
                         onClick={(e) => toggleImportant(email, e)}
                         className="p-1 hidden sm:block flex-shrink-0"
                       >
@@ -1678,7 +1684,7 @@ export default function MailPage() {
                         ) : (
                           <MdLabelImportantOutline className="text-lg text-gray-300 opacity-0 group-hover:opacity-100 hover:text-yellow-600" />
                         )}
-                      </button>
+                      </NativeButton>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-0.5">
@@ -1706,21 +1712,21 @@ export default function MailPage() {
 
                       {/* Actions on hover */}
                       <div className="hidden sm:group-hover:flex items-center gap-0.5">
-                        <button
+                        <NativeButton
                           onClick={(e) => archiveEmail(email, e)}
                           className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                           title="Archive"
                         >
                           <MdArchive className="text-lg text-gray-500 dark:text-zinc-400" />
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={(e) => deleteEmail(email, e)}
                           className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                           title="Delete"
                         >
                           <MdDelete className="text-lg text-gray-500 dark:text-zinc-400" />
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={(e) => toggleRead(email, e)}
                           className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                           title={email.isRead ? 'Mark as unread' : 'Mark as read'}
@@ -1730,14 +1736,14 @@ export default function MailPage() {
                           ) : (
                             <FaRegEnvelopeOpen className="text-sm text-gray-500 dark:text-zinc-400" />
                           )}
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={(e) => handleSnoozeEmail(email, e)}
                           className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                           title="Snooze"
                         >
                           <MdSchedule className="text-lg text-gray-500 dark:text-zinc-400" />
-                        </button>
+                        </NativeButton>
                       </div>
 
                       {/* Date */}
@@ -1771,45 +1777,45 @@ export default function MailPage() {
               <>
                 {/* Detail Toolbar */}
                 <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-zinc-700">
-                  <button
+                  <NativeButton
                     onClick={() => setSelectedEmail(null)}
                     className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded mr-2"
                   >
                     <BackIcon />
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     onClick={(e) => archiveEmail(selectedEmail, e)}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Archive"
                   >
                     <MdArchive className="text-xl text-gray-600 dark:text-zinc-400" />
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     onClick={(e) => deleteEmail(selectedEmail, e)}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Delete"
                   >
                     <MdDelete className="text-xl text-gray-600 dark:text-zinc-400" />
-                  </button>
+                  </NativeButton>
                   <div className="h-5 w-px bg-gray-300 dark:bg-zinc-600 mx-1"></div>
-                  <button
+                  <NativeButton
                     onClick={(e) => toggleRead(selectedEmail, e)}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title={selectedEmail.isRead ? 'Mark as unread' : 'Mark as read'}
                   >
                     <FaRegEnvelope className="text-gray-600 dark:text-zinc-400" />
-                  </button>
-                  <button
+                  </NativeButton>
+                  <NativeButton
                     onClick={(e) => handleSnoozeEmail(selectedEmail, e)}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Snooze"
                   >
                     <MdSchedule className="text-xl text-gray-600 dark:text-zinc-400" />
-                  </button>
+                  </NativeButton>
 
                   {/* Move to Dropdown */}
                   <div className="relative" data-dropdown>
-                    <button
+                    <NativeButton
                       onClick={() => {
                         setShowMoveToMenu(!showMoveToMenu);
                         setShowLabelsMenu(false);
@@ -1819,44 +1825,44 @@ export default function MailPage() {
                       title="Move to"
                     >
                       <MdMoveToInbox className="text-xl text-gray-600 dark:text-zinc-400" />
-                    </button>
+                    </NativeButton>
                     {showMoveToMenu && (
-                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
-                        <button
+                      <Surface className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
+                        <NativeButton
                           onClick={(e) => moveToFolder(selectedEmail, 'inbox', e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdInbox className="text-lg" />
                           Move to Inbox
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={(e) => archiveEmail(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdArchive className="text-lg" />
                           Archive
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={(e) => reportSpam(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdReport className="text-lg" />
                           Report spam
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={(e) => deleteEmail(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdDelete className="text-lg" />
                           Move to Trash
-                        </button>
-                      </div>
+                        </NativeButton>
+                      </Surface>
                     )}
                   </div>
 
                   {/* Labels Dropdown */}
                   <div className="relative" data-dropdown>
-                    <button
+                    <NativeButton
                       onClick={() => {
                         setShowLabelsMenu(!showLabelsMenu);
                         setShowMoveToMenu(false);
@@ -1866,9 +1872,9 @@ export default function MailPage() {
                       title="Labels"
                     >
                       <MdLabel className="text-xl text-gray-600 dark:text-zinc-400" />
-                    </button>
+                    </NativeButton>
                     {showLabelsMenu && (
-                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
+                      <Surface className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
                         <div className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-300 border-b border-gray-100 dark:border-zinc-700">
                           Apply labels
                         </div>
@@ -1879,19 +1885,19 @@ export default function MailPage() {
                             </div>
                           ) : (
                             userLabels.map((label) => (
-                              <button
+                              <NativeButton
                                 key={label.id}
                                 onClick={() => setShowLabelsMenu(false)}
                                 className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                               >
                                 <MdLabel className="text-lg" style={{ color: label.color?.backgroundColor || '#5f6368' }} />
                                 {label.name}
-                              </button>
+                              </NativeButton>
                             ))
                           )}
                         </div>
                         <div className="border-t border-gray-100 dark:border-zinc-700">
-                          <button
+                          <NativeButton
                             onClick={() => {
                               setShowLabelsMenu(false);
                               setShowLabelsModal(true);
@@ -1900,15 +1906,15 @@ export default function MailPage() {
                           >
                             <MdAdd className="text-lg" />
                             Create new label
-                          </button>
+                          </NativeButton>
                         </div>
-                      </div>
+                      </Surface>
                     )}
                   </div>
 
                   {/* More Options Dropdown */}
                   <div className="relative" data-dropdown>
-                    <button
+                    <NativeButton
                       onClick={() => {
                         setShowMoreMenu(!showMoreMenu);
                         setShowMoveToMenu(false);
@@ -1918,10 +1924,10 @@ export default function MailPage() {
                       title="More options"
                     >
                       <MdMoreVert className="text-xl text-gray-600 dark:text-zinc-400" />
-                    </button>
+                    </NativeButton>
                     {showMoreMenu && (
-                      <div className="absolute top-full right-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
-                        <button
+                      <Surface className="absolute top-full right-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
+                        <NativeButton
                           onClick={(e) => toggleRead(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
@@ -1936,8 +1942,8 @@ export default function MailPage() {
                               Mark as read
                             </>
                           )}
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={(e) => toggleStar(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
@@ -1952,8 +1958,8 @@ export default function MailPage() {
                               Star
                             </>
                           )}
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={(e) => toggleImportant(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
@@ -1968,31 +1974,31 @@ export default function MailPage() {
                               Mark as important
                             </>
                           )}
-                        </button>
+                        </NativeButton>
                         <div className="border-t border-gray-100 dark:border-zinc-700 my-1"></div>
-                        <button
+                        <NativeButton
                           onClick={(e) => handleSnoozeEmail(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdSchedule className="text-lg" />
                           Snooze
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={() => setShowMoreMenu(false)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdFilterList className="text-lg" />
                           Filter messages like this
-                        </button>
+                        </NativeButton>
                         <div className="border-t border-gray-100 dark:border-zinc-700 my-1"></div>
-                        <button
+                        <NativeButton
                           onClick={(e) => reportSpam(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdReport className="text-lg" />
                           Report spam
-                        </button>
-                        <button
+                        </NativeButton>
+                        <NativeButton
                           onClick={() => {
                             // Print email
                             window.print();
@@ -2002,8 +2008,8 @@ export default function MailPage() {
                         >
                           <MdPrint className="text-lg" />
                           Print
-                        </button>
-                      </div>
+                        </NativeButton>
+                      </Surface>
                     )}
                   </div>
                 </div>
@@ -2014,9 +2020,9 @@ export default function MailPage() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h1 className="text-xl md:text-2xl font-normal text-gray-900 dark:text-zinc-100">
+                        <Heading1 className="text-xl md:text-2xl font-normal text-gray-900 dark:text-zinc-100">
                           {selectedEmail.subject || '(no subject)'}
-                        </h1>
+                        </Heading1>
                         {(() => {
                           const p = getEmailPriority(selectedEmail);
                           return p.label ? (
@@ -2027,7 +2033,7 @@ export default function MailPage() {
                         })()}
                       </div>
                     </div>
-                    <button
+                    <NativeButton
                       onClick={() => handleAiSummary(selectedEmail)}
                       disabled={isGeneratingSummary}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors text-xs font-medium ml-3 flex-shrink-0"
@@ -2039,7 +2045,7 @@ export default function MailPage() {
                         <FaMagic className="text-sm" />
                       )}
                       <span className="hidden sm:inline">{isGeneratingSummary ? 'Summarizing...' : 'AI Summary'}</span>
-                    </button>
+                    </NativeButton>
                   </div>
 
                   {/* AI Summary Panel */}
@@ -2048,12 +2054,12 @@ export default function MailPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <FaMagic className="text-purple-600 dark:text-purple-400 text-sm" />
                         <span className="text-sm font-semibold text-purple-800 dark:text-purple-300">AI Summary</span>
-                        <button
+                        <NativeButton
                           onClick={() => setAiSummary(null)}
                           className="ml-auto p-1 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded text-purple-500"
                         >
                           <FaTimes className="text-xs" />
-                        </button>
+                        </NativeButton>
                       </div>
                       <div
                         className="text-sm text-purple-900 dark:text-purple-200 prose prose-sm max-w-none [&_ul]:mt-1 [&_li]:text-purple-900 dark:[&_li]:text-purple-200"
@@ -2100,7 +2106,7 @@ export default function MailPage() {
                           hour12: true
                         })}
                       </span>
-                      <button
+                      <NativeButton
                         onClick={(e) => toggleStar(selectedEmail, e)}
                         className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                       >
@@ -2109,8 +2115,8 @@ export default function MailPage() {
                         ) : (
                           <MdStarBorder className="text-xl text-gray-400 dark:text-zinc-500" />
                         )}
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => {
                           setComposeData({
                             to: selectedEmail.from?.email || '',
@@ -2128,10 +2134,10 @@ export default function MailPage() {
                         title="Reply"
                       >
                         <FaReply className="text-gray-500 dark:text-zinc-400" />
-                      </button>
-                      <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block">
+                      </NativeButton>
+                      <NativeButton className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block">
                         <MdMoreVert className="text-xl text-gray-500 dark:text-zinc-400" />
-                      </button>
+                      </NativeButton>
                     </div>
                   </div>
 
@@ -2169,7 +2175,7 @@ export default function MailPage() {
 
                   {/* Reply/Forward Actions */}
                   <div className="mt-8 md:ml-10 flex gap-3">
-                    <button
+                    <NativeButton
                       onClick={() => {
                         setComposeData({
                           to: selectedEmail.from?.email || '',
@@ -2187,8 +2193,8 @@ export default function MailPage() {
                     >
                       <FaReply className="text-gray-500 dark:text-zinc-400" />
                       Reply
-                    </button>
-                    <button
+                    </NativeButton>
+                    <NativeButton
                       onClick={() => {
                         setComposeData({
                           to: '',
@@ -2206,7 +2212,7 @@ export default function MailPage() {
                     >
                       <FaForward className="text-gray-500 dark:text-zinc-400" />
                       Forward
-                    </button>
+                    </NativeButton>
                   </div>
                 </div>
               </>
@@ -2217,25 +2223,25 @@ export default function MailPage() {
               </div>
             )}
           </div>
-        </div>
+        </Surface>
 
       {/* AI Compose Modal */}
       {showAiCompose && (
         <div className="modal-overlay">
-          <div className="bg-white dark:bg-zinc-800 rounded-[30px] shadow-xl w-full max-w-md p-6 animate-modal-enter">
+          <DialogSurface className="bg-white dark:bg-zinc-800 rounded-[30px] shadow-xl w-full max-w-md p-6 animate-modal-enter">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+              <Heading3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
                 Write with AI
-              </h3>
-              <button onClick={() => setShowAiCompose(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+              </Heading3>
+              <NativeButton onClick={() => setShowAiCompose(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
                 <FaTimes />
-              </button>
+              </NativeButton>
             </div>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">What should this email say?</label>
-                <textarea
+                <NativeTextarea
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500 h-32 resize-none dark:placeholder:text-slate-400"
@@ -2245,7 +2251,7 @@ export default function MailPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">Tone</label>
-                <select
+                <NativeSelect
                   value={aiTone}
                   onChange={(e) => setAiTone(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -2255,34 +2261,34 @@ export default function MailPage() {
                   <option value="friendly">Friendly</option>
                   <option value="formal">Formal</option>
                   <option value="urgent">Urgent</option>
-                </select>
+                </NativeSelect>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <button
+                <NativeButton
                   onClick={() => setShowAiCompose(false)}
                   className="px-4 py-2 text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md"
                 >
                   Cancel
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   onClick={handleAiCompose}
                   disabled={isGeneratingAi || !aiPrompt.trim()}
                   className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
                 >
                   {isGeneratingAi ? <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : <FaMagic />}
                   Generate
-                </button>
+                </NativeButton>
               </div>
             </div>
-          </div>
+          </DialogSurface>
         </div>
       )}
 
       {/* Compose Modal - Gmail Style with Full Functionality */}
       {showCompose && (
         <div className={`fixed ${composeFullscreen ? 'inset-0 p-4' : 'bottom-0 right-0 sm:right-8 left-0 sm:left-auto'} z-[99999]`}>
-          <div className={`bg-white dark:bg-zinc-800 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col ${composeFullscreen
+          <Surface className={`bg-white dark:bg-zinc-800 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col ${composeFullscreen
             ? 'w-full h-full rounded-xl'
             : composeMinimized
               ? 'w-72 h-10 hidden sm:flex rounded-lg'
@@ -2295,19 +2301,19 @@ export default function MailPage() {
             >
               <span className="font-medium text-sm truncate">{composeData.subject || 'New Message'}</span>
               <div className="flex items-center gap-1">
-                <button
+                <NativeButton
                   onClick={(e) => { e.stopPropagation(); setComposeMinimized(!composeMinimized); }}
                   className="p-1.5 hover:bg-gray-600 rounded hidden sm:block"
                 >
                   <FaMinus className="text-xs" />
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   onClick={(e) => { e.stopPropagation(); setComposeFullscreen(!composeFullscreen); setComposeMinimized(false); }}
                   className="p-1.5 hover:bg-gray-600 rounded hidden sm:block"
                 >
                   {composeFullscreen ? <FaCompressAlt className="text-xs" /> : <FaExpandAlt className="text-xs" />}
-                </button>
-                <button
+                </NativeButton>
+                <NativeButton
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowCompose(false);
@@ -2319,7 +2325,7 @@ export default function MailPage() {
                   className="p-1.5 hover:bg-gray-600 rounded"
                 >
                   <MdClose className="text-base" />
-                </button>
+                </NativeButton>
               </div>
             </div>
 
@@ -2342,7 +2348,7 @@ export default function MailPage() {
                   {/* To */}
                   <div className="flex items-center border-b border-gray-200 dark:border-zinc-700">
                     <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-zinc-400 w-14">To</span>
-                    <input
+                    <NativeInput
                       type="text"
                       value={composeData.to}
                       onChange={(e) => setComposeData(prev => ({ ...prev, to: e.target.value }))}
@@ -2350,12 +2356,12 @@ export default function MailPage() {
                       placeholder="Recipients"
                     />
                     {!showCcBcc && (
-                      <button
+                      <NativeButton
                         onClick={() => setShowCcBcc(true)}
                         className="px-4 text-sm text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-slate-300"
                       >
                         Cc Bcc
-                      </button>
+                      </NativeButton>
                     )}
                   </div>
 
@@ -2363,7 +2369,7 @@ export default function MailPage() {
                   {showCcBcc && (
                     <div className="flex items-center border-b border-gray-200 dark:border-zinc-700">
                       <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-zinc-400 w-14">Cc</span>
-                      <input
+                      <NativeInput
                         type="text"
                         value={composeData.cc}
                         onChange={(e) => setComposeData(prev => ({ ...prev, cc: e.target.value }))}
@@ -2376,7 +2382,7 @@ export default function MailPage() {
                   {showCcBcc && (
                     <div className="flex items-center border-b border-gray-200 dark:border-zinc-700">
                       <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-zinc-400 w-14">Bcc</span>
-                      <input
+                      <NativeInput
                         type="text"
                         value={composeData.bcc}
                         onChange={(e) => setComposeData(prev => ({ ...prev, bcc: e.target.value }))}
@@ -2387,7 +2393,7 @@ export default function MailPage() {
 
                   {/* Subject */}
                   <div className="flex items-center border-b border-gray-200 dark:border-zinc-700">
-                    <input
+                    <NativeInput
                       type="text"
                       value={composeData.subject}
                       onChange={(e) => setComposeData(prev => ({ ...prev, subject: e.target.value }))}
@@ -2399,71 +2405,71 @@ export default function MailPage() {
                   {/* Formatting Toolbar (shown when enabled) */}
                   {showFormattingToolbar && (
                     <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-700/50 flex-wrap">
-                      <button
+                      <NativeButton
                         onClick={() => applyFormatting('bold')}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Bold (Ctrl+B)"
                       >
                         <FaBold className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => applyFormatting('italic')}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Italic (Ctrl+I)"
                       >
                         <FaItalic className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => applyFormatting('underline')}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Underline (Ctrl+U)"
                       >
                         <FaUnderline className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => applyFormatting('strikeThrough')}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Strikethrough"
                       >
                         <FaStrikethrough className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
+                      </NativeButton>
                       <div className="h-5 w-px bg-gray-300 dark:bg-zinc-600 mx-1"></div>
-                      <button
+                      <NativeButton
                         onClick={() => applyFormatting('insertUnorderedList')}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Bulleted list"
                       >
                         <FaListUl className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => applyFormatting('insertOrderedList')}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Numbered list"
                       >
                         <FaListOl className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => applyFormatting('formatBlock', 'blockquote')}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Quote"
                       >
                         <FaQuoteRight className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
+                      </NativeButton>
                       <div className="h-5 w-px bg-gray-300 dark:bg-zinc-600 mx-1"></div>
-                      <button
+                      <NativeButton
                         onClick={insertLink}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Insert link"
                       >
                         <FaLink className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
-                      <button
+                      </NativeButton>
+                      <NativeButton
                         onClick={() => applyFormatting('removeFormat')}
                         className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Remove formatting"
                       >
                         <FaTimes className="text-sm text-gray-600 dark:text-zinc-300" />
-                      </button>
+                      </NativeButton>
                     </div>
                   )}
 
@@ -2488,20 +2494,20 @@ export default function MailPage() {
                       <div className="text-xs text-gray-500 dark:text-zinc-400 mb-2">Attachments ({attachments.length})</div>
                       <div className="flex flex-wrap gap-2">
                         {attachments.map((file, idx) => (
-                          <div
+                          <Surface
                             key={idx}
                             className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-700 rounded-lg border border-gray-200 dark:border-zinc-600 text-sm group"
                           >
                             <MdAttachFile className="text-gray-400 -rotate-45" />
                             <span className="text-gray-700 dark:text-zinc-300 max-w-[150px] truncate">{file.name}</span>
                             <span className="text-gray-400 text-xs">({formatFileSize(file.size)})</span>
-                            <button
+                            <NativeButton
                               onClick={() => removeAttachment(idx)}
                               className="ml-1 p-1 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               <FaTimes className="text-xs text-gray-500" />
-                            </button>
-                          </div>
+                            </NativeButton>
+                          </Surface>
                         ))}
                       </div>
                     </div>
@@ -2509,66 +2515,66 @@ export default function MailPage() {
 
                   {/* Emoji Picker */}
                   {showEmojiPicker && (
-                    <div className="absolute bottom-16 left-3 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-xl p-3 z-10 w-80">
+                    <Surface className="absolute bottom-16 left-3 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-xl p-3 z-10 w-80">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Emojis</span>
-                        <button onClick={() => setShowEmojiPicker(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded">
+                        <NativeButton onClick={() => setShowEmojiPicker(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded">
                           <FaTimes className="text-xs text-gray-500" />
-                        </button>
+                        </NativeButton>
                       </div>
                       <div className="grid grid-cols-10 gap-1 max-h-40 overflow-y-auto">
                         {commonEmojis.map((emoji, idx) => (
-                          <button
+                          <NativeButton
                             key={idx}
                             onClick={() => insertEmoji(emoji)}
                             className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded text-xl"
                           >
                             {emoji}
-                          </button>
+                          </NativeButton>
                         ))}
                       </div>
-                    </div>
+                    </Surface>
                   )}
                 </div>
 
                 {/* Footer */}
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-b-xl">
                   <div className="flex items-center gap-0.5">
-                    <button
+                    <NativeButton
                       onClick={sendEmail}
                       disabled={sending || !composeData.to || !composeData.subject}
                       className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {sending ? <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : 'Send'}
-                    </button>
-                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block">
+                    </NativeButton>
+                    <NativeButton className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block">
                       <MdArrowDropDown className="text-xl text-gray-600 dark:text-zinc-400" />
-                    </button>
+                    </NativeButton>
 
                     <div className="h-6 w-px bg-gray-300 dark:bg-zinc-600 mx-2"></div>
 
-                    <button
+                    <NativeButton
                       onClick={() => setShowAiCompose(true)}
                       className="flex items-center gap-1 p-2 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded transition-colors"
                       title="Write with AI"
                     >
                       <FaMagic className="text-lg" />
                       <span className="text-xs font-medium hidden sm:inline">AI Write</span>
-                    </button>
+                    </NativeButton>
                   </div>
 
                   <div className="flex items-center gap-0.5">
                     {/* Formatting Toggle */}
-                    <button
+                    <NativeButton
                       onClick={() => setShowFormattingToolbar(!showFormattingToolbar)}
                       className={`p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block ${showFormattingToolbar ? 'bg-gray-200 dark:bg-zinc-600' : ''}`}
                       title="Formatting options"
                     >
                       <FaBold className="text-gray-500 text-sm" />
-                    </button>
+                    </NativeButton>
 
                     {/* Hidden file input */}
-                    <input
+                    <NativeInput
                       ref={fileInputRef}
                       type="file"
                       multiple
@@ -2577,7 +2583,7 @@ export default function MailPage() {
                     />
 
                     {/* Attach files */}
-                    <button
+                    <UploadButton busy={uploadingAttachment} label="Attach files"
                       onClick={() => fileInputRef.current?.click()}
                       className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded relative"
                       title="Attach files"
@@ -2593,30 +2599,30 @@ export default function MailPage() {
                           {attachments.length}
                         </span>
                       )}
-                    </button>
+                    </UploadButton>
 
                     {/* Insert link */}
-                    <button
+                    <NativeButton
                       onClick={insertLink}
                       className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block"
                       title="Insert link"
                     >
                       <MdInsertLink className="text-xl text-gray-500 dark:text-zinc-400" />
-                    </button>
+                    </NativeButton>
 
                     {/* Insert emoji */}
-                    <button
+                    <NativeButton
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                       className={`p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block ${showEmojiPicker ? 'bg-gray-200 dark:bg-zinc-600' : ''}`}
                       title="Insert emoji"
                     >
                       <MdInsertEmoticon className="text-xl text-gray-500 dark:text-zinc-400" />
-                    </button>
+                    </NativeButton>
 
                     <div className="flex-1"></div>
 
                     {/* Discard */}
-                    <button
+                    <NativeButton
                       onClick={() => {
                         setShowCompose(false);
                         setComposeData({ to: '', cc: '', bcc: '', subject: '', body: '', isHtml: true, accountId: null, threadId: null });
@@ -2628,12 +2634,12 @@ export default function MailPage() {
                       title="Discard draft"
                     >
                       <MdDelete className="text-xl text-gray-500 dark:text-zinc-400" />
-                    </button>
+                    </NativeButton>
                   </div>
                 </div>
               </>
             )}
-          </div>
+          </Surface>
         </div>
       )}
     </div>

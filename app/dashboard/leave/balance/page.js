@@ -1,7 +1,11 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
-import { Card, CardBody, CardHeader, Skeleton, Select, SelectItem } from '@heroui/react'
+import { Card, CardBody, CardHeader, Skeleton, Select, SelectItem } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCalendarAlt, FaClock, FaChartPie, FaHistory } from 'react-icons/fa'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from '@/components/charts/FernlyCharts'
@@ -119,7 +123,7 @@ export default function LeaveBalancePage() {
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-default-800">Leave Balance</h1>
+          <Heading1 className="text-3xl font-bold text-default-800">Leave Balance</Heading1>
           <p className="text-default-500 mt-1">Track your leave entitlements and usage</p>
         </div>
         <div className="flex items-center space-x-4 mt-4 md:mt-0">
@@ -145,19 +149,7 @@ export default function LeaveBalancePage() {
           { title: 'Remaining Balance', value: getTotalBalance(), color: 'success', icon: FaChartPie },
           { title: 'Leave Requests', value: leaveHistory.length, color: 'secondary', icon: FaHistory },
         ].map((stat, index) => (
-          <Card key={index} shadow="sm">
-            <CardBody className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-default-500 text-sm font-medium">{stat.title}</p>
-                  <h3 className="text-2xl font-bold text-default-800 mt-2">{stat.value}</h3>
-                </div>
-                <div className={`bg-${stat.color} p-4 rounded-lg`}>
-                  <stat.icon className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </CardBody>
-          </Card>
+          <SummaryCard key={index} shadow="sm" label={<>{stat.title}</>} value={<>{stat.value}</>} />
         ))}
       </div>
 
@@ -166,7 +158,7 @@ export default function LeaveBalancePage() {
         {/* Leave Balance Chart */}
         <Card shadow="sm" className="bg-primary-50">
           <CardBody>
-            <h3 className="text-sm sm:text-base font-bold text-default-800 mb-4">Leave Balance by Type</h3>
+            <Heading3 className="text-sm sm:text-base font-bold text-default-800 mb-4">Leave Balance by Type</Heading3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={getChartData()} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
@@ -185,7 +177,7 @@ export default function LeaveBalancePage() {
         {/* Monthly Usage */}
         <Card shadow="sm" className="bg-primary-50">
           <CardBody>
-            <h3 className="text-sm sm:text-base font-bold text-default-800 mb-4">Monthly Leave Usage</h3>
+            <Heading3 className="text-sm sm:text-base font-bold text-default-800 mb-4">Monthly Leave Usage</Heading3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={getMonthlyUsage()} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
@@ -207,11 +199,11 @@ export default function LeaveBalancePage() {
       {/* Leave Balance Details */}
       <Card shadow="sm" className="mb-6">
         <CardHeader className="px-6 py-4 border-b border-default-200">
-          <h3 className="text-lg font-semibold text-default-800">Leave Balance Details</h3>
+          <Heading3 className="text-lg font-semibold text-default-800">Leave Balance Details</Heading3>
         </CardHeader>
         <CardBody className="p-0">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
+            <NativeTable className="min-w-full divide-y divide-default-200">
               <thead className="bg-default-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -270,7 +262,7 @@ export default function LeaveBalancePage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         </CardBody>
       </Card>
@@ -278,7 +270,7 @@ export default function LeaveBalancePage() {
       {/* Recent Leave History */}
       <Card shadow="sm">
         <CardHeader className="px-6 py-4 border-b border-default-200">
-          <h3 className="text-lg font-semibold text-default-800">Recent Leave History</h3>
+          <Heading3 className="text-lg font-semibold text-default-800">Recent Leave History</Heading3>
         </CardHeader>
         <CardBody className="p-0">
           {leaveHistory.length === 0 ? (
@@ -288,7 +280,7 @@ export default function LeaveBalancePage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-default-200">
+              <NativeTable className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -325,7 +317,7 @@ export default function LeaveBalancePage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </NativeTable>
             </div>
           )}
         </CardBody>

@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 import { useEffect } from 'react'
 import { retryPageError } from '@/lib/client/retryPageError'
@@ -27,7 +28,7 @@ export default function DashboardError({ error, reset }) {
         </div>
 
         {/* Error Details */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <Surface className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-3">
             Error Details
           </h2>
@@ -36,7 +37,7 @@ export default function DashboardError({ error, reset }) {
               {error?.message || 'An unknown error occurred'}
             </p>
           </div>
-        </div>
+        </Surface>
 
         {/* Action Buttons */}
         <div className="space-y-3">

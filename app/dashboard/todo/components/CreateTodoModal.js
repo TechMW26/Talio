@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Modal from '@/components/ui/HeroModal'
+import { Modal as Modal } from '@/components/ui/fernly'
 import {
   ModalContent,
   ModalHeader,
@@ -12,7 +12,7 @@ import {
   Select,
   SelectItem,
   Chip
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import {
   HiOutlineFlag,
   HiOutlineCalendarDays,

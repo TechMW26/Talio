@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { dashboardRequest } from '@/lib/client/dashboardRequest'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
@@ -9,6 +10,7 @@ import { getRoleDisplayLabel } from '@/hooks/useRoles'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import { CustomizableDashboard } from '@/components/dashboard'
 import AttendanceHeaderSummary from '@/components/widgets/AttendanceHeaderSummary'
+import homeStyles from '@/components/dashboard/HomeDashboard.module.css'
 import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import { getTodayDateString } from '@/lib/timezone'
 import { canApplyAttendanceSnapshot } from '@/lib/client/attendanceSnapshot'
@@ -242,6 +244,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     // State
     const [loading, setLoading] = useState(true)
+    const [dashboardErrors, setDashboardErrors] = useState({})
     const [user, setUser] = useState(userProp)
     const [todayAttendance, setTodayAttendance] = useState(null)
     const [attendanceLoading, setAttendanceLoading] = useState(false)
@@ -310,6 +313,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         leaveBalance: permissions.leaveBalance && isFeatureEnabled('leaveManagement'),
         projectTasks: permissions.projectTasks && isFeatureEnabled('projects'),
         todayTasks: permissions.todayTasks && isFeatureEnabled('projects'),
+        meetingReminders: isFeatureEnabled('meetings'),
         departmentChart: permissions.departmentChart && isFeatureEnabled('employees'),
         employeeDirectory: permissions.employeeDirectory && isFeatureEnabled('employees'),
         goals: permissions.goals && isFeatureEnabled('performance'),
@@ -365,15 +369,13 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             // Only fetch the stats endpoint - departments, leave requests,
             // attendance summary, and employee data all come from the unified endpoint
-            const response = await fetch(statsEndpoint, {
-                headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store'
-            })
-            const statsData = await response.json()
+            const statsData = await dashboardRequest(statsEndpoint, token)
+            setDashboardErrors(previous => ({ ...previous, stats: null }))
             if (statsData.success && dashboardStatsRequestRef.current === requestPromise) {
                 setDashboardStats(statsData.data)
             }
           } catch (error) {
-            console.error('Fetch dashboard stats error:', error)
+            setDashboardErrors(previous => ({ ...previous, stats: error.message || 'Unable to load dashboard statistics.' }))
           }
         })()
 
@@ -422,10 +424,8 @@ export default function UnifiedDashboard({ user: userProp }) {
         const requestPromise = (async () => {
           try {
             const token = localStorage.getItem('token')
-            const response = await fetch(`/api/dashboard/unified?widgets=${encodeURIComponent(unifiedWidgetSelection)}`, {
-                headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store'
-            })
-            const data = await response.json()
+            const data = await dashboardRequest(`/api/dashboard/unified?widgets=${encodeURIComponent(unifiedWidgetSelection)}`, token)
+            setDashboardErrors(previous => ({ ...previous, widgets: null }))
             if (data.success && unifiedWidgetsRequestRef.current === requestPromise) {
                 setUnifiedWidgetData(data)
 
@@ -452,7 +452,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
             }
           } catch (error) {
-            console.error('Error fetching unified widget data:', error)
+            setDashboardErrors(previous => ({ ...previous, widgets: error.message || 'Unable to load dashboard widgets.' }))
           }
         })()
 
@@ -538,6 +538,21 @@ export default function UnifiedDashboard({ user: userProp }) {
     }, [userRole, fetchDashboardData])
 
     // Load user from localStorage if not provided via props
+    useEffect(() => {
+        const syncPhoto = event => {
+            const updated = event.detail
+            if (!updated) return
+            const ref = updated.employeeId
+            const employeeId = typeof ref === 'object' && ref ? ref._id || ref.id : ref
+            const photo = updated.profilePicture || (typeof ref === 'object' && ref?.profilePicture)
+            if (!photo) return
+            const viewport = updated.profilePictureViewport || (typeof ref === 'object' && ref?.profilePictureViewport)
+            setEmployeeData(previous => previous && String(previous._id) === String(employeeId) ? { ...previous, profilePicture: photo, profilePictureViewport: viewport } : previous)
+            setUser(previous => previous && String(previous._id || previous.userId) === String(updated._id || updated.userId) ? { ...previous, profilePicture: photo, profilePictureViewport: viewport } : previous)
+        }
+        window.addEventListener('talio:user-updated', syncPhoto)
+        return () => window.removeEventListener('talio:user-updated', syncPhoto)
+    }, [])
     useEffect(() => {
         if (!userProp || !userProp.employeeId) {
             const parsedUser = getCurrentUser()
@@ -798,9 +813,12 @@ export default function UnifiedDashboard({ user: userProp }) {
         if (featurePermissions.checkInOut) {
             components['check-in-out'] = (
                 <CheckInOutWidget
+                    enableDayCompassTasks={featurePermissions.todayTasks}
+                    enableMeetingReminders={featurePermissions.meetingReminders}
                     user={user}
                     employeeData={employeeData}
                     todayAttendance={todayAttendance}
+                    companySettings={companySettings}
                     attendanceLoading={attendanceLoading}
                     onClockIn={handleCheckIn}
                     onClockOut={handleCheckOut}
@@ -992,7 +1010,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         // Goals Widget (Employee-focused)
         if (featurePermissions.goals) {
-            components['goals'] = <GoalsWidget userId={user?.userId || user?._id} />
+            components['goals-widget'] = <GoalsWidget userId={user?.userId || user?._id} />
         }
 
         // Today's Tasks Widget
@@ -1024,7 +1042,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         // Birthday Widget
         if (featurePermissions.birthday) {
-            components['birthdays'] = <BirthdayWidget />
+            components['birthday-widget'] = <BirthdayWidget />
         }
 
         // === PERSONAL WIDGETS ===
@@ -1095,7 +1113,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Loading skeleton
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-[#09090b] p-4 sm:p-6">
+            <div data-dashboard-home className={`page-container ${homeStyles.page}`}>
                 <div className="animate-pulse space-y-4">
                     <div className="h-16 bg-white dark:bg-[#18181b] rounded-xl shadow-sm dark:shadow-none"></div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1114,7 +1132,11 @@ export default function UnifiedDashboard({ user: userProp }) {
     }
 
     return (
-        <div className="page-container">
+        <div data-dashboard-home className={`page-container ${homeStyles.page}`}>
+            {(dashboardErrors.stats || dashboardErrors.widgets) && <div role="alert" className="mb-4 rounded-xl border border-default-200 p-3 text-sm">
+                Some dashboard data could not be loaded. You can still use the rest of the app.
+                <button type="button" className="ml-3 underline" onClick={() => { fetchDashboardData(); fetchUnifiedWidgetData() }}>Retry data</button>
+            </div>}
             {/* Dashboard Content */}
             <CustomizableDashboard
                 userId={user?._id || user?.userId || 'user'}

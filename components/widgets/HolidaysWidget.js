@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { FaCalendarAlt, FaGift } from 'react-icons/fa'
 
 import { useRouter } from 'next/navigation'
-import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/react'
+import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 
 export default function HolidaysWidget({ limit = 5, initialData }) {
     const router = useRouter()

@@ -2,6 +2,7 @@ import { performanceDatabase, performanceEmployees, joinPerformanceEmployees, sc
 import { collectFirestorePages, readFirestoreReferences } from '@/lib/platform/firestoreQueries.server'
 import { NextResponse } from 'next/server';
 import { getAuthAndDatabase } from '@/lib/auth';
+import { attendanceReportTrend } from '@/lib/client/reportTrends';
 import { getDateKeyInTimezone, getDateTimePartsInTimezone, getTodayDateString } from '@/lib/timezone';
 
 /**
@@ -335,6 +336,7 @@ export async function GET(request) {
         departmentBreakdown,
         employeeBreakdown,
         dayOfWeekBreakdown,
+        dailyTrend: attendanceReportTrend(attendanceRecords),
         dateRange: { startDate, endDate }
       }
     });

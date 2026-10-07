@@ -1,12 +1,16 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
+
+import { Heading1, Heading3, NativeTextarea, NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import Modal from '@/components/ui/HeroModal'
-import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
+import { Modal as Modal } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Chip, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@/components/ui/fernly'
 import {
   FaCheck, FaTimes, FaTrash, FaProjectDiagram,
   FaClock, FaCheckCircle, FaTimesCircle, FaFilter,
@@ -227,7 +231,7 @@ export default function ApprovalsPage() {
             <BackIcon className="text-default-600" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-default-800">Request Approvals</h1>
+            <Heading1 className="text-2xl font-bold text-default-800">Request Approvals</Heading1>
             <p className="text-default-500 text-sm">Manage pending requests for your projects</p>
           </div>
         </div>
@@ -235,63 +239,9 @@ export default function ApprovalsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card
-          isPressable
-          shadow="sm"
-          className={`cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-warning' : ''
-            }`}
-          onPress={() => setStatusFilter('pending')}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-default-500">Pending</p>
-                <p className="text-2xl font-bold text-warning">{stats.pending}</p>
-              </div>
-              <div className="p-3 bg-warning-100 rounded-lg">
-                <FaClock className="text-warning text-xl" />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card
-          isPressable
-          shadow="sm"
-          className={`cursor-pointer transition-all ${statusFilter === 'approved' ? 'ring-2 ring-success' : ''
-            }`}
-          onPress={() => setStatusFilter('approved')}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-default-500">Approved</p>
-                <p className="text-2xl font-bold text-success">{stats.approved}</p>
-              </div>
-              <div className="p-3 bg-success-100 rounded-lg">
-                <FaCheckCircle className="text-success text-xl" />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card
-          isPressable
-          shadow="sm"
-          className={`cursor-pointer transition-all ${statusFilter === 'rejected' ? 'ring-2 ring-danger' : ''
-            }`}
-          onPress={() => setStatusFilter('rejected')}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-default-500">Rejected</p>
-                <p className="text-2xl font-bold text-danger">{stats.rejected}</p>
-              </div>
-              <div className="p-3 bg-danger-100 rounded-lg">
-                <FaTimesCircle className="text-danger text-xl" />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard isPressable shadow="sm" onPress={() => setStatusFilter('pending')} className="cursor-pointer" label={<>Pending</>} value={<>{stats.pending}</>} />
+        <SummaryCard isPressable shadow="sm" onPress={() => setStatusFilter('approved')} className="cursor-pointer" label={<>Approved</>} value={<>{stats.approved}</>} />
+        <SummaryCard isPressable shadow="sm" onPress={() => setStatusFilter('rejected')} className="cursor-pointer" label={<>Rejected</>} value={<>{stats.rejected}</>} />
       </div>
 
       {/* Type Filter Bar */}
@@ -351,9 +301,9 @@ export default function ApprovalsPage() {
         <Card shadow="sm">
           <CardBody className="p-8 text-center">
             <FaCheckCircle className="text-6xl text-default-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-default-700 mb-2">
+            <Heading3 className="text-xl font-semibold text-default-700 mb-2">
               {statusFilter === 'pending' ? 'No pending requests' : `No ${statusFilter} requests`}
-            </h3>
+            </Heading3>
             <p className="text-default-500">
               {statusFilter === 'pending'
                 ? 'All caught up! No requests need your attention right now.'
@@ -394,7 +344,7 @@ export default function ApprovalsPage() {
                 </div>
 
                 {/* Request Details */}
-                <div className="bg-default-50 rounded-lg p-4 mb-4">
+                <Surface className="bg-default-50 rounded-lg p-4 mb-4">
                   {request.type === 'task_deletion' && request.relatedTask && (
                     <div className="flex items-start gap-3">
                       <FaTasks className="text-default-400 mt-1" />
@@ -414,7 +364,7 @@ export default function ApprovalsPage() {
                       </p>
                     </div>
                   )}
-                </div>
+                </Surface>
 
                 {/* Requester Info */}
                 <div className="flex items-center justify-between">
@@ -490,9 +440,9 @@ export default function ApprovalsPage() {
       {/* Reject Modal */}
       <ModalPortal isOpen={showRejectModal && selectedRequest}>
         {selectedRequest && <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4 overflow-y-auto">
-          <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
+          <DialogSurface className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
             <div className="px-6 py-4 bg-default-50 border-b border-default-200">
-              <h3 className="text-xl font-bold text-default-800">Reject Task Review</h3>
+              <Heading3 className="text-xl font-bold text-default-800">Reject Task Review</Heading3>
               {selectedRequest.relatedTask?.title && (
                 <p className="text-sm text-default-500 mt-1">Task: {selectedRequest.relatedTask.title}</p>
               )}
@@ -508,7 +458,7 @@ export default function ApprovalsPage() {
                     <label className="block text-sm font-medium text-default-700 mb-2">
                       Rejection Reason
                     </label>
-                    <textarea
+                    <NativeTextarea
                       value={rejectComment}
                       onChange={(e) => setRejectComment(e.target.value)}
                       placeholder="Explain why this task is being rejected..."
@@ -524,7 +474,7 @@ export default function ApprovalsPage() {
                         <label className="block text-sm font-medium text-default-700">
                           Select subtasks to mark as incomplete
                         </label>
-                        <button
+                        <NativeButton
                           type="button"
                           onClick={() => {
                             if (subtasksToUnmark.length === taskDetails.subtasks.length) {
@@ -536,16 +486,16 @@ export default function ApprovalsPage() {
                           className="text-xs text-primary-600 hover:text-primary-700"
                         >
                           {subtasksToUnmark.length === taskDetails.subtasks.length ? 'Deselect All' : 'Select All'}
-                        </button>
+                        </NativeButton>
                       </div>
-                      <div className="space-y-3 max-h-60 overflow-y-auto border border-default-200 rounded-lg p-3 bg-default-50">
+                      <Surface className="space-y-3 max-h-60 overflow-y-auto border border-default-200 rounded-lg p-3 bg-default-50">
                         {taskDetails.subtasks.map((subtask) => {
                           const isSelected = subtasksToUnmark.includes(subtask._id)
                           return (
                             <div key={subtask._id} className={`p-3 rounded-lg border transition-all ${isSelected ? 'border-danger-300 bg-danger-50' : 'border-default-200 bg-content1'
                               }`}>
                               <div className="flex items-start gap-3">
-                                <input
+                                <NativeInput
                                   type="checkbox"
                                   id={`subtask-${subtask._id}`}
                                   checked={isSelected}
@@ -575,7 +525,7 @@ export default function ApprovalsPage() {
                                   )}
                                   {isSelected && (
                                     <div className="mt-2">
-                                      <input
+                                      <NativeInput
                                         type="text"
                                         placeholder="Add comment for this subtask (optional)..."
                                         value={subtaskComments[subtask._id] || ''}
@@ -592,7 +542,7 @@ export default function ApprovalsPage() {
                             </div>
                           )
                         })}
-                      </div>
+                      </Surface>
                       {subtasksToUnmark.length > 0 && (
                         <p className="text-sm text-danger mt-2">
                           {subtasksToUnmark.length} subtask(s) will be marked as incomplete
@@ -653,7 +603,7 @@ export default function ApprovalsPage() {
                 </Button>
               </div>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
     </div>
