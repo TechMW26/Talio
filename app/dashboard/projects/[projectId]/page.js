@@ -1364,6 +1364,7 @@ export default function ProjectDetailPage() {
   const canManageStatuses = isProjectHead
   const taskStatuses = getBoardTaskStatuses(project)
   const kanbanStatusColumns = taskStatuses.map(s => ({ key: s.key, label: s.label, color: s.color }))
+  const taskStatusTaskCounts = project?.taskStatusUsage || {}
   const isAcceptedMember = project.currentUserInvitationStatus === 'accepted' || isProjectHead || isCreator || (user && ['admin'].includes(user.role))
   const isPendingInvitation = project.currentUserInvitationStatus === 'invited'
   const isWaitingForReview = (project.completionPercentage >= 100) && new Date(project.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(project.status)
@@ -1455,7 +1456,7 @@ export default function ProjectDetailPage() {
           )}
           {canManageStatuses && (
             <button
-              onClick={() => setShowManageStatuses(true)}
+              onClick={() => { setShowManageStatuses(true); mutateProject() }}
               className="btn-secondary flex items-center"
             >
               <HiOutlineSquares2X2 className="mr-2 w-4 h-4" />
@@ -1515,6 +1516,7 @@ export default function ProjectDetailPage() {
         isOpen={showManageStatuses}
         onClose={() => setShowManageStatuses(false)}
         statuses={taskStatuses}
+        taskCounts={taskStatusTaskCounts}
         onSave={handleSaveTaskStatuses}
         saving={savingStatuses}
       />

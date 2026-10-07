@@ -11,7 +11,7 @@ const emit = detail => act(() => window.dispatchEvent(new CustomEvent('mira:acti
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => { jest.runOnlyPendingTimers(); jest.useRealTimers() })
 
-test('uses the supplied cursor and lights the viewport only during activity', () => {
+test('lights the viewport during activity without rendering a cursor icon', () => {
   const { unmount } = render(<MiraActivityPointer />)
   expect(screen.queryByTestId('mira-page-glow')).toBeNull()
   const target = { getBoundingClientRect: () => ({ left: 100, top: 100, width: 80, height: 40, right: 180, bottom: 140 }) }
@@ -20,12 +20,8 @@ test('uses the supplied cursor and lights the viewport only during activity', ()
   expect(screen.getByTestId('shared-activity-beam')).toHaveAttribute('data-active', 'true')
   expect(screen.getByTestId('shared-activity-beam')).toHaveAttribute('data-radius', '0')
   expect(screen.getByTestId('shared-activity-beam')).not.toHaveAttribute('data-strength')
-  const pointer = screen.getByRole('status', { name: 'MIRA activity' })
-  expect(pointer.style.transform).toBe('translate3d(140px, 120px, 0)')
-  expect(pointer.querySelector('img').getAttribute('src')).toBe('/mira-cursor.png')
-  expect(pointer.querySelectorAll('span[aria-hidden="true"]')).toHaveLength(0)
+  expect(document.querySelector('img[src="/mira-cursor.png"]')).toBeNull()
   emit({ label: 'Selected Tasks', phase: 'click', target })
-  expect(pointer.querySelectorAll('span[aria-hidden="true"]')).toHaveLength(1)
   act(() => jest.advanceTimersByTime(1800))
   expect(screen.queryByTestId('mira-page-glow')).toBeNull()
   unmount()

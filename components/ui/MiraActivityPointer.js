@@ -47,9 +47,6 @@ export default function MiraActivityPointer() {
     {(activity.visible || boardActive) && <div aria-hidden="true" data-testid="mira-page-glow" className={styles.pageGlow}>
       <AIActivityBeam active borderRadius={0} />
     </div>}
-    <div role="status" aria-label="MIRA activity" aria-live="polite" aria-hidden={!activity.visible} className={styles.pointer} style={{ opacity: activity.visible ? 1 : 0, transform: `translate3d(${activity.x}px, ${activity.y}px, 0)` }}>
-      {activity.click > 0 && <span key={activity.click} className={styles.clickRing} aria-hidden="true" />}
-      <img src="/mira-cursor.png" width="24" height="24" alt="" draggable={false} className={`${styles.icon} ${activity.click ? styles.click : ''}`} />
-    </div>
+    <div role="status" aria-label="MIRA activity" aria-live="polite" aria-hidden={!activity.visible} className={styles.pointer} />
   </>, document.body)
 }

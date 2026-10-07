@@ -4,12 +4,13 @@ import { FaTimes, FaPlus, FaTrash, FaArrowUp, FaArrowDown, FaLock, FaExclamation
 import ModalPortal from '@/components/ui/ModalPortal'
 import { STATUS_COLOR_KEYS, getStatusColorClasses } from '@/lib/taskStatusConfig'
 
-export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = [], onSave, saving = false }) {
+export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = [], onSave, saving = false, taskCounts = {} }) {
   const [rows, setRows] = useState([])
   const [confirmIndex, setConfirmIndex] = useState(null)
+  const [blockedIndex, setBlockedIndex] = useState(null)
   const wasOpenRef = useRef(false)
   useEffect(() => {
-    if (isOpen && !wasOpenRef.current) { setRows(statuses.map(s => ({ ...s }))); setConfirmIndex(null) }
+    if (isOpen && !wasOpenRef.current) { setRows(statuses.map(s => ({ ...s }))); setConfirmIndex(null); setBlockedIndex(null) }
     wasOpenRef.current = isOpen
   }, [isOpen, statuses])
   if (!isOpen) return null
@@ -21,7 +22,11 @@ export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = []
     ;[next[i], next[t]] = [next[t], next[i]]
     return next
   })
-  const confirmRemove = (i) => setConfirmIndex(i)
+  const confirmRemove = (i) => {
+    const row = rows[i]
+    if (row.key && (taskCounts[row.key] || 0) > 0) { setBlockedIndex(i); return }
+    setConfirmIndex(i)
+  }
   const cancelRemove = () => setConfirmIndex(null)
   const doRemove = (i) => { setRows(prev => prev.filter((_, idx) => idx !== i)); setConfirmIndex(null) }
   const addRow = () => setRows(prev => [...prev, { key: '', label: '', color: 'blue', order: prev.length, isSystem: false }])
@@ -42,6 +47,24 @@ export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = []
           <div className="p-4 space-y-2 overflow-y-auto flex-1">
             {rows.map((row, i) => {
               const c = getStatusColorClasses(row.color)
+              if (blockedIndex === i) {
+                const count = taskCounts[row.key] || 0
+                return (
+                  <div key={row.key || `blocked-${i}`} className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <FaExclamationTriangle className="text-amber-500" size={13} />
+                      </span>
+                      <p className="text-sm text-gray-700 leading-snug">
+                        You can't delete <span className="font-semibold">"{row.label}"</span> because {count === 1 ? '1 task is' : `${count} tasks are`} using this status.
+                      </p>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-3">
+                      <button type="button" onClick={() => setBlockedIndex(null)} className="px-4 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-100">OK</button>
+                    </div>
+                  </div>
+                )
+              }
               if (confirmIndex === i) {
                 return (
                   <div key={row.key || `new-${i}`} className="rounded-xl border border-red-200 bg-red-50 p-4">
