@@ -2,6 +2,9 @@
 .navigation.navigation { position: sticky; top: 16px; align-self: start; max-height: calc(100dvh - 112px); overflow: hidden; border: 1px solid var(--color-border, #303030); }
 .navigationBody.navigationBody { padding: 16px; gap: 20px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
 .search.search { border-radius: 10px; box-shadow: none; border: 0; background: var(--color-bg-hover, #252525); }
+/* dark-mode.css paints the base shell of fields nested in cards with the elevated
+   fill. On the search field that shell is the visible surface, so it carries the radius. */
+:global(html.dark .bg-content1) .searchField.searchField { border-radius: 10px !important; }
 .searchInput.searchInput { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; outline: none; min-width: 0; }
 .nav { display: flex; flex-direction: column; gap: 20px; }
 .navButton.navButton { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 10px 12px; text-align: left; border-radius: 10px !important; background: transparent; color: var(--color-text-secondary, #a1a1aa); font-size: 13px; line-height: 1.4; }

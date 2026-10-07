@@ -198,9 +198,6 @@ export default function LeaveBalancePage() {
 
       {/* Leave Balance Details */}
       <Card shadow="sm" className="mb-6">
-        <CardHeader className="px-6 py-4 border-b border-default-200">
-          <Heading3 className="text-lg font-semibold text-default-800">Leave Balance Details</Heading3>
-        </CardHeader>
         <CardBody className="p-0">
           <div className="overflow-x-auto">
             <NativeTable className="min-w-full divide-y divide-default-200">

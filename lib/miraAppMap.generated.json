@@ -203,7 +203,6 @@
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js",
@@ -242,6 +241,7 @@
     "controls": [
       "Add Missing Entry",
       "Approve",
+      "Attendance colour legend",
       "Calendar",
       "Cancel",
       "Check-In Time",
@@ -271,7 +271,9 @@
     "sources": [
       "app/dashboard/attendance/page.js",
       "components/OvertimePrompt.js",
+      "components/attendance/AttendanceLegend.js",
       "components/attendance/LocationAccessStatus.js",
+      "components/attendance/attendance-colors.module.css",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
@@ -333,6 +335,7 @@
     "route": "/dashboard/attendance/team",
     "name": "Team Attendance",
     "controls": [
+      "Attendance colour legend",
       "Connection Error",
       "Department Filter",
       "Filter by department",
@@ -348,6 +351,8 @@
     ],
     "sources": [
       "app/dashboard/attendance/team/page.js",
+      "components/attendance/AttendanceLegend.js",
+      "components/attendance/attendance-colors.module.css",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
@@ -403,7 +408,6 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -535,7 +539,6 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -644,7 +647,6 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -738,7 +740,6 @@
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1215,7 +1216,6 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1486,7 +1486,6 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2059,7 +2058,6 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2132,7 +2130,6 @@
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2285,7 +2282,6 @@
       "components/ui/ModalPortal.js",
       "components/ui/Portal.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2394,7 +2390,6 @@
       "components/ui/ModalPortal.js",
       "components/ui/Portal.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2499,7 +2494,6 @@
       "components/ui/ModalPortal.js",
       "components/ui/Portal.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2627,7 +2621,6 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3213,7 +3206,6 @@
       "Previous",
       "Primary Location",
       "Productivity",
-      "Productivity screenshots",
       "Professional Tax",
       "Provident Fund (PF)",
       "Publish induction",
@@ -3271,7 +3263,6 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js",
@@ -3443,7 +3434,6 @@
       "components/ui/MiraPet.js",
       "components/ui/ModalPortal.js",
       "components/ui/UploadButton.js",
-      "components/ui/UploadButton.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js",
@@ -3514,6 +3504,7 @@
       "Activity date",
       "Analytics period",
       "Analyzed Mosaic ( )",
+      "Attendance colour legend",
       "Back to previous page",
       "Blocked",
       "Category",
@@ -3567,6 +3558,8 @@
       "app/dashboard/team/members/[id]/lifecycle.module.css",
       "app/dashboard/team/members/[id]/member.module.css",
       "app/dashboard/team/members/[id]/page.js",
+      "components/attendance/AttendanceLegend.js",
+      "components/attendance/attendance-colors.module.css",
       "components/charts/FernlyCharts.js",
       "components/charts/FernlyCharts.module.css",
       "components/productivity/AnalyzedComposite.js",

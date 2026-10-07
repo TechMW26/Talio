@@ -317,11 +317,6 @@ export default function AssetsPage() {
 
       {/* Assets Table */}
       <Surface className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <Heading2 className="text-xl font-semibold text-gray-800">
-            {isAdmin ? 'Asset Inventory' : 'Your Assigned Assets'}
-          </Heading2>
-        </div>
 
         {error ? (
           <DataErrorState error={error} onRetry={() => refreshAssets()} />

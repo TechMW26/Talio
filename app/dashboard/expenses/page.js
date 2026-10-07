@@ -118,10 +118,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Expenses Table */}
-      <Card as="section" shadow="none" className={styles.card}>
-        <div className={styles.tableHeading}>
-          <Heading2 className="text-xl font-semibold text-default-800">My Expenses</Heading2>
-        </div>
+      <Card as="section" aria-label="My Expenses" shadow="none" className={styles.card}>
 
         {error ? (
           <div className="p-8">

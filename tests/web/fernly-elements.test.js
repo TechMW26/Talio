@@ -1,11 +1,12 @@
 import { createRef } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { NativeButton, NativeInput, NativeSelect, Heading2, Input, SelectItem, Tabs } from '@/components/ui/fernly'
+import { NativeButton, NativeInput, NativeSelect, Heading2, Input, SelectItem, Tabs, Autocomplete } from '@/components/ui/fernly'
 
 jest.mock('@heroui/react', () => {
   const React = require('react')
   return {
     Input: React.forwardRef(({ classNames, ...props }, ref) => <input {...props} ref={ref} data-wrapper={classNames.inputWrapper} />),
+    Autocomplete: React.forwardRef(({ classNames, ...props }, ref) => <input {...props} ref={ref} data-end-content={classNames.endContentWrapper} />),
     SelectItem: Object.assign(() => null, { getCollectionNode: () => 'collection' }),
     Tabs: React.forwardRef(({ variant, color, radius, classNames, onSelectionChange }, ref) => <div ref={ref} data-testid="tabs" data-variant={variant} data-color={color} data-radius={radius} data-cursor={classNames.cursor}><button onClick={() => onSelectionChange('approved')}>Approved</button></div>),
   }
@@ -23,6 +24,26 @@ test('shared tabs enforce the standard solid pill and preserve selection and slo
   expect(select).toHaveBeenCalledWith('approved')
 })
 jest.mock('@/components/ui/HeroModal', () => ({ __esModule: true, default: () => null }))
+
+test('searchable dropdowns preserve caller slots and share the arrow gutter', () => {
+  render(<Autocomplete aria-label="Search department" classNames={{ endContentWrapper: 'existing-end-content' }} />)
+  expect(screen.getByRole('textbox').dataset.endContent).toContain('existing-end-content')
+  const source = require('fs').readFileSync('components/ui/fernly/index.js', 'utf8')
+  expect(source).toContain("endContentWrapper: 'dropdownEndContent'")
+  const css = require('fs').readFileSync('components/ui/fernly/elements.module.css', 'utf8')
+  expect(css).toContain('margin-inline: 0 !important')
+  expect(css).toContain('padding-inline-end: var(--talio-select-arrow-inset, 16px)')
+})
+
+test('global dropdown spacing covers native and shared selects without changing listboxes', () => {
+  const css = require('fs').readFileSync('app/globals.css', 'utf8')
+  expect(css).toContain('--talio-select-arrow-inset: 16px')
+  expect(css).toContain('inset-inline-end: var(--talio-select-arrow-inset)')
+  expect(css).toContain('select:not([multiple]):is(:not([size]), [size="1"])')
+  expect(css).toContain('background-position: right var(--talio-select-arrow-inset) center')
+  expect(css).toContain('background-position: left var(--talio-select-arrow-inset) center')
+  expect(css).toContain('padding-inline-end: calc(var(--talio-select-arrow-inset) + 24px)')
+})
 
 test('native button preserves disabled, click, type, class and ref behavior', () => {
   const ref = createRef(), click = jest.fn()

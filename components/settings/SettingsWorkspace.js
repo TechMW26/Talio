@@ -23,7 +23,7 @@ export default function SettingsWorkspace({ tabs, activeTab, onSelect, children 
         <CardBody className={styles.navigationBody}>
           <Input aria-label="Search settings" placeholder="Search settings" value={query} onValueChange={setQuery}
             size="sm" variant="flat" startContent={<FaSearch aria-hidden="true" />} isClearable onClear={() => setQuery('')}
-            classNames={{ inputWrapper: styles.search, input: styles.searchInput }} />
+            classNames={{ base: styles.searchField, inputWrapper: styles.search, input: styles.searchInput }} />
           <label className={styles.mobilePicker}>
             <span>Settings section</span>
             <NativeSelect value={activeTab} onChange={event => onSelect(event.target.value)}>

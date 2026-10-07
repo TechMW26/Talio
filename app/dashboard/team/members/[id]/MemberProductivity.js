@@ -1,7 +1,7 @@
 'use client'
 
 
-import { Heading2, NativeButton, Heading3 } from '@/components/ui/fernly/native'
+import { NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useEffect, useRef, useState } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import AnalyzedComposite from '@/components/productivity/AnalyzedComposite'
@@ -54,7 +54,7 @@ export default function MemberProductivity({ employee, date }) {
   function nextPage() { setCursors(previous => [...previous.slice(0, page + 1), data.pagination.nextCursor]); setPage(value => value + 1) }
   function refresh() { mutate(); refreshScores(); setRefreshSignal(value => value + 1) }
   return <section className={styles.section} aria-label="Employee productivity">
-    <header className={styles.sectionHeader}><div><Heading2>Productivity & screenshots</Heading2><p>{employee.firstName} {employee.lastName} · {date}</p></div><NativeButton className={styles.secondaryButton} disabled={!userId || isValidating} onClick={refresh}>Refresh</NativeButton></header>
+    <header className={styles.sectionHeader}><p>{employee.firstName} {employee.lastName} · {date}</p><NativeButton className={styles.secondaryButton} disabled={!userId || isValidating} onClick={refresh}>Refresh</NativeButton></header>
     {!userId ? <p className={styles.emptyState}>No linked account for this employee. Productivity captures are unavailable.</p> : <>
       <div className={styles.productivityMetrics}><div><span>Productivity score</span><strong>{scoreLoading ? '…' : score?.averageProductivityScore != null ? `${score.averageProductivityScore}/100` : '—'}</strong></div><div><span>Focus score</span><strong>{scoreLoading ? '…' : score?.averageFocusScore != null ? `${score.averageFocusScore}/100` : '—'}</strong></div><div><span>Available screenshots</span><strong>{isLoading ? '…' : data?.pagination?.total ?? '—'}</strong></div></div>
       {scoreError && <p role="alert">{scoreError.status === 403 ? 'You do not have permission to view productivity scores.' : 'Scores could not be loaded. Use Refresh to retry.'}</p>}

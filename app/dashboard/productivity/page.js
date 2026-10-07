@@ -925,9 +925,6 @@ export default function ProductivityPage() {
       {/* Team grid (when in team tab and no member selected) */}
       {activeTab === 'team' && !selectedTeamUserId ? (
         <div className="mb-6">
-          <Heading2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            Team
-          </Heading2>
           {renderTeamGrid()}
         </div>
       ) : null}

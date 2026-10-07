@@ -59,7 +59,7 @@ test('closed mobile navigation cannot intercept clicks or keyboard focus', () =>
 test('both desktop sidebar states share taller left-aligned geometry with space for native mac controls', () => {
   const css = read('app/dashboard/dashboard-layout.css')
   expect(css).toContain('--dashboard-navigation-inset: 6px')
-  expect(css).toContain('--dashboard-rail-width: 88px')
+  expect(css).toContain('--dashboard-rail-width: 76px')
   expect(css).toContain('--dashboard-expanded-width: 19rem')
   expect(css).toContain('.talio-floating-rail, .talio-floating-expanded {')
   expect(css).toContain('height: calc(100dvh - 2 * var(--dashboard-navigation-inset))')
@@ -69,6 +69,16 @@ test('both desktop sidebar states share taller left-aligned geometry with space 
   expect(read('components/sidebar/SlidingSidebar.js')).not.toContain('w-[18rem]')
   // The existing native app clearance keeps the logo and expand control below the lights.
   expect(read('desktop-app/src/main.js')).toContain('padding-top: 38px !important')
+})
+
+test('collapsed rail centres the native traffic-light group with equal side spacing', () => {
+  const css = read('app/dashboard/dashboard-layout.css')
+  const inset = Number(css.match(/--dashboard-navigation-inset: (\d+)px/)[1])
+  const width = Number(css.match(/--dashboard-rail-width: (\d+)px/)[1])
+  const desktop = read('desktop-app/src/main.js')
+  const lightsLeft = Number(desktop.match(/trafficLightPosition: \{ x: (\d+)/)[1])
+  const lightsWidth = 52 // Three native 12px buttons, with 8px gaps.
+  expect(lightsLeft - inset).toBe(inset + width - (lightsLeft + lightsWidth))
 })
 
 test('navigation sits above the header and its dismissal backdrop covers header actions', () => {

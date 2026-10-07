@@ -3,7 +3,7 @@ import { NativeTable } from '@/components/ui/fernly'
 import { Surface } from '@/components/ui/fernly'
 
 
-import { Heading1, Heading2, NativeButton } from '@/components/ui/fernly/native'
+import { Heading1, NativeButton } from '@/components/ui/fernly/native'
 import { useState } from 'react'
 import { Skeleton } from '@/components/ui/fernly'
 import { FaUser, FaEye, FaEyeSlash, FaCopy } from 'react-icons/fa'
@@ -75,9 +75,6 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <Surface className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <Heading2 className="text-xl font-semibold text-gray-800">All Users</Heading2>
-        </div>
 
         <div className="overflow-x-auto">
           <NativeTable className="min-w-full divide-y divide-gray-200">

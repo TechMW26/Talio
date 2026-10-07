@@ -2,6 +2,8 @@
 import { NativeTable } from '@/components/ui/fernly'
 import { Surface, SummaryCard } from '@/components/ui/fernly'
 import calendar from '@/components/ui/fernly/calendar.module.css'
+import AttendanceLegend from '@/components/attendance/AttendanceLegend'
+import attendanceColors from '@/components/attendance/attendance-colors.module.css'
 
 
 import { Heading1, Heading2, NativeButton, Heading3, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
@@ -1103,40 +1105,7 @@ export default function AttendancePage() {
           </div>
 
           {/* Status Legend */}
-          <Surface className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-default-50 rounded-lg">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-success-100 border border-success-400"></div>
-              <span className="text-[10px] sm:text-xs text-default-600">Present</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
-              <span className="text-[10px] sm:text-xs text-default-600">In Progress</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
-              <span className="text-[10px] sm:text-xs text-default-600">Half Day</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
-              <span className="text-[10px] sm:text-xs text-default-600">Late</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-danger-100 border border-danger-400"></div>
-              <span className="text-[10px] sm:text-xs text-default-600">Absent</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-primary-100 border border-primary-400"></div>
-              <span className="text-[10px] sm:text-xs text-default-600">On Leave</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-secondary-100 border border-secondary-400"></div>
-              <span className="text-[10px] sm:text-xs text-default-600">Holiday</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-default-100 border border-default-300"></div>
-              <span className="text-[10px] sm:text-xs text-default-600">No Record</span>
-            </div>
-          </Surface>
+<AttendanceLegend />
 
           {attendanceLoadError ? (
             <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger">
@@ -1201,6 +1170,7 @@ export default function AttendancePage() {
                     return (
                       <div
                         key={index}
+                        data-attendance-status={dayData.isCurrentMonth ? (displayStatus || (isHoliday ? 'holiday' : isWeekend ? 'weekend' : 'no-record')) : undefined}
                         onClick={() => {
                           if (dayData.holiday) {
                             setSelectedHoliday(dayData.holiday)
@@ -1226,6 +1196,7 @@ export default function AttendancePage() {
                         className={`
                       min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 border rounded transition-all cursor-pointer relative group
                       ${statusColor}
+                      ${attendanceColors.day}
                       ${dayData.isToday ? 'ring-2 ring-primary' : ''}
                       ${!dayData.isCurrentMonth ? 'opacity-40 bg-default-50 border-transparent' : 'bg-content1 hover:shadow'}
                     `}
@@ -1242,9 +1213,9 @@ export default function AttendancePage() {
                           <div className="mb-1">
                             <span className={`
                           inline-block text-[9px] sm:text-[10px] px-1 py-0.5 rounded border font-medium uppercase tracking-tight leading-tight
-                          ${getStatusBadgeColor(displayStatus || dayData.record?.status)}
+                          ${attendanceColors.badge}
                           break-words max-w-full
-                        `} style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
+                        `} data-attendance-status={displayStatus || dayData.record?.status} style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
                               {displayStatus || dayData.record?.status}
                             </span>
                           </div>

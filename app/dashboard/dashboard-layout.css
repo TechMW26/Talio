@@ -15,7 +15,9 @@
 :root {
   --dashboard-shell-inset: 12px;
   --dashboard-navigation-inset: 6px;
-  --dashboard-rail-width: 88px;
+  /* Native mac controls span x=18..70; the rail spans x=6..82,
+   * leaving 12px on either side of the traffic-light group. */
+  --dashboard-rail-width: 76px;
   --dashboard-expanded-width: 19rem;
   --dashboard-shell-radius: 22px;
   --dashboard-shell-motion: 360ms cubic-bezier(.22, 1, .36, 1);

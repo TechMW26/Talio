@@ -16,7 +16,7 @@ export const Card = element(HeroCard, 'card')
 export const Input = element(HeroInput, 'field', { inputWrapper: 'control', label: 'label' })
 export const Textarea = element(HeroTextarea, 'field', { inputWrapper: 'control', label: 'label' })
 export const Select = element(HeroSelect, 'field', { trigger: 'control', label: 'label', popoverContent: 'popover' })
-export const Autocomplete = element(HeroAutocomplete, 'field', { popoverContent: 'popover' })
+export const Autocomplete = element(HeroAutocomplete, 'field', { popoverContent: 'popover', endContentWrapper: 'dropdownEndContent' })
 export const Chip = element(HeroChip, 'chip')
 const StyledTabs = element(HeroTabs, 'tabs', { tabList: 'tabList', cursor: 'tabCursor', tab: 'tab', tabContent: 'tabContent' })
 // One solid sliding-pill treatment across all shared tab selectors.
