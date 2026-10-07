@@ -65,6 +65,7 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [respondingTo, setRespondingTo] = useState(null)
+  const [openingProjectId, setOpeningProjectId] = useState(null)
 
   // User from localStorage
   const user = useMemo(() => {
@@ -287,8 +288,8 @@ export default function ProjectsPage() {
             return (
               <Surface
                 key={project._id}
-                onClick={() => router.push(`/dashboard/projects/${project._id}`)}
-                className={`bg-content1 rounded-xl shadow-sm border-2 hover:shadow-md transition-shadow cursor-pointer overflow-hidden flex flex-col ${getStatusBorderColor()}`}
+                onClick={() => { setOpeningProjectId(project._id); router.push(`/dashboard/projects/${project._id}`) }}
+                className={`relative bg-content1 rounded-xl shadow-sm border-2 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col ${getStatusBorderColor()} ${openingProjectId === project._id ? 'ring-4 ring-primary/40' : ''}`}
               >
                 {/* Project Header */}
                 <div className="p-5 flex-1">
@@ -442,6 +443,14 @@ export default function ProjectsPage() {
                         {respondingTo?.projectId === project._id && respondingTo?.action === 'reject' ? 'Declining...' : 'Decline'}
                       </Button>
                     </div>
+                  </div>
+                )}
+
+                {/* Selecting / opening overlay */}
+                {openingProjectId === project._id && (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/40 backdrop-blur-[1px]">
+                    <div className="h-7 w-7 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    <span className="text-sm font-medium text-white">Opening…</span>
                   </div>
                 )}
               </Surface>
