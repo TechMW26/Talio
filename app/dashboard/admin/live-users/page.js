@@ -1,4 +1,7 @@
 'use client'
+import { SummaryCard } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, NativeInput, NativeSelect, Heading3 } from '@/components/ui/fernly/native'
@@ -243,7 +246,7 @@ export default function LiveUsersPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+            <Surface key={i} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
               <div className="flex items-center gap-4">
                 <Skeleton className="w-12 h-12 rounded-lg" />
                 <div>
@@ -251,11 +254,11 @@ export default function LiveUsersPage() {
                   <Skeleton className="h-4 w-24 rounded-lg" />
                 </div>
               </div>
-            </div>
+            </Surface>
           ))}
         </div>
         <Skeleton className="h-12 w-full rounded-xl mb-6" />
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="flex items-center justify-between p-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
@@ -268,7 +271,7 @@ export default function LiveUsersPage() {
               <Skeleton className="h-6 w-20 rounded-full" />
             </div>
           ))}
-        </div>
+        </Surface>
       </div>
     )
   }
@@ -331,23 +334,13 @@ export default function LiveUsersPage() {
             purple: 'bg-purple-100 text-purple-600'
           }
           return (
-            <div key={index} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${colorClasses[stat.color]}`}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
-                  <p className="text-sm text-gray-600">{stat.label}</p>
-                </div>
-              </div>
-            </div>
+            <SummaryCard key={index} label={<>{stat.label}</>} value={<>{stat.value}</>} />
           )
         })}
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 mb-6">
+      <Surface className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
           <div className="input-with-icon flex-1">
@@ -387,36 +380,19 @@ export default function LiveUsersPage() {
             </Button>
           )}
         </div>
-      </div>
+      </Surface>
 
       {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-        <div className="flex overflow-x-auto border-b border-gray-200">
-          {tabs.map(tab => (
-            <NativeButton
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600 bg-blue-50'
-                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                }`}
-            >
-              {tab.label}
-              <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                }`}>
-                {tab.count}
-              </span>
-            </NativeButton>
-          ))}
-        </div>
-      </div>
+      <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
+        <Tabs aria-label="Live user views" selectedKey={activeTab} onSelectionChange={setActiveTab} className="w-full p-2">{tabs.map(tab => <Tab key={tab.id} title={<span className="flex items-center gap-2">{tab.label}<span className="text-xs">{tab.count}</span></span>} />)}</Tabs>
+      </Surface>
 
       {/* Content */}
       {activeTab === 'byDepartment' ? (
         /* By Department View */
         <div className="space-y-4">
           {visibleDepartments.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 text-center">
+            <Surface className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 text-center">
               <HiOutlineBuildingOffice2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <Heading3 className="text-lg font-medium text-gray-800 mb-2">
                 {hasActiveGroupSearch(searchQuery) ? 'No matching employees' : 'No Departments Found'}
@@ -424,7 +400,7 @@ export default function LiveUsersPage() {
               <p className="text-gray-600">
                 {hasActiveGroupSearch(searchQuery) ? 'Try another name, email, role, or department.' : 'No department data available.'}
               </p>
-            </div>
+            </Surface>
           ) : (
             visibleDepartments.map(dept => {
               const isExpanded = isDepartmentGroupExpanded({
@@ -433,7 +409,7 @@ export default function LiveUsersPage() {
                 departmentId: dept.id,
               })
               return (
-                <div key={dept.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <Surface key={dept.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 {/* Department Header */}
                 <div
                   onClick={() => toggleDepartmentExpand(dept.id)}
@@ -518,14 +494,14 @@ export default function LiveUsersPage() {
                     )}
                   </div>
                 )}
-                </div>
+                </Surface>
               )
             })
           )}
         </div>
       ) : (
         /* User List View */
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {filteredUsers.length === 0 ? (
             <div className="p-8 text-center">
               <HiOutlineUserGroup className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -585,7 +561,7 @@ export default function LiveUsersPage() {
               ))}
             </div>
           )}
-        </div>
+        </Surface>
       )}
     </div>
   )

@@ -1,4 +1,6 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, NativeInput } from '@/components/ui/fernly/native'
@@ -354,77 +356,13 @@ export default function OnboardingEmailsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card
-          shadow="sm"
-          isPressable
-          onPress={() => setStatusFilter('')}
-          className={`cursor-pointer transition-all ${statusFilter === ''
-            ? 'bg-secondary-50 border-secondary/30'
-            : 'border-default-200 hover:border-secondary/30'
-            }`}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-default-500 text-sm">Total</span>
-              <HiOutlineEnvelope className="w-5 h-5 text-secondary" />
-            </div>
-            <p className="text-2xl font-bold text-default-800 mt-1">{stats.total}</p>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" isPressable onPress={() => setStatusFilter('')} className="cursor-pointer" label={<>Total</>} value={<>{stats.total}</>} />
 
-        <Card
-          shadow="sm"
-          isPressable
-          onPress={() => setStatusFilter(statusFilter === 'sent' ? '' : 'sent')}
-          className={`cursor-pointer transition-all ${statusFilter === 'sent'
-            ? 'bg-success-50 border-success/30'
-            : 'border-default-200 hover:border-success/30'
-            }`}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-default-500 text-sm">Sent</span>
-              <HiOutlineCheckCircle className="w-5 h-5 text-success" />
-            </div>
-            <p className="text-2xl font-bold text-success mt-1">{stats.sent}</p>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" isPressable onPress={() => setStatusFilter(statusFilter === 'sent' ? '' : 'sent')} className="cursor-pointer" label={<>Sent</>} value={<>{stats.sent}</>} />
 
-        <Card
-          shadow="sm"
-          isPressable
-          onPress={() => setStatusFilter(statusFilter === 'failed' ? '' : 'failed')}
-          className={`cursor-pointer transition-all ${statusFilter === 'failed'
-            ? 'bg-danger-50 border-danger/30'
-            : 'border-default-200 hover:border-danger/30'
-            }`}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-default-500 text-sm">Failed</span>
-              <HiOutlineXCircle className="w-5 h-5 text-danger" />
-            </div>
-            <p className="text-2xl font-bold text-danger mt-1">{stats.failed}</p>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" isPressable onPress={() => setStatusFilter(statusFilter === 'failed' ? '' : 'failed')} className="cursor-pointer" label={<>Failed</>} value={<>{stats.failed}</>} />
 
-        <Card
-          shadow="sm"
-          isPressable
-          onPress={() => setStatusFilter(statusFilter === 'pending' ? '' : 'pending')}
-          className={`cursor-pointer transition-all ${statusFilter === 'pending'
-            ? 'bg-warning-50 border-warning/30'
-            : 'border-default-200 hover:border-warning/30'
-            }`}
-        >
-          <CardBody className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-default-500 text-sm">Pending</span>
-              <HiOutlineClock className="w-5 h-5 text-warning" />
-            </div>
-            <p className="text-2xl font-bold text-warning mt-1">{stats.pending}</p>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" isPressable onPress={() => setStatusFilter(statusFilter === 'pending' ? '' : 'pending')} className="cursor-pointer" label={<>Pending</>} value={<>{stats.pending}</>} />
       </div>
 
       {/* Actions Bar */}
@@ -493,7 +431,7 @@ export default function OnboardingEmailsPage() {
       <Card shadow="sm" className="overflow-hidden">
         <CardBody className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead>
                 <tr className="border-b border-default-200 bg-default-50">
                   <th className="px-4 py-3 text-left">
@@ -666,7 +604,7 @@ export default function OnboardingEmailsPage() {
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
 
           {/* Pagination */}

@@ -1,4 +1,6 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3 } from '@/components/ui/fernly/native'
@@ -147,19 +149,7 @@ export default function LeaveBalancePage() {
           { title: 'Remaining Balance', value: getTotalBalance(), color: 'success', icon: FaChartPie },
           { title: 'Leave Requests', value: leaveHistory.length, color: 'secondary', icon: FaHistory },
         ].map((stat, index) => (
-          <Card key={index} shadow="sm">
-            <CardBody className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-default-500 text-sm font-medium">{stat.title}</p>
-                  <Heading3 className="text-2xl font-bold text-default-800 mt-2">{stat.value}</Heading3>
-                </div>
-                <div className={`bg-${stat.color} p-4 rounded-lg`}>
-                  <stat.icon className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </CardBody>
-          </Card>
+          <SummaryCard key={index} shadow="sm" label={<>{stat.title}</>} value={<>{stat.value}</>} />
         ))}
       </div>
 
@@ -213,7 +203,7 @@ export default function LeaveBalancePage() {
         </CardHeader>
         <CardBody className="p-0">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
+            <NativeTable className="min-w-full divide-y divide-default-200">
               <thead className="bg-default-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -272,7 +262,7 @@ export default function LeaveBalancePage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         </CardBody>
       </Card>
@@ -290,7 +280,7 @@ export default function LeaveBalancePage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-default-200">
+              <NativeTable className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -327,7 +317,7 @@ export default function LeaveBalancePage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </NativeTable>
             </div>
           )}
         </CardBody>

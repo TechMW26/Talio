@@ -1,4 +1,5 @@
 'use client'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
@@ -322,50 +323,15 @@ export default function TodoPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{(analytics?.summary?.total || 0) + projectTasks.length}</p>
-              <p className="text-sm text-gray-500">Total</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Total</>} value={<>{(analytics?.summary?.total || 0) + projectTasks.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{(analytics?.summary?.pending || 0) + projectTasks.length}</p>
-              <p className="text-sm text-gray-500">Pending</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Pending</>} value={<>{(analytics?.summary?.pending || 0) + projectTasks.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{projectTasks.length}</p>
-              <p className="text-sm text-gray-500">Project Tasks</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Project Tasks</>} value={<>{projectTasks.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{analytics?.summary?.completed || 0}</p>
-              <p className="text-sm text-gray-500">Completed</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Completed</>} value={<>{analytics?.summary?.completed || 0}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{analytics?.summary?.productivityScore || 0}%</p>
-              <p className="text-sm text-gray-500">Score</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Score</>} value={<>{analytics?.summary?.productivityScore || 0}%</>} />
       </div>
 
       {/* Analytics Panel */}
@@ -377,7 +343,7 @@ export default function TodoPage() {
       <div className="flex gap-6">
         {/* Sidebar - Categories */}
         <div className="hidden md:block w-64 flex-shrink-0">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sticky top-4">
+          <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sticky top-4">
             {/* Quick filters */}
             <div className="space-y-1 mb-4">
               <NativeButton
@@ -508,13 +474,13 @@ export default function TodoPage() {
                 </NativeButton>
               </>
             )}
-          </div>
+          </Surface>
         </div>
 
         {/* Main Todo List */}
         <div className="flex-1 min-w-0">
           {/* Search and Filters */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+          <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search */}
               <div className="flex-1">
@@ -570,13 +536,13 @@ export default function TodoPage() {
                 ))}
               </Select>
             </div>
-          </div>
+          </Surface>
 
           {/* Todo List */}
           {loading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
+                <Surface key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
                   <div className="flex items-center gap-3">
                     <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
                     <div className="flex-1">
@@ -584,20 +550,20 @@ export default function TodoPage() {
                       <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                     </div>
                   </div>
-                </div>
+                </Surface>
               ))}
             </div>
           ) : activeTab === 'project-tasks' ? (
             // Project Tasks View
             projectTasks.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+              <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
                 <Heading3 className="text-lg font-medium text-gray-800 mb-2">No project tasks</Heading3>
                 <p className="text-gray-500">You don't have any project tasks assigned to you in todo status.</p>
-              </div>
+              </Surface>
             ) : (
               <div className="space-y-2">
                 {projectTasks.map(task => (
-                  <div
+                  <Surface
                     key={task._id}
                     className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
                   >
@@ -668,12 +634,12 @@ export default function TodoPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </Surface>
                 ))}
               </div>
             )
           ) : combinedTodos.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+            <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
               <Heading3 className="text-lg font-medium text-gray-800 mb-2">
                 {activeTab === 'completed' ? 'No completed to-dos' : 'No to-dos yet'}
               </Heading3>
@@ -692,11 +658,11 @@ export default function TodoPage() {
                   Add To-do
                 </Button>
               )}
-            </div>
+            </Surface>
           ) : (
             <div className="space-y-2">
               {combinedTodos.map(todo => (
-                <div
+                <Surface
                   key={todo._id}
                   onClick={() => !todo.isProjectTask && setSelectedTodo(todo)}
                   className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow ${!todo.isProjectTask ? 'cursor-pointer' : ''
@@ -825,7 +791,7 @@ export default function TodoPage() {
                       </NativeButton>
                     )}
                   </div>
-                </div>
+                </Surface>
               ))}
             </div>
           )}

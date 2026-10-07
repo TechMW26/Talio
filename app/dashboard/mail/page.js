@@ -1,4 +1,6 @@
 'use client';
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 
@@ -1054,14 +1056,14 @@ export default function MailPage() {
         {/* Skeleton stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+            <Surface key={i} className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
               <Skeleton className="h-3 w-16 rounded mb-2" />
               <Skeleton className="h-7 w-10 rounded" />
-            </div>
+            </Surface>
           ))}
         </div>
         {/* Skeleton toolbar */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md dark:shadow-none p-4 mb-6">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-lg shadow-md dark:shadow-none p-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="flex gap-2">
               {[...Array(5)].map((_, i) => (
@@ -1071,9 +1073,9 @@ export default function MailPage() {
             <div className="flex-1" />
             <Skeleton className="h-10 w-64 rounded-full" />
           </div>
-        </div>
+        </Surface>
         {/* Skeleton email list */}
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100">
               <Skeleton className="w-5 h-5 rounded" />
@@ -1083,7 +1085,7 @@ export default function MailPage() {
               <Skeleton className="h-3 w-16 rounded" />
             </div>
           ))}
-        </div>
+        </Surface>
       </div>
     );
   }
@@ -1097,7 +1099,7 @@ export default function MailPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <Heading1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</Heading1>
           </div>
-          <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
+          <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
             <div className="text-center max-w-md px-4">
               <div className="mb-8">
                 <div className="w-20 h-20 mx-auto bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
@@ -1142,7 +1144,7 @@ export default function MailPage() {
                 I&apos;ve connected my email - Refresh
               </NativeButton>
             </div>
-          </div>
+          </Surface>
         </div>
       );
     }
@@ -1153,7 +1155,7 @@ export default function MailPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <Heading1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</Heading1>
         </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
           <div className="text-center max-w-md">
             <div className="mb-8">
               <div className="w-20 h-20 mx-auto bg-red-50 dark:bg-red-900/30 rounded-2xl flex items-center justify-center">
@@ -1193,7 +1195,7 @@ export default function MailPage() {
               You can disconnect at any time.
             </p>
           </div>
-        </div>
+        </Surface>
       </div>
     );
   }
@@ -1223,7 +1225,7 @@ export default function MailPage() {
 
             {/* Account Switcher Dropdown */}
             {showAccountSwitcher && (
-              <div className="absolute top-full right-0 mt-2 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-700 py-2 z-50 min-w-[260px]">
+              <Surface className="absolute top-full right-0 mt-2 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-700 py-2 z-50 min-w-[260px]">
                 <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Switch Account</div>
 
                 <NativeButton
@@ -1281,7 +1283,7 @@ export default function MailPage() {
                 >
                   <span className="text-sm">Disconnect {showAllAccounts ? 'all accounts' : 'this account'}</span>
                 </NativeButton>
-              </div>
+              </Surface>
             )}
           </div>
 
@@ -1297,38 +1299,38 @@ export default function MailPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 flex-shrink-0">
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
           <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineEnvelope className="text-sm" />
             Unread
           </div>
           <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{unreadCount || 0}</p>
-        </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+        </Surface>
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
           <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineStar className="text-sm" />
             Starred
           </div>
           <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.starred?.total || 0}</p>
-        </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+        </Surface>
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
           <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <MdLabelImportant className="text-sm" />
             Important
           </div>
           <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.important?.total || 0}</p>
-        </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+        </Surface>
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
           <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineClock className="text-sm" />
             Snoozed
           </div>
           <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.snoozed?.total || 0}</p>
-        </div>
+        </Surface>
       </div>
 
       {/* Toolbar - Folder Pills + Search */}
-      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-3 mb-4 flex-shrink-0">
+      <Surface className="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-3 mb-4 flex-shrink-0">
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           {/* Folder pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 flex-shrink-0 scrollbar-hide">
@@ -1445,7 +1447,7 @@ export default function MailPage() {
             </Tooltip>
           </div>
         </div>
-      </div>
+      </Surface>
 
       {/* Mobile Bottom Nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-800 border-t border-gray-200 dark:border-zinc-700 z-40 flex justify-around py-2 shadow-lg">
@@ -1483,7 +1485,7 @@ export default function MailPage() {
       </div>
 
       {/* Email List & Detail Card */}
-      <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden flex flex-1 min-h-0 mb-2">
+      <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden flex flex-1 min-h-0 mb-2">
           {/* Email List */}
           <div className={`${selectedEmail ? 'hidden lg:flex' : 'flex'} flex-col w-full lg:w-[400px] xl:w-[450px] flex-shrink-0 border-r border-gray-200 dark:border-zinc-700`}>
             {/* Toolbar */}
@@ -1825,7 +1827,7 @@ export default function MailPage() {
                       <MdMoveToInbox className="text-xl text-gray-600 dark:text-zinc-400" />
                     </NativeButton>
                     {showMoveToMenu && (
-                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
+                      <Surface className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
                         <NativeButton
                           onClick={(e) => moveToFolder(selectedEmail, 'inbox', e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
@@ -1854,7 +1856,7 @@ export default function MailPage() {
                           <MdDelete className="text-lg" />
                           Move to Trash
                         </NativeButton>
-                      </div>
+                      </Surface>
                     )}
                   </div>
 
@@ -1872,7 +1874,7 @@ export default function MailPage() {
                       <MdLabel className="text-xl text-gray-600 dark:text-zinc-400" />
                     </NativeButton>
                     {showLabelsMenu && (
-                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
+                      <Surface className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
                         <div className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-300 border-b border-gray-100 dark:border-zinc-700">
                           Apply labels
                         </div>
@@ -1906,7 +1908,7 @@ export default function MailPage() {
                             Create new label
                           </NativeButton>
                         </div>
-                      </div>
+                      </Surface>
                     )}
                   </div>
 
@@ -1924,7 +1926,7 @@ export default function MailPage() {
                       <MdMoreVert className="text-xl text-gray-600 dark:text-zinc-400" />
                     </NativeButton>
                     {showMoreMenu && (
-                      <div className="absolute top-full right-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
+                      <Surface className="absolute top-full right-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
                         <NativeButton
                           onClick={(e) => toggleRead(selectedEmail, e)}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
@@ -2007,7 +2009,7 @@ export default function MailPage() {
                           <MdPrint className="text-lg" />
                           Print
                         </NativeButton>
-                      </div>
+                      </Surface>
                     )}
                   </div>
                 </div>
@@ -2221,12 +2223,12 @@ export default function MailPage() {
               </div>
             )}
           </div>
-        </div>
+        </Surface>
 
       {/* AI Compose Modal */}
       {showAiCompose && (
         <div className="modal-overlay">
-          <div className="bg-white dark:bg-zinc-800 rounded-[30px] shadow-xl w-full max-w-md p-6 animate-modal-enter">
+          <DialogSurface className="bg-white dark:bg-zinc-800 rounded-[30px] shadow-xl w-full max-w-md p-6 animate-modal-enter">
             <div className="flex justify-between items-center mb-4">
               <Heading3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
                 Write with AI
@@ -2279,14 +2281,14 @@ export default function MailPage() {
                 </NativeButton>
               </div>
             </div>
-          </div>
+          </DialogSurface>
         </div>
       )}
 
       {/* Compose Modal - Gmail Style with Full Functionality */}
       {showCompose && (
         <div className={`fixed ${composeFullscreen ? 'inset-0 p-4' : 'bottom-0 right-0 sm:right-8 left-0 sm:left-auto'} z-[99999]`}>
-          <div className={`bg-white dark:bg-zinc-800 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col ${composeFullscreen
+          <Surface className={`bg-white dark:bg-zinc-800 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col ${composeFullscreen
             ? 'w-full h-full rounded-xl'
             : composeMinimized
               ? 'w-72 h-10 hidden sm:flex rounded-lg'
@@ -2492,7 +2494,7 @@ export default function MailPage() {
                       <div className="text-xs text-gray-500 dark:text-zinc-400 mb-2">Attachments ({attachments.length})</div>
                       <div className="flex flex-wrap gap-2">
                         {attachments.map((file, idx) => (
-                          <div
+                          <Surface
                             key={idx}
                             className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-700 rounded-lg border border-gray-200 dark:border-zinc-600 text-sm group"
                           >
@@ -2505,7 +2507,7 @@ export default function MailPage() {
                             >
                               <FaTimes className="text-xs text-gray-500" />
                             </NativeButton>
-                          </div>
+                          </Surface>
                         ))}
                       </div>
                     </div>
@@ -2513,7 +2515,7 @@ export default function MailPage() {
 
                   {/* Emoji Picker */}
                   {showEmojiPicker && (
-                    <div className="absolute bottom-16 left-3 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-xl p-3 z-10 w-80">
+                    <Surface className="absolute bottom-16 left-3 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-xl p-3 z-10 w-80">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Emojis</span>
                         <NativeButton onClick={() => setShowEmojiPicker(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded">
@@ -2531,7 +2533,7 @@ export default function MailPage() {
                           </NativeButton>
                         ))}
                       </div>
-                    </div>
+                    </Surface>
                   )}
                 </div>
 
@@ -2637,7 +2639,7 @@ export default function MailPage() {
                 </div>
               </>
             )}
-          </div>
+          </Surface>
         </div>
       )}
     </div>

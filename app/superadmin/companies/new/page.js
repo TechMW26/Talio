@@ -1,5 +1,7 @@
 'use client'
 
+import { Tabs, Tab } from '@/components/ui/fernly'
+
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect } from 'react'
@@ -207,24 +209,9 @@ export default function NewCompanyPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <div className="flex gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+<Tabs aria-label="Company creation sections" selectedKey={activeTab} onSelectionChange={setActiveTab} className="w-full mb-6">
+          {tabs.map(tab => <Tab key={tab.id} title={tab.label} />)}
+        </Tabs>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">

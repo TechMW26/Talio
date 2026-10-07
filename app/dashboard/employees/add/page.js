@@ -1,4 +1,6 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, NativeInput, Heading3 } from '@/components/ui/fernly/native'
@@ -398,30 +400,7 @@ export default function AddEmployeePage() {
 
       {/* Tabs */}
       <div className="mb-6">
-        <div className="flex border-b border-default-200">
-          <NativeButton
-            type="button"
-            onClick={() => setActiveTab('single')}
-            className={`px-6 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'single'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
-              }`}
-          >
-            <FaUserPlus />
-            <span>Single Employee</span>
-          </NativeButton>
-          <NativeButton
-            type="button"
-            onClick={() => setActiveTab('bulk')}
-            className={`px-6 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'bulk'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
-              }`}
-          >
-            <FaFileUpload />
-            <span>Bulk Import</span>
-          </NativeButton>
-        </div>
+        <Tabs aria-label="Employee creation method" selectedKey={activeTab} onSelectionChange={setActiveTab}><Tab key="single" title={<span className="flex items-center gap-2"><FaUserPlus aria-hidden="true" />Single Employee</span>} /><Tab key="bulk" title={<span className="flex items-center gap-2"><FaFileUpload aria-hidden="true" />Bulk Import</span>} /></Tabs>
       </div>
 
       {/* Bulk Import Tab Content */}
@@ -626,7 +605,7 @@ export default function AddEmployeePage() {
 
                     {/* Dropdown List */}
                     {showDeptDropdown && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-default-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <Surface className="absolute z-50 w-full mt-1 bg-white border border-default-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                         {departments.length === 0 ? (
                           <div className="px-4 py-2 text-default-500 text-sm">No departments available</div>
                         ) : (
@@ -648,7 +627,7 @@ export default function AddEmployeePage() {
                             </label>
                           ))
                         )}
-                      </div>
+                      </Surface>
                     )}
                   </div>
                 </div>
@@ -1191,7 +1170,7 @@ export default function AddEmployeePage() {
                 {/* PF & ESI Section */}
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* PF Enrollment */}
-                  <div className="p-4 bg-default-50 rounded-lg border border-default-200">
+                  <Surface className="p-4 bg-default-50 rounded-lg border border-default-200">
                     <div className="flex items-center justify-between mb-4">
                       <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                         🏦 Provident Fund (PF)
@@ -1277,10 +1256,10 @@ export default function AddEmployeePage() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </Surface>
 
                   {/* ESI Enrollment */}
-                  <div className="p-4 bg-default-50 rounded-lg border border-default-200">
+                  <Surface className="p-4 bg-default-50 rounded-lg border border-default-200">
                     <div className="flex items-center justify-between mb-4">
                       <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                         🏥 ESI (Employee State Insurance)
@@ -1320,11 +1299,11 @@ export default function AddEmployeePage() {
                         <p className="text-xs text-default-500 mt-1">Applicable for gross ≤ ₹21,000</p>
                       </div>
                     )}
-                  </div>
+                  </Surface>
                 </div>
 
                 {/* Professional Tax */}
-                <div className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
+                <Surface className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                       📋 Professional Tax
@@ -1361,10 +1340,10 @@ export default function AddEmployeePage() {
                       )}
                     </div>
                   </div>
-                </div>
+                </Surface>
 
                 {/* Corporate Health Insurance */}
-                <div className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
+                <Surface className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                       🏥 Corporate Health Insurance
@@ -1417,7 +1396,7 @@ export default function AddEmployeePage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </Surface>
               </div>
 
               {/* Login Credentials Info */}

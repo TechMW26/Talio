@@ -1,4 +1,6 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
 import UploadButton from '@/components/ui/UploadButton'
 
 
@@ -435,19 +437,7 @@ export default function LeaveAllocationsPage() {
           { title: 'Total Allocations', value: leaveBalances.length, color: 'secondary', icon: FaPlus },
           { title: 'Pending Allocations', value: Math.max(0, employees.length * leaveTypes.length - leaveBalances.length), color: 'warning', icon: FaEdit },
         ].map((stat, index) => (
-          <Card key={index} shadow="sm">
-            <CardBody className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-default-500 text-sm font-medium">{stat.title}</p>
-                  <Heading3 className="text-2xl font-bold text-default-800 mt-2">{stat.value}</Heading3>
-                </div>
-                <div className={`bg-${stat.color} p-4 rounded-lg`}>
-                  <stat.icon className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </CardBody>
-          </Card>
+          <SummaryCard key={index} shadow="sm" label={<>{stat.title}</>} value={<>{stat.value}</>} />
         ))}
       </div>
 
@@ -476,7 +466,7 @@ export default function LeaveAllocationsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-default-200">
+              <NativeTable className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -550,7 +540,7 @@ export default function LeaveAllocationsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </NativeTable>
               <nav aria-label="Employee balance pages" className="flex items-center justify-between gap-3 border-t border-default-200 p-4">
                 <span className="text-sm text-default-500">Page {currentEmployeePage} of {employeePageCount} · {filteredEmployees.length} results</span>
                 <div className="flex gap-2">
@@ -726,7 +716,7 @@ export default function LeaveAllocationsPage() {
 
                     {/* Preview Table */}
                     <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                      <table className="min-w-full divide-y divide-default-200 text-sm">
+                      <NativeTable className="min-w-full divide-y divide-default-200 text-sm">
                         <thead className="bg-default-50 sticky top-0">
                           <tr>
                             <th className="px-3 py-2 text-left">
@@ -789,7 +779,7 @@ export default function LeaveAllocationsPage() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </NativeTable>
                     </div>
                   </div>
                 )}

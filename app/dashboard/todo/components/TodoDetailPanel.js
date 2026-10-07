@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading3, NativeButton, NativeInput, Heading2, NativeTextarea, NativeSelect } from '@/components/ui/fernly/native'
@@ -182,7 +183,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
 
   return (
     <div className="hidden lg:block w-96 flex-shrink-0">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 sticky top-4 overflow-hidden">
+      <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 sticky top-4 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <Heading3 className="font-semibold text-gray-800">To-do Details</Heading3>
@@ -476,7 +477,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
             </NativeButton>
           </div>
         )}
-      </div>
+      </Surface>
     </div>
   )
 }

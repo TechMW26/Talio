@@ -1,4 +1,6 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 
@@ -689,7 +691,7 @@ export default function ChatPage() {
               <Skeleton className="w-14 h-14 rounded-full" />
             </div>
           </div>
-          <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+          <Surface className="bg-white rounded-2xl shadow-md overflow-hidden">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-4 border-b border-gray-100">
                 <Skeleton className="w-12 h-12 rounded-full flex-shrink-0" />
@@ -700,7 +702,7 @@ export default function ChatPage() {
                 <Skeleton className="h-3 w-10 rounded" />
               </div>
             ))}
-          </div>
+          </Surface>
         </div>
       </div>
     )
@@ -996,7 +998,7 @@ export default function ChatPage() {
                                       maxWidth: 'calc(100vw - 2rem)'
                                     }}
                                   >
-                                    <div className="bg-white rounded-2xl shadow-2xl px-4 py-3 flex gap-3 border border-gray-200 items-center">
+                                    <Surface className="bg-white rounded-2xl shadow-2xl px-4 py-3 flex gap-3 border border-gray-200 items-center">
                                       {reactions.map(reaction => (
                                         <NativeButton
                                           key={reaction}
@@ -1014,7 +1016,7 @@ export default function ChatPage() {
                                       >
                                         🗑️
                                       </NativeButton>
-                                    </div>
+                                    </Surface>
                                   </div>
                                 )}
                               </div>
@@ -1037,7 +1039,7 @@ export default function ChatPage() {
                         >
                           <FaUser className="text-white text-sm" />
                         </div>
-                        <div className="px-4 py-3 rounded-2xl bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100">
+                        <Surface className="px-4 py-3 rounded-2xl bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100">
                           <p className="text-xs text-gray-500 mb-1">
                             {Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length === 1 ? 'is' : 'are'} typing...
                           </p>
@@ -1046,7 +1048,7 @@ export default function ChatPage() {
                             <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                             <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                           </div>
-                        </div>
+                        </Surface>
                       </div>
                     </div>
                   )}
@@ -1335,7 +1337,7 @@ export default function ChatPage() {
       {/* Group Members Modal */}
       {showMembersModal && selectedChat?.isGroup && (
         <div className="fixed inset-0 modal-overlay flex items-center justify-center p-4">
-          <div className="bg-white rounded-[30px] max-w-md w-full max-h-[80vh] overflow-hidden shadow-2xl">
+          <DialogSurface className="bg-white rounded-[30px] max-w-md w-full max-h-[80vh] overflow-hidden shadow-2xl">
             {/* Modal Header */}
             <div
               className="px-5 py-4 flex items-center justify-between border-b border-gray-100"
@@ -1455,7 +1457,7 @@ export default function ChatPage() {
                 Close
               </NativeButton>
             </div>
-          </div>
+          </DialogSurface>
         </div>
       )}
     </div>

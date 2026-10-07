@@ -818,6 +818,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                     user={user}
                     employeeData={employeeData}
                     todayAttendance={todayAttendance}
+                    companySettings={companySettings}
                     attendanceLoading={attendanceLoading}
                     onClockIn={handleCheckIn}
                     onClockOut={handleCheckOut}

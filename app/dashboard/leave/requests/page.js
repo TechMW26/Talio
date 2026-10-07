@@ -1,4 +1,7 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3, NativeButton, Heading2 } from '@/components/ui/fernly/native'
@@ -100,19 +103,7 @@ export default function LeaveRequestsPage() {
           { title: 'Approved', value: leaves.filter(l => l.status === 'approved').length, color: 'success', icon: FaCheck },
           { title: 'Rejected', value: leaves.filter(l => l.status === 'rejected').length, color: 'danger', icon: FaTimes },
         ].map((stat, index) => (
-          <Card key={index} shadow="sm">
-            <CardBody className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-default-500 text-sm font-medium">{stat.title}</p>
-                  <Heading3 className="text-2xl font-bold text-default-800 mt-2">{stat.value}</Heading3>
-                </div>
-                <div className={`bg-${stat.color} p-4 rounded-lg`}>
-                  <stat.icon className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </CardBody>
-          </Card>
+          <SummaryCard key={index} shadow="sm" label={<>{stat.title}</>} value={<>{stat.value}</>} />
         ))}
       </div>
 
@@ -120,25 +111,7 @@ export default function LeaveRequestsPage() {
       <Card shadow="sm" className="mb-6">
         <CardBody className="p-0">
           <div className="border-b border-default-200">
-            <nav className="flex space-x-8 px-6">
-              {[
-                { key: 'all', label: 'All Requests', count: leaves.length },
-                { key: 'pending', label: 'Pending', count: leaves.filter(l => l.status === 'pending').length },
-                { key: 'approved', label: 'Approved', count: leaves.filter(l => l.status === 'approved').length },
-                { key: 'rejected', label: 'Rejected', count: leaves.filter(l => l.status === 'rejected').length },
-              ].map((tab) => (
-                <NativeButton
-                  key={tab.key}
-                  onClick={() => setFilter(tab.key)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${filter === tab.key
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
-                    }`}
-                >
-                  {tab.label} ({tab.count})
-                </NativeButton>
-              ))}
-            </nav>
+            <Tabs aria-label="Leave request status" selectedKey={filter} onSelectionChange={setFilter} className="w-full p-2">{[{ key: 'all', label: 'All Requests', count: leaves.length }, { key: 'pending', label: 'Pending', count: leaves.filter(l => l.status === 'pending').length }, { key: 'approved', label: 'Approved', count: leaves.filter(l => l.status === 'approved').length }, { key: 'rejected', label: 'Rejected', count: leaves.filter(l => l.status === 'rejected').length }].map(tab => <Tab key={tab.key} title={tab.label + ' (' + tab.count + ')'} />)}</Tabs>
           </div>
         </CardBody>
       </Card>
@@ -153,7 +126,7 @@ export default function LeaveRequestsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-default-200">
+              <NativeTable className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -225,7 +198,7 @@ export default function LeaveRequestsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </NativeTable>
             </div>
           )}
         </CardBody>

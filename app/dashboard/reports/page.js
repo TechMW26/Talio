@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading3, Heading2 } from '@/components/ui/fernly/native'
@@ -62,7 +63,7 @@ export default function ReportsPage() {
         {reports.map((report) => {
           const Icon = report.icon
           return (
-            <div
+            <Surface
               key={report.id}
               className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-95"
             >
@@ -81,7 +82,7 @@ export default function ReportsPage() {
               <Button color="primary" className="w-full" startContent={<FaDownload className="w-4 h-4" />}>
                 Generate Report
               </Button>
-            </div>
+            </Surface>
           )
         })}
       </MobileGrid>

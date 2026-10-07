@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
@@ -143,7 +144,7 @@ export default function AnnouncementsPage() {
         ) : isLoading ? (
           <div className="space-y-3 sm:space-y-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md p-4 sm:p-6 space-y-3">
+              <Surface key={i} className="bg-white rounded-lg shadow-md p-4 sm:p-6 space-y-3">
                 <div className="flex items-center gap-3">
                   <Skeleton className="w-6 h-6 rounded" />
                   <Skeleton className="h-5 w-1/3 rounded-lg" />
@@ -155,13 +156,13 @@ export default function AnnouncementsPage() {
                   <Skeleton className="h-3 w-24 rounded-lg" />
                   <Skeleton className="h-3 w-32 rounded-lg" />
                 </div>
-              </div>
+              </Surface>
             ))}
           </div>
         ) : announcements.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-6 sm:p-8 text-center text-sm sm:text-base text-gray-500">
+          <Surface className="bg-white rounded-lg shadow-md p-6 sm:p-8 text-center text-sm sm:text-base text-gray-500">
             No announcements found
-          </div>
+          </Surface>
         ) : (
           announcements.map((announcement) => (
             <div

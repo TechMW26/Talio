@@ -1,4 +1,6 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 
@@ -1523,52 +1525,15 @@ export default function ProjectDetailPage() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{formatDate(project.endDate)}</p>
-              <p className="text-sm text-gray-500">Deadline</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{project.completionPercentage || 0}%</p>
-              <p className="text-sm text-gray-500">Progress</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">
-                {project.taskStats?.completed || 0}/{project.taskStats?.total || 0}
-              </p>
-              <p className="text-sm text-gray-500">Tasks</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{project.members?.length || 0}</p>
-              <p className="text-sm text-gray-500">Members</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{project.taskStats?.overdue || 0}</p>
-              <p className="text-sm text-gray-500">Overdue Tasks</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Deadline</>} value={<>{formatDate(project.endDate)}</>} />
+        <SummaryCard  label={<>Progress</>} value={<>{project.completionPercentage || 0}%</>} />
+        <SummaryCard  label={<>Tasks</>} value={<>{project.taskStats?.completed || 0}/{project.taskStats?.total || 0}</>} />
+        <SummaryCard  label={<>Members</>} value={<>{project.members?.length || 0}</>} />
+        <SummaryCard  label={<>Overdue Tasks</>} value={<>{project.taskStats?.overdue || 0}</>} />
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+      <Surface className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
           <Tabs aria-label="Project sections" selectedKey={activeTab} onSelectionChange={setActiveTab} color="primary" radius="full" className="px-6 pt-6">
             {[
               { id: 'overview', label: 'Overview' },
@@ -2233,12 +2198,12 @@ export default function ProjectDetailPage() {
             </div>
           )}
         </div>
-      </div>
+      </Surface>
 
       {/* Create Task Modal */}
       <ModalPortal isOpen={showCreateTask}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <Heading3 className="text-xl font-bold text-gray-900">Create New Task</Heading3>
               <NativeButton
@@ -2479,14 +2444,14 @@ export default function ProjectDetailPage() {
                 </Button>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 
       {/* Task ETA Modal (for self-assignment) */}
       <ModalPortal isOpen={showTaskEtaModal && !!pendingTaskData}>
         {pendingTaskData && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-xl font-bold text-gray-900">Set Your ETA</Heading3>
               <NativeButton
@@ -2633,14 +2598,14 @@ export default function ProjectDetailPage() {
                 )}
               </NativeButton>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Edit Task Modal */}
       <ModalPortal isOpen={showEditTaskModal && !!editTaskForm}>
         {editTaskForm && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-xl font-bold text-gray-900">Edit Task</Heading3>
               <NativeButton
@@ -2880,14 +2845,14 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Reject Invitation Modal */}
       <ModalPortal isOpen={showRejectInvitationModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
               <Heading3 className="text-lg font-semibold text-gray-800 mb-4">Reject Project Invitation</Heading3>
               <p className="text-gray-600 text-sm mb-4">
@@ -2920,14 +2885,14 @@ export default function ProjectDetailPage() {
                 </NativeButton>
               </div>
             </div>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 
       {/* Task Detail Modal */}
       <ModalPortal isOpen={!!selectedTask}>
         {selectedTask && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <Heading3 className="text-lg font-semibold text-gray-800">Task Details</Heading3>
               <div className="flex items-center gap-2">
@@ -3488,14 +3453,14 @@ export default function ProjectDetailPage() {
                 )
               })()}
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Delete Task Modal */}
       <ModalPortal isOpen={showDeleteTaskModal && !!taskToDelete}>
         {taskToDelete && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
               <Heading3 className="text-lg font-semibold text-gray-800 mb-4">
                 {isProjectHead ? 'Delete Task' : 'Request Task Deletion'}
@@ -3539,14 +3504,14 @@ export default function ProjectDetailPage() {
                 </NativeButton>
               </div>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Reassign Task Modal */}
       <ModalPortal isOpen={showReassignModal && !!reassignTask}>
         {reassignTask && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-lg font-semibold text-gray-800">Reassign Task</Heading3>
               <NativeButton
@@ -3611,14 +3576,14 @@ export default function ProjectDetailPage() {
                 </NativeButton>
               </div>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Reason Modal for Status Changes */}
       <ModalPortal isOpen={showReasonModal && !!pendingStatusChange}>
         {pendingStatusChange && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-md transform transition-all">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-md transform transition-all">
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-xl">
               <Heading3 className="text-lg font-semibold text-white">Reason Required</Heading3>
               <p className="text-amber-100 text-sm">Please provide a reason for this status change</p>
@@ -3665,7 +3630,7 @@ export default function ProjectDetailPage() {
                 </NativeButton>
               </div>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
     </div>

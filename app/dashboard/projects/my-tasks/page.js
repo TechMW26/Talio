@@ -1,4 +1,6 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeInput, NativeButton, Heading2, Heading3 } from '@/components/ui/fernly/native'
@@ -537,71 +539,17 @@ export default function MyTasksPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.total}</p>
-                <p className="text-sm text-default-500">Total</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total</>} value={<>{stats.total}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.pendingAcceptance}</p>
-                <p className="text-sm text-default-500">Pending Accept</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Pending Accept</>} value={<>{stats.pendingAcceptance}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.todo}</p>
-                <p className="text-sm text-default-500">To Do</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>To Do</>} value={<>{stats.todo}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.inProgress}</p>
-                <p className="text-sm text-default-500">In Progress</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>In Progress</>} value={<>{stats.inProgress}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.completed}</p>
-                <p className="text-sm text-default-500">Completed</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Completed</>} value={<>{stats.completed}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.overdue}</p>
-                <p className="text-sm text-default-500">Overdue</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Overdue</>} value={<>{stats.overdue}</>} />
       </div>
 
       {/* Filters and Search */}
@@ -955,7 +903,7 @@ export default function MyTasksPage() {
                     </p>
                     <div className="space-y-4">
                       {taskForEta.subtasks.map((st, index) => (
-                        <div key={st._id} className="p-3 bg-default-50 rounded-lg">
+                        <Surface key={st._id} className="p-3 bg-default-50 rounded-lg">
                           <p className="text-sm font-medium text-default-700 mb-2">
                             {index + 1}. {st.title}
                           </p>
@@ -992,7 +940,7 @@ export default function MyTasksPage() {
                               <span className="text-xs text-default-500">hours</span>
                             </div>
                           </div>
-                        </div>
+                        </Surface>
                       ))}
                     </div>
                     <div className="mt-4 p-3 bg-primary-50 rounded-lg">
@@ -1071,10 +1019,10 @@ export default function MyTasksPage() {
                   </p>
                 </div>
                 <p className="text-default-600 mb-2">Are you sure you want to delete this task?</p>
-                <div className="p-3 bg-default-50 rounded-lg">
+                <Surface className="p-3 bg-default-50 rounded-lg">
                   <p className="font-medium text-default-800">{taskToDelete?.title}</p>
                   <p className="text-sm text-default-500 mt-1">Project: {taskToDelete?.project?.name}</p>
-                </div>
+                </Surface>
               </ModalBody>
               <ModalFooter>
                 <Button
@@ -1100,7 +1048,7 @@ export default function MyTasksPage() {
       {/* Task Detail Modal - Opens when clicking task in Kanban view */}
       <ModalPortal isOpen={!!selectedTask && !showRejectModal}>
         {selectedTask && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
-          <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+          <DialogSurface className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-default-50 flex items-center justify-between flex-shrink-0">
               <Heading3 className="text-lg font-semibold text-default-800">Task Details</Heading3>
               <div className="flex items-center gap-2">
@@ -1175,34 +1123,34 @@ export default function MyTasksPage() {
 
               {/* Details Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-default-50 p-3 rounded-lg">
+                <Surface className="bg-default-50 p-3 rounded-lg">
                   <p className="text-xs text-default-500 mb-1">Priority</p>
                   <span className={`px-2 py-1 rounded text-sm font-medium ${priorityColors[selectedTask.priority]}`}>
                     {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
                   </span>
-                </div>
-                <div className="bg-default-50 p-3 rounded-lg">
+                </Surface>
+                <Surface className="bg-default-50 p-3 rounded-lg">
                   <p className="text-xs text-default-500 mb-1">Due Date</p>
                   <p className={`font-medium ${selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed'
                       ? 'text-danger' : 'text-default-800'
                     }`}>
                     {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
                   </p>
-                </div>
+                </Surface>
                 {selectedTask.estimatedHours && (
-                  <div className="bg-default-50 p-3 rounded-lg">
+                  <Surface className="bg-default-50 p-3 rounded-lg">
                     <p className="text-xs text-default-500 mb-1">Estimated Time</p>
                     <p className="font-medium text-default-800">
                       {selectedTask.estimatedHours >= 8
                         ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h`
                         : `${selectedTask.estimatedHours}h`}
                     </p>
-                  </div>
+                  </Surface>
                 )}
-                <div className="bg-default-50 p-3 rounded-lg">
+                <Surface className="bg-default-50 p-3 rounded-lg">
                   <p className="text-xs text-default-500 mb-1">Progress</p>
                   <p className="font-medium text-default-800">{selectedTask.progressPercentage || 0}%</p>
-                </div>
+                </Surface>
               </div>
 
               {/* Progress Bar */}
@@ -1361,7 +1309,7 @@ export default function MyTasksPage() {
                       </NativeButton>
 
                       {showModalStatusDropdown && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
+                        <Surface className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
                           {['todo', 'in-progress', 'review', 'completed', 'blocked'].map(status => (
                             <NativeButton
                               key={status}
@@ -1413,7 +1361,7 @@ export default function MyTasksPage() {
                               {status === selectedTask.status && <FaCheck className="ml-auto text-blue-500" />}
                             </NativeButton>
                           ))}
-                        </div>
+                        </Surface>
                       )}
                     </div>
                   </div>
@@ -1440,7 +1388,7 @@ export default function MyTasksPage() {
                 </div>
               )}
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
@@ -1980,7 +1928,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
               </NativeButton>
 
               {showStatusMenu && (
-                <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                <Surface className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
                   {['todo', 'in-progress', 'review', 'completed'].map(status => (
                     <NativeButton
                       key={status}
@@ -1995,7 +1943,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                       {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </NativeButton>
                   ))}
-                </div>
+                </Surface>
               )}
             </div>
           )}
@@ -2054,7 +2002,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   }
 
                   return (
-                    <div key={subtask._id} className={`bg-white rounded-lg p-3 border ${subtask.pendingAcceptance ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}`}>
+                    <Surface key={subtask._id} className={`bg-white rounded-lg p-3 border ${subtask.pendingAcceptance ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}`}>
                       <div className="flex items-center gap-3 group">
                         <div className="flex-1 min-w-0">
                           <span
@@ -2175,7 +2123,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                           </NativeButton>
                         </div>
                       )}
-                    </div>
+                    </Surface>
                   )
                 })
             )}

@@ -1,4 +1,7 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3, Heading2, NativeButton, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
@@ -103,29 +106,15 @@ export default function DesignationsPage() {
 
       {/* Stats Card */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Designations</Heading3>
-            <FaBriefcase className="text-primary-500 flex-shrink-0" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">{designations.length}</div>
-        </div>
+        <SummaryCard  label={<>Total Designations</>} value={<>{designations.length}</>} />
 
 
 
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Roles</Heading3>
-            <FaBriefcase className="text-blue-500 flex-shrink-0" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-            {designations.filter(d => d.isActive !== false).length}
-          </div>
-        </div>
+        <SummaryCard  label={<>Active Roles</>} value={<>{designations.filter(d => d.isActive !== false).length}</>} />
       </div>
 
       {/* Designations Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <Surface className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <Heading2 className="text-xl font-semibold text-gray-800">All Designations</Heading2>
         </div>
@@ -146,7 +135,7 @@ export default function DesignationsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -201,15 +190,15 @@ export default function DesignationsPage() {
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         )}
-      </div>
+      </Surface>
 
       {/* Add/Edit Modal */}
       <ModalPortal isOpen={showModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
             <Heading2 className="text-2xl font-bold text-gray-800 mb-4">
               {editingDesig ? 'Edit Designation' : 'Add Designation'}
             </Heading2>
@@ -261,7 +250,7 @@ export default function DesignationsPage() {
                 </LoadingButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>

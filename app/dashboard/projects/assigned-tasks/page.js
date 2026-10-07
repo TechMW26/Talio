@@ -1,4 +1,6 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeInput, NativeButton, Heading3, Heading2, NativeTextarea } from '@/components/ui/fernly/native'
@@ -610,66 +612,12 @@ export default function AssignedTasksPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.total || 0}</p>
-                <p className="text-sm text-default-500">Total</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.pendingAcceptance || 0}</p>
-                <p className="text-sm text-default-500">Pending Accept</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.inProgress || 0}</p>
-                <p className="text-sm text-default-500">In Progress</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.review || 0}</p>
-                <p className="text-sm text-default-500">In Review</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.completed || 0}</p>
-                <p className="text-sm text-default-500">Completed</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card shadow="sm">
-          <CardBody className="p-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-2xl font-bold text-default-800">{stats.pendingDeletion || 0}</p>
-                <p className="text-sm text-default-500">Pending Delete</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total</>} value={<>{stats.total || 0}</>} />
+        <SummaryCard shadow="sm" label={<>Pending Accept</>} value={<>{stats.pendingAcceptance || 0}</>} />
+        <SummaryCard shadow="sm" label={<>In Progress</>} value={<>{stats.inProgress || 0}</>} />
+        <SummaryCard shadow="sm" label={<>In Review</>} value={<>{stats.review || 0}</>} />
+        <SummaryCard shadow="sm" label={<>Completed</>} value={<>{stats.completed || 0}</>} />
+        <SummaryCard shadow="sm" label={<>Pending Delete</>} value={<>{stats.pendingDeletion || 0}</>} />
       </div>
 
       {/* Search & Filters */}
@@ -1005,11 +953,11 @@ export default function AssignedTasksPage() {
           )}
 
           {filteredTasks.length === 0 && (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+            <Surface className="bg-white rounded-xl shadow-sm p-12 text-center">
               <FaTasks className="mx-auto text-4xl text-gray-300 mb-4" />
               <Heading3 className="text-lg font-medium text-gray-600">No assigned tasks found</Heading3>
               <p className="text-gray-500">Tasks you assign to others will appear here</p>
-            </div>
+            </Surface>
           )}
         </>
       )}
@@ -1017,7 +965,7 @@ export default function AssignedTasksPage() {
       {/* Edit Task Modal */}
       <ModalPortal isOpen={showEditModal && !!selectedTask}>
         {selectedTask && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-xl font-bold text-gray-900">Edit Task</Heading3>
               <NativeButton onClick={() => { setShowEditModal(false); setSelectedTask(null) }} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -1086,14 +1034,14 @@ export default function AssignedTasksPage() {
                 </Button>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Reason for Status Change Modal */}
       <ModalPortal isOpen={showReasonModal && !!pendingStatusChange}>
         {pendingStatusChange && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowReasonModal(false), setPendingStatusChange(null), setStatusChangeReason(''))}>
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-between rounded-t-2xl">
               <Heading3 className="text-xl font-bold text-white">Reason for Status Change</Heading3>
               <NativeButton onClick={() => { setShowReasonModal(false); setPendingStatusChange(null); setStatusChangeReason('') }} className="text-white/80 hover:text-white">
@@ -1147,14 +1095,14 @@ export default function AssignedTasksPage() {
                 )}
               </NativeButton>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Delete Task Modal */}
       <ModalPortal isOpen={showDeleteModal && !!selectedTask}>
         {selectedTask && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-xl font-bold text-gray-900">Delete Task</Heading3>
               <NativeButton onClick={() => { setShowDeleteModal(false); setSelectedTask(null); setDeleteReason('') }} className="text-gray-400 hover:text-gray-600">
@@ -1188,14 +1136,14 @@ export default function AssignedTasksPage() {
                 {submitting ? <><Loader size="xs" /> <span className="ml-1">Requesting...</span></> : <><FaTrash /> Request Deletion</>}
               </NativeButton>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Add Subtask Modal */}
       <ModalPortal isOpen={showAddSubtaskModal && !!selectedTask}>
         {selectedTask && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-xl font-bold text-gray-900">Add Subtask</Heading3>
               <NativeButton onClick={() => { setShowAddSubtaskModal(false); setNewSubtaskTitle('') }} className="text-gray-400 hover:text-gray-600">
@@ -1234,14 +1182,14 @@ export default function AssignedTasksPage() {
                 {submitting ? 'Adding...' : 'Add Subtask'}
               </Button>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Reassign Modal */}
       <ModalPortal isOpen={showReassignModal && !!selectedTask}>
         {selectedTask && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-xl font-bold text-gray-900">Reassign Task</Heading3>
               <NativeButton onClick={() => { setShowReassignModal(false); setReassignToId('') }} className="text-gray-400 hover:text-gray-600">
@@ -1285,14 +1233,14 @@ export default function AssignedTasksPage() {
                 {submitting ? 'Reassigning...' : 'Reassign'}
               </Button>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Add User Modal */}
       <ModalPortal isOpen={showAddUserModal && !!selectedTask}>
         {selectedTask && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-xl font-bold text-gray-900">Add Users to Task</Heading3>
               <NativeButton onClick={() => { setShowAddUserModal(false); setAddUserIds([]) }} className="text-gray-400 hover:text-gray-600">
@@ -1347,14 +1295,14 @@ export default function AssignedTasksPage() {
                 {submitting ? 'Adding...' : 'Add Users'}
               </Button>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Deletion Approval Modal */}
       <ModalPortal isOpen={showDeletionApprovalModal && !!selectedTask}>
         {selectedTask && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <Heading3 className="text-xl font-bold text-gray-900">Deletion Request</Heading3>
               <NativeButton onClick={() => { setShowDeletionApprovalModal(false); setDeletionResponse({ action: '', reason: '' }) }} className="text-gray-400 hover:text-gray-600">
@@ -1430,14 +1378,14 @@ export default function AssignedTasksPage() {
                 {deletionResponse.action === 'approve' ? 'Approve Deletion' : 'Reject Deletion'}
               </NativeButton>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
       {/* Task Detail Modal - Opens when clicking task in Kanban view */}
       <ModalPortal isOpen={!!selectedTask && !showEditModal && !showDeleteModal && !showAddUserModal && !showReassignModal && !showAddSubtaskModal && !showDeletionApprovalModal}>
         {selectedTask && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
-          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+          <DialogSurface className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <Heading3 className="text-lg font-semibold text-gray-800">Task Details</Heading3>
               <div className="flex items-center gap-2">
@@ -1712,7 +1660,7 @@ export default function AssignedTasksPage() {
                     </NativeButton>
 
                     {showModalStatusDropdown && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
+                      <Surface className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
                         {['todo', 'in-progress', 'review', 'completed', 'blocked'].map(status => (
                           <NativeButton
                             key={status}
@@ -1739,7 +1687,7 @@ export default function AssignedTasksPage() {
                             {status === selectedTask.status && <FaCheck className="ml-auto text-blue-500" />}
                           </NativeButton>
                         ))}
-                      </div>
+                      </Surface>
                     )}
                   </div>
                 </div>
@@ -1796,7 +1744,7 @@ export default function AssignedTasksPage() {
                 </NativeButton>
               </div>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
 
@@ -1817,7 +1765,7 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
   const progressPercentage = task.progressPercentage || 0
 
   return (
-    <div className={`rounded-xl shadow-sm border-2 border-l-4 p-4 transition-all bg-white ${projectColor.border} ${hasPendingDeletion ? 'border-red-300 bg-red-50/30' :
+    <Surface className={`rounded-xl shadow-sm border-2 border-l-4 p-4 transition-all bg-white ${projectColor.border} ${hasPendingDeletion ? 'border-red-300 bg-red-50/30' :
         isOverdue ? 'border-red-300 bg-red-50/30' :
           isCompleted ? 'border-green-300 bg-green-50/30' :
             'border-gray-200'
@@ -1938,7 +1886,7 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
           </NativeButton>
 
           {showActions && (
-            <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+            <Surface className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
               <NativeButton
                 onClick={() => { onEdit(); setShowActions(false) }}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -1976,10 +1924,10 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
               >
                 <FaTrash /> Delete Task
               </NativeButton>
-            </div>
+            </Surface>
           )}
         </div>
       </div>
-    </div>
+    </Surface>
   )
 }

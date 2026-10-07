@@ -1,4 +1,5 @@
 'use client';
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3, NativeButton, NativeInput } from '@/components/ui/fernly/native'
@@ -419,12 +420,12 @@ export default function CandidateDetailPage() {
                 {candidate.notes?.length > 0 ? (
                   <div className="space-y-3">
                     {candidate.notes.slice().reverse().map((note, i) => (
-                      <div key={i} className="p-3 bg-default-50 rounded-lg">
+                      <Surface key={i} className="p-3 bg-default-50 rounded-lg">
                         <p className="text-sm text-default-700">{note.note}</p>
                         <p className="text-xs text-default-400 mt-1">
                           {note.addedBy?.firstName || 'System'} &middot; {new Date(note.addedAt).toLocaleString()}
                         </p>
-                      </div>
+                      </Surface>
                     ))}
                   </div>
                 ) : (

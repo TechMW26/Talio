@@ -12,8 +12,10 @@ test('board chat uses an explicit light MIRA surface and stronger chat-only beam
   expect(read('components/ui/AIActivityBeam.js')).not.toContain('strength = 0.55')
   expect(read('app/globals.css')).toContain('color-scheme: light;')
 })
-test('search and both board panels render floating glass and activity beams', () => {
-  for (const path of ['components/Header.js', 'components/whiteboard/MiraAgentSidebar.js', 'components/whiteboard/WhiteboardCanvas.js']) {
+test('inline search and both board panels retain activity beams', () => {
+  expect(read('components/Header.js')).toContain("import HeaderSearch from '@/components/HeaderSearch'")
+  expect(read('components/HeaderSearch.js')).toContain('<AIActivityBeam active={busy}')
+  for (const path of ['components/whiteboard/MiraAgentSidebar.js', 'components/whiteboard/WhiteboardCanvas.js']) {
     const source = read(path)
     expect(source).toContain('ai-glass-panel fixed')
     expect(source).toContain('<AIActivityBeam active=')

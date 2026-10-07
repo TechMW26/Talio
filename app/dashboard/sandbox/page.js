@@ -1,4 +1,5 @@
 'use client'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, NativeInput, Heading2, Heading3 } from '@/components/ui/fernly/native'
@@ -159,45 +160,17 @@ export default function SandboxPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{ideas.length}</p>
-              <p className="text-sm text-gray-500">Total Ideas</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Total Ideas</>} value={<>{ideas.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{myIdeas.length}</p>
-              <p className="text-sm text-gray-500">My Ideas</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>My Ideas</>} value={<>{myIdeas.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{pinnedIdeas.length}</p>
-              <p className="text-sm text-gray-500">Pinned</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Pinned</>} value={<>{pinnedIdeas.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{totalVotes}</p>
-              <p className="text-sm text-gray-500">Total Votes</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Total Votes</>} value={<>{totalVotes}</>} />
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <Surface className="bg-white rounded-lg shadow-md p-4 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="input-with-icon flex-1">
@@ -213,7 +186,7 @@ export default function SandboxPage() {
 
           {/* Filters */}
           <div className="flex flex-wrap gap-2">
-            <div className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
+            <Surface className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
               <NativeButton
                 onClick={() => setFilter(prev => ({ ...prev, tab: 'all' }))}
                 className={`px-4 py-2.5 text-sm font-medium transition-colors ${filter.tab === 'all'
@@ -232,7 +205,7 @@ export default function SandboxPage() {
               >
                 My Ideas
               </NativeButton>
-            </div>
+            </Surface>
 
             <NativeButton
               onClick={() => setFilter(prev => ({ ...prev, pinned: !prev.pinned }))}
@@ -246,7 +219,7 @@ export default function SandboxPage() {
             </NativeButton>
           </div>
         </div>
-      </div>
+      </Surface>
 
       {/* Ideas List */}
       <div>
@@ -259,15 +232,15 @@ export default function SandboxPage() {
         ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
+              <Surface key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
                 <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
                 <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
                 <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-              </div>
+              </Surface>
             ))}
           </div>
         ) : ideas.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+          <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
             <HiOutlineLightBulb className="w-16 h-16 mx-auto text-gray-300 mb-4" />
             <Heading3 className="text-lg font-medium text-gray-800 mb-2">
               No ideas found
@@ -282,7 +255,7 @@ export default function SandboxPage() {
             >
               Share an Idea
             </Button>
-          </div>
+          </Surface>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {ideas.map(idea => (

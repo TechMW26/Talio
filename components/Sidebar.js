@@ -245,8 +245,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     if (isDepartmentHead) {
       const teamSubmenu = [
         { name: 'Team Members', path: '/dashboard/team/members' },
-        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-        { name: 'Team Goals', path: '/dashboard/performance/goals' },
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
         { name: 'Appraisal Requests', path: '/dashboard/performance/appraisals' },
         { name: 'Geofencing', path: '/dashboard/team/geofencing' }
@@ -295,8 +293,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
         { name: 'My Teams', path: '/dashboard/team/my-teams' },
         { name: 'Team Members', path: '/dashboard/team/members' },
         { name: 'Employee Directory', path: '/dashboard/employees' },
-        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-        { name: 'Team Goals', path: '/dashboard/performance/goals' },
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
         { name: 'Appraisal Requests', path: '/dashboard/performance/appraisals' },
       ]
@@ -466,7 +462,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             companyFeatures={companyFeatures}
           />
           {/* Spacer for icon strip width */}
-          <div className="hidden lg:block w-[4.5rem] flex-shrink-0" />
+          <div className="talio-sidebar-spacer hidden lg:block flex-shrink-0" />
         </>
       )}
 
@@ -476,7 +472,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
           {/* Mobile overlay with tinted background */}
           {isOpen && (
             <div
-              className="fixed inset-0 z-[60] animate-fade-in bg-black/60 backdrop-blur-[10px]"
+              className="fixed inset-0 z-[110] animate-fade-in bg-black/60 backdrop-blur-[10px]"
               onClick={() => setIsOpen(false)}
             />
           )}
@@ -487,7 +483,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             inert={!isOpen || undefined}
             aria-hidden={!isOpen}
             className={`
-              talio-sidebar-shell talio-floating-mobile-sidebar fixed z-[60]
+              talio-sidebar-shell talio-floating-mobile-sidebar fixed z-[120]
               flex flex-col shadow-[0_6px_24px_rgba(15,23,42,0.08)]
               ${isOpen ? 'translate-x-0' : '-translate-x-full'}
               w-full max-w-[288px]

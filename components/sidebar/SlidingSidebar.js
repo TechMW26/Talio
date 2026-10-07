@@ -189,8 +189,6 @@ export default function SlidingSidebar({
     if (isDepartmentHead) {
       const teamSubmenu = [
         { name: 'Team Members', path: '/dashboard/team/members' },
-        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-        { name: 'Team Goals', path: '/dashboard/performance/goals' },
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
         { name: 'Geofencing', path: '/dashboard/team/geofencing' }
       ]
@@ -343,7 +341,7 @@ export default function SlidingSidebar({
       {/* Overlay for clicking outside to close */}
       {isOpen && (
         <div
-          className="hidden lg:block fixed inset-0 z-[49] bg-black/20 backdrop-blur-[10px]"
+          className="hidden lg:block fixed inset-0 z-[110] bg-black/20 backdrop-blur-[10px]"
           onClick={() => {
             setIsOpen(false)
             setActiveSubmenu(null)
@@ -368,7 +366,7 @@ export default function SlidingSidebar({
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
         className={`
-          talio-sidebar-shell talio-floating-expanded hidden lg:flex fixed z-[70] flex-col w-[18rem]
+          talio-sidebar-shell talio-floating-expanded hidden lg:flex fixed z-[120] flex-col
         `}
         style={{
           backgroundColor: 'var(--color-bg-sidebar)',

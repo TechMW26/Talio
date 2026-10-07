@@ -1,5 +1,6 @@
 'use client'
 
+import { NativeTable } from '@/components/ui/fernly'
 
 import { Heading1, Heading3, Heading2 } from '@/components/ui/fernly/native'
 import { useState, useEffect, useMemo } from 'react'
@@ -283,7 +284,7 @@ export default function LeavePage() {
 
           {/* Desktop Table View */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead className="bg-default-50 border-b border-default-200">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -345,7 +346,7 @@ export default function LeavePage() {
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         </CardBody>
       </Card>

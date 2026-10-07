@@ -437,7 +437,7 @@ export default function ManagerDashboard({ user }) {
         icon: FaExclamationCircle,
         color: 'bg-red-500',
         trend: 'down',
-        href: '/dashboard/performance/ratings'
+        href: '/dashboard/team/members'
       },
     ]
   }
@@ -490,7 +490,7 @@ export default function ManagerDashboard({ user }) {
       <QuickActionsWidget
         actions={[
           { name: 'Review Leaves', icon: 'FaCalendarAlt', href: '/dashboard/leave/approvals', color: 'blue' },
-          { name: 'Team Ratings', icon: 'FaChartLine', href: '/dashboard/performance/ratings', color: 'purple' },
+          { name: 'Team Ratings', icon: 'FaChartLine', href: '/dashboard/team/members', color: 'purple' },
           { name: 'Create Review', icon: 'FaAward', href: '/dashboard/performance/create', color: 'green' },
           { name: 'Mark Attendance', icon: 'FaClock', href: '/dashboard/attendance', color: 'red' },
         ]}

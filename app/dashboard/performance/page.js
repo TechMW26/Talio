@@ -1,4 +1,6 @@
 'use client'
+import { SummaryCard } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading3, Heading2 } from '@/components/ui/fernly/native'
@@ -107,15 +109,15 @@ export default function PerformancePage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-md p-6">
+            <Surface key={i} className="bg-white rounded-lg shadow-md p-6">
               <Skeleton className="h-4 w-24 rounded mb-3" />
               <Skeleton className="h-8 w-16 rounded" />
-            </div>
+            </Surface>
           ))}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-md p-6">
+            <Surface key={i} className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center space-x-4">
                 <Skeleton className="w-12 h-12 rounded-lg" />
                 <div>
@@ -123,10 +125,10 @@ export default function PerformancePage() {
                   <Skeleton className="h-4 w-24 rounded" />
                 </div>
               </div>
-            </div>
+            </Surface>
           ))}
         </div>
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <Surface className="bg-white rounded-lg shadow-md p-8">
           <Skeleton className="h-6 w-48 rounded mb-4" />
           {[...Array(3)].map((_, i) => (
             <div key={i} className="py-4">
@@ -134,7 +136,7 @@ export default function PerformancePage() {
               <Skeleton className="h-4 w-64 rounded" />
             </div>
           ))}
-        </div>
+        </Surface>
       </div>
     )
   }
@@ -169,13 +171,7 @@ export default function PerformancePage() {
               <FaPlus className="w-4 h-4" />
               <span>New Rating</span>
             </NativeButton>
-            <NativeButton
-              onClick={() => router.push('/dashboard/performance/goals/create')}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
-            >
-              <FaBullseye className="w-4 h-4" />
-              <span>Set Goal</span>
-            </NativeButton>
+
           </div>
         )}
       </div>
@@ -188,25 +184,13 @@ export default function PerformancePage() {
           { title: 'Average Rating', value: performanceData.stats.averageRating, icon: FaStar, color: 'bg-yellow-500' },
           { title: 'Pending Reviews', value: performanceData.stats.pendingReviews, icon: FaAward, color: 'bg-purple-500' },
         ].map((stat, index) => (
-          <div key={index} className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">{stat.title}</p>
-                <Heading3 className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</Heading3>
-              </div>
-              <div className={`${stat.color} p-4 rounded-lg`}>
-                <stat.icon className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
+          <SummaryCard key={index} label={<>{stat.title}</>} value={<>{stat.value}</>} />
         ))}
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 gap-6 mb-6">
         {[
-          { name: 'Goals & Objectives', icon: FaBullseye, href: '/dashboard/performance/goals', color: 'bg-green-500' },
-          { name: 'Employee Ratings', icon: FaStar, href: '/dashboard/performance/ratings', color: 'bg-yellow-500' },
           { name: 'Performance Reports', icon: FaTrophy, href: '/dashboard/performance/reports', color: 'bg-purple-500' },
         ].map((action, index) => (
           <NativeButton
@@ -228,7 +212,7 @@ export default function PerformancePage() {
       </div>
 
       {/* Reviews List */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <Surface className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <Heading2 className="text-xl font-semibold text-gray-800">Performance Reviews</Heading2>
         </div>
@@ -304,7 +288,7 @@ export default function PerformancePage() {
             ))}
           </div>
         )}
-      </div>
+      </Surface>
     </div>
   )
 }

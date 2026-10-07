@@ -1,5 +1,6 @@
 'use client'
 
+import { NativeTable } from '@/components/ui/fernly'
 
 import { Heading1, Heading2, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useEffect, useState, useMemo } from 'react'
@@ -132,7 +133,7 @@ export default function FCMDiagnosticPage() {
 
             <div style={{ background: '#f5f5f5', padding: '15px', marginTop: '20px', borderRadius: '8px' }}>
                 <Heading2>Status</Heading2>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <NativeTable style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>
                         <tr>
                             <td style={{ padding: '8px', borderBottom: '1px solid #ddd' }}><strong>Android FCM Interface:</strong></td>
@@ -157,7 +158,7 @@ export default function FCMDiagnosticPage() {
                             <td style={{ padding: '8px', borderBottom: '1px solid #ddd' }}>{diagnostics.registrationStatus || 'Not registered'}</td>
                         </tr>
                     </tbody>
-                </table>
+                </NativeTable>
             </div>
 
             <div style={{ marginTop: '30px' }}>

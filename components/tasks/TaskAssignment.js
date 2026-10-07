@@ -1,4 +1,5 @@
 'use client'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 import { useState, useEffect } from 'react'
 import { Select, SelectItem } from '@/components/ui/fernly'
@@ -516,30 +517,7 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
 
       {/* Department Tabs */}
       <div className="border-b border-gray-200 mb-4">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => setActiveTab('myDepartment')}
-            className={`${activeTab === 'myDepartment'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            My Department
-            {currentEmp?.department?.name && (
-              <span className="ml-2 text-xs text-gray-500">({currentEmp.department.name})</span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('otherDepartments')}
-            disabled
-            className="border-transparent text-gray-400 cursor-not-allowed whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm relative"
-          >
-            Other Departments
-            <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
-              Coming Soon
-            </span>
-          </button>
-        </nav>
+        <Tabs aria-label="Assignment department" selectedKey={activeTab} onSelectionChange={setActiveTab} disabledKeys={['otherDepartments']}><Tab key="myDepartment" title={<span>My Department{currentEmp?.department?.name && <span className="ml-2 text-xs">({currentEmp.department.name})</span>}</span>} /><Tab key="otherDepartments" title="Other Departments (Coming Soon)" /></Tabs>
       </div>
 
       {/* Add Assignee */}

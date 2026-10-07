@@ -1,4 +1,7 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 
@@ -296,68 +299,24 @@ export default function AssetsPage() {
       {/* Stats Cards - Different view for admin vs employee */}
       {isAdmin ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <Heading3 className="text-sm font-medium text-gray-600">Total Assets</Heading3>
-              <FaLaptop className="text-primary-500" />
-            </div>
-            <div className="text-3xl font-bold text-gray-800">{assets.length}</div>
-          </div>
+          <SummaryCard  label={<>Total Assets</>} value={<>{assets.length}</>} />
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <Heading3 className="text-sm font-medium text-gray-600">Assigned</Heading3>
-              <FaCheckCircle className="text-green-500" />
-            </div>
-            <div className="text-3xl font-bold text-gray-800">
-              {assets.filter(a => a.status === 'assigned').length}
-            </div>
-          </div>
+          <SummaryCard  label={<>Assigned</>} value={<>{assets.filter(a => a.status === 'assigned').length}</>} />
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <Heading3 className="text-sm font-medium text-gray-600">Available</Heading3>
-              <FaClock className="text-blue-500" />
-            </div>
-            <div className="text-3xl font-bold text-gray-800">
-              {assets.filter(a => a.status === 'available').length}
-            </div>
-          </div>
+          <SummaryCard  label={<>Available</>} value={<>{assets.filter(a => a.status === 'available').length}</>} />
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <Heading3 className="text-sm font-medium text-gray-600">Under Maintenance</Heading3>
-              <FaTools className="text-orange-500" />
-            </div>
-            <div className="text-3xl font-bold text-gray-800">
-              {assets.filter(a => normalizeAssetStatus(a.status) === 'under-maintenance').length}
-            </div>
-          </div>
+          <SummaryCard  label={<>Under Maintenance</>} value={<>{assets.filter(a => normalizeAssetStatus(a.status) === 'under-maintenance').length}</>} />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <Heading3 className="text-sm font-medium text-gray-600">Assets Assigned to You</Heading3>
-              <FaBox className="text-primary-500" />
-            </div>
-            <div className="text-3xl font-bold text-gray-800">{assets.length}</div>
-          </div>
+          <SummaryCard  label={<>Assets Assigned to You</>} value={<>{assets.length}</>} />
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <Heading3 className="text-sm font-medium text-gray-600">Under Maintenance</Heading3>
-              <FaTools className="text-orange-500" />
-            </div>
-            <div className="text-3xl font-bold text-gray-800">
-              {assets.filter(a => normalizeAssetStatus(a.status) === 'under-maintenance').length}
-            </div>
-          </div>
+          <SummaryCard  label={<>Under Maintenance</>} value={<>{assets.filter(a => normalizeAssetStatus(a.status) === 'under-maintenance').length}</>} />
         </div>
       )}
 
       {/* Assets Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <Surface className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <Heading2 className="text-xl font-semibold text-gray-800">
             {isAdmin ? 'Asset Inventory' : 'Your Assigned Assets'}
@@ -386,7 +345,7 @@ export default function AssetsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -487,15 +446,15 @@ export default function AssetsPage() {
                   )
                 })}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         )}
-      </div>
+      </Surface>
 
       {/* Asset details and edit modal */}
       <ModalPortal isOpen={Boolean(selectedAsset)}>
         <div className="modal-overlay" onMouseDown={(event) => event.target === event.currentTarget && closeAsset()}>
-          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="asset-details-title">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="asset-details-title">
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <Heading2 id="asset-details-title" className="text-xl font-bold text-gray-900">
@@ -626,14 +585,14 @@ export default function AssetsPage() {
                 </>
               )
             })() : null}
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 
       {/* Add Asset Modal */}
       <ModalPortal isOpen={isModalOpen}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <Heading2 className="text-xl font-bold">Add New Asset</Heading2>
               <NativeButton onClick={closeModal} className="text-gray-500 hover:text-gray-700">
@@ -820,14 +779,14 @@ export default function AssetsPage() {
                 </LoadingButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 
       {/* Bulk Import Modal */}
       <ModalPortal isOpen={isBulkImportOpen}>
         <div className="modal-overlay">
-          <div role="dialog" aria-modal="true" aria-label="Bulk Import Assets" className="bg-white rounded-[30px] animate-modal-enter w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
+          <DialogSurface role="dialog" aria-modal="true" aria-label="Bulk Import Assets" className="bg-white rounded-[30px] animate-modal-enter w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <Heading2 className="text-xl font-bold">Bulk Import Assets</Heading2>
               <NativeButton aria-label="Close bulk import" disabled={bulkImporting || bulkPreviewing} onClick={() => { setIsBulkImportOpen(false); setBulkFile(null); setBulkPreview(null); setBulkResult(null) }} className="text-gray-500 hover:text-gray-700">
@@ -889,7 +848,7 @@ export default function AssetsPage() {
                 </div>
 
                 <div className="overflow-x-auto max-h-[400px] overflow-y-auto border rounded-lg">
-                  <table className="w-full text-sm">
+                  <NativeTable className="w-full text-sm">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Row</th>
@@ -914,7 +873,7 @@ export default function AssetsPage() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </NativeTable>
                 </div>
 
                 <div className="flex justify-end gap-3">
@@ -930,7 +889,7 @@ export default function AssetsPage() {
                 </div>
               </div>
             )}
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>

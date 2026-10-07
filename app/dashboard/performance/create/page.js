@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { NativeButton, Heading1, Heading2, NativeInput, Heading3, NativeTextarea } from '@/components/ui/fernly/native'
@@ -114,7 +115,7 @@ export default function CreatePerformanceReviewPage() {
       </div>
 
       {/* Form */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <Surface className="bg-white rounded-lg shadow-md p-6">
         <form onSubmit={handleSubmit}>
           {/* Employee Selection */}
           <div className="mb-8">
@@ -300,7 +301,7 @@ export default function CreatePerformanceReviewPage() {
             </LoadingButton>
           </div>
         </form>
-      </div>
+      </Surface>
     </div>
   )
 }

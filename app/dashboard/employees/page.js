@@ -1,4 +1,6 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeInput, Heading3 } from '@/components/ui/fernly/native'
@@ -559,7 +561,7 @@ export default function EmployeesPage() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <NativeTable className="w-full">
                   <thead className="bg-default-50 border-b border-default-200">
                     <tr>
                       {canManageEmployees() && (
@@ -660,7 +662,7 @@ export default function EmployeesPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </NativeTable>
               </div>
 
               <div className="bg-content1 px-4 py-3 flex items-center justify-between border-t border-default-200 sm:px-6">
@@ -698,7 +700,7 @@ export default function EmployeesPage() {
           <ModalBody className="py-4">
             <p className="text-default-700 mb-4">Are you sure you want to <span className="font-semibold text-danger">permanently delete</span> this employee?</p>
             {deleteModal.employee && (
-              <div className="bg-default-50 rounded-lg p-4 mb-4">
+              <Surface className="bg-default-50 rounded-lg p-4 mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-semibold overflow-hidden">
                     {deleteModal.employee.profilePicture ? (
@@ -713,7 +715,7 @@ export default function EmployeesPage() {
                     <p className="text-xs text-default-400">{deleteModal.employee.employeeCode}</p>
                   </div>
                 </div>
-              </div>
+              </Surface>
             )}
             <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 text-sm text-warning-800">
               <strong>Warning:</strong> This action cannot be undone. The employee and their user account will be permanently removed from the system.

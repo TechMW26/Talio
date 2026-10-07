@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Autocomplete, AutocompleteItem } from '@heroui/react'
+import { Autocomplete, AutocompleteItem } from '@/components/ui/fernly'
 import { HiOutlineMagnifyingGlass } from 'react-icons/hi2'
 
 const asKey = (value) => value === null || value === undefined ? '' : String(value)

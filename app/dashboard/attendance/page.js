@@ -1,4 +1,6 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { Surface, SummaryCard } from '@/components/ui/fernly'
 import calendar from '@/components/ui/fernly/calendar.module.css'
 
 
@@ -1101,7 +1103,7 @@ export default function AttendancePage() {
           </div>
 
           {/* Status Legend */}
-          <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-default-50 rounded-lg">
+          <Surface className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-default-50 rounded-lg">
             <div className="flex items-center gap-1.5 sm:gap-2">
               <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-success-100 border border-success-400"></div>
               <span className="text-[10px] sm:text-xs text-default-600">Present</span>
@@ -1134,7 +1136,7 @@ export default function AttendancePage() {
               <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-default-100 border border-default-300"></div>
               <span className="text-[10px] sm:text-xs text-default-600">No Record</span>
             </div>
-          </div>
+          </Surface>
 
           {attendanceLoadError ? (
             <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger">
@@ -1325,7 +1327,7 @@ export default function AttendancePage() {
           ) : (
             /* List View */
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <NativeTable className="w-full">
                 <thead className="bg-default-50 border-b border-divider">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Date</th>
@@ -1425,7 +1427,7 @@ export default function AttendancePage() {
                     })
                   )}
                 </tbody>
-              </table>
+              </NativeTable>
             </div>
           )}
 
@@ -1433,38 +1435,10 @@ export default function AttendancePage() {
           <div className="mt-6 pt-6 border-t border-divider">
             <Heading3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</Heading3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="bg-success-50">
-                <CardBody className="text-center py-4">
-                  <p className="text-2xl font-bold text-success">
-                    {attendance.filter(r => r.status === 'present').length}
-                  </p>
-                  <p className="text-sm text-success-700">Present Days</p>
-                </CardBody>
-              </Card>
-              <Card className="bg-danger-50">
-                <CardBody className="text-center py-4">
-                  <p className="text-2xl font-bold text-danger">
-                    {attendance.filter(r => r.status === 'absent').length}
-                  </p>
-                  <p className="text-sm text-danger-700">Absent Days</p>
-                </CardBody>
-              </Card>
-              <Card className="bg-warning-50">
-                <CardBody className="text-center py-4">
-                  <p className="text-2xl font-bold text-warning">
-                    {attendance.filter(r => r.status === 'late').length}
-                  </p>
-                  <p className="text-sm text-warning-700">Late Days</p>
-                </CardBody>
-              </Card>
-              <Card className="bg-warning-50">
-                <CardBody className="text-center py-4">
-                  <p className="text-2xl font-bold text-warning">
-                    {attendance.filter(r => r.status === 'half-day').length}
-                  </p>
-                  <p className="text-sm text-warning-700">Half Days</p>
-                </CardBody>
-              </Card>
+              <SummaryCard  label={<>Present Days</>} value={<>{attendance.filter(r => r.status === 'present').length}</>} />
+              <SummaryCard  label={<>Absent Days</>} value={<>{attendance.filter(r => r.status === 'absent').length}</>} />
+              <SummaryCard  label={<>Late Days</>} value={<>{attendance.filter(r => r.status === 'late').length}</>} />
+              <SummaryCard  label={<>Half Days</>} value={<>{attendance.filter(r => r.status === 'half-day').length}</>} />
             </div>
           </div>
         </CardBody>
@@ -1795,9 +1769,9 @@ export default function AttendancePage() {
                   </CardBody>
                 </Card>
               ) : (
-                <div className="text-center py-4 text-default-500 italic bg-default-50 rounded-lg">
+                <Surface className="text-center py-4 text-default-500 italic bg-default-50 rounded-lg">
                   No description available for this holiday.
-                </div>
+                </Surface>
               )}
 
               <div className="flex gap-2 pt-2">

@@ -1,4 +1,7 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3, NativeButton, Heading2 } from '@/components/ui/fernly/native'
@@ -133,94 +136,19 @@ function LeaveApprovalsContent() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card shadow="sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Heading3 className="text-sm font-medium text-default-600">Pending</Heading3>
-              <FaFilter className="text-warning" />
-            </div>
-            <div className="text-3xl font-bold text-default-800">
-              {leaves.filter(l => l.status === 'pending').length}
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Pending</>} value={<>{leaves.filter(l => l.status === 'pending').length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Heading3 className="text-sm font-medium text-default-600">Approved</Heading3>
-              <FaCheck className="text-success" />
-            </div>
-            <div className="text-3xl font-bold text-default-800">
-              {leaves.filter(l => l.status === 'approved').length}
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Approved</>} value={<>{leaves.filter(l => l.status === 'approved').length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Heading3 className="text-sm font-medium text-default-600">Rejected</Heading3>
-              <FaTimes className="text-danger" />
-            </div>
-            <div className="text-3xl font-bold text-default-800">
-              {leaves.filter(l => l.status === 'rejected').length}
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Rejected</>} value={<>{leaves.filter(l => l.status === 'rejected').length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Heading3 className="text-sm font-medium text-default-600">Total Requests</Heading3>
-              <FaFilter className="text-primary" />
-            </div>
-            <div className="text-3xl font-bold text-default-800">{leaves.length}</div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total Requests</>} value={<>{leaves.length}</>} />
       </div>
 
       {/* Filter Tabs */}
       <Card shadow="sm" className="mb-6">
         <CardBody className="p-0">
-          <div className="flex border-b border-default-200">
-            <NativeButton
-              onClick={() => setFilter('pending')}
-              className={`px-6 py-3 font-medium ${filter === 'pending'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-default-600 hover:text-default-800'
-                }`}
-            >
-              Pending
-            </NativeButton>
-            <NativeButton
-              onClick={() => setFilter('approved')}
-              className={`px-6 py-3 font-medium ${filter === 'approved'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-default-600 hover:text-default-800'
-                }`}
-            >
-              Approved
-            </NativeButton>
-            <NativeButton
-              onClick={() => setFilter('rejected')}
-              className={`px-6 py-3 font-medium ${filter === 'rejected'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-default-600 hover:text-default-800'
-                }`}
-            >
-              Rejected
-            </NativeButton>
-            <NativeButton
-              onClick={() => setFilter('')}
-              className={`px-6 py-3 font-medium ${filter === ''
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-default-600 hover:text-default-800'
-                }`}
-            >
-              All
-            </NativeButton>
-          </div>
+          <Tabs aria-label="Leave approval status" selectedKey={filter || 'all'} onSelectionChange={key => setFilter(key === 'all' ? '' : String(key))} className="w-full p-2"><Tab key="pending" title="Pending" /><Tab key="approved" title="Approved" /><Tab key="rejected" title="Rejected" /><Tab key="all" title="All" /></Tabs>
         </CardBody>
       </Card>
 
@@ -228,7 +156,7 @@ function LeaveApprovalsContent() {
       <Card shadow="sm">
         <CardBody className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead className="bg-default-50 border-b border-default-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -336,7 +264,7 @@ function LeaveApprovalsContent() {
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         </CardBody>
       </Card>

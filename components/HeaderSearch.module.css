@@ -1,4 +1,5 @@
 .shell { --search-radius: var(--dashboard-header-control-radius, 16px); position: relative; flex: 0 1 156px; min-width: 0; width: 156px; transition: flex-basis .28s cubic-bezier(.2,.8,.2,1), width .28s cubic-bezier(.2,.8,.2,1); outline: none; }
+.shell { z-index: 20; }
 .shell[data-expanded="true"] { flex-basis: 540px; width: 540px; }
 .control { position: relative; display: flex; align-items: center; gap: 9px; height: var(--dashboard-header-control-height, 42px); padding: 0 12px; border: 0; border-radius: var(--search-radius); background: var(--color-bg-card); color: var(--color-text-primary); }
 .shell .control[data-search-container]:has(input:focus-visible) { outline: none !important; box-shadow: none; border: 0; }
@@ -14,7 +15,9 @@
 .list { max-height: min(55dvh, 460px); overflow-y: auto; overscroll-behavior: contain; }
 .message { padding: 16px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); }
 .message button { color: var(--color-text-primary); background: transparent; padding: 0 6px; text-decoration: underline; font-size: inherit; }
-.result { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; border-radius: 0; border: 0; background: transparent; padding: 12px 14px; text-align: left; color: var(--color-text-primary); }
+/* Result rows are compact rectangles, not shared pill-shaped action buttons. */
+.shell .result.result { border-radius: 8px; }
+.result { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; border: 0; background: transparent; padding: 12px 14px; text-align: left; color: var(--color-text-primary); }
 .result[aria-selected="true"] { background: #2563eb20; }
 .resultCopy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .resultCopy strong { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

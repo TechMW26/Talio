@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { NativeButton, Heading1, NativeInput, NativeTextarea, Heading3 } from '@/components/ui/fernly/native'
@@ -491,7 +492,7 @@ export default function EditProjectPage() {
 
         {/* Members Panel */}
         <div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <Surface className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <Heading3 className="text-lg font-semibold text-gray-800 dark:text-black">Team Members</Heading3>
               {canManage && (
@@ -542,7 +543,7 @@ export default function EditProjectPage() {
                 <p className="text-sm text-gray-500 text-center py-4">No members added yet</p>
               )}
             </div>
-          </div>
+          </Surface>
         </div>
       </div>
 
@@ -550,7 +551,7 @@ export default function EditProjectPage() {
       {showAddMemberModal && (
         <Portal>
           <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <Surface className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
               <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <FaUsers className="text-primary-500" />
@@ -682,7 +683,7 @@ export default function EditProjectPage() {
                   {`Add ${selectedNewMembers.length} Member${selectedNewMembers.length !== 1 ? 's' : ''}`}
                 </LoadingButton>
               </div>
-            </div>
+            </Surface>
           </div>
         </Portal>
       )}
@@ -691,7 +692,7 @@ export default function EditProjectPage() {
       {showHeadSearch && (
         <Portal>
           <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <Surface className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
               <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                 <Heading3 className="text-lg font-semibold text-gray-800">Add Project Head</Heading3>
                 <NativeButton
@@ -801,7 +802,7 @@ export default function EditProjectPage() {
                   )
                 })()}
               </div>
-            </div>
+            </Surface>
           </div>
         </Portal>
       )}

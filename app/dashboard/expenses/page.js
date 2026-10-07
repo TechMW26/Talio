@@ -1,20 +1,23 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { NativeTable } from '@/components/ui/fernly'
 
 
-import { Heading1, Heading3, Heading2, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
+import { Heading1, Heading2, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { FaPlus, FaMoneyBillWave, FaCheckCircle, FaClock, FaTimesCircle } from 'react-icons/fa'
+import { FaPlus } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
-import { Modal as Modal } from '@/components/ui/fernly'
-import { Select, SelectItem, Input, Textarea, Button, Skeleton, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/fernly'
+import { Select, SelectItem, Button, Skeleton, Card, CardBody, Chip } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import styles from './expenses.module.css'
+import { SummaryCard } from '@/components/ui/fernly'
 
 export default function ExpensesPage() {
   const [showModal, setShowModal] = useState(false)
@@ -82,12 +85,12 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
-      <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
+      <div className="flex md:justify-between md:items-center md:flex-row flex-col gap-4 mb-6">
         <div>
-          <Heading1 className="text-3xl font-bold text-gray-800">Expenses</Heading1>
-          <p className="text-gray-600 mt-1 flex items-center gap-2">
+          <Heading1 className="text-3xl font-bold text-default-800">Expenses</Heading1>
+          <p className="text-default-500 mt-1 flex items-center gap-2">
             Submit and track your expense claims
             <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
           </p>
@@ -101,61 +104,23 @@ export default function ExpensesPage() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-sm font-medium text-gray-600">Total Expenses</Heading3>
-            <FaMoneyBillWave className="text-primary-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-800">
-            {formatCurrency(expenses.reduce((sum, e) => sum + (e.amount || 0), 0))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-sm font-medium text-gray-600">Approved</Heading3>
-            <FaCheckCircle className="text-green-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-800">
-            {formatCurrency(
-              expenses
-                .filter(e => e.status === 'approved')
-                .reduce((sum, e) => sum + (e.amount || 0), 0)
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-sm font-medium text-gray-600">Pending</Heading3>
-            <FaClock className="text-yellow-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-800">
-            {formatCurrency(
-              expenses
-                .filter(e => e.status === 'pending')
-                .reduce((sum, e) => sum + (e.amount || 0), 0)
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-sm font-medium text-gray-600">Rejected</Heading3>
-            <FaTimesCircle className="text-red-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-800">
-            {expenses.filter(e => e.status === 'rejected').length}
-          </div>
-        </div>
+      {/* Shared Fernly summary cards, with plain text labels. */}
+      <div className={styles.summary}>
+        {[
+          { label: 'Total Expenses', value: formatCurrency(expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)) },
+          { label: 'Approved', value: formatCurrency(expenses.filter(expense => expense.status === 'approved').reduce((sum, expense) => sum + (expense.amount || 0), 0)) },
+          { label: 'Pending', value: formatCurrency(expenses.filter(expense => expense.status === 'pending').reduce((sum, expense) => sum + (expense.amount || 0), 0)) },
+          { label: 'Rejected', value: expenses.filter(expense => expense.status === 'rejected').length },
+        ].map(({ label, value }) => (
+          <SummaryCard key={label} as="section" aria-label={label} label={label}
+            value={isLoading ? <Skeleton className="h-9 w-28 rounded-lg" /> : error ? '—' : value} />
+        ))}
       </div>
 
       {/* Expenses Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <Heading2 className="text-xl font-semibold text-gray-800">My Expenses</Heading2>
+      <Card as="section" shadow="none" className={styles.card}>
+        <div className={styles.tableHeading}>
+          <Heading2 className="text-xl font-semibold text-default-800">My Expenses</Heading2>
         </div>
 
         {error ? (
@@ -175,70 +140,67 @@ export default function ExpensesPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <NativeTable className={styles.table} aria-label="My Expenses">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Description
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Status
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody>
                 {expenses.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan="5" className={styles.empty}>
                       No expenses found
                     </td>
                   </tr>
                 ) : (
                   expenses.map((expense) => (
-                    <tr key={expense._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <tr key={expense._id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">
                         {expense?.expenseDate ? new Date(expense.expenseDate).toLocaleDateString() : 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">
                         {expense?.category || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                      <td className="px-6 py-4 text-sm text-default-800 max-w-xs truncate">
                         {expense?.description || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-default-800">
                         {formatCurrency(expense?.amount)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${expense?.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            expense?.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                          }`}>
+                        <Chip size="sm" variant="flat" color={expense?.status === 'approved' ? 'success' : expense?.status === 'rejected' ? 'danger' : 'warning'}>
                           {expense?.status || 'pending'}
-                        </span>
+                        </Chip>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Submit Expense Modal */}
       <ModalPortal isOpen={showModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
-            <Heading2 className="text-2xl font-bold text-gray-800 mb-4">Submit Expense</Heading2>
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
+            <Heading2 className="text-2xl font-bold text-default-800 mb-4">Submit Expense</Heading2>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
@@ -319,7 +281,7 @@ export default function ExpensesPage() {
                 </LoadingButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>

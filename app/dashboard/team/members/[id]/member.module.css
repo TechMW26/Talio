@@ -10,7 +10,6 @@
 .dashboardHeader p { color: var(--color-text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dashboardHeader button { flex: none; margin: 0; }
 .dashboardHeader .backButton { width: 42px; height: 42px; display: grid; place-items: center; padding: 0; border: 1px solid var(--color-border); border-radius: 50%; background: var(--color-bg-card); color: var(--color-text-primary); }
-.backButton:hover { background: var(--color-bg-hover, #252525); }
 .backButton:focus-visible { outline: 2px solid #60a5fa; outline-offset: 3px; }
 .backButton svg { width: 18px; height: 18px; }
 .tabs { flex: none; display: flex; gap: 4px; padding: 5px; margin: 16px 0; border-radius: 99px; background: var(--color-bg-card); overflow-x: auto; }
@@ -78,7 +77,6 @@
 .profileHeading p { color: var(--color-text-secondary); font-size: 12px; margin-bottom: 6px; }
 .profileHeading nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border-radius: 99px; background: var(--color-bg-card); }
 .profileHeading a { font-size: 12px; padding: 10px 16px; border-radius: 99px; }
-.profileHeading a:hover { background: #2563eb; color: white; }
 .assignmentCard { padding: 24px; border-radius: 28px; border: 1px solid var(--color-border); background: var(--color-bg-card); min-width: 0; }
 .assignmentCard ol { list-style: none; padding: 0; margin: 20px 0; }
 .assignmentCard li { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; }

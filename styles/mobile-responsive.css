@@ -120,16 +120,6 @@
     line-height: 1rem;
   }
   
-  /* Learning progress mobile */
-  .learning-item {
-    margin-bottom: 1rem;
-  }
-  
-  .learning-title {
-    font-size: 0.75rem;
-    line-height: 1rem;
-  }
-  
   .progress-bar {
     height: 0.5rem;
   }

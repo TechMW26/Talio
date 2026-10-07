@@ -1,4 +1,6 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3, NativeButton, Heading2, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
@@ -364,43 +366,13 @@ export default function DepartmentsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Departments</Heading3>
-            <FaBuilding className="text-primary-500 flex-shrink-0" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">{departments.length}</div>
-        </div>
+        <SummaryCard  label={<>Total Departments</>} value={<>{departments.length}</>} />
 
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Departments</Heading3>
-            <FaBuilding className="text-green-500 flex-shrink-0" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-            {departments.filter(d => d.isActive !== false).length}
-          </div>
-        </div>
+        <SummaryCard  label={<>Active Departments</>} value={<>{departments.filter(d => d.isActive !== false).length}</>} />
 
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Teams</Heading3>
-            <FaLayerGroup className="text-indigo-500 flex-shrink-0" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-            {departments.reduce((sum, d) => sum + (d.teams?.length || 0), 0)}
-          </div>
-        </div>
+        <SummaryCard  label={<>Total Teams</>} value={<>{departments.reduce((sum, d) => sum + (d.teams?.length || 0), 0)}</>} />
 
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Employees</Heading3>
-            <FaUsers className="text-blue-500 flex-shrink-0" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-            {departments.reduce((sum, d) => sum + (d.employeeCount || 0), 0)}
-          </div>
-        </div>
+        <SummaryCard  label={<>Total Employees</>} value={<>{departments.reduce((sum, d) => sum + (d.employeeCount || 0), 0)}</>} />
       </div>
 
       {/* Departments Grid */}
@@ -408,7 +380,7 @@ export default function DepartmentsPage() {
         {isLoading ? (
           <>
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md p-3 sm:p-6">
+              <Surface key={i} className="bg-white rounded-lg shadow-md p-3 sm:p-6">
                 <div className="flex items-start justify-between mb-3 sm:mb-4">
                   <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
                     <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
@@ -423,16 +395,16 @@ export default function DepartmentsPage() {
                   <Skeleton className="h-4 w-24 rounded" />
                   <Skeleton className="h-4 w-20 rounded" />
                 </div>
-              </div>
+              </Surface>
             ))}
           </>
         ) : departments.length === 0 ? (
-          <div className="col-span-full bg-white rounded-lg shadow-md p-6 sm:p-8 text-center text-gray-500">
+          <Surface className="col-span-full bg-white rounded-lg shadow-md p-6 sm:p-8 text-center text-gray-500">
             No departments found
-          </div>
+          </Surface>
         ) : (
           departments.map((dept) => (
-            <div
+            <Surface
               key={dept._id}
               className="bg-white rounded-lg shadow-md p-3 sm:p-6 hover:shadow-lg transition-shadow"
             >
@@ -581,7 +553,7 @@ export default function DepartmentsPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </Surface>
           ))
         )}
       </div>
@@ -589,7 +561,7 @@ export default function DepartmentsPage() {
       {/* Add/Edit Modal */}
       <ModalPortal isOpen={showModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
             <Heading2 className="text-2xl font-bold text-gray-800 mb-4">
               {editingDept ? 'Edit Department' : 'Add Department'}
             </Heading2>
@@ -682,7 +654,7 @@ export default function DepartmentsPage() {
                     </div>
 
                     {showHeadDropdown && filteredEmployees.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      <Surface className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                         {filteredEmployees.slice(0, 10).map(employee => (
                           <NativeButton
                             key={employee._id}
@@ -699,19 +671,19 @@ export default function DepartmentsPage() {
                             Type to search {unselectedPeople.length - 10} more...
                           </div>
                         )}
-                      </div>
+                      </Surface>
                     )}
 
                     {showHeadDropdown && filteredEmployees.length === 0 && headSearch.trim() && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
+                      <Surface className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
                         No matches found for "{headSearch}"
-                      </div>
+                      </Surface>
                     )}
 
                     {showHeadDropdown && filteredEmployees.length === 0 && !headSearch.trim() && availablePeople.length === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
+                      <Surface className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
                         No employees or users found. You can create the department without heads and add them later.
-                      </div>
+                      </Surface>
                     )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
@@ -733,14 +705,14 @@ export default function DepartmentsPage() {
                 </LoadingButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 
       {/* Team Create/Edit Modal */}
       <ModalPortal isOpen={showTeamModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <Heading2 className="text-2xl font-bold text-gray-800 mb-4">
               {editingTeam ? 'Edit Team' : 'Create Team'}
             </Heading2>
@@ -811,7 +783,7 @@ export default function DepartmentsPage() {
                       className="input input-search text-sm"
                     />
                     {showTeamDropdown && teamSearchType === 'leaders' && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-36 overflow-y-auto">
+                      <Surface className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-36 overflow-y-auto">
                         {availablePeople
                           .filter(p => !teamFormData.leaderIds.includes(p._id) && !teamFormData.memberIds.includes(p._id))
                           .filter(p => !debouncedTeamSearch.trim() || `${p.firstName} ${p.lastName}`.toLowerCase().includes(debouncedTeamSearch.toLowerCase()))
@@ -827,7 +799,7 @@ export default function DepartmentsPage() {
                               <span className="text-[10px] text-gray-400 ml-2">{p.employeeCode || ''}</span>
                             </NativeButton>
                           ))}
-                      </div>
+                      </Surface>
                     )}
                   </div>
                 </div>
@@ -862,7 +834,7 @@ export default function DepartmentsPage() {
                       className="input input-search text-sm"
                     />
                     {showTeamDropdown && teamSearchType === 'members' && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-36 overflow-y-auto">
+                      <Surface className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-36 overflow-y-auto">
                         {availablePeople
                           .filter(p => !teamFormData.memberIds.includes(p._id) && !teamFormData.leaderIds.includes(p._id))
                           .filter(p => !debouncedTeamSearch.trim() || `${p.firstName} ${p.lastName}`.toLowerCase().includes(debouncedTeamSearch.toLowerCase()))
@@ -878,7 +850,7 @@ export default function DepartmentsPage() {
                               <span className="text-[10px] text-gray-400 ml-2">{p.employeeCode || ''}</span>
                             </NativeButton>
                           ))}
-                      </div>
+                      </Surface>
                     )}
                   </div>
                 </div>
@@ -891,7 +863,7 @@ export default function DepartmentsPage() {
                 </LoadingButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 

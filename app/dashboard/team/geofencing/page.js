@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
@@ -151,7 +152,7 @@ export default function GeofencingPage() {
       )}
 
       {/* Filter Tabs */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <Surface className="bg-white rounded-lg shadow-md p-4 mb-6">
         {/* Department & Team Filters */}
         <div className="flex flex-wrap items-end gap-3 mb-4">
           {/* Department filter - admin/HR */}
@@ -228,21 +229,21 @@ export default function GeofencingPage() {
             </NativeButton>
           ))}
         </div>
-      </div>
+      </Surface>
 
       {/* Logs List */}
       <div className="space-y-4">
         {logs.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <Surface className="bg-white rounded-lg shadow-md p-8 text-center">
             <FaMapMarkerAlt className="text-gray-300 text-5xl mx-auto mb-4" />
             <p className="text-gray-600">No geofencing logs found</p>
             <p className="text-sm text-gray-500 mt-2">
               Logs will appear here when employees are tracked outside the geofence
             </p>
-          </div>
+          </Surface>
         ) : (
           logs.map(log => (
-            <div key={log._id} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <Surface key={log._id} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 {/* Employee Info */}
                 <div className="flex items-start gap-3 flex-1">
@@ -370,7 +371,7 @@ export default function GeofencingPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </Surface>
           ))
         )}
       </div>

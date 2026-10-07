@@ -1,4 +1,6 @@
 'use client';
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { NativeButton, Heading2, NativeInput, NativeSelect, Heading3 } from '@/components/ui/fernly/native'
@@ -314,10 +316,10 @@ export default function WhiteboardEditorPage() {
       {/* Saving overlay */}
       <ModalPortal isOpen={isSaving}>
         <div className="modal-overlay whiteboard-light-override">
-          <div className="bg-white rounded-[30px] animate-modal-enter px-6 py-4 flex items-center gap-3 shadow-xl">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter px-6 py-4 flex items-center gap-3 shadow-xl">
             <Skeleton className="w-5 h-5 rounded-full" />
             <span className="text-gray-700 font-medium">Saving...</span>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 
@@ -383,7 +385,7 @@ export default function WhiteboardEditorPage() {
       {/* Share Modal */}
       <ModalPortal isOpen={showShareModal}>
         <div className="modal-overlay whiteboard-light-override">
-          <div className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-md overflow-hidden">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <Heading2 className="text-xl font-semibold text-gray-900">Share board</Heading2>
@@ -416,7 +418,7 @@ export default function WhiteboardEditorPage() {
                   />
 
                   {(userSearch || safeArrayLength(userResults) > 0) && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto z-10">
+                    <Surface className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto z-10">
                       {loadingUsers ? (
                         <div className="p-4 text-center text-gray-500">
                           <Skeleton className="w-5 h-5 rounded-full mx-auto mb-2" />
@@ -453,7 +455,7 @@ export default function WhiteboardEditorPage() {
                           ))}
                         </div>
                       )}
-                    </div>
+                    </Surface>
                   )}
                 </div>
 
@@ -504,14 +506,14 @@ export default function WhiteboardEditorPage() {
                 </div>
               )}
             </div>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 
       {/* Rename Modal */}
       <ModalPortal isOpen={showRenameModal}>
         <div className="modal-overlay whiteboard-light-override">
-          <div className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-sm overflow-hidden">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-sm overflow-hidden">
             <div className="p-6">
               <Heading2 className="text-xl font-semibold text-gray-900 mb-4">Rename board</Heading2>
               <form onSubmit={handleRename}>
@@ -539,7 +541,7 @@ export default function WhiteboardEditorPage() {
                 </div>
               </form>
             </div>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>

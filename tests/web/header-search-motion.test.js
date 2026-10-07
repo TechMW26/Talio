@@ -29,3 +29,21 @@ test('header search has no idle, active or result borders; activity glow remains
   expect(css).toContain('.control[data-search-container]:has(input:focus-visible) { outline: none !important; box-shadow: none; border: 0; }')
   expect(source).toContain('<AIActivityBeam active={busy}')
 })
+
+test('search result rows override the shared pill radius with compact corners', () => {
+  const css = fs.readFileSync(path.join(process.cwd(), 'components/HeaderSearch.module.css'), 'utf8')
+  expect(css).toMatch(/\.shell \.result\.result\s*\{\s*border-radius:\s*8px;/)
+  expect(source).toContain('className={styles.result}')
+})
+
+test('header search stacks above page content but below modal overlays', () => {
+  const layout = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/dashboard-layout.css'), 'utf8')
+  const css = fs.readFileSync(path.join(process.cwd(), 'components/HeaderSearch.module.css'), 'utf8')
+  const header = fs.readFileSync(path.join(process.cwd(), 'components/Header.js'), 'utf8')
+  const globals = fs.readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8')
+  expect(layout).toMatch(/\.dashboard-floating-shell \.talio-navigation-header\s*\{[^}]*z-index: 80;/)
+  expect(header).not.toContain('z-[40]')
+  expect(css).toContain('.shell { z-index: 20; }')
+  expect(css).toMatch(/\.results\s*\{[^}]*z-index: 50;/)
+  expect(globals).toContain('z-index: 99999 !important;')
+})

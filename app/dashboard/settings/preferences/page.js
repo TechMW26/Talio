@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading2 } from '@/components/ui/fernly/native'
@@ -94,13 +95,13 @@ export default function PreferencesPage() {
           <Skeleton className="h-10 w-36 rounded-lg" />
         </div>
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="bg-white rounded-lg shadow-md p-6 space-y-4">
+          <Surface key={i} className="bg-white rounded-lg shadow-md p-6 space-y-4">
             <Skeleton className="h-6 w-48 rounded-lg" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Skeleton className="h-12 w-full rounded-lg" />
               <Skeleton className="h-12 w-full rounded-lg" />
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
     )
@@ -131,7 +132,7 @@ export default function PreferencesPage() {
 
       <div className="space-y-6">
         {/* Currency Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <Surface className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center space-x-3 mb-4">
             <FaMoneyBillWave className="w-6 h-6 text-green-500" />
             <Heading2 className="text-xl font-semibold text-gray-800">Currency Settings</Heading2>
@@ -162,10 +163,10 @@ export default function PreferencesPage() {
               />
             </div>
           </div>
-        </div>
+        </Surface>
 
         {/* Time & Date Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <Surface className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center space-x-3 mb-4">
             <FaClock className="w-6 h-6 text-blue-500" />
             <Heading2 className="text-xl font-semibold text-gray-800">Time & Date Settings</Heading2>
@@ -214,10 +215,10 @@ export default function PreferencesPage() {
               </Select>
             </div>
           </div>
-        </div>
+        </Surface>
 
         {/* Work Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <Surface className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center space-x-3 mb-4">
             <FaCalendarAlt className="w-6 h-6 text-purple-500" />
             <Heading2 className="text-xl font-semibold text-gray-800">Work Settings</Heading2>
@@ -244,10 +245,10 @@ export default function PreferencesPage() {
               />
             </div>
           </div>
-        </div>
+        </Surface>
 
         {/* Attendance Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <Surface className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center space-x-3 mb-4">
             <FaClock className="w-6 h-6 text-orange-500" />
             <Heading2 className="text-xl font-semibold text-gray-800">Attendance Settings</Heading2>
@@ -281,10 +282,10 @@ export default function PreferencesPage() {
               Automatically mark employees as absent if no check-in
             </Checkbox>
           </div>
-        </div>
+        </Surface>
 
         {/* Company Information */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <Surface className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center space-x-3 mb-4">
             <FaCog className="w-6 h-6 text-gray-500" />
             <Heading2 className="text-xl font-semibold text-gray-800">Company Information</Heading2>
@@ -328,7 +329,7 @@ export default function PreferencesPage() {
               </div>
             </div>
           </div>
-        </div>
+        </Surface>
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 import calendar from '@/components/ui/fernly/calendar.module.css'
 
 
@@ -596,7 +597,7 @@ export default function TeamAttendancePage() {
         <Card className="shadow-md">
           <CardBody className="p-6">
             {/* Employee Info Card */}
-            <div className="flex items-center space-x-4 mb-6 p-4 bg-default-50 rounded-lg">
+            <Surface className="flex items-center space-x-4 mb-6 p-4 bg-default-50 rounded-lg">
               {selectedEmployee.avatar ? (
                 <img
                   src={selectedEmployee.avatar}
@@ -617,7 +618,7 @@ export default function TeamAttendancePage() {
                 <p className="text-sm text-default-500">{selectedEmployee.designation?.title || 'No Designation'}</p>
                 <p className="text-xs text-default-400">{selectedEmployee.employeeCode || ''} • {selectedEmployee.email}</p>
               </div>
-            </div>
+            </Surface>
 
             {/* Month Navigation */}
             <div className="flex justify-between items-center mb-6">
@@ -643,7 +644,7 @@ export default function TeamAttendancePage() {
             </div>
 
             {/* Status Legend */}
-            <div className="flex flex-wrap gap-3 mb-6 p-3 bg-default-50 rounded-lg">
+            <Surface className="flex flex-wrap gap-3 mb-6 p-3 bg-default-50 rounded-lg">
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 rounded bg-success-100 border border-success"></div>
                 <span className="text-xs text-default-600">Present</span>
@@ -676,7 +677,7 @@ export default function TeamAttendancePage() {
                 <div className="w-4 h-4 rounded bg-default-100 border border-default-300"></div>
                 <span className="text-xs text-default-600">No Record</span>
               </div>
-            </div>
+            </Surface>
 
             {/* Calendar Grid */}
             {attError ? (

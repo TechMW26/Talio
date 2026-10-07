@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3 } from '@/components/ui/fernly/native'
@@ -141,7 +142,7 @@ export default function RBACRolesPage() {
                         <p className="text-gray-500">Failed to load roles. {roles.length === 0 ? 'Click "Seed System Roles" to initialize.' : ''}</p>
                     </div>
                 ) : roles.length === 0 ? (
-                    <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                    <Surface className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                         <FaShieldAlt className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                         <Heading3 className="text-lg font-medium text-gray-800 dark:text-gray-200">No roles configured</Heading3>
                         <p className="text-gray-500 mt-2 mb-4">Seed system roles to get started, or create a custom role.</p>
@@ -153,11 +154,11 @@ export default function RBACRolesPage() {
                                 Create Custom Role
                             </Button>
                         </div>
-                    </div>
+                    </Surface>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {roles.map((role) => (
-                            <div
+                            <Surface
                                 key={role._id}
                                 className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow"
                             >
@@ -221,7 +222,7 @@ export default function RBACRolesPage() {
                                         )}
                                     </div>
                                 </div>
-                            </div>
+                            </Surface>
                         ))}
                     </div>
                 )}

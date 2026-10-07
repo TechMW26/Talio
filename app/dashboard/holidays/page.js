@@ -1,5 +1,7 @@
 'use client'
+import { Surface, SummaryCard } from '@/components/ui/fernly'
 import calendar from '@/components/ui/fernly/calendar.module.css'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 
 import { Heading2, NativeButton, Heading1, Heading3 } from '@/components/ui/fernly/native'
@@ -169,7 +171,7 @@ export default function HolidaysPage() {
     const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate })
 
     return (
-      <div className="bg-white rounded-lg shadow-md p-2 sm:p-4 overflow-x-auto">
+      <Surface className="bg-white rounded-lg shadow-md p-2 sm:p-4 overflow-x-auto">
         <div className="min-w-0">
           {/* Calendar Controls */}
           <div className="flex items-center justify-between mb-4">
@@ -245,7 +247,7 @@ export default function HolidaysPage() {
             })}
           </div>
         </div>
-      </div>
+      </Surface>
     )
   }
 
@@ -274,24 +276,10 @@ export default function HolidaysPage() {
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
           {/* View Toggle */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <NativeButton
-              onClick={() => setViewMode('calendar')}
-              className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${viewMode === 'calendar' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
-              title="Calendar View"
-            >
-              <FaTh />
-              <span className="hidden sm:inline">calendar</span>
-            </NativeButton>
-            <NativeButton
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${viewMode === 'list' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
-              title="List View"
-            >
-              <FaList />
-              <span className="hidden sm:inline">list</span>
-            </NativeButton>
-          </div>
+          <Tabs aria-label="Holiday view" selectedKey={viewMode} onSelectionChange={setViewMode}>
+            <Tab key="calendar" title="Calendar" />
+            <Tab key="list" title="List" />
+          </Tabs>
 
           <Button
             onPress={() => setShowModal(true)}
@@ -306,46 +294,24 @@ export default function HolidaysPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-primary-500">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600">Total Holidays</Heading3>
-            <FaCalendarAlt className="text-primary-500 text-sm sm:text-base" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">{holidays.length}</div>
-        </div>
+        <SummaryCard  label={<>Total Holidays</>} value={<>{holidays.length}</>} />
 
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-green-500">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600">Public Holidays</Heading3>
-            <FaCalendarAlt className="text-green-500 text-sm sm:text-base" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-            {holidays.filter(h => h.type === 'public').length}
-          </div>
-        </div>
+        <SummaryCard  label={<>Public Holidays</>} value={<>{holidays.filter(h => h.type === 'public').length}</>} />
 
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-blue-500">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-xs sm:text-sm font-medium text-gray-600">Upcoming Holidays</Heading3>
-            <FaCalendarAlt className="text-blue-500 text-sm sm:text-base" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-            {holidays.filter(h => new Date(h.date) >= new Date(new Date().setHours(0, 0, 0, 0))).length}
-          </div>
-        </div>
+        <SummaryCard  label={<>Upcoming Holidays</>} value={<>{holidays.filter(h => new Date(h.date) >= new Date(new Date().setHours(0, 0, 0, 0))).length}</>} />
       </div>
 
       {/* Main Content */}
       {error ? (
         <DataErrorState message="Failed to load holidays" onRetry={() => refreshHolidays()} />
       ) : isLoading ? (
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 space-y-4">
+        <Surface className="bg-white rounded-lg shadow-md p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-7 gap-2">
             {[...Array(35)].map((_, i) => (
               <Skeleton key={i} className="h-16 rounded-lg" />
             ))}
           </div>
-        </div>
+        </Surface>
       ) : (
         <>
           {viewMode === 'calendar' ? (
@@ -354,12 +320,12 @@ export default function HolidaysPage() {
             /* List View */
             <div className="space-y-6">
               {holidays.length === 0 ? (
-                <div className="bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
+                <Surface className="bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
                   No holidays found
-                </div>
+                </Surface>
               ) : (
                 Object.entries(groupedHolidays).map(([monthYear, monthHolidays]) => (
-                  <div key={monthYear} className="bg-white rounded-lg shadow-md overflow-hidden">
+                  <Surface key={monthYear} className="bg-white rounded-lg shadow-md overflow-hidden">
                     <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
                       <Heading2 className="text-lg font-semibold text-gray-800">{monthYear}</Heading2>
                     </div>
@@ -420,7 +386,7 @@ export default function HolidaysPage() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </Surface>
                 ))
               )}
             </div>

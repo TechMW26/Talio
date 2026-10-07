@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3, Heading2 } from '@/components/ui/fernly/native'
@@ -105,10 +106,10 @@ Generated on: ${new Date().toLocaleDateString()}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl shadow-sm p-4">
+            <Surface key={i} className="bg-white rounded-xl shadow-sm p-4">
               <Skeleton className="h-4 w-24 rounded mb-3" />
               <Skeleton className="h-7 w-20 rounded" />
-            </div>
+            </Surface>
           ))}
         </div>
         <HRMSCard>
@@ -277,7 +278,7 @@ Generated on: ${new Date().toLocaleDateString()}
               <HRMSModalBody>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Employee Details */}
-                  <div className="bg-default-50 p-6 rounded-lg">
+                  <Surface className="bg-default-50 p-6 rounded-lg">
                     <Heading3 className="text-lg font-semibold text-foreground mb-4">Employee Details</Heading3>
                     <div className="space-y-2">
                       <div className="flex justify-between">
@@ -297,7 +298,7 @@ Generated on: ${new Date().toLocaleDateString()}
                         <span className="font-medium text-foreground">{user?.employeeId?.designation?.name || 'N/A'}</span>
                       </div>
                     </div>
-                  </div>
+                  </Surface>
 
                   {/* Earnings */}
                   <div className="bg-success-50 p-6 rounded-lg">

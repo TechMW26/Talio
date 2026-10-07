@@ -1,4 +1,5 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
 
 
 import { Heading2, NativeButton, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
@@ -159,7 +160,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
       />
       
       {/* Modal */}
-      <div className="relative bg-white rounded-[30px] animate-modal-enter shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogSurface className="relative bg-white rounded-[30px] animate-modal-enter shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header - Compact */}
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -284,7 +285,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
             )}
           </NativeButton>
         </div>
-      </div>
+      </DialogSurface>
     </div>
   )
 

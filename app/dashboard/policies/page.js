@@ -1,4 +1,5 @@
 'use client'
+import { Surface, SummaryCard } from '@/components/ui/fernly'
 
 
 
@@ -33,17 +34,17 @@ function PoliciesSkeleton() {
       {/* Stats skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="bg-white rounded-lg shadow-md p-6">
+          <Surface key={i} className="bg-white rounded-lg shadow-md p-6">
             <Skeleton className="h-3 w-24 rounded mb-3" />
             <Skeleton className="h-8 w-12 rounded" />
-          </div>
+          </Surface>
         ))}
       </div>
 
       {/* Policy cards skeleton */}
       <div className="space-y-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="bg-white rounded-lg shadow-md p-6">
+          <Surface key={i} className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center space-x-3 mb-3">
               <Skeleton className="h-5 w-5 rounded" />
               <Skeleton className="h-6 w-48 rounded-lg" />
@@ -55,7 +56,7 @@ function PoliciesSkeleton() {
               <Skeleton className="h-3 w-32 rounded" />
               <Skeleton className="h-3 w-24 rounded" />
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
     </div>
@@ -259,36 +260,22 @@ export default function PoliciesPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-start mb-2">
-            <Heading3 className="text-sm font-medium text-gray-600">Total Policies</Heading3>
-            <FaFileAlt className="text-primary-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-800">{policies.length}</div>
-        </div>
+        <SummaryCard  label={<>Total Policies</>} value={<>{policies.length}</>} />
 
         {['HR', 'IT', 'Finance', 'General'].map((cat) => (
-          <div key={cat} className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <Heading3 className="text-sm font-medium text-gray-600">{cat} Policies</Heading3>
-              <FaFileAlt className="text-blue-500" />
-            </div>
-            <div className="text-3xl font-bold text-gray-800">
-              {policies.filter((p) => p.category === cat.toLowerCase()).length}
-            </div>
-          </div>
+          <SummaryCard key={cat} label={<>{cat} Policies</>} value={<>{policies.filter((p) => p.category === cat.toLowerCase()).length}</>} />
         ))}
       </div>
 
       {/* Policies List */}
       <div className="space-y-4">
         {policies.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
+          <Surface className="bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
             No policies found
-          </div>
+          </Surface>
         ) : (
           policies.map((policy) => (
-            <div
+            <Surface
               key={policy._id}
               className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
             >
@@ -374,7 +361,7 @@ export default function PoliciesPage() {
                   )}
                 </div>
               </div>
-            </div>
+            </Surface>
           ))
         )}
       </div>
@@ -449,7 +436,7 @@ export default function PoliciesPage() {
                     placeholder="Full policy content..."
                   />
 
-                  <div className="rounded-xl border border-default-200 bg-default-50 p-4">
+                  <Surface className="rounded-xl border border-default-200 bg-default-50 p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
                         <p className="font-medium text-default-800">Policy attachments</p>
@@ -489,7 +476,7 @@ export default function PoliciesPage() {
                         ))}
                       </ul>
                     )}
-                  </div>
+                  </Surface>
 
                   <Checkbox
                     isSelected={formData.requiresAcknowledgment}
@@ -512,7 +499,7 @@ export default function PoliciesPage() {
                   </Select>
 
                   {(formData.applicableTo === 'company' || formData.applicableTo === 'department') && (
-                    <div className="space-y-4 p-4 border border-default-200 rounded-lg bg-default-50">
+                    <Surface className="space-y-4 p-4 border border-default-200 rounded-lg bg-default-50">
                       {(formData.applicableTo === 'company') && (
                         <div>
                           <Select
@@ -570,7 +557,7 @@ export default function PoliciesPage() {
                           Only employees in the selected companies who belong to the selected departments will receive this policy.
                         </p>
                       )}
-                    </div>
+                    </Surface>
                   )}
                 </ModalBody>
 

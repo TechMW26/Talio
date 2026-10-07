@@ -1,4 +1,7 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading3, NativeInput, NativeTextarea, NativeSelect } from '@/components/ui/fernly/native'
@@ -67,34 +70,17 @@ export default function NotificationsPage() {
       {/* Tabs */}
       <div className="mb-6">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-4 overflow-x-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              return (
-                <NativeButton
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.name}</span>
-                </NativeButton>
-              )
-            })}
-          </nav>
+          <Tabs aria-label="Notification sections" selectedKey={activeTab} onSelectionChange={setActiveTab}>{tabs.map(tab => <Tab key={tab.id} title={<span className="flex items-center gap-2"><tab.icon className="w-4 h-4" aria-hidden="true" />{tab.name}</span>} />)}</Tabs>
         </div>
       </div>
 
       {/* Content */}
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+      <Surface className="bg-white rounded-lg shadow-md p-4 sm:p-6">
         {activeTab === 'send' && <SendNotificationTab userRole={userRole} userDepartment={userDepartment} />}
         {activeTab === 'scheduled' && <ScheduledNotificationsTab userRole={userRole} userDepartment={userDepartment} />}
         {activeTab === 'recurring' && <RecurringNotificationsTab userRole={userRole} userDepartment={userDepartment} />}
         {activeTab === 'history' && <NotificationHistoryTab userRole={userRole} userDepartment={userDepartment} />}
-      </div>
+      </Surface>
     </div>
   )
 }
@@ -465,7 +451,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
       {/* Create Modal */}
       <ModalPortal isOpen={showCreateModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <Heading3 className="text-lg font-semibold">Schedule Notification</Heading3>
               <NativeButton onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
@@ -574,7 +560,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
                 </LoadingButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>
@@ -790,7 +776,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
       {/* Create Modal */}
       <ModalPortal isOpen={showCreateModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <Heading3 className="text-lg font-semibold">Create Recurring Notification</Heading3>
               <NativeButton onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
@@ -1002,7 +988,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                 </LoadingButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>
@@ -1199,7 +1185,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
       {/* Detail Modal */}
       <ModalPortal isOpen={!!selectedNotification}>
         {selectedNotification && <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <Heading3 className="text-lg font-semibold">Notification Details</Heading3>
               <NativeButton onClick={() => setSelectedNotification(null)} className="text-gray-500 hover:text-gray-700">
@@ -1294,7 +1280,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
                 Close
               </NativeButton>
             </div>
-          </div>
+          </DialogSurface>
         </div>}
       </ModalPortal>
     </div>

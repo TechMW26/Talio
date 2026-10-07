@@ -1,4 +1,6 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading3, Heading2, NativeInput, NativeTextarea } from '@/components/ui/fernly/native'
@@ -186,12 +188,12 @@ export default function GeofenceLocationsPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white rounded-lg border-2 border-gray-200 p-4 space-y-3">
+            <Surface key={i} className="bg-white rounded-lg border-2 border-gray-200 p-4 space-y-3">
               <Skeleton className="h-6 w-40 rounded-lg" />
               <Skeleton className="h-4 w-full rounded-lg" />
               <Skeleton className="h-4 w-3/4 rounded-lg" />
               <Skeleton className="h-4 w-1/2 rounded-lg" />
-            </div>
+            </Surface>
           ))}
         </div>
       </div>
@@ -223,7 +225,7 @@ export default function GeofenceLocationsPage() {
       {/* Locations List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {locations.map(location => (
-          <div
+          <Surface
             key={location._id}
             className={`bg-white rounded-lg border-2 p-4 ${location.isPrimary ? 'border-primary-500' : 'border-gray-200'
               }`}
@@ -290,7 +292,7 @@ export default function GeofenceLocationsPage() {
                 )}
               </div>
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
 
@@ -305,7 +307,7 @@ export default function GeofenceLocationsPage() {
       {/* Modal */}
       <ModalPortal isOpen={showModal}>
         <div className="modal-overlay">
-          <div className="bg-white rounded-[30px] animate-modal-enter max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <DialogSurface className="bg-white rounded-[30px] animate-modal-enter max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <Heading2 className="text-xl font-bold text-gray-900">
                 {editingLocation ? 'Edit Location' : 'Add New Location'}
@@ -522,7 +524,7 @@ export default function GeofenceLocationsPage() {
                 </NativeButton>
               </div>
             </form>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>

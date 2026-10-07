@@ -10,7 +10,7 @@ import {
   Pagination,
   Spinner,
   Chip,
-} from '@heroui/react'
+} from '@/components/ui/fernly'
 import { cn } from '@/utils/cn'
 
 // Re-export HeroUI table components with HRMS prefix for composable usage

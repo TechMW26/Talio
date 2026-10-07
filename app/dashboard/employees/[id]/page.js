@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading2, NativeInput } from '@/components/ui/fernly/native'
@@ -46,9 +47,9 @@ function StatTile({ icon: Icon, label, value, accent = 'sky' }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br ${accents[accent]} p-4`}>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-white/70 dark:bg-zinc-900/70 flex items-center justify-center">
+        <Surface className="w-10 h-10 rounded-xl bg-white/70 dark:bg-zinc-900/70 flex items-center justify-center">
           <Icon className="w-5 h-5" />
-        </div>
+        </Surface>
         <div>
           <p className="text-[11px] uppercase tracking-wider opacity-70 font-semibold">{label}</p>
           <p className="text-base font-bold text-slate-800 dark:text-zinc-100">{value}</p>
@@ -527,7 +528,7 @@ export default function EmployeeDetailPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {aiGeneratedKRIs.map((kri, idx) => (
-                  <div
+                  <Surface
                     key={`${kri.title}-${idx}`}
                     className="p-4 rounded-2xl bg-white/80 dark:bg-zinc-900/80 border border-white/60 dark:border-zinc-800/60 backdrop-blur"
                   >
@@ -538,7 +539,7 @@ export default function EmployeeDetailPage() {
                       </Chip>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">{kri.description}</p>
-                  </div>
+                  </Surface>
                 ))}
               </div>
             )}

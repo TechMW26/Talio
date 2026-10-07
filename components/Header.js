@@ -25,7 +25,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   if (!mounted) {
     return (
       <header
-        className="talio-navigation-header w-full z-[40] transition-all duration-300 flex-shrink-0"
+        className="talio-navigation-header w-full transition-all duration-300 flex-shrink-0"
       >
         <div className="talio-navigation-header-row flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
@@ -50,7 +50,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
   return (
     <header
-      className="talio-navigation-header w-full z-[40] transition-all duration-300 flex-shrink-0"
+      className="talio-navigation-header w-full transition-all duration-300 flex-shrink-0"
     >
       <div className="talio-navigation-header-row flex items-center justify-between">
         {/* Left side - Hamburger (mobile/tablet) + Search pill */}

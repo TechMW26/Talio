@@ -1,4 +1,5 @@
 'use client';
+import { Surface } from '@/components/ui/fernly'
 
 
 
@@ -253,10 +254,10 @@ export default function JobDetailPage() {
                       const count = job.pipeline[stage] || 0;
                       if (count === 0 && !['applied', 'screening', 'interview', 'offer', 'hired'].includes(stage)) return null;
                       return (
-                        <div key={stage} className="text-center p-2 sm:p-3 rounded-lg bg-default-50">
+                        <Surface key={stage} className="text-center p-2 sm:p-3 rounded-lg bg-default-50">
                           <p className="text-lg sm:text-xl font-bold text-default-800">{count}</p>
                           <Chip size="sm" variant="flat" color={STAGE_COLORS[stage]} className="capitalize mt-1">{stage}</Chip>
-                        </div>
+                        </Surface>
                       );
                     })}
                   </div>

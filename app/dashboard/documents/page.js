@@ -1,4 +1,5 @@
 'use client'
+import { SummaryCard } from '@/components/ui/fernly'
 
 
 
@@ -254,14 +255,7 @@ export default function DocumentsPage() {
       {organisationView ? <p className="text-sm text-default-500 mb-6">Organisation documents · Employee files remain restricted to authorised Admin and HR users.</p> : <EmployeeOnboardingDocuments onSubmitted={refreshDocuments} />}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {['Identity', 'Personal', 'Employment', 'Tax', 'Other'].map((category) => (
-          <div key={category} className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-start mb-2">
-              <Heading3 className="text-sm font-medium text-gray-600">{category}</Heading3>
-            </div>
-            <div className="text-3xl font-bold text-gray-800">
-              {documents.filter(d => d.category === category.toLowerCase()).length}
-            </div>
-          </div>
+          <SummaryCard key={category} label={<>{category}</>} value={<>{documents.filter(d => d.category === category.toLowerCase()).length}</>} />
         ))}
       </div>
 

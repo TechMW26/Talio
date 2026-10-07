@@ -1,14 +1,16 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 
 import { UploadInput } from '@/components/ui/UploadButton'
-import { NativeButton, Heading3, Heading1, NativeSelect, NativeInput, Heading2, NativeTextarea } from '@/components/ui/fernly/native'
+import { NativeButton, Heading3, NativeSelect, NativeInput, Heading2, NativeTextarea } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Select, SelectItem, Button, Skeleton } from '@/components/ui/fernly'
+import { Select, SelectItem, Button, Skeleton, Card } from '@/components/ui/fernly'
 import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaCheck, FaBell, FaMoneyBillWave, FaSun, FaMoon, FaDesktop, FaFingerprint, FaSearch, FaMicrophone } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
@@ -18,6 +20,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
 import { saveCompanySettings, validateCompanyLogo } from '@/lib/client/companySettings'
+import SettingsWorkspace from '@/components/settings/SettingsWorkspace'
 import AttendanceMachinesSettings from '@/components/settings/AttendanceMachinesSettings'
 import MiraSettings from '@/components/settings/MiraSettings'
 import InductionSettings from '@/components/settings/InductionSettings'
@@ -50,7 +53,7 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
           <BackIcon className="w-5 h-5" />
           <span>Back to Companies</span>
         </NativeButton>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+        <Card className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
           <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
             {selectedCompany.logo ? (
               <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-full h-full object-contain" />
@@ -62,7 +65,7 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
             <Heading3 className="font-semibold text-gray-800">{selectedCompany.name}</Heading3>
             <p className="text-sm text-gray-500">{selectedCompany.code}</p>
           </div>
-        </div>
+        </Card>
       </div>
     )
   }
@@ -75,16 +78,17 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
       </div>
 
       {companies.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
+        <Card className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
           <FaBuilding className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <Heading3 className="text-lg font-medium text-gray-800">No companies found</Heading3>
           <p className="text-gray-500 mt-2">Create a company first in the Company Settings tab.</p>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {companies.map((company) => (
             <NativeButton
               key={company._id}
+              data-shape="card"
               onClick={() => onSelect(company)}
               className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-blue-200 transition-all text-left group overflow-hidden"
             >
@@ -112,7 +116,6 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('company')
-  const [settingsQuery, setSettingsQuery] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -160,19 +163,6 @@ export default function SettingsPage() {
     return baseTabs
   }, [userRole, isDepartmentHead, isFeatureEnabled])
 
-  const visibleTabs = useMemo(() => {
-    const query = settingsQuery.trim().toLocaleLowerCase()
-    if (!query) return tabs
-    return tabs.filter((tab) => [tab.name, tab.description, tab.group]
-      .some((value) => value?.toLocaleLowerCase().includes(query)))
-  }, [settingsQuery, tabs])
-
-  const groupedTabs = useMemo(() => visibleTabs.reduce((groups, tab) => {
-    if (!groups[tab.group]) groups[tab.group] = []
-    groups[tab.group].push(tab)
-    return groups
-  }, {}), [visibleTabs])
-
   const selectTab = (tabId) => {
     setActiveTab(tabId)
     if (typeof window === 'undefined') return
@@ -189,12 +179,8 @@ export default function SettingsPage() {
 
     if (requestedTab && tabs.some((tab) => tab.id === requestedTab)) {
       setActiveTab(requestedTab)
-    } else if (userRole === 'admin' || userRole === 'hr') {
-      setActiveTab('company')
-    } else if (userRole === 'department_head' || isDepartmentHead) {
-      setActiveTab('notifications')
     } else {
-      setActiveTab(tabs[0]?.id || null)
+      setActiveTab(tabs.some((tab) => tab.id === 'company') ? 'company' : tabs[0]?.id)
     }
   }, [userRole, isDepartmentHead, tabs])
 
@@ -235,17 +221,11 @@ export default function SettingsPage() {
     window.history.replaceState({}, '', nextUrl)
   }, [mounted])
 
-  // Show loading state while detecting device
+  // Match the menu/content layout while the client session becomes available.
   if (!mounted) {
     return (
-      <div className="page-container">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <Skeleton className="h-8 w-40 rounded-lg mb-2" />
-            <Skeleton className="h-4 w-56 rounded-lg" />
-          </div>
-        </div>
-        <Skeleton className="h-12 w-full rounded-xl mb-6" />
+      <div className="page-container grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] gap-7">
+        <Skeleton className="h-40 md:h-96 w-full rounded-xl" />
         <Skeleton className="h-96 w-full rounded-xl" />
       </div>
     )
@@ -253,84 +233,7 @@ export default function SettingsPage() {
 
   return (
     <div className="page-container talio-settings-page">
-      {/* Header */}
-      <div className="page-header mb-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-600">Workspace controls</p>
-          <Heading1 className="page-title mt-1">Settings</Heading1>
-          <p className="page-subtitle">Manage organisation policies, integrations, and your preferences.</p>
-        </div>
-      </div>
-
-      <div className="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <label className="talio-surface block lg:hidden">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-default-400">Settings section</span>
-          <NativeSelect
-            value={activeTab}
-            onChange={(event) => selectTab(event.target.value)}
-            className="w-full rounded-xl border border-default-200 bg-default-50 px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-primary-500"
-          >
-            {tabs.map((tab) => <option key={tab.id} value={tab.id}>{tab.name}</option>)}
-          </NativeSelect>
-        </label>
-
-        <aside className="talio-surface hidden lg:sticky lg:top-5 lg:block">
-          <label className="flex items-center gap-2 rounded-xl border border-default-200 bg-default-50 px-3 py-2.5">
-            <FaSearch className="h-3.5 w-3.5 flex-shrink-0 text-default-400" />
-            <NativeInput
-              value={settingsQuery}
-              onChange={(event) => setSettingsQuery(event.target.value)}
-              placeholder="Search settings"
-              aria-label="Search settings"
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-default-400"
-            />
-          </label>
-
-          <nav className="mt-4 space-y-4" aria-label="Settings sections">
-            {Object.entries(groupedTabs).map(([group, groupTabs]) => (
-              <div key={group}>
-                <p className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-default-400">{group}</p>
-                <div className="space-y-1">
-                  {groupTabs.map((tab) => {
-                    const Icon = tab.icon
-                    const selected = activeTab === tab.id
-                    return (
-                      <NativeButton
-                        key={tab.id}
-                        type="button"
-                        onClick={() => selectTab(tab.id)}
-                        aria-current={selected ? 'page' : undefined}
-                        className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${selected ? 'bg-primary-500 text-primary-foreground' : 'text-foreground hover:bg-default-100'}`}
-                      >
-                        <span className="flex items-start gap-3">
-                          <Icon className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'text-primary-foreground' : 'text-primary-500'}`} />
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold">{tab.name}</span>
-                            <span className={`mt-0.5 block text-xs leading-4 ${selected ? 'text-primary-foreground opacity-80' : 'text-default-500'}`}>{tab.description}</span>
-                          </span>
-                        </span>
-                      </NativeButton>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          {visibleTabs.length === 0 && (
-            <div className="py-8 text-center">
-              <p className="text-sm font-medium text-foreground">No settings found</p>
-              <NativeButton type="button" onClick={() => setSettingsQuery('')} className="mt-2 text-xs font-semibold text-primary-600">Clear search</NativeButton>
-            </div>
-          )}
-        </aside>
-
-        {/* Content */}
-        <section className="talio-surface min-w-0" aria-live="polite">
-          <div className="mb-6 border-b border-default-200 pb-4">
-            <Heading2 className="text-xl font-bold text-foreground">{tabs.find((tab) => tab.id === activeTab)?.name}</Heading2>
-            <p className="mt-1 text-sm text-default-500">{tabs.find((tab) => tab.id === activeTab)?.description}</p>
-          </div>
+      <SettingsWorkspace tabs={tabs} activeTab={activeTab} onSelect={selectTab}>
           {activeTab === 'company' && <CompanySettingsTab />}
           {activeTab === 'recruitment' && <div className="space-y-6"><WordPressRecruitmentSettings /><RecruitmentSettingsTab /></div>}
           {activeTab === 'geofencing' && <GeofencingTab />}
@@ -340,8 +243,7 @@ export default function SettingsPage() {
           {activeTab === 'mira' && <MiraSettings />}
           {activeTab === 'induction' && <InductionSettings />}
           {activeTab === 'productivity' && userRole === 'admin' && <ProductivitySettings />}
-        </section>
-      </div>
+      </SettingsWorkspace>
     </div>
   )
 }
@@ -909,7 +811,7 @@ function CompanySettingsTab() {
 
       {/* Companies Grid */}
       {companies.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
+        <Card className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
           <FaBuilding className="mx-auto h-12 w-12 text-gray-400" />
           <Heading3 className="mt-4 text-lg font-medium text-gray-800">No companies yet</Heading3>
           <p className="mt-2 text-sm text-gray-500">Get started by adding your first company.</p>
@@ -920,11 +822,11 @@ function CompanySettingsTab() {
           >
             Add Company
           </Button>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {companies.map((company) => (
-            <div
+            <Card
               key={company._id}
               className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer overflow-hidden"
               onClick={() => handleOpenModal(company)}
@@ -986,7 +888,7 @@ function CompanySettingsTab() {
                   Delete
                 </NativeButton>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -1016,13 +918,13 @@ function CompanySettingsTab() {
                     <span>Company Logo</span>
                   </div>
                   <div className="flex items-center gap-6">
-                    <div className="w-24 h-24 border-2 border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                    <Surface className="w-24 h-24 border-2 border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center">
                       {logoPreview ? (
                         <img src={logoPreview} alt="Company Logo" className="max-w-full max-h-full object-contain" />
                       ) : (
                         <FaBuilding className="w-8 h-8 text-gray-400" />
                       )}
-                    </div>
+                    </Surface>
                     <div className="flex-1">
                       <UploadInput
                         type="file"
@@ -1558,7 +1460,7 @@ function GeofenceLocationsManager({ companyId }) {
   }
 
   return (
-    <div className="bg-white rounded-lg">
+    <Card className="bg-white rounded-lg">
       <div className="flex justify-between items-center mb-6">
         <div>
           <Heading3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -1655,7 +1557,7 @@ function GeofenceLocationsManager({ companyId }) {
             setEditingLocation(null)
           }}
         >
-          <div
+          <DialogSurface
             className="rounded-[30px] animate-modal-enter shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col bg-white border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1846,11 +1748,11 @@ function GeofenceLocationsManager({ companyId }) {
                 {editingLocation ? '✓ Update Location' : '+ Add Location'}
               </NativeButton>
             </div>
-          </div>
+          </DialogSurface>
         </div>,
         document.body
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -2032,7 +1934,7 @@ function GeofencingTab() {
         <GeofenceLocationsManager companyId={selectedCompany._id} />
 
         {/* Geofence Options */}
-        <div className="bg-white rounded-lg">
+        <Card className="bg-white rounded-lg">
           <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <span>Geofence Enforcement Options</span>
           </Heading3>
@@ -2098,10 +2000,10 @@ function GeofencingTab() {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Break Timings */}
-        <div className="bg-white rounded-lg">
+        <Card className="bg-white rounded-lg">
           <div className="flex justify-between items-center mb-4">
             <div>
               <Heading3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -2198,7 +2100,7 @@ function GeofencingTab() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
 
         <div className="flex justify-end pt-4 border-t border-gray-200">
           <LoadingButton
@@ -2576,7 +2478,7 @@ function PayrollSettingsTab() {
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* General Settings */}
-        <div className="bg-white rounded-lg">
+        <Card className="bg-white rounded-lg">
           <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             General Settings
           </Heading3>
@@ -2596,10 +2498,10 @@ function PayrollSettingsTab() {
               <p className="text-xs text-gray-500 mt-1">Used to calculate daily salary rate</p>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Attendance-Based Deductions */}
-        <div className="bg-white rounded-lg">
+        <Card className="bg-white rounded-lg">
           <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             Attendance-Based Deductions
           </Heading3>
@@ -2747,10 +2649,10 @@ function PayrollSettingsTab() {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Overtime Settings */}
-        <div className="bg-white rounded-lg">
+        <Card className="bg-white rounded-lg">
           <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             Overtime Settings
           </Heading3>
@@ -2799,10 +2701,10 @@ function PayrollSettingsTab() {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Statutory Deductions */}
-        <div className="bg-white rounded-lg">
+        <Card className="bg-white rounded-lg">
           <Heading3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             Statutory Deductions
           </Heading3>
@@ -2919,28 +2821,28 @@ function PayrollSettingsTab() {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Summary Preview */}
         <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-6 border border-blue-200 dark:border-blue-800">
-          <Heading3 className="text-lg font-semibold text-gray-900 mb-4">📊 Settings Summary</Heading3>
+          <Heading3 className="text-lg font-semibold text-gray-900 mb-4">Settings Summary</Heading3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="bg-white p-3 rounded-lg">
+            <Surface className="bg-white p-3 rounded-lg">
               <p className="text-gray-500">Working Days</p>
               <p className="font-semibold text-gray-900">{payroll.workingDaysPerMonth || 26} days/month</p>
-            </div>
-            <div className="bg-white p-3 rounded-lg">
+            </Surface>
+            <Surface className="bg-white p-3 rounded-lg">
               <p className="text-gray-500">Grace Lates</p>
               <p className="font-semibold text-gray-900">{payroll.lateDeduction?.graceLatesPerMonth || 3} per month</p>
-            </div>
-            <div className="bg-white p-3 rounded-lg">
+            </Surface>
+            <Surface className="bg-white p-3 rounded-lg">
               <p className="text-gray-500">Overtime Rate</p>
               <p className="font-semibold text-gray-900">{payroll.overtime?.rateMultiplier || 1.5}x</p>
-            </div>
-            <div className="bg-white p-3 rounded-lg">
+            </Surface>
+            <Surface className="bg-white p-3 rounded-lg">
               <p className="text-gray-500">PF Rate</p>
               <p className="font-semibold text-gray-900">{payroll.pfPercentage || 12}%</p>
-            </div>
+            </Surface>
           </div>
         </div>
 
@@ -3211,7 +3113,7 @@ function NotificationsTab() {
       )}
 
       <form onSubmit={handleSave} className="space-y-4">
-        <div className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200 shadow-sm">
+        <Card className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200 shadow-sm">
           <Heading2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Email Notifications</Heading2>
           <p className="text-sm text-gray-600 mb-6">
             Choose which activities should send emails to employees.
@@ -3369,7 +3271,7 @@ function NotificationsTab() {
               })}
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Action buttons */}
         <div className="flex items-center justify-between gap-3">
@@ -3393,10 +3295,10 @@ function NotificationsTab() {
         </div>
       </form>
 
-      <div className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200 shadow-sm">
+      <Card className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200 shadow-sm">
         <Heading2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Push Notifications</Heading2>
         <NotificationManagement />
-      </div>
+      </Card>
     </div>
   )
 }

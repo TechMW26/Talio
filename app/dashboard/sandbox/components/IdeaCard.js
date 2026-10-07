@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading3, NativeButton, NativeInput } from '@/components/ui/fernly/native'
@@ -153,7 +154,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
   const voteScore = (idea.likes || 0) - (idea.dislikes || 0)
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border transition-all ${idea.isPinned
+    <Surface className={`bg-white rounded-xl shadow-sm border transition-all ${idea.isPinned
         ? 'border-amber-300 ring-1 ring-amber-200'
         : 'border-gray-100 hover:shadow-md'
       }`}>
@@ -373,6 +374,6 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
           </div>
         )}
       </div>
-    </div>
+    </Surface>
   )
 }

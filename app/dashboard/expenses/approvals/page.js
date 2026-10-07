@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3 } from '@/components/ui/fernly/native'
@@ -67,7 +68,7 @@ export default function ExpenseApprovalsPage() {
         </div>
         <div className="grid gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-200 space-y-3">
+            <Surface key={i} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-200 space-y-3">
               <div className="flex gap-3">
                 <Skeleton className="w-16 h-5 rounded" />
                 <Skeleton className="w-24 h-5 rounded" />
@@ -81,7 +82,7 @@ export default function ExpenseApprovalsPage() {
               </div>
               <Skeleton className="h-5 w-40 rounded-lg" />
               <Skeleton className="h-8 w-24 rounded-lg" />
-            </div>
+            </Surface>
           ))}
         </div>
       </div>
@@ -107,14 +108,14 @@ export default function ExpenseApprovalsPage() {
       </div>
 
       {expenses.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+        <Surface className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
           <FaFileInvoiceDollar className="mx-auto text-4xl mb-4 text-gray-300" />
           <p>No pending expense requests found.</p>
-        </div>
+        </Surface>
       ) : (
         <div className="grid gap-4">
           {expenses.map((expense) => (
-            <div key={expense._id} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-400">
+            <Surface key={expense._id} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-400">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
@@ -173,7 +174,7 @@ export default function ExpenseApprovalsPage() {
                   </LoadingButton>
                 </div>
               </div>
-            </div>
+            </Surface>
           ))}
         </div>
       )}

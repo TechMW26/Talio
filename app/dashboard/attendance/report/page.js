@@ -1,4 +1,6 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading2, Heading1, NativeInput, Heading3, NativeButton } from '@/components/ui/fernly/native'
@@ -839,13 +841,13 @@ export default function AttendanceReportPage() {
                     </div>
 
                     <div className="space-y-3">
-                      <div className="flex justify-between items-center p-3 bg-default-50 rounded-lg">
+                      <Surface className="flex justify-between items-center p-3 bg-default-50 rounded-lg">
                         <div>
                           <span className="text-sm text-default-700">Scheduled Hours</span>
                           <p className="text-xs text-default-400">{reportData.overview.expectedAttendance} employee-days × 8h</p>
                         </div>
                         <span className="font-semibold text-default-800">{reportData.workHours.scheduled}h</span>
-                      </div>
+                      </Surface>
                       <div className="flex justify-between items-center p-3 bg-success-50 rounded-lg">
                         <span className="text-sm text-success-700">Actual Work Hours</span>
                         <span className="font-semibold text-success-800">{reportData.workHours.total}h</span>
@@ -876,10 +878,10 @@ export default function AttendanceReportPage() {
                         <span className="text-sm text-warning-700">Early Departures</span>
                         <span className="font-semibold text-warning-800">{reportData.shrinkage.breakdown.earlyDeparture} instances</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-default-50 rounded-lg">
+                      <Surface className="flex justify-between items-center p-3 bg-default-50 rounded-lg">
                         <span className="text-sm text-default-700">Other Unproductive</span>
                         <span className="font-semibold text-default-800">{reportData.shrinkage.breakdown.unproductive}h</span>
-                      </div>
+                      </Surface>
                     </div>
                   </div>
                 </div>
@@ -903,7 +905,7 @@ export default function AttendanceReportPage() {
 
                 {expandedSections.departmentBreakdown && (
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <NativeTable className="w-full">
                       <thead className="bg-default-50 border-b border-divider">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Department</th>
@@ -928,7 +930,7 @@ export default function AttendanceReportPage() {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                    </NativeTable>
                   </div>
                 )}
               </CardBody>
@@ -965,7 +967,7 @@ export default function AttendanceReportPage() {
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <NativeTable className="w-full">
                       <thead className="bg-default-50 border-b border-divider">
                         <tr>
                           <th className="px-3 py-3 text-left text-xs font-medium text-default-500 uppercase">Punches</th>
@@ -1037,8 +1039,8 @@ export default function AttendanceReportPage() {
                                 {emp.records.length === 0 ? (
                                   <p className="text-sm text-default-500">No punch records exist for this employee in the selected period.</p>
                                 ) : (
-                                  <div className="overflow-x-auto rounded-xl border border-divider bg-content1">
-                                    <table className="w-full min-w-[720px] text-sm">
+                                  <Surface className="overflow-x-auto rounded-xl border border-divider bg-content1">
+                                    <NativeTable className="w-full min-w-[720px] text-sm">
                                       <thead className="bg-default-100/70 text-default-500">
                                         <tr>
                                           <th className="px-4 py-2 text-left">Date</th>
@@ -1063,8 +1065,8 @@ export default function AttendanceReportPage() {
                                             </tr>
                                           ))}
                                       </tbody>
-                                    </table>
-                                  </div>
+                                    </NativeTable>
+                                  </Surface>
                                 )}
                               </td>
                             </tr>
@@ -1072,7 +1074,7 @@ export default function AttendanceReportPage() {
                           </Fragment>
                         ))}
                       </tbody>
-                    </table>
+                    </NativeTable>
                   </div>
                 </>
               )}

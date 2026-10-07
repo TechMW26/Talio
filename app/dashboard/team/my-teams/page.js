@@ -1,4 +1,5 @@
 'use client'
+import { Surface, SummaryCard } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3, NativeButton, NativeInput } from '@/components/ui/fernly/native'
@@ -127,10 +128,10 @@ export default function MyTeamsPage() {
         <div className="flex items-center mb-6">
           <Heading1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Teams</Heading1>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-8 text-center">
+        <Surface className="bg-white rounded-xl shadow-md p-8 text-center">
           <Heading3 className="text-lg font-semibold text-gray-700 mb-2">No Teams Found</Heading3>
           <p className="text-gray-500">You are not leading any teams yet.</p>
-        </div>
+        </Surface>
       </div>
     )
   }
@@ -172,7 +173,7 @@ export default function MyTeamsPage() {
 
         {/* Search */}
         {teamMembers.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <Surface className="bg-white rounded-lg shadow-md p-4 mb-6">
             <div className="input-with-icon">
               <FaSearch className="input-icon" />
               <NativeInput
@@ -183,14 +184,14 @@ export default function MyTeamsPage() {
                 className="input input-search"
               />
             </div>
-          </div>
+          </Surface>
         )}
 
         {/* Members */}
         {teamDetailLoading && selectedTeamId !== ASSIGNED_TEAM_ID ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md p-6 space-y-3">
+              <Surface key={i} className="bg-white rounded-lg shadow-md p-6 space-y-3">
                 <div className="flex items-center gap-3">
                   <Skeleton className="w-12 h-12 rounded-full" />
                   <div>
@@ -200,21 +201,21 @@ export default function MyTeamsPage() {
                 </div>
                 <Skeleton className="h-3 w-3/4 rounded-lg" />
                 <Skeleton className="h-3 w-1/2 rounded-lg" />
-              </div>
+              </Surface>
             ))}
           </div>
         ) : filteredMembers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <Surface className="bg-white rounded-lg shadow-md p-8 text-center">
             <FaUsers className="text-gray-400 text-4xl mx-auto mb-4" />
             <Heading3 className="text-lg font-semibold text-gray-700 mb-2">No Members Found</Heading3>
             <p className="text-gray-600">
               {searchTerm ? 'Try adjusting your search' : 'This team has no members yet'}
             </p>
-          </div>
+          </Surface>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredMembers.map((member) => (
-              <div
+              <Surface
                 key={member._id}
                 onClick={() => router.push(`/dashboard/team/members/${member._id}`)}
                 className="bg-white rounded-lg shadow-md p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow"
@@ -285,7 +286,7 @@ export default function MyTeamsPage() {
                   <FaChartLine className="mr-2" />
                   View Details
                 </NativeButton>
-              </div>
+              </Surface>
             ))}
           </div>
         )}
@@ -311,22 +312,12 @@ export default function MyTeamsPage() {
       </div>
 
       {/* Summary */}
-      <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600 font-medium">Teams You Lead</p>
-            <p className="text-3xl font-bold text-gray-900">{displayTeams.length}</p>
-          </div>
-          <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center">
-            <FaUserFriends className="text-primary-500 text-2xl" />
-          </div>
-        </div>
-      </div>
+      <SummaryCard  className="mb-6" label={<>Teams You Lead</>} value={<>{displayTeams.length}</>} />
 
       {/* Team Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {displayTeams.map((team) => (
-          <div
+          <Surface
             key={team._id}
             onClick={() => handleTeamSelect(team._id)}
             className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-primary-300 group"
@@ -334,9 +325,9 @@ export default function MyTeamsPage() {
             {/* Team Color Header */}
             <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-t-xl p-4">
               <div className="flex items-center justify-between">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <Surface className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
                   <FaUserFriends className="text-white text-lg" />
-                </div>
+                </Surface>
                 {team.isCrossDepartment && (
                   <Chip size="sm" variant="flat" className="bg-white/20 text-white text-xs">
                     Cross-Dept
@@ -374,7 +365,7 @@ export default function MyTeamsPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
     </div>

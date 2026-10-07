@@ -14,6 +14,9 @@
 }
 :root {
   --dashboard-shell-inset: 12px;
+  --dashboard-navigation-inset: 6px;
+  --dashboard-rail-width: 88px;
+  --dashboard-expanded-width: 19rem;
   --dashboard-shell-radius: 22px;
   --dashboard-shell-motion: 360ms cubic-bezier(.22, 1, .36, 1);
   --dashboard-font: var(--font-montserrat);
@@ -33,13 +36,14 @@
 /* One floating geometry source for both navigation states and the header.
  * Do not transform/filter the header: its search and MIRA overlays must keep
  * their existing viewport positioning and interactive desktop drag regions. */
-.dashboard-floating-shell { height: 100dvh; padding: var(--dashboard-shell-inset); gap: 12px; }
+.dashboard-floating-shell { height: 100dvh; padding: var(--dashboard-navigation-inset) var(--dashboard-shell-inset); gap: 12px; }
 .dashboard-floating-shell > :last-child { min-height: 0; }
 .dashboard-floating-shell .talio-navigation-header {
   --dashboard-header-inset: 10px;
   --dashboard-header-control-height: 42px;
   --dashboard-header-control-radius: max(0px, calc(var(--dashboard-shell-radius) - var(--dashboard-header-inset) - 1px));
   position: relative;
+  z-index: 80;
   height: auto;
   padding: var(--dashboard-header-inset);
   margin-bottom: 12px;
@@ -62,13 +66,23 @@
   transition: transform var(--dashboard-shell-motion), opacity var(--dashboard-shell-motion), visibility 360ms;
 }
 .talio-floating-rail { transform-origin: left center; }
+.talio-floating-rail, .talio-floating-expanded {
+  top: var(--dashboard-navigation-inset);
+  bottom: var(--dashboard-navigation-inset);
+  left: var(--dashboard-navigation-inset);
+  height: calc(100dvh - 2 * var(--dashboard-navigation-inset));
+}
+.talio-floating-rail { width: var(--dashboard-rail-width); }
+.talio-floating-expanded { width: var(--dashboard-expanded-width); }
+/* Account for the rail's smaller left inset without shifting the content over it. */
+.talio-sidebar-spacer { width: calc(var(--dashboard-rail-width) + var(--dashboard-navigation-inset) - var(--dashboard-shell-inset)); }
 .talio-floating-rail[data-open="false"] { transform: translateX(-24px) scale(.94); opacity: 0; visibility: hidden; pointer-events: none; }
 .talio-floating-expanded[data-open="false"] { transform: translateX(-36px) scale(.97); opacity: 0; visibility: hidden; pointer-events: none; }
 .talio-floating-rail[data-open="true"], .talio-floating-expanded[data-open="true"] { transform: none; opacity: 1; visibility: visible; }
 .talio-floating-mobile-sidebar { width: min(288px, calc(100vw - 2 * var(--dashboard-shell-inset))); }
 .talio-floating-mobile-sidebar[data-open="false"] { opacity: 0; visibility: hidden; pointer-events: none; }
 .talio-floating-mobile-sidebar[data-open="true"] { opacity: 1; visibility: visible; }
-@media (max-width: 639px) { :root { --dashboard-shell-inset: 8px; --dashboard-shell-radius: 18px; } .dashboard-floating-shell { gap: 8px; } }
+@media (max-width: 639px) { :root { --dashboard-shell-inset: 8px; --dashboard-navigation-inset: 8px; --dashboard-shell-radius: 18px; } .dashboard-floating-shell { gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .talio-floating-rail, .talio-floating-expanded, .talio-floating-mobile-sidebar { transition: none; } }
 @media (min-width: 640px) {
   :root { --dashboard-gutter-x: 24px; --dashboard-gutter-bottom: 56px; }

@@ -1,4 +1,6 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeInput, Heading3, Heading2 } from '@/components/ui/fernly/native'
@@ -165,17 +167,7 @@ export default function EmployeeCheckinsPage() {
           { title: 'In Progress', value: stats.inProgress, color: 'secondary', icon: FaClock },
           { title: 'Absent', value: stats.absent, color: 'danger', icon: FaUsers },
         ].map((stat, index) => (
-          <Card key={index} className="shadow-md">
-            <CardBody className="flex flex-row items-center justify-between p-3 sm:p-6">
-              <div className="flex-1 min-w-0">
-                <p className="text-default-500 text-xs sm:text-sm font-medium truncate">{stat.title}</p>
-                <Heading3 className="text-xl sm:text-2xl font-bold text-default-800 mt-1 sm:mt-2">{stat.value}</Heading3>
-              </div>
-              <div className={`bg-${stat.color} p-2 sm:p-4 rounded-lg flex-shrink-0`}>
-                <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-              </div>
-            </CardBody>
-          </Card>
+          <SummaryCard key={index} label={<>{stat.title}</>} value={<>{stat.value}</>} />
         ))}
       </div>
 
@@ -216,7 +208,7 @@ export default function EmployeeCheckinsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-divider">
+              <NativeTable className="min-w-full divide-y divide-divider">
                 <thead className="bg-default-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
@@ -324,7 +316,7 @@ export default function EmployeeCheckinsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </NativeTable>
             </div>
           )}
         </CardBody>

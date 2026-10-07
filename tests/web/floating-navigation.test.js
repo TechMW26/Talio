@@ -55,3 +55,36 @@ test('closed mobile navigation cannot intercept clicks or keyboard focus', () =>
   expect(css).toContain('width: min(288px, calc(100vw - 2 * var(--dashboard-shell-inset)))')
   expect(css).toContain('.talio-floating-mobile-sidebar[data-open="false"] { opacity: 0; visibility: hidden; pointer-events: none; }')
 })
+
+test('both desktop sidebar states share taller left-aligned geometry with space for native mac controls', () => {
+  const css = read('app/dashboard/dashboard-layout.css')
+  expect(css).toContain('--dashboard-navigation-inset: 6px')
+  expect(css).toContain('--dashboard-rail-width: 88px')
+  expect(css).toContain('--dashboard-expanded-width: 19rem')
+  expect(css).toContain('.talio-floating-rail, .talio-floating-expanded {')
+  expect(css).toContain('height: calc(100dvh - 2 * var(--dashboard-navigation-inset))')
+  expect(css).toContain('width: calc(var(--dashboard-rail-width) + var(--dashboard-navigation-inset) - var(--dashboard-shell-inset))')
+  expect(read('components/Sidebar.js')).toContain('talio-sidebar-spacer hidden lg:block flex-shrink-0')
+  expect(read('components/sidebar/IconStrip.js')).not.toContain('w-[4.5rem]')
+  expect(read('components/sidebar/SlidingSidebar.js')).not.toContain('w-[18rem]')
+  // The existing native app clearance keeps the logo and expand control below the lights.
+  expect(read('desktop-app/src/main.js')).toContain('padding-top: 38px !important')
+})
+
+test('navigation sits above the header and its dismissal backdrop covers header actions', () => {
+  const css = read('app/dashboard/dashboard-layout.css')
+  expect(css).toContain('z-index: 80')
+  expect(read('components/sidebar/IconStrip.js')).toContain('fixed z-[100]')
+  expect(read('components/sidebar/SlidingSidebar.js')).toContain('fixed z-[120]')
+  expect(read('components/sidebar/SlidingSidebar.js')).toContain('fixed inset-0 z-[110]')
+  expect(read('components/Sidebar.js')).toContain('fixed z-[120]')
+  expect(read('components/Sidebar.js')).toContain('fixed inset-0 z-[110]')
+})
+
+test('equal sidebar insets and the no-scroll page bottom share the shell baseline', () => {
+  const css = read('app/dashboard/dashboard-layout.css')
+  expect(css).toMatch(/\.talio-floating-rail, \.talio-floating-expanded \{\s*top: var\(--dashboard-navigation-inset\);\s*bottom: var\(--dashboard-navigation-inset\);/)
+  expect(css).toContain('padding: var(--dashboard-navigation-inset) var(--dashboard-shell-inset)')
+  expect(css).toContain('.dashboard-content-frame:has([data-page-sizing="viewport"]):has([data-dashboard-home]) { padding-bottom: 0; }')
+  expect(css).toContain('--dashboard-navigation-inset: 8px')
+})

@@ -86,7 +86,7 @@ Demo = WhatsApp meeting link। Phone call पर demo नहीं। Time assu
 
 Talio — AI HRMS, 15 modules, एक platform।
 Core: Attendance (geofence+GPS), Leave, Payroll (TDS/GST/PF/ESI/PT), Performance (KRA/KPI/OKR/360)
-Advanced: MIRA AI, Productivity (desktop app, screenshots, AI score), Recruitment ATS, Projects+Tasks, Chat, Meetings (AI transcription), Whiteboard (AI analysis), Expenses, Assets, Helpdesk, Documents, LMS
+Advanced: MIRA AI, Productivity (desktop app, screenshots, AI score), Recruitment ATS, Projects+Tasks, Chat, Meetings (AI transcription), Whiteboard (AI analysis), Expenses, Assets, Helpdesk, Documents
 Mobile: iOS + Android। Security: AES-256, isolated DBs, role-based access।
 
 # Guardrails

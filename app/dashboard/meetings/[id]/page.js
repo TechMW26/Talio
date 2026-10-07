@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading2, NativeButton, Heading1, NativeInput, Heading3 } from '@/components/ui/fernly/native'
@@ -410,7 +411,7 @@ export default function MeetingDetailPage({ params }) {
         </div>
 
         {/* Main Content */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+        <Surface className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
           {/* Meeting Header */}
           <div className={`border-b border-gray-200 dark:border-gray-800 px-5 py-5 ${meeting.type === 'online' ? 'bg-indigo-50 dark:bg-slate-950' : 'bg-amber-50 dark:bg-slate-950'}`}>
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -757,7 +758,7 @@ export default function MeetingDetailPage({ params }) {
                   <div className="flex flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/45">
                     <div className="h-full min-h-0 flex-1 overflow-y-auto space-y-3 pr-1">
                     {meeting.transcript.map((segment, index) => (
-                      <div key={index} className="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+                      <Surface key={index} className="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
                         <div className="flex items-center justify-between gap-3 mb-1">
                           <p className="text-xs text-gray-500 dark:text-gray-300">
                             {segment.speakerName || 'Unknown'}
@@ -767,7 +768,7 @@ export default function MeetingDetailPage({ params }) {
                           </p>
                         </div>
                         <p className="text-gray-900 dark:text-white">{segment.text}</p>
-                      </div>
+                      </Surface>
                     ))}
                     </div>
                   </div>
@@ -978,7 +979,7 @@ export default function MeetingDetailPage({ params }) {
               </div>
             )}
           </div>
-        </div>
+        </Surface>
       </div>
 
       {/* Delete Confirmation Modal */}

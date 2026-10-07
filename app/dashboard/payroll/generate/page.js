@@ -1,4 +1,6 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading2, NativeButton, NativeInput, Heading3 } from '@/components/ui/fernly/native'
@@ -828,34 +830,34 @@ export default function GeneratePayrollPage() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 text-sm">
-              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+              <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase mb-1">Working Days/Month</p>
                 <p className="font-semibold text-foreground">{payrollConfig.workingDaysPerMonth || 26}</p>
-              </div>
-              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase mb-1">Full Day Threshold</p>
                 <p className="font-semibold text-foreground">{companySettings.fullDayThreshold || 7.5} hrs</p>
-              </div>
-              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase mb-1">Holidays This Month</p>
                 <p className="font-semibold text-success-600">{holidayData.length} days</p>
-              </div>
+              </Surface>
               {payrollConfig.pfEnabled && (
-                <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                   <p className="text-xs text-default-500 uppercase mb-1">PF Deduction</p>
                   <p className="font-semibold text-foreground">{payrollConfig.pfPercentage || 12}%</p>
-                </div>
+                </Surface>
               )}
               {payrollConfig.professionalTax?.enabled && (
-                <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                <Surface className="bg-content1 p-3 rounded-lg shadow-sm">
                   <p className="text-xs text-default-500 uppercase mb-1">Professional Tax</p>
                   <p className="font-semibold text-foreground">{formatCurrency(payrollConfig.professionalTax.amount || 200)}</p>
-                </div>
+                </Surface>
               )}
             </div>
 
             {/* Salary Calculation Rules */}
-            <div className="mt-4 p-4 bg-content1 rounded-lg">
+            <Surface className="mt-4 p-4 bg-content1 rounded-lg">
               <p className="text-sm font-medium text-foreground mb-3">How Salary is Calculated:</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -880,7 +882,7 @@ export default function GeneratePayrollPage() {
               <div className="mt-3 p-2 bg-success-50 rounded text-xs text-success-700">
                 <strong>Formula:</strong> Per-Day Salary = Gross Salary ÷ Working Days (rounded up) | Net Salary = (Per-Day × Paid Days) - Statutory Deductions
               </div>
-            </div>
+            </Surface>
           </HRMSCardBody>
         </HRMSCard>
       )}
@@ -974,7 +976,7 @@ export default function GeneratePayrollPage() {
           <HRMSCardBody>
             {/* Filters Section */}
             {showFilters && (
-              <div className="mb-4 p-4 bg-default-50 rounded-lg">
+              <Surface className="mb-4 p-4 bg-default-50 rounded-lg">
                 <div className="flex flex-col md:flex-row gap-4">
                   {/* Search Box */}
                   <div className="flex-1">
@@ -1029,7 +1031,7 @@ export default function GeneratePayrollPage() {
                     </div>
                   )}
                 </div>
-              </div>
+              </Surface>
             )}
 
             {/* Department-Based Employee List */}
@@ -1083,7 +1085,7 @@ export default function GeneratePayrollPage() {
                     {/* Employees in Department */}
                     {isExpanded && (
                       <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <NativeTable className="w-full text-sm">
                           <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
                               <th className="px-4 py-2 text-left w-10">
@@ -1171,7 +1173,7 @@ export default function GeneratePayrollPage() {
                               )
                             })}
                           </tbody>
-                        </table>
+                        </NativeTable>
                       </div>
                     )}
                     </div>
@@ -1203,30 +1205,30 @@ export default function GeneratePayrollPage() {
           <HRMSCardBody className="p-0">
             {/* Summary Cards - Simplified Addition-Based */}
             <div className="grid gap-4 p-4 bg-default-50 border-b border-default-200 grid-cols-2 md:grid-cols-5">
-              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+              <Surface className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Working Days</p>
                 <p className="text-xl font-bold text-foreground">{payrollConfig.workingDaysPerMonth || 26}</p>
-              </div>
-              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Total Paid Days</p>
                 <p className="text-xl font-bold text-primary">{summaryTotals.totalPaidDays}</p>
-              </div>
-              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Earned Salary</p>
                 <p className="text-xl font-bold text-success">{formatCurrency(summaryTotals.earnedSalary)}</p>
-              </div>
-              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+              </Surface>
+              <Surface className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Total Deductions</p>
                 <p className="text-xl font-bold text-red-600">{formatCurrency(summaryTotals.totalDeductions)}</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-green-200">
+              </Surface>
+              <Surface className="bg-white p-4 rounded-lg shadow-sm border-2 border-green-200">
                 <p className="text-xs text-green-600 uppercase">Net Payable</p>
                 <p className="text-xl font-bold text-green-600">{formatCurrency(summaryTotals.netSalary)}</p>
-              </div>
+              </Surface>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <NativeTable className="w-full text-xs">
                 <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
                     <th className="px-3 py-3 text-left font-semibold text-gray-700 sticky left-0 bg-gray-100 min-w-[180px]">Employee</th>
@@ -1293,7 +1295,7 @@ export default function GeneratePayrollPage() {
                     <td className="px-3 py-3 text-right font-bold text-green-700 bg-green-200">{formatCurrency(summaryTotals.netSalary)}</td>
                   </tr>
                 </tfoot>
-              </table>
+              </NativeTable>
             </div>
 
             {/* Pending Leaves Warning Section */}
@@ -1308,7 +1310,7 @@ export default function GeneratePayrollPage() {
                     </p>
                     <div className="space-y-2">
                       {selectedEmployeesPendingLeaves.map((warning, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-content1 rounded-lg px-3 py-2 border border-warning-200">
+                        <Surface key={idx} className="flex items-center justify-between bg-content1 rounded-lg px-3 py-2 border border-warning-200">
                           <div>
                             <span className="font-medium text-foreground">{warning.employeeName}</span>
                             <span className="text-default-500 text-xs ml-2">({warning.employeeCode})</span>
@@ -1319,7 +1321,7 @@ export default function GeneratePayrollPage() {
                               {new Date(warning.startDate).toLocaleDateString()} - {new Date(warning.endDate).toLocaleDateString()}
                             </span>
                           </div>
-                        </div>
+                        </Surface>
                       ))}
                     </div>
                   </div>

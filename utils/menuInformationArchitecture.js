@@ -45,7 +45,7 @@ const CATEGORY_DEFINITIONS = [
     name: 'People',
     description: 'Employees, teams, hiring and growth',
     icon: HiOutlineUsers,
-    members: ['Employees', 'Organogram', 'Team', 'My Teams', 'Live Users', 'Performance', 'Recruitment', 'Manpower Requests', 'Learning', 'Learning (LMS)'],
+    members: ['Employees', 'Organogram', 'Team', 'My Teams', 'Live Users', 'Performance', 'Recruitment', 'Manpower Requests'],
   },
   {
     id: 'communication',

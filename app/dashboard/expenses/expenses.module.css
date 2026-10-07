@@ -1,0 +1,13 @@
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { border: 1px solid var(--color-border, #303030); }
+.metric { padding: 24px; gap: 10px; }
+.label { color: var(--color-text-secondary, #a1a1aa); font-size: 14px; font-weight: 500; }
+.value { color: var(--color-text-primary, #fafafa); font-size: clamp(24px, 2.2vw, 32px); font-weight: 600; letter-spacing: -.025em; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tableHeading { padding: 20px 24px; border-bottom: 1px solid var(--color-border, #303030); }
+.table { width: 100%; color: var(--color-text-primary, #fafafa); }
+.table thead { background: var(--color-bg-secondary, #202020); }
+.table th { font-weight: 500; }
+.table tr:not(:last-child), .table thead tr { border-bottom: 1px solid var(--color-border, #303030); }
+.empty { padding: 40px 24px; text-align: center; color: var(--color-text-secondary, #a1a1aa); }
+@media (max-width: 1024px) { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .summary { gap: 12px; } .metric { padding: 18px; } .tableHeading { padding: 18px; } }

@@ -1,4 +1,6 @@
 'use client';
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3 } from '@/components/ui/fernly/native'
@@ -143,17 +145,7 @@ export default function RecruitmentPage() {
               { label: 'Total Candidates', value: stats.totalCandidates || 0, icon: FaUsers, iconColor: 'text-secondary', bgColor: 'bg-secondary-50' },
               { label: 'Hired', value: stats.hiredCount || 0, icon: FaUsers, iconColor: 'text-success', bgColor: 'bg-success-50' },
             ].map((stat) => (
-              <Card key={stat.label} shadow="sm">
-                <CardBody className="p-3 sm:p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Heading3 className="text-xs sm:text-sm font-medium text-default-600 truncate">{stat.label}</Heading3>
-                    <div className={`w-8 h-8 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
-                      <stat.icon className={`w-3.5 h-3.5 ${stat.iconColor}`} />
-                    </div>
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-bold text-default-800">{stat.value}</div>
-                </CardBody>
-              </Card>
+              <SummaryCard key={stat.label} shadow="sm" label={<>{stat.label}</>} value={<>{stat.value}</>} />
             ))}
           </div>
         )}
@@ -220,7 +212,7 @@ export default function RecruitmentPage() {
               <Card shadow="sm">
                 <CardBody className="p-0">
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <NativeTable className="w-full">
                       <thead className="bg-default-50 border-b border-default-200">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Job</th>
@@ -265,7 +257,7 @@ export default function RecruitmentPage() {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                    </NativeTable>
                   </div>
                 </CardBody>
               </Card>

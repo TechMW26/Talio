@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeInput, Heading3 } from '@/components/ui/fernly/native'
@@ -284,7 +285,7 @@ export default function ProjectsPage() {
             }
 
             return (
-              <div
+              <Surface
                 key={project._id}
                 onClick={() => router.push(`/dashboard/projects/${project._id}`)}
                 className={`bg-content1 rounded-xl shadow-sm border-2 hover:shadow-md transition-shadow cursor-pointer overflow-hidden flex flex-col ${getStatusBorderColor()}`}
@@ -332,10 +333,10 @@ export default function ProjectsPage() {
                   {/* Task Stats */}
                   {project.taskStats && (
                     <div className="grid grid-cols-3 gap-2 mb-4">
-                      <div className="text-center p-2 bg-default-50 rounded-lg">
+                      <Surface className="text-center p-2 bg-default-50 rounded-lg">
                         <p className="text-lg font-bold text-default-800">{project.taskStats.total}</p>
                         <p className="text-xs text-default-500">Tasks</p>
-                      </div>
+                      </Surface>
                       <div className="text-center p-2 bg-success-50 rounded-lg">
                         <p className="text-lg font-bold text-success">{project.taskStats.completed}</p>
                         <p className="text-xs text-default-500">Done</p>
@@ -443,7 +444,7 @@ export default function ProjectsPage() {
                     </div>
                   </div>
                 )}
-              </div>
+              </Surface>
             )
           })}
         </div>

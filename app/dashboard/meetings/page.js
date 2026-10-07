@@ -1,4 +1,5 @@
 'use client'
+import { SummaryCard, Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeInput, NativeSelect, Heading2, Heading3, NativeButton } from '@/components/ui/fernly/native'
@@ -174,45 +175,17 @@ export default function MeetingsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{todayMeetings.length}</p>
-              <p className="text-sm text-gray-500">Today</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Today</>} value={<>{todayMeetings.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{upcomingMeetings.length}</p>
-              <p className="text-sm text-gray-500">Upcoming</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Upcoming</>} value={<>{upcomingMeetings.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{pendingInvites.length}</p>
-              <p className="text-sm text-gray-500">Pending</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Pending</>} value={<>{pendingInvites.length}</>} />
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{meetings.length}</p>
-              <p className="text-sm text-gray-500">Total</p>
-            </div>
-          </div>
-        </div>
+        <SummaryCard  label={<>Total</>} value={<>{meetings.length}</>} />
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <Surface className="bg-white rounded-lg shadow-md p-4 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="input-with-icon flex-1">
@@ -261,7 +234,7 @@ export default function MeetingsPage() {
             </NativeSelect>
           </div>
         </div>
-      </div>
+      </Surface>
 
       {/* Pending Invitations */}
       {pendingInvites.length > 0 && (
@@ -311,15 +284,15 @@ export default function MeetingsPage() {
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+              <Surface key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
                 <Skeleton className="h-4 w-3/4 rounded" />
                 <Skeleton className="h-3 w-1/2 rounded" />
                 <Skeleton className="h-3 w-2/3 rounded" />
-              </div>
+              </Surface>
             ))}
           </div>
         ) : filteredMeetings.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+          <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
             <HiOutlineCalendarDays className="w-16 h-16 mx-auto text-gray-300 mb-4" />
             <Heading3 className="text-lg font-medium text-gray-800 mb-2">
               No meetings found
@@ -334,7 +307,7 @@ export default function MeetingsPage() {
             >
               Schedule Meeting
             </Button>
-          </div>
+          </Surface>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredMeetings.map(meeting => (

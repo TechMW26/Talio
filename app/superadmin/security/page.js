@@ -1,5 +1,7 @@
 'use client'
 
+import { Tabs, Tab } from '@/components/ui/fernly'
+
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import toast from '@/utils/toast'
 
@@ -176,17 +178,9 @@ export default function SuperAdminSecurityPage() {
                 >Refresh</button>
             </div>
 
-            <div className="border-b border-gray-200">
-                <nav className="-mb-px flex gap-6">
-                    {TABS.map((t) => (
-                        <button
-                            key={t.id}
-                            onClick={() => setActiveTab(t.id)}
-                            className={`py-3 px-1 text-sm font-medium border-b-2 transition ${activeTab === t.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-                        >{t.label}</button>
-                    ))}
-                </nav>
-            </div>
+<Tabs aria-label="Security views" selectedKey={activeTab} onSelectionChange={setActiveTab} className="w-full">
+          {TABS.map(tab => <Tab key={tab.id} title={tab.label} />)}
+        </Tabs>
 
             {activeTab === 'overview' && (
                 <div className="space-y-6">

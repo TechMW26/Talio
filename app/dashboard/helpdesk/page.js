@@ -1,4 +1,7 @@
 'use client'
+import { NativeTable } from '@/components/ui/fernly'
+import { SummaryCard } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading2 } from '@/components/ui/fernly/native'
@@ -145,32 +148,22 @@ export default function HelpdeskPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
+            <Surface key={i} className="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
               <div className="flex items-center justify-between">
                 <div className="space-y-2"><Skeleton className="w-20 h-4 rounded" /><Skeleton className="w-12 h-8 rounded" /></div>
                 <Skeleton className="w-12 h-12 rounded-xl" />
               </div>
-            </div>
+            </Surface>
           ))
         ) : (
           stats.map((stat, index) => (
-            <div key={index} className="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="mb-1 text-sm text-gray-600">{stat.label}</p>
-                  <p className="text-2xl font-bold text-gray-900 sm:text-3xl">{stat.value}</p>
-                </div>
-                <div className={`p-3 rounded-xl ${stat.bgColor}`}>
-                  <stat.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.iconColor}`} />
-                </div>
-              </div>
-            </div>
+            <SummaryCard key={index} label={<>{stat.label}</>} value={<>{stat.value}</>} />
           ))
         )}
       </div>
 
       {/* Tickets Table */}
-      <div className="overflow-hidden bg-white rounded-lg shadow-md">
+      <Surface className="overflow-hidden bg-white rounded-lg shadow-md">
         <div className="p-4 border-b border-gray-200">
           <Heading2 className="text-xl font-semibold text-gray-800">My Tickets</Heading2>
         </div>
@@ -183,7 +176,7 @@ export default function HelpdeskPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <NativeTable className="w-full">
               <thead className="border-b border-gray-200 bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
@@ -253,10 +246,10 @@ export default function HelpdeskPage() {
                   ))
                 )}
               </tbody>
-            </table>
+            </NativeTable>
           </div>
         )}
-      </div>
+      </Surface>
 
       {/* Create Ticket Modal */}
       <Modal isOpen={showModal} onOpenChange={setShowModal} size="lg">

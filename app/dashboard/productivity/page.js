@@ -1,4 +1,5 @@
 'use client'
+import { SummaryCard as StatCard, Surface } from '@/components/ui/fernly'
 
 
 import { NativeButton, Heading3, NativeInput, Heading1, Heading2 } from '@/components/ui/fernly/native'
@@ -57,21 +58,7 @@ function ScorePill({ score, label = 'Score' }) {
   )
 }
 
-function StatCard({ icon: Icon, label, value, iconBg = 'bg-blue-100', iconText = 'text-blue-600' }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${iconBg}`}>
-          <Icon className={`w-5 h-5 ${iconText}`} />
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-gray-800">{value}</p>
-          <p className="text-sm text-gray-500">{label}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
+
 
 function ScreenshotTile({ shot, onClick }) {
   return (
@@ -103,10 +90,10 @@ function ScreenshotTile({ shot, onClick }) {
 function ScreenshotGrid({ screenshots, emptyHint, onPick }) {
   if (screenshots.length === 0) {
     return (
-      <div className="text-center py-10 bg-white rounded-xl shadow-sm border border-dashed border-gray-200">
+      <Surface className="text-center py-10 bg-white rounded-xl shadow-sm border border-dashed border-gray-200">
         <HiOutlinePhoto className="w-10 h-10 mx-auto text-gray-300 mb-2" />
         <p className="text-sm text-gray-500">{emptyHint}</p>
-      </div>
+      </Surface>
     )
   }
   return (
@@ -305,7 +292,7 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
   const genuineWork = oa.genuineWorkPercentage
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <Surface className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Header — flat (no gradient) */}
       <div className="p-5 border-b border-gray-100">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -471,7 +458,7 @@ function AnalysisCard({ analysis, lastAnalyzedAt }) {
           </div>
         ) : null}
       </div>
-    </div>
+    </Surface>
   )
 }
 
@@ -763,7 +750,7 @@ export default function ProductivityPage() {
   const renderTeamGrid = () => (
     <div className="space-y-4">
       {/* Filters / search bar — matches meetings filter card */}
-      <div className="bg-white rounded-lg shadow-md p-4">
+      <Surface className="bg-white rounded-lg shadow-md p-4">
         <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
           <div className="flex items-center gap-2 text-gray-600">
             <HiOutlineUsers className="w-5 h-5 text-indigo-600" />
@@ -782,24 +769,24 @@ export default function ProductivityPage() {
             />
           </div>
         </div>
-      </div>
+      </Surface>
 
       {teamLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <Surface key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
               <Skeleton className="h-4 w-3/4 rounded" />
               <Skeleton className="h-3 w-1/2 rounded" />
               <Skeleton className="h-3 w-2/3 rounded" />
-            </div>
+            </Surface>
           ))}
         </div>
       ) : teamMembers.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+        <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
           <HiOutlineUsers className="w-16 h-16 mx-auto text-gray-300 mb-4" />
           <Heading3 className="text-lg font-medium text-gray-800 mb-2">No team members found</Heading3>
           <p className="text-gray-500">Try adjusting your search or pick a different date.</p>
-        </div>
+        </Surface>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {teamMembers.map((m) => {
@@ -867,7 +854,7 @@ export default function ProductivityPage() {
           >
             <HiOutlineChevronLeft className="w-5 h-5 text-gray-600" />
           </NativeButton>
-          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+          <Surface className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
             <HiOutlineCalendarDays className="w-4 h-4 text-gray-500" />
             <NativeInput
               type="date"
@@ -876,7 +863,7 @@ export default function ProductivityPage() {
               onChange={(e) => setSelectedDate(e.target.value)}
               className="bg-transparent text-sm text-gray-700 focus:outline-none"
             />
-          </div>
+          </Surface>
           <NativeButton
             type="button"
             onClick={() => changeDate(1)}
@@ -923,7 +910,7 @@ export default function ProductivityPage() {
 
       {/* Tabs */}
       {canViewTeam ? (
-        <div className="bg-white rounded-lg shadow-md p-2 mb-6">
+        <Surface className="bg-white rounded-lg shadow-md p-2 mb-6">
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={(k) => { setActiveTab(k); setSelectedTeamUserId(null); }}
@@ -932,7 +919,7 @@ export default function ProductivityPage() {
             <Tab key="my" title={(<span className="flex items-center gap-1.5"><HiOutlineUser className="w-4 h-4" /> My Day</span>)} />
             <Tab key="team" title={(<span className="flex items-center gap-1.5"><HiOutlineUsers className="w-4 h-4" /> Team</span>)} />
           </Tabs>
-        </div>
+        </Surface>
       ) : null}
 
       {/* Team grid (when in team tab and no member selected) */}
@@ -963,7 +950,7 @@ export default function ProductivityPage() {
       {showDailyBody ? (
         <div className="space-y-6">
           {/* Action bar — sits in a meetings-style filter card */}
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <Surface className="bg-white rounded-lg shadow-md p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="text-sm text-gray-600">
                 {dailyRes?.user ? (
@@ -1002,16 +989,16 @@ export default function ProductivityPage() {
                 </Button>
               </div>
             </div>
-          </div>
+          </Surface>
 
           {/* Loading skeleton */}
           {dailyLoading ? (
             <div className="space-y-4">
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
+              <Surface className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
                 <Skeleton className="h-5 w-1/3 rounded" />
                 <Skeleton className="h-4 w-2/3 rounded" />
                 <Skeleton className="h-3 w-full rounded" />
-              </div>
+              </Surface>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {[...Array(10)].map((_, i) => (
                   <Skeleton key={i} className="aspect-video rounded-xl" />
@@ -1047,13 +1034,13 @@ export default function ProductivityPage() {
 
               {/* Truly empty */}
               {screenshots.length === 0 && !analysis ? (
-                <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+                <Surface className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
                   <HiOutlinePhoto className="w-16 h-16 mx-auto text-gray-300 mb-4" />
                   <Heading3 className="text-lg font-medium text-gray-800 mb-2">No captures for this day</Heading3>
                   <p className="text-gray-500">
                     Screenshots are captured every 4 minutes during your company&apos;s office hours.
                   </p>
-                </div>
+                </Surface>
               ) : null}
             </>
           )}

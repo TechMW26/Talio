@@ -33,6 +33,6 @@ test('punch cards are explicitly placed side by side, with location underneath',
   const css = fs.readFileSync('components/widgets/CheckInOutWidget.module.css', 'utf8')
   expect(css).toContain('.arrival { grid-column: 1; grid-row: 2; }')
   expect(css).toContain('.departure { grid-column: 2; grid-row: 2; }')
-  expect(css).toContain('.location { grid-column: 1 / -1; grid-row: 3; }')
+  expect(css).toContain('.location { grid-column: 1 / -1; grid-row: 4; }')
   expect(fs.readFileSync('components/widgets/CheckInOutWidget.js', 'utf8')).toContain('showLocation')
 })

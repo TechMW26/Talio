@@ -1,4 +1,5 @@
 'use client'
+import { Tabs, Tab } from '@/components/ui/fernly'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -93,7 +94,7 @@ export default function ManpowerRequests() {
     {notice && <p role="status" className="rounded-xl bg-success/10 p-3">{notice}</p>}
     {creating && <RequestForm departments={data?.departments || []} busy={mutation.isLoading} onSubmit={save} onCancel={() => setCreating(false)} />}
     <section className="overflow-hidden rounded-2xl border border-default-200 bg-content1" aria-label="Manpower request list">
-    <nav aria-label="Request status" className="flex gap-5 overflow-x-auto border-b border-default-200 px-5">{Object.entries(statuses).map(([key, label]) => <button type="button" key={key} aria-pressed={status === key} onClick={() => selectStatus(key)} className={`shrink-0 border-b-2 px-1 py-4 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${status === key ? 'border-primary text-foreground' : 'border-transparent text-default-500 hover:text-foreground'}`}>{label}</button>)}</nav>
+    <Tabs aria-label="Request status" selectedKey={status} onSelectionChange={selectStatus} className="px-5">{Object.entries(statuses).map(([key, label]) => <Tab key={key} title={label} />)}</Tabs>
     <div className="space-y-4 p-5 sm:p-6"><div><h2 className="text-lg font-semibold">{statuses[status]}</h2><p className="mt-1 text-xs text-default-500">{!isLoading && !error && Number.isFinite(data?.total) ? `${data.total} request(s) · ` : ''}Only requests you are authorised to view.</p></div>
     {isLoading && <div className="space-y-3" aria-hidden="true">{[1, 2].map(key => <div key={key} className="h-24 animate-pulse rounded-xl bg-default-100" />)}</div>}
     {!isLoading && !error && data?.data?.length === 0 && <div className="flex min-h-60 flex-col items-center justify-center rounded-xl border border-dashed border-default-200 px-6 py-10 text-center"><span className="mb-4 rounded-2xl bg-default-100 p-4"><HiOutlineInbox className="h-8 w-8 text-default-400" aria-hidden="true" /></span><h3 className="font-semibold">{status === 'all' ? 'No manpower requests yet.' : `No ${status} requests.`}</h3><p className="mt-2 max-w-sm text-sm text-default-500">{status === 'all' ? 'Create a request to share your workforce needs with HR and start the hiring process.' : 'Requests will appear here when they reach this stage.'}</p></div>}

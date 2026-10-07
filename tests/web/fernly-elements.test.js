@@ -1,13 +1,26 @@
 import { createRef } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { NativeButton, NativeInput, NativeSelect, Heading2, Input, SelectItem } from '@/components/ui/fernly'
+import { NativeButton, NativeInput, NativeSelect, Heading2, Input, SelectItem, Tabs } from '@/components/ui/fernly'
 
 jest.mock('@heroui/react', () => {
   const React = require('react')
   return {
     Input: React.forwardRef(({ classNames, ...props }, ref) => <input {...props} ref={ref} data-wrapper={classNames.inputWrapper} />),
     SelectItem: Object.assign(() => null, { getCollectionNode: () => 'collection' }),
+    Tabs: React.forwardRef(({ variant, color, radius, classNames, onSelectionChange }, ref) => <div ref={ref} data-testid="tabs" data-variant={variant} data-color={color} data-radius={radius} data-cursor={classNames.cursor}><button onClick={() => onSelectionChange('approved')}>Approved</button></div>),
   }
+})
+
+test('shared tabs enforce the standard solid pill and preserve selection and slot additions', () => {
+  const select = jest.fn(), ref = createRef()
+  render(<Tabs ref={ref} variant="underlined" color="default" radius="none" onSelectionChange={select} classNames={{ cursor: 'existing-cursor' }} />)
+  expect(ref.current).toBe(screen.getByTestId('tabs'))
+  expect(ref.current).toHaveAttribute('data-variant', 'solid')
+  expect(ref.current).toHaveAttribute('data-color', 'primary')
+  expect(ref.current).toHaveAttribute('data-radius', 'full')
+  expect(ref.current.dataset.cursor).toContain('existing-cursor')
+  fireEvent.click(screen.getByRole('button', { name: 'Approved' }))
+  expect(select).toHaveBeenCalledWith('approved')
 })
 jest.mock('@/components/ui/HeroModal', () => ({ __esModule: true, default: () => null }))
 
@@ -70,4 +83,24 @@ test('project navigation reuses shared tabs instead of bespoke bordered pill but
   expect(navigation).not.toContain('<NativeButton')
   expect(navigation).not.toContain('border-b-2')
   expect(navigation).not.toContain('<tab.icon')
+})
+
+test.each([
+  'app/dashboard/leave/approvals/page.js',
+  'app/dashboard/leave/requests/page.js',
+  'app/dashboard/admin/live-users/page.js',
+  'app/dashboard/employees/add/page.js',
+  'app/dashboard/performance/my-performance/page.js',
+  'app/dashboard/settings/notifications/page.js',
+  'components/NotificationManagement.js',
+  'components/employees/ResignationPanel.js',
+  'components/recruitment/ManpowerRequests.js',
+  'components/tasks/TaskAssignment.js',
+  'app/superadmin/companies/[id]/page.js',
+  'app/superadmin/companies/new/page.js',
+  'app/superadmin/security/page.js',
+])('%s reuses standard tabs rather than curved underline selectors', file => {
+  const source = require('fs').readFileSync(file, 'utf8')
+  expect(source).toContain('<Tabs aria-label=')
+  expect(source).not.toContain('border-b-2')
 })

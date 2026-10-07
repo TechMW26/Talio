@@ -1,4 +1,5 @@
 'use client';
+import { NativeTable } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeButton, Heading3 } from '@/components/ui/fernly/native'
@@ -273,7 +274,7 @@ export default function CandidatesPage() {
                   <Card shadow="sm">
                     <CardBody className="p-0">
                       <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <NativeTable className="w-full">
                           <thead className="bg-default-50 border-b border-default-200">
                             <tr>
                               <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Candidate</th>
@@ -328,7 +329,7 @@ export default function CandidatesPage() {
                               </tr>
                             ))}
                           </tbody>
-                        </table>
+                        </NativeTable>
                       </div>
                     </CardBody>
                   </Card>

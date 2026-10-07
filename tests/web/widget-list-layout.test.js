@@ -20,7 +20,7 @@ test('all scroll-shadow widget lists fill available height instead of using old 
       expect(tag).not.toMatch(/max-h-/)
     }
   }
-  expect(count).toBe(15)
+  expect(count).toBe(14)
 })
 
 test('nested list wrappers can shrink and project tasks fills its parent', () => {

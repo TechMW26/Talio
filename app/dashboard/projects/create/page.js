@@ -1,4 +1,6 @@
 'use client'
+import { DialogSurface } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading2, NativeInput, NativeTextarea, Heading3, NativeButton } from '@/components/ui/fernly/native'
@@ -522,7 +524,7 @@ export default function CreateProjectPage() {
             ) : (
               <div className="space-y-3">
                 {formData.members.map((member) => (
-                  <div key={member.userId} className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
+                  <Surface key={member.userId} className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
                         {member.profilePicture ? (
@@ -544,7 +546,7 @@ export default function CreateProjectPage() {
                     >
                       <FaTimes />
                     </Button>
-                  </div>
+                  </Surface>
                 ))}
               </div>
             )}
@@ -575,7 +577,7 @@ export default function CreateProjectPage() {
       {/* Employee Search Modal */}
       <ModalPortal isOpen={showEmployeeSearch}>
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-content1 rounded-[30px] shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col animate-modal-enter">
+          <DialogSurface className="bg-content1 rounded-[30px] shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="p-4 border-b border-default-200 flex items-center justify-between flex-shrink-0">
               <Heading3 className="text-lg font-semibold">Add Team Member</Heading3>
               <Button
@@ -731,14 +733,14 @@ export default function CreateProjectPage() {
                 </div>
               )}
             </div>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
 
       {/* Project Head Search Modal */}
       <ModalPortal isOpen={showHeadSearch}>
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-content1 rounded-[30px] shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col animate-modal-enter">
+          <DialogSurface className="bg-content1 rounded-[30px] shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="p-4 border-b border-default-200 flex items-center justify-between flex-shrink-0">
               <Heading3 className="text-lg font-semibold">Add Project Head</Heading3>
               <Button
@@ -887,7 +889,7 @@ export default function CreateProjectPage() {
                 </div>
               )}
             </div>
-          </div>
+          </DialogSurface>
         </div>
       </ModalPortal>
     </div>

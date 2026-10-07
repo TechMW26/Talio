@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { NativeButton, Heading1, Heading2, Heading3 } from '@/components/ui/fernly/native'
@@ -382,7 +383,7 @@ export default function PayslipDetailPage() {
       </div>
 
       {/* Payslip Preview */}
-      <div ref={payslipRef} className="bg-white rounded-lg shadow-lg overflow-hidden max-w-4xl mx-auto">
+      <Surface ref={payslipRef} className="bg-white rounded-lg shadow-lg overflow-hidden max-w-4xl mx-auto">
         {/* Company Header - Use employee's assigned company */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
           <div className="flex items-center justify-between">
@@ -575,7 +576,7 @@ export default function PayslipDetailPage() {
           <p>This is a system-generated salary slip. For any queries, please contact HR.</p>
           <p className="mt-1">Generated on: {new Date().toLocaleDateString('en-IN')}</p>
         </div>
-      </div>
+      </Surface>
     </div>
   )
 }

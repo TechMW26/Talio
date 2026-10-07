@@ -454,7 +454,6 @@ const ROUTE_SKELETON_MAP = {
     '/dashboard/recruitment': TablePageSkeleton,
     '/dashboard/performance': TablePageSkeleton,
     '/dashboard/productivity': TablePageSkeleton,
-    '/dashboard/learning': TablePageSkeleton,
     '/dashboard/mail': TablePageSkeleton,
     '/dashboard/users': TablePageSkeleton,
     '/dashboard/talioboard': TablePageSkeleton,

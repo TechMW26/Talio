@@ -1,4 +1,6 @@
 'use client';
+import { SummaryCard } from '@/components/ui/fernly'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3 } from '@/components/ui/fernly/native'
@@ -93,15 +95,7 @@ export default function RecruitmentAnalyticsPage() {
             { label: 'Conversion Rate', value: `${overview.conversionRate}%`, icon: FaPercentage, iconColor: 'text-warning', bgColor: 'bg-warning-50' },
             { label: 'Avg Time to Hire', value: `${overview.avgTimeToHire}d`, icon: FaClock, iconColor: 'text-secondary', bgColor: 'bg-secondary-50' },
           ].map((metric) => (
-            <Card key={metric.label} shadow="sm">
-              <CardBody className="p-3 sm:p-4">
-                <div className={`w-9 h-9 rounded-lg ${metric.bgColor} flex items-center justify-center mb-3`}>
-                  <metric.icon className={`w-4 h-4 ${metric.iconColor}`} />
-                </div>
-                <p className="text-2xl font-bold text-default-800">{metric.value}</p>
-                <p className="text-xs text-default-500 mt-0.5">{metric.label}</p>
-              </CardBody>
-            </Card>
+            <SummaryCard key={metric.label} shadow="sm" label={<>{metric.label}</>} value={<>{metric.value}</>} />
           ))}
         </div>
 
@@ -150,13 +144,13 @@ export default function RecruitmentAnalyticsPage() {
               {sources?.length > 0 ? (
                 <div className="space-y-3">
                   {sources.map((source) => (
-                    <div key={source._id} className="flex items-center justify-between p-2.5 bg-default-50 rounded-lg">
+                    <Surface key={source._id} className="flex items-center justify-between p-2.5 bg-default-50 rounded-lg">
                       <span className="text-sm text-default-700 capitalize">{source._id || 'Unknown'}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-default-800">{source.count}</span>
                         <span className="text-xs text-default-400">({source.hired || 0} hired)</span>
                       </div>
-                    </div>
+                    </Surface>
                   ))}
                 </div>
               ) : (
@@ -174,13 +168,13 @@ export default function RecruitmentAnalyticsPage() {
               {departments?.length > 0 ? (
                 <div className="space-y-3">
                   {departments.map((dept) => (
-                    <div key={dept._id} className="flex items-center justify-between p-2.5 bg-default-50 rounded-lg">
+                    <Surface key={dept._id} className="flex items-center justify-between p-2.5 bg-default-50 rounded-lg">
                       <span className="text-sm text-default-700">{dept.departmentName || dept._id}</span>
                       <div className="flex items-center gap-3">
                         <Chip size="sm" variant="flat" color="primary">{dept.totalJobs} jobs</Chip>
                         <Chip size="sm" variant="flat" color="success">{dept.totalHired} hired</Chip>
                       </div>
-                    </div>
+                    </Surface>
                   ))}
                 </div>
               ) : (

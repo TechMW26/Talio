@@ -6,6 +6,9 @@ import useApiMutation from '@/hooks/useApiMutation'
 jest.mock('@/hooks/useAuthedSWR', () => ({ __esModule: true, default: jest.fn() }))
 jest.mock('@/hooks/useApiMutation', () => ({ __esModule: true, default: jest.fn() }))
 let execute, mutate, data
+const originalResizeObserver = global.ResizeObserver
+beforeAll(() => { global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } })
+afterAll(() => { global.ResizeObserver = originalResizeObserver })
 const record = () => ({ _id: 'r1', own: true, active: true, reason: 'Moving to another city', status: 'employee_review', version: 3, createdAt: '2026-09-29T00:00:00Z', timeline: [], actions: ['accept', 'negotiate', 'withdraw'], proposal: { noticeDays: 30, noticeStartDate: '2026-09-29T00:00:00Z', lastWorkingDate: '2026-10-29T00:00:00Z', reason: 'Complete handover' } })
 beforeEach(() => {
   execute = jest.fn().mockResolvedValue({ success: true, message: 'Saved' }); mutate = jest.fn()
@@ -29,7 +32,7 @@ test('dashboard keeps summary cards visible on every view and separates the prim
   render(<ResignationPanel dashboard initialView="reviews" />)
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Resignations & Exits')
   expect(screen.getByRole('button', { name: 'View completed exits' })).toBeInTheDocument()
-  const navigation = screen.getByRole('navigation', { name: 'Resignation views' })
+  const navigation = screen.getByRole('tablist', { name: 'Resignation views' })
   const submit = screen.getByRole('button', { name: 'Submit resignation' })
   expect(navigation).not.toContainElement(submit)
   expect(submit).toHaveClass('bg-primary')

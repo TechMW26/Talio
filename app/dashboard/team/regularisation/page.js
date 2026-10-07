@@ -1,4 +1,5 @@
 'use client'
+import { SummaryCard } from '@/components/ui/fernly'
 
 
 import { Heading2, Heading1, Heading3 } from '@/components/ui/fernly/native'
@@ -303,47 +304,11 @@ export default function TeamRegularisationPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Card shadow="sm" className="border-l-4 border-l-warning-500">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <p className="text-sm text-warning-600 font-medium">Pending Requests</p>
-              <p className="text-3xl font-bold text-warning-600 mt-1">
-                {pendingCorrections.length}
-              </p>
-            </div>
-            <div className="bg-warning-100 p-3 rounded-xl">
-              <FaCalendarCheck className="h-6 w-6 text-warning-600" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Pending Requests</>} value={<>{pendingCorrections.length}</>} />
 
-        <Card shadow="sm" className="border-l-4 border-l-success-500">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <p className="text-sm text-success-600 font-medium">Approved This Month</p>
-              <p className="text-3xl font-bold text-success-600 mt-1">
-                {allCorrections.filter(c => c.status === 'approved').length}
-              </p>
-            </div>
-            <div className="bg-success-100 p-3 rounded-xl">
-              <FaCheck className="h-6 w-6 text-success-600" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Approved This Month</>} value={<>{allCorrections.filter(c => c.status === 'approved').length}</>} />
 
-        <Card shadow="sm" className="border-l-4 border-l-danger-500">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <p className="text-sm text-danger-600 font-medium">Rejected This Month</p>
-              <p className="text-3xl font-bold text-danger-600 mt-1">
-                {allCorrections.filter(c => c.status === 'rejected').length}
-              </p>
-            </div>
-            <div className="bg-danger-100 p-3 rounded-xl">
-              <FaTimes className="h-6 w-6 text-danger-600" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Rejected This Month</>} value={<>{allCorrections.filter(c => c.status === 'rejected').length}</>} />
       </div>
 
       {/* Corrections List */}

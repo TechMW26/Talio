@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading3, NativeButton, Heading1, Heading2, NativeSelect, NativeTextarea } from '@/components/ui/fernly/native'
@@ -196,7 +197,7 @@ export default function TeamMemberDetailsPage() {
   if (!memberData) {
     return (
       <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <Surface className="bg-white rounded-lg shadow-md p-8 text-center">
           <FaExclamationCircle className="text-red-500 text-4xl mx-auto mb-4" />
           <Heading3 className="text-lg font-semibold text-gray-700 mb-2">Member Not Found</Heading3>
           <NativeButton
@@ -205,7 +206,7 @@ export default function TeamMemberDetailsPage() {
           >
             Go Back
           </NativeButton>
-        </div>
+        </Surface>
       </div>
     )
   }
@@ -256,7 +257,7 @@ export default function TeamMemberDetailsPage() {
       <div hidden={!['overview', 'tasks', 'reviews'].includes(activeTab)} className={styles.legacyPanels}>
         <div hidden={!['overview', 'tasks'].includes(activeTab)} className={styles.fillPanel}>
           {/* Basic Info */}
-          <div hidden={activeTab !== 'overview'} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <Surface hidden={activeTab !== 'overview'} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <Heading2 className="text-xl font-bold text-gray-900 mb-4">Basic Information</Heading2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-center text-gray-600">
@@ -303,10 +304,10 @@ export default function TeamMemberDetailsPage() {
                 </div>
               </div>
             )}
-          </div>
+          </Surface>
 
           {/* Member Tasks - Month Wise */}
-          <div hidden={activeTab !== 'tasks'} id="member-tasks" data-fernly-element className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-4 sm:p-6">
+          <Surface hidden={activeTab !== 'tasks'} id="member-tasks" data-fernly-element className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-4 sm:p-6">
             {/* Month Navigator */}
             <div className="flex items-center justify-between mb-4">
               <Heading2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 flex items-center">
@@ -401,7 +402,7 @@ export default function TeamMemberDetailsPage() {
             ) : (
               <MemberTaskList tasks={memberTasks} />
             )}
-          </div>
+          </Surface>
         </div>
 
         {/* Right Sidebar - Reviews */}
@@ -417,7 +418,7 @@ export default function TeamMemberDetailsPage() {
 
           {/* Review Form */}
           {showReviewForm && (
-            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <Surface className="bg-white rounded-lg shadow-md p-4 sm:p-6">
               <Heading3 className="text-lg font-bold text-gray-900 mb-4">Add Review / Remark</Heading3>
 
               {/* Type Selection */}
@@ -497,11 +498,11 @@ export default function TeamMemberDetailsPage() {
                 <FaPaperPlane className="mr-2" />
                 Submit
               </LoadingButton>
-            </div>
+            </Surface>
           )}
 
           {/* Reviews History */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <Surface className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <Heading3 className="text-lg font-bold text-gray-900 mb-4">Reviews & Remarks</Heading3>
             {!employee.reviews || employee.reviews.length === 0 ? (
               <p className="text-gray-600 text-center py-4">No reviews yet</p>
@@ -532,7 +533,7 @@ export default function TeamMemberDetailsPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Surface>
         </div>
       </div>
       {activeTab === 'attendance' && <MemberAttendance key={employee._id} employee={employee} showProductivity={false} />}

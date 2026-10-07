@@ -1,4 +1,5 @@
 'use client'
+import { SummaryCard } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading3, Heading2 } from '@/components/ui/fernly/native'
@@ -123,45 +124,11 @@ export default function LeaveTypesPage() {
 
       {/* Stats Card */}
       < div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" >
-        <Card shadow="sm">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <Heading3 className="text-sm font-medium text-default-500">Total Leave Types</Heading3>
-              <div className="text-3xl font-bold text-default-900 mt-1">{leaveTypes.length}</div>
-            </div>
-            <div className="bg-primary-100 p-3 rounded-xl">
-              <FaUmbrella className="text-primary-500 h-6 w-6" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total Leave Types</>} value={<>{leaveTypes.length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <Heading3 className="text-sm font-medium text-default-500">Paid Leaves</Heading3>
-              <div className="text-3xl font-bold text-success-600 mt-1">
-                {leaveTypes.filter(t => t.isPaid).length}
-              </div>
-            </div>
-            <div className="bg-success-100 p-3 rounded-xl">
-              <FaUmbrella className="text-success-500 h-6 w-6" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Paid Leaves</>} value={<>{leaveTypes.filter(t => t.isPaid).length}</>} />
 
-        <Card shadow="sm">
-          <CardBody className="flex flex-row items-center justify-between">
-            <div>
-              <Heading3 className="text-sm font-medium text-default-500">Total Days</Heading3>
-              <div className="text-3xl font-bold text-primary-600 mt-1">
-                {leaveTypes.reduce((sum, t) => sum + (t.maxDaysPerYear || 0), 0)}
-              </div>
-            </div>
-            <div className="bg-primary-100 p-3 rounded-xl">
-              <FaUmbrella className="text-primary-500 h-6 w-6" />
-            </div>
-          </CardBody>
-        </Card>
+        <SummaryCard shadow="sm" label={<>Total Days</>} value={<>{leaveTypes.reduce((sum, t) => sum + (t.maxDaysPerYear || 0), 0)}</>} />
       </div >
 
       {/* Leave Types Grid */}

@@ -92,8 +92,6 @@ export default function IconStrip({ onExpandClick, isHidden = false, sidebarCoun
     if (isDepartmentHead) {
       const teamSubmenu = [
         { name: 'Team Members', path: '/dashboard/team/members' },
-        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-        { name: 'Team Goals', path: '/dashboard/performance/goals' },
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
         { name: 'Geofencing', path: '/dashboard/team/geofencing' }
       ]
@@ -297,7 +295,7 @@ export default function IconStrip({ onExpandClick, isHidden = false, sidebarCoun
         inert={isHidden || undefined}
         aria-hidden={isHidden}
         aria-label="Compact navigation"
-        className="talio-floating-rail hidden lg:flex fixed z-[8] flex-col w-[4.5rem]"
+        className="talio-floating-rail hidden lg:flex fixed z-[100] flex-col"
         style={{
           backgroundColor: 'var(--color-bg-sidebar)'
         }}

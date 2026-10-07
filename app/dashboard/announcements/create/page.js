@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, NativeInput, NativeTextarea, Heading3, NativeButton } from '@/components/ui/fernly/native'
@@ -132,7 +133,7 @@ export default function CreateAnnouncementPage() {
       </div>
 
       {/* Form */}
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+      <Surface className="bg-white rounded-lg shadow-md p-4 sm:p-6">
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {/* Title */}
           <div>
@@ -422,7 +423,7 @@ export default function CreateAnnouncementPage() {
             </LoadingButton>
           </div>
         </form>
-      </div>
+      </Surface>
     </div>
   )
 }

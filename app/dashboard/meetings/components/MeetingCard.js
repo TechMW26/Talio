@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading3, NativeButton } from '@/components/ui/fernly/native'
@@ -130,7 +131,7 @@ export default function MeetingCard({ meeting, onRespond, onEdit, showResponseAc
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+      <Surface className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
         {/* Header */}
         <div className={`px-4 py-3 ${meeting.type === 'online' ? 'bg-indigo-50' : 'bg-amber-50'}`}>
           <div className="flex items-center justify-between">
@@ -283,7 +284,7 @@ export default function MeetingCard({ meeting, onRespond, onEdit, showResponseAc
             </div>
           )}
         </div>
-      </div>
+      </Surface>
 
       {/* Reject Reason Modal */}
       <Modal isOpen={showRejectModal} onOpenChange={setShowRejectModal} size="md">

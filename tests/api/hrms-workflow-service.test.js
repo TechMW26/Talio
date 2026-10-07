@@ -30,6 +30,11 @@ describe('HRMS workflow service', () => {
     expect(errors.map((error) => error.field)).toEqual(expect.arrayContaining(['module', 'title']))
   })
 
+  test('rejects the retired LMS module', () => {
+    expect(validateWorkflowPayload({ module: 'learning', title: 'Old course', data: {} }))
+      .toEqual(expect.arrayContaining([expect.objectContaining({ field: 'module', message: 'Unknown HRMS module' })]))
+  })
+
   test('sanitizes prototype-pollution keys while preserving normal nested input', () => {
     const input = JSON.parse('{"safe":{"value":1},"__proto__":{"polluted":true},"constructor":"bad"}')
     expect(sanitizeWorkflowData(input)).toEqual({ safe: { value: 1 } })

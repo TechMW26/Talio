@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { NativeButton, Heading1, Heading3, NativeInput } from '@/components/ui/fernly/native'
@@ -109,7 +110,7 @@ export default function TicketDetailPage() {
         {/* Main Content - Ticket Info & Comments */}
         <div className="lg:col-span-2 space-y-6">
           {/* Ticket Header */}
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <Surface className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <Heading1 className="text-2xl font-bold text-gray-800 mb-2">{ticket.subject}</Heading1>
@@ -146,10 +147,10 @@ export default function TicketDetailPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </Surface>
 
           {/* Comments Section */}
-          <div className="bg-white rounded-lg shadow-md flex flex-col h-[500px]">
+          <Surface className="bg-white rounded-lg shadow-md flex flex-col h-[500px]">
             <div className="p-4 border-b border-gray-200">
               <Heading3 className="font-semibold text-gray-800">Discussion</Heading3>
             </div>
@@ -205,12 +206,12 @@ export default function TicketDetailPage() {
                 </NativeButton>
               </form>
             </div>
-          </div>
+          </Surface>
         </div>
 
         {/* Sidebar - Meta Info & Actions */}
         <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <Surface className="bg-white rounded-lg shadow-md p-6">
             <Heading3 className="font-semibold text-gray-800 mb-4">Ticket Details</Heading3>
 
             <div className="space-y-4">
@@ -250,7 +251,7 @@ export default function TicketDetailPage() {
                 </div>
               )}
             </div>
-          </div>
+          </Surface>
         </div>
       </div>
     </div>

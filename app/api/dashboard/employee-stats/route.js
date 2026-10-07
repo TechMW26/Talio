@@ -151,11 +151,6 @@ export async function GET(request) {
         change: 0,
         trend: 'neutral'
       },
-      completedCourses: {
-        value: 0,
-        change: 0,
-        trend: 'neutral'
-      },
       performanceScore: {
         value: latestPerformance ? latestPerformance.overallRating * 20 : 0,
         change: 0,

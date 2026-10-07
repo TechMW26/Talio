@@ -72,7 +72,7 @@ test('named page pills jump directly to a panel and mark the active page', () =>
 test('home bottom clearance comes only from the shell and pagination stays bounded', () => {
   const layout = fs.readFileSync('app/dashboard/dashboard-layout.css', 'utf8')
   expect(layout).toContain('.dashboard-content-frame:has([data-page-sizing="viewport"]):has([data-dashboard-home]) { padding-bottom: 0; }')
-  expect(layout).toContain('padding: var(--dashboard-shell-inset)')
+  expect(layout).toContain('padding: var(--dashboard-navigation-inset) var(--dashboard-shell-inset)')
   expect(layout).toContain('calc(76px + env(safe-area-inset-bottom))')
   expect(fs.readFileSync('components/dashboards/UnifiedDashboard.js', 'utf8').match(/data-dashboard-home/g)).toHaveLength(2)
   expect(fs.readFileSync('app/dashboard/page.js', 'utf8')).toContain('data-dashboard-home')
@@ -126,6 +126,6 @@ test('widgets and quick tools stretch to a shared bottom edge without extra stag
   expect(workspace).toContain('align-items: stretch')
   expect(slide).toContain('padding: 0')
   const punchCss = fs.readFileSync('components/widgets/CheckInOutWidget.module.css', 'utf8')
-  expect(punchCss).toContain('.punches:has(> .location:empty) { grid-template-rows: auto minmax(180px, 1fr); }')
+  expect(punchCss).toContain('.punches:has(> .location:empty) { grid-template-rows: auto repeat(2, minmax(150px, 1fr)); }')
   expect(punchCss.match(/\.layout\s*\{([^}]+)\}/)[1]).toContain('grid-template-rows: minmax(0, 1fr);')
 })

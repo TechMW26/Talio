@@ -1,4 +1,5 @@
 'use client'
+import { Surface } from '@/components/ui/fernly'
 
 
 import { Heading1, Heading2, NativeInput, NativeTextarea, NativeButton, Heading3 } from '@/components/ui/fernly/native'
@@ -541,7 +542,7 @@ export default function EditEmployeePage() {
 
                     {/* Dropdown List */}
                     {showDeptDropdown && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-default-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <Surface className="absolute z-50 w-full mt-1 bg-white border border-default-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                         {departments.length === 0 ? (
                           <div className="px-4 py-2 text-default-500 text-sm">No departments available</div>
                         ) : (
@@ -581,7 +582,7 @@ export default function EditEmployeePage() {
                             )
                           })
                         )}
-                      </div>
+                      </Surface>
                     )}
                   </div>
                 </div>
@@ -961,7 +962,7 @@ export default function EditEmployeePage() {
               <Heading3 className="text-lg font-semibold text-default-700 mb-3">Statutory Compliance</Heading3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                 {/* PF Enrollment */}
-                <div className="bg-default-50 p-4 rounded-lg">
+                <Surface className="bg-default-50 p-4 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-default-700">PF Enrolled</label>
                     <NativeButton
@@ -996,10 +997,10 @@ export default function EditEmployeePage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </Surface>
 
                 {/* ESI Enrollment */}
-                <div className="bg-default-50 p-4 rounded-lg">
+                <Surface className="bg-default-50 p-4 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-default-700">ESI Enrolled</label>
                     <NativeButton
@@ -1022,7 +1023,7 @@ export default function EditEmployeePage() {
                       />
                     </div>
                   )}
-                </div>
+                </Surface>
               </div>
 
               {/* PAN Number */}
@@ -1043,7 +1044,7 @@ export default function EditEmployeePage() {
               </div>
 
               {/* Corporate Health Insurance */}
-              <div className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
+              <Surface className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                     🏥 Corporate Health Insurance
@@ -1087,7 +1088,7 @@ export default function EditEmployeePage() {
                     </div>
                   </div>
                 )}
-              </div>
+              </Surface>
             </div>
 
             {/* Submit Button */}

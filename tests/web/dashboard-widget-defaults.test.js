@@ -3,7 +3,7 @@ import { useDashboardWidgets } from '@/hooks/useDashboardWidgets'
 import { WIDGET_REGISTRY } from '@/lib/widgetRegistry'
 
 test('only scrollable-list widgets opt into the taller minimum height', () => {
-  const scrollable = ['employee-directory', 'leave-requests', 'leave-balance', 'goals-widget', 'project-tasks', 'announcements', 'holidays', 'today-tasks', 'learning-progress', 'recent-activity', 'my-assets', 'my-expenses', 'my-helpdesk', 'policies', 'role-news']
+  const scrollable = ['employee-directory', 'leave-requests', 'leave-balance', 'goals-widget', 'project-tasks', 'announcements', 'holidays', 'today-tasks', 'recent-activity', 'my-assets', 'my-expenses', 'my-helpdesk', 'policies', 'role-news']
   expect(Object.values(WIDGET_REGISTRY).filter(widget => widget.scrollableList).map(widget => widget.id).sort()).toEqual(scrollable.sort())
   for (const id of ['check-in-out', 'attendance-summary', 'team-attendance', 'quick-actions', 'recent-activities']) {
     expect(WIDGET_REGISTRY[id].scrollableList).toBeUndefined()
