@@ -24,7 +24,7 @@ import {
   HiOutlineChevronLeft, HiOutlineChevronRight,
   HiOutlinePlay, HiOutlineEye, HiOutlineDocumentText, HiOutlineArrowRight,
   HiOutlineLockClosed, HiOutlineArrowPath, HiOutlineArrowsRightLeft,
-    HiOutlineMagnifyingGlass, HiOutlineSquares2X2
+  HiOutlineMagnifyingGlass, HiOutlineSquares2X2
 } from 'react-icons/hi2'
 import {
   FaEdit, FaPlus, FaUsers, FaTasks, FaCalendarAlt,
@@ -1276,31 +1276,31 @@ export default function ProjectDetailPage() {
   }
 
   const handleSaveTaskStatuses = async (statuses) => {
-  try {
-    setSavingStatuses(true)
-    const token = localStorage.getItem('token')
-    const response = await fetch(`/api/projects/${projectId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-        body: JSON.stringify({ taskStatuses: [...statuses, ...getHiddenSystemStatuses(project)] })    })
-
-        const data = await response.json()
-    if (data.success) {
-      await mutateProject()
-      toast.success('Task statuses updated')
-      setShowManageStatuses(false)
-    } else {
-      toast.error(data.message)
+    try {
+      setSavingStatuses(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ taskStatuses: [...statuses, ...getHiddenSystemStatuses(project)] })
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        await mutateProject()
+        toast.success('Task statuses updated')
+        setShowManageStatuses(false)
+      } else {
+        toast.error(data.message || 'Failed to update task statuses')
+      }
+    } catch (error) {
+      toast.error('Failed to update task statuses')
+    } finally {
+      setSavingStatuses(false)
     }
-  } catch (error) {
-    toast.error('Failed to update task statuses')
-  } finally {
-    setSavingStatuses(false)
   }
-}
 
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -1361,7 +1361,7 @@ export default function ProjectDetailPage() {
   const isProjectHead = project.isProjectHead
   const isCreator = project.isCreator
   const canManage = isProjectHead || isCreator || (user && ['admin'].includes(user.role))
-  const canManageStatuses = isProjectHead
+  const canManageStatuses = Boolean(currentEmployeeId && [project.projectHead, ...(project.projectHeads || [])].some(head => (head?._id || head) === currentEmployeeId))
   const taskStatuses = getBoardTaskStatuses(project)
   const kanbanStatusColumns = taskStatuses.map(s => ({ key: s.key, label: s.label, color: s.color }))
   const taskStatusTaskCounts = project?.taskStatusUsage || {}
@@ -1455,13 +1455,13 @@ export default function ProjectDetailPage() {
             </NativeButton>
           )}
           {canManageStatuses && (
-            <button
+            <NativeButton
               onClick={() => { setShowManageStatuses(true); mutateProject() }}
               className="btn-secondary flex items-center"
             >
               <HiOutlineSquares2X2 className="mr-2 w-4 h-4" />
               Manage Statuses
-            </button>
+            </NativeButton>
           )}
 
           {/* Mark Complete button - ONLY visible for Project Head */}
@@ -1509,7 +1509,7 @@ export default function ProjectDetailPage() {
               )}
             </NativeButton>
           )}
-               </div>
+        </div>
       </div>
 
       <ManageTaskStatusesModal
@@ -1641,7 +1641,7 @@ export default function ProjectDetailPage() {
                 )}
               </div>
 
-                           <TaskStatusProgressBar tasks={tasks} taskStatuses={taskStatuses} />
+              <TaskStatusProgressBar tasks={tasks} taskStatuses={taskStatuses} />
 
               {/* Kanban-style Board */}
               <KanbanBoard

@@ -1,7 +1,27 @@
 import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import KanbanBoard, { canMoveTask } from '@/components/tasks/KanbanBoard'
+import fs from 'fs'
 
 const task = { _id: 'one', title: 'Design review', status: 'todo', priority: 'high', project: { _id: 'p1', name: 'Talio' }, assignees: [{ _id: 'a1', assignmentStatus: 'accepted', user: { firstName: 'Alex' } }] }
+
+test('dynamic columns preserve order, colors and custom move actions beyond four columns', () => {
+  const columns = ['todo', 'in-progress', 'review', 'completed', 'qa', 'ready'].map(key => ({ key, label: key, color: 'pink' }))
+  const move = jest.fn()
+  render(<KanbanBoard tasks={[task, { ...task, _id: 'qa-task', title: 'Check quality', status: 'qa' }]} statusColumns={columns} onStatusChange={move} />)
+  expect(screen.getAllByRole('region').map(el => el.dataset.kanbanColumn)).toEqual(columns.map(s => s.key))
+  expect(within(screen.getByRole('region', { name: 'qa' })).getByText('Check quality')).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'qa' }).querySelector('header > span')).toHaveStyle({ background: '#f472b6' })
+  fireEvent.click(screen.getByRole('button', { name: 'Move Design review' }))
+  fireEvent.click(screen.getByRole('button', { name: 'ready', exact: true }))
+  expect(move).toHaveBeenCalledWith(task, 'ready')
+})
+test('dynamic layout remains one horizontal row on desktop and mobile', () => {
+  const css = fs.readFileSync('components/tasks/KanbanBoard.module.css', 'utf8')
+  expect(css).toContain('grid-auto-flow: column')
+  expect(css).toContain('grid-auto-columns: minmax(250px, 1fr)')
+  expect(css).toContain('grid-auto-columns: 84%')
+  expect(css).not.toContain('repeat(4,')
+})
 
 test('shared board keeps details and project actions separate', () => {
   const open = jest.fn(), project = jest.fn()

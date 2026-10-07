@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { FaTimes, FaPlus, FaTrash, FaArrowUp, FaArrowDown, FaLock, FaExclamationTriangle } from 'react-icons/fa'
+import { NativeButton, NativeInput, NativeSelect, DialogSurface } from "@/components/ui/fernly/native"
 import ModalPortal from '@/components/ui/ModalPortal'
 import { STATUS_COLOR_KEYS, getStatusColorClasses } from '@/lib/taskStatusConfig'
 
@@ -30,18 +31,18 @@ export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = []
   const cancelRemove = () => setConfirmIndex(null)
   const doRemove = (i) => { setRows(prev => prev.filter((_, idx) => idx !== i)); setConfirmIndex(null) }
   const addRow = () => setRows(prev => [...prev, { key: '', label: '', color: 'blue', order: prev.length, isSystem: false }])
-  const handleSave = () => onSave(rows.filter(r => r.label.trim()))
+  const handleSave = () => onSave(rows)
 
   return (
     <ModalPortal isOpen={isOpen}>
       <div className="modal-overlay">
-        <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+        <DialogSurface role="dialog" aria-modal="true" aria-label="Manage Task Statuses" className="bg-white rounded-[30px] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
           <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
             <div>
               <h3 className="text-xl font-bold text-gray-900">Manage Task Statuses</h3>
               <p className="text-xs text-gray-500 mt-0.5">Add, rename, recolor or reorder statuses.</p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg"><FaTimes /></button>
+            <NativeButton onClick={onClose} disabled={saving} className="p-2 hover:bg-gray-100 rounded-lg"><FaTimes aria-label="Close" /></NativeButton>
           </div>
 
           <div className="p-4 space-y-2 overflow-y-auto flex-1">
@@ -60,7 +61,7 @@ export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = []
                       </p>
                     </div>
                     <div className="flex justify-end gap-2 mt-3">
-                      <button type="button" onClick={() => setBlockedIndex(null)} className="px-4 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-100">OK</button>
+                      <NativeButton type="button" onClick={() => setBlockedIndex(null)} className="px-4 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-100">OK</NativeButton>
                     </div>
                   </div>
                 )
@@ -77,8 +78,8 @@ export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = []
                       </p>
                     </div>
                     <div className="flex justify-end gap-2 mt-3">
-                      <button type="button" onClick={cancelRemove} className="px-4 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-100">Cancel</button>
-                      <button type="button" onClick={() => doRemove(i)} className="px-4 py-1.5 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700">Yes, Delete</button>
+                      <NativeButton type="button" onClick={cancelRemove} className="px-4 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-100">Cancel</NativeButton>
+                      <NativeButton type="button" onClick={() => doRemove(i)} disabled={saving} className="px-4 py-1.5 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700">Yes, Delete</NativeButton>
                     </div>
                   </div>
                 )
@@ -86,31 +87,31 @@ export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = []
               return (
                 <div key={row.key || `new-${i}`} className="flex items-center gap-2 p-2 rounded-xl border border-gray-200">
                   <div className="flex flex-col">
-                    <button type="button" onClick={() => moveRow(i, -1)} disabled={i === 0} className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30"><FaArrowUp size={10} /></button>
-                    <button type="button" onClick={() => moveRow(i, 1)} disabled={i === rows.length - 1} className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30"><FaArrowDown size={10} /></button>
+                    <NativeButton type="button" onClick={() => moveRow(i, -1)} disabled={saving || i === 0} aria-label={`Move ${row.label || "status"} up`} className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30"><FaArrowUp size={10} /></NativeButton>
+                    <NativeButton type="button" onClick={() => moveRow(i, 1)} disabled={saving || i === rows.length - 1} aria-label={`Move ${row.label || "status"} down`} className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30"><FaArrowDown size={10} /></NativeButton>
                   </div>
                   <span className={`inline-block h-3 w-3 rounded-full flex-shrink-0 ${c.dot}`} />
-                  <input type="text" value={row.label} onChange={(e) => updateRow(i, { label: e.target.value })} maxLength={60} placeholder="Status name" className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
-                  <select value={row.color} onChange={(e) => updateRow(i, { color: e.target.value })} className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
+                  <NativeInput type="text" aria-label={`Status ${i + 1} name`} disabled={saving} value={row.label} onChange={(e) => updateRow(i, { label: e.target.value })} maxLength={60} placeholder="Status name" className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
+                  <NativeSelect aria-label={`Status ${i + 1} color`} disabled={saving} value={row.color} onChange={(e) => updateRow(i, { color: e.target.value })} className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
                     {STATUS_COLOR_KEYS.map(cl => <option key={cl} value={cl}>{cl.charAt(0).toUpperCase() + cl.slice(1)}</option>)}
-                  </select>
+                  </NativeSelect>
                   {row.isSystem ? (
                     <span className="p-2 text-gray-400" title="Built-in - cannot be removed"><FaLock size={12} /></span>
                   ) : (
-                    <button type="button" onClick={() => confirmRemove(i)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><FaTrash size={12} /></button>
+                    <NativeButton type="button" onClick={() => confirmRemove(i)} disabled={saving} aria-label={`Delete ${row.label || "status"}`}  className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><FaTrash size={12} /></NativeButton>
                   )}
                 </div>
               )
             })}
 
-            <button type="button" onClick={addRow} className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-gray-300 text-sm text-gray-600 hover:bg-gray-50"><FaPlus size={11} /> Add status</button>
+            <NativeButton type="button" onClick={addRow} disabled={saving || rows.length >= 96} className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-gray-300 text-sm text-gray-600 hover:bg-gray-50"><FaPlus size={11} /> Add status</NativeButton>
           </div>
 
           <div className="px-6 py-4 bg-gray-50 flex items-center justify-end gap-2 flex-shrink-0">
-            <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-200">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-60">{saving ? 'Saving...' : 'Save Statuses'}</button>
+            <NativeButton onClick={onClose} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-200">Cancel</NativeButton>
+            <NativeButton onClick={handleSave} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-60">{saving ? 'Saving...' : 'Save Statuses'}</NativeButton>
           </div>
-        </div>
+        </DialogSurface>
       </div>
     </ModalPortal>
   )
