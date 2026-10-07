@@ -9,7 +9,10 @@ firestore-debug.log
 firebase-debug.log
 node_modules
 coverage
-desktop-app
+desktop-app/*
+!desktop-app/src
+desktop-app/src/*
+!desktop-app/src/miraActionPlan.js
 talioapp
 release
 android
