@@ -1,6 +1,7 @@
 """Talio's data-only Agent S action interface. Never evaluates generated code."""
 import ast
 import math
+from urllib.parse import urlparse
 
 
 def action(method):
@@ -61,6 +62,37 @@ class SafeACI:
         if key not in ("space", "enter", "tab", "escape", "backspace", "up", "down", "left", "right", "select_all", "copy", "paste", "find", "open_location", "app_switch", "app_search", "browser_address", "new_tab", "close_tab", "refresh", "save", "undo", "redo"):
             raise ValueError("Unsupported key")
         return {"type": "key", "key": key}
+
+    @action
+    def navigate(self, url: str, newTab: bool = False):
+        """Open HTTP(S) URL in the current browser tab in one step. Only set newTab when the user explicitly requests a new tab. Observe after navigation; this does not prove the page loaded."""
+        if not isinstance(url, str) or len(url) > 2000 or type(newTab) is not bool or any(ord(char) <= 32 or ord(char) == 127 for char in url):
+            raise ValueError('Invalid navigation')
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError('Unsafe URL')
+        return {"type": "navigate", "url": url, "newTab": newTab}
+
+    @action
+    def batch(self, actions: list):
+        """Execute 2..4 predictable inputs grounded in ONE screenshot. Literal dicts only. Allowed: browser_address,type HTTP(S) URL,enter; find,type; click verified editable input,type; click,select_all,type; select_all,type. No newlines, sends, submissions, app/tab changes or unknown next-screen targets. Use navigate for URLs. Observe after the batch."""
+        if not isinstance(actions, list) or not 2 <= len(actions) <= 4:
+            raise ValueError('Invalid batch')
+        validated = []
+        for item in actions:
+            if not isinstance(item, dict) or item.get('type') not in ('click', 'type', 'key'):
+                raise ValueError('Unsupported batch action')
+            args = {key: value for key, value in item.items() if key != 'type'}
+            validated.append(getattr(self, item['type'])(**args))
+        signature = ','.join(item['key'] if item['type'] == 'key' else item['type'] for item in validated)
+        if signature == 'browser_address,type,enter':
+            self.navigate(validated[1]['text'])
+        elif signature in ('find,type', 'click,type', 'click,select_all,type', 'select_all,type'):
+            if any(item['type'] == 'type' and any(ord(char) < 32 or ord(char) == 127 for char in item['text']) for item in validated):
+                raise ValueError('Control characters forbidden in editing batches')
+        else:
+            raise ValueError('Sequence requires a fresh screenshot')
+        return {"type": "batch", "actions": validated}
 
     @action
     def scroll(self, amount: int):

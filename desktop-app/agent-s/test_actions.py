@@ -3,6 +3,21 @@ from actions import SafeACI, parse_action
 
 
 class ActionsTest(unittest.TestCase):
+    def test_bounded_literal_sequences(self):
+        self.assertEqual(parse_action(SafeACI(), 'agent.navigate("https://example.com")', {})['type'], 'navigate')
+        result = parse_action(SafeACI(), 'agent.batch([{"type":"key","key":"find"},{"type":"type","text":"Mansi"}])', {})
+        self.assertEqual(len(result['actions']), 2)
+        for code in [
+            'agent.navigate("javascript:alert(1)")',
+            'agent.navigate("https://user:pass@example.com")',
+            'agent.batch([{"type":"type","text":"Hi"},{"type":"key","key":"enter"}])',
+            'agent.batch([{"type":"click","x":0.2,"y":0.3},{"type":"type","text":"Hi\\n"}])',
+            'agent.batch([agent.key("find"),agent.type("Mansi")])',
+            'agent.batch([{"type":"open_app","name":"Notes"},{"type":"type","text":"Hi"}])',
+        ]:
+            with self.subTest(code=code), self.assertRaises(Exception):
+                parse_action(SafeACI(), code, {})
+
     def test_supported(self):
         self.assertEqual(parse_action(SafeACI(), 'agent.click(0.2, 0.7)', {}), {"type": "click", "x": 0.2, "y": 0.7})
         self.assertEqual(parse_action(SafeACI(), 'agent.type("hello")', {}), {"type": "type", "text": "hello"})

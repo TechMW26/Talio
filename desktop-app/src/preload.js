@@ -1,5 +1,5 @@
 /**
- * Preload Script v6.0.3
+ * Preload Script v6.0.24
  * Exposes secure IPC channels to the renderer process
  * With enhanced screen sharing support for Windows multi-display
  */

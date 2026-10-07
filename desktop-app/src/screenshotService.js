@@ -1,5 +1,5 @@
 /**
- * Screenshot Service v6.0.3
+ * Screenshot Service v6.0.24
  * Handles automatic screen capture with tenant-controlled Vercel Blob uploads
  * Uses main-process desktopCapturer via IPC (Electron 35+ compatibility)
  */

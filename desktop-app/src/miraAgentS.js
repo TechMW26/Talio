@@ -26,7 +26,7 @@ function createAgentS({ packaged, resourcesPath, platform = process.platform, ar
   return {
     available: () => fs.existsSync(executable),
     stop,
-    async begin(goal) {
+    async begin(goal, policy = '') {
       if (!fs.existsSync(executable)) throw new Error('This desktop build is missing the local Agent S runtime. Please update Talio.');
       stop();
       child = spawn(executable, [], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true,
@@ -50,7 +50,7 @@ function createAgentS({ packaged, resourcesPath, platform = process.platform, ar
           else waiter.resolve(message);
         } catch { stop(); }
       });
-      return exchange({ operation: 'begin', goal });
+      return exchange({ operation: 'begin', goal, policy });
     },
     predict: observation => exchange({ operation: 'predict', ...observation }),
     respond: text => exchange({ operation: 'model_response', text }),

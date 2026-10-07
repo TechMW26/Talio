@@ -11,6 +11,13 @@ async function main() {
     assert.equal((await worker.predict(screen)).kind, 'model_request');
     const done = await worker.respond('```python\nagent.done("WhatsApp is open.")\n```');
     assert.equal(done.done, true);
+    assert.equal((await worker.predict(screen)).kind, 'model_request');
+    const navigation = await worker.respond('```python\nagent.navigate("https://example.com")\n```');
+    assert.deepEqual(navigation.action, { type: 'navigate', url: 'https://example.com', newTab: false });
+    assert.equal((await worker.predict(screen)).kind, 'model_request');
+    const batch = await worker.respond('```python\nagent.batch([{"type":"key","key":"find"},{"type":"type","text":"Fixture"}])\n```');
+    assert.equal(batch.action.type, 'batch');
+    assert.equal(batch.action.actions.length, 2);
     worker.stop();
     assert.equal((await worker.begin('Restart fixture')).kind, 'ready');
     console.log('Packaged Agent S startup, prediction, continuity and restart passed.');

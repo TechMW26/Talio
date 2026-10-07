@@ -1,3 +1,18 @@
+## Talio Desktop v6.0.24 - Smarter MIRA Desktop Actions
+
+- Short, predictable input sequences share one screenshot; browser URL navigation combines address-bar focus, typing and Enter.
+- Reuse the current browser tab by default, including known web-app fallbacks. New tabs require an explicit user request.
+- Shared shortest-reliable-route policy prioritises native app focus, supported shortcuts and verified accessibility targets.
+- Email, WhatsApp and app-specific DM hints improve channel selection; recipient and send-result verification remain required.
+- Stop on focus changes, cancelled sessions, revoked consent or uncertain input failures. Never replay a partially completed batch.
+- Includes the recent shared UI spacing, dropdown, tab-shell and global attendance-colour refinements in the hosted web app.
+
+Validation: 2,793 automated tests passed; 348 were skipped under existing conditions. Eight Python tests, production web build and packaged Agent S smoke tests passed. Hands-on acceptance across all operating systems remains unverified.
+
+Distribution: macOS Apple Silicon/Intel, Windows x64 and Linux x64. CI packages remain unsigned; macOS packages are not Apple-notarized. macOS desktop control requires macOS 14+, Accessibility and Screen Recording; Linux requires X11.
+
+---
+
 ## Talio Desktop v5.0.0 - Major Update: macOS 26 Compatibility
 
 ### Breaking Changes
