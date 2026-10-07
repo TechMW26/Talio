@@ -18,7 +18,7 @@ import {
   HiOutlineChevronLeft, HiOutlineChevronRight,
   HiOutlinePlay, HiOutlineEye, HiOutlineDocumentText, HiOutlineArrowRight,
   HiOutlineLockClosed, HiOutlineArrowPath, HiOutlineArrowsRightLeft,
-  HiOutlineMagnifyingGlass
+    HiOutlineMagnifyingGlass, HiOutlineSquares2X2
 } from 'react-icons/hi2'
 import {
   FaEdit, FaPlus, FaUsers, FaTasks, FaCalendarAlt,
@@ -37,6 +37,9 @@ import ModalPortal from '@/components/ui/ModalPortal'
 import Loader from '@/components/ui/Loader'
 import SubtaskCompletionButton from '@/components/tasks/SubtaskCompletionButton'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
+import ManageTaskStatusesModal from '@/components/tasks/ManageTaskStatusesModal'
+import TaskStatusProgressBar from '@/components/tasks/TaskStatusProgressBar'
+import { getBoardTaskStatuses, getHiddenSystemStatuses } from '@/lib/taskStatusConfig'
 
 const statusColors = {
   planned: 'bg-blue-100 text-blue-800',
@@ -190,6 +193,8 @@ export default function ProjectDetailPage() {
   const [showEditTaskModal, setShowEditTaskModal] = useState(false)
   const [editTaskForm, setEditTaskForm] = useState(null)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+  const [showManageStatuses, setShowManageStatuses] = useState(false)
+  const [savingStatuses, setSavingStatuses] = useState(false)
 
   // Reason modal state for status changes (requires justification)
   const [showReasonModal, setShowReasonModal] = useState(false)
@@ -1264,6 +1269,33 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const handleSaveTaskStatuses = async (statuses) => {
+  try {
+    setSavingStatuses(true)
+    const token = localStorage.getItem('token')
+    const response = await fetch(`/api/projects/${projectId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+        body: JSON.stringify({ taskStatuses: [...statuses, ...getHiddenSystemStatuses(project)] })    })
+
+        const data = await response.json()
+    if (data.success) {
+      await mutateProject()
+      toast.success('Task statuses updated')
+      setShowManageStatuses(false)
+    } else {
+      toast.error(data.message)
+    }
+  } catch (error) {
+    toast.error('Failed to update task statuses')
+  } finally {
+    setSavingStatuses(false)
+  }
+}
+
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
@@ -1323,6 +1355,9 @@ export default function ProjectDetailPage() {
   const isProjectHead = project.isProjectHead
   const isCreator = project.isCreator
   const canManage = isProjectHead || isCreator || (user && ['admin'].includes(user.role))
+  const canManageStatuses = isProjectHead
+  const taskStatuses = getBoardTaskStatuses(project)
+  const kanbanStatusColumns = taskStatuses.map(s => ({ key: s.key, label: s.label, color: s.color }))
   const isAcceptedMember = project.currentUserInvitationStatus === 'accepted' || isProjectHead || isCreator || (user && ['admin'].includes(user.role))
   const isPendingInvitation = project.currentUserInvitationStatus === 'invited'
   const isWaitingForReview = (project.completionPercentage >= 100) && new Date(project.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(project.status)
@@ -1403,13 +1438,22 @@ export default function ProjectDetailPage() {
         {/* Action Buttons */}
         <div className="flex gap-2 flex-wrap">
           {/* Edit button - for project head, creator, or admin */}
-          {canManage && (
+                   {canManage && (
             <button
               onClick={() => router.push(`/dashboard/projects/${projectId}/edit`)}
               className="btn-secondary flex items-center"
             >
               <FaEdit className="mr-2" />
               Edit
+            </button>
+          )}
+          {canManageStatuses && (
+            <button
+              onClick={() => setShowManageStatuses(true)}
+              className="btn-secondary flex items-center"
+            >
+              <HiOutlineSquares2X2 className="mr-2 w-4 h-4" />
+              Manage Statuses
             </button>
           )}
 
@@ -1458,8 +1502,16 @@ export default function ProjectDetailPage() {
               )}
             </button>
           )}
-        </div>
+               </div>
       </div>
+
+      <ManageTaskStatusesModal
+        isOpen={showManageStatuses}
+        onClose={() => setShowManageStatuses(false)}
+        statuses={taskStatuses}
+        onSave={handleSaveTaskStatuses}
+        saving={savingStatuses}
+      />
 
       {/* Pending Invitation Banner */}
       {isPendingInvitation && (
@@ -1632,12 +1684,15 @@ export default function ProjectDetailPage() {
                 )}
               </div>
 
+                           <TaskStatusProgressBar tasks={tasks} taskStatuses={taskStatuses} />
+
               {/* Kanban-style Board */}
               <KanbanBoard
                 tasks={tasks}
                 onTaskClick={setSelectedTask}
                 onStatusChange={handleKanbanStatusChange}
                 enableDragDrop={true}
+                statusColumns={kanbanStatusColumns}
               />
             </div>
           )}

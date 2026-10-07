@@ -7,12 +7,13 @@ import styles from './KanbanBoard.module.css'
 
 // Fernly kanban geometry, © 2026 Hasib (OVERSHOOT), adapted for Talio.
 // Persistence, confirmations and authorization remain with existing callers.
-const COLUMNS = [
+const DEFAULT_COLUMNS = [
   { id: 'todo', label: 'To Do', color: '#94a3b8' },
   { id: 'in-progress', label: 'In Progress', color: '#60a5fa' },
   { id: 'review', label: 'Review', color: '#a78bfa' },
   { id: 'completed', label: 'Completed', color: '#34d399' },
 ]
+const COLOR_HEX = { gray: '#94a3b8', blue: '#60a5fa', purple: '#a78bfa', green: '#34d399', orange: '#fb923c', red: '#f87171', amber: '#fbbf24', indigo: '#818cf8', pink: '#f472b6', teal: '#2dd4bf' }
 
 export function canMoveTask(task, enabled) {
   const pending = task.assignmentStatus === 'pending' || task.assignees?.some(a => a.assignmentStatus === 'pending')
@@ -20,7 +21,10 @@ export function canMoveTask(task, enabled) {
 }
 const dateLabel = date => date && !Number.isNaN(new Date(date).getTime()) ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null
 
-export default function KanbanBoard({ tasks = [], onTaskClick, onStatusChange, showProject = false, enableDragDrop = true, onProjectClick }) {
+export default function KanbanBoard({ tasks = [], onTaskClick, onStatusChange, showProject = false, enableDragDrop = true, onProjectClick, statusColumns }) {
+  const COLUMNS = Array.isArray(statusColumns) && statusColumns.length > 0
+    ? statusColumns.map(s => ({ id: s.key, label: s.label, color: COLOR_HEX[s.color] || COLOR_HEX.gray }))
+    : DEFAULT_COLUMNS
   const [draggedTask, setDraggedTask] = useState(null)
   const [overColumn, setOverColumn] = useState(null)
   const [moveMenu, setMoveMenu] = useState(null)
