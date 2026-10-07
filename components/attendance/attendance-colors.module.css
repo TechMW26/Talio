@@ -1,0 +1,24 @@
+/* One attendance palette for every month calendar, legend and day badge. */
+.day, .badge, .swatch { --attendance-rgb: 148, 163, 184; }
+:is(.day, .badge, .swatch)[data-attendance-status="present"] { --attendance-rgb: 16, 185, 129; }
+:is(.day, .badge, .swatch)[data-attendance-status="absent"] { --attendance-rgb: 244, 63, 94; }
+:is(.day, .badge, .swatch)[data-attendance-status="late"] { --attendance-rgb: 234, 179, 8; }
+:is(.day, .badge, .swatch)[data-attendance-status="half-day"], :is(.day, .badge, .swatch)[data-attendance-status="half_day"] { --attendance-rgb: 249, 115, 22; }
+:is(.day, .badge, .swatch)[data-attendance-status="leave"], :is(.day, .badge, .swatch)[data-attendance-status="on-leave"] { --attendance-rgb: 168, 85, 247; }
+:is(.day, .badge, .swatch)[data-attendance-status="holiday"] { --attendance-rgb: 20, 184, 166; }
+:is(.day, .badge, .swatch)[data-attendance-status="in-progress"], :is(.day, .badge, .swatch)[data-attendance-status="working"] { --attendance-rgb: 59, 130, 246; }
+:is(.day, .badge, .swatch)[data-attendance-status="work-from-home"], :is(.day, .badge, .swatch)[data-attendance-status="wfh"] { --attendance-rgb: 6, 182, 212; }
+.day.day[data-attendance-status], .badge.badge[data-attendance-status] {
+  background: rgba(var(--attendance-rgb), .14) !important;
+  border-color: rgba(var(--attendance-rgb), .45) !important;
+}
+.day.day[data-attendance-status] > span, .badge.badge[data-attendance-status] {
+  color: color-mix(in srgb, rgb(var(--attendance-rgb)) 70%, var(--color-text-primary)) !important;
+}
+.day.day[data-attendance-status="no-record"], .day.day[data-attendance-status="weekend"] { background: rgba(var(--attendance-rgb), .04) !important; border-color: var(--color-border) !important; }
+.day.day[data-attendance-status][aria-pressed="true"] { box-shadow: inset 0 0 0 2px rgb(var(--attendance-rgb)) !important; }
+.day.day[data-attendance-status]:disabled { opacity: .65; }
+.day.day[data-attendance-status="no-record"]:disabled { opacity: .3; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 16px; padding: 0; list-style: none; color: var(--color-text-secondary); font-size: 11px; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.swatch { width: 9px; height: 9px; border-radius: 3px; background: rgb(var(--attendance-rgb)); flex-shrink: 0; }

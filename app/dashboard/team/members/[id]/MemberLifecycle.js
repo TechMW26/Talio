@@ -1,7 +1,7 @@
 'use client'
 
 
-import { Heading2, NativeButton, Heading3 } from '@/components/ui/fernly/native'
+import { NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { useState } from 'react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import styles from './lifecycle.module.css'
@@ -12,7 +12,7 @@ export default function MemberLifecycle({ employeeId }) {
   const history = data?.data
   const events = (history?.events || []).filter(event => filter === 'all' || event.category === filter)
   return <section className={styles.panel} aria-label="Employee lifecycle">
-    <header><div><p>EMPLOYEE JOURNEY</p><Heading2>Lifecycle history</Heading2></div><NativeButton onClick={() => mutate()} disabled={isValidating} aria-label="Refresh lifecycle history">↻</NativeButton></header>
+    <header><NativeButton onClick={() => mutate()} disabled={isValidating} aria-label="Refresh lifecycle history">↻</NativeButton></header>
     {isLoading ? <p role="status">Loading lifecycle history…</p> : error ? <p role="alert">{error.status === 403 ? 'You do not have permission to view this lifecycle history.' : 'History could not be loaded. Use refresh to retry.'}</p> : history && <>
       <div className={styles.summary}><span>{history.stage.replaceAll('_', ' ')}</span><strong>{history.progress ? `${history.progress.percentage}%` : '—'}</strong><p>{history.progress ? `Onboarding · ${history.progress.completed}/${history.progress.total} recorded tasks` : 'No onboarding checklist recorded'}</p></div>
       <nav aria-label="Lifecycle filters">{[['all','All'],['promotion','Promotions'],['appraisal','Appraisals'],['pip','PIPs'],['other','Other']].map(([key, title]) => <NativeButton key={key} aria-pressed={filter === key} onClick={() => { setFilter(key); setCount(8) }}>{title}</NativeButton>)}</nav>

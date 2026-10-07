@@ -4,7 +4,7 @@ import { SummaryCard } from '@/components/ui/fernly'
 
 
 import { UploadInput } from '@/components/ui/UploadButton'
-import { Heading1, Heading3, Heading2, NativeInput } from '@/components/ui/fernly/native'
+import { Heading1, Heading3, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
@@ -262,7 +262,6 @@ export default function DocumentsPage() {
       {/* Employee folders and document cards */}
       {organisationView && employeeOptionsError && <DataErrorState message="Could not load the employee directory" onRetry={() => refreshEmployees()} />}
       {organisationView ? <DocumentFolders folders={folders} loading={isLoading || employeesLoading} onOpen={(id, element) => { folderSource.current = element; setSelectedFolderId(id) }} /> : <section aria-label="My documents" className="space-y-4">
-        <Heading2 className="text-xl font-semibold">My documents</Heading2>
         {isLoading ? <div aria-label="Loading documents" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(id => <Skeleton key={id} className="h-64 rounded-2xl" />)}</div> : <DocumentGrid documents={documents} canManage={canManageDocuments} onPreview={doc => { setPreviewDoc(doc); setShowPreview(true) }} onDownload={downloadDocument} onDelete={handleDelete} />}
       </section>}
       {selectedFolder && <FolderDocumentSurface key={selectedFolder.id} folder={selectedFolder} sourceElement={folderSource.current} onClose={() => setSelectedFolderId(null)} canManage={canManageDocuments} onPreview={doc => { setPreviewDoc(doc); setShowPreview(true) }} onDownload={downloadDocument} onDelete={handleDelete} />}

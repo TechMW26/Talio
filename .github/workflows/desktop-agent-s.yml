@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v6.0.23'
+      - 'v6.0.24'
 permissions:
   contents: write
 jobs:
@@ -85,21 +85,30 @@ jobs:
           pattern: desktop-*
           path: release-assets
           merge-multiple: true
-      - name: Publish v6.0.23
+      - name: Verify complete installer set
+        run: |
+          for asset in Talio-6.0.24-arm64.dmg Talio-6.0.24-arm64.zip Talio-6.0.24-x64.dmg Talio-6.0.24-x64.zip Talio.Setup.6.0.24.exe Talio-6.0.24-x86_64.AppImage Talio-6.0.24-amd64.deb; do
+            test -s "release-assets/$asset" || exit 1
+          done
+          cd release-assets
+          sha256sum *.dmg *.zip *.exe *.AppImage *.deb > SHA256SUMS.txt
+      - name: Publish v6.0.24
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.23
+          tag_name: v6.0.24
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.23 — Refined notifications and desktop interaction fixes
-          draft: false
+          name: Talio Desktop 6.0.24 — Smarter MIRA desktop actions
+          draft: true
           prerelease: false
           generate_release_notes: false
           body: |
-            Redesigned in-app notifications with elevated charcoal cards, clear actions, dismiss controls and consistent notification-list styling. Incoming notifications pause auto-dismiss while hovered or keyboard-focused; approval, reason, confirmation and reminder flows are preserved.
+            MIRA can execute short, predictable input sequences from one screenshot. Opening a URL focuses the browser address bar, types the URL and presses Enter as one observation-grounded action. Navigation reuses the current browser tab by default; new tabs require an explicit request.
 
-            Fixes desktop drag regions that could intercept close buttons and other controls. Header and sidebar now share one colour, wrapped search fields have a single border, and public document folders offer Load more in batches of 12 with full-list search.
+            Both desktop planners prioritise the shortest reliable route using documented shortcuts and verified accessibility targets. Channel hints distinguish email, WhatsApp and app-specific DMs; recipient and send-result verification remain required. Interrupted or uncertain batches stop without replaying partial input. Known web-app fallbacks use the current-tab navigation flow rather than the OS URL launcher.
 
-            Validated with focused automated UI tests and a production web build. CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 installers, including tested local Agent S runtimes. Hands-on acceptance on every operating system has not been performed.
+            Includes recent shared UI refinements: attendance status colours, consistent dropdown arrow spacing, transparent tab shells, compact headings and upload controls, and sidebar/settings spacing fixes. Web interface changes are delivered through the hosted Talio app.
+
+            Validated with 2,793 automated tests, eight Python action tests, a production web build and packaged Agent S smoke tests. 348 tests were skipped by their existing conditions. CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 installers with freshly rebuilt local Agent S runtimes. Hands-on browser/message acceptance on every operating system has not been performed.
 
             Signing: CI packages are not Developer ID signed or Apple notarized; Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
           files: |
@@ -108,4 +117,21 @@ jobs:
             release-assets/**/*.exe
             release-assets/**/*.AppImage
             release-assets/**/*.deb
+            release-assets/SHA256SUMS.txt
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify uploaded assets and publish completed release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view v6.0.24 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
+            let text = "";
+            process.stdin.on("data", chunk => text += chunk);
+            process.stdin.on("end", () => {
+              const assets = JSON.parse(text);
+              const expected = ["Talio-6.0.24-arm64.dmg", "Talio-6.0.24-arm64.zip", "Talio-6.0.24-x64.dmg", "Talio-6.0.24-x64.zip", "Talio.Setup.6.0.24.exe", "Talio-6.0.24-x86_64.AppImage", "Talio-6.0.24-amd64.deb", "SHA256SUMS.txt"];
+              for (const name of expected) {
+                const asset = assets.find(item => item.name === name);
+                if (!asset || asset.size < (name.endsWith(".txt") ? 100 : 1048576)) throw new Error("Missing or truncated release asset: " + name);
+              }
+            });'
+          gh release edit v6.0.24 --repo "${{ github.repository }}" --draft=false --latest

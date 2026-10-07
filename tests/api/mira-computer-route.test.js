@@ -53,3 +53,13 @@ test('provides host context and platform shortcut guidance to the legacy planner
   expect(prompt).toContain('try an OS-appropriate documented keyboard shortcut')
   expect(prompt).toContain('app_switch|app_search|browser_address')
 })
+
+test('batch-capable clients receive short navigation sequences; older clients do not', async () => {
+  const image = (await sharp({ create: { width: 8, height: 8, channels: 3, background: '#fff' } }).jpeg().toBuffer()).toString('base64')
+  generateVisionContent.mockResolvedValue('{"action":{"type":"navigate","url":"https://example.com"}}')
+  expect((await POST(request({ goal: 'Open example.com', app: 'Chrome', image, history: [], supportsBatch: true }))).status).toBe(200)
+  expect(generateVisionContent.mock.calls[0][0]).toContain('CURRENT browser tab')
+  expect((await POST(request({ goal: 'Open example.com', app: 'Chrome', image, history: [] }))).status).toBe(422)
+  generateVisionContent.mockResolvedValue('{"action":{"type":"batch","actions":[{"type":"type","text":"Hi"},{"type":"key","key":"enter"}]}}')
+  expect((await POST(request({ goal: 'WhatsApp Mansi', app: 'WhatsApp', image, history: [], supportsBatch: true }))).status).toBe(422)
+})

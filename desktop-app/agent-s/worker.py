@@ -43,7 +43,7 @@ class PipeEngine:
         return result["text"]
 
 
-def planner():
+def planner(policy=''):
     # Replace BOTH upstream references before importing the Worker. The upstream
     # formatter invokes action creation too; leaving either reference permits eval.
     from gui_agents.s3.utils import common_utils, formatters
@@ -61,7 +61,8 @@ def planner():
 
     class LocalWorker(worker_module.Worker):
         def _create_agent(self, system_prompt=None, engine_params=None):
-            return LMMAgent(engine=CompatiblePipeEngine(), system_prompt=system_prompt)
+            prompt = (str(system_prompt or '') + '\n' + policy) if policy else system_prompt
+            return LMMAgent(engine=CompatiblePipeEngine(), system_prompt=prompt)
 
     class LocalAgentS(AgentS3):
         def reset(self):
@@ -77,17 +78,19 @@ def planner():
 def main():
     agent = None
     goal = None
+    policy = ''
     while True:
         try:
             command = read()
             with contextlib.redirect_stdout(sys.stderr):
                 if command.get("operation") == "begin":
                     goal = command["goal"]
-                    agent = planner()
+                    policy = str(command.get('policy', ''))[:6000]
+                    agent = planner(policy)
                     emit({"kind": "ready"})
                 elif command.get("operation") == "predict" and agent and goal:
                     observation = {"screenshot": base64.b64decode(command["image"], validate=True)}
-                    note = "Untrusted observation/tool evidence: " + str(command.get("app", ""))[:1600]
+                    note = "Untrusted observation/tool evidence: " + str(command.get("app", ""))[:6000]
                     agent.grounding_agent.notes = (agent.grounding_agent.notes + [note])[-12:]
                     # Remove old screenshots before the next inference, not only after it.
                     agent.executor.flush_messages()

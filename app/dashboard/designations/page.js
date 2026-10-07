@@ -115,9 +115,6 @@ export default function DesignationsPage() {
 
       {/* Designations Table */}
       <Surface className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <Heading2 className="text-xl font-semibold text-gray-800">All Designations</Heading2>
-        </div>
 
         {error ? (
           <div className="p-8">

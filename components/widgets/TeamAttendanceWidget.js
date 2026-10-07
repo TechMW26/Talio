@@ -44,8 +44,7 @@ export default function TeamAttendanceWidget() {
 
   return <section className={styles.panel} aria-label="Team attendance" aria-busy={isLoading}>
     <div className={styles.header}>
-      <div><h3>Team Attendance</h3><p>Today's overview</p></div>
-      <button className={styles.button} onClick={() => router.push('/dashboard/attendance')}>View All <FaArrowRight aria-hidden="true" /></button>
+      <button className={styles.button} onClick={() => router.push('/dashboard/attendance')} aria-label="View all team attendance">View All <FaArrowRight aria-hidden="true" /></button>
     </div>
     {error && <div role="alert" className={styles.notice}>Unable to update team attendance. <button onClick={() => mutate()}>Retry</button></div>}
     <div className={styles.metrics}>
@@ -61,7 +60,6 @@ export default function TeamAttendanceWidget() {
         </div>
       })}
     </div>
-    <div className={styles.subheading}><div><h4>Recent Team Status</h4><p>Today's attendance records</p></div><span>Today</span></div>
     <div className={styles.search} data-search-container>
       <FaSearch aria-hidden="true" />
       <input type="search" aria-label="Search team members" placeholder="Search team members…" value={search}

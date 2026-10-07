@@ -59,6 +59,13 @@ test('dashboard cards show server counts and filtering resets pagination', () =>
   expect(screen.getByRole('tab', { name: 'Approved', exact: true })).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByText('No approved requests.')).toBeInTheDocument()
 })
+test('request tabs use transparent shared shell with spacing outside the pill track', () => {
+  render(<ManpowerRequests />)
+  const tabs = screen.getByRole('tablist', { name: 'Request status' })
+  expect(tabs.parentElement.parentElement).toHaveClass('px-5', 'pt-5')
+  const css = require('fs').readFileSync('components/ui/fernly/elements.module.css', 'utf8')
+  expect(css).toMatch(/\.tabs\.tabs\s*\{\s*background:\s*transparent\s*!important;/)
+})
 test('loading and failed requests do not display misleading zero counts or enable creation', () => {
   useAuthedSWR.mockReturnValue({ isLoading: true, mutate })
   const { rerender } = render(<ManpowerRequests />)

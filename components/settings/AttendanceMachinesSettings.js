@@ -225,7 +225,6 @@ export default function AttendanceMachinesSettings() {
               <FaFingerprint className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Attendance machines</h2>
               <p className={`text-sm ${mutedClass}`}>Connect multiple devices organisation-wide or assign them to a specific company.</p>
             </div>
           </div>

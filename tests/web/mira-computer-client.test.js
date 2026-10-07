@@ -1,5 +1,30 @@
 import { executeMiraComputerTask, fetchMiraDesktopPlan } from '@/lib/miraComputerClient'
 afterEach(() => { delete window.electronAPI })
+test('a three-input navigation uses one observation then verifies with the next screenshot', async () => {
+  let observations = 0
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local', capabilities: { actionBatch: true, navigateCurrentTab: true } }
+    if (input.operation === 'observe') return { success: true, observationId: `o${++observations}`, app: 'Chrome', image: `screen${observations}` }
+    if (input.operation === 'plan') return observations === 1 ? { success: true, action: { type: 'navigate', url: 'https://example.com' } } : { success: true, done: true, message: 'Page verified.' }
+    if (input.operation === 'act') return { success: true, completedActions: 3 }
+    return { success: true }
+  }) }
+  expect(await executeMiraComputerTask('Open example.com', { token: 't' })).toEqual({ success: true, message: 'Page verified.' })
+  expect(window.electronAPI.computerTask.mock.calls.map(([i]) => i.operation)).toEqual(['begin', 'observe', 'plan', 'act', 'observe', 'plan', 'cancel'])
+  expect(observations).toBe(2)
+})
+
+test('partial batch failure ends the session without replaying the sequence', async () => {
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+    if (input.operation === 'observe') return { success: true, observationId: 'o', app: 'Chrome' }
+    if (input.operation === 'plan') return { success: true, action: { type: 'navigate', url: 'https://example.com' } }
+    if (input.operation === 'act') return { success: false, completedActions: 1, message: 'Window changed.' }
+    return { success: true }
+  }) }
+  expect(await executeMiraComputerTask('Open example.com', { token: 't' })).toMatchObject({ success: false, completedActions: 1 })
+  expect(window.electronAPI.computerTask.mock.calls.map(([i]) => i.operation)).toEqual(['begin', 'observe', 'plan', 'act', 'cancel'])
+})
 test('a rejected model request rebuilds the planner and continues from a fresh observation', async () => {
   const originalFetch = global.fetch
   let plans = 0

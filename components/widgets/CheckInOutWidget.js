@@ -118,7 +118,6 @@ export default function CheckInOutWidget({
       </CardBody>
     </Card>
     <div className={styles.punches}>
-      <header className={styles.workdayHeading}><p className={styles.eyebrow}>TODAY’S WORKDAY</p><h3>Make today count.</h3><p>Your attendance actions, all in one place.</p></header>
       <section className={`${styles.punch} ${styles.arrival}`} aria-label="Check in card">
         <div className={styles.punchHeading}><span><FaSignInAlt aria-hidden="true" /></span><div><h3>Check In</h3><p>Start your workday</p></div></div>
         <p className={styles.time}>{formatPunchTime(todayAttendance?.checkIn)}</p>

@@ -32,6 +32,12 @@
 .table.table th { font-size: 12px; font-weight: 500; letter-spacing: .04em; }
 @media (max-width: 640px) { .summaryCard.summaryCard { padding: 18px; } }
 .field { font-family: inherit; }
+/* Autocomplete's default negative margin pushes its chevron to the edge.
+   Keep the clear/loading/selector controls together in normal flex flow. */
+.dropdownEndContent.dropdownEndContent { margin-inline: 0 !important; flex-shrink: 0; }
+.field [data-slot="input-wrapper"]:has(.dropdownEndContent) {
+  padding-inline-end: var(--talio-select-arrow-inset, 16px) !important;
+}
 .control.control, .nativeControl.nativeControl {
   border-radius: 12px;
   font-family: inherit;
@@ -41,6 +47,8 @@
 .nativeControl:is([type="checkbox"], [type="radio"], [type="range"], [type="color"]) { border-radius: revert; }
 .label { font-weight: 500; }
 .chip.chip { border-radius: 999px; font-weight: 500; }
+/* Only the pill track owns a surface; its spacing shell stays transparent. */
+.tabs.tabs { background: transparent !important; box-shadow: none; }
 .tabList.tabList { border-radius: 999px; padding: 5px; gap: 4px; border: 1px solid var(--color-border, #303030); background: var(--color-bg-card, #171717); max-width: 100%; overflow-x: auto; }
 .tab.tab { border-radius: 999px; min-height: 36px; padding: 8px 16px; border: 0; }
 .tabCursor.tabCursor { border-radius: 999px; height: 100%; border: 0; background: #2563eb; box-shadow: none; }

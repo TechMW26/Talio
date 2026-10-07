@@ -1,6 +1,8 @@
 'use client'
 import { Surface } from '@/components/ui/fernly'
 import calendar from '@/components/ui/fernly/calendar.module.css'
+import AttendanceLegend from '@/components/attendance/AttendanceLegend'
+import attendanceColors from '@/components/attendance/attendance-colors.module.css'
 
 
 import { Heading1, Heading3, Heading2 } from '@/components/ui/fernly/native'
@@ -644,40 +646,7 @@ export default function TeamAttendancePage() {
             </div>
 
             {/* Status Legend */}
-            <Surface className="flex flex-wrap gap-3 mb-6 p-3 bg-default-50 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded bg-success-100 border border-success"></div>
-                <span className="text-xs text-default-600">Present</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded bg-warning-100 border border-warning"></div>
-                <span className="text-xs text-default-600">In Progress</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded bg-warning-100 border border-warning"></div>
-                <span className="text-xs text-default-600">Half Day</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded bg-warning-100 border border-warning"></div>
-                <span className="text-xs text-default-600">Late</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded bg-danger-100 border border-danger"></div>
-                <span className="text-xs text-default-600">Absent</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded bg-primary-100 border border-primary"></div>
-                <span className="text-xs text-default-600">On Leave</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded bg-secondary-100 border border-secondary"></div>
-                <span className="text-xs text-default-600">Holiday</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded bg-default-100 border border-default-300"></div>
-                <span className="text-xs text-default-600">No Record</span>
-              </div>
-            </Surface>
+<AttendanceLegend />
 
             {/* Calendar Grid */}
             {attError ? (
@@ -705,8 +674,10 @@ export default function TeamAttendancePage() {
                   {calendarData.map((dayData, index) => (
                     <div
                       key={index}
+                      data-attendance-status={dayData.day ? (dayData.record?.status || (dayData.record?.checkIn ? 'present' : 'no-record')) : undefined}
                       className={`
                         min-h-[100px] p-2 rounded-lg border-2 transition-all
+                        ${attendanceColors.day}
                         ${dayData.day === null ? 'bg-transparent border-transparent' :
                           `${getStatusColor(dayData.record, dayData.isFuture)}`
                         }
@@ -723,7 +694,7 @@ export default function TeamAttendancePage() {
 
                           {dayData.record ? (
                             <div className="space-y-1">
-                              <span className={`text-xs font-medium capitalize ${getStatusTextColor(dayData.record.status)}`}>
+                              <span className={`text-xs font-medium capitalize ${attendanceColors.badge}`} data-attendance-status={dayData.record.status}>
                                 {dayData.record.status === 'in-progress' ? 'In Progress' : dayData.record.status}
                               </span>
                               <div className="text-[10px] text-default-500">

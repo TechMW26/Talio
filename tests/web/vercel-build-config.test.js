@@ -7,6 +7,14 @@ const nextConfig = require(path.join(root, 'next.config.js'))
 const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'))
 
 describe('Vercel production build configuration', () => {
+  test('includes the shared MIRA action policy without desktop build artifacts', () => {
+    const ignore = require('ignore')().add(fs.readFileSync(path.join(root, '.vercelignore'), 'utf8'))
+    expect(ignore.ignores('desktop-app/src/miraActionPlan.js')).toBe(false)
+    expect(ignore.ignores('desktop-app/src/main.js')).toBe(true)
+    expect(ignore.ignores('desktop-app/node_modules/example/index.js')).toBe(true)
+    expect(ignore.ignores('desktop-app/dist/Talio.dmg')).toBe(true)
+  })
+
   test('keeps Sentry out of runtime and build dependencies', () => {
     expect(packageJson.dependencies?.['@sentry/nextjs']).toBeUndefined()
     expect(packageJson.devDependencies?.['@sentry/nextjs']).toBeUndefined()

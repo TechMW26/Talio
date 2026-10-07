@@ -19,7 +19,7 @@ export default function ProductivitySettings() {
     finally { setBusy(false) }
   }
   return <section className="rounded-2xl border border-default-200 bg-content1 p-6 space-y-5">
-    <div><h3 className="text-lg font-semibold">Productivity screenshots</h3><p className="mt-2 text-sm text-default-500">Control screenshot capture for all employees in your organisation. Turning this off stops new screenshot uploads. Existing records are retained and pending analysis can finish. Attendance continues normally.</p></div>
+    <p className="text-sm text-default-500">Control screenshot capture for all employees in your organisation. Turning this off stops new screenshot uploads. Existing records are retained and pending analysis can finish. Attendance continues normally.</p>
     {!settings ? (error ? <div role="alert">{error} <Button onPress={load}>Retry</Button></div> : <p role="status">Loading settings…</p>) : <>
       <Switch isSelected={enabled} isDisabled={busy} onValueChange={value => { setEnabled(value); setSaved(false) }}>Screenshot capture {enabled ? 'on' : 'off'}</Switch>
       <p className="text-sm text-default-500">When enabled, eligible employees are captured every 4 minutes. Admin and HR screens remain excluded.</p>

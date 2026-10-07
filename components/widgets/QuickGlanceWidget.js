@@ -147,10 +147,6 @@ export default function QuickGlanceWidget({
   return (
     <section className={styles.panel} aria-label="Quick Glance">
       <div className={styles.header}>
-        <div className={styles.heading}>
-          <span className={styles.clock}><FaClock aria-hidden="true" /></span>
-          <div><h3>Quick Glance</h3><p>Your attendance overview for today</p></div>
-        </div>
         <span className={styles.timer} style={{ '--accent': timerColor }} aria-label="Remaining work time">
           <i aria-hidden="true" />{formatCountdown(remainingTime)}
         </span>

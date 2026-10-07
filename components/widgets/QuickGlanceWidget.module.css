@@ -1,6 +1,6 @@
 /* Fernly tracker and stat cards; live attendance state stays in the component. */
 .panel { container-type: inline-size; height: 100%; min-height: 0; padding: 22px; display: flex; flex-direction: column; gap: 18px; border-radius: 20px; border: 1px solid var(--color-border); background: var(--color-bg-card); color: var(--color-text-primary); overflow: auto; }
-.header { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex: none; }
+.header { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex: none; }
 .heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .heading h3 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -.02em; }
 .heading p { margin: 5px 0 0; font-size: 11px; color: var(--color-text-secondary); }

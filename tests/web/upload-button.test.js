@@ -10,9 +10,20 @@ test('picker preserves file restrictions, multiple, refs and handler', () => {
   expect(change).toHaveBeenCalledTimes(1)
   expect(ref.current.accept).toBe('image/*')
   expect(ref.current.multiple).toBe(true)
-  expect(screen.getByText('one.png')).toBeTruthy()
+  expect(ref.current.files[0].name).toBe('one.png')
   expect(screen.queryByRole('button', { name: 'Uploaded' })).toBeNull()
 })
+test('attachment buttons restore their original compact content', () => {
+  const click = jest.fn()
+  render(<UploadButton label="Attach file" onClick={click}><svg data-testid="paperclip" /></UploadButton>)
+  const button = screen.getByRole('button', { name: 'Attach file' })
+  expect(screen.getByTestId('paperclip')).toBeInTheDocument()
+  expect(screen.queryByText('Attach file')).not.toBeInTheDocument()
+  expect(button.style.getPropertyValue('--upload-progress')).toBe('')
+  fireEvent.click(button)
+  expect(click).toHaveBeenCalledTimes(1)
+})
+
 test('only confirmed done state announces success, not 100 percent progress', () => {
   const { rerender } = render(<UploadButton state="uploading" progress={100} />)
   expect(screen.getByRole('button').dataset.state).toBe('uploading')

@@ -1,6 +1,143 @@
 const { createMiraComputer, validateComputerAction } = require('../../desktop-app/src/miraComputer')
 const { createMiraPermissions, trustedMiraSender } = require('../../desktop-app/src/miraPermissions')
 const { decideDesktopRoute, sameWindowFrame } = require('../../desktop-app/src/miraDecision')
+const { channelContext, allowsNewTab } = require('../../desktop-app/src/miraActionPlan')
+
+test('batch grammar allows predictable edits but never sends or nested actions', () => {
+  expect(validateComputerAction({ type: 'batch', actions: [{ type: 'key', key: 'find' }, { type: 'type', text: 'Mansi' }] })).not.toBeNull()
+  expect(validateComputerAction({ type: 'navigate', url: 'https://example.com' })).toEqual({ type: 'navigate', url: 'https://example.com/', newTab: false })
+  for (const url of ['javascript:alert(1)', 'file:///tmp/a', 'https://user:pass@example.com/']) expect(validateComputerAction({ type: 'navigate', url })).toBeNull()
+  for (const actions of [
+    [{ type: 'type', text: 'Hi' }, { type: 'key', key: 'enter' }],
+    [{ type: 'click', x: .2, y: .3 }, { type: 'type', text: 'Hi\n' }],
+    [{ type: 'key', key: 'find' }, { type: 'click', x: .2, y: .3 }],
+    [{ type: 'open_app', name: 'Notes' }, { type: 'type', text: 'Hi' }],
+    [{ type: 'batch', actions: [] }, { type: 'type', text: 'Hi' }],
+  ]) expect(validateComputerAction({ type: 'batch', actions })).toBeNull()
+})
+
+test('channel hints distinguish email, WhatsApp and DMs rather than defaulting all messages to Talio', () => {
+  expect(channelContext('Send a WhatsApp to Mansi', 'Outlook')).toMatchObject({ requested: 'whatsapp', observed: 'email', mismatch: true })
+  expect(channelContext('Email Mansi', 'WhatsApp')).toMatchObject({ requested: 'email', observed: 'whatsapp', mismatch: true })
+  expect(channelContext('DM Mansi', 'Mail')).toMatchObject({ requested: 'dm', observed: 'email', mismatch: true })
+  expect(channelContext('DM Mansi on Slack', 'Slack')).toMatchObject({ requested: 'slack', observed: 'slack', mismatch: false })
+  expect(channelContext('Message Mansi', 'Talio')).toMatchObject({ requested: null, observed: null })
+  expect(channelContext('WhatsApp Mansi', 'Google Chrome', [{ label: 'web.whatsapp.com' }])).toMatchObject({ observed: 'whatsapp' })
+  expect(allowsNewTab('Open the URL in a new tab')).toBe(true)
+  expect(allowsNewTab('Open the URL, do not open a new tab')).toBe(false)
+})
+
+test('browser navigation delivers three inputs from one screenshot and consumes the observation', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, app: 'Google Chrome' })) })
+  const start = await call({ operation: 'begin', goal: 'Open https://example.com' })
+  expect(start.capabilities).toMatchObject({ actionBatch: true })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  const input = { operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'navigate', url: 'https://example.com' } }
+  expect(await call(input)).toMatchObject({ success: true, completedActions: 3 })
+  expect(deps.runControl.mock.calls.map(([a]) => a).filter(a => ['key', 'type'].includes(a.type))).toEqual([{ type: 'key', key: 'browser_address' }, { type: 'type', text: 'https://example.com/' }, { type: 'key', key: 'enter' }])
+  expect(deps.desktopCapturer.getSources).toHaveBeenCalledTimes(1)
+  expect((await call(input)).success).toBe(false)
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test.each(['TextEdit', 'WhatsApp', 'Terminal'])('navigation cannot send a URL plus Enter into %s', async app => {
+  const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, app })) })
+  const start = await call({ operation: 'begin', goal: 'Open https://example.com' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'navigate', url: 'https://example.com' } })).success).toBe(false)
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'type' }))
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('new tabs require an explicit request at the native boundary', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, app: 'Safari' })) })
+  for (const action of [{ type: 'navigate', url: 'https://example.com', newTab: true }, { type: 'key', key: 'new_tab' }]) {
+    const start = await call({ operation: 'begin', goal: 'Open example.com' })
+    const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+    expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action })).toMatchObject({ success: false, retryable: true })
+    await call({ operation: 'cancel', sessionId: start.sessionId })
+  }
+  expect(deps.runControl).not.toHaveBeenCalledWith({ type: 'key', key: 'new_tab' })
+  const start = await call({ operation: 'begin', goal: 'Open example.com in a new tab' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'navigate', url: 'https://example.com', newTab: true } })).toMatchObject({ success: true, completedActions: 4 })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('an interrupted batch stops before typing into a different app and never retries partial input', async () => {
+  let app = 'Chrome'
+  const { call, deps } = harness({ runControl: jest.fn(async action => {
+    if (action.type === 'key') app = 'WhatsApp'
+    return { success: true, pid: app === 'Chrome' ? 1 : 2, app }
+  }) })
+  const start = await call({ operation: 'begin', goal: 'Open example.com' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'navigate', url: 'https://example.com' } })).toMatchObject({ success: false, retryable: false, completedActions: 1 })
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'type' }))
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('uncertain native batch failure never executes remaining inputs', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'type' ? { success: false } : { success: true, pid: 1, app: 'Chrome' }) })
+  const start = await call({ operation: 'begin', goal: 'Open example.com' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'navigate', url: 'https://example.com' } })).toMatchObject({ success: false, completedActions: 1 })
+  expect(deps.runControl).not.toHaveBeenCalledWith({ type: 'key', key: 'enter' })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('concurrent calls cannot replay an observation while a sequence is executing', async () => {
+  let release, started
+  const entered = new Promise(resolve => { started = resolve })
+  const held = new Promise(resolve => { release = resolve })
+  const { call, deps } = harness({ runControl: jest.fn(async action => {
+    if (action.type === 'key' && action.key === 'browser_address') { started(); await held }
+    return { success: true, pid: 1, app: 'Chrome' }
+  }) })
+  const start = await call({ operation: 'begin', goal: 'Open example.com' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  const input = { operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'navigate', url: 'https://example.com' } }
+  const running = call(input)
+  await entered
+  expect(await call(input)).toMatchObject({ success: false, message: expect.stringContaining('still running') })
+  expect((await call({ operation: 'observe', sessionId: start.sessionId })).success).toBe(false)
+  release()
+  expect(await running).toMatchObject({ success: true, completedActions: 3 })
+  expect(deps.runControl.mock.calls.filter(([a]) => a.type === 'key' && a.key === 'browser_address')).toHaveLength(1)
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('emergency cancellation after the first input prevents URL typing and Enter', async () => {
+  let call
+  const h = harness({ runControl: jest.fn(async action => {
+    if (action.type === 'key') await call({ operation: 'cancel' })
+    return { success: true, pid: 1, app: 'Chrome' }
+  }) })
+  call = h.call
+  const start = await call({ operation: 'begin', goal: 'Open example.com' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'navigate', url: 'https://example.com' } })).toMatchObject({ success: false, completedActions: 1 })
+  expect(h.deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'type' }))
+})
+
+test('click-and-type batches require an observed editable accessibility target', async () => {
+  const { call, deps } = harness()
+  const start = await call({ operation: 'begin', goal: 'Search Notes for Mansi' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'batch', actions: [{ type: 'click', x: .2, y: .3 }, { type: 'type', text: 'Mansi' }] } })).toMatchObject({ success: false, retryable: true })
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }))
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('web-app fallback reuses the foreground browser instead of shell-opening another tab', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'open_app' ? { success: false, notInstalled: true } : { success: true, pid: 1, app: 'Safari' }) })
+  const start = await call({ operation: 'begin', goal: 'Open WhatsApp' })
+  expect(await call({ operation: 'fast', sessionId: start.sessionId })).toMatchObject({ success: true, done: false })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(obs.suggestedAction).toEqual({ type: 'navigate', url: 'https://web.whatsapp.com/' })
+  expect(deps.shell.openExternal).not.toHaveBeenCalled()
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
 
 test('opening Talio restores its main window even when PiP owns the foreground', async () => {
   const revealMainWindow = jest.fn()
@@ -160,7 +297,7 @@ test('local planner consumes native observations and relays only expected model 
   const observation = await call({ operation: 'observe', sessionId: start.sessionId })
   const args = { sessionId: start.sessionId, observationId: observation.observationId }
   expect((await call({ ...args, operation: 'plan', image: 'untrusted renderer image' })).kind).toBe('model_request')
-  expect(agentS.begin).toHaveBeenCalledWith('Find a contact in WhatsApp')
+  expect(agentS.begin).toHaveBeenCalledWith('Find a contact in WhatsApp', expect.stringContaining('shortest reliable'))
   expect(agentS.predict).toHaveBeenCalledWith({ image: Buffer.from('image').toString('base64'), app: expect.stringContaining('TextEdit') })
   expect((await call({ ...args, operation: 'model_response', text: 'agent.key("find")' })).action.type).toBe('key')
   expect((await call({ ...args, operation: 'model_response', text: 'unsolicited' })).success).toBe(false)

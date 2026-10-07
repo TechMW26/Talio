@@ -51,8 +51,8 @@ test('invalid attendance and schedule times do not display invented values', () 
 
 test('four cards occupy explicit two-by-two positions with location below', () => {
   const css = fs.readFileSync('components/widgets/CheckInOutWidget.module.css', 'utf8')
-  expect(css).toContain('grid-template-rows: auto repeat(2, minmax(150px, 1fr))')
-  expect(css).toContain('.duration { grid-column: 1; grid-row: 3; }')
-  expect(css).toContain('.schedule { grid-column: 2; grid-row: 3; }')
-  expect(css).toContain('.location { grid-column: 1 / -1; grid-row: 4; }')
+  expect(css).toContain('grid-template-rows: repeat(2, minmax(150px, 1fr))')
+  expect(css).toContain('.duration { grid-column: 1; grid-row: 2; }')
+  expect(css).toContain('.schedule { grid-column: 2; grid-row: 2; }')
+  expect(css).toContain('.location { grid-column: 1 / -1; grid-row: 3; }')
 })

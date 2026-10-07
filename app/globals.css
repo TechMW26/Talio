@@ -249,6 +249,27 @@ html body [data-slot="input-wrapper"] :is(input, textarea, [data-slot="inner-wra
 /* Round the visible Select control, not its borderless layout shell. */
 html body button[data-slot="trigger"][aria-haspopup="listbox"] {
   border-radius: 0.75rem !important;
+  padding-inline-end: calc(var(--talio-select-arrow-inset) + 24px) !important;
+}
+
+/* Shared dropdown arrow gutter: keep native and React Aria arrows clear of
+   rounded edges, and reserve space so long values cannot overlap them. */
+:root { --talio-select-arrow-inset: 16px; }
+html body button[data-slot="trigger"][aria-haspopup="listbox"] [data-slot="selectorIcon"] {
+  inset-inline-start: auto !important;
+  inset-inline-end: var(--talio-select-arrow-inset) !important;
+}
+html body select:not([multiple]):is(:not([size]), [size="1"]) {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: calc(var(--talio-select-arrow-inset) + 24px) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-size: 16px 16px !important;
+  background-position: right var(--talio-select-arrow-inset) center !important;
+}
+html body select:not([multiple]):is(:not([size]), [size="1"]):dir(rtl) {
+  background-position: left var(--talio-select-arrow-inset) center !important;
 }
 
 html body [data-slot="input-wrapper"]:focus-within,

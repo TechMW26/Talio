@@ -126,6 +126,6 @@ test('widgets and quick tools stretch to a shared bottom edge without extra stag
   expect(workspace).toContain('align-items: stretch')
   expect(slide).toContain('padding: 0')
   const punchCss = fs.readFileSync('components/widgets/CheckInOutWidget.module.css', 'utf8')
-  expect(punchCss).toContain('.punches:has(> .location:empty) { grid-template-rows: auto repeat(2, minmax(150px, 1fr)); }')
+  expect(punchCss).toContain('.punches:has(> .location:empty) { grid-template-rows: repeat(2, minmax(150px, 1fr)); }')
   expect(punchCss.match(/\.layout\s*\{([^}]+)\}/)[1]).toContain('grid-template-rows: minmax(0, 1fr);')
 })
