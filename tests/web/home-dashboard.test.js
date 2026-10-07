@@ -69,9 +69,10 @@ test('named page pills jump directly to a panel and mark the active page', () =>
   expect(screen.getByRole('button', { name: /^Go to widget page 1:/ }).getAttribute('aria-current')).toBe('page')
 })
 
-test('home bottom clearance comes only from the shell and pagination stays bounded', () => {
+test('home retains the shared page bottom clearance and pagination stays bounded', () => {
   const layout = fs.readFileSync('app/dashboard/dashboard-layout.css', 'utf8')
-  expect(layout).toContain('.dashboard-content-frame:has([data-page-sizing="viewport"]):has([data-dashboard-home]) { padding-bottom: 0; }')
+  expect(layout).toContain('--dashboard-gutter-bottom: var(--dashboard-page-gutter);')
+  expect(layout).not.toContain('padding-bottom: 0;')
   expect(layout).toContain('padding: var(--dashboard-navigation-inset) var(--dashboard-shell-inset)')
   expect(layout).toContain('calc(76px + env(safe-area-inset-bottom))')
   expect(fs.readFileSync('components/dashboards/UnifiedDashboard.js', 'utf8').match(/data-dashboard-home/g)).toHaveLength(2)
@@ -87,9 +88,9 @@ test('home bottom clearance comes only from the shell and pagination stays bound
   expect(css).not.toContain('max-width: 40vw')
 })
 
-test('all dashboard pages share compact top clearance at every breakpoint', () => {
+test('all dashboard pages omit extra top padding at every breakpoint', () => {
   const layout = fs.readFileSync('app/dashboard/dashboard-layout.css', 'utf8')
-  expect(layout.match(/--dashboard-gutter-top:\s*[^;]+;/g)).toEqual(['--dashboard-gutter-top: 8px;'])
+  expect(layout.match(/--dashboard-gutter-top:\s*[^;]+;/g)).toEqual(['--dashboard-gutter-top: 0;'])
   expect(layout).toContain('padding: var(--dashboard-gutter-top) var(--dashboard-gutter-x) var(--dashboard-gutter-bottom);')
   const css = fs.readFileSync('components/dashboard/HomeDashboard.module.css', 'utf8')
   expect(css.match(/\.header\s*\{([^}]+)\}/)[1]).toContain('margin-bottom: 8px;')

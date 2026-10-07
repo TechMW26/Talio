@@ -422,7 +422,7 @@ export default function DashboardLayout({ children }) {
                       />
 
                       {/* Right Side Content - Flex Column */}
-                      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+                      <div className="dashboard-content-column flex-1 flex flex-col h-full min-w-0 overflow-hidden">
                         {/* Offline Indicator */}
                         <OfflineIndicator />
 
@@ -439,10 +439,6 @@ export default function DashboardLayout({ children }) {
                             </ErrorBoundaryWithRetry>
                           </div>
 
-                          {/* Bottom padding for mobile nav */}
-                          <div className={`w-full flex-shrink-0 md:hidden ${shouldShowFade ? 'h-20' : 'h-16'}`}></div>
-                          {/* Bottom padding for desktop */}
-                          <div className="w-full flex-shrink-0 hidden md:block h-4"></div>
                         </main>
 
                         {/* Gradient above bottom nav - Mobile only */}

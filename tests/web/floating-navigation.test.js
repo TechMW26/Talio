@@ -91,10 +91,11 @@ test('navigation sits above the header and its dismissal backdrop covers header 
   expect(read('components/Sidebar.js')).toContain('fixed inset-0 z-[110]')
 })
 
-test('equal sidebar insets and the no-scroll page bottom share the shell baseline', () => {
+test('equal sidebar insets remain independent of the no-scroll content gutter', () => {
   const css = read('app/dashboard/dashboard-layout.css')
   expect(css).toMatch(/\.talio-floating-rail, \.talio-floating-expanded \{\s*top: var\(--dashboard-navigation-inset\);\s*bottom: var\(--dashboard-navigation-inset\);/)
   expect(css).toContain('padding: var(--dashboard-navigation-inset) var(--dashboard-shell-inset)')
-  expect(css).toContain('.dashboard-content-frame:has([data-page-sizing="viewport"]):has([data-dashboard-home]) { padding-bottom: 0; }')
+  expect(css).toContain('--dashboard-page-gutter: 2em;')
+  expect(css).not.toContain('padding-bottom: 0;')
   expect(css).toContain('--dashboard-navigation-inset: 8px')
 })

@@ -15,14 +15,28 @@ test('dashboard layout delegates its geometry to a single shared frame', () => {
   expect(layout).not.toContain("isChatPage ? 'sm:pb-16 px-0")
   expect(read('app/layout.js')).toContain("import './dashboard/dashboard-layout.css'")
 })
-test('canonical gutters use compact header clearance and scope root normalization', () => {
+test('canonical gutters have no top padding and 2em side/bottom padding at every breakpoint', () => {
   const css = read('app/dashboard/dashboard-layout.css')
-  expect(css).toContain('--dashboard-gutter-top: 8px')
-  expect(css).toContain('--dashboard-gutter-x: 32px')
+  expect(css.match(/--dashboard-page-gutter:\s*[^;]+;/g)).toEqual(['--dashboard-page-gutter: 2em;'])
+  expect(css.match(/--dashboard-gutter-top:\s*[^;]+;/g)).toEqual(['--dashboard-gutter-top: 0;'])
+  for (const side of ['x', 'bottom']) {
+    expect(css.match(new RegExp(`--dashboard-gutter-${side}:\\s*[^;]+;`, 'g'))).toEqual([`--dashboard-gutter-${side}: var(--dashboard-page-gutter);`])
+  }
+  expect(css).toContain('padding: var(--dashboard-gutter-top) var(--dashboard-gutter-x) var(--dashboard-gutter-bottom);')
+  expect(css).not.toMatch(/\.dashboard-content-frame[^{}]*\{[^}]*padding-bottom:/)
   expect(css).toContain('.dashboard-route-page > :is(div, section, article, form)')
   expect(css).toContain(':not([role="dialog"])')
   expect(css).toContain('--dashboard-heading-weight: 500')
   expect(css).not.toMatch(/\.dashboard-route-page\s+\*\s*\{/)
+})
+test('mobile navigation clearance is outside the page frame and no duplicate spacers remain', () => {
+  const css = read('app/dashboard/dashboard-layout.css')
+  const layout = read('app/dashboard/layout.js')
+  expect(css).toContain('.dashboard-content-column { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }')
+  expect(layout).toContain('className="dashboard-content-column flex-1')
+  expect(layout).not.toContain('Bottom padding for mobile nav')
+  expect(layout).not.toContain('Bottom padding for desktop')
+  expect(layout).not.toContain("shouldShowFade ? 'h-20' : 'h-16'")
 })
 test('page headings and adjacent copy share the performance typography, excluding overlays', () => {
   const css = read('app/dashboard/dashboard-layout.css')

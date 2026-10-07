@@ -22,9 +22,10 @@
   --dashboard-shell-radius: 22px;
   --dashboard-shell-motion: 360ms cubic-bezier(.22, 1, .36, 1);
   --dashboard-font: var(--font-montserrat);
-  --dashboard-gutter-x: 16px;
-  --dashboard-gutter-top: 8px;
-  --dashboard-gutter-bottom: 40px;
+  --dashboard-page-gutter: 2em;
+  --dashboard-gutter-x: var(--dashboard-page-gutter);
+  --dashboard-gutter-top: 0;
+  --dashboard-gutter-bottom: var(--dashboard-page-gutter);
   --dashboard-heading-size: clamp(28px, 3vw, 42px);
   --dashboard-heading-weight: 500;
   --dashboard-heading-tracking: -.045em;
@@ -86,11 +87,6 @@
 .talio-floating-mobile-sidebar[data-open="true"] { opacity: 1; visibility: visible; }
 @media (max-width: 639px) { :root { --dashboard-shell-inset: 8px; --dashboard-navigation-inset: 8px; --dashboard-shell-radius: 18px; } .dashboard-floating-shell { gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .talio-floating-rail, .talio-floating-expanded, .talio-floating-mobile-sidebar { transition: none; } }
-@media (min-width: 640px) {
-  :root { --dashboard-gutter-x: 24px; --dashboard-gutter-bottom: 56px; }
-}
-@media (min-width: 1024px) { :root { --dashboard-gutter-x: 32px; } }
-
 .dashboard-content-frame {
   box-sizing: border-box;
   min-height: 100%;
@@ -150,13 +146,8 @@ main.dashboard-page-canvas:has([data-page-sizing="viewport"]) { overflow: hidden
 .dashboard-route-stage:has([data-page-sizing="viewport"]),
 .dashboard-route-page[data-page-sizing="viewport"] { height: 100%; min-height: 0; }
 .dashboard-route-page[data-page-sizing="viewport"] > :first-child { height: 100%; min-height: 0; }
-@media (min-width: 768px) {
-  .dashboard-content-frame:has([data-page-sizing="viewport"]) { padding-bottom: var(--dashboard-gutter-x); }
-  /* Home widgets and Quick Tools terminate at the floating navigation's shell
-   * baseline. The shell already provides the outer bottom inset. */
-  .dashboard-content-frame:has([data-page-sizing="viewport"]):has([data-dashboard-home]) { padding-bottom: 0; }
-}
-/* Persistent navigation clearance belongs to the shared frame, not each page. */
+/* Reserve mobile navigation outside the page frame, so document and no-scroll
+ * routes retain 2em side/bottom padding without adding top clearance. */
 @media (max-width: 767px) {
-  .dashboard-content-frame { padding-bottom: max(var(--dashboard-gutter-bottom), calc(76px + env(safe-area-inset-bottom))); }
+  .dashboard-content-column { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
 }
