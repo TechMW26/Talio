@@ -167,7 +167,7 @@ export default function ProjectDetailPage() {
     return getEmployeeId(user)
   }, [tasksData, user])
 
-  // When the requester opens the Status Requests tab, mark their resolved requests as seen
+  // When the requester opens the Task Status tab, mark their resolved requests as seen
   // so the badge clears. Project heads keep the pending-count badge instead.
   useEffect(() => {
     if (activeTab !== 'status-requests' || project?.isProjectHead || !projectId) return
@@ -219,15 +219,17 @@ export default function ProjectDetailPage() {
   const [editTaskForm, setEditTaskForm] = useState(null)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const [showManageStatuses, setShowManageStatuses] = useState(false)
+  const [statusBoardMode, setStatusBoardMode] = useState('manage')
   const [savingStatuses, setSavingStatuses] = useState(false)
   const [showStatusRequestModal, setShowStatusRequestModal] = useState(false)
-  const [statusRequestForm, setStatusRequestForm] = useState({ statusName: '', reason: '' })
+  const [statusRequestForm, setStatusRequestForm] = useState({ statusName: '', reason: '', position: '' })
   const [submittingStatusRequest, setSubmittingStatusRequest] = useState(false)
   const [rejectingStatusRequestId, setRejectingStatusRequestId] = useState(null)
   const [statusRequestRejectReason, setStatusRequestRejectReason] = useState('')
   const [submittingStatusRequestAction, setSubmittingStatusRequestAction] = useState(false)
   const [approvingStatusRequest, setApprovingStatusRequest] = useState(null)
   const [suggestedStatusName, setSuggestedStatusName] = useState('')
+  const [suggestedStatusPosition, setSuggestedStatusPosition] = useState('')
   const [deletingStatusRequestId, setDeletingStatusRequestId] = useState(null)
 
   // Reason modal state for status changes (requires justification)
@@ -1307,6 +1309,38 @@ export default function ProjectDetailPage() {
   const submitStatusRequest = async () => {
     const statusName = statusRequestForm.statusName.trim()
     const reason = statusRequestForm.reason.trim()
+    const position = statusRequestForm.position
+    if (!statusName || !reason || !position) {
+      toast.error('Status name, position and reason are required')
+      return
+    }
+    try {
+      setSubmittingStatusRequest(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/projects/approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ projectId, statusName, reason, position })
+      })
+      const data = await response.json()
+      if (data.success) {
+        // No toast here: the requester must not receive any notification until the owner acts.
+        setShowStatusRequestModal(false)
+        setStatusRequestForm({ statusName: '', reason: '', position: '' })
+        mutateProject()
+        mutateTimeline()
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to submit status request')
+    } finally {
+      setSubmittingStatusRequest(false)
+    }
+  }
+
+  // Requester submits a request directly from the shared Manage Board UI
+  const requestStatusFromBoard = async ({ statusName, position, reason }) => {
     if (!statusName || !reason) {
       toast.error('Status name and reason are required')
       return
@@ -1317,13 +1351,12 @@ export default function ProjectDetailPage() {
       const response = await fetch('/api/projects/approvals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ projectId, statusName, reason })
+        body: JSON.stringify({ projectId, statusName, reason, position })
       })
       const data = await response.json()
       if (data.success) {
-        // No toast here: the requester must not receive any notification until the owner acts.
-        setShowStatusRequestModal(false)
-        setStatusRequestForm({ statusName: '', reason: '' })
+        setShowManageStatuses(false)
+        setStatusBoardMode('manage')
         mutateProject()
         mutateTimeline()
       } else {
@@ -1366,6 +1399,8 @@ export default function ProjectDetailPage() {
   const handleApproveStatusRequest = (request) => {
     setApprovingStatusRequest(request)
     setSuggestedStatusName(request.metadata?.statusName || '')
+    setSuggestedStatusPosition(request.metadata?.position || '')
+    setStatusBoardMode('manage')
     setShowManageStatuses(true)
   }
 
@@ -1414,6 +1449,7 @@ export default function ProjectDetailPage() {
           const requestId = approvingStatusRequest._id
           setApprovingStatusRequest(null)
           setSuggestedStatusName('')
+          setSuggestedStatusPosition('')
           await resolveStatusRequest(requestId, 'approve')
         }
       } else {
@@ -1583,25 +1619,6 @@ export default function ProjectDetailPage() {
               Edit
             </NativeButton>
           )}
-          {canManageStatuses && (
-            <NativeButton
-              onClick={() => { setShowManageStatuses(true); mutateProject() }}
-              className="btn-secondary flex items-center"
-            >
-              <HiOutlineSquares2X2 className="mr-2 w-4 h-4" />
-              Manage Statuses
-            </NativeButton>
-          )}
-          {!canManageStatuses && isAcceptedMember && (
-            <NativeButton
-              onClick={() => setShowStatusRequestModal(true)}
-              className="btn-secondary flex items-center"
-            >
-              <HiOutlinePlus className="mr-2 w-4 h-4" />
-              Request New Status
-            </NativeButton>
-          )}
-
           {/* Mark Complete button - ONLY visible for Project Head */}
           {isProjectHead && project.status !== 'completed' && (
             <NativeButton
@@ -1652,73 +1669,17 @@ export default function ProjectDetailPage() {
 
       <ManageTaskStatusesModal
         isOpen={showManageStatuses}
-        onClose={() => { setShowManageStatuses(false); setApprovingStatusRequest(null); setSuggestedStatusName('') }}
+        onClose={() => { setShowManageStatuses(false); setStatusBoardMode('manage'); setApprovingStatusRequest(null); setSuggestedStatusName(''); setSuggestedStatusPosition('') }}
         statuses={taskStatuses}
         taskCounts={taskStatusTaskCounts}
         onSave={handleSaveTaskStatuses}
         saving={savingStatuses}
         suggestedStatusName={suggestedStatusName}
+        suggestedStatusPosition={suggestedStatusPosition}
+        requestMode={statusBoardMode === 'request'}
+        onRequest={requestStatusFromBoard}
+        requesting={submittingStatusRequest}
       />
-
-      {/* Request New Status Modal */}
-      <ModalPortal isOpen={showStatusRequestModal}>
-        <div className="modal-overlay">
-          <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden animate-modal-enter">
-            <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
-              <div>
-                <Heading3 className="text-lg font-bold text-gray-900">Request New Status</Heading3>
-                <p className="text-xs text-gray-500 mt-0.5">Ask the project owner to add a status for this project.</p>
-              </div>
-              <NativeButton onClick={() => setShowStatusRequestModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <FaTimes />
-              </NativeButton>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status name <span className="text-red-500">*</span>
-                </label>
-                <NativeInput
-                  type="text"
-                  value={statusRequestForm.statusName}
-                  onChange={(e) => setStatusRequestForm(prev => ({ ...prev, statusName: e.target.value }))}
-                  maxLength={60}
-                  placeholder="e.g. In QA"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reason <span className="text-red-500">*</span>
-                </label>
-                <NativeTextarea
-                  value={statusRequestForm.reason}
-                  onChange={(e) => setStatusRequestForm(prev => ({ ...prev, reason: e.target.value }))}
-                  rows={3}
-                  maxLength={2000}
-                  placeholder="Why do you need this status?"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <NativeButton
-                  onClick={() => setShowStatusRequestModal(false)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-200"
-                >
-                  Cancel
-                </NativeButton>
-                <NativeButton
-                  onClick={submitStatusRequest}
-                  disabled={submittingStatusRequest}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-60"
-                >
-                  {submittingStatusRequest ? 'Submitting…' : 'Submit Request'}
-                </NativeButton>
-              </div>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
 
       {/* Pending Invitation Banner */}
       {isPendingInvitation && (
@@ -1791,24 +1752,27 @@ export default function ProjectDetailPage() {
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'tasks', label: 'Tasks' },
+              { id: 'status-requests', label: 'Task Status' },
               { id: 'members', label: 'Members' },
               { id: 'notes', label: 'Notes' },
-              { id: 'timeline', label: 'Activity' },
-              { id: 'status-requests', label: 'Status Requests' }
+              { id: 'timeline', label: 'Activity' }
             ].map(tab => (
               <Tab
                 key={tab.id}
+                className={tab.id === 'tasks' && activeTab === 'status-requests' ? 'ring-2 ring-primary/40' : undefined}
                 title={
-                  tab.id === 'status-requests' && statusRequestBadgeCount > 0 ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      {tab.label}
+                  <span className="inline-flex items-center gap-1.5">
+                    {/* The Task Status tab belongs to Tasks: highlight Tasks too when it is open. */}
+                    {tab.id === 'tasks' && activeTab === 'status-requests' && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                    )}
+                    {tab.label}
+                    {tab.id === 'status-requests' && statusRequestBadgeCount > 0 && (
                       <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
                         {statusRequestBadgeCount}
                       </span>
-                    </span>
-                  ) : (
-                    tab.label
-                  )
+                    )}
+                  </span>
                 }
               />
             ))}
@@ -1844,15 +1808,35 @@ export default function ProjectDetailPage() {
                   </NativeButton>
                 </div>
 
-                {isAcceptedMember && (
-                  <Button
-                    onPress={() => setShowCreateTask(true)}
-                    color="primary"
-                    startContent={<FaPlus className="mr-2" />}
-                  >
-                    Add Task
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {canManageStatuses && (
+                    <NativeButton
+                      onClick={() => { setStatusBoardMode('manage'); setShowManageStatuses(true); mutateProject() }}
+                      className="btn-secondary flex items-center"
+                    >
+                      <HiOutlineSquares2X2 className="mr-2 w-4 h-4" />
+                      Manage Board
+                    </NativeButton>
+                  )}
+                  {!canManageStatuses && isAcceptedMember && (
+                    <NativeButton
+                      onClick={() => { setStatusBoardMode('request'); setShowManageStatuses(true) }}
+                      className="btn-secondary flex items-center"
+                    >
+                      <HiOutlinePlus className="mr-2 w-4 h-4" />
+                      Request New Status
+                    </NativeButton>
+                  )}
+                  {isAcceptedMember && (
+                    <Button
+                      onPress={() => setShowCreateTask(true)}
+                      color="primary"
+                      startContent={<FaPlus className="mr-2" />}
+                    >
+                      Add Task
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <TaskStatusProgressBar tasks={tasks} taskStatuses={taskStatuses} />
@@ -2483,16 +2467,16 @@ export default function ProjectDetailPage() {
             </div>
           )}
 
-          {/* Status Requests Tab */}
+          {/* Task Status (Status Requests) Tab */}
           {activeTab === 'status-requests' && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h4 className="font-semibold text-gray-900">Status Requests</h4>
-                  <p className="text-sm text-gray-500">Members can request new statuses for this project.</p>
+                  <h4 className="font-semibold text-gray-900">Task Status</h4>
+                  <p className="text-sm text-gray-500">Manage board statuses and review requests for this project's tasks.</p>
                 </div>
                 {!isProjectHead && isAcceptedMember && (
-                  <NativeButton onClick={() => setShowStatusRequestModal(true)} className="btn-secondary flex items-center text-sm">
+                  <NativeButton onClick={() => { setStatusBoardMode('request'); setShowManageStatuses(true) }} className="btn-secondary flex items-center text-sm">
                     <HiOutlinePlus className="mr-1 w-4 h-4" /> Request New Status
                   </NativeButton>
                 )}
@@ -2511,6 +2495,11 @@ export default function ProjectDetailPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-400">Requested status</p>
                           <p className="font-semibold text-gray-900">{request.metadata?.statusName}</p>
+                          {request.metadata?.position && (
+                            <p className="text-xs text-primary-600 mt-1">
+                              Place before: <span className="font-medium">{taskStatuses.find(s => s.key === request.metadata.position)?.label || request.metadata.position}</span>
+                            </p>
+                          )}
                           <p className="text-sm text-gray-600 mt-2">{request.reason}</p>
                           <p className="text-xs text-gray-400 mt-2">
                             Requested by {request.requestedBy?.firstName} {request.requestedBy?.lastName}
