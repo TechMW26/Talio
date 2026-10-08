@@ -379,7 +379,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             // Only fetch the stats endpoint - departments, leave requests,
             // attendance summary, and employee data all come from the unified endpoint
-            const statsData = await dashboardRequest(statsEndpoint, token, { signal: dashboardSignal() })
+            const statsData = await dashboardRequest(statsEndpoint, token, { signal: dashboardSignal(), forceFresh: force })
             setDashboardErrors(previous => ({ ...previous, stats: null }))
             if (statsData.success && dashboardStatsRequestRef.current === requestPromise) {
                 setDashboardStats(statsData.data)

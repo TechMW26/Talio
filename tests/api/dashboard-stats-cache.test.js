@@ -40,3 +40,11 @@ test('does not cache failures and releases failed in-flight work', async () => {
   expect(setCache).not.toHaveBeenCalled()
   expect(await cachedDashboardStats(request(),auth,'employee',{},async()=>result)).toEqual(result)
 })
+test('browser no-store can reuse aggregates, but Talio mutation refresh bypasses them', async () => {
+  getCache.mockResolvedValue({value:result,expiresAt:Date.now()+15000})
+  const load=jest.fn(async()=>result)
+  await cachedDashboardStats(new Request('https://talio.test',{headers:{'cache-control':'no-cache'}}),auth,'employee',{},load)
+  expect(load).not.toHaveBeenCalled()
+  await cachedDashboardStats(new Request('https://talio.test',{headers:{'x-talio-force-fresh':'1'}}),auth,'employee',{},load)
+  expect(load).toHaveBeenCalledTimes(1)
+})

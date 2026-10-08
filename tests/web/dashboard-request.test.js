@@ -20,3 +20,8 @@ test('bounds stalled reads, including body consumption', async () => {
   await assertion
   expect(fetch).toHaveBeenCalledTimes(1)
 })
+test('manual dashboard refresh sends the server cache bypass signal', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ok:true,json:async()=>({success:true})})
+  await dashboardRequest('/api/dashboard/hr-stats','test',{forceFresh:true})
+  expect(fetch.mock.calls[0][1].headers).toEqual({Authorization:'Bearer test','x-talio-force-fresh':'1'})
+})
