@@ -22,40 +22,49 @@ export function ActionableToastProvider({ children }) {
   const { socket, isConnected, subscribe } = useSocket()
   const hasFetchedRef = useRef(false)
   const notificationRevisionRef = useRef(0)
+  const pendingFetchRef = useRef(null)
 
   // Fetch pending notifications on mount
   const fetchPendingNotifications = useCallback(async () => {
     const revision = notificationRevisionRef.current
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) {
+    const token = localStorage.getItem('token')
+    if (pendingFetchRef.current?.revision === revision && pendingFetchRef.current?.token === token) return pendingFetchRef.current.promise
+    const run = async () => {
+      try {
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+
+        const response = await fetch('/api/actionable-notifications', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        // Handle 401 - session expired
+        if (response.status === 401) {
+          handleSessionExpired()
+          return
+        }
+
+        if (response.ok) {
+          const data = await response.json()
+          if (token === localStorage.getItem('token') && revision === notificationRevisionRef.current && data.success && Array.isArray(data.notifications)) {
+            setNotifications(data.notifications)
+            setNextReminderAt(data.nextReminderAt || null)
+          }
+        }
+      } catch (error) {
+        console.error('[ActionableToast] Error fetching notifications:', error)
+      } finally {
         setIsLoading(false)
-        return
       }
-
-      const response = await fetch('/api/actionable-notifications', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      // Handle 401 - session expired
-      if (response.status === 401) {
-        handleSessionExpired()
-        return
-      }
-
-      if (response.ok) {
-        const data = await response.json()
-        if (revision === notificationRevisionRef.current && data.success && Array.isArray(data.notifications)) {
-          setNotifications(data.notifications)
-          setNextReminderAt(data.nextReminderAt || null)
-        }
-      }
-    } catch (error) {
-      console.error('[ActionableToast] Error fetching notifications:', error)
-    } finally {
-      setIsLoading(false)
+    }
+    const promise = run()
+    pendingFetchRef.current = { revision, token, promise }
+    try { await promise } finally {
+      if (pendingFetchRef.current?.promise === promise) pendingFetchRef.current = null
     }
   }, [])
 
@@ -72,15 +81,22 @@ export function ActionableToastProvider({ children }) {
   // including when a suspended tab wakes, so completed decisions never reappear.
   useEffect(() => {
     if (!nextReminderAt) return
-    const timer = setTimeout(fetchPendingNotifications, Math.max(500, Math.min(2147483647, new Date(nextReminderAt).getTime() - Date.now())))
-    const retry = setInterval(() => { if (Date.now() >= new Date(nextReminderAt).getTime()) fetchPendingNotifications() }, 60000)
+    const refreshDue = () => { if (!document.hidden && navigator.onLine !== false) fetchPendingNotifications() }
+    const timer = setTimeout(refreshDue, Math.max(500, Math.min(2147483647, new Date(nextReminderAt).getTime() - Date.now())))
+    const retry = setInterval(() => { if (Date.now() >= new Date(nextReminderAt).getTime()) refreshDue() }, 60000)
     return () => { clearTimeout(timer); clearInterval(retry) }
   }, [nextReminderAt, fetchPendingNotifications])
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === 'visible') fetchPendingNotifications() }
+    let lastRefresh = -Infinity
+    const refresh = () => {
+      if (document.visibilityState !== 'visible' || navigator.onLine === false || Date.now() - lastRefresh < 1000) return
+      lastRefresh = Date.now()
+      fetchPendingNotifications()
+    }
     window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
     document.addEventListener('visibilitychange', refresh)
-    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('online', refresh); document.removeEventListener('visibilitychange', refresh) }
   }, [fetchPendingNotifications])
 
   // Listen for new actionable notifications via Socket.IO

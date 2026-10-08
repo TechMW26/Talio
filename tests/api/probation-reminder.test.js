@@ -11,3 +11,10 @@ test('creates one daily review list atomically and preserves imported daily reco
   expect(await database.count('actionablenotifications')).toBe(1)
   expect((await database.list('actionablenotifications')).records[0]).toMatchObject({ user: 'hr', type: 'generic', url: '/dashboard/employees', metadata: { reminderKey: 'probation-review:2026-09-25' } })
 })
+test('an existing daily reminder skips all employee reads', async () => {
+  const database = { get: jest.fn(async()=>({_id:'delivered'})), list:jest.fn(), transaction:jest.fn() }
+  await ensureProbationReviewReminder({database,user:{_id:'hr',role:'hr'},now:new Date('2026-09-25T12:00:00Z')})
+  expect(database.get).toHaveBeenCalledTimes(1)
+  expect(database.list).not.toHaveBeenCalled()
+  expect(database.transaction).not.toHaveBeenCalled()
+})
