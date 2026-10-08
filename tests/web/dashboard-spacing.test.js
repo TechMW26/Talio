@@ -1,6 +1,28 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import postcss from 'postcss'
 const read = file => fs.readFileSync(path.join(process.cwd(), file), 'utf8')
+test.each([
+  ['app/dashboard/team/members/[id]/member.module.css', 'dashboard'],
+  ['app/dashboard/calendar/calendar.module.css', 'page'],
+])('%s never hides the sole shared content frame as an obsolete bottom spacer', (file, pageClass) => {
+  const main = document.createElement('main')
+  main.className = 'dashboard-page-canvas'
+  main.innerHTML = `<div class="dashboard-content-frame"><div class="dashboard-route-stage"><div class="dashboard-route-page"><div class="${pageClass}">Page content</div></div></div></div>`
+  const frame = main.firstElementChild
+  expect(frame).toBe(main.lastElementChild)
+  expect(frame.matches(`main.dashboard-page-canvas:has(.${pageClass}) > div:last-child`)).toBe(true)
+  // Match route CSS against the current shell shape. The former last-child
+  // spacer selector matched this frame and hid all loaded page content.
+  postcss.parse(read(file)).walkRules(rule => {
+    if (!rule.nodes.some(node => node.prop === 'display' && node.value === 'none')) return
+    for (const selector of rule.selectors) {
+      if (!selector.startsWith(':global(main.dashboard-page-canvas)')) continue
+      const domSelector = selector.replace(/:global\(([^)]+)\)/g, '$1')
+      expect(frame.matches(domSelector)).toBe(false)
+    }
+  })
+})
 test('employee navigation is icon-only and viewport panels grow into free space', () => {
   const page = read('app/dashboard/team/members/[id]/page.js')
   expect(page).toContain('aria-label="Back to previous page"')

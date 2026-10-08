@@ -4,7 +4,7 @@ import { Surface } from '@/components/ui/fernly'
 
 import { Heading1, NativeInput, Heading3 } from '@/components/ui/fernly/native'
 import { useState, useMemo } from 'react'
-import { FernlyMetricCard } from '@/components/charts/FernlyCharts'
+import { FernlyMetricCard } from '@/components/charts/FernlyVisuals'
 import FernlyMotion from '@/components/ui/FernlyMotion'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'

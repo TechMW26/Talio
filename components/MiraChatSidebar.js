@@ -3,7 +3,7 @@
 import BackIcon from '@/components/ui/BackIcon'
 
 import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaRegTrashAlt, FaCopy, FaCheck, FaDownload, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb } from 'react-icons/fa'
+import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaRegTrashAlt, FaCopy, FaCheck, FaDownload, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb, FaExpand, FaCompress, FaMicrophone, FaStop, FaPen, FaUndo } from 'react-icons/fa'
 import { useRouter, usePathname } from 'next/navigation'
 import { useMiraChat } from '@/contexts/MiraChatContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
@@ -27,7 +27,6 @@ import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import { prewarmMiraVoice } from '@/lib/miraVoiceReady'
 import MiraEditPrompt from './MiraEditPrompt'
 import { miraMessageDisplay, miraPlainCaption } from '@/lib/miraMessageDisplay'
-import { Maximize2, Minimize2, Mic, Square, Pencil, RotateCcw, Reply } from 'lucide-react'
 
 // ─── Copy Button ────────────────────────────────────────────────────
 
@@ -350,8 +349,8 @@ const MessageBubble = memo(function MessageBubble({ message, onSuggestionClick, 
           {message.data?.attachments?.map((file, index) => <p key={index} className="mt-1 truncate text-xs text-neutral-400">Attachment: {file.name}</p>)}
         </div>
         <div className="mt-1 flex gap-1 text-neutral-400 md:opacity-0 md:group-hover/msg:opacity-100 md:group-focus-within/msg:opacity-100">
-          <button aria-label="Edit and resend" title="Edit and resend" disabled={busy} onClick={() => onEdit(message)} className="rounded-md p-1.5 hover:bg-white/10 disabled:opacity-40"><Pencil size={13} /></button>
-          <button aria-label="Retry message" title="Retry" disabled={busy} onClick={() => onRetry(message)} className="rounded-md p-1.5 hover:bg-white/10 disabled:opacity-40"><RotateCcw size={13} /></button>
+          <button aria-label="Edit and resend" title="Edit and resend" disabled={busy} onClick={() => onEdit(message)} className="rounded-md p-1.5 hover:bg-white/10 disabled:opacity-40"><FaPen size={13} /></button>
+          <button aria-label="Retry message" title="Retry" disabled={busy} onClick={() => onRetry(message)} className="rounded-md p-1.5 hover:bg-white/10 disabled:opacity-40"><FaUndo size={13} /></button>
         </div>
       </div>
     )
@@ -771,7 +770,7 @@ export default function MiraChatSidebar() {
           <div className="flex items-center gap-0.5">
             <button onClick={popOutMira} className="p-2 rounded-lg text-white/70 hover:bg-white/10" aria-label="Minimize MIRA to floating voice">−</button>
             <button onClick={() => setViewMode(expanded ? 'chat' : 'expanded')} className="p-2 rounded-lg text-white/70 hover:bg-white/10" aria-label={expanded ? 'Collapse MIRA sidebar' : 'Expand MIRA workspace'} aria-pressed={expanded}>
-              {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {expanded ? <FaCompress size={16} /> : <FaExpand size={16} />}
             </button>
             <button
               onClick={closeChat}
@@ -960,7 +959,7 @@ export default function MiraChatSidebar() {
               />
             </div>
             <button onClick={toggleMicrophone} disabled={!voice.active && isThinking} className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-default-100 text-default-800" title={voice.active ? 'Stop voice conversation' : 'Talk in your language. Conversation audio and spoken replies use ElevenLabs.'} aria-label={voice.active ? 'Stop voice conversation' : 'Start voice conversation'} aria-pressed={voice.active}>
-              {voice.active ? <Square size={16} /> : <Mic size={16} />}
+              {voice.active ? <FaStop size={16} /> : <FaMicrophone size={16} />}
             </button>
             <button
               onClick={handleSend}

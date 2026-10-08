@@ -4,7 +4,7 @@ import { Heading2, NativeButton, Heading3 } from '@/components/ui/fernly/native'
 import { Card } from '@/components/ui/fernly'
 import { HiOutlineXMark, HiOutlineChartBar, HiOutlineTrophy, HiOutlineArrowTrendingUp, HiOutlineClock, HiOutlineCheckCircle, HiOutlineExclamationCircle, HiOutlineCalendarDays, HiOutlineFlag } from 'react-icons/hi2'
 import s from './AnalyticsPanel.module.css'
-import { FernlyBars } from '@/components/charts/FernlyCharts'
+import { FernlyBars } from '@/components/charts/FernlyVisuals'
 
 const num = v => Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : 0
 const pct = v => Math.min(100, num(v))

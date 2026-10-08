@@ -844,9 +844,10 @@ html.dark .bg-content1 {
   border-color: transparent !important;
 }
 
-/* Nested cards / inner cards - slightly elevated */
+/* Nested cards / inner cards - slightly elevated. Tabs' base is only a
+   spacing shell; the rounded tabList owns its surface, not this wrapper. */
 html.dark .bg-content1 .bg-content1,
-html.dark .bg-content1 [data-slot="base"] {
+html.dark .bg-content1 [data-slot="base"]:not(:has(> [data-slot="tabList"])) {
   background-color: #27272a !important;
 }
 

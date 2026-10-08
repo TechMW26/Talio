@@ -46,6 +46,9 @@ export const metadata = {
       { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
     ],
     shortcut: '/favicon-32.png',
+    // iOS/Android request this by convention; declaring it stops the automatic
+    // /apple-touch-icon(-precomposed).png 404 on every device visit.
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
 }
 export const viewport = {

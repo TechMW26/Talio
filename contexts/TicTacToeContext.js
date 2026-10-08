@@ -3,7 +3,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useSocket } from '@/contexts/SocketContext'
 import { playGameInviteSound, playSuccessSound, playGameOverSound } from '@/utils/audio'
-import confetti from 'canvas-confetti'
 import {
   HiOutlineTrophy,
   HiOutlineXMark,
@@ -28,12 +27,14 @@ function normalizeBoard(raw) {
   return raw.map(c => (c === 'X' || c === 'O') ? c : null)
 }
 
-// Fire confetti burst for the winner
+// Fire confetti burst for the winner. canvas-confetti is imported on demand so
+// it is never part of the dashboard shell bundle.
 function fireCrackers() {
   const duration = 2500
   const end = Date.now() + duration
   const colors = ['#6366f1', '#a855f7', '#ec4899', '#f59e0b', '#10b981']
 
+  void import('canvas-confetti').then(({ default: confetti }) => {
     ; (function frame() {
       confetti({
         particleCount: 4,
@@ -53,6 +54,7 @@ function fireCrackers() {
       })
       if (Date.now() < end) requestAnimationFrame(frame)
     })()
+  })
 }
 
 const TicTacToeContext = createContext({

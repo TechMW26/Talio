@@ -156,6 +156,8 @@ export function SocketProvider({ children }) {
     const sendHeartbeat = async () => {
       const token = localStorage.getItem('token')
       if (!token) return
+      // Offline presence writes cannot succeed; skip instead of queueing failures.
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
       try {
         await fetch('/api/user/heartbeat', {
           method: 'POST',

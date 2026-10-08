@@ -12,6 +12,7 @@ import OfflineIndicator from '@/components/OfflineIndicator'
 
 import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
+import DashboardAIProviders from '@/components/DashboardAIProviders'
 import { UnreadMessagesProvider } from '@/contexts/UnreadMessagesContext'
 import { InAppNotificationProvider } from '@/contexts/InAppNotificationContext'
 import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
@@ -376,6 +377,7 @@ export default function DashboardLayout({ children }) {
       <InductionGate>
         <SocketProvider>
           <CompanyFeaturesProvider>
+            <DashboardAIProviders>
             <CompanyFeatureRouteGuard />
             <TicTacToeProvider>
               <UnreadMessagesProvider>
@@ -388,6 +390,7 @@ export default function DashboardLayout({ children }) {
                 </ChatWidgetProvider>
               </UnreadMessagesProvider>
             </TicTacToeProvider>
+            </DashboardAIProviders>
           </CompanyFeaturesProvider>
         </SocketProvider>
       </InductionGate>
@@ -398,6 +401,7 @@ export default function DashboardLayout({ children }) {
     <InductionGate>
       <SocketProvider>
         <CompanyFeaturesProvider>
+        <DashboardAIProviders>
         <CompanyFeatureRouteGuard />
         <TicTacToeProvider>
           <UnreadMessagesProvider>
@@ -493,6 +497,7 @@ export default function DashboardLayout({ children }) {
             </ChatWidgetProvider>
           </UnreadMessagesProvider>
         </TicTacToeProvider>
+        </DashboardAIProviders>
         </CompanyFeaturesProvider>
       </SocketProvider>
     </InductionGate>

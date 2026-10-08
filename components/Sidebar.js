@@ -30,8 +30,12 @@ import { useSocket } from '@/contexts/SocketContext'
 import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import UnreadBadge from './UnreadBadge'
 import SidebarSubmenu from './sidebar/SidebarSubmenu'
-import Modal from '@/components/ui/HeroModal'
-import { Button, ScrollShadow, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import dynamic from 'next/dynamic'
+import { Button, ScrollShadow } from '@heroui/react'
+
+// The HeroUI modal stack (react-aria dialog/focus/overlay) is only needed when
+// the user confirms a logout, so it is code-split out of the dashboard shell.
+const LogoutConfirmModal = dynamic(() => import('./sidebar/LogoutConfirmModal'), { ssr: false })
 
 import IconStrip from './sidebar/IconStrip'
 import SlidingSidebar from './sidebar/SlidingSidebar'
@@ -658,29 +662,14 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             </div>
           </aside>
 
-          {/* Logout Confirmation Modal */}
-          <Modal isOpen={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
-            <ModalContent>
-              {(onClose) => (
-                <>
-                  <ModalHeader className="bg-danger-500 text-white">Confirm Logout</ModalHeader>
-                  <ModalBody className="py-6">
-                    <p className="text-center text-default-700">
-                      Are you sure you want to logout?
-                    </p>
-                  </ModalBody>
-                  <ModalFooter className="justify-center">
-                    <Button variant="light" onPress={onClose}>
-                      Cancel
-                    </Button>
-                    <Button color="danger" onPress={handleLogout}>
-                      Logout
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalContent>
-          </Modal>
+          {/* Logout Confirmation Modal (loaded on demand) */}
+          {showLogoutConfirm && (
+            <LogoutConfirmModal
+              isOpen={showLogoutConfirm}
+              onOpenChange={setShowLogoutConfirm}
+              onConfirm={handleLogout}
+            />
+          )}
         </>
       )}
     </>

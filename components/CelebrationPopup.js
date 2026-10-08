@@ -2,48 +2,53 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import confetti from 'canvas-confetti'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import MemberAvatar from '@/components/chat/MemberAvatar'
 import { sendCelebrationWishes } from '@/lib/client/celebrationWishes'
 
 // ── Confetti Launchers ──
+// canvas-confetti is loaded on demand so the celebration overlay never pulls it
+// into the initial chunk.
+let confettiPromise = null
+const loadConfetti = () => (confettiPromise ||= import('canvas-confetti').then(({ default: confetti }) => confetti))
 
 function fireBirthdayConfetti() {
   const duration = 3500
   const end = Date.now() + duration
   const colors = ['#FF6B9D', '#C084FC', '#FDE047', '#67E8F9', '#FB923C', '#34D399']
 
-  ;(function frame() {
-    confetti({
-      particleCount: 3,
-      angle: 60,
-      spread: 55,
-      origin: { x: 0, y: 0.65 },
-      colors,
-      zIndex: 2147483647,
-    })
-    confetti({
-      particleCount: 3,
-      angle: 120,
-      spread: 55,
-      origin: { x: 1, y: 0.65 },
-      colors,
-      zIndex: 2147483647,
-    })
-    if (Date.now() < end) requestAnimationFrame(frame)
-  })()
+  void loadConfetti().then((confetti) => {
+    ;(function frame() {
+      confetti({
+        particleCount: 3,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.65 },
+        colors,
+        zIndex: 2147483647,
+      })
+      confetti({
+        particleCount: 3,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.65 },
+        colors,
+        zIndex: 2147483647,
+      })
+      if (Date.now() < end) requestAnimationFrame(frame)
+    })()
 
-  setTimeout(() => {
-    confetti({
-      particleCount: 120,
-      spread: 100,
-      origin: { x: 0.5, y: 0.4 },
-      colors,
-      zIndex: 2147483647,
-      scalar: 1.2,
-    })
-  }, 300)
+    setTimeout(() => {
+      confetti({
+        particleCount: 120,
+        spread: 100,
+        origin: { x: 0.5, y: 0.4 },
+        colors,
+        zIndex: 2147483647,
+        scalar: 1.2,
+      })
+    }, 300)
+  })
 }
 
 function fireAnniversaryConfetti() {
@@ -51,39 +56,41 @@ function fireAnniversaryConfetti() {
   const duration = 3500
   const end = Date.now() + duration
 
-  ;(function frame() {
-    confetti({
-      particleCount: 2,
-      angle: 60,
-      spread: 80,
-      origin: { x: 0, y: 0.5 },
-      colors,
-      shapes: ['star'],
-      zIndex: 2147483647,
-    })
-    confetti({
-      particleCount: 2,
-      angle: 120,
-      spread: 80,
-      origin: { x: 1, y: 0.5 },
-      colors,
-      shapes: ['star'],
-      zIndex: 2147483647,
-    })
-    if (Date.now() < end) requestAnimationFrame(frame)
-  })()
+  void loadConfetti().then((confetti) => {
+    ;(function frame() {
+      confetti({
+        particleCount: 2,
+        angle: 60,
+        spread: 80,
+        origin: { x: 0, y: 0.5 },
+        colors,
+        shapes: ['star'],
+        zIndex: 2147483647,
+      })
+      confetti({
+        particleCount: 2,
+        angle: 120,
+        spread: 80,
+        origin: { x: 1, y: 0.5 },
+        colors,
+        shapes: ['star'],
+        zIndex: 2147483647,
+      })
+      if (Date.now() < end) requestAnimationFrame(frame)
+    })()
 
-  setTimeout(() => {
-    confetti({
-      particleCount: 80,
-      spread: 120,
-      origin: { x: 0.5, y: 0.45 },
-      colors,
-      shapes: ['star', 'circle'],
-      zIndex: 2147483647,
-      scalar: 1.3,
-    })
-  }, 400)
+    setTimeout(() => {
+      confetti({
+        particleCount: 80,
+        spread: 120,
+        origin: { x: 0.5, y: 0.45 },
+        colors,
+        shapes: ['star', 'circle'],
+        zIndex: 2147483647,
+        scalar: 1.3,
+      })
+    }, 400)
+  })
 }
 
 // ── Subtle sparkle dots (replaces old FloatingParticles) ──

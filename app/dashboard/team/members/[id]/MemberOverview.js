@@ -3,7 +3,7 @@
 
 import { Heading1, Heading2, NativeButton } from '@/components/ui/fernly/native'
 import { useState } from 'react'
-import { CompletionRing, TaskBars } from '@/components/charts/FernlyCharts'
+import { CompletionRing, TaskBars } from '@/components/charts/FernlyVisuals'
 import { formatDesignation } from '@/lib/formatters'
 import styles from './member.module.css'
 

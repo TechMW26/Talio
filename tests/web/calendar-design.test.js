@@ -3,7 +3,7 @@ import path from 'node:path'
 const read = file => fs.readFileSync(path.join(process.cwd(), file), 'utf8')
 test('employee calendar uses larger consistent navigation icons', () => {
   const source = read('app/dashboard/team/members/[id]/MemberAttendance.js')
-  for (const icon of ['ChevronLeft', 'ChevronRight', 'RotateCw']) {
+  for (const icon of ['FaChevronLeft', 'FaChevronRight', 'FaRedo']) {
     expect(source).toContain(`<${icon} size={20} aria-hidden="true"`)
   }
   expect(read('app/dashboard/team/members/[id]/member.module.css')).toContain('.attendanceControls svg { width: 20px; height: 20px; }')
