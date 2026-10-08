@@ -6,7 +6,7 @@ const statuses = [...DEFAULT_TASK_STATUSES.slice(0, 4), { key: 'qa', label: 'QA'
 test('modal edits shared controls and only removes unused statuses after confirmation', () => {
   const save = jest.fn()
   render(<ManageTaskStatusesModal isOpen statuses={statuses} onSave={save} />)
-  expect(screen.getByRole('dialog', { name: 'Manage Task Statuses' })).toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: 'Manage Board' })).toBeInTheDocument()
   fireEvent.change(screen.getByRole('textbox', { name: 'Status 5 name' }), { target: { value: 'Quality' } })
   fireEvent.change(screen.getByRole('combobox', { name: 'Status 5 color' }), { target: { value: 'pink' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save Statuses' }))

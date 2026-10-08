@@ -167,6 +167,25 @@ export default function ProjectDetailPage() {
     return getEmployeeId(user)
   }, [tasksData, user])
 
+  // When the requester opens the Task Status tab, mark their resolved requests as seen
+  // so the badge clears. Project heads keep the pending-count badge instead.
+  useEffect(() => {
+    if (activeTab !== 'status-requests' || project?.isProjectHead || !projectId) return
+    const markSeen = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch('/api/projects/approvals', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ projectId })
+        })
+        const data = await response.json()
+        if (data?.success && data.marked > 0) mutateProject()
+      } catch { /* Ignore transient mark-seen failures */ }
+    }
+    markSeen()
+  }, [activeTab, project?.isProjectHead, projectId, mutateProject])
+
   // Redirect on project fetch error
   useEffect(() => {
     if (projectError) {
@@ -200,7 +219,18 @@ export default function ProjectDetailPage() {
   const [editTaskForm, setEditTaskForm] = useState(null)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const [showManageStatuses, setShowManageStatuses] = useState(false)
+  const [statusBoardMode, setStatusBoardMode] = useState('manage')
   const [savingStatuses, setSavingStatuses] = useState(false)
+  const [showStatusRequestModal, setShowStatusRequestModal] = useState(false)
+  const [statusRequestForm, setStatusRequestForm] = useState({ statusName: '', reason: '', position: '' })
+  const [submittingStatusRequest, setSubmittingStatusRequest] = useState(false)
+  const [rejectingStatusRequestId, setRejectingStatusRequestId] = useState(null)
+  const [statusRequestRejectReason, setStatusRequestRejectReason] = useState('')
+  const [submittingStatusRequestAction, setSubmittingStatusRequestAction] = useState(false)
+  const [approvingStatusRequest, setApprovingStatusRequest] = useState(null)
+  const [suggestedStatusName, setSuggestedStatusName] = useState('')
+  const [suggestedStatusPosition, setSuggestedStatusPosition] = useState('')
+  const [deletingStatusRequestId, setDeletingStatusRequestId] = useState(null)
 
   // Reason modal state for status changes (requires justification)
   const [showReasonModal, setShowReasonModal] = useState(false)
@@ -1275,6 +1305,129 @@ export default function ProjectDetailPage() {
     }
   }
 
+  // Request a new status from the project owner (non-owner members)
+  const submitStatusRequest = async () => {
+    const statusName = statusRequestForm.statusName.trim()
+    const reason = statusRequestForm.reason.trim()
+    const position = statusRequestForm.position
+    if (!statusName || !reason || !position) {
+      toast.error('Status name, position and reason are required')
+      return
+    }
+    try {
+      setSubmittingStatusRequest(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/projects/approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ projectId, statusName, reason, position })
+      })
+      const data = await response.json()
+      if (data.success) {
+        // No toast here: the requester must not receive any notification until the owner acts.
+        setShowStatusRequestModal(false)
+        setStatusRequestForm({ statusName: '', reason: '', position: '' })
+        mutateProject()
+        mutateTimeline()
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to submit status request')
+    } finally {
+      setSubmittingStatusRequest(false)
+    }
+  }
+
+  // Requester submits a request directly from the shared Manage Board UI
+  const requestStatusFromBoard = async ({ statusName, position, reason }) => {
+    if (!statusName || !reason) {
+      toast.error('Status name and reason are required')
+      return
+    }
+    try {
+      setSubmittingStatusRequest(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/projects/approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ projectId, statusName, reason, position })
+      })
+      const data = await response.json()
+      if (data.success) {
+        setShowManageStatuses(false)
+        setStatusBoardMode('manage')
+        mutateProject()
+        mutateTimeline()
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to submit status request')
+    } finally {
+      setSubmittingStatusRequest(false)
+    }
+  }
+
+  // Owner resolves a status request (approve/reject)
+  const resolveStatusRequest = async (requestId, action, reason = '') => {
+    try {
+      setSubmittingStatusRequestAction(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/approvals/${requestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action, comment: reason })
+      })
+      const data = await response.json()
+      if (data.success) {
+        toast.success(data.message)
+        setRejectingStatusRequestId(null)
+        setStatusRequestRejectReason('')
+        mutateProject()
+        mutateTimeline()
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to respond to status request')
+    } finally {
+      setSubmittingStatusRequestAction(false)
+    }
+  }
+
+  const handleApproveStatusRequest = (request) => {
+    setApprovingStatusRequest(request)
+    setSuggestedStatusName(request.metadata?.statusName || '')
+    setSuggestedStatusPosition(request.metadata?.position || '')
+    setStatusBoardMode('manage')
+    setShowManageStatuses(true)
+  }
+
+  // Requester deletes their own resolved (approved/rejected) status request
+  const deleteStatusRequest = async (requestId) => {
+    try {
+      setDeletingStatusRequestId(requestId)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/approvals/${requestId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await response.json()
+      if (data.success) {
+        toast.success(data.message)
+        mutateProject()
+        mutateTimeline()
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to delete status request')
+    } finally {
+      setDeletingStatusRequestId(null)
+    }
+  }
+
   const handleSaveTaskStatuses = async (statuses) => {
     try {
       setSavingStatuses(true)
@@ -1292,6 +1445,13 @@ export default function ProjectDetailPage() {
         await mutateProject()
         toast.success('Task statuses updated')
         setShowManageStatuses(false)
+        if (approvingStatusRequest) {
+          const requestId = approvingStatusRequest._id
+          setApprovingStatusRequest(null)
+          setSuggestedStatusName('')
+          setSuggestedStatusPosition('')
+          await resolveStatusRequest(requestId, 'approve')
+        }
       } else {
         toast.error(data.message || 'Failed to update task statuses')
       }
@@ -1365,6 +1525,11 @@ export default function ProjectDetailPage() {
   const taskStatuses = getBoardTaskStatuses(project)
   const kanbanStatusColumns = taskStatuses.map(s => ({ key: s.key, label: s.label, color: s.color }))
   const taskStatusTaskCounts = project?.taskStatusUsage || {}
+  const statusRequests = project?.statusRequests || []
+  const visibleStatusRequests = isProjectHead ? statusRequests : statusRequests.filter(request => request.requestedBy?._id === currentEmployeeId)
+  const statusRequestBadgeCount = isProjectHead
+    ? statusRequests.filter(request => request.status === 'pending').length
+    : statusRequests.filter(request => request.requestedBy?._id === currentEmployeeId && ['approved', 'rejected'].includes(request.status) && !request.requesterSeenAt).length
   const isAcceptedMember = project.currentUserInvitationStatus === 'accepted' || isProjectHead || isCreator || (user && ['admin'].includes(user.role))
   const isPendingInvitation = project.currentUserInvitationStatus === 'invited'
   const isWaitingForReview = (project.completionPercentage >= 100) && new Date(project.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(project.status)
@@ -1454,16 +1619,6 @@ export default function ProjectDetailPage() {
               Edit
             </NativeButton>
           )}
-          {canManageStatuses && (
-            <NativeButton
-              onClick={() => { setShowManageStatuses(true); mutateProject() }}
-              className="btn-secondary flex items-center"
-            >
-              <HiOutlineSquares2X2 className="mr-2 w-4 h-4" />
-              Manage Statuses
-            </NativeButton>
-          )}
-
           {/* Mark Complete button - ONLY visible for Project Head */}
           {isProjectHead && project.status !== 'completed' && (
             <NativeButton
@@ -1514,11 +1669,16 @@ export default function ProjectDetailPage() {
 
       <ManageTaskStatusesModal
         isOpen={showManageStatuses}
-        onClose={() => setShowManageStatuses(false)}
+        onClose={() => { setShowManageStatuses(false); setStatusBoardMode('manage'); setApprovingStatusRequest(null); setSuggestedStatusName(''); setSuggestedStatusPosition('') }}
         statuses={taskStatuses}
         taskCounts={taskStatusTaskCounts}
         onSave={handleSaveTaskStatuses}
         saving={savingStatuses}
+        suggestedStatusName={suggestedStatusName}
+        suggestedStatusPosition={suggestedStatusPosition}
+        requestMode={statusBoardMode === 'request'}
+        onRequest={requestStatusFromBoard}
+        requesting={submittingStatusRequest}
       />
 
       {/* Pending Invitation Banner */}
@@ -1592,11 +1752,29 @@ export default function ProjectDetailPage() {
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'tasks', label: 'Tasks' },
+              { id: 'status-requests', label: 'Task Status' },
               { id: 'members', label: 'Members' },
               { id: 'notes', label: 'Notes' },
               { id: 'timeline', label: 'Activity' }
             ].map(tab => (
-              <Tab key={tab.id} title={tab.label} />
+              <Tab
+                key={tab.id}
+                className={tab.id === 'tasks' && activeTab === 'status-requests' ? 'ring-2 ring-primary/40' : undefined}
+                title={
+                  <span className="inline-flex items-center gap-1.5">
+                    {/* The Task Status tab belongs to Tasks: highlight Tasks too when it is open. */}
+                    {tab.id === 'tasks' && activeTab === 'status-requests' && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                    )}
+                    {tab.label}
+                    {tab.id === 'status-requests' && statusRequestBadgeCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                        {statusRequestBadgeCount}
+                      </span>
+                    )}
+                  </span>
+                }
+              />
             ))}
           </Tabs>
 
@@ -1630,15 +1808,35 @@ export default function ProjectDetailPage() {
                   </NativeButton>
                 </div>
 
-                {isAcceptedMember && (
-                  <Button
-                    onPress={() => setShowCreateTask(true)}
-                    color="primary"
-                    startContent={<FaPlus className="mr-2" />}
-                  >
-                    Add Task
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {canManageStatuses && (
+                    <NativeButton
+                      onClick={() => { setStatusBoardMode('manage'); setShowManageStatuses(true); mutateProject() }}
+                      className="btn-secondary flex items-center"
+                    >
+                      <HiOutlineSquares2X2 className="mr-2 w-4 h-4" />
+                      Manage Board
+                    </NativeButton>
+                  )}
+                  {!canManageStatuses && isAcceptedMember && (
+                    <NativeButton
+                      onClick={() => { setStatusBoardMode('request'); setShowManageStatuses(true) }}
+                      className="btn-secondary flex items-center"
+                    >
+                      <HiOutlinePlus className="mr-2 w-4 h-4" />
+                      Request New Status
+                    </NativeButton>
+                  )}
+                  {isAcceptedMember && (
+                    <Button
+                      onPress={() => setShowCreateTask(true)}
+                      color="primary"
+                      startContent={<FaPlus className="mr-2" />}
+                    >
+                      Add Task
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <TaskStatusProgressBar tasks={tasks} taskStatuses={taskStatuses} />
@@ -1810,6 +2008,12 @@ export default function ProjectDetailPage() {
                             return { icon: HiOutlineCheckCircle, bg: 'bg-emerald-500', color: 'text-white', branch: 'emerald' }
                           case 'project_rejected':
                             return { icon: HiOutlineXMark, bg: 'bg-red-500', color: 'text-white', branch: 'red' }
+                          case 'status_request_created':
+                            return { icon: HiOutlineSquares2X2, bg: 'bg-blue-500', color: 'text-white', branch: 'blue' }
+                          case 'status_request_approved':
+                            return { icon: HiOutlineCheckCircle, bg: 'bg-green-500', color: 'text-white', branch: 'green' }
+                          case 'status_request_rejected':
+                            return { icon: HiOutlineXMark, bg: 'bg-red-500', color: 'text-white', branch: 'red' }
                           case 'member_joined':
                             return { icon: HiOutlineUsers, bg: 'bg-indigo-500', color: 'text-white', branch: 'indigo' }
                           case 'status_changed':
@@ -1895,6 +2099,14 @@ export default function ProjectDetailPage() {
                                       </ul>
                                     </div>
                                   )}
+                                </div>
+                              )}
+
+                              {/* Show status request reason */}
+                              {event.type === 'status_request_created' && event.metadata?.reason && (
+                                <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                                  <p className="text-sm font-medium text-blue-700 mb-1">Reason</p>
+                                  <p className="text-sm text-blue-600">{event.metadata.reason}</p>
                                 </div>
                               )}
 
@@ -2252,6 +2464,117 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Task Status (Status Requests) Tab */}
+          {activeTab === 'status-requests' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="font-semibold text-gray-900">Task Status</h4>
+                  <p className="text-sm text-gray-500">Manage board statuses and review requests for this project's tasks.</p>
+                </div>
+                {!isProjectHead && isAcceptedMember && (
+                  <NativeButton onClick={() => { setStatusBoardMode('request'); setShowManageStatuses(true) }} className="btn-secondary flex items-center text-sm">
+                    <HiOutlinePlus className="mr-1 w-4 h-4" /> Request New Status
+                  </NativeButton>
+                )}
+              </div>
+
+              {visibleStatusRequests.length === 0 ? (
+                <div className="text-center py-12">
+                  <HiOutlineSquares2X2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No status requests yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {visibleStatusRequests.map(request => (
+                    <div key={request._id} className="rounded-xl border border-gray-200 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-400">Requested status</p>
+                          <p className="font-semibold text-gray-900">{request.metadata?.statusName}</p>
+                          {request.metadata?.position && (
+                            <p className="text-xs text-primary-600 mt-1">
+                              Place before: <span className="font-medium">{taskStatuses.find(s => s.key === request.metadata.position)?.label || request.metadata.position}</span>
+                            </p>
+                          )}
+                          <p className="text-sm text-gray-600 mt-2">{request.reason}</p>
+                          <p className="text-xs text-gray-400 mt-2">
+                            Requested by {request.requestedBy?.firstName} {request.requestedBy?.lastName}
+                            {request.reviewedBy ? ` · Reviewed by ${request.reviewedBy.firstName} ${request.reviewedBy.lastName}` : ''}
+                          </p>
+                          {request.status === 'rejected' && request.reviewerComment && (
+                            <p className="text-sm text-red-600 mt-2">Reason for rejection: {request.reviewerComment}</p>
+                          )}
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${request.status === 'pending' ? 'bg-orange-100 text-orange-700' : request.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {request.status === 'pending' ? 'Pending' : request.status === 'approved' ? 'Approved' : 'Rejected'}
+                        </span>
+                      </div>
+
+                      {isProjectHead && request.status === 'pending' && (
+                        <div className="flex items-center gap-2 mt-3 border-t border-gray-100 pt-3">
+                          {rejectingStatusRequestId === request._id ? (
+                            <>
+                              <NativeInput
+                                type="text"
+                                value={statusRequestRejectReason}
+                                onChange={(e) => setStatusRequestRejectReason(e.target.value)}
+                                placeholder="Reason for rejecting this request"
+                                className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm"
+                              />
+                              <NativeButton
+                                onClick={() => resolveStatusRequest(request._id, 'reject', statusRequestRejectReason.trim())}
+                                disabled={!statusRequestRejectReason.trim() || submittingStatusRequestAction}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                              >
+                                Submit Rejection
+                              </NativeButton>
+                              <NativeButton
+                                onClick={() => { setRejectingStatusRequestId(null); setStatusRequestRejectReason('') }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100"
+                              >
+                                Cancel
+                              </NativeButton>
+                            </>
+                          ) : (
+                            <>
+                              <NativeButton
+                                onClick={() => handleApproveStatusRequest(request)}
+                                disabled={submittingStatusRequestAction}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                              >
+                                Approve & Add Status
+                              </NativeButton>
+                              <NativeButton
+                                onClick={() => { setRejectingStatusRequestId(request._id); setStatusRequestRejectReason('') }}
+                                disabled={submittingStatusRequestAction}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                              >
+                                Reject
+                              </NativeButton>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {(isProjectHead || request.requestedBy?._id === currentEmployeeId) && ['approved', 'rejected'].includes(request.status) && (
+                        <div className="flex justify-end mt-3 border-t border-gray-100 pt-3">
+                          <NativeButton
+                            onClick={() => deleteStatusRequest(request._id)}
+                            disabled={deletingStatusRequestId === request._id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            {deletingStatusRequestId === request._id ? 'Deleting…' : 'Delete'}
+                          </NativeButton>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

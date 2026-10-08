@@ -18,7 +18,17 @@ export async function GET(request) {
     if (statuses?.length > 30) return NextResponse.json({ success: false, message: 'Too many status filters' }, { status: 400 })
     const departments = (query.get('departments') || query.get('department') || '').split(',').map(value => value.trim()).filter(value => value && value !== 'all')
     const projects = await visibleProjects(auth.database, auth.user, { all: query.get('all') === 'true', status: statuses, role: query.get('role'), invitationStatus: query.get('invitationStatus'), departments })
-    const data = await Promise.all(projects.map(async project => ({ ...await populateProject(auth.database, project), taskStats: await getProjectTaskStats(project._id, auth.database) })))
+    const pendingStatusRequests = await projectRows(auth.database, 'projectapprovalrequests', [projectFilter('type', 'status_creation'), projectFilter('status', 'pending')])
+    const resolvedStatusRequests = await projectRows(auth.database, 'projectapprovalrequests', [projectFilter('type', 'status_creation'), projectFilter('requestedBy', employeeId), projectFilter('status', ['approved', 'rejected'], 'in')])
+    const pendingCountByProject = {}
+    for (const row of pendingStatusRequests) pendingCountByProject[projectId(row.project)] = (pendingCountByProject[projectId(row.project)] || 0) + 1
+    const resolvedCountByProject = {}
+    for (const row of resolvedStatusRequests) if (!row.requesterSeenAt) resolvedCountByProject[projectId(row.project)] = (resolvedCountByProject[projectId(row.project)] || 0) + 1
+    const data = await Promise.all(projects.map(async project => {
+      const isOwner = auth.user.role === 'admin' || projectId(project.projectHead) === employeeId || (project.projectHeads || []).some(head => projectId(head) === employeeId)
+      const statusRequestCount = isOwner ? (pendingCountByProject[project._id] || 0) : (resolvedCountByProject[project._id] || 0)
+      return { ...await populateProject(auth.database, project), taskStats: await getProjectTaskStats(project._id, auth.database), statusRequestCount }
+    }))
     return NextResponse.json({ success: true, data, currentEmployeeId: employeeId })
   } catch (error) { return NextResponse.json({ success: false, message: error.message }, { status: error.status || 500 }) }
 }

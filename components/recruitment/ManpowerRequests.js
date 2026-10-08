@@ -5,7 +5,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
-import { HiOutlinePlus, HiOutlineBriefcase, HiOutlineClock, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineInbox, HiOutlineArrowRight } from 'react-icons/hi2'
+import { HiOutlinePlus, HiOutlineBriefcase, HiOutlineClock, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineInbox, HiOutlineArrowRight, HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2'
 
 const endpoint = '/api/recruitment/requisitions'
 const field = 'w-full rounded-xl border border-default-300 bg-content1 p-3 text-sm text-foreground'
@@ -25,7 +25,8 @@ function RequestForm({ departments, busy, onSubmit, onCancel }) {
     event.preventDefault()
     const body = { ...form, submissionKey, action: 'submit' }
     for (const key of ['numberOfPositions', 'experienceMin', 'experienceMax', 'salaryMin', 'salaryMax']) body[key] = Number(body[key])
-    for (const key of ['requirements', 'responsibilities', 'skills', 'benefits']) body[key] = body[key].split('\n').map(v => v.trim()).filter(Boolean)
+    for (const key of ['requirements', 'responsibilities', 'benefits']) body[key] = body[key].split('\n').map(v => v.trim()).filter(Boolean)
+    body.skills = body.skills.split(/[\n,]+/).map(v => v.trim()).filter(Boolean)
     onSubmit(body)
   }}>
     <h2 className="text-lg font-semibold">New manpower request</h2>
@@ -44,7 +45,7 @@ function RequestForm({ departments, busy, onSubmit, onCancel }) {
     </div>
     <h3 className="border-t border-default-200 pt-4 text-sm font-semibold">Business case &amp; job requirements</h3>
     <div className="grid gap-4 sm:grid-cols-2">
-      {[['justification', 'Business justification (internal)'], ['jobDescription', 'Job description (public)'], ['requirements', 'Requirements (one per line)'], ['responsibilities', 'Responsibilities (one per line)'], ['skills', 'Skills (one per line)'], ['benefits', 'Benefits (optional, one per line)']].map(([name, label]) => <label className="space-y-1 text-sm" key={name}><span>{label}</span><textarea className={field} name={name} rows={4} value={form[name]} onChange={update} required={name !== 'benefits'} maxLength={name === 'jobDescription' ? 15000 : 4000} /></label>)}
+      {[['justification', 'Business justification (internal)'], ['jobDescription', 'Job description (public)'], ['requirements', 'Requirements (one per line)'], ['responsibilities', 'Responsibilities (one per line)'], ['skills', 'Skills (comma-separated)'], ['benefits', 'Benefits (optional, one per line)']].map(([name, label]) => <label className="space-y-1 text-sm" key={name}><span>{label}</span><textarea className={field} name={name} rows={4} value={form[name]} onChange={update} required={name !== 'benefits'} maxLength={name === 'jobDescription' ? 15000 : 4000} /></label>)}
     </div>
     <div className="flex flex-wrap gap-3 border-t border-default-200 pt-4"><button className={primaryButton} disabled={busy} type="submit">{busy ? 'Submitting…' : 'Submit to HR'}</button><button className={button} disabled={busy} type="button" onClick={onCancel}>Cancel</button></div>
   </form>
@@ -52,18 +53,47 @@ function RequestForm({ departments, busy, onSubmit, onCancel }) {
 function RequestCard({ record, busy, onReview, isHr }) {
   const [review, setReview] = useState('')
   const [reason, setReason] = useState('')
+  const [showDetails, setShowDetails] = useState(false)
   const job = record.job
+  const skills = (job.skills || []).flatMap(value => String(value).split(',').map(item => item.trim()).filter(Boolean))
+  const fact = (label, value) => value ? (
+    <div className="rounded-xl border border-default-200 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-default-500">{label}</p>
+      <p className="mt-1 text-sm font-medium">{value}</p>
+    </div>
+  ) : null
+  const section = (title, children) => (
+    <section className="overflow-hidden rounded-xl border border-default-200">
+      <h4 className="border-b border-default-200 bg-default-50 px-4 py-3 text-sm font-semibold">{title}</h4>
+      <div className="p-4">{children}</div>
+    </section>
+  )
   return <article className="space-y-3 rounded-2xl border border-default-200 bg-content1 p-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-xl bg-primary/10 p-3 text-primary"><HiOutlineBriefcase className="h-5 w-5" aria-hidden="true" /></span><div><h3 className="text-lg font-semibold">{job.jobTitle}</h3><p className="text-sm text-default-500">{job.numberOfPositions} position(s) · {job.location} · {job.workMode}</p></div></div><span className={`rounded-full px-3 py-1 text-xs font-medium ${statusTone[record.status] || 'bg-default-100'}`}>{statuses[record.status] || record.status}</span></div>
     <p className="text-sm text-default-500">{record.department?.name} · {record.employee?.firstName} {record.employee?.lastName} · {new Date(record.createdAt).toLocaleDateString()}</p>
     <div className="rounded-xl bg-default-50 p-4"><p className="mb-1 text-xs font-medium text-default-500">BUSINESS JUSTIFICATION · INTERNAL</p><p className="whitespace-pre-wrap break-words text-sm">{record.justification}</p></div>
-    <details><summary className="cursor-pointer text-sm font-medium">View full job details</summary><div className="mt-3 space-y-3 text-sm">
-      <p>{job.location} · {job.workMode} · {job.employmentType} · Education: {job.educationLevel}</p>
-      <p>Experience: {job.experience.min}–{job.experience.max} years</p>
-      <p>Annual salary budget (internal): {job.salaryRange.currency} {job.salaryRange.min}–{job.salaryRange.max}</p>
-      <p className="whitespace-pre-wrap">{job.jobDescription}</p>
-      {['requirements', 'responsibilities', 'skills', 'benefits'].map(key => <div key={key}><h3 className="font-medium capitalize">{key}</h3><ul className="list-inside list-disc">{job[key].map((v, i) => <li key={i}>{v}</li>)}</ul></div>)}
-    </div></details>
+    <div className="border-t border-default-200 pt-4">
+      <button type="button" className={button} disabled={busy} onClick={() => setShowDetails(value => !value)}>
+        {showDetails ? <HiOutlineEyeSlash className="h-4 w-4" aria-hidden="true" /> : <HiOutlineEye className="h-4 w-4" aria-hidden="true" />}
+        {showDetails ? 'Hide job preview' : 'View full job details'}
+      </button>
+      {showDetails && <div className="mt-4 space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {fact('Location', job.location)}
+          {fact('Work mode', job.workMode)}
+          {fact('Employment type', job.employmentType)}
+          {fact('Education', job.educationLevel && job.educationLevel !== 'any' ? job.educationLevel : null)}
+          {fact('Experience', `${job.experience?.min ?? 0}–${job.experience?.max ?? 0} years`)}
+          {fact('Headcount', `${job.numberOfPositions} position(s)`)}
+          {fact('Salary budget · internal', job.salaryRange ? `${job.salaryRange.currency} ${job.salaryRange.min}–${job.salaryRange.max}` : null)}
+        </div>
+        {job.jobDescription && section('Job description', <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{job.jobDescription}</p>)}
+        {job.requirements?.length > 0 && section('Requirements', <ul className="list-inside list-disc space-y-1 text-sm">{job.requirements.map((value, index) => <li key={index}>{value}</li>)}</ul>)}
+        {job.responsibilities?.length > 0 && section('Responsibilities', <ul className="list-inside list-disc space-y-1 text-sm">{job.responsibilities.map((value, index) => <li key={index}>{value}</li>)}</ul>)}
+        {skills.length > 0 && section('Skills', <div className="flex flex-wrap gap-1.5">{skills.map((value, index) => <span key={index} className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">{value}</span>)}</div>)}
+        {job.benefits?.length > 0 && section('Benefits', <ul className="list-inside list-disc space-y-1 text-sm">{job.benefits.map((value, index) => <li key={index}>{value}</li>)}</ul>)}
+      </div>}
+    </div>
     {record.reviewReason && <p className="text-sm">HR feedback: {record.reviewReason}</p>}
     {record.jobPosting && (isHr ? <Link className="inline-block text-sm underline" href={`/dashboard/recruitment/${record.jobPosting}`}>View published job</Link> : <p className="text-sm">Job published in Talio. HR is managing recruitment.</p>)}
     {record.canReview && <div className="space-y-3">
