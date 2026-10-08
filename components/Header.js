@@ -201,11 +201,19 @@ function RealTimeClock({ timezone = 'Asia/Kolkata' }) {
   const [time, setTime] = useState(new Date())
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    // A hidden tab does not need a per-second re-render; resync on return.
+    let timer = null
+    const start = () => {
       setTime(new Date())
-    }, 1000)
+      if (timer) return
+      timer = setInterval(() => setTime(new Date()), 1000)
+    }
+    const stop = () => { if (timer) { clearInterval(timer); timer = null } }
+    const onVisibility = () => (document.hidden ? stop() : start())
 
-    return () => clearInterval(timer)
+    onVisibility()
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisibility) }
   }, [])
 
   const formatTime = (date) => {

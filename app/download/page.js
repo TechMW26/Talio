@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, Monitor, Apple, CheckCircle, AlertCircle } from 'lucide-react'
+import { FaDownload, FaDesktop, FaApple, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
 
 export default function DownloadPage() {
   const [platform, setPlatform] = useState('unknown')
@@ -37,7 +37,7 @@ export default function DownloadPage() {
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white text-center">
           <div className="flex justify-center gap-4 mb-4">
-            <Monitor className="w-12 h-12" />
+            <FaDesktop className="w-12 h-12" />
           </div>
           <h1 className="text-3xl font-bold mb-2">Talio</h1>
           <p className="text-blue-100">Download for your platform</p>
@@ -48,7 +48,7 @@ export default function DownloadPage() {
           {/* Version Info */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <FaCheckCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
               <div>
                 <h3 className="font-semibold text-blue-900 mb-1">Download links always point to the latest release</h3>
                 <p className="text-sm text-blue-700">Auto-updates are built in — the app stays current automatically</p>
@@ -61,14 +61,14 @@ export default function DownloadPage() {
             {/* Desktop Apps */}
             <div className="border border-gray-200 rounded-lg p-5">
               <div className="flex items-center gap-2 mb-4">
-                <Monitor className="w-6 h-6 text-gray-700" />
+                <FaDesktop className="w-6 h-6 text-gray-700" />
                 <h3 className="font-semibold text-gray-900">Desktop App</h3>
               </div>
               
               {/* macOS */}
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
-                  <Apple className="w-4 h-4" /> macOS
+                  <FaApple className="w-4 h-4" /> macOS
                 </p>
                 <div className="space-y-2">
                   <a
@@ -76,7 +76,7 @@ export default function DownloadPage() {
                     onClick={handleDownload}
                     className="block w-full bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-all text-center"
                   >
-                    <Download className="w-4 h-4 inline mr-2" />
+                    <FaDownload className="w-4 h-4 inline mr-2" />
                     Apple Silicon (M1/M2/M3)
                   </a>
                   <a
@@ -84,7 +84,7 @@ export default function DownloadPage() {
                     onClick={handleDownload}
                     className="block w-full bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-all text-center"
                   >
-                    <Download className="w-4 h-4 inline mr-2" />
+                    <FaDownload className="w-4 h-4 inline mr-2" />
                     Intel Mac
                   </a>
                 </div>
@@ -93,14 +93,14 @@ export default function DownloadPage() {
               {/* Windows */}
               <div>
                 <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
-                  <Monitor className="w-4 h-4" /> Windows
+                  <FaDesktop className="w-4 h-4" /> Windows
                 </p>
                 <a
                   href={downloadLinks.windows}
                   onClick={handleDownload}
                   className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-all text-center"
                 >
-                  <Download className="w-4 h-4 inline mr-2" />
+                  <FaDownload className="w-4 h-4 inline mr-2" />
                   Windows 10/11
                 </a>
               </div>
@@ -118,27 +118,27 @@ export default function DownloadPage() {
             <h3 className="font-semibold text-gray-900 mb-3">Features</h3>
             <ul className="grid md:grid-cols-2 gap-2">
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <FaCheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-700 text-sm">Automatic screenshot capture</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <FaCheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-700 text-sm">Location-based attendance</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <FaCheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-700 text-sm">Real-time notifications</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <FaCheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-700 text-sm">Screen sharing for meetings</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <FaCheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-700 text-sm">System tray integration</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <FaCheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-700 text-sm">Auto-start on boot</span>
               </li>
             </ul>
@@ -163,7 +163,7 @@ export default function DownloadPage() {
           {/* Important Notes */}
           <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <FaExclamationCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
               <div>
                 <h4 className="font-semibold text-amber-900 mb-1">Important</h4>
                 <p className="text-sm text-amber-700">

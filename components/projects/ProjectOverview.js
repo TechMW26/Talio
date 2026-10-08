@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { 
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
-  Legend, ResponsiveContainer, FernlyGauge, FernlyCompletionAnalytics
+  Legend, ResponsiveContainer, FernlyCompletionAnalytics
 } from '@/components/charts/FernlyCharts'
+import { FernlyGauge } from '@/components/charts/FernlyVisuals'
 import {
   FaChartLine, FaUsers, FaTasks, FaCalendarAlt, FaClock,
   FaExclamationTriangle, FaRocket, FaLightbulb, FaCheckCircle,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Download, Check, Info } from 'lucide-react';
+import { FaDownload, FaCheck, FaInfoCircle } from 'react-icons/fa'
 
 // ============================================
 // RELEASE CONFIGURATION - Update for new releases
@@ -175,7 +175,7 @@ export default function ResourcesPage() {
                   <div className="text-sm opacity-80">{recommended.label} • v{RELEASE_VERSION} • {recommended.size}</div>
                 </div>
               </div>
-              <Download className="w-5 h-5" />
+              <FaDownload className="w-5 h-5" />
             </a>
           </div>
 
@@ -211,7 +211,7 @@ export default function ResourcesPage() {
                   </a>
                 </div>
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
-                  <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <FaInfoCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-800">
                     If macOS blocks the app, <a href="https://github.com/TechMW26/Talio/blob/main/MAC_INSTALLATION_GUIDE.md" target="_blank" rel="noreferrer" className="underline font-medium">follow this guide</a>.
                   </p>
@@ -250,15 +250,15 @@ export default function ResourcesPage() {
                 <h4 className="font-semibold text-gray-900 mb-3">macOS</h4>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-teal-600" />
+                    <FaCheck className="w-4 h-4 text-teal-600" />
                     macOS 10.15 (Catalina) or later
                   </li>
                   <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-teal-600" />
+                    <FaCheck className="w-4 h-4 text-teal-600" />
                     Apple Silicon or Intel processor
                   </li>
                   <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-teal-600" />
+                    <FaCheck className="w-4 h-4 text-teal-600" />
                     200 MB disk space
                   </li>
                 </ul>
@@ -267,15 +267,15 @@ export default function ResourcesPage() {
                 <h4 className="font-semibold text-gray-900 mb-3">Windows</h4>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-blue-600" />
+                    <FaCheck className="w-4 h-4 text-blue-600" />
                     Windows 10 or Windows 11
                   </li>
                   <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-blue-600" />
+                    <FaCheck className="w-4 h-4 text-blue-600" />
                     64-bit processor
                   </li>
                   <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-blue-600" />
+                    <FaCheck className="w-4 h-4 text-blue-600" />
                     200 MB disk space
                   </li>
                 </ul>

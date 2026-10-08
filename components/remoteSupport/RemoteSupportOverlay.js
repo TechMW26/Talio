@@ -20,31 +20,58 @@ export default function RemoteSupportOverlay() {
   const [error, setError] = useState('')
 
   const refresh = useCallback(async signal => {
-    if (!getToken()) return
+    if (!getToken()) return null
     try {
       const result = await request('/api/remote-support/sessions', { signal })
-      if (signal.aborted) return
+      if (signal.aborted) return null
       const employeeSessions = (result.sessions || []).filter(item => item.side === 'employee' && ['pending', 'approved'].includes(item.status))
-      setSession(employeeSessions[0] || null)
+      const next = employeeSessions[0] || null
+      setSession(next)
       setError('')
-    } catch { /* transient auth/network errors are retried on the next poll */ }
+      return next
+    } catch { /* transient auth/network errors are retried on the next poll */ return null }
   }, [])
 
   useEffect(() => {
-    let stopped = false, timer, controller, deadline
+    // A pending request must surface quickly; an idle queue does not. Polling
+    // every few seconds on every dashboard page was the single largest source
+    // of background requests, so idle reads back off and hidden tabs stop.
+    const ACTIVE_MS = 3500
+    const IDLE_MS = 30000
+    let stopped = false, running = false, timer, controller, deadline
     const poll = async () => {
+      if (stopped || running) return
+      if (typeof document !== 'undefined' && document.hidden) {
+        timer = window.setTimeout(poll, IDLE_MS)
+        return
+      }
+      running = true
       controller = new AbortController()
       deadline = window.setTimeout(() => controller.abort(), 20000)
-      try { await refresh(controller.signal) }
+      let active = null
+      try { active = await refresh(controller.signal) }
       finally {
         window.clearTimeout(deadline)
+        running = false
         // Schedule from completion: a slow cloud read must never accumulate
         // concurrent background polls and starve page navigation/asset loads.
-        if (!stopped) timer = window.setTimeout(poll, 3500)
+        if (!stopped) timer = window.setTimeout(poll, active ? ACTIVE_MS : IDLE_MS)
       }
     }
+    const onVisible = () => {
+      if (stopped || document.hidden) return
+      window.clearTimeout(timer)
+      void poll()
+    }
     void poll()
-    return () => { stopped = true; window.clearTimeout(timer); window.clearTimeout(deadline); controller?.abort() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      stopped = true
+      document.removeEventListener('visibilitychange', onVisible)
+      window.clearTimeout(timer)
+      window.clearTimeout(deadline)
+      controller?.abort()
+    }
   }, [refresh])
 
   const decide = async action => {

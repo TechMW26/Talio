@@ -4,27 +4,20 @@ import { useEffect, useCallback, useRef } from 'react'
 import { SWRConfig, useSWRConfig } from 'swr'
 import { HeroUIProvider } from '@heroui/react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
-import { AILoadingProvider } from '@/contexts/AILoadingContext'
-import { AIAssistantProvider } from '@/contexts/AIAssistantContext'
-import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
-import MiraTransitionOverlay from '@/components/ui/MiraTransitionOverlay'
-import AIAssistant from '@/components/AIAssistant'
-import AIAssistantBridge from '@/components/AIAssistantBridge'
-import WebNetworkRecovery from '@/components/WebNetworkRecovery'
-import MiraPermissionChecklist from '@/components/ui/MiraPermissionChecklist'
 import DesktopPermissionGate from '@/components/ui/DesktopPermissionGate'
 import ScrollToTop from '@/components/ScrollToTop'
-import { FocusTimerProvider } from '@/contexts/FocusTimerContext'
-import { MiraChatProvider } from '@/contexts/MiraChatContext'
-import { MeetingSessionProvider } from '@/contexts/MeetingSessionContext'
+import WebNetworkRecovery from '@/components/WebNetworkRecovery'
 import {
     patchBrowserFetchForFreshness,
     revalidateApiQueries,
     subscribeToClientDataChanges
 } from '@/lib/clientDataSync'
 
-// Cache operations completely disabled - no imports needed
-// import { checkAndClearCaches } from '@/lib/cacheManager'
+// This component wraps EVERY route, including public pages such as /login and
+// /download. Keep it limited to genuinely global concerns (theme, HeroUI, SWR,
+// fetch freshness). Feature stacks that only the authenticated dashboard needs —
+// AI/MIRA providers and their overlays — live in DashboardAIProviders so public
+// pages do not compile or download them.
 
 /**
  * Check if running in Electron/desktop app environment
@@ -72,7 +65,7 @@ export function Providers({ children }) {
             console.log('[Providers] Desktop app detected, skipping audio init')
             return
         }
-        
+
         // Initialize audio system lazily (don't block render)
         try {
             const { initAudio } = await import('@/utils/audio')
@@ -90,20 +83,20 @@ export function Providers({ children }) {
             console.log('[Providers] Desktop app - audio disabled')
             return
         }
-        
+
         // Initialize audio after first user interaction or after delay
         const initOnInteraction = () => {
             initializeNonCritical();
             document.removeEventListener('click', initOnInteraction);
             document.removeEventListener('touchstart', initOnInteraction);
         };
-        
+
         document.addEventListener('click', initOnInteraction, { once: true });
         document.addEventListener('touchstart', initOnInteraction, { once: true });
-        
+
         // Also init after 3 seconds if no interaction
         const timer = setTimeout(initializeNonCritical, 3000);
-        
+
         return () => {
             clearTimeout(timer);
             document.removeEventListener('click', initOnInteraction);
@@ -114,49 +107,34 @@ export function Providers({ children }) {
     return (
         <HeroUIProvider>
             <ThemeProvider>
-                <AILoadingProvider>
-                <AIAssistantProvider>
-                <FocusTimerProvider>
-                <MiraChatProvider>
-                    <SWRConfig
-                        value={{
-                            // Stale-while-revalidate: show cached data immediately
-                            revalidateOnFocus: false,
-                            revalidateOnReconnect: true,
-                            // Collapse duplicate mounts and realtime event bursts.
-                            dedupingInterval: 5000,
-                            // Retry on error with backoff
-                            shouldRetryOnError: true,
-                            errorRetryInterval: 5000,
-                            errorRetryCount: 2,
-                            // Keep previous data while loading to prevent flashing
-                            keepPreviousData: true,
-                            // Don't suspend - render immediately with stale data
-                            suspense: false,
-                            // Fallback data for SSR/slow networks
-                            fallback: {},
-                            // Use IndexedDB/localStorage for persistent cache
-                            provider: () => new Map(),
-                        }}
-                    >
-                        <DesktopPermissionGate>
+                <SWRConfig
+                    value={{
+                        // Stale-while-revalidate: show cached data immediately
+                        revalidateOnFocus: false,
+                        revalidateOnReconnect: true,
+                        // Collapse duplicate mounts and realtime event bursts.
+                        dedupingInterval: 5000,
+                        // Retry on error with backoff
+                        shouldRetryOnError: true,
+                        errorRetryInterval: 5000,
+                        errorRetryCount: 2,
+                        // Keep previous data while loading to prevent flashing
+                        keepPreviousData: true,
+                        // Don't suspend - render immediately with stale data
+                        suspense: false,
+                        // Fallback data for SSR/slow networks
+                        fallback: {},
+                        // Use IndexedDB/localStorage for persistent cache
+                        provider: () => new Map(),
+                    }}
+                >
+                    <DesktopPermissionGate>
                         <ClientDataSyncBridge />
-                        <MiraPermissionChecklist />
-                        <MiraTransitionOverlay />
-                        <GlobalAILoadingOverlay />
                         <ScrollToTop />
                         <WebNetworkRecovery />
-                        <AIAssistant />
-                        <AIAssistantBridge />
-                        <MeetingSessionProvider>
-                            {children}
-                        </MeetingSessionProvider>
-                        </DesktopPermissionGate>
-                    </SWRConfig>
-                </MiraChatProvider>
-                </FocusTimerProvider>
-                </AIAssistantProvider>
-                </AILoadingProvider>
+                        {children}
+                    </DesktopPermissionGate>
+                </SWRConfig>
             </ThemeProvider>
         </HeroUIProvider>
     )

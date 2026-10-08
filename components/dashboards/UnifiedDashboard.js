@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { dashboardRequest } from '@/lib/client/dashboardRequest'
+import { dashboardRequest, isRequestCancelled } from '@/lib/client/dashboardRequest'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
@@ -297,6 +297,16 @@ export default function UnifiedDashboard({ user: userProp }) {
     const dashboardStatsRequestRef = useRef(null)
     const unifiedWidgetsRequestRef = useRef(null)
     const realtimeRefreshTimerRef = useRef(null)
+    const dashboardAbortRef = useRef(null)
+
+    // One signal per mounted dashboard, shared by all dashboard reads so a route
+    // change cancels every outstanding request at once.
+    const dashboardSignal = useCallback(() => {
+        // Once unmounted the signal stays aborted, so late callers bail out
+        // immediately instead of starting new work.
+        if (!dashboardAbortRef.current) dashboardAbortRef.current = new AbortController()
+        return dashboardAbortRef.current.signal
+    }, [])
 
     // Get employee ID and role
     const employeeIdStr = getEmployeeId(user)
@@ -369,12 +379,13 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             // Only fetch the stats endpoint - departments, leave requests,
             // attendance summary, and employee data all come from the unified endpoint
-            const statsData = await dashboardRequest(statsEndpoint, token)
+            const statsData = await dashboardRequest(statsEndpoint, token, { signal: dashboardSignal() })
             setDashboardErrors(previous => ({ ...previous, stats: null }))
             if (statsData.success && dashboardStatsRequestRef.current === requestPromise) {
                 setDashboardStats(statsData.data)
             }
           } catch (error) {
+            if (isRequestCancelled(error)) return
             setDashboardErrors(previous => ({ ...previous, stats: error.message || 'Unable to load dashboard statistics.' }))
           }
         })()
@@ -385,7 +396,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             () => { if (dashboardStatsRequestRef.current === requestPromise) dashboardStatsRequestRef.current = null }
         )
         return requestPromise
-    }, [user?.role])
+    }, [user?.role, dashboardSignal])
 
     // Fetch today's attendance - used for real-time updates only (initial load uses unified endpoint)
     const fetchTodayAttendance = useCallback(async () => {
@@ -424,7 +435,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         const requestPromise = (async () => {
           try {
             const token = localStorage.getItem('token')
-            const data = await dashboardRequest(`/api/dashboard/unified?widgets=${encodeURIComponent(unifiedWidgetSelection)}`, token)
+            const data = await dashboardRequest(`/api/dashboard/unified?widgets=${encodeURIComponent(unifiedWidgetSelection)}`, token, { signal: dashboardSignal() })
             setDashboardErrors(previous => ({ ...previous, widgets: null }))
             if (data.success && unifiedWidgetsRequestRef.current === requestPromise) {
                 setUnifiedWidgetData(data)
@@ -452,6 +463,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
             }
           } catch (error) {
+            if (isRequestCancelled(error)) return
             setDashboardErrors(previous => ({ ...previous, widgets: error.message || 'Unable to load dashboard widgets.' }))
           }
         })()
@@ -462,7 +474,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             () => { if (unifiedWidgetsRequestRef.current === requestPromise) unifiedWidgetsRequestRef.current = null }
         )
         return requestPromise
-    }, [unifiedWidgetSelection])
+    }, [unifiedWidgetSelection, dashboardSignal])
 
     const scheduleDashboardRefresh = useCallback(() => {
         if (realtimeRefreshTimerRef.current) {
@@ -512,6 +524,9 @@ export default function UnifiedDashboard({ user: userProp }) {
         if (realtimeRefreshTimerRef.current) {
             clearTimeout(realtimeRefreshTimerRef.current)
         }
+        // Navigating away must cancel dashboard reads still in flight instead of
+        // letting them finish against the server after the page is gone.
+        dashboardAbortRef.current?.abort()
     }, [])
 
     // Cross-tab sync via BroadcastChannel — updates all open tabs when attendance changes

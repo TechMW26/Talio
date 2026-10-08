@@ -1,7 +1,7 @@
 'use client'
 
 import widgetStyles from './WidgetDesign.module.css'
-import { FernlyBars } from '@/components/charts/FernlyCharts'
+import { FernlyBars } from '@/components/charts/FernlyVisuals'
 
 export default function DepartmentChartWidget({ departmentStats = [] }) {
   const rows = departmentStats.map(row => ({ ...row, value: Number.isFinite(Number(row.value)) ? Math.max(0, Number(row.value)) : 0 }))

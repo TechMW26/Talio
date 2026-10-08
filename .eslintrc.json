@@ -1,4 +1,29 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "lucide-react",
+            "message": "Icon standard: import icons from 'react-icons/<set>' (the app standardizes on react-icons)."
+          },
+          {
+            "name": "@headlessui/react",
+            "message": "Headless UI is not part of the design system. Use the shared primitives from '@/components/ui/fernly'."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["components/ui/heroui/**/*.js", "components/ui/fernly/**/*.js"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }
 

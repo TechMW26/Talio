@@ -23,11 +23,15 @@ export default function InductionGate({ children }) {
   }, [])
   useEffect(() => {
     live.current = true; refresh()
-    const timer = setInterval(refresh, 60000)
+    // Poll quickly only while an induction is actually outstanding. Once there is
+    // nothing to complete, back off so every open dashboard tab is not calling the
+    // endpoint every minute. The published event still refreshes immediately.
+    const interval = status?.required ? 60000 : 600000
+    const timer = setInterval(refresh, interval)
     window.addEventListener('focus', refresh)
     window.addEventListener('induction-published', refresh)
     return () => { live.current = false; clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('induction-published', refresh) }
-  }, [refresh])
+  }, [refresh, status?.required])
   const settingsException = status?.canManage && pathname.startsWith('/dashboard/settings')
   const required = status?.required && !settingsException
   const version = status?.program?.version

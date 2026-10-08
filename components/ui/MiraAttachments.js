@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Paperclip, X } from 'lucide-react'
+import { FaPaperclip, FaTimes } from 'react-icons/fa'
 import { MIRA_ATTACHMENT_ACCEPT, miraFileError } from '@/lib/miraAttachments'
 
 export default function MiraAttachments({ files, onChange, busy, onBusyChange }) {
@@ -34,10 +34,10 @@ export default function MiraAttachments({ files, onChange, busy, onBusyChange })
   return <div className="mb-2 text-xs text-default-600">
     <input ref={input} type="file" multiple accept={MIRA_ATTACHMENT_ACCEPT} onChange={upload} className="hidden" aria-label="Choose files for MIRA" disabled={busy || reading} />
     <div className="flex flex-wrap items-center gap-2">
-      <button type="button" onClick={() => input.current?.click()} disabled={busy || reading || files.length >= 3} className="inline-flex items-center gap-1.5 rounded-full bg-default-100 px-3 py-2 disabled:opacity-50" aria-label="Attach files to MIRA"><Paperclip size={16} />{reading ? 'Reading file…' : 'Attach files'}</button>
+      <button type="button" onClick={() => input.current?.click()} disabled={busy || reading || files.length >= 3} className="inline-flex items-center gap-1.5 rounded-full bg-default-100 px-3 py-2 disabled:opacity-50" aria-label="Attach files to MIRA"><FaPaperclip size={16} />{reading ? 'Reading file…' : 'Attach files'}</button>
       {files.map((file, index) => <span key={`${index}-${file.name}`} className="inline-flex max-w-full items-center gap-2 rounded-full border border-default-200 px-3 py-1.5">
         <span className="truncate">{file.name}{file.truncated ? ' (excerpt)' : ''}</span>
-        <button type="button" disabled={busy || reading} onClick={() => onChange(files.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`}><X size={14} /></button>
+        <button type="button" disabled={busy || reading} onClick={() => onChange(files.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`}><FaTimes size={14} /></button>
       </span>)}
     </div>
     <p className="mt-1 text-[10px] text-default-400">Images, TXT, MD, CSV, JSON · 3 files · 2 MB each. Image content is processed by MIRA’s vision provider.</p>

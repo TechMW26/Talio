@@ -23,6 +23,27 @@ test('shared tabs enforce the standard solid pill and preserve selection and slo
   fireEvent.click(screen.getByRole('button', { name: 'Approved' }))
   expect(select).toHaveBeenCalledWith('approved')
 })
+
+test('dark nested-card elevation excludes tab spacing shells', () => {
+  const fs = require('fs')
+  const postcss = require('postcss')
+  const root = postcss.parse(fs.readFileSync('styles/dark-mode.css', 'utf8'))
+  const nestedBaseRules = []
+  root.walkRules(rule => {
+    if (rule.selectors?.some(selector => selector.startsWith('html.dark .bg-content1 [data-slot="base"]'))) {
+      nestedBaseRules.push(rule)
+    }
+  })
+  expect(nestedBaseRules).toHaveLength(1)
+  expect(nestedBaseRules[0].selectors).toContain('html.dark .bg-content1 [data-slot="base"]:not(:has(> [data-slot="tabList"]))')
+  // Keep actual nested cards elevated, without painting the tab padding.
+  expect(nestedBaseRules[0].nodes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ prop: 'background-color', value: '#27272a', important: true }),
+  ]))
+  const shared = fs.readFileSync('components/ui/fernly/elements.module.css', 'utf8')
+  expect(shared).toMatch(/\.tabs\.tabs\s*\{\s*background:\s*transparent\s*!important;/)
+  expect(shared).toMatch(/\.tabList\.tabList\s*\{[^}]*border-radius:\s*999px;[^}]*background:\s*var\(--color-bg-card/)
+})
 jest.mock('@/components/ui/HeroModal', () => ({ __esModule: true, default: () => null }))
 
 test('searchable dropdowns preserve caller slots and share the arrow gutter', () => {

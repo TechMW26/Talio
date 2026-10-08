@@ -26,8 +26,11 @@ import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import SidebarSubmenu from '@/components/sidebar/SidebarSubmenu'
-import Modal from '@/components/ui/HeroModal'
-import { Button, ScrollShadow, ModalContent, ModalHeader, ModalBody, ModalFooter, Avatar } from '@heroui/react'
+import dynamic from 'next/dynamic'
+import { Button, ScrollShadow, Avatar } from '@heroui/react'
+
+// The HeroUI modal stack is only needed when the user confirms a logout.
+const LogoutConfirmModal = dynamic(() => import('@/components/sidebar/LogoutConfirmModal'), { ssr: false })
 
 // Inline badge component for expanded menu items
 function InlineBadge({ count }) {
@@ -567,29 +570,14 @@ export default function SlidingSidebar({
         </ScrollShadow>
       </aside>
 
-      {/* Logout Confirmation Modal */}
-      <Modal isOpen={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader className="bg-danger-500 text-white">Confirm Logout</ModalHeader>
-              <ModalBody className="py-6">
-                <p className="text-center text-default-700">
-                  Are you sure you want to logout?
-                </p>
-              </ModalBody>
-              <ModalFooter className="justify-center">
-                <Button variant="light" onPress={onClose}>
-                  Cancel
-                </Button>
-                <Button color="danger" onPress={handleLogout}>
-                  Logout
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {/* Logout Confirmation Modal (loaded on demand) */}
+      {showLogoutConfirm && (
+        <LogoutConfirmModal
+          isOpen={showLogoutConfirm}
+          onOpenChange={setShowLogoutConfirm}
+          onConfirm={handleLogout}
+        />
+      )}
     </>
   )
 }

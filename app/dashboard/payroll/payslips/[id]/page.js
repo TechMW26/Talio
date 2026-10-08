@@ -13,8 +13,8 @@ import { FaDownload, FaPrint, FaEnvelope } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+
+
 
 export default function PayslipDetailPage() {
   const params = useParams()
@@ -59,6 +59,11 @@ export default function PayslipDetailPage() {
     setDownloading(true)
 
     try {
+      // Load the PDF toolchain on demand; it is only needed when exporting.
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ])
       const doc = new jsPDF('p', 'mm', 'a4')
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { useSocket } from './SocketContext'
+import { useCompanyFeatures } from './CompanyFeaturesContext'
 import { handleSessionExpired } from '@/utils/userHelper'
 
 const UnreadMessagesContext = createContext({
@@ -15,6 +16,9 @@ export function UnreadMessagesProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [unreadChats, setUnreadChats] = useState({}) // { chatId: count }
   const { onNewMessage, subscribe, isConnected } = useSocket()
+  const { features } = useCompanyFeatures()
+  // Fail open until features load; skip chat endpoints only when disabled.
+  const chatEnabled = features ? features.teamChat !== false : true
   const debounceTimerRef = useRef(null)
   const wasConnectedRef = useRef(null) // null = never connected yet
 
@@ -182,7 +186,9 @@ export function UnreadMessagesProvider({ children }) {
   }, [])
 
   // Fetch unread count on mount and listen for real-time updates (pure event-driven, zero polling)
+  // Tenant plans without team chat never call the unread endpoints.
   useEffect(() => {
+    if (!chatEnabled) return undefined
     fetchUnreadCount()
 
     // Listen for server-pushed unread count updates instead of polling
@@ -195,19 +201,20 @@ export function UnreadMessagesProvider({ children }) {
       if (unsubscribe) unsubscribe()
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
     }
-  }, [subscribe, debouncedFetchUnread])
+  }, [chatEnabled, subscribe, debouncedFetchUnread])
 
   // Re-fetch on socket reconnect to catch any events missed during disconnect
   // null→true (first connect): skip (mount useEffect already fetches)
   // true→false (disconnect): no-op
   // false→true (reconnect): re-fetch to sync missed events
   useEffect(() => {
+    if (!chatEnabled) return
     if (isConnected && wasConnectedRef.current === false) {
       console.log('[UnreadMessages] Socket reconnected - syncing unread count')
       fetchUnreadCount()
     }
     wasConnectedRef.current = isConnected
-  }, [isConnected])
+  }, [chatEnabled, isConnected])
 
   return (
     <UnreadMessagesContext.Provider value={{

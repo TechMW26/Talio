@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, BellOff, Check, X, Smartphone, Monitor, AlertCircle } from 'lucide-react';
+import { FaBell, FaBellSlash, FaCheck, FaTimes, FaMobileAlt, FaDesktop, FaExclamationCircle } from 'react-icons/fa';
 import Loader from '@/components/ui/Loader';
 import useWebPush from '@/hooks/useWebPush';
 
@@ -82,7 +82,7 @@ export function WebPushPrompt({ onClose }) {
                             <div className="relative inline-flex items-center justify-center mb-6">
                                 <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl blur-lg opacity-30"></div>
                                 <div className="relative bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-4 shadow-lg">
-                                    <Check className="w-7 h-7 text-white" strokeWidth={2.5} />
+                                    <FaCheck className="w-7 h-7 text-white" strokeWidth={2.5} />
                                 </div>
                             </div>
                             <h3 className="text-xl font-semibold text-slate-800 dark:text-black mb-3 tracking-tight">
@@ -112,7 +112,7 @@ export function WebPushPrompt({ onClose }) {
                     className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors duration-200 group"
                     aria-label="Close"
                 >
-                    <X className="w-4 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-gray-300" />
+                    <FaTimes className="w-4 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-gray-300" />
                 </button>
 
                 {/* Content Container */}
@@ -121,7 +121,7 @@ export function WebPushPrompt({ onClose }) {
                     <div className="relative inline-flex items-center justify-center mb-6">
                         <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl blur-lg opacity-30"></div>
                         <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-4 shadow-lg">
-                            <Bell className="w-7 h-7 text-white" strokeWidth={2.5} />
+                            <FaBell className="w-7 h-7 text-white" strokeWidth={2.5} />
                         </div>
                     </div>
 
@@ -139,7 +139,7 @@ export function WebPushPrompt({ onClose }) {
                     {error && (
                         <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
                             <p className="text-xs text-red-600 dark:text-red-400 flex items-center justify-center gap-1.5">
-                                <AlertCircle className="w-3.5 h-3.5" />
+                                <FaExclamationCircle className="w-3.5 h-3.5" />
                                 {error}
                             </p>
                         </div>
@@ -223,7 +223,7 @@ export function WebPushSettings() {
         return (
             <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <div className="flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                    <FaExclamationCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
                     <div>
                         <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
                             Browser Not Supported
@@ -241,7 +241,7 @@ export function WebPushSettings() {
         return (
             <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                 <div className="flex items-center gap-3">
-                    <BellOff className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    <FaBellSlash className="w-5 h-5 text-red-600 dark:text-red-400" />
                     <div>
                         <p className="text-sm font-medium text-red-800 dark:text-red-200">
                             Notifications Blocked
@@ -265,9 +265,9 @@ export function WebPushSettings() {
                         : 'bg-gray-100 dark:bg-gray-700'
                         }`}>
                         {isSubscribed ? (
-                            <Bell className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            <FaBell className="w-5 h-5 text-green-600 dark:text-green-400" />
                         ) : (
-                            <BellOff className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            <FaBellSlash className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                         )}
                     </div>
                     <div>
@@ -320,7 +320,7 @@ export function WebPushSettings() {
                             </>
                         ) : testSent ? (
                             <>
-                                <Check className="w-3 h-3" />
+                                <FaCheck className="w-3 h-3" />
                                 Sent!
                             </>
                         ) : (
@@ -337,11 +337,11 @@ export function WebPushSettings() {
                 </p>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                        <Monitor className="w-4 h-4" />
+                        <FaDesktop className="w-4 h-4" />
                         <span>Web: {isSubscribed ? '1' : '0'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                        <Smartphone className="w-4 h-4" />
+                        <FaMobileAlt className="w-4 h-4" />
                         <span>Android: Check mobile app</span>
                     </div>
                 </div>
@@ -362,7 +362,7 @@ export function NotificationStatusBadge() {
     if (permission === 'denied') {
         return (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30 rounded-full">
-                <BellOff className="w-3 h-3" />
+                <FaBellSlash className="w-3 h-3" />
                 Blocked
             </span>
         );
@@ -371,7 +371,7 @@ export function NotificationStatusBadge() {
     if (isSubscribed) {
         return (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/30 rounded-full">
-                <Bell className="w-3 h-3" />
+                <FaBell className="w-3 h-3" />
                 Enabled
             </span>
         );
@@ -379,7 +379,7 @@ export function NotificationStatusBadge() {
 
     return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700 rounded-full">
-            <BellOff className="w-3 h-3" />
+            <FaBellSlash className="w-3 h-3" />
             Disabled
         </span>
     );
