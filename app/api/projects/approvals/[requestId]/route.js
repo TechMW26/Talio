@@ -1,1 +1,1 @@
-export { resolveProjectApproval as PUT, cancelProjectApproval as DELETE } from '@/lib/projectApprovals.server'
+export { resolveProjectApproval as PUT, handleApprovalDelete as DELETE } from '@/lib/projectApprovals.server'

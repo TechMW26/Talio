@@ -5,15 +5,19 @@ import { NativeButton, NativeInput, NativeSelect, DialogSurface } from "@/compon
 import ModalPortal from '@/components/ui/ModalPortal'
 import { STATUS_COLOR_KEYS, getStatusColorClasses } from '@/lib/taskStatusConfig'
 
-export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = [], onSave, saving = false, taskCounts = {} }) {
+export default function ManageTaskStatusesModal({ isOpen, onClose, statuses = [], onSave, saving = false, taskCounts = {}, suggestedStatusName = '' }) {
   const [rows, setRows] = useState([])
   const [confirmIndex, setConfirmIndex] = useState(null)
   const [blockedIndex, setBlockedIndex] = useState(null)
   const wasOpenRef = useRef(false)
   useEffect(() => {
-    if (isOpen && !wasOpenRef.current) { setRows(statuses.map(s => ({ ...s }))); setConfirmIndex(null); setBlockedIndex(null) }
+    if (isOpen && !wasOpenRef.current) {
+      const next = statuses.map(s => ({ ...s }))
+      if (suggestedStatusName) next.push({ key: '', label: suggestedStatusName, color: 'blue', order: next.length, isSystem: false })
+      setRows(next); setConfirmIndex(null); setBlockedIndex(null)
+    }
     wasOpenRef.current = isOpen
-  }, [isOpen, statuses])
+  }, [isOpen, statuses, suggestedStatusName])
   if (!isOpen) return null
 
   const updateRow = (i, patch) => setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r))

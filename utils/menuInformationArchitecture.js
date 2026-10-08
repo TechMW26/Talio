@@ -218,7 +218,9 @@ function toBadgeCount(value) {
 
 export function getNavigationLeafBadgeCount(item, counts = {}) {
   const countKey = BADGE_COUNT_KEY_BY_PATH[item?.path]
-  return countKey ? toBadgeCount(counts[countKey]) : 0
+  let total = countKey ? toBadgeCount(counts[countKey]) : 0
+  if (item?.path === '/dashboard/projects') total += toBadgeCount(counts.projectStatusRequests)
+  return total
 }
 
 export function getNavigationBadgeCount(item, counts = {}) {

@@ -294,9 +294,19 @@ export default function ProjectsPage() {
                 {/* Project Header */}
                 <div className="p-5 flex-1">
                   <div className="flex items-start justify-between mb-3">
-                    <Heading3 className="text-lg font-semibold text-default-800 line-clamp-1">
-                      {project.name}
-                    </Heading3>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Heading3 className="text-lg font-semibold text-default-800 line-clamp-1">
+                        {project.name}
+                      </Heading3>
+                      {project.statusRequestCount > 0 && (
+                        <span
+                          className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold"
+                          title={`${project.statusRequestCount} status request(s) need attention`}
+                        >
+                          {project.statusRequestCount}
+                        </span>
+                      )}
+                    </div>
                     <Chip color={priorityColors[project.priority]} variant="flat" size="sm">
                       {project.priority}
                     </Chip>
