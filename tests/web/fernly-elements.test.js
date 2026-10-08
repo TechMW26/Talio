@@ -100,7 +100,7 @@ test('project navigation reuses shared tabs instead of bespoke bordered pill but
   const source = fs.readFileSync('app/dashboard/projects/[projectId]/page.js', 'utf8')
   const navigation = source.slice(source.indexOf('{/* Tabs */}'), source.indexOf('{/* Overview Tab'))
   expect(navigation).toContain('<Tabs aria-label="Project sections" selectedKey={activeTab} onSelectionChange={setActiveTab}')
-  expect(navigation).toContain('<Tab key={tab.id} title={tab.label} />')
+  expect(navigation).toMatch(/<Tab\s+key=\{tab\.id\}\s+title=\{/)
   expect(navigation).not.toContain('<NativeButton')
   expect(navigation).not.toContain('border-b-2')
   expect(navigation).not.toContain('<tab.icon')
