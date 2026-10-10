@@ -16,14 +16,18 @@ const TOKEN_PROTOCOL_REVIEW_HASH = sha256(canonical({ sourceRevision: REVIEWED_S
 const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
 const time = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? Date.parse(value) : NaN
 
-function validateBlobOrphanTail({ plane, fence, candidate, candidateManifestHash, sourceHash, media, mediaPlan, mediaVerificationReportHash }) {
-  const tail = plane?.orphanTail, frozen = time(fence.writersFrozenSince), drained = time(fence.drainedAt)
+function validateBlobOrphanTail({ plane, fence, candidate, candidateManifestHash, sourceHash, media, mediaPlan, mediaVerificationReportHash, now = Date.now() }) {
+  const tail = plane?.orphanTail, frozen = time(fence.writersFrozenSince), drained = time(fence.drainedAt), recorded = time(fence.recordedAt)
   const duringFence = value => Number.isFinite(time(value)) && time(value) >= frozen && time(value) <= drained
+  // Immutable deployed-code forensics may finish after candidate export. This
+  // is not a physical writer probe: require its real time in the recorded fence,
+  // never backdate it into the earlier physical freeze/drain window.
+  const reviewedBeforeRecording = value => Number.isFinite(recorded) && Number.isFinite(now) && recorded <= now && Number.isFinite(time(value)) && time(value) >= frozen && time(value) <= recorded
   const fail = () => { throw new Error('EXACT_PROVEN_BLOB_ORPHAN_ONLY_TAIL_REQUIRED') }
   if (plane?.blocked !== false || plane.inFlightDrained !== false || plane.orphanOnlyTail !== true || tail?.version !== 1 || tail.invariant !== 'append-only-unreferenced-client-upload-tail-v1' || tail.run !== candidate.run || tail.candidateManifestHash !== candidateManifestHash || tail.sourceHash !== sourceHash || tail.sourceProject !== 'talio-hrms' || candidate.sourceProject !== tail.sourceProject || tail.sourceDatabase !== '(default)' || candidate.sourceDatabase !== tail.sourceDatabase) fail()
   if (tail.sourceRevision !== REVIEWED_SOURCE_REVISION || canonical(tail.reviewedSourceHashes) !== canonical(REVIEWED_SOURCE_HASHES) || tail.tokenProtocolReviewHash !== TOKEN_PROTOCOL_REVIEW_HASH || canonical(tail.clientProtocol) !== canonical(REVIEWED_TOKEN_PROTOCOL)) fail()
   const deployment = tail.sourceDeployment
-  if (deployment?.revision !== REVIEWED_SOURCE_REVISION || deployment.allTokenIssuersReviewed !== true || !hash(deployment.providerEvidenceHash) || !duringFence(deployment.checkedAt)) fail()
+  if (deployment?.revision !== REVIEWED_SOURCE_REVISION || deployment.allTokenIssuersReviewed !== true || !hash(deployment.providerEvidenceHash) || !reviewedBeforeRecording(deployment.checkedAt)) fail()
   const metadata = tail.sourceMetadataWriterFence, dataPlane = fence.planes?.['firestore-data-principal']
   if (metadata?.positiveCatalogRead !== true || metadata.negativeMutationPermissionDenied !== true || metadata.projectWritePermissionsGranted !== 0 || !hash(metadata.probeReportHash) || dataPlane?.probeReportHash !== metadata.probeReportHash || dataPlane.blocked !== true || dataPlane.inFlightDrained !== true || !duringFence(metadata.checkedAt)) fail()
   const server = tail.serverBlobWriterFence

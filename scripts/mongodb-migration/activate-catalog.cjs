@@ -60,7 +60,7 @@ function validateActivationEvidence({ candidate, candidateManifestHash, source, 
     const check = fence.planes?.[plane], checked = time(check?.checkedAt)
     if (!check || typeof check.method !== 'string' || check.method.trim().length < 8 || check.method.length > 500 || !Number.isFinite(checked) || checked < frozen || checked > drained) return true
     if (plane === 'blob-uploads-tokens-variants' && check.orphanOnlyTail === true) {
-      blobOrphanTail = validateBlobOrphanTail({ plane: check, fence, candidate, candidateManifestHash, sourceHash, media, mediaPlan, mediaVerificationReportHash })
+      blobOrphanTail = validateBlobOrphanTail({ plane: check, fence, candidate, candidateManifestHash, sourceHash, media, mediaPlan, mediaVerificationReportHash, now })
       return false
     }
     return check.blocked !== true || check.inFlightDrained !== true

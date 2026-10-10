@@ -455,6 +455,14 @@ validated by `blob-orphan-tail.cjs` and must include:
   a successful positive source read plus actual denied metadata mutation probe
   with zero granted project write permissions. Its protected probe-report hash
   must also bind the separately strict `firestore-data-principal` plane.
+- Immutable deployment/token-protocol forensic review uses its actual
+  `sourceDeployment.checkedAt`: at or after `writersFrozenSince`, no later than
+  `fence.recordedAt`, and never in the future. It may complete after drain and
+  candidate export because reviewing immutable deployed code is not a physical
+  writer-state change. Do not backdate that review. Actual metadata-denial and
+  server-block/drain proofs must still precede candidate export and remain
+  between `writersFrozenSince` and `drainedAt`; this distinction relaxes no
+  physical fence, source freshness, retained-media or parity requirement.
 - Timestamped, proved blocking and completed drain of **all server** Blob
   uploads/deletes/variants, bound to HTTP/cron evidence hashes. These checks must
   fall within the source fence window, with server drain after metadata denial.

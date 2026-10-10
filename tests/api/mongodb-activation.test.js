@@ -84,6 +84,38 @@ test('optional Blob orphan-only tail preserves truthful physical state and binds
   expect(validateActivationEvidence(evidence())).not.toHaveProperty('blobOrphanTail')
 })
 
+test('immutable Blob issuer review may finish after candidate export but before fence recording', () => {
+  const value = withBlobOrphanTail()
+  const deployment = value.fence.planes['blob-uploads-tokens-variants'].orphanTail.sourceDeployment
+  deployment.checkedAt = new Date(value.now - 15000).toISOString()
+  expect(Date.parse(deployment.checkedAt)).toBeGreaterThan(Date.parse(value.candidate.exportFinishedAt))
+  expect(validateActivationEvidence(value).blobOrphanTail.sourceDeploymentEvidenceHash).toBe(deployment.providerEvidenceHash)
+  deployment.checkedAt = value.fence.recordedAt
+  expect(validateActivationEvidence(value)).toHaveProperty('blobOrphanTail')
+})
+
+test('immutable Blob review rejects before-freeze, unrecorded, future and missing timestamps', () => {
+  for (const timestamp of ['before-freeze', 'after-recording', 'future', 'missing', 'invalid']) {
+    const value = withBlobOrphanTail()
+    const deployment = value.fence.planes['blob-uploads-tokens-variants'].orphanTail.sourceDeployment
+    deployment.checkedAt = timestamp === 'before-freeze' ? new Date(Date.parse(value.fence.writersFrozenSince) - 1).toISOString()
+      : timestamp === 'after-recording' ? new Date(Date.parse(value.fence.recordedAt) + 1).toISOString()
+        : timestamp === 'future' ? new Date(value.now + 1).toISOString()
+          : timestamp === 'missing' ? undefined : 'invalid'
+    expect(() => validateActivationEvidence(value)).toThrow('BLOB_ORPHAN')
+  }
+})
+
+test('later immutable review never permits metadata-denial or server-drain proofs after drain', () => {
+  for (const key of ['sourceMetadataWriterFence', 'serverBlobWriterFence']) {
+    const value = withBlobOrphanTail()
+    const tail = value.fence.planes['blob-uploads-tokens-variants'].orphanTail
+    tail.sourceDeployment.checkedAt = new Date(value.now - 15000).toISOString()
+    tail[key].checkedAt = new Date(Date.parse(value.fence.drainedAt) + 1).toISOString()
+    expect(() => validateActivationEvidence(value)).toThrow('BLOB_ORPHAN')
+  }
+})
+
 test('Blob orphan alternative rejects every missing or mismatched typed invariant, proof and binding', () => {
   const mutateTail = change => value => change(value.fence.planes['blob-uploads-tokens-variants'].orphanTail)
   for (const change of [
