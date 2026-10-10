@@ -27,9 +27,18 @@ function validateChanges(changes, report) {
   if (operationsHash.digest('hex') !== report.operationsHash) throw new Error('EXACT_MEDIA_DISPOSITION_OPERATION_HASH_REQUIRED')
 }
 
-async function applyDisposition({ db, client, changes, report, reportHash, prepareFence = false }) {
+function dispositionContext(report, finalCandidate, prepareFence) {
+  if (!finalCandidate) return { baselineRun: report.run, candidateRun: report.run, datasets: report.datasets }
+  const { manifest, manifestHash } = finalCandidate
+  const { sourceCollectionsHash } = require('./migrate.cjs')
+  const datasets = values => Array.isArray(values) && values.length && values.every(value => /^[a-z][a-z0-9-]{7,79}$/.test(value)) ? [...new Set(values)].sort() : null
+  if (prepareFence || !manifest || manifest.complete !== true || manifest.sourceVerificationRequired !== true || manifest.run !== report.run || !/^[a-z][a-z0-9-]{7,79}$/.test(manifest.sourceBaselineRun || '') || manifest.sourceBaselineRun === manifest.run || !/^[a-f0-9]{64}$/.test(manifest.sourceBaselineManifestHash || '') || !/^[a-f0-9]{64}$/.test(manifestHash || '') || report.candidateManifestHash !== manifestHash || report.sourceHash !== sourceCollectionsHash(manifest.collections) || !datasets(manifest.datasets) || !datasets(report.datasets) || canonical(datasets(manifest.datasets)) !== canonical(datasets(report.datasets))) throw new Error('EXACT_FINAL_MEDIA_DISPOSITION_CONTEXT_REQUIRED')
+  return { baselineRun: manifest.sourceBaselineRun, candidateRun: report.run, datasets: datasets(report.datasets), candidateManifestHash: manifestHash, sourceHash: report.sourceHash }
+}
+
+async function applyDisposition({ db, client, changes, report, reportHash, prepareFence = false, finalCandidate }) {
   validateChanges(changes, report)
-  const context = { baselineRun: report.run, candidateRun: report.run, datasets: report.datasets }
+  const context = dispositionContext(report, finalCandidate, prepareFence)
   const control = db.collection('talio_migration_controls'), records = db.collection('talio_records')
   if (prepareFence) {
     const catalogs = await db.collection('talio_catalogs').find({ _id: { $in: report.datasets } }).toArray()
@@ -53,11 +62,11 @@ async function applyDisposition({ db, client, changes, report, reportHash, prepa
         const checkpointId = `media-disposition/${reportHash}/${before._id}`
         const checkpoint = await control.findOne({ _id: checkpointId }, { session })
         if (checkpoint) {
-          if (checkpoint.beforeHash !== change.beforeHash || checkpoint.afterHash !== change.afterHash || currentHash !== change.afterHash) throw new Error('MEDIA_DISPOSITION_RESUME_STATE_MISMATCH')
+          if (checkpoint.beforeHash !== change.beforeHash || checkpoint.afterHash !== change.afterHash || currentHash !== change.afterHash || (finalCandidate && canonical(checkpoint.finalContext) !== canonical(context))) throw new Error('MEDIA_DISPOSITION_RESUME_STATE_MISMATCH')
           outcome = 'resumed'; return
         }
         if (currentHash !== change.beforeHash) throw new Error('MEDIA_DISPOSITION_CURRENT_BEFORE_IMAGE_MISMATCH')
-        const lock = await control.updateOne({ _id: 'write-fence', active: true, baselineRun: context.baselineRun, candidateRun: context.candidateRun }, { $set: { lastMediaDispositionHash: reportHash } }, { session })
+        const lock = await control.updateOne({ _id: 'write-fence', active: true, baselineRun: context.baselineRun, candidateRun: context.candidateRun, ...(context.candidateManifestHash !== undefined ? { candidateManifestHash: context.candidateManifestHash } : {}), ...(context.sourceHash !== undefined ? { sourceHash: context.sourceHash } : {}) }, { $set: { lastMediaDispositionHash: reportHash } }, { session })
         if (lock.matchedCount !== 1) throw new Error('TARGET_MAINTENANCE_FENCE_RELEASED')
         if (after) {
           const result = await records.replaceOne({ _id: before._id }, after, { session })
@@ -66,7 +75,7 @@ async function applyDisposition({ db, client, changes, report, reportHash, prepa
           const result = await records.deleteOne({ _id: before._id }, { session })
           if (result.deletedCount !== 1) throw new Error('MEDIA_DISPOSITION_RECORD_CHANGED')
         }
-        await control.insertOne({ _id: checkpointId, reportHash, recordId: before._id, beforeHash: change.beforeHash, afterHash: change.afterHash, committedAt: new Date() }, { session })
+        await control.insertOne({ _id: checkpointId, reportHash, recordId: before._id, beforeHash: change.beforeHash, afterHash: change.afterHash, ...(finalCandidate ? { finalContext: context } : {}), committedAt: new Date() }, { session })
         outcome = 'changed'
       }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary', maxCommitTimeMS: 30000 })
       if (outcome === 'changed') changed++
@@ -79,7 +88,7 @@ async function applyDisposition({ db, client, changes, report, reportHash, prepa
     const before = unpack(change.before)
     if (hashDocument(await records.findOne({ _id: before._id })) !== change.afterHash) throw new Error('MEDIA_DISPOSITION_AFTER_IMAGE_VERIFICATION_FAILED')
   }
-  return { command: 'apply-authorized-media-disposition', complete: true, reportHash, changedRecords: changed, resumedRecords: resumed, afterImagesVerified: changes.length, sourceWrites: 0, mediaWrites: 0, catalogsActivated: false, sourceArchiveUnmodified: true, finalCutoverComplete: false, finalDeltaMustAccountForDisposition: true }
+  return { command: 'apply-authorized-media-disposition', complete: true, reportHash, changedRecords: changed, resumedRecords: resumed, afterImagesVerified: changes.length, sourceWrites: 0, mediaWrites: 0, catalogsActivated: false, sourceArchiveUnmodified: true, finalCutoverComplete: false, finalDeltaMustAccountForDisposition: true, ...(finalCandidate ? { reusedExistingFinalFence: true, finalContext: context } : {}) }
 }
 
 async function main() {
@@ -87,11 +96,12 @@ async function main() {
   const [name, ...args] = process.argv.slice(2), flags = {}
   if (!/^media-disposition-[a-z0-9-]{8,60}$/.test(name || '')) throw new Error('EXACT_PROTECTED_DISPOSITION_DIRECTORY_REQUIRED')
   for (const arg of args) {
-    if (arg === '--execute' || arg === '--prepare-fence') { if (flags[arg]) throw new Error('DUPLICATE_DISPOSITION_FLAG'); flags[arg] = true; continue }
+    if (arg === '--execute' || arg === '--prepare-fence' || arg === '--reuse-final-fence') { if (flags[arg]) throw new Error('DUPLICATE_DISPOSITION_FLAG'); flags[arg] = true; continue }
     const match = /^--(host|database|report-sha256|inventory)=([^=]+)$/.exec(arg)
     if (!match || flags[match[1]]) throw new Error('INVALID_DISPOSITION_APPLY_FLAG')
     flags[match[1]] = match[2]
   }
+  if (flags['--prepare-fence'] && flags['--reuse-final-fence']) throw new Error('FINAL_FENCE_MUST_NOT_BE_PREPARED_OR_RESET')
   const root = path.resolve(__dirname, '../..'), directory = path.join(root, '.migration-data', name)
   function readProtected(file, maximum) {
     const fd = fs.openSync(path.join(directory, file), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW)
@@ -123,10 +133,10 @@ async function main() {
   try {
     ledger = await loadDispositionLedger(directory, { expectedDispositionHash: flags['report-sha256'], entries, manifest, inventoryBytes, inventoryReportHash: sha256(inventoryBytes), run: manifest.run, datasets: report.datasets, candidateManifestHash: sha256(manifestBytes), sourceHash: sourceCollectionsHash(manifest.collections), referenceHash: report.referenceHash, target, decision: 'remove-unavailable-media-only' })
     await client.connect()
-    const result = await applyDisposition({ db: client.db(target.databaseName), client, changes, report, reportHash: flags['report-sha256'], prepareFence: flags['--prepare-fence'] === true })
+    const result = await applyDisposition({ db: client.db(target.databaseName), client, changes, report, reportHash: flags['report-sha256'], prepareFence: flags['--prepare-fence'] === true, ...(flags['--reuse-final-fence'] ? { finalCandidate: { manifest, manifestHash: sha256(manifestBytes) } } : {}) })
     fs.writeFileSync(path.join(directory, `application-${Date.now()}.json`), JSON.stringify({ ...result, target, verifiedAt: new Date().toISOString() }, null, 2), { mode: 0o600, flag: 'wx' })
     console.log(JSON.stringify(result))
   } finally { ledger?.close(); entries.close(); await client.close() }
 }
 if (require.main === module) main().catch(error => { console.error(JSON.stringify({ event: 'media-disposition-apply-failed', code: /^[A-Z][A-Z_]{1,100}$/.test(error.message || '') ? error.message : 'MEDIA_DISPOSITION_APPLY_FAILED', privateDetailsOmitted: true })); process.exitCode = 1 })
-module.exports = { validateChanges, applyDisposition }
+module.exports = { validateChanges, dispositionContext, applyDisposition }

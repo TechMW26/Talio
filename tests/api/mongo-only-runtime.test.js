@@ -23,6 +23,9 @@ test('runtime audit rejects retired Firestore imports and configuration reads', 
   expect(report.counts.offlineToolStartup).toBe(0)
   expect(report.runtimeDirectories).toEqual(expect.arrayContaining(['src', 'public', 'desktop-app', 'mobile', 'socket-server', 'scripts']))
   expect(report.offlineTools).toContain('scripts/mongodb-migration/migrate.cjs')
+  expect(report.offlineTools).toContain('scripts/mongodb-migration/fixed-epoch-metadata.cjs')
+  expect(report.offlineTools).toContain('scripts/mongodb-migration/fixed-epoch-export.cjs')
+  expect(report.offlineTools).toContain('scripts/mongodb-migration/fixed-epoch-verification.cjs')
   expect(report.packageFilesScanned).toBeGreaterThanOrEqual(2)
   expect(report.complete).toBe(true)
 })
@@ -49,6 +52,11 @@ test('offline tools cannot be imported into runtime or activated through package
   const { inspectSource, inspectPackageScripts } = require('../../scripts/firestore-migration/audit-runtime.cjs')
   expect(inspectSource('lib/unsafe.js', "require('../scripts/mongodb-migration/migrate.cjs')")?.kinds.offlineToolImport).toEqual([1])
   expect(inspectSource('scripts/mongodb-migration/migrate.cjs', "require('firebase-admin/firestore')")).toBeNull()
+  expect(inspectSource('scripts/mongodb-migration/fixed-epoch-metadata.cjs', "require('@google-cloud/firestore/build/src/path')")).toBeNull()
+  for (const tool of ['fixed-epoch-metadata', 'fixed-epoch-export', 'fixed-epoch-verification']) {
+    expect(inspectSource('lib/unsafe.js', `require('../scripts/mongodb-migration/${tool}.cjs')`)?.kinds.offlineToolImport).toEqual([1])
+    expect(inspectPackageScripts({ start: `node scripts/mongodb-migration/${tool}.cjs` })).toEqual([{ file: 'package.json', kinds: { offlineToolStartup: ['start'] } }])
+  }
   expect(inspectPackageScripts({ start: 'node scripts/firestore-migration/configure-local.cjs', 'migration:export': 'node scripts/mongodb-migration/migrate.cjs' })).toEqual([{ file: 'package.json', kinds: { offlineToolStartup: ['start'] } }])
   expect(inspectPackageScripts({ prebuild: 'npm run migration:export', 'migration:export': 'node scripts/mongodb-migration/migrate.cjs' })).toEqual([{ file: 'package.json', kinds: { offlineToolStartup: ['prebuild'] } }])
   expect(inspectPackageScripts({ start: 'npm run start', prebuild: 'npm run map', map: 'node scripts/generate-mira-app-map.cjs' })).toEqual([])

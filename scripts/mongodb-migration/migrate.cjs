@@ -25,6 +25,8 @@ function sourceCollectionsHash(collections) {
 
 const SOURCE_VERIFICATION_EPOCH_PROTOCOL = 'full-body-topology-source-reread-v1'
 function verifiedSourceEpoch(source, expected, now = Date.now()) {
+  const fixed = require('./fixed-epoch-verification.cjs')
+  if (source?.verificationProtocol === fixed.PROTOCOL || expected.fixedEpochCandidate?.consistency === fixed.EXPORT_PROTOCOL) return fixed.validateFixedEpochVerification(source, expected, now)
   const timestamp = value => typeof value === 'string' ? Date.parse(value) : NaN
   const original = timestamp(expected.candidateStartedAt)
   const markers = ['verificationStartedAt', 'verificationProtocol', 'fullBodiesRead', 'fullTopologyVerified', 'metadataUpdateTimesVerified', 'noReuse', 'reusedDocuments', 'archiveUnchanged']

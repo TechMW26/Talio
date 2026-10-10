@@ -60,6 +60,29 @@ function withVerifiedSnapshot(value = evidence()) {
   return value
 }
 
+function withFixedEpochSnapshot() {
+  const value = evidence(), at = offset => new Date(value.now + offset).toISOString()
+  const epochMs = value.now - 65000, readTime = { seconds: String(Math.floor(epochMs / 1000)), nanos: (epochMs % 1000) * 1000000 }
+  const { PROTOCOL, EXPORT_PROTOCOL } = require('../../scripts/mongodb-migration/fixed-epoch-verification.cjs')
+  Object.assign(value.candidate, { consistency: EXPORT_PROTOCOL, finalSnapshot: true, readTime, baselineRun: 'online-donor-tests', baselineManifestHash: '2'.repeat(64), writersDrainedAt: value.fence.drainedAt, writerDrainEvidenceHash: '3'.repeat(64), cutoverSafe: false, applicationCutover: false, sourceWrites: 0, targetWrites: 0, reusedDocuments: 0, fullDocumentsFetched: 0, metadataDocuments: 0, missingParents: 0, fullBodiesRead: true, noReuse: true, metadataEvidence: { terminalPageObserved: true, globallyOrdered: true, metadataHash: '4'.repeat(64), readTime } })
+  value.fence.writerDrainEvidenceHash = value.candidate.writerDrainEvidenceHash
+  Object.assign(value.source, { candidateManifestHash: value.candidateManifestHash, sourceProject: value.candidate.sourceProject, sourceDatabase: value.candidate.sourceDatabase, datasets: value.datasets, verificationProtocol: PROTOCOL, verificationStartedAt: at(-40000), readTime, baselineRun: value.candidate.baselineRun, baselineManifestHash: value.candidate.baselineManifestHash, sourceBaselineRun: value.candidate.sourceBaselineRun, sourceBaselineManifestHash: value.candidate.sourceBaselineManifestHash, writersDrainedAt: value.candidate.writersDrainedAt, writerDrainEvidenceHash: value.candidate.writerDrainEvidenceHash, cutoverSafe: false, sourceWrites: 0, targetWrites: 0, archiveUnchanged: true, fullTopologyVerified: true, metadataUpdateTimesVerified: true, sameEpochMetadataReread: true, changedBodiesIndependentlyRead: true, reusedBodiesIndependentlyAudited: true, reusedDocuments: 0, fullDocumentsFetched: 0, metadataDocuments: 0, missingParents: 0, reusedBodiesVerified: 0, changedBodiesVerified: 0, fullBodiesRead: true, noReuse: true, metadataHash: value.candidate.metadataEvidence.metadataHash, terminalPageObserved: true, metadataPages: 1, ...sourceTreeCounts(value.candidate.collections) })
+  return value
+}
+
+test('fixed-epoch activation orders the freeze against actual snapshot time, never verification start', () => {
+  const value = withFixedEpochSnapshot()
+  expect(validateActivationEvidence(value).sourceVerificationEpoch.startedAt).toBe(new Date(value.now - 65000).toISOString())
+  const late = withFixedEpochSnapshot()
+  late.fence.drainedAt = new Date(late.now - 64000).toISOString()
+  late.candidate.writersDrainedAt = late.fence.drainedAt; late.source.writersDrainedAt = late.fence.drainedAt
+  expect(() => validateActivationEvidence(late)).toThrow('BOUND_FIXED_EPOCH')
+  const swapped = withFixedEpochSnapshot(); swapped.fence.writerDrainEvidenceHash = 'f'.repeat(64)
+  expect(() => validateActivationEvidence(swapped)).toThrow('EXACT_FIXED_EPOCH_WRITER_DRAIN')
+  const online = withFixedEpochSnapshot(); delete online.candidate.finalSnapshot
+  expect(() => validateActivationEvidence(online)).toThrow('BOUND_FIXED_EPOCH')
+})
+
 test('a new exact full-body/topology post-drain verification may establish an unchanged snapshot epoch without relabeling the candidate', () => {
   const value = withVerifiedSnapshot(), before = JSON.stringify(value.candidate)
   expect(validateActivationEvidence(value).sourceVerificationEpoch).toEqual({ mode: SOURCE_VERIFICATION_EPOCH_PROTOCOL, startedAt: value.source.verificationStartedAt, verifiedAt: value.source.verifiedAt })
@@ -346,7 +369,7 @@ function target() {
   const catalog = { _id: 'live-tests', purpose: 'production', status: 'ready', applicationCutover: false, mongoVerified: false, tenants: [{ tenantId: 'immutable-auth-identity', databaseName: 'talio_company_test', active: true }], settings: { retained: true } }
   native.bank('talio_catalogs').set('live-tests', catalog)
   native.bank('talio_catalogs').set('local-tests', { _id: 'local-tests', purpose: 'local-acceptance-only', status: 'verified-local-dataset', applicationCutover: false, mongoVerified: false })
-  native.bank('talio_migration_controls').set('write-fence', { _id: 'write-fence', active: true, baselineRun: context.baselineRun, candidateRun: context.candidateRun, datasets: context.datasets })
+  native.bank('talio_migration_controls').set('write-fence', { _id: 'write-fence', active: true, baselineRun: context.baselineRun, candidateRun: context.candidateRun, datasets: context.datasets, candidateManifestHash: context.candidateManifestHash, sourceHash: context.sourceHash })
   const audit = { ...context, sourceFenceEvidenceHash: 'f'.repeat(64) }
   return { ...native, context, candidate: proof.candidate, entries: new Map(), audit, verifyParity: jest.fn(async () => ({ verified: true })) }
 }

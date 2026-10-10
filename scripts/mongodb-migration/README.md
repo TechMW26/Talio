@@ -140,6 +140,37 @@ requires a new candidate rather than relabeling the old one. Legacy reports
 without the complete new protocol retain `drainedAt <= candidate.startedAt`;
 partial/invalid epoch reports fail closed, with no legacy fallback.
 
+### Fixed-epoch read preparation
+
+`fixed-epoch-metadata.cjs` is a separate, read-only transport for preparing a
+faster snapshot. It queries the entire database namespace, including unknown
+root collections and descendants of missing parents, using the names-only
+kindless query already used by the installed Firestore SDK. Every page uses the
+same server `readTime`, an exclusive document-name cursor and a bounded limit.
+Name comparisons use the installed SDK's segment-by-segment ordering, including
+numeric document IDs, rather than sorting joined path strings.
+An empty page must still contain a response confirming that exact epoch; an
+expired epoch, changed scope, unexpected body fields, missing versions,
+non-monotonic names, excess responses or a stalled stream fail closed.
+
+This avoids a child-collection discovery RPC for every document. It does **not**
+avoid Firestore's per-document read charges, prove a source write freeze or
+activate MongoDB. Metadata alone is not a body archive: unchanged bodies must
+come from checksum-validated immutable archives with matching server-managed
+versions, and changed/new bodies must be read at the same epoch. Snapshot
+preparation while production is writable is not permission to discard writes
+that occur afterward. The existing full-body source verification and activation
+guards remain unchanged; this transport's reports are not accepted as cutover
+evidence.
+
+`fixed-epoch-export.cjs` combines that transport with the checked indexed
+archive and same-epoch bounded `batchGetDocuments` reads for changed/new
+documents. It writes a distinct private candidate, derives missing ancestor
+placeholders, and rechecks the resulting collection hashes. Its explicit
+`fixed-epoch-metadata-exact-version-body-reuse-v1` protocol records what was
+actually reused; it does not masquerade as a no-reuse full-body verification.
+The module has no automatic deployment, MongoDB write or activation path.
+
 ## Allowlisted target and parity
 
 Set `MONGODB_URI` and `MONGODB_DATABASE` privately, then provide the exact target
@@ -590,3 +621,63 @@ build with maintenance still enabled; independently accept authenticated tenant,
 media, realtime and worker behavior before a separately authorized fence release.
 If local receipt writing fails after commit, inspect `mongoVerificationAudit` in
 the selected catalog; do not rerun activation blindly or overwrite source data.
+
+### Opt-in fixed-epoch final snapshot protocol
+
+`fixed-epoch-export.cjs` can prepare online archives without activating anything.
+An online archive is **not** a final snapshot and cannot gain final authority
+retroactively. After all source writer planes have been blocked and drained,
+create a new run with a fresh exact Firestore `readTime` at or after that drain:
+
+```js
+const { exportFixedEpochArchive } = require('./fixed-epoch-export.cjs')
+const { verifyFixedEpochCandidate } = require('./fixed-epoch-verification.cjs')
+const common = {
+  client, // read-only runQuery and batchGetDocuments transport
+  sourceProject, sourceDatabase, readTime,
+  baselineDirectory: auditedBodyDonorDirectory,
+  baselineManifestHash: auditedBodyDonorManifestHash,
+  directory: newCandidateDirectory, run: newCandidateRun,
+  snapshotFromDocument: (document, epoch) => firestore.snapshot_(document, epoch, 'protobufJS'),
+  pageSize: 1000, batchSize: 64,
+}
+await exportFixedEpochArchive({ ...common, finalOptions: {
+  targetBaselineRun, targetBaselineManifestHash, datasets,
+  writersDrainedAt, writerDrainEvidenceHash,
+} })
+// Compute this hash from the completed on-disk candidate manifest.
+await verifyFixedEpochCandidate({ ...common, candidateManifestHash })
+```
+
+The **body donor** is distinct from the exact **Mongo target baseline**. Delta
+optimistic checks and shared archive aliases still reference the latter. Do not
+use an online donor run as the target baseline unless it genuinely exists there.
+The verifier independently rereads the complete ordered metadata inventory at
+the same epoch, checks its hash and EOF, audits reused archive bodies against
+exact source update versions (also creation versions when previously archived),
+rereads changed/new bodies at that epoch, and reconciles missing parents and all
+archive entries. Provider epoch expiry fails closed; start a fresh candidate
+instead of changing an old candidate's timestamp.
+
+The resulting `source-verification.json` uses the distinct protocol
+`fixed-epoch-metadata-and-version-bound-body-verification-v1`. Reused bodies stay
+truthfully `fullBodiesRead:false` and `noReuse:false`. Existing full-body-reread
+verification remains unchanged. `verifiedSourceEpoch` rejects a markerless or
+legacy report for a fixed-epoch candidate, and returns the actual snapshot epoch
+for freeze ordering—not the later verification start time.
+
+The final source fence must carry the same `writerDrainEvidenceHash` and exactly
+the same `drainedAt` as the final candidate. All existing writer-plane, target
+maintenance, media, queue, expiry and current target parity checks remain
+mandatory. These export/verification functions perform source reads and private
+local writes only; their reports remain `cutoverSafe:false`. They do not freeze
+providers, import Mongo records, change environments, activate catalogs, or
+release maintenance.
+
+For a separately prepared final media-disposition ledger, use
+`apply-media-disposition.cjs ... --reuse-final-fence --execute`. This mode uses
+the final manifest's `sourceBaselineRun` and candidate run, and requires the
+existing fence's `candidateManifestHash` and `sourceHash` to match. It never
+creates or resets that fence and cannot be combined with `--prepare-fence`.
+Existing private before/after images, raw archive preservation, optimistic
+record checks and resumable checkpoints remain required.

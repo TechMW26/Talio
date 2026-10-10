@@ -1,5 +1,6 @@
 const { validateChanges, applyDisposition } = require('../../scripts/mongodb-migration/apply-media-disposition.cjs')
 const { sha256, canonical } = require('../../scripts/mongodb-migration/core.cjs')
+const { sourceCollectionsHash } = require('../../scripts/mongodb-migration/migrate.cjs')
 const { pack, unpack } = require('../../lib/platform/firestoreCodec.cjs')
 const dataset = 'live-example', run = 'mongo-example-run'
 const before = { _id: 'a'.repeat(64), dataset, databaseName: 'talio_company_example', collectionName: 'screenshots.files', recordKey: '1'.repeat(24), envelope: { data: { length: 10 } }, parts: [], digest: 'd'.repeat(64) }
@@ -49,4 +50,71 @@ test('unauthorized, corrupt and non-media deletes are rejected before mutations'
   expect(() => validateChanges([{ ...f.changes[0], afterHash: 'x' }], f.report)).toThrow('IDENTITY')
   const business = fixture('employees')
   expect(() => validateChanges(business.changes, business.report)).toThrow('BUSINESS_RECORD_DELETION_FORBIDDEN')
+})
+
+function finalFixture() {
+  const d = driver(), f = fixture(), manifestHash = 'f'.repeat(64)
+  const manifest = { run, complete: true, sourceVerificationRequired: true, sourceBaselineRun: 'mongo-baseline-run', sourceBaselineManifestHash: 'c'.repeat(64), datasets: [dataset], collections: [] }
+  Object.assign(f.report, { candidateManifestHash: manifestHash, sourceHash: sourceCollectionsHash(manifest.collections) })
+  d.bank('talio_migration_controls').set('write-fence', { _id: 'write-fence', active: true, baselineRun: manifest.sourceBaselineRun, candidateRun: run, datasets: [dataset], candidateManifestHash: manifestHash, sourceHash: f.report.sourceHash, expiresAt: new Date(Date.now() + 60000), sentinel: 'retain-fence' })
+  d.bank('talio_firestore_archive').set('immutable', { _id: 'immutable', bytes: Buffer.from('unchanged') })
+  return { ...d, ...f, reportHash: 'e'.repeat(64), finalCandidate: { manifest, manifestHash } }
+}
+test('reuses exact existing final fence without resetting it, preserves raw archives, and resumes exact final context', async () => {
+  const input = finalFixture(), original = clone(input.bank('talio_migration_controls').get('write-fence'))
+  expect(await applyDisposition(input)).toMatchObject({ complete: true, reusedExistingFinalFence: true, changedRecords: 1, finalContext: { baselineRun: 'mongo-baseline-run', candidateRun: run, candidateManifestHash: input.finalCandidate.manifestHash } })
+  const fence = input.bank('talio_migration_controls').get('write-fence')
+  expect(fence).toEqual({ ...original, lastMediaDispositionHash: input.reportHash })
+  expect(input.bank('talio_firestore_archive').get('immutable').bytes).toEqual(Buffer.from('unchanged'))
+  expect(await applyDisposition(input)).toMatchObject({ changedRecords: 0, resumedRecords: 1 })
+  const checkpoint = [...input.bank('talio_migration_controls').values()].find(value => value._id.startsWith('media-disposition/'))
+  checkpoint.finalContext.baselineRun = 'other-baseline-run'
+  await expect(applyDisposition(input)).rejects.toThrow('RESUME_STATE_MISMATCH')
+})
+test.each([
+  input => { input.prepareFence = true },
+  input => { input.report.candidateManifestHash = '0'.repeat(64) },
+  input => { input.report.sourceHash = '0'.repeat(64) },
+  input => { input.finalCandidate.manifest.datasets = ['other-dataset'] },
+  input => { input.finalCandidate.manifest.run = 'different-candidate' },
+])('rejects mismatched final disposition binding before mutations', async alter => {
+  const input = finalFixture(); alter(input)
+  await expect(applyDisposition(input)).rejects.toThrow('EXACT_FINAL_MEDIA_DISPOSITION_CONTEXT')
+  expect(input.bank('talio_records').size).toBe(1)
+  expect(input.bank('talio_migration_controls').size).toBe(1)
+})
+test.each([
+  input => { input.bank('talio_migration_controls').clear() },
+  input => { delete input.bank('talio_migration_controls').get('write-fence').candidateManifestHash },
+  input => { delete input.bank('talio_migration_controls').get('write-fence').sourceHash },
+  input => { input.bank('talio_migration_controls').get('write-fence').candidateManifestHash = '0'.repeat(64) },
+  input => { input.bank('talio_migration_controls').get('write-fence').sourceHash = '0'.repeat(64) },
+  input => { input.bank('talio_migration_controls').get('write-fence').baselineRun = 'wrong-baseline' },
+  input => { input.bank('talio_migration_controls').get('write-fence').expiresAt = new Date(0) },
+  input => { input.bank('talio_catalogs').get(dataset).mongoVerified = true },
+])('requires active exact unexpired fence and nonwritable catalogs for final cleanup', async alter => {
+  const input = finalFixture(); alter(input)
+  await expect(applyDisposition(input)).rejects.toThrow()
+  expect(input.bank('talio_records').size).toBe(1)
+})
+
+test('final lock compare includes both hashes and aborts a changed fence before record mutation', async () => {
+  const input = finalFixture(), originalCollection = input.db.collection.bind(input.db)
+  input.db.collection = name => {
+    const collection = originalCollection(name)
+    if (name !== 'talio_migration_controls') return collection
+    const update = collection.updateOne
+    collection.updateOne = async (filter, ...rest) => {
+      if (filter._id === 'write-fence') {
+        expect(filter.candidateManifestHash).toBe(input.finalCandidate.manifestHash)
+        expect(filter.sourceHash).toBe(input.report.sourceHash)
+        input.bank(name).get('write-fence').sourceHash = '0'.repeat(64)
+      }
+      return update(filter, ...rest)
+    }
+    return collection
+  }
+  await expect(applyDisposition(input)).rejects.toThrow('TARGET_MAINTENANCE_FENCE_RELEASED')
+  expect(input.bank('talio_records').size).toBe(1)
+  expect(input.bank('talio_migration_controls').size).toBe(1)
 })

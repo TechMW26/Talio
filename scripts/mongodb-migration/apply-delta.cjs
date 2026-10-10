@@ -8,7 +8,7 @@ const dotenv = require('dotenv')
 const { BSON } = require('bson')
 const { gzipSync } = require('node:zlib')
 const { createHash } = require('node:crypto')
-const { loadIndexedEntries, resolveSharedArchiveDocuments, sourceCollectionsHash } = require('./migrate.cjs')
+const { loadIndexedEntries, resolveSharedArchiveDocuments, sourceCollectionsHash, verifiedSourceEpoch, sourceTreeCounts } = require('./migrate.cjs')
 const { targetDocuments } = require('./reconcile.cjs')
 const { sha256, canonical, archiveDocument, decodeArchiveDocument, assertSameSource, assertTarget } = require('./core.cjs')
 
@@ -88,6 +88,9 @@ async function assertFence(db, context, session) {
   const fence = await db.collection('talio_migration_controls').findOne({ _id: 'write-fence' }, options)
   const expiresAt = fence?.expiresAt === undefined ? null : new Date(fence.expiresAt).getTime()
   if (!fence || fence.active !== true || fence.baselineRun !== context.baselineRun || fence.candidateRun !== context.candidateRun || canonical(normalizeDatasets(fence.datasets)) !== canonical(context.datasets) || (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= Date.now()))) throw new Error('EXACT_ACTIVE_TARGET_WRITE_FENCE_REQUIRED')
+  for (const key of ['candidateManifestHash', 'sourceHash']) {
+    if (context[key] !== undefined && (!/^[a-f0-9]{64}$/.test(context[key]) || fence[key] !== context[key])) throw new Error('EXACT_TARGET_FENCE_HASH_BINDING_REQUIRED')
+  }
   const catalogs = await db.collection('talio_catalogs').find({ _id: { $in: context.datasets } }, options).toArray()
   if (catalogs.length !== context.datasets.length || catalogs.some(catalog => catalog.applicationCutover !== false || catalog.mongoVerified !== false)) throw new Error('TARGET_CATALOG_MUST_REMAIN_UNVERIFIED_AND_NON_WRITABLE')
 }
@@ -205,6 +208,7 @@ async function main() {
   const verifiedAt = Date.parse(verification.verifiedAt), exportedAt = Date.parse(candidate.exportFinishedAt)
   const expectedSourceHash = verification.sourceHashVersion === 'canonical-sorted-collections-v1' ? sourceCollectionsHash(candidate.collections) : verification.sourceHashVersion === undefined ? sha256(JSON.stringify(candidate.collections)) : null
   if (!baseline.complete || !candidate.complete || baseline.run !== baselineRun || candidate.run !== candidateRun || candidate.sourceBaselineRun !== baselineRun || candidate.sourceBaselineManifestHash !== sha256(baselineBytes) || canonical(normalizeDatasets(candidate.datasets)) !== canonical(datasets) || verification.run !== candidateRun || verification.complete !== true || verification.unchangedAtRead !== true || verification.sourceHash !== expectedSourceHash || !Number.isFinite(verifiedAt) || !Number.isFinite(exportedAt) || verifiedAt < exportedAt) throw new Error('EXACT_FROZEN_SOURCE_CANDIDATE_VERIFICATION_REQUIRED')
+  verifiedSourceEpoch(verification, { run: candidateRun, candidateManifestHash: sha256(candidateBytes), sourceHash: sourceCollectionsHash(candidate.collections), sourceProject: candidate.sourceProject, sourceDatabase: candidate.sourceDatabase, datasets, candidateStartedAt: candidate.startedAt, candidateExportFinishedAt: candidate.exportFinishedAt, sourceCounts: sourceTreeCounts(candidate.collections), fixedEpochCandidate: candidate })
   const before = await loadIndexedEntries(baselineDir, baseline)
   let after
   let client

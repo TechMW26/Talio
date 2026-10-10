@@ -29,6 +29,13 @@ function verifiedSnapshotProof() {
   return input
 }
 
+test('fixed-epoch queue disposition cannot fall back to legacy export-start evidence', () => {
+  const input = proof()
+  const { EXPORT_PROTOCOL } = require('../../scripts/mongodb-migration/fixed-epoch-verification.cjs')
+  input.expected.fixedEpochCandidate = { consistency: EXPORT_PROTOCOL, finalSnapshot: false }
+  expect(() => validateQueueDisposition(input)).toThrow('BOUND_FIXED_EPOCH')
+})
+
 test('post-retirement full source pass validates later drain without changing candidate start or claiming preservation', () => {
   const input = verifiedSnapshotProof(), original = input.expected.candidateStartedAt
   expect(validateQueueDisposition(input)).toMatchObject({ sourceVerificationEpoch: { mode: SOURCE_VERIFICATION_EPOCH_PROTOCOL, startedAt: input.expected.sourceVerification.verificationStartedAt }, preservationVerified: false })
