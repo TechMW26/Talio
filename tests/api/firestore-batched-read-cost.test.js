@@ -47,12 +47,13 @@ test('reads concurrently but bounds concurrency to three and keeps order', async
 test('membership batches retain filters, paginate and deduplicate records', async () => {
   const filters = [{ field: 'status', operator: '==', value: 'approved' }]
   const store = { list: jest.fn(async (_, options) => ({ records: options.filters[0].value.map(_id => ({ _id })), nextCursor: null })) }
-  const ids = Array.from({ length: 65 }, (_, i) => String(i))
+  const ids = Array.from({ length: 265 }, (_, i) => String(i))
   expect((await queryProductivityByIds(store, 'leaves', 'employee', [...ids, '0'], filters)).map(r => r._id)).toEqual(ids)
-  expect(store.list.mock.calls.length).toBeGreaterThan(1)
+  expect(store.list).toHaveBeenCalledTimes(3)
   for (const [, options] of store.list.mock.calls) {
     expect(options.filters.slice(1)).toEqual(filters)
     expect(options.limit).toBe(100)
+    expect(options.filters[0].value.length).toBeLessThanOrEqual(100)
   }
 })
 test('failed reads reject rather than returning incomplete records', async () => {

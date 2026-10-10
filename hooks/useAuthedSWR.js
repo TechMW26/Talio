@@ -113,12 +113,12 @@ const authedFetcher = async (url) => {
 export default function useAuthedSWR(key, options = {}) {
   const result = useSWR(key, authedFetcher, {
     // Stale-while-revalidate: show cached data immediately
-    revalidateOnFocus: true,
+    revalidateOnFocus: false,
     revalidateOnMount: true,
     revalidateOnReconnect: true,
     // Coalesce duplicate mounts and realtime bursts. Explicit mutate calls are
     // still immediate, so this does not delay post-mutation updates.
-    dedupingInterval: 5000,
+    dedupingInterval: 15000,
     // Don't retry on error by default (we have retry in fetcher)
     shouldRetryOnError: false,
     // Keep previous data while loading new data (prevents flashing)
@@ -149,10 +149,10 @@ export default function useAuthedSWR(key, options = {}) {
  */
 export function useAuthedSWRStatic(key, options = {}) {
   return useAuthedSWR(key, {
-    revalidateOnFocus: true,
+    revalidateOnFocus: false,
     revalidateOnReconnect: true,
     revalidateIfStale: true,
-    dedupingInterval: 5000,
+    dedupingInterval: 60000,
     shouldRetryOnError: false,
     keepPreviousData: true,
     ...options,
@@ -176,6 +176,7 @@ export function useAuthedSWRInfinite(getKey, options = {}) {
 export function useAuthedSWRRealtime(key, options = {}) {
   return useAuthedSWR(key, {
     revalidateOnFocus: true,
+    focusThrottleInterval: 30000,
     revalidateOnReconnect: true,
     // Realtime screens are event-driven. Callers may opt into polling only for
     // protocols that require a liveness check (for example meeting sessions).

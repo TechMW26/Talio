@@ -54,7 +54,7 @@ test('empty scoped team never becomes an unfiltered organization query', async (
 
 test('large team queries keep per-batch limits and hydrate only the global newest five', async () => {
   auth.user.role = 'manager'
-  resolveTeamViewScope.mockResolvedValue({ members: Array.from({ length: 70 }, (_, n) => ({ _id: `report-${n}` })) })
+  resolveTeamViewScope.mockResolvedValue({ members: Array.from({ length: 270 }, (_, n) => ({ _id: `report-${n}` })) })
   let active = 0, maxActive = 0
   database.list.mockImplementation(async (_, options) => {
     active += 1
@@ -66,9 +66,10 @@ test('large team queries keep per-batch limits and hydrate only the global newes
   })
   const result = await (await GET(request())).json()
   expect(result.data).toHaveLength(5)
-  expect(database.list.mock.calls.length).toBeGreaterThan(1)
+  expect(database.list).toHaveBeenCalledTimes(3)
   expect(maxActive).toBeLessThanOrEqual(3)
   expect(database.list.mock.calls.every(([, options]) => options.limit === 5)).toBe(true)
+  expect(database.list.mock.calls.every(([, options]) => options.filters.find(item => item.field === 'employee').value.length <= 100)).toBe(true)
   expect(database.getMany.mock.calls.find(([collection]) => collection === 'employees')[1]).toHaveLength(5)
   expect(database.getMany).toHaveBeenCalledWith('leavetypes', ['annual'])
   expect(result.data.map(row => +new Date(row.createdAt))).toEqual(result.data.map(row => +new Date(row.createdAt)).sort((a, b) => b - a))
@@ -105,10 +106,14 @@ test('query failure is an error, not a misleading empty success', async () => {
   expect(await response.json()).toEqual({ success: false, message: 'Failed to fetch leave requests' })
 })
 
-test('all queries used by the widget are covered by deployed index manifest', () => {
-  const { coveredByManifest } = require('../../scripts/firestore-migration/audit-query-indexes.cjs')
-  const manifest = require('../../firestore.indexes.json')
-  for (const pending of [false, true]) for (const scoped of [false, true]) expect(coveredByManifest({ collection: 'leaves', filters: [...(pending ? [{ field: 'status', operator: '==' }] : []), ...(scoped ? [{ field: 'employee', operator: 'in' }] : [])], orderBy: [{ field: 'createdAt', direction: 'desc' }] }, manifest)).toBe(true)
+test('native widget hot paths have scoped partial Mongo indexes', () => {
+  const { RECORD_INDEXES, PREFIX } = require('../../scripts/mongodb-migration/indexes.cjs')
+  for (const name of ['talio_created_v1', 'talio_status_created_v1', 'talio_employee_created_v1']) {
+    const index = RECORD_INDEXES.find(index => index.name === name)
+    expect(Object.fromEntries(Object.entries(index.key).slice(0, 3))).toEqual(PREFIX)
+    expect(index.key['envelope.data.createdAt']).toBe(-1)
+    expect(index.partialFilterExpression['envelope.data.createdAt']).toEqual({ $exists: true })
+  }
 })
 
 test('pending results do not trigger a second recent query', async () => {

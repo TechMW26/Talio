@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getRuntimeCapabilities, getVercelReadiness } from '@/lib/platform/runtime'
+import { isMigrationFrozen } from '@/lib/platform/migrationFence.cjs'
 
 // Lightweight liveness endpoint; detailed checks verify managed services.
 export async function HEAD() {
@@ -17,6 +18,7 @@ export async function GET(request) {
     runtime: runtime.runtime,
     deployment: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || null,
     instanceUptimeSeconds: Math.round(process.uptime()),
+    migrationFrozen: isMigrationFrozen(),
     // Client boot must not contact a deliberately disabled provider. This
     // capability check is configuration-only: no database or Redis reads.
     capabilities: { managedRealtime: runtime.managedRealtime },
@@ -32,9 +34,9 @@ export async function GET(request) {
     const { getFirestoreProvisioningContext } = await import('@/lib/platform/firestoreApplication.server')
     // An uncached read verifies the configured native data plane, not merely
     // that credentials or a cached tenant catalog exist.
-    const { firestore, dataset } = await getFirestoreProvisioningContext()
-    const snapshot = await firestore.collection('talioDatasets').doc(dataset).get()
-    health.firestore = { connected: snapshot.exists }
+    const context = await getFirestoreProvisioningContext({ freshAuthorization: true })
+    const result = await context.db.command({ ping: 1 })
+    health.database = { provider: 'mongodb', connected: result.ok === 1 }
 
     // Check Redis if available
     try {
@@ -81,7 +83,7 @@ export async function GET(request) {
     }
 
     // Check if all critical services are healthy
-    if (!health.firestore?.connected) {
+    if (!health.database?.connected) {
       health.status = 'degraded'
     }
 

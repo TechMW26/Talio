@@ -100,10 +100,9 @@ describe('dashboard performance boundaries', () => {
     expect(loginSource).not.toContain('warmDashboardCaches')
   })
 
-  test('does not block API responses on remote cache writes', () => {
-    expect(authSource).toContain('void setCache(authCacheKey')
+  test('removes unused authentication cache writes and keeps other writes nonblocking', () => {
+    expect(authSource).not.toContain('setCache(authCacheKey')
     expect(companyFeatureServerSource).toContain('void setCache(cacheKey, response, 300)')
-    expect(authSource).not.toContain('await setCache(authCacheKey')
     expect(companyFeatureServerSource).not.toContain('await setCache(cacheKey, response, 300)')
     expect(cacheSource).toContain('waitUntil(remoteWrite)')
     expect(cacheSource).toContain("process.env.VERCEL === '1'")

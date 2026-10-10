@@ -42,7 +42,7 @@ describe('platform runtime capabilities', () => {
 
 describe('Vercel readiness', () => {
   const complete = {
-    FIRESTORE_PROJECT_ID: 'talio-test', FIRESTORE_DATASET: 'verified-test', FIRESTORE_SERVICE_ACCOUNT_JSON: '{}', JWT_SECRET: 'secret', NEXT_PUBLIC_APP_URL: 'https://talio.example',
+    MONGODB_URI: 'mongodb://localhost:27017', MONGODB_DATABASE: 'talio', MONGODB_DATASET: 'verified-mongo-data', JWT_SECRET: 'secret', NEXT_PUBLIC_APP_URL: 'https://talio.example',
     BLOB_READ_WRITE_TOKEN: 'blob', CRON_SECRET: 'cron', PUSHER_APP_ID: 'app', PUSHER_KEY: 'key',
     PUSHER_SECRET: 'secret', PUSHER_CLUSTER: 'ap2', NEXT_PUBLIC_PUSHER_KEY: 'key',
     NEXT_PUBLIC_PUSHER_CLUSTER: 'ap2', LIVEKIT_URL: 'wss://livekit', LIVEKIT_API_KEY: 'key',
@@ -65,6 +65,46 @@ describe('Vercel readiness', () => {
   test('requires private Blob storage and rejects a public store', () => {
     expect(getVercelReadiness({ ...complete, BLOB_READ_WRITE_TOKEN: '' }).ready).toBe(false)
     expect(getVercelReadiness({ ...complete, BLOB_ACCESS: 'public' }).ready).toBe(false)
+  })
+  test('Mongo readiness requires only Mongo data-plane settings with no Firestore fallback', () => {
+    const mongo = { ...complete, TALIO_DATABASE_PROVIDER: 'mongodb', MONGODB_URI: 'mongodb://localhost:27017', MONGODB_DATABASE: 'talio', MONGODB_DATASET: 'verified-mongo-data', FIRESTORE_PROJECT_ID: '', FIRESTORE_DATASET: '', FIRESTORE_SERVICE_ACCOUNT_JSON: '' }
+    expect(getVercelReadiness(mongo)).toEqual({ ready: true, missing: [], invalid: [] })
+    expect(getVercelReadiness({ ...mongo, MONGODB_DATASET: '' }).missing).toContainEqual({ capability: 'database', missingKeys: ['MONGODB_DATASET'] })
+    expect(getVercelReadiness({ ...mongo, TALIO_DATABASE_PROVIDER: 'unknown' }).invalid).toContainEqual(expect.objectContaining({ capability: 'database' }))
+    expect(getVercelReadiness({ ...mongo, TALIO_DATABASE_PROVIDER: 'firestore' }).invalid).toContainEqual(expect.objectContaining({ capability: 'database' }))
+  })
+  test.each([
+    'https://private-user:private-password@example.test', 'mongodb://',
+    'mongodb://host:99999', 'mongodb://host:0', 'mongodb://host,,other',
+    'mongodb://bad host', 'mongodb://user:%invalid@host',
+    'mongodb+srv://host:27017', 'mongodb+srv://one.test,two.test',
+  ])('rejects malformed Mongo URI without returning its contents (%#)', uri => {
+    const result = getVercelReadiness({ ...complete, MONGODB_URI: uri })
+    expect(result.ready).toBe(false)
+    expect(result.invalid).toContainEqual(expect.objectContaining({ capability: 'database' }))
+    expect(JSON.stringify(result)).not.toContain(uri)
+    expect(JSON.stringify(result)).not.toContain('private-password')
+  })
+  test.each([
+    'mongodb://localhost:27017', 'mongodb://one.test:27017,two.test:27018/?replicaSet=test',
+    'mongodb://[::1]:27017', 'mongodb+srv://user:encoded%40password@cluster.example.test/?retryWrites=true',
+  ])('supports standard, replica-set, IPv6 and Atlas URI structures (%#)', uri => {
+    expect(getVercelReadiness({ ...complete, MONGODB_URI: uri }).ready).toBe(true)
+  })
+  test('database and dataset readiness obey actual namespace format boundaries', () => {
+    for (const name of ['../private-db', 'a.b', 'a'.repeat(64), 123]) {
+      expect(getVercelReadiness({ ...complete, MONGODB_DATABASE: name }).ready).toBe(false)
+    }
+    for (const dataset of ['short', 'Uppercase-dataset', '../private-data', 'a'.repeat(81), 123]) {
+      expect(getVercelReadiness({ ...complete, MONGODB_DATASET: dataset }).ready).toBe(false)
+    }
+    expect(getVercelReadiness({ ...complete, MONGODB_DATABASE: 'A'.repeat(63), MONGODB_DATASET: 'a'.repeat(80) }).ready).toBe(true)
+  })
+  test('local acceptance mode is rejected on Vercel production without blocking isolated harnesses', () => {
+    expect(getVercelReadiness({ ...complete, VERCEL: '1', VERCEL_ENV: 'production', TALIO_LOCAL_ACCEPTANCE: '1' })).toMatchObject({ ready: false, invalid: [expect.objectContaining({ capability: 'production isolation' })] })
+    expect(getVercelReadiness({ ...complete, VERCEL: '1', NODE_ENV: 'production', TALIO_LOCAL_ACCEPTANCE: '1' }).ready).toBe(false)
+    expect(getVercelReadiness({ ...complete, VERCEL: '0', NODE_ENV: 'production', TALIO_LOCAL_ACCEPTANCE: '1' }).ready).toBe(true)
+    expect(getVercelReadiness({ ...complete, VERCEL: '1', VERCEL_ENV: 'preview', TALIO_LOCAL_ACCEPTANCE: '1' }).ready).toBe(true)
   })
 })
 

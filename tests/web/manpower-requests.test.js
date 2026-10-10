@@ -21,10 +21,10 @@ beforeEach(() => {
 test('new request has full job fields and submits normalized payload', async () => {
   render(<ManpowerRequests />)
   fireEvent.click(screen.getByText('New request'))
-  const fields = { 'Job title': 'Engineer', Department: 'd1', Headcount: '2', Location: 'Bhopal', 'Annual salary budget: minimum': '500000', 'Annual salary budget: maximum': '900000', 'Business justification (internal)': 'More delivery capacity required', 'Job description (public)': 'Build and maintain software applications', 'Requirements (one per line)': 'Experience', 'Responsibilities (one per line)': 'Build\nTest', 'Skills (one per line)': 'JavaScript' }
+  const fields = { 'Job title': 'Engineer', Department: 'd1', Headcount: '2', Location: 'Bhopal', 'Annual salary budget: minimum': '500000', 'Annual salary budget: maximum': '900000', 'Business justification (internal)': 'More delivery capacity required', 'Job description (public)': 'Build and maintain software applications', 'Requirements (one per line)': 'Experience', 'Responsibilities (one per line)': 'Build\nTest', 'Skills (comma-separated)': 'JavaScript, MongoDB' }
   for (const [label, value] of Object.entries(fields)) fireEvent.change(screen.getByLabelText(label), { target: { value } })
   fireEvent.submit(screen.getByText('Submit to HR').closest('form'))
-  await waitFor(() => expect(execute).toHaveBeenCalledWith('/api/recruitment/requisitions', expect.objectContaining({ action: 'submit', submissionKey: 'submission-key-1234', numberOfPositions: 2, responsibilities: ['Build', 'Test'], salaryMin: 500000 })))
+  await waitFor(() => expect(execute).toHaveBeenCalledWith('/api/recruitment/requisitions', expect.objectContaining({ action: 'submit', submissionKey: 'submission-key-1234', numberOfPositions: 2, responsibilities: ['Build', 'Test'], skills: ['JavaScript', 'MongoDB'], salaryMin: 500000 })))
   expect(await screen.findByRole('status')).toHaveTextContent('Saved')
 })
 test('HR approval requires confirmation and exposes published link after refresh', async () => {

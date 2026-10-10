@@ -4,7 +4,7 @@ jest.mock('@/lib/platform/firestoreApplication.server', () => ({
 jest.mock('@/lib/cache', () => ({ buildCacheKey: jest.fn(() => 'key'), getCache: jest.fn(), setCache: jest.fn(async () => {}), buildCachePattern: jest.fn(), clearCachePattern: jest.fn() }))
 jest.mock('jose', () => ({ jwtVerify: jest.fn() }))
 import { getFirestoreSystemDatabase, getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
-import { getCache } from '@/lib/cache'
+import { getCache, setCache } from '@/lib/cache'
 import { jwtVerify } from 'jose'
 import { getTenantByEmail, getTenantBySlug, clearTenantCache, checkServiceStatus, checkUserLimit, validateSetupCode, markSetupCodeUsed, registerUserTenantMapping } from '@/lib/tenantContext'
 import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server'
@@ -86,12 +86,23 @@ describe('Firestore authentication and tenant boundaries', () => {
     expect(tenant.mutate).not.toHaveBeenCalled()
   })
 
-  test('role permissions come from bound Firestore repository and cache is updated', async () => {
+  test('custom-role permissions are read fresh without redundant user cache writes', async () => {
     tenant.get.mockResolvedValue({ permissions: { employees: { view: true } } })
     const result = await resolveUserPermissions({ _id: 'user', roleId: 'role' }, 'talio_company_one')
     expect(result).toEqual({ employees: { view: true } })
     expect(tenant.get).toHaveBeenCalledWith('roles', 'role')
-    expect(tenant.mutate).toHaveBeenCalledWith('users', 'user', expect.any(Function))
+    expect(tenant.mutate).not.toHaveBeenCalled()
+    tenant.get.mockResolvedValue({ permissions: { employees: { view: false } } })
+    expect(await resolveUserPermissions({ _id: 'user', roleId: 'role' }, 'talio_company_one')).toEqual({ employees: { view: false } })
+    expect(tenant.get).toHaveBeenCalledTimes(2)
+  })
+
+  test('legacy-role permissions ignore stale persisted privileges without reading or writing user records', async () => {
+    const { getPermissionsForLegacyRole } = await import('@/lib/systemRoles')
+    const user = { _id: 'user', role: 'employee', permissionsCache: { all: true }, cacheUpdatedAt: new Date() }
+    expect(await resolveUserPermissions(user, 'talio_company_one')).toEqual(getPermissionsForLegacyRole('employee'))
+    expect(tenant.get).not.toHaveBeenCalled()
+    expect(tenant.mutate).not.toHaveBeenCalled()
   })
 
   test('permission invalidation batches transactions and deduplicates IDs', async () => {
@@ -112,6 +123,7 @@ describe('Firestore authentication and tenant boundaries', () => {
     expect(result.success).toBe(true)
     expect(result.user.password).toBeUndefined()
     expect(result.tenant.databaseName).toBe('talio_company_one')
+    expect(setCache).not.toHaveBeenCalled()
   })
 
   test('a password reset invalidates old signed tokens even without a session row', async () => {

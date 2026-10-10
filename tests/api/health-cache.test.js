@@ -1,5 +1,5 @@
 jest.mock('next/server', () => ({ NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) } }))
-jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreProvisioningContext: jest.fn().mockResolvedValue({ dataset: 'test-health', firestore: { collection: () => ({ doc: () => ({ get: async () => ({ exists: true }) }) }) } }) }))
+jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreProvisioningContext: jest.fn().mockResolvedValue({ dataset: 'test-health', provider: 'mongodb', db: { command: async () => ({ ok: 1 }) } }) }))
 jest.mock('@/lib/platform/runtime', () => ({
   getRuntimeCapabilities: () => ({ runtime: 'vercel', isVercel: true, distributedCache: true }),
   getVercelReadiness: () => ({ ready: true, missing: [], invalid: [] }),

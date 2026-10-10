@@ -1,21 +1,24 @@
-jest.mock('../../lib/platform/firestore.server', () => ({ getTalioFirestore: jest.fn() }))
-import { getTalioFirestore } from '../../lib/platform/firestore.server'
+jest.mock('../../lib/platform/mongo.server', () => ({ getTalioMongoClient: jest.fn(), getTalioMongoDatabase: jest.fn() }))
+jest.mock('../../lib/platform/mongoFirestoreFacade.server', () => ({ createMongoFirestoreFacade: jest.fn(() => ({})) }))
+import { getTalioMongoClient, getTalioMongoDatabase } from '../../lib/platform/mongo.server'
 import { getFirestoreApplicationContext } from '../../lib/platform/firestoreApplication.server'
 
 describe('native dataset readiness boundary', () => {
-  const original = { dataset: process.env.FIRESTORE_DATASET, environment: process.env.NODE_ENV }
+  const keys = ['MONGODB_DATASET', 'MONGODB_DATABASE', 'TALIO_DATABASE_PROVIDER', 'NODE_ENV']
+  const original = Object.fromEntries(keys.map(key => [key, process.env[key]]))
   let catalog, get
   beforeEach(() => {
-    process.env.FIRESTORE_DATASET = `local-fixture-${Date.now()}-${Math.floor(Math.random() * 1000000)}`
+    process.env.MONGODB_DATASET = `local-fixture-${Date.now()}-${Math.floor(Math.random() * 1000000)}`
+    process.env.MONGODB_DATABASE = 'talio'
+    process.env.TALIO_DATABASE_PROVIDER = 'mongodb'
     process.env.NODE_ENV = 'test'
-    catalog = { status: 'verified-local-dataset', purpose: 'local-acceptance-only', tenants: [{ databaseName: 'talio_company_first' }] }
-    get = jest.fn(async () => ({ exists: true, data: () => catalog }))
-    getTalioFirestore.mockReturnValue({ collection: () => ({ doc: () => ({ get }) }) })
+    catalog = { mongoVerified: true, status: 'verified-local-dataset', purpose: 'local-acceptance-only', tenants: [{ databaseName: 'talio_company_first' }] }
+    get = jest.fn(async () => catalog)
+    getTalioMongoClient.mockResolvedValue({})
+    getTalioMongoDatabase.mockResolvedValue({ collection: () => ({ findOne: get }) })
   })
   afterAll(() => {
-    if (original.dataset === undefined) delete process.env.FIRESTORE_DATASET
-    else process.env.FIRESTORE_DATASET = original.dataset
-    process.env.NODE_ENV = original.environment
+    for (const key of keys) { if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key] }
   })
   test('does not permit reads of an unverified dataset or unknown tenant', async () => {
     catalog.status = 'materializing'
@@ -36,7 +39,7 @@ describe('native dataset readiness boundary', () => {
     { status: 'ready', purpose: 'production' },
     { status: 'ready', purpose: 'production', applicationCutover: 'true' },
   ])('production rejects an incomplete cutover: %j', async (flags) => {
-    catalog = { ...flags, tenants: catalog.tenants }
+    catalog = { mongoVerified: true, ...flags, tenants: catalog.tenants }
     process.env.NODE_ENV = 'production'
     await expect(getFirestoreApplicationContext('talio_company_first')).rejects.toThrow('live cutover verification')
   })
@@ -56,8 +59,8 @@ describe('native dataset readiness boundary', () => {
     await expect(getFirestoreApplicationContext('talio_company_archived')).rejects.toThrow('not registered')
   })
   test('rejects system names before obtaining a server connection', async () => {
-    getTalioFirestore.mockClear()
+    getTalioMongoClient.mockClear()
     await expect(getFirestoreApplicationContext('talio_superadmin')).rejects.toThrow('Registered tenant')
-    expect(getTalioFirestore).not.toHaveBeenCalled()
+    expect(getTalioMongoClient).not.toHaveBeenCalled()
   })
 })

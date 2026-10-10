@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
+import { isMigrationFrozen, isMigrationProducerPaused, isMigrationDrainCallback } from './lib/platform/migrationFence.cjs'
 
 const TOKEN_CACHE = global.__tokenCache || new Map()
 const TOKEN_CACHE_TTL = 5 * 60 * 1000
@@ -50,6 +51,33 @@ function setCachedPayload(token, payload) {
 }
 
 export async function middleware(request) {
+  // Some GET handlers persist sessions, variants or leases. Freeze the entire
+  // API plane, including cron, queues and public webhooks, not just POST requests.
+  if (isMigrationFrozen() && request.nextUrl.pathname.startsWith('/api/')
+    && !(request.nextUrl.pathname === '/api/health' && request.method === 'GET')) {
+    return NextResponse.json(
+      { success: false, code: 'MIGRATION_WRITE_FENCE', message: 'Talio is migrating its database. Please retry shortly.' },
+      { status: 503, headers: { 'Retry-After': '60', 'Cache-Control': 'no-store', 'X-Talio-Migration-Freeze': '1' } },
+    )
+  }
+
+  // Stop new HTTP producers without halting existing deployment-pinned queue
+  // work. Production callbacks are private queue/v2beta triggers in vercel.json,
+  // not publicly authenticated SDK endpoints. Never grant this exception to
+  // ordinary local HTTP handlers or via a client-controlled bypass header.
+  // This is not a source write fence: internal consumer writes/fan-out continue.
+  if (isMigrationProducerPaused() && request.nextUrl.pathname.startsWith('/api/')) {
+    if (process.env.VERCEL === '1' && isMigrationDrainCallback(request.nextUrl.pathname, request.method)) {
+      return NextResponse.next()
+    }
+    if (!(request.nextUrl.pathname === '/api/health' && request.method === 'GET')) {
+      return NextResponse.json(
+        { success: false, code: 'MIGRATION_PRODUCER_PAUSE', message: 'Talio is undergoing database maintenance. Please retry shortly.' },
+        { status: 503, headers: { 'Retry-After': '60', 'Cache-Control': 'no-store', 'X-Talio-Migration-Producer-Pause': '1' } },
+      )
+    }
+  }
+
   // Permanent redirect: app.talio.in/resources -> talio.in/resources
   if (request.nextUrl.pathname.startsWith('/resources')) {
     const redirectUrl = new URL(request.nextUrl.pathname + request.nextUrl.search, 'https://talio.in')

@@ -8,9 +8,10 @@ import * as cache from '@/lib/cache'
 describe('local migration acceptance cache isolation', () => {
   let previous, client
   beforeEach(() => {
-    previous = { local: process.env.TALIO_LOCAL_ACCEPTANCE, dataset: process.env.FIRESTORE_DATASET, client: global.__redisClient }
+    previous = { local: process.env.TALIO_LOCAL_ACCEPTANCE, database: process.env.MONGODB_DATABASE, dataset: process.env.MONGODB_DATASET, client: global.__redisClient }
     process.env.TALIO_LOCAL_ACCEPTANCE = '1'
-    process.env.FIRESTORE_DATASET = 'test-acceptance-a'
+    process.env.MONGODB_DATABASE = 'talio'
+    process.env.MONGODB_DATASET = 'test-acceptance-a'
     client = { isReady: true, ...Object.fromEntries(['get', 'set', 'del', 'scan', 'eval', 'ping', 'info', 'flushDb'].map(key => [key, jest.fn()])) }
     global.__redisClient = client
     global.__l1Cache.set('shared-key', { source: 'production' })
@@ -19,7 +20,7 @@ describe('local migration acceptance cache isolation', () => {
   })
   afterEach(async () => {
     await cache.flushAllCaches()
-    for (const [key, value] of [['TALIO_LOCAL_ACCEPTANCE', previous.local], ['FIRESTORE_DATASET', previous.dataset]]) {
+    for (const [key, value] of [['TALIO_LOCAL_ACCEPTANCE', previous.local], ['MONGODB_DATABASE', previous.database], ['MONGODB_DATASET', previous.dataset]]) {
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
@@ -51,14 +52,25 @@ describe('local migration acceptance cache isolation', () => {
   })
   test('local datasets have independent keys and flushing one preserves the other', async () => {
     await cache.setCache('same-key', 'dataset-a')
-    process.env.FIRESTORE_DATASET = 'test-acceptance-b'
+    process.env.MONGODB_DATASET = 'test-acceptance-b'
     expect(await cache.getCache('same-key')).toBeNull()
     await cache.setCache('same-key', 'dataset-b')
-    process.env.FIRESTORE_DATASET = 'test-acceptance-a'
+    process.env.MONGODB_DATASET = 'test-acceptance-a'
     await cache.flushAllCaches()
     expect(await cache.getCache('same-key')).toBeNull()
-    process.env.FIRESTORE_DATASET = 'test-acceptance-b'
+    process.env.MONGODB_DATASET = 'test-acceptance-b'
     expect(await cache.getCache('same-key')).toBe('dataset-b')
+    expectNoRemoteCalls()
+  })
+  test('local databases have independent keys even with the same dataset name', async () => {
+    await cache.setCache('same-key', 'database-a')
+    process.env.MONGODB_DATABASE = 'talio-test'
+    expect(await cache.getCache('same-key')).toBeNull()
+    await cache.setCache('same-key', 'database-b')
+    process.env.MONGODB_DATABASE = 'talio'
+    await cache.flushAllCaches()
+    process.env.MONGODB_DATABASE = 'talio-test'
+    expect(await cache.getCache('same-key')).toBe('database-b')
     expectNoRemoteCalls()
   })
 })

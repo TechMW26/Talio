@@ -1,10 +1,30 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act, render, renderHook, waitFor } from '@testing-library/react'
 import { SWRConfig } from 'swr'
 import useAuthedSWR, { useAuthedSWRStatic, useAuthedSWRRealtime } from '@/hooks/useAuthedSWR'
 
 const response = data => ({ ok: true, status: 200, json: async () => data })
 beforeEach(() => { global.fetch = jest.fn(); localStorage.setItem('token', 'test') })
 afterEach(() => { delete global.fetch; localStorage.clear() })
+
+test.each([useAuthedSWR, useAuthedSWRStatic])('repeat mounts share a recent read but explicit refresh is immediate', async useHook => {
+  fetch.mockResolvedValue(response({ count: 1 }))
+  const cache = new Map()
+  const config = { provider: () => cache }
+  let current
+  function Reader() { current = useHook('/api/cost-test'); return <div>{current.data?.count}</div> }
+  function Harness({ show }) { return <SWRConfig value={config}>{show && <Reader />}</SWRConfig> }
+  const page = render(<Harness show />)
+  await waitFor(() => expect(current.data?.count).toBe(1))
+  page.rerender(<Harness show={false} />)
+  page.rerender(<Harness show />)
+  expect(current.data.count).toBe(1)
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  expect(fetch).toHaveBeenCalledTimes(1)
+  fetch.mockResolvedValue(response({ count: 2 }))
+  await act(async () => { await current.mutate() })
+  expect(fetch).toHaveBeenCalledTimes(2)
+  expect(current.data.count).toBe(2)
+})
 
 test('timeout remains active while the response body is stalled', async () => {
   jest.useFakeTimers()

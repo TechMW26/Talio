@@ -55,6 +55,21 @@ export async function GET(request, { params }) {
         const needsResize = width || height
 
         const contentType = fileInfo.contentType || 'image/webp'
+        // Upload IDs are immutable: replacement photos/logos receive a new URL.
+        // Let the browser retain only low-sensitivity display media briefly;
+        // never persist identity documents or arbitrary private attachments.
+        const cacheable = ['profile', 'company'].includes(fileInfo.metadata?.category)
+        const cacheHeaders = {
+            'Cache-Control': cacheable ? 'private, max-age=300, must-revalidate' : 'private, no-store',
+            'Vary': 'Cookie, Authorization',
+        }
+        const etag = cacheable ? `"${id}-${width || 0}-${height || 0}-${quality}"` : null
+        if (etag) cacheHeaders.ETag = etag
+        // Authentication and document ownership checks above must run before
+        // conditional responses. Expired caches still check live permissions.
+        if (etag && request.headers.get('if-none-match') === etag) {
+            return new NextResponse(null, { status: 304, headers: cacheHeaders })
+        }
 
         if (!needsResize) {
             // Stream directly without processing
@@ -63,7 +78,7 @@ export async function GET(request, { params }) {
             return new NextResponse(readableStream, {
                 headers: {
                     'Content-Type': contentType,
-                    'Cache-Control': 'private, no-store',
+                    ...cacheHeaders,
                     'X-Content-Type-Options': 'nosniff',
                     'Content-Length': String(fileInfo.length),
                 }
@@ -77,7 +92,7 @@ export async function GET(request, { params }) {
                 const buffer = Buffer.from(await new Response(original.stream).arrayBuffer())
                 return sharp(buffer, { failOnError: false }).resize(variant, variant, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer()
             }, resolved.validateVariant)
-            return new NextResponse(stream, { headers: { 'Content-Type': 'image/webp', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } })
+            return new NextResponse(stream, { headers: { 'Content-Type': 'image/webp', ...cacheHeaders, 'X-Content-Type-Options': 'nosniff' } })
         }
 
         // Custom transforms remain bounded and uncached to avoid unbounded variants.
@@ -104,7 +119,7 @@ export async function GET(request, { params }) {
         return new NextResponse(resizedBuffer, {
             headers: {
                 'Content-Type': contentType.includes('png') ? 'image/png' : /jpeg|jpg/.test(contentType) ? 'image/jpeg' : 'image/webp',
-                'Cache-Control': 'private, no-store',
+                ...cacheHeaders,
                 'X-Content-Type-Options': 'nosniff',
                 'Content-Length': String(resizedBuffer.length),
             }

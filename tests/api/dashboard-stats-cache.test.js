@@ -20,6 +20,23 @@ test('separates tenant, user, role and current team scope', async () => {
   }
   expect(new Set(getCache.mock.calls.map(([key])=>key)).size).toBe(5)
 })
+test('separates MongoDB databases and datasets without Firestore configuration', async () => {
+  const originalDatabase = process.env.MONGODB_DATABASE
+  const originalDataset = process.env.MONGODB_DATASET
+  try {
+    for (const [database, dataset] of [['talio', 'production-a'], ['talio', 'production-b'], ['talio-test', 'production-a']]) {
+      process.env.MONGODB_DATABASE = database
+      process.env.MONGODB_DATASET = dataset
+      await cachedDashboardStats(request(), auth, 'employee', {}, async () => result)
+    }
+    expect(new Set(getCache.mock.calls.map(([key]) => key)).size).toBe(3)
+  } finally {
+    if (originalDatabase === undefined) delete process.env.MONGODB_DATABASE
+    else process.env.MONGODB_DATABASE = originalDatabase
+    if (originalDataset === undefined) delete process.env.MONGODB_DATASET
+    else process.env.MONGODB_DATASET = originalDataset
+  }
+})
 test('reuses valid data but rejects expired data even if a local cache returns it', async () => {
   const load = jest.fn(async () => result)
   getCache.mockResolvedValue({value:result,expiresAt:Date.now()+15000})

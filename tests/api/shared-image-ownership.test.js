@@ -1,8 +1,8 @@
 import { getImageInfo } from '@/lib/mediaStorage'
 import { getFirestoreApplicationContext, getFirestoreTenantDatabase } from '@/lib/platform/firestoreApplication.server'
-import { createFirestoreMediaRepository } from '@/lib/platform/firestoreMedia.server'
+import { createMongoMediaRepository as createFirestoreMediaRepository } from '@/lib/platform/mongoMedia.server'
 jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreApplicationContext: jest.fn(), getFirestoreTenantDatabase: jest.fn() }))
-jest.mock('@/lib/platform/firestoreMedia.server', () => ({ createFirestoreMediaRepository: jest.fn(), getFirestoreMediaRepository: jest.fn() }))
+jest.mock('@/lib/platform/mongoMedia.server', () => ({ createMongoMediaRepository: jest.fn(), getMongoMediaRepository: jest.fn(), getMongoMediaStats: jest.fn() }))
 const id = 'aaaaaaaaaaaaaaaaaaaaaaaa'
 let tenant, sharedFile, localFile
 beforeEach(() => {

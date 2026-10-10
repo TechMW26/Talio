@@ -1,33 +1,27 @@
-jest.mock('@/lib/platform/firestore.server', () => ({ getTalioFirestore: jest.fn() }))
-import { Firestore } from 'firebase-admin/firestore'
-import { getTalioFirestore } from '@/lib/platform/firestore.server'
+jest.mock('@/lib/platform/mongo.server', () => ({ getTalioMongoClient: jest.fn(), getTalioMongoDatabase: jest.fn() }))
+import { getTalioMongoClient, getTalioMongoDatabase } from '@/lib/platform/mongo.server'
 import { getFirestoreApplicationContext, getFirestoreSystemDatabase, getFirestoreTenantDatabase, registerFirestoreTenant, setFirestoreTenantActive } from '@/lib/platform/firestoreApplication.server'
+import { createMongoFirestoreFacade } from '@/lib/platform/mongoFirestoreFacade.server'
+import { memoryMongoDriver } from '../helpers/mongoDriver'
 
-jest.setTimeout(60000)
-const emulator = process.env.TALIO_FIRESTORE_EMULATOR_TEST === '1' ? describe : describe.skip
-emulator('native application catalog and tenant repository boundaries', () => {
-  let firestore, dataset, originalDataset, originalMode, root
-  const tenantId = 'aaaaaaaaaaaaaaaaaaaaaaaa'
-  const databaseName = 'talio_company_native_one'
-  beforeAll(() => {
-    if (process.env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8185') throw new Error('Isolated emulator required')
-    originalDataset = process.env.FIRESTORE_DATASET
-    originalMode = process.env.NODE_ENV
-    firestore = new Firestore({ projectId: 'demo-talio-firestore' })
-    getTalioFirestore.mockReturnValue(firestore)
-  })
-  beforeEach(async () => {
+describe('Mongo application catalog and tenant repository boundaries', () => {
+  let native, dataset, root
+  const tenantId = 'aaaaaaaaaaaaaaaaaaaaaaaa', databaseName = 'talio_company_native_one'
+  const keys = ['MONGODB_DATASET', 'MONGODB_DATABASE', 'TALIO_DATABASE_PROVIDER', 'NODE_ENV']
+  const original = Object.fromEntries(keys.map(key => [key, process.env[key]]))
+  beforeEach(() => {
+    native = memoryMongoDriver()
     dataset = `test-context-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    process.env.FIRESTORE_DATASET = dataset
-    root = firestore.collection('talioDatasets').doc(dataset)
-    await root.set({ status: 'verified-local-dataset', purpose: 'local-acceptance-only', tenants: [{ tenantId, databaseName, active: true }, { tenantId: 'bbbbbbbbbbbbbbbbbbbbbbbb', databaseName: 'talio_company_native_two', active: true }] })
+    process.env.MONGODB_DATASET = dataset
+    process.env.MONGODB_DATABASE = 'talio'
+    process.env.TALIO_DATABASE_PROVIDER = 'mongodb'
+    process.env.NODE_ENV = 'test'
+    getTalioMongoClient.mockResolvedValue(native.client)
+    getTalioMongoDatabase.mockResolvedValue(native.db)
+    native.bank('talio_catalogs').set(dataset, { _id: dataset, mongoVerified: true, status: 'verified-local-dataset', purpose: 'local-acceptance-only', tenants: [{ tenantId, databaseName, active: true }, { tenantId: 'bbbbbbbbbbbbbbbbbbbbbbbb', databaseName: 'talio_company_native_two', active: true }] })
+    root = createMongoFirestoreFacade({ ...native, dataset }).collection('talioDatasets').doc(dataset)
   })
-  afterEach(() => { process.env.NODE_ENV = originalMode })
-  afterAll(async () => {
-    if (originalDataset === undefined) delete process.env.FIRESTORE_DATASET
-    else process.env.FIRESTORE_DATASET = originalDataset
-    await firestore?.terminate()
-  })
+  afterAll(() => { for (const key of keys) { if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key] } })
 
   test('same record IDs remain isolated across tenants and the system registry', async () => {
     const [one, two, system] = await Promise.all([getFirestoreTenantDatabase(databaseName), getFirestoreTenantDatabase('talio_company_native_two'), getFirestoreSystemDatabase()])
@@ -40,7 +34,7 @@ emulator('native application catalog and tenant repository boundaries', () => {
     await expect(getFirestoreTenantDatabase('talio_company_unregistered')).rejects.toThrow('not registered')
   })
 
-  test('unverified catalog fails closed and subsequent verified requests recover', async () => {
+  test('unverified catalog fails closed and a verified request can recover', async () => {
     await root.update({ status: 'copy-in-progress' })
     await expect(getFirestoreApplicationContext(databaseName)).rejects.toThrow('not passed verification')
     await root.update({ status: 'verified-local-dataset' })
@@ -53,26 +47,25 @@ emulator('native application catalog and tenant repository boundaries', () => {
     await expect(getFirestoreApplicationContext(databaseName)).rejects.toThrow('must not be used in production')
   })
 
-  test('a different physical database cannot inherit another database catalog verification', async () => {
+  test('a different native client cannot inherit another physical database verification', async () => {
     await getFirestoreApplicationContext(databaseName)
-    const get = jest.fn(async () => ({ exists: false }))
-    getTalioFirestore.mockReturnValueOnce({ collection: () => ({ doc: () => ({ get }) }) })
+    const other = memoryMongoDriver()
+    getTalioMongoClient.mockResolvedValueOnce(other.client)
+    getTalioMongoDatabase.mockResolvedValueOnce(other.db)
     await expect(getFirestoreApplicationContext(databaseName)).rejects.toThrow('not passed verification')
-    expect(get).toHaveBeenCalledTimes(1)
   })
 
-  test('protected authorization observes an archive made by another worker despite a warm catalog', async () => {
+  test('fresh authorization observes tenant archive by another worker', async () => {
     await getFirestoreTenantDatabase(databaseName)
-    // A different worker updates Firestore without clearing this module cache.
     const catalog = (await root.get()).data()
     await root.update({ tenants: catalog.tenants.map(tenant => tenant.databaseName === databaseName ? { ...tenant, active: false } : tenant) })
     await expect(getFirestoreTenantDatabase(databaseName, { freshAuthorization: true })).rejects.toThrow('not registered')
-    const outage = jest.fn(async () => { throw new Error('catalog unavailable') })
-    getTalioFirestore.mockReturnValueOnce({ collection: () => ({ doc: () => ({ get: outage }) }) })
+    const failure = { collection: () => ({ findOne: async () => { throw new Error('catalog unavailable') } }) }
+    getTalioMongoDatabase.mockResolvedValueOnce(failure)
     await expect(getFirestoreTenantDatabase(databaseName, { freshAuthorization: true })).rejects.toThrow('catalog unavailable')
   })
 
-  test('company registration requires persisted matching identity and is idempotent', async () => {
+  test('company registration requires persisted identity and remains idempotent', async () => {
     const system = await getFirestoreSystemDatabase()
     const company = { _id: 'cccccccccccccccccccccccc', databaseName: 'talio_company_new', isActive: true }
     await expect(registerFirestoreTenant(company)).rejects.toThrow('must exist')
@@ -83,9 +76,8 @@ emulator('native application catalog and tenant repository boundaries', () => {
     await expect(registerFirestoreTenant({ ...company, databaseName: 'talio_company_mismatch' })).rejects.toThrow('must exist')
   })
 
-  test('archive rechecks admin, switches registry and catalog together and preserves tenant data', async () => {
-    const system = await getFirestoreSystemDatabase()
-    const tenant = await getFirestoreTenantDatabase(databaseName)
+  test('archive rechecks admin, commits registry and catalog together, and retains tenant data', async () => {
+    const system = await getFirestoreSystemDatabase(), tenant = await getFirestoreTenantDatabase(databaseName)
     await system.create('tenantcompanies', { _id: tenantId, databaseName, isActive: true })
     await system.create('superadmins', { _id: 'owner', isActive: true, permissions: { canDeleteCompanies: true } })
     await tenant.create('users', { _id: 'preserved', email: 'kept@example.test' })
