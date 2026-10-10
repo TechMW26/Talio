@@ -1,6 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { QUEUE_DISCARD_DECISION, TALIO_VERCEL_PROJECT, TALIO_VERCEL_TEAM, QUEUE_TOPICS, REQUIRED_QUEUE_FENCE_PLANES, validateQueueDisposition } = require('../../scripts/mongodb-migration/queue-disposition.cjs')
+const { SOURCE_VERIFICATION_EPOCH_PROTOCOL } = require('../../scripts/mongodb-migration/migrate.cjs')
 
 function proof() {
   const now = Date.now(), at = offset => new Date(now + offset).toISOString()
@@ -17,6 +18,39 @@ test('explicit queue-only disposition records unknown loss without authorizing b
   expect(JSON.stringify(input)).toBe(before)
   expect(validateQueueDisposition(input)).not.toHaveProperty('complete')
   expect(validateQueueDisposition(input)).not.toHaveProperty('allBusinessDataPreserved')
+})
+
+function verifiedSnapshotProof() {
+  const input = proof(), at = offset => new Date(input.now + offset).toISOString()
+  input.expected.candidateExportFinishedAt = at(-25000)
+  input.expected.sourceCounts = { collectionsVerified: 2, documentsVerified: 3, missingParentsVerified: 1 }
+  input.expected.sourceVerification = { run: input.expected.run, candidateManifestHash: input.expected.candidateManifestHash, sourceHash: input.expected.sourceHash, sourceHashVersion: 'canonical-sorted-collections-v1', sourceProject: input.expected.sourceProject, sourceDatabase: input.expected.sourceDatabase, datasets: [...input.expected.datasets], complete: true, unchangedAtRead: true, verificationProtocol: SOURCE_VERIFICATION_EPOCH_PROTOCOL, verificationStartedAt: at(-15000), verifiedAt: at(-12000), fullBodiesRead: true, fullTopologyVerified: true, metadataUpdateTimesVerified: true, noReuse: true, reusedDocuments: 0, archiveUnchanged: true, ...input.expected.sourceCounts }
+  input.fence.drainedAt = at(-20000)
+  return input
+}
+
+test('post-retirement full source pass validates later drain without changing candidate start or claiming preservation', () => {
+  const input = verifiedSnapshotProof(), original = input.expected.candidateStartedAt
+  expect(validateQueueDisposition(input)).toMatchObject({ sourceVerificationEpoch: { mode: SOURCE_VERIFICATION_EPOCH_PROTOCOL, startedAt: input.expected.sourceVerification.verificationStartedAt }, preservationVerified: false })
+  expect(input.expected.candidateStartedAt).toBe(original)
+  delete input.expected.sourceVerification
+  expect(() => validateQueueDisposition(input)).toThrow('BOUND_ACTIVE_SOURCE_FENCE')
+})
+
+test.each([
+  input => { delete input.expected.sourceVerification.noReuse },
+  input => { input.expected.sourceVerification.fullBodiesRead = false },
+  input => { input.expected.sourceVerification.fullTopologyVerified = false },
+  input => { input.expected.sourceVerification.reusedDocuments = 1 },
+  input => { input.expected.sourceVerification.verificationStartedAt = input.expected.candidateStartedAt },
+  input => { input.expected.sourceVerification.verificationStartedAt = new Date(input.now + 1).toISOString() },
+  input => { input.expected.sourceVerification.verificationStartedAt = 'invalid' },
+  input => { input.expected.sourceVerification.candidateManifestHash = 'f'.repeat(64) },
+  input => { input.expected.sourceVerification.datasets = ['foreign-tests'] },
+  input => { input.expected.sourceVerification.documentsVerified++ },
+])('queue gate cannot accept a forged/partial/reused verification epoch (%#)', change => {
+  const input = verifiedSnapshotProof(); change(input)
+  expect(() => validateQueueDisposition(input)).toThrow('FULL_SOURCE_VERIFICATION_EPOCH')
 })
 
 test.each([

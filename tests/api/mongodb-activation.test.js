@@ -2,7 +2,7 @@ const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
 const { SOURCE_WRITER_PLANES, readProtectedJson, validateActivationEvidence, activateCatalog } = require('../../scripts/mongodb-migration/activate-catalog.cjs')
-const { sourceCollectionsHash } = require('../../scripts/mongodb-migration/migrate.cjs')
+const { sourceCollectionsHash, sourceTreeCounts, SOURCE_VERIFICATION_EPOCH_PROTOCOL } = require('../../scripts/mongodb-migration/migrate.cjs')
 const { memoryMongoDriver } = require('../helpers/mongoDriver')
 const { QUEUE_DISCARD_DECISION, TALIO_VERCEL_PROJECT, TALIO_VERCEL_TEAM, QUEUE_TOPICS } = require('../../scripts/mongodb-migration/queue-disposition.cjs')
 const { REVIEWED_SOURCE_REVISION, REVIEWED_SOURCE_HASHES, REVIEWED_TOKEN_PROTOCOL, TOKEN_PROTOCOL_REVIEW_HASH } = require('../../scripts/mongodb-migration/blob-orphan-tail.cjs')
@@ -49,6 +49,57 @@ test('fails closed on every unfenced source writer, undrained operations and mai
     value => { value.fence.targetMaintenance.writeProbeStatus = 200 },
     value => { value.fence.targetMaintenance.guardRevision = 'unknown' },
   ]) { const value = evidence(); alter(value); expect(() => validateActivationEvidence(value)).toThrow() }
+})
+
+function withVerifiedSnapshot(value = evidence()) {
+  const original = JSON.stringify(value.candidate)
+  Object.assign(value.source, { candidateManifestHash: value.candidateManifestHash, sourceProject: value.candidate.sourceProject, sourceDatabase: value.candidate.sourceDatabase, datasets: [...value.datasets], verificationProtocol: SOURCE_VERIFICATION_EPOCH_PROTOCOL, verificationStartedAt: new Date(value.now - 40000).toISOString(), fullBodiesRead: true, fullTopologyVerified: true, metadataUpdateTimesVerified: true, noReuse: true, reusedDocuments: 0, archiveUnchanged: true, ...sourceTreeCounts(value.candidate.collections) })
+  value.fence.drainedAt = new Date(value.now - 45000).toISOString()
+  expect(Date.parse(value.fence.drainedAt)).toBeGreaterThan(Date.parse(value.candidate.startedAt))
+  expect(JSON.stringify(value.candidate)).toBe(original)
+  return value
+}
+
+test('a new exact full-body/topology post-drain verification may establish an unchanged snapshot epoch without relabeling the candidate', () => {
+  const value = withVerifiedSnapshot(), before = JSON.stringify(value.candidate)
+  expect(validateActivationEvidence(value).sourceVerificationEpoch).toEqual({ mode: SOURCE_VERIFICATION_EPOCH_PROTOCOL, startedAt: value.source.verificationStartedAt, verifiedAt: value.source.verifiedAt })
+  expect(JSON.stringify(value.candidate)).toBe(before)
+  const legacy = evidence(); legacy.fence.drainedAt = value.fence.drainedAt
+  expect(() => validateActivationEvidence(legacy)).toThrow('SOURCE_WIDE_FROZEN')
+})
+
+test.each([
+  value => { delete value.source.verificationStartedAt },
+  value => { value.source.verificationStartedAt = 'invalid' },
+  value => { value.source.verificationStartedAt = value.candidate.startedAt },
+  value => { value.source.verificationStartedAt = new Date(value.now + 1).toISOString() },
+  value => { value.source.verificationStartedAt = new Date(Date.parse(value.source.verifiedAt) + 1).toISOString() },
+  value => { delete value.source.verificationProtocol },
+  value => { value.source.fullBodiesRead = false },
+  value => { value.source.fullTopologyVerified = false },
+  value => { value.source.metadataUpdateTimesVerified = false },
+  value => { value.source.noReuse = false },
+  value => { value.source.reusedDocuments = 1 },
+  value => { value.source.archiveUnchanged = false },
+  value => { value.source.documentsVerified++ },
+  value => { value.source.collectionsVerified++ },
+  value => { value.source.missingParentsVerified++ },
+  value => { value.source.candidateManifestHash = 'f'.repeat(64) },
+  value => { value.source.sourceProject = 'foreign' },
+  value => { value.source.sourceDatabase = 'foreign' },
+  value => { value.source.datasets = ['foreign-tests'] },
+])('verification epoch fails closed without exact complete post-export no-reuse source evidence (%#)', change => {
+  const value = withVerifiedSnapshot(); change(value)
+  expect(() => validateActivationEvidence(value)).toThrow('FULL_SOURCE_VERIFICATION_EPOCH')
+})
+
+test('new epoch never permits drain after first source read or media/Mongo reports before verification completion', () => {
+  for (const change of [
+    value => { value.fence.drainedAt = new Date(Date.parse(value.source.verificationStartedAt) + 1).toISOString() },
+    value => { value.media.verifiedAt = value.source.verificationStartedAt },
+    value => { value.mongo.verifiedAt = value.source.verificationStartedAt },
+    value => { value.fence.planes['old-deployments'].checkedAt = new Date(Date.parse(value.fence.drainedAt) + 1).toISOString() },
+  ]) { const value = withVerifiedSnapshot(); change(value); expect(() => validateActivationEvidence(value)).toThrow() }
 })
 
 function withBlobOrphanTail(value = evidence()) {
@@ -208,6 +259,13 @@ test('optional queue evidence is candidate/fence/target bound and retained in ac
     input => { input.queueDisposition.targetQueueIsolation.deploymentlessRuntimePollingEnabled = true },
     input => { input.queueDisposition.outstandingJobCount = 0 },
   ]) { const input = withQueueDisposition(); alter(input); expect(() => validateActivationEvidence(input)).toThrow() }
+})
+
+test('queue disposition uses the exact independently validated full source epoch, not a late drain override', () => {
+  const value = withQueueDisposition(withVerifiedSnapshot())
+  expect(validateActivationEvidence(value).queueDisposition.sourceVerificationEpoch).toEqual({ mode: SOURCE_VERIFICATION_EPOCH_PROTOCOL, startedAt: value.source.verificationStartedAt, verifiedAt: value.source.verifiedAt })
+  delete value.source.noReuse
+  expect(() => validateActivationEvidence(value)).toThrow('FULL_SOURCE_VERIFICATION_EPOCH')
 })
 
 test('approved queue discard cannot bypass any source writer, parity, media or maintenance gate', () => {

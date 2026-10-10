@@ -23,6 +23,46 @@ function sourceCollectionsHash(collections) {
   return sha256(canonical([...collections].sort((a, b) => a.path.localeCompare(b.path))))
 }
 
+const SOURCE_VERIFICATION_EPOCH_PROTOCOL = 'full-body-topology-source-reread-v1'
+function verifiedSourceEpoch(source, expected, now = Date.now()) {
+  const timestamp = value => typeof value === 'string' ? Date.parse(value) : NaN
+  const original = timestamp(expected.candidateStartedAt)
+  const markers = ['verificationStartedAt', 'verificationProtocol', 'fullBodiesRead', 'fullTopologyVerified', 'metadataUpdateTimesVerified', 'noReuse', 'reusedDocuments', 'archiveUnchanged']
+  if (!source || !markers.some(key => Object.hasOwn(source, key))) return { mode: 'candidate-export-start-v1', startedAt: expected.candidateStartedAt }
+  const started = timestamp(source.verificationStartedAt), finished = timestamp(source.verifiedAt), exported = timestamp(expected.candidateExportFinishedAt)
+  const sameDatasets = Array.isArray(source.datasets) && Array.isArray(expected.datasets) && canonical([...source.datasets].sort()) === canonical([...expected.datasets].sort())
+  if (source.verificationProtocol !== SOURCE_VERIFICATION_EPOCH_PROTOCOL || source.complete !== true || source.unchangedAtRead !== true || source.fullBodiesRead !== true || source.fullTopologyVerified !== true || source.metadataUpdateTimesVerified !== true || source.noReuse !== true || source.reusedDocuments !== 0 || source.archiveUnchanged !== true || source.run !== expected.run || source.candidateManifestHash !== expected.candidateManifestHash || source.sourceHash !== expected.sourceHash || source.sourceHashVersion !== 'canonical-sorted-collections-v1' || source.sourceProject !== expected.sourceProject || source.sourceDatabase !== expected.sourceDatabase || !sameDatasets || !Number.isFinite(original) || !Number.isFinite(exported) || exported < original || !Number.isFinite(started) || started < exported || !Number.isFinite(finished) || finished < started || finished > now || !expected.sourceCounts || ['collectionsVerified', 'documentsVerified', 'missingParentsVerified'].some(key => !Number.isSafeInteger(source[key]) || source[key] < 0 || source[key] !== expected.sourceCounts[key])) throw new Error('BOUND_FULL_SOURCE_VERIFICATION_EPOCH_REQUIRED')
+  return { mode: SOURCE_VERIFICATION_EPOCH_PROTOCOL, startedAt: source.verificationStartedAt, verifiedAt: source.verifiedAt }
+}
+
+function sourceTreeCounts(collections) {
+  return { collectionsVerified: collections.length, documentsVerified: collections.reduce((total, item) => total + item.summary.documents, 0), missingParentsVerified: collections.reduce((total, item) => total + item.summary.missingParents, 0) }
+}
+
+async function verifySourceSnapshot(db, dir, manifest, options = {}) {
+  if (manifest.complete !== true || options.verificationStartedAt !== undefined || options.onVerificationStarted !== undefined) throw new Error('COMPLETE_IMMUTABLE_SOURCE_VERIFICATION_INPUT_REQUIRED')
+  const manifestFile = path.join(dir, 'manifest.json'), manifestBytes = await fsp.readFile(manifestFile)
+  if (canonical(JSON.parse(manifestBytes)) !== canonical(manifest)) throw new Error('SOURCE_VERIFICATION_MANIFEST_CHANGED')
+  const fingerprint = stat => [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].join(':')
+  const manifestFingerprint = fingerprint(fs.statSync(manifestFile, { bigint: true }))
+  // All local archive checks finish before the first source-read epoch. Never
+  // borrow the export start or accept an operator-provided timestamp.
+  const archive = await loadIndexedEntries(dir, manifest)
+  let verificationStartedAt
+  try {
+    archive.assertUnchanged()
+    const reports = await exportTree(db, dir, manifest, true, { ...options, reuseUnchanged: false, onVerificationStarted: value => { verificationStartedAt = value } })
+    archive.assertUnchanged()
+    if (fingerprint(fs.statSync(manifestFile, { bigint: true })) !== manifestFingerprint || sha256(await fsp.readFile(manifestFile)) !== sha256(manifestBytes)) throw new Error('SOURCE_VERIFICATION_MANIFEST_CHANGED')
+    // Old baseline manifests have no final dataset allowlist. They remain
+    // verifiable, but never gain the new final-candidate epoch authority.
+    if (!Array.isArray(manifest.datasets) || !manifest.datasets.length) return { run: manifest.run, verifiedAt: new Date().toISOString(), sourceHash: sourceCollectionsHash(reports), sourceHashVersion: 'canonical-sorted-collections-v1', unchangedAtRead: true, writerFreezeRequiredForCutover: true, complete: true }
+    const report = { run: manifest.run, candidateManifestHash: sha256(manifestBytes), sourceProject: manifest.sourceProject, sourceDatabase: manifest.sourceDatabase, datasets: [...manifest.datasets].sort(), verificationProtocol: SOURCE_VERIFICATION_EPOCH_PROTOCOL, verificationStartedAt, verifiedAt: new Date().toISOString(), sourceHash: sourceCollectionsHash(reports), sourceHashVersion: 'canonical-sorted-collections-v1', unchangedAtRead: true, fullBodiesRead: true, fullTopologyVerified: true, metadataUpdateTimesVerified: true, noReuse: true, reusedDocuments: 0, archiveUnchanged: true, ...sourceTreeCounts(reports), writerFreezeRequiredForCutover: true, complete: true }
+    verifiedSourceEpoch(report, { ...report, sourceHash: sourceCollectionsHash(manifest.collections), candidateStartedAt: manifest.startedAt, candidateExportFinishedAt: manifest.exportFinishedAt, sourceCounts: sourceTreeCounts(manifest.collections) })
+    return report
+  } finally { archive.close() }
+}
+
 function mediaDispositionBinding(overlay) {
   if (!overlay) return undefined
   const report = overlay.report
@@ -164,7 +204,7 @@ async function readRecoveryBatch(db, batch, existing, retryOptions) {
   return { entries, reused, fullFetched: full.length }
 }
 
-async function exportTree(db, dir, manifest, verify = false, { childConcurrency = Number(process.env.MONGODB_EXPORT_CHILD_CONCURRENCY || 16), batchSize = Number(process.env.MONGODB_EXPORT_BATCH_SIZE || 64), reuseUnchanged = false, retryOptions } = {}) {
+async function exportTree(db, dir, manifest, verify = false, { childConcurrency = Number(process.env.MONGODB_EXPORT_CHILD_CONCURRENCY || 16), batchSize = Number(process.env.MONGODB_EXPORT_BATCH_SIZE || 64), reuseUnchanged = false, retryOptions, onVerificationStarted } = {}) {
   if (!Number.isInteger(childConcurrency) || childConcurrency < 1 || childConcurrency > 128) throw new Error('INVALID_EXPORT_CHILD_CONCURRENCY')
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 256) throw new Error('INVALID_EXPORT_BATCH_SIZE')
   const recovery = !verify && manifest.recoveryGeneration === true
@@ -176,6 +216,7 @@ async function exportTree(db, dir, manifest, verify = false, { childConcurrency 
   }
   const started = Date.now()
   let totalDocuments = 0, totalMissingParents = 0
+  if (verify) onVerificationStarted?.(new Date(started).toISOString())
   const queue = (await retrySourceRead(() => db.listCollections(), 'root-collections', retryOptions)).map(ref => ref.path).sort()
   const seen = new Set(), reports = []
   const known = new Map((manifest.collections || []).map(item => [item.path, item]))
@@ -395,9 +436,9 @@ async function main() {
         console.log(JSON.stringify({ event: 'root-inventory', collections, completeRecursiveInventory: false }))
       } else {
         if (command === 'verify-source' && !manifest.complete) throw new Error('COMPLETE_EXPORT_REQUIRED')
-        const reports = await exportTree(db, dir, manifest, command === 'verify-source', { childConcurrency: Number(env.MONGODB_EXPORT_CHILD_CONCURRENCY || 16), batchSize: Number(env.MONGODB_EXPORT_BATCH_SIZE || 64), reuseUnchanged: env.MONGODB_EXPORT_REUSE_UNCHANGED === '1' })
-        if (command === 'export') { manifest.collections = reports; manifest.complete = true; manifest.exportFinishedAt = new Date().toISOString(); await writeJson(manifestFile, manifest) }
-        else await writeJson(path.join(dir, 'source-verification.json'), { run, verifiedAt: new Date().toISOString(), sourceHash: sourceCollectionsHash(reports), sourceHashVersion: 'canonical-sorted-collections-v1', unchangedAtRead: true, writerFreezeRequiredForCutover: true, complete: true })
+        const options = { childConcurrency: Number(env.MONGODB_EXPORT_CHILD_CONCURRENCY || 16), batchSize: Number(env.MONGODB_EXPORT_BATCH_SIZE || 64), reuseUnchanged: env.MONGODB_EXPORT_REUSE_UNCHANGED === '1' }
+        if (command === 'export') { const reports = await exportTree(db, dir, manifest, false, options); manifest.collections = reports; manifest.complete = true; manifest.exportFinishedAt = new Date().toISOString(); await writeJson(manifestFile, manifest) }
+        else await writeJson(path.join(dir, 'source-verification.json'), await verifySourceSnapshot(db, dir, manifest, options))
       }
     } finally { await db.terminate(); await app.delete() }
   } else {
@@ -440,4 +481,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(JSON.stringify({ event: 'migration-failed', code: error.code || null, message: String(error.message).replace(/(?:mongodb(?:\+srv)?|https?):\/\/\S+/g, '[REDACTED_URI]') })); process.exitCode = 1 })
-module.exports = { loadEntries, loadIndexedEntries, exportTree, importMongo, planMongo, resolveSharedArchiveDocuments, sourceCollectionsHash, retrySourceRead, readRecoveryBatch, mediaDispositionBinding, dispositionRecord, loadNativeDisposition }
+module.exports = { loadEntries, loadIndexedEntries, exportTree, verifySourceSnapshot, verifiedSourceEpoch, sourceTreeCounts, SOURCE_VERIFICATION_EPOCH_PROTOCOL, importMongo, planMongo, resolveSharedArchiveDocuments, sourceCollectionsHash, retrySourceRead, readRecoveryBatch, mediaDispositionBinding, dispositionRecord, loadNativeDisposition }

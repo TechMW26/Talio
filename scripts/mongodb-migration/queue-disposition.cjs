@@ -3,6 +3,7 @@
 // Offline acknowledgement validation only. No queue calls, data transformations,
 // provider mutations, preservation claim, catalog activation or fence release.
 const { canonical } = require('./core.cjs')
+const { verifiedSourceEpoch } = require('./migrate.cjs')
 
 const QUEUE_DISCARD_DECISION = 'discard-outstanding-source-queue-jobs'
 const TALIO_VERCEL_PROJECT = 'prj_oeAvg1xGfwnBqG8G3LdI0n0PofDY'
@@ -24,7 +25,8 @@ function validateQueueDisposition({ evidence, evidenceHash, expected, fence, now
   if (evidence.vercelProjectId !== TALIO_VERCEL_PROJECT || evidence.vercelTeamId !== TALIO_VERCEL_TEAM || evidence.environment !== 'production' || canonical(evidence.topics) !== canonical(QUEUE_TOPICS)) fail('EXACT_TALIO_SOURCE_QUEUE_SCOPE_REQUIRED')
   if (!/^[a-z][a-z0-9-]{7,79}$/.test(expected.run || '') || !hash(expected.candidateManifestHash) || !hash(expected.sourceHash) || !hash(expected.sourceFenceEvidenceHash) || evidence.run !== expected.run || evidence.candidateManifestHash !== expected.candidateManifestHash || evidence.sourceHash !== expected.sourceHash || evidence.sourceFenceEvidenceHash !== expected.sourceFenceEvidenceHash || evidence.sourceProject !== expected.sourceProject || evidence.sourceDatabase !== expected.sourceDatabase || canonical(datasets(evidence.datasets)) !== canonical(datasets(expected.datasets)) || canonical(evidence.target) !== canonical(expected.target)) fail('BOUND_FINAL_QUEUE_DISPOSITION_REQUIRED')
   const frozen = timestamp(fence.writersFrozenSince), drained = timestamp(fence.drainedAt), expires = timestamp(fence.expiresAt)
-  const authorized = timestamp(evidence.authorizedAt), recorded = timestamp(evidence.recordedAt), candidateStarted = timestamp(expected.candidateStartedAt)
+  const sourceVerificationEpoch = verifiedSourceEpoch(expected.sourceVerification, expected, now)
+  const authorized = timestamp(evidence.authorizedAt), recorded = timestamp(evidence.recordedAt), candidateStarted = timestamp(sourceVerificationEpoch.startedAt)
   if (!Number.isFinite(authorized) || !Number.isFinite(recorded) || authorized > recorded || recorded > now || fence.active !== true || !Number.isFinite(frozen) || !Number.isFinite(drained) || drained < frozen || !Number.isFinite(candidateStarted) || drained > candidateStarted || recorded < drained || !Number.isFinite(expires) || expires <= now || fence.candidateRun !== expected.run || fence.candidateManifestHash !== expected.candidateManifestHash || fence.sourceHash !== expected.sourceHash || fence.sourceProject !== expected.sourceProject || fence.sourceDatabase !== expected.sourceDatabase || canonical(datasets(fence.datasets)) !== canonical(datasets(expected.datasets))) fail('QUEUE_DISCARD_STILL_REQUIRES_BOUND_ACTIVE_SOURCE_FENCE')
   for (const plane of REQUIRED_QUEUE_FENCE_PLANES) {
     const check = fence.planes?.[plane], checked = timestamp(check?.checkedAt)
@@ -41,6 +43,7 @@ function validateQueueDisposition({ evidence, evidenceHash, expected, fence, now
     vercelProjectId: evidence.vercelProjectId, vercelTeamId: evidence.vercelTeamId, environment: evidence.environment, topics: [...QUEUE_TOPICS],
     outstandingJobCount: null, unknownOutstandingCountAccepted: true, preservationVerified: false, businessDataDeletionAuthorized: false, queueReplayAuthorized: false,
     targetQueueIsolation: { ...isolation }, acknowledgementValidated: true, maintenanceReleasePerformed: false,
+    sourceVerificationEpoch,
   }
 }
 

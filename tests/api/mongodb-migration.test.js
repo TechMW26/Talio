@@ -1,6 +1,6 @@
 const { encodeApplicationRecord, pack, unpack, recordDigest } = require('../../lib/platform/firestoreCodec.cjs')
 const { sha256, snapshotEntry, archiveDocument, decodeArchiveDocument, materializeRecord, materializeCatalog, materializeClaim, assertTarget, collectionSummary, assertSameSource, mongoRecordId } = require('../../scripts/mongodb-migration/core.cjs')
-const { exportTree, importMongo, planMongo } = require('../../scripts/mongodb-migration/migrate.cjs')
+const { exportTree, verifySourceSnapshot, importMongo, planMongo, SOURCE_VERIFICATION_EPOCH_PROTOCOL } = require('../../scripts/mongodb-migration/migrate.cjs')
 const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
@@ -207,6 +207,37 @@ describe('lossless, explicitly scoped Mongo migration', () => {
     await expect(exportTree(null, '/unused', {}, false, { childConcurrency: 0 })).rejects.toThrow('CONCURRENCY')
     await expect(exportTree(null, '/unused', {}, false, { batchSize: 257 })).rejects.toThrow('BATCH_SIZE')
   })
+  test('full source verification captures real first-read epoch after archive preflight without reusing bodies or relabeling export', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'talio-source-epoch-'))
+    const ref = { path: 'root/document', listCollections: async () => [] }
+    let firstReadAt, fullReads = 0
+    const db = { listCollections: async () => { firstReadAt = Date.now(); return [{ path: 'root' }] }, collection: () => ({ listDocuments: async () => [ref] }), getAll: async (...batch) => { fullReads++; expect(batch.every(item => item.path)).toBe(true); return batch.map(item => ({ ref: item, exists: true, _fieldsProto: proto, updateTime: { seconds: 1, nanoseconds: 2 } })) } }
+    const manifest = { run: 'source-epoch-tests', sourceProject: 'source-tests', sourceDatabase: '(default)', datasets: ['live-tests'], collections: [], startedAt: new Date(Date.now() - 60000).toISOString() }
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      manifest.collections = await exportTree(db, dir, manifest)
+      manifest.complete = true; manifest.exportFinishedAt = new Date(Date.now() - 10000).toISOString()
+      const bytes = JSON.stringify(manifest)
+      await fs.writeFile(path.join(dir, 'manifest.json'), bytes)
+      fullReads = 0
+      const before = Date.now()
+      const report = await verifySourceSnapshot(db, dir, manifest, { reuseUnchanged: true })
+      expect(report).toMatchObject({ verificationProtocol: SOURCE_VERIFICATION_EPOCH_PROTOCOL, noReuse: true, reusedDocuments: 0, fullBodiesRead: true, fullTopologyVerified: true, metadataUpdateTimesVerified: true, archiveUnchanged: true, collectionsVerified: 1, documentsVerified: 1, missingParentsVerified: 0, candidateManifestHash: sha256(bytes) })
+      expect(Date.parse(report.verificationStartedAt)).toBeGreaterThanOrEqual(before)
+      expect(Date.parse(report.verificationStartedAt)).toBeLessThanOrEqual(firstReadAt)
+      expect(Date.parse(report.verificationStartedAt)).toBeGreaterThan(Date.parse(manifest.exportFinishedAt))
+      expect(fullReads).toBe(1)
+      expect(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')).toBe(bytes)
+      await expect(verifySourceSnapshot(db, dir, manifest, { verificationStartedAt: manifest.startedAt })).rejects.toThrow('IMMUTABLE')
+      await expect(verifySourceSnapshot(db, dir, manifest, { onVerificationStarted: () => {} })).rejects.toThrow('IMMUTABLE')
+      const legacy = { ...manifest }; delete legacy.datasets
+      await fs.writeFile(path.join(dir, 'manifest.json'), JSON.stringify(legacy))
+      expect(await verifySourceSnapshot(db, dir, legacy)).not.toHaveProperty('verificationStartedAt')
+      await fs.writeFile(path.join(dir, 'manifest.json'), bytes)
+      db.getAll = async (...batch) => batch.map(item => ({ ref: item, exists: true, _fieldsProto: proto, updateTime: { seconds: 2, nanoseconds: 2 } }))
+      await expect(verifySourceSnapshot(db, dir, manifest)).rejects.toThrow('SOURCE_CHANGED')
+    } finally { log.mockRestore(); await fs.rm(dir, { recursive: true, force: true }) }
+  })
   test('orders every provider batch explicitly and hashes the same canonical sorted collection', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'talio-source-order-'))
     const refs = ['root/z', 'root/a', 'root/missing'].map(documentPath => ({ path: documentPath, listCollections: async () => [] }))
@@ -220,6 +251,40 @@ describe('lossless, explicitly scoped Mongo migration', () => {
       const saved = (await fs.readFile(path.join(dir, reports[0].file), 'utf8')).trim().split('\n').map(line => JSON.parse(line).path)
       expect(saved).toEqual(['root/a', 'root/missing', 'root/z'])
       expect(await exportTree(db, dir, manifest, true, { batchSize: 2 })).toEqual(reports)
+    } finally { log.mockRestore(); await fs.rm(dir, { recursive: true, force: true }) }
+  })
+  test('snapshot epoch refuses foreign manifest, changed fragment bodies, topology drift and concurrent archive changes', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'talio-source-epoch-guards-'))
+    const parent = { path: 'root/document', listCollections: async () => [{ path: 'root/document/parts' }] }, fragment = { path: 'root/document/parts/fragment', listCollections: async () => [] }
+    const snapshots = (...batch) => batch.map(ref => ({ ref, exists: true, _fieldsProto: proto, updateTime: { seconds: 1, nanoseconds: 2 } }))
+    const originalRoots = async () => [{ path: 'root' }]
+    const db = { listCollections: originalRoots, collection: name => ({ listDocuments: async () => name === 'root' ? [parent] : name === 'root/document/parts' ? [fragment] : [] }), getAll: jest.fn(async (...batch) => snapshots(...batch)) }
+    const manifest = { run: 'source-epoch-tests', sourceProject: 'source-tests', sourceDatabase: '(default)', datasets: ['live-tests'], collections: [], startedAt: new Date(Date.now() - 60000).toISOString() }
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      manifest.collections = await exportTree(db, dir, manifest)
+      manifest.complete = true; manifest.exportFinishedAt = new Date(Date.now() - 10000).toISOString()
+      const bytes = JSON.stringify(manifest), filename = path.join(dir, 'manifest.json')
+      await fs.writeFile(filename, bytes)
+      db.getAll.mockClear()
+      await expect(verifySourceSnapshot(db, dir, { ...manifest, sourceProject: 'foreign' })).rejects.toThrow('MANIFEST_CHANGED')
+      expect(db.getAll).not.toHaveBeenCalled()
+      db.getAll = async (...batch) => snapshots(...batch).map(snapshot => snapshot.ref.path === fragment.path ? { ...snapshot, _fieldsProto: { bytes: { bytesValue: Buffer.from('changed-overflow-body') } } } : snapshot)
+      await expect(verifySourceSnapshot(db, dir, manifest)).rejects.toThrow('SOURCE_CHANGED')
+      db.getAll = async (...batch) => snapshots(...batch)
+      db.listCollections = async () => []
+      await expect(verifySourceSnapshot(db, dir, manifest)).rejects.toThrow('SOURCE_COLLECTION_REMOVED')
+      db.listCollections = async () => [{ path: 'root' }, { path: 'unexpected' }]
+      await expect(verifySourceSnapshot(db, dir, manifest)).rejects.toThrow('NEW_SOURCE_COLLECTION')
+      db.listCollections = originalRoots
+      parent.listCollections = async () => []
+      await expect(verifySourceSnapshot(db, dir, manifest)).rejects.toThrow('SOURCE_COLLECTION_REMOVED')
+      parent.listCollections = async () => [{ path: 'root/document/parts' }]
+      db.listCollections = async () => { await fs.writeFile(filename, bytes); return originalRoots() }
+      await expect(verifySourceSnapshot(db, dir, manifest)).rejects.toThrow('MANIFEST_CHANGED')
+      db.listCollections = originalRoots
+      db.getAll = async (...batch) => { if (batch.some(ref => ref.path === fragment.path)) await fs.appendFile(path.join(dir, manifest.collections[0].file), '\n'); return snapshots(...batch) }
+      await expect(verifySourceSnapshot(db, dir, manifest)).rejects.toThrow('ARCHIVE_FILE_CHANGED')
     } finally { log.mockRestore(); await fs.rm(dir, { recursive: true, force: true }) }
   })
   test('rejects incomplete, duplicate, wrong-path and malformed full source snapshots without checkpointing', async () => {

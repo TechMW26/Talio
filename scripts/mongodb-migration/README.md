@@ -120,6 +120,26 @@ ordinary resume and all source verification remain strict. A full final frozen
 reconciliation, complete BSON/parts planning and independent parity are still
 required. Higher concurrency changes throughput, not which documents are read.
 
+For a completed final candidate with an exact dataset allowlist, `verify-source`
+also emits `verificationProtocol: "full-body-topology-source-reread-v1"` and the
+actual `verificationStartedAt` immediately before its first source collection
+read, **after** local archive preflight. It rereads every body, exact `updateTime`
+and child topology without metadata/body reuse, compares them to the immutable
+archive, and checks all archive files and the manifest stayed unchanged. The
+report binds the run, manifest hash, source hash/version, source scope, datasets
+and complete collection/document/missing-parent counts.
+
+This permits a late-retired writer plane to establish the same unchanged source
+snapshot only if its independently proved drain precedes that **fresh full
+verification's** first read. It never changes the candidate's original
+`startedAt` or `exportFinishedAt`, backdates a verification, accepts reused or
+partial scans, or treats a quiet log as a fence. Every physical plane must remain
+blocked throughout verification/cutover; Mongo/media reports must still follow
+source verification completion. A changed source body, version or topology
+requires a new candidate rather than relabeling the old one. Legacy reports
+without the complete new protocol retain `drainedAt <= candidate.startedAt`;
+partial/invalid epoch reports fail closed, with no legacy fallback.
+
 ## Allowlisted target and parity
 
 Set `MONGODB_URI` and `MONGODB_DATABASE` privately, then provide the exact target
@@ -460,7 +480,8 @@ validated by `blob-orphan-tail.cjs` and must include:
   `fence.recordedAt`, and never in the future. It may complete after drain and
   candidate export because reviewing immutable deployed code is not a physical
   writer-state change. Do not backdate that review. Actual metadata-denial and
-  server-block/drain proofs must still precede candidate export and remain
+  server-block/drain proofs must still precede the candidate export's first read
+  (or the exactly validated fresh full-source verification epoch above) and remain
   between `writersFrozenSince` and `drainedAt`; this distinction relaxes no
   physical fence, source freshness, retained-media or parity requirement.
 - Timestamped, proved blocking and completed drain of **all server** Blob
@@ -536,7 +557,9 @@ not something this tool creates or assumes. It must contain:
 
 - `version: 1`, `active: true`, exact `candidateRun`, `candidateManifestHash`,
   canonical `sourceHash`, `sourceProject`, `sourceDatabase`, and `datasets`.
-- ISO `writersFrozenSince`, `drainedAt` (both before candidate `startedAt`),
+- ISO `writersFrozenSince`, `drainedAt` (both before candidate `startedAt`, or
+  before the exact new full-source `verificationStartedAt` protocol described
+  above; original candidate timestamps are never relabeled),
   `recordedAt` (after source verification), and future `expiresAt`.
 - `planes` with all keys exported as `SOURCE_WRITER_PLANES`: web/desktop/mobile
   API, old deployments, Socket.IO, Electron telemetry, attendance integrations,
