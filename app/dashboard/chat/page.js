@@ -12,13 +12,14 @@ import styles from './chat.module.css'
 import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { FaUserPlus, FaUsers, FaTimes, FaFile, FaImage, FaFilePdf, FaUser, FaComments, FaArrowDown, } from 'react-icons/fa'
+import { FaUserPlus, FaUsers, FaTimes, FaFile, FaImage, FaFilePdf, FaUser, FaComments, FaArrowDown, FaTrash } from 'react-icons/fa'
 import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import MemberAvatar from '@/components/chat/MemberAvatar'
 import { playNotificationSound } from '@/utils/audio'
+import toast from '@/utils/toast'
 import { Modal as Modal } from '@/components/ui/fernly'
 import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Checkbox, Skeleton } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -52,8 +53,13 @@ export default function ChatPage() {
   const [swipedMessage, setSwipedMessage] = useState(null)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  const [showAddMembersModal, setShowAddMembersModal] = useState(false)
+  const [addMemberSearchQuery, setAddMemberSearchQuery] = useState('')
+  const [selectedAddMembers, setSelectedAddMembers] = useState([])
+  const [addingMembers, setAddingMembers] = useState(false)
+  const [deletingGroup, setDeletingGroup] = useState(false)
   const { employees, isLoading: employeesLoading } = useEmployeeDirectorySearch({
-    enabled: showNewChatModal || showGroupModal,
+    enabled: showNewChatModal || showGroupModal || showAddMembersModal,
     query: employeeSearchQuery,
     limit: 100,
     includeAdmins: true,
@@ -578,6 +584,81 @@ export default function ChatPage() {
     }
   }
 
+  const handleAddMembers = async () => {
+    if (!selectedChat?.isGroup || selectedAddMembers.length === 0) return
+    try {
+      setAddingMembers(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/chat/${selectedChat._id}/members`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participants: selectedAddMembers })
+      })
+      const result = await response.json()
+      if (result.success) {
+        toast.success('Members added successfully')
+        setShowAddMembersModal(false)
+        setSelectedAddMembers([])
+        setAddMemberSearchQuery('')
+        // Re-fetch the chat to reflect the new participants.
+        const refreshed = await fetch(`/api/chat/${selectedChat._id}`).then(r => r.json())
+        if (refreshed?._id) setSelectedChat(refreshed)
+        await refreshChats()
+      } else {
+        toast.error(result.message || 'Failed to add members')
+      }
+    } catch (error) {
+      console.error('Error adding members:', error)
+      toast.error('Failed to add members')
+    } finally {
+      setAddingMembers(false)
+    }
+  }
+
+  const handleDeleteGroup = async () => {
+    if (!selectedChat?.isGroup) return
+    if (!confirm('Delete this group and its messages for everyone? This cannot be undone.')) return
+    try {
+      setDeletingGroup(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/chat/${selectedChat._id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const result = await response.json()
+      if (result.success) {
+        toast.success('Group deleted')
+        setSelectedChat(null)
+        setMessages([])
+        setShowMembersModal(false)
+        setShowAddMembersModal(false)
+        await refreshChats()
+      } else {
+        toast.error(result.message || 'Failed to delete group')
+      }
+    } catch (error) {
+      console.error('Error deleting group:', error)
+      toast.error('Failed to delete group')
+    } finally {
+      setDeletingGroup(false)
+    }
+  }
+
+  // Robust admin check: normalize ids to strings and also treat the group creator as admin.
+  const isGroupAdmin = useCallback((chat) => {
+    if (!chat?.isGroup) return false
+    const adminId = chat.admin?._id ?? chat.admin ?? chat.createdBy ?? null
+    if (!adminId || !currentUserId) return false
+    return String(adminId) === String(currentUserId)
+  }, [currentUserId])
+
+  const getGroupAdminName = (chat) => {
+    const adminId = chat?.admin?._id ?? chat?.admin ?? chat?.createdBy ?? null
+    const admin = chat?.participants?.find(p => String(p._id || p) === String(adminId))
+      || (chat?.admin && typeof chat.admin === 'object' ? chat.admin : null)
+    return `${admin?.firstName || ''} ${admin?.lastName || ''}`.trim() || 'the group admin'
+  }
+
   const getChatName = (chat) => {
     if (chat.isGroup) return chat.name
     const other = getOtherParticipant(chat)
@@ -827,6 +908,27 @@ export default function ChatPage() {
                       <p className="text-xs text-gray-500">{getPresenceText(selectedChat)}</p>
                     )}
                   </div>
+                  {/* Add Members Button - Only for group admins */}
+                  {isGroupAdmin(selectedChat) && (
+                    <NativeButton
+                      onClick={() => { setSelectedAddMembers([]); setAddMemberSearchQuery(''); setShowAddMembersModal(true) }}
+                      className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+                      title="Add Members"
+                    >
+                      <FaUserPlus className="text-lg" />
+                    </NativeButton>
+                  )}
+                  {/* Delete Group Button - Only for group admins */}
+                  {isGroupAdmin(selectedChat) && (
+                    <NativeButton
+                      onClick={handleDeleteGroup}
+                      disabled={deletingGroup}
+                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors disabled:opacity-50"
+                      title="Delete Group"
+                    >
+                      <FaTrash className="text-lg" />
+                    </NativeButton>
+                  )}
                   {/* View Members Button - Only for group chats */}
                   {selectedChat.isGroup && (
                     <NativeButton
@@ -1446,7 +1548,20 @@ export default function ChatPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 space-y-2">
+              {isGroupAdmin(selectedChat) && (
+                <NativeButton
+                  onClick={() => { setShowMembersModal(false); setSelectedAddMembers([]); setAddMemberSearchQuery(''); setShowAddMembersModal(true) }}
+                  className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <FaUserPlus className="text-sm" /> Add Members
+                </NativeButton>
+              )}
+              {!isGroupAdmin(selectedChat) && (
+                <p className="text-center text-xs text-gray-500">
+                  Only {getGroupAdminName(selectedChat)} can add members to this group
+                </p>
+              )}
               <NativeButton
                 onClick={() => {
                   setShowMembersModal(false)
@@ -1455,6 +1570,113 @@ export default function ChatPage() {
                 className="w-full py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium text-sm transition-colors"
               >
                 Close
+              </NativeButton>
+            </div>
+          </DialogSurface>
+        </div>
+      )}
+
+      {/* Add Members Modal */}
+      {showAddMembersModal && selectedChat?.isGroup && (
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center p-4 z-[210]">
+          <DialogSurface className="bg-white rounded-[30px] max-w-md w-full max-h-[80vh] overflow-hidden shadow-2xl">
+            <div
+              className="px-5 py-4 flex items-center justify-between border-b border-gray-100"
+              style={{
+                background: `linear-gradient(135deg, ${themes[currentTheme]?.primary?.[600] || '#2563EB'} 0%, ${themes[currentTheme]?.primary?.[500] || '#3B82F6'} 100%)`
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                  <FaUserPlus className="text-white text-lg" />
+                </div>
+                <div>
+                  <Heading2 className="text-lg font-bold text-white">Add Members</Heading2>
+                  <p className="text-white/80 text-xs">{selectedChat.name}</p>
+                </div>
+              </div>
+              <NativeButton onClick={() => setShowAddMembersModal(false)} disabled={addingMembers} className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors">
+                <FaTimes className="text-lg" />
+              </NativeButton>
+            </div>
+
+            <div className="px-4 pt-3 pb-2">
+              <div className="input-with-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="input-icon" fill="#9CA3AF">
+                  <path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z" />
+                </svg>
+                <NativeInput
+                  type="text"
+                  value={addMemberSearchQuery}
+                  onChange={(e) => setAddMemberSearchQuery(e.target.value)}
+                  placeholder="Search employees to add..."
+                  className="input input-search text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="px-4 pb-4 overflow-y-auto max-h-[45vh] space-y-2">
+              {(() => {
+                const existingIds = new Set((selectedChat.participants || []).map(p => p._id))
+                const candidates = (addMemberSearchQuery.trim()
+                  ? employees.filter(emp =>
+                    `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(addMemberSearchQuery.toLowerCase()) ||
+                    emp.email?.toLowerCase().includes(addMemberSearchQuery.toLowerCase()) ||
+                    emp.employeeCode?.toLowerCase().includes(addMemberSearchQuery.toLowerCase()))
+                  : employees
+                ).filter(emp => !existingIds.has(emp._id)).slice(0, 50)
+
+                if (candidates.length === 0) {
+                  return <div className="text-center text-gray-400 py-8 text-sm">No employees to add.</div>
+                }
+
+                return candidates.map((emp) => {
+                  const isSelected = selectedAddMembers.includes(emp._id)
+                  return (
+                    <div
+                      key={emp._id}
+                      onClick={() => {
+                        if (isSelected) setSelectedAddMembers(selectedAddMembers.filter(id => id !== emp._id))
+                        else setSelectedAddMembers([...selectedAddMembers, emp._id])
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${isSelected ? 'bg-primary-50 border-2 border-primary-500' : 'hover:bg-gray-50 border-2 border-transparent'}`}
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {emp.profilePicture ? (
+                          <img src={emp.profilePicture} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-white font-bold">{emp.firstName?.[0] || '?'}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{emp.firstName} {emp.lastName}</p>
+                        {emp.employeeCode && <p className="text-xs text-gray-500 truncate">{emp.employeeCode}</p>}
+                      </div>
+                      {isSelected && (
+                        <div className="w-6 h-6 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
+                          <FaTimes className="text-white text-xs" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 space-y-2">
+              <NativeButton
+                onClick={handleAddMembers}
+                disabled={addingMembers || selectedAddMembers.length === 0}
+                className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+              >
+                {addingMembers ? 'Adding...' : `Add ${selectedAddMembers.length > 0 ? `(${selectedAddMembers.length})` : 'Members'}`}
+              </NativeButton>
+              <NativeButton
+                onClick={() => { setShowAddMembersModal(false); setSelectedAddMembers([]); setAddMemberSearchQuery('') }}
+                disabled={addingMembers}
+                className="w-full py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium text-sm transition-colors"
+              >
+                Cancel
               </NativeButton>
             </div>
           </DialogSurface>
