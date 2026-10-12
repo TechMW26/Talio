@@ -37,6 +37,13 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
       setNotice(config.voiceNotice || '')
       const conversation = await sdk.Conversation.startSession({
         signedUrl: config.signedUrl, connectionType: 'websocket', useWakeLock: false,
+        // AudioWorklets obey script-src, not worker-src. Use same-origin static
+        // modules rather than the SDK's CSP-blocked blob/data URLs or CDN fallback.
+        workletPaths: {
+          rawAudioProcessor: '/mira/worklets/elevenlabs-1.27.0/rawAudioProcessor.js',
+          audioConcatProcessor: '/mira/worklets/elevenlabs-1.27.0/audioConcatProcessor.js',
+        },
+        libsampleratePath: '/mira/worklets/libsamplerate-2.1.2/libsamplerate.worklet.js',
         overrides: { tts: { voiceId: config.voiceId } },
         customLlmExtraBody: { mira_bridge_credential: config.bridgeCredential },
         clientTools: {

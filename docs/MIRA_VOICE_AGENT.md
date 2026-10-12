@@ -33,6 +33,15 @@ each gateway turn. Voice credentials are not accepted as application logins.
 
 ## Voice compatibility and behavior
 
+Audio processors are self-hosted under versioned `/mira/worklets/` paths.
+The voice hook sets both `workletPaths` and `libsampleratePath`: microphone,
+playback and Safari/device resampling never need CSP-blocked blob/data scripts
+or an external CDN. Do not relax `script-src` to solve audio startup errors.
+After upgrading a voice dependency, update the versions/paths in
+`scripts/sync-mira-worklets.cjs` and the hook, run the sync script and commit
+the generated assets and their upstream licenses. Regression tests compare
+the bundled assets with the installed versions to prevent drift.
+
 ElevenLabs currently rejects Instant Voice Clones with custom-LLM agents.
 The curated MIRA and Mansi voices are instant clones; previews retain those
 voices, but live conversations explicitly fall back to Aria. Aria, Laura,
