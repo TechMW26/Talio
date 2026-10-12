@@ -12,7 +12,10 @@ LLM is charged or allowed to execute actions separately.
 - Keep `ELEVENLABS_API_KEY` and `JWT_SECRET` server-only.
 - `MIRA_AGENT_PUBLIC_ORIGIN` optionally selects the public HTTPS Talio origin;
   it defaults to `https://app.talio.in`. Never use an untrusted request host.
-- Deploy `/api/ai/mira-agent/llm` before attempting live agent conversations.
+- Deploy `/api/ai/mira-agent/llm` and its `/chat/completions` compatibility
+  route before attempting live agent conversations. ElevenLabs appends the
+  OpenAI endpoint suffix to its configured custom-LLM URL and nests client
+  extra parameters under `elevenlabs_extra_body` in callback requests.
 - In Settings → MIRA, an administrator can create/sync the agent. Its ID,
   configuration hash and sync time live in the tenant's existing
   `servicesettings/mira` record, alongside the access policy. A stale prompt

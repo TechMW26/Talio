@@ -6,6 +6,7 @@ import { getAuthAndDatabase } from '@/lib/auth'
 import { verifyMiraBridgeCredential, miraBridgeAuthRequest } from '@/lib/miraVoiceAgent.server'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { POST } from '@/app/api/ai/mira-agent/llm/route'
+import { POST as compatiblePOST } from '@/app/api/ai/mira-agent/llm/chat/completions/route'
 
 const request = body => new Request('https://app.talio.in/api/ai/mira-agent/llm', { method: 'POST', body: JSON.stringify(body) })
 beforeEach(() => {
@@ -20,6 +21,9 @@ test('accepts the real ElevenLabs extra-body envelope and emits SSE', async () =
   expect(response.status).toBe(200)
   expect(verifyMiraBridgeCredential).toHaveBeenCalledWith('scoped')
   expect(await response.text()).toContain('ask_mira')
+})
+test('the provider-appended OpenAI endpoint uses exactly the same secured handler', () => {
+  expect(compatiblePOST).toBe(POST)
 })
 test('rejects unsigned callback requests before database or rate-limit work', async () => {
   const response = await POST(request({ elevenlabs_extra_body: {}, messages: [] }))

@@ -103,6 +103,7 @@ export async function middleware(request) {
   const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/forgot-password', '/auth/reset-password', '/setup', '/join', '/download']
   const publicApiRoutes = [
     '/api/ai/mira-agent/llm', // Dedicated short-lived voice credential is verified in this route.
+    '/api/ai/mira-agent/llm/chat/completions', // OpenAI-compatible provider URL suffix; same scoped credential check.
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/session',
@@ -143,7 +144,7 @@ export async function middleware(request) {
   const isPublicRoute = publicRoutes.some(route =>
     route === '/' ? request.nextUrl.pathname === '/' : request.nextUrl.pathname.startsWith(route)
   )
-  const isPublicApiRoute = publicApiRoutes.some(route => route === '/api/ai/mira-agent/llm'
+  const isPublicApiRoute = publicApiRoutes.some(route => route.startsWith('/api/ai/mira-agent/llm')
     ? request.nextUrl.pathname === route : request.nextUrl.pathname.startsWith(route))
   const isPasswordChangeRoute = passwordChangeRoutes.some(route => request.nextUrl.pathname.startsWith(route))
   const isPasswordChangeApiRoute = passwordChangeApiRoutes.some(route => request.nextUrl.pathname.startsWith(route))
