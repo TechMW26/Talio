@@ -9,6 +9,7 @@ export const prewarmMiraAgentVoice = () => import('@elevenlabs/client')
 
 export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, interruptResponse }) {
   const [state, setState] = useState('idle'), [transcript, setTranscript] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [voiceName, setVoiceName] = useState('Mira')
   const current = useRef({ open, busy, sendMessage, onDismiss, interruptResponse }), session = useRef(null)
   current.current = { open, busy, sendMessage, onDismiss, interruptResponse }
   const stop = useCallback(() => {
@@ -35,6 +36,7 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
       if (!response.ok || !config.success) throw new Error(config.message || 'Mira voice is unavailable')
       if (!live()) return
       setNotice(config.voiceNotice || '')
+      setVoiceName(config.voiceName || 'Mira')
       const conversation = await sdk.Conversation.startSession({
         signedUrl: config.signedUrl, connectionType: 'websocket', useWakeLock: false,
         // AudioWorklets obey script-src, not worker-src. Use same-origin static
@@ -92,5 +94,5 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
       if (live()) { stop(); if (err.name !== 'AbortError') setError(err.message || 'Could not start Mira voice') }
     }
   }, [stop])
-  return { state, stream: null, transcript, error, notice, start, stop, active: state !== 'idle' }
+  return { state, stream: null, transcript, error, notice, voiceName, start, stop, active: state !== 'idle' }
 }

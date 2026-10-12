@@ -44,8 +44,16 @@ the bundled assets with the installed versions to prevent drift.
 
 ElevenLabs currently rejects Instant Voice Clones with custom-LLM agents.
 The curated MIRA and Mansi voices are instant clones; previews retain those
-voices, but live conversations explicitly fall back to Aria. Aria, Laura,
-Lily and Sarah are compatible live selections. The UI explains this limit.
+voices, but live conversations explicitly fall back to Alisha, an Indian
+professional conversational voice verified on the account with v4 Turbo.
+Alisha, Aria, Laura, Lily and Sarah are compatible live selections.
+Microphone activation starts a continuous signed ElevenLabs Agents audio
+call, not browser dictation followed by separate TTS. The call indicator shows
+connection, listening and speaking status plus an explicit End call control.
+Scribe realtime recognition uses Hindi/Hinglish-friendly defaults and English
+and Hindi language presets. Chat is the call transcript. Both the shared agent
+prompt and Talio brain receive the same live-call context: they can acknowledge
+that spoken words reached Mira without claiming to diagnose raw audio quality.
 
 The SDK handles turn detection and interruptions. Speculative turns and
 timeout retranscription are disabled. Only final transcripts can run tools;

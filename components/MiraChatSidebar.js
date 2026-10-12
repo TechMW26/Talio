@@ -26,6 +26,7 @@ import { miraNavigationPath } from '@/lib/miraNavigation'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import MiraEditPrompt from './MiraEditPrompt'
 import { miraMessageDisplay, miraPlainCaption } from '@/lib/miraMessageDisplay'
+import MiraLiveCallStatus from '@/components/ui/MiraLiveCallStatus'
 
 // ─── Copy Button ────────────────────────────────────────────────────
 
@@ -934,6 +935,7 @@ export default function MiraChatSidebar() {
             <span className="truncate">{`Replying to: ${replying.data?.message || replying.content}`}</span>
             <button aria-label="Cancel edit or reply" onClick={() => { setEditing(null); setReplying(null) }}><FaTimes /></button>
           </div>}
+          <MiraLiveCallStatus state={voice.state} voiceName={voice.voiceName} onEnd={voice.stop} />
           <MiraAttachments files={attachments} onChange={setAttachments} busy={isThinking} onBusyChange={setAttachmentsBusy} />
           <div className="flex items-end gap-2 p-2 rounded-2xl border border-default-200 bg-white/5">
             <div className="flex-1 relative">

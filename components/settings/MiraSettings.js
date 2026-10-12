@@ -76,7 +76,7 @@ export default function MiraSettings() {
         </button>)}
       </div>
       <p className="mt-3 flex items-center gap-2 text-xs text-default-500"><FaMicrophone aria-hidden="true" />Voice previews use ElevenLabs and the current MIRA speech service.</p>
-      <p className="mt-2 text-xs text-default-500">For live agent conversations, choose Aria, Laura, Lily or Sarah. ElevenLabs does not support the instant-cloned MIRA and Mansi voices with custom-LLM agents; live voice uses Aria for those selections while previews keep your chosen voice.</p>
+      <p className="mt-2 text-xs text-default-500">Alisha is the Indian live-call default. You can also select Aria, Laura, Lily or Sarah. Instant-cloned MIRA and Mansi voices remain available for previews; live calls use Alisha for those selections.</p>
     </section>
 
     <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">

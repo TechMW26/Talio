@@ -23,7 +23,7 @@ test('returns the default voice and curated choices to every authenticated user'
   const result = await (await GET(new Request('http://localhost/api/mira/preferences'))).json()
   expect(result.success).toBe(true)
   expect(result.data.voiceId).toBe('jJ0Hr51MaPgsgfPtFdR4')
-  expect(result.voices).toHaveLength(6)
+  expect(result.voices).toHaveLength(7)
   expect(result.voices.map(voice => voice.id)).toContain('komDQG4wp0wC5IDFwetv')
 })
 

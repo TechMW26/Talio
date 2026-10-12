@@ -15,9 +15,9 @@ export async function POST(request) {
     const { agent } = await getMiraSettings(auth.database)
     if (!agent?.agentId || agent.promptHash !== miraAgentPromptHash()) return NextResponse.json({ success: false, message: 'An administrator needs to sync the Mira voice agent in Settings → MIRA' }, { status: 409 })
     const profile = await auth.database.get('users', String(auth.user._id || auth.user.userId))
-    const { voiceId, notice } = miraAgentVoice(sanitizeMiraPreferences(profile?.miraPreferences).voiceId)
+    const { voiceId, voiceName, notice } = miraAgentVoice(sanitizeMiraPreferences(profile?.miraPreferences).voiceId)
     const result = await elevenAgentRequest(`/conversation/get-signed-url?agent_id=${encodeURIComponent(agent.agentId)}`)
-    return NextResponse.json({ success: true, signedUrl: result.signed_url, voiceId, voiceNotice: notice, bridgeCredential: await createMiraBridgeCredential(auth.user, auth.tenant) }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ success: true, signedUrl: result.signed_url, voiceId, voiceName, voiceNotice: notice, bridgeCredential: await createMiraBridgeCredential(auth.user, auth.tenant) }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     return NextResponse.json({ success: false, message: error.status ? error.message : 'Could not start Mira voice' }, { status: error.status || 500 })
   }
