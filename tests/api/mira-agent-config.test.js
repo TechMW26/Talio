@@ -8,6 +8,8 @@ test('private v4 Turbo agent uses a single shared brain and forbids speculative 
   expect(config.name).toBe('Mira')
   expect(config.conversation_config.tts.model_id).toBe('eleven_v4_turbo')
   expect(config.conversation_config.tts.voice_id).toBe('ftDdhfYtmfGP0tFlBYA1')
+  expect(config.conversation_config.tts.speed).toBe(1.2)
+  expect(config.conversation_config.turn.soft_timeout_config.timeout_seconds).toBe(-1)
   expect(config.conversation_config.asr).toMatchObject({ provider: 'scribe_realtime', quality: 'high' })
   expect(config.conversation_config.agent).toMatchObject({ language: 'hi', hinglish_mode: true })
   expect(Object.keys(config.conversation_config.language_presets).sort()).toEqual(['en', 'hi'])

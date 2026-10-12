@@ -8,14 +8,14 @@ let options, end
 beforeEach(() => {
   end = jest.fn(async () => {})
   localStorage.setItem('token', 'app-token')
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, signedUrl: 'wss://elevenlabs.example/private', bridgeCredential: 'voice-scoped-only', voiceId: 'voice' }) }))
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, conversationToken: 'rtc-token', bridgeCredential: 'voice-scoped-only', voiceId: 'voice' }) }))
   mockStartSession.mockImplementation(async config => { options = config; config.onConnect({ conversationId: 'one' }); return { endSession: end } })
 })
 test('does not acquire the microphone until explicitly started and keeps the app JWT away from the provider', async () => {
   const { result, unmount } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage: jest.fn() }))
   expect(mockStartSession).not.toHaveBeenCalled()
   await act(async () => result.current.start())
-  expect(options.connectionType).toBe('websocket')
+  expect(options.connectionType).toBe('webrtc')
   expect(options.customLlmExtraBody).toEqual({ mira_bridge_credential: 'voice-scoped-only' })
   expect(JSON.stringify(options)).not.toContain('app-token')
   expect(result.current.state).toBe('listening')

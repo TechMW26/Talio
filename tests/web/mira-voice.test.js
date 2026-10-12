@@ -41,7 +41,7 @@ jest.mock('@/contexts/MiraChatContext', () => ({ useMiraChat: () => {
 }) } }))
 
 beforeEach(() => {
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, signedUrl: 'wss://test', voiceId: 'voice', bridgeCredential: 'scoped' }) }))
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, conversationToken: 'rtc-token', voiceId: 'voice', bridgeCredential: 'scoped' }) }))
   jest.spyOn(document, 'hasFocus').mockReturnValue(true)
   mockBeamProps = null
   mockOpen = true

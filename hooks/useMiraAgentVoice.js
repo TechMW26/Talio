@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createMiraVoiceTurns, createMiraAcknowledgementCadence } from '@/lib/miraVoiceTurns'
-import { createMiraListeningAudio } from '@/lib/miraListeningAudio'
+import { createMiraVoiceTurns } from '@/lib/miraVoiceTurns'
+import { createMiraVoiceEchoGuard } from '@/lib/miraVoiceEcho'
 import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { isMiraDismissal } from '@/lib/miraDismissal'
 
@@ -15,7 +15,7 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
   const stop = useCallback(() => {
     const run = session.current
     session.current = null
-    run?.abort.abort(); run?.ack.close()
+    run?.abort.abort()
     run?.conversation?.endSession().catch(() => {})
     setState('idle'); setTranscript('')
   }, [])
@@ -23,14 +23,14 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
   useEffect(() => stop, [stop])
   const start = useCallback(async () => {
     if (session.current || !current.current.open) return
-    const run = { abort: new AbortController(), ack: createMiraListeningAudio(), turns: createMiraVoiceTurns(), cadence: createMiraAcknowledgementCadence(), mode: 'listening', previousTranscript: '', pending: 0, generation: 0 }
+    const run = { abort: new AbortController(), turns: createMiraVoiceTurns(), echo: createMiraVoiceEchoGuard(), mode: 'listening', pending: 0, generation: 0 }
     session.current = run
     const live = () => session.current === run && current.current.open
-    const listening = () => live() && run.mode === 'listening' && !run.pending && !current.current.busy
     setError(''); setNotice(''); setState('loading')
     try {
       const [sdk, response] = await Promise.all([prewarmMiraAgentVoice(), fetch('/api/ai/mira-agent/session', {
-        method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }, signal: run.abort.signal,
+        method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transport: 'webrtc' }), signal: run.abort.signal,
       })])
       const config = await response.json()
       if (!response.ok || !config.success) throw new Error(config.message || 'Mira voice is unavailable')
@@ -38,7 +38,7 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
       setNotice(config.voiceNotice || '')
       setVoiceName(config.voiceName || 'Mira')
       const conversation = await sdk.Conversation.startSession({
-        signedUrl: config.signedUrl, connectionType: 'websocket', useWakeLock: false,
+        conversationToken: config.conversationToken, connectionType: 'webrtc', useWakeLock: false,
         // AudioWorklets obey script-src, not worker-src. Use same-origin static
         // modules rather than the SDK's CSP-blocked blob/data URLs or CDN fallback.
         workletPaths: {
@@ -50,11 +50,11 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
         customLlmExtraBody: { mira_bridge_credential: config.bridgeCredential },
         clientTools: {
           ask_mira: params => {
-            if (!live()) return JSON.stringify({ speech: '' })
+            if (!live() || run.echo.reject(params?.message, Date.now(), true)) return JSON.stringify({ speech: '' })
             return run.turns.execute(params, async text => {
               if (!live()) return JSON.stringify({ speech: '' })
               const generation = run.generation
-              run.pending++; run.ack.cancel(); setState('thinking')
+              run.pending++; setState('thinking')
               try {
                 if (isMiraDismissal(text)) {
                   await current.current.sendMessage(text, { inputMode: 'voice' })
@@ -63,7 +63,9 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
                 }
                 let finalSpeech = ''
                 const reply = await current.current.sendMessage(text, { inputMode: 'voice', onSpeech: speech => { finalSpeech = speech } })
-                return JSON.stringify({ speech: live() && generation === run.generation ? finalSpeech || miraSpeechSummary(reply || '') || 'Please check the reply in chat.' : '' })
+                const speech = live() && generation === run.generation ? finalSpeech || miraSpeechSummary(reply || '') || 'Please check the reply in chat.' : ''
+                if (speech) run.echo.remember(speech)
+                return JSON.stringify({ speech })
               } finally { run.pending--; if (live()) setState(run.mode === 'speaking' ? 'speaking' : 'listening') }
             })
           },
@@ -72,20 +74,18 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
         onDisconnect: () => { if (live()) stop() },
         onError: () => { if (live()) { stop(); setError('Voice connection interrupted. Your conversation is still in chat; reconnect to continue.') } },
         onMessage: event => {
-          if (!live() || event.source !== 'user') return
+          if (!live()) return
+          if (event.source === 'ai') { run.echo.remember(event.message); return }
+          if (event.source !== 'user' || run.echo.reject(event.message, Date.now())) return
           if (!run.turns.transcript(event.message, event.event_id)) return
           run.generation++
-          run.previousTranscript = event.message; run.cadence.newTurn(); run.ack.cancel(); setTranscript(event.message)
+          setTranscript(event.message)
         },
-        onModeChange: ({ mode }) => { run.mode = mode; if (mode === 'speaking') run.ack.cancel(); if (live()) setState(run.pending ? 'thinking' : mode) },
+        onModeChange: ({ mode }) => { run.mode = mode; run.echo.mode(mode, Date.now()); if (live()) setState(run.pending ? 'thinking' : mode) },
         onInterruption: () => {
           run.generation++
-          run.ack.cancel()
           // Stop generation, never automatically retry an uncertain action.
           if (live()) current.current.interruptResponse?.()
-        },
-        onVadScore: ({ vadScore }) => {
-          if (run.cadence.sample(vadScore, Date.now(), listening())) void run.ack.play(config.voiceId, run.previousTranscript, listening)
         },
       })
       if (!live()) { await conversation.endSession(); return }

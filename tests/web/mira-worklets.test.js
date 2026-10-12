@@ -27,7 +27,7 @@ test.each(['rawAudioProcessor', 'audioConcatProcessor'])('%s registers the proce
 })
 test('voice startup uses same-origin microphone, playback and resampler assets without widening CSP', async () => {
   const originalFetch = global.fetch
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, signedUrl: 'wss://voice.example/private', voiceId: 'voice' }) }))
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, conversationToken: 'rtc-token', voiceId: 'voice' }) }))
   mockStart.mockResolvedValue({ endSession: jest.fn(async () => {}) })
   const { result, unmount } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage: jest.fn() }))
   try {

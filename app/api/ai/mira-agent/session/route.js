@@ -16,8 +16,18 @@ export async function POST(request) {
     if (!agent?.agentId || agent.promptHash !== miraAgentPromptHash()) return NextResponse.json({ success: false, message: 'An administrator needs to sync the Mira voice agent in Settings → MIRA' }, { status: 409 })
     const profile = await auth.database.get('users', String(auth.user._id || auth.user.userId))
     const { voiceId, voiceName, notice } = miraAgentVoice(sanitizeMiraPreferences(profile?.miraPreferences).voiceId)
-    const result = await elevenAgentRequest(`/conversation/get-signed-url?agent_id=${encodeURIComponent(agent.agentId)}`)
-    return NextResponse.json({ success: true, signedUrl: result.signed_url, voiceId, voiceName, voiceNotice: notice, bridgeCredential: await createMiraBridgeCredential(auth.user, auth.tenant) }, { headers: { 'Cache-Control': 'no-store' } })
+    // Existing clients can still finish/start their signed-URL session. New
+    // clients explicitly request WebRTC; never silently downgrade a live call.
+    const raw = await request.text()
+    let payload = {}
+    try { if (raw.trim()) payload = JSON.parse(raw) }
+    catch { return NextResponse.json({ success: false, message: 'Invalid call request' }, { status: 400 }) }
+    const transport = raw.trim() ? payload?.transport : 'websocket'
+    if (!['webrtc', 'websocket'].includes(transport)) return NextResponse.json({ success: false, message: 'Choose a supported call transport' }, { status: 400 })
+    const result = await elevenAgentRequest(`/conversation/${transport === 'webrtc' ? 'token' : 'get-signed-url'}?agent_id=${encodeURIComponent(agent.agentId)}`)
+    const connection = transport === 'webrtc' ? { conversationToken: result.token } : { signedUrl: result.signed_url }
+    if (!Object.values(connection)[0]) throw new Error('Provider did not return a call credential')
+    return NextResponse.json({ success: true, connectionType: transport, ...connection, voiceId, voiceName, voiceNotice: notice, bridgeCredential: await createMiraBridgeCredential(auth.user, auth.tenant) }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     return NextResponse.json({ success: false, message: error.status ? error.message : 'Could not start Mira voice' }, { status: error.status || 500 })
   }

@@ -1,6 +1,6 @@
 # Mira voice agent
 
-Live voice uses the ElevenLabs Agents JavaScript SDK with the private `Mira`
+Live voice uses the ElevenLabs Agents JavaScript SDK's WebRTC transport with the private `Mira`
 agent and `eleven_v4_turbo`. The existing Talio/DeepSeek pipeline remains the
 only reasoning and action engine. The provider's custom-LLM endpoint returns
 a deterministic `ask_mira` client-tool call; the authenticated browser runs
@@ -47,7 +47,7 @@ The curated MIRA and Mansi voices are instant clones; previews retain those
 voices, but live conversations explicitly fall back to Alisha, an Indian
 professional conversational voice verified on the account with v4 Turbo.
 Alisha, Aria, Laura, Lily and Sarah are compatible live selections.
-Microphone activation starts a continuous signed ElevenLabs Agents audio
+Microphone activation starts a continuous authenticated ElevenLabs Agents audio
 call, not browser dictation followed by separate TTS. The call indicator shows
 connection, listening and speaking status plus an explicit End call control.
 Scribe realtime recognition uses Hindi/Hinglish-friendly defaults and English
@@ -61,13 +61,18 @@ duplicate tool IDs or retries on the same transcript reuse the same promise.
 Interruptions abort generation and suppress obsolete speech, never replaying
 an uncertain write. An already committed action cannot be undone by barge-in.
 
-Listening acknowledgements are optional, not model-generated task responses:
-one after at least six seconds of sustained voice activity, no more than once
-every 18 seconds, never while Mira is responding. Clear Roman Hindi cues use
-`Achha.`; other/unknown languages use neutral `Hmm.` rather than guessing a
-language from script. Each PCM clip is bounded to four seconds. Clear English
-cues also allow `Okay.`; at most three small clips are cached per session.
-Ordinary thinking also has a single provider soft-timeout acknowledgement.
+Speech speed is 1.2×. Provider soft-timeout fillers are disabled (`-1`), and
+the live hook does not create a second audio player or request local listening
+acknowledgements. The shared prompt forbids repetitive filler prefixes.
+WebRTC keeps the microphone connected with native acoustic echo cancellation,
+noise suppression and gain control; it is not muted while Mira speaks, so real
+barge-in remains available. A secondary transcript guard ignores matching
+Mira playback phrases of three or more words during playback and its short
+echo tail, including delayed echoed tool requests. Other speech and short
+interruptions remain accepted; the guard never auto-replays uncertain writes.
+New clients request `{transport:"webrtc"}` from the session endpoint and receive
+a private conversation token. Empty legacy requests retain signed-URL support;
+there is no automatic downgrade of a new live call to the old PCM transport.
 The agent microphone starts only on voice activation; existing local wake
 detection remains separate and is suspended during the SDK session.
 Closing/unmounting ends the agent session/audio.
