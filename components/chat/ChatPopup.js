@@ -4,7 +4,7 @@ import UploadButton from '@/components/ui/UploadButton'
 import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FaTimes, FaPaperPlane, FaUsers, FaPaperclip, FaFile, FaFilePdf, FaMinus, FaExpand, FaCompress } from 'react-icons/fa'
+import { FaTimes, FaPaperPlane, FaUsers, FaPaperclip, FaFile, FaFilePdf, FaMinus, FaExpand, FaCompress, FaUserPlus, FaArrowLeft, FaCheck } from 'react-icons/fa'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
@@ -13,9 +13,11 @@ import { playNotificationSound } from '@/utils/audio'
 import Loader from '@/components/ui/Loader'
 import MemberAvatar from '@/components/chat/MemberAvatar'
 import { uploadAuthenticatedFile } from '@/lib/client/uploadFile'
+import toast from '@/utils/toast'
+import useEmployeeDirectorySearch from '@/hooks/useEmployeeDirectorySearch'
 
 export default function ChatPopup({ chat, index }) {
-  const { closeChat, chatPositions, updateChatPosition, bringToFront, triggerSource, widgetPosition, getZIndex, focusedChatId, sidebarCollapsed, isAutoMinimized } = useChatWidget()
+  const { closeChat, updateChat, chatPositions, updateChatPosition, bringToFront, triggerSource, widgetPosition, getZIndex, focusedChatId, sidebarCollapsed, isAutoMinimized } = useChatWidget()
   const { isConnected, joinChat, leaveChat, onNewMessage, sendTyping, sendStopTyping, onUserTyping, onUserStopTyping, requestPresence, onPresenceStatus, onPresenceUpdate } = useSocket()
   const { markChatAsRead, unreadChats } = useUnreadMessages()
   const { theme, isDarkMode } = useTheme()
@@ -34,6 +36,36 @@ export default function ChatPopup({ chat, index }) {
   const [minimizedUnread, setMinimizedUnread] = useState(0) // Track unread while minimized
   const [showMembersPanel, setShowMembersPanel] = useState(false) // Show group members panel
   const [memberSearchQuery, setMemberSearchQuery] = useState('') // Search members in panel
+  const [showAddMembers, setShowAddMembers] = useState(false) // Members panel shows the add-people view
+  const [addMemberSearchQuery, setAddMemberSearchQuery] = useState('')
+  const [selectedAddMembers, setSelectedAddMembers] = useState([])
+  const [addingMembers, setAddingMembers] = useState(false)
+  const [addMembersError, setAddMembersError] = useState('')
+
+  const { employees: directoryEmployees, isLoading: loadingDirectory } = useEmployeeDirectorySearch({
+    enabled: showMembersPanel && showAddMembers && !!chat.isGroup,
+    query: addMemberSearchQuery,
+    limit: 100,
+    includeAdmins: true,
+  })
+
+  // Server populates `admin` as an employee object, but older records may hold a raw id.
+  const groupAdminId = chat.admin?._id || chat.admin || chat.createdBy || null
+  const isGroupAdmin = !!groupAdminId && [currentEmployeeId, currentUserId].some(id => id && String(id) === String(groupAdminId))
+  const groupAdminName = (() => {
+    const admin = chat.participants?.find(p => String(p._id || p) === String(groupAdminId))
+      || (chat.admin && typeof chat.admin === 'object' ? chat.admin : null)
+    const name = `${admin?.firstName || ''} ${admin?.lastName || ''}`.trim()
+    return name || 'the group admin'
+  })()
+  const existingMemberIds = new Set((chat.participants || []).map(p => String(p._id || p)))
+  const addMemberCandidates = (directoryEmployees || []).filter((emp) => {
+    if (!emp?._id || existingMemberIds.has(String(emp._id))) return false
+    const query = addMemberSearchQuery.trim().toLowerCase()
+    if (!query) return true
+    return [emp.firstName, emp.lastName, emp.email, emp.employeeCode, emp.designation?.title, emp.department?.name]
+      .filter(Boolean).join(' ').toLowerCase().includes(query)
+  })
 
   // --- Mentions state ---
   const [showMentionList, setShowMentionList] = useState(false)
@@ -602,6 +634,61 @@ export default function ChatPopup({ chat, index }) {
     }
   };
 
+  const closeMembersPanel = () => {
+    setShowMembersPanel(false)
+    setMemberSearchQuery('')
+    setShowAddMembers(false)
+    setAddMemberSearchQuery('')
+    setSelectedAddMembers([])
+    setAddMembersError('')
+  }
+
+  const openAddMembersView = () => {
+    setSelectedAddMembers([])
+    setAddMemberSearchQuery('')
+    setAddMembersError('')
+    setShowAddMembers(true)
+  }
+
+  const toggleAddMember = (employeeId) => {
+    setSelectedAddMembers(prev => prev.includes(employeeId)
+      ? prev.filter(id => id !== employeeId)
+      : [...prev, employeeId])
+  }
+
+  const addMembersToGroup = async () => {
+    if (!chat.isGroup || !selectedAddMembers.length || addingMembers) return
+    const addedCount = selectedAddMembers.length
+    try {
+      setAddingMembers(true)
+      setAddMembersError('')
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/chat/${chat._id}/members`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participants: selectedAddMembers })
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || 'Unable to add members')
+      }
+      // The mutation returns the raw chat, so re-read it for populated participants.
+      const refreshed = await fetch(`/api/chat/${chat._id}`, { headers: { 'Authorization': `Bearer ${token}` } })
+        .then(res => (res.ok ? res.json() : null))
+        .catch(() => null)
+      if (refreshed?._id) updateChat(chat._id, refreshed)
+      setSelectedAddMembers([])
+      setAddMemberSearchQuery('')
+      setShowAddMembers(false)
+      toast.success(addedCount === 1 ? 'Member added' : 'Members added')
+    } catch (error) {
+      console.error('Error adding group members:', error)
+      setAddMembersError(error.message || 'Unable to add members')
+    } finally {
+      setAddingMembers(false)
+    }
+  }
+
   // Filter group members for mention popup
   const getMentionCandidates = (query) => {
     if (!chat.isGroup || !Array.isArray(chat.participants)) return [];
@@ -1053,7 +1140,8 @@ export default function ChatPopup({ chat, index }) {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  setShowMembersPanel(!showMembersPanel)
+                  if (showMembersPanel) closeMembersPanel()
+                  else setShowMembersPanel(true)
                 }}
                 className={`p-2 rounded-lg transition-all hover:scale-110 ${showMembersPanel ? 'ring-2 ring-white/50' : ''}`}
                 style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
@@ -1124,16 +1212,40 @@ export default function ChatPopup({ chat, index }) {
             {/* Panel Header */}
             <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50/50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900/60">
               <div className="flex min-w-0 items-center gap-2">
-                <FaUsers className="w-4 h-4" style={{ color: primaryColor }} />
-                <span className="truncate text-sm font-semibold text-gray-800 dark:text-zinc-100">Group Members</span>
-                <span className="flex-shrink-0 text-xs text-gray-500 dark:text-zinc-400">({chat.participants?.length || 0})</span>
+                {showAddMembers ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setShowAddMembers(false)
+                        setSelectedAddMembers([])
+                        setAddMemberSearchQuery('')
+                        setAddMembersError('')
+                      }}
+                      className="rounded-lg p-1 transition-colors hover:bg-gray-200 dark:hover:bg-zinc-700"
+                      aria-label="Back to group members"
+                    >
+                      <FaArrowLeft className="w-3.5 h-3.5 text-gray-600 dark:text-zinc-300" />
+                    </button>
+                    <span className="truncate text-sm font-semibold text-gray-800 dark:text-zinc-100">Add Members</span>
+                    {selectedAddMembers.length > 0 && (
+                      <span className="flex-shrink-0 text-xs text-gray-500 dark:text-zinc-400">({selectedAddMembers.length})</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <FaUsers className="w-4 h-4" style={{ color: primaryColor }} />
+                    <span className="truncate text-sm font-semibold text-gray-800 dark:text-zinc-100">Group Members</span>
+                    <span className="flex-shrink-0 text-xs text-gray-500 dark:text-zinc-400">({chat.participants?.length || 0})</span>
+                  </>
+                )}
               </div>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  setShowMembersPanel(false)
-                  setMemberSearchQuery('')
+                  closeMembersPanel()
                 }}
                 className="rounded-lg p-1.5 transition-colors hover:bg-gray-200 dark:hover:bg-zinc-700"
                 aria-label="Close group members"
@@ -1152,9 +1264,9 @@ export default function ChatPopup({ chat, index }) {
                 </svg>
                 <input
                   type="text"
-                  value={memberSearchQuery}
-                  onChange={(e) => setMemberSearchQuery(e.target.value)}
-                  placeholder="Search members..."
+                  value={showAddMembers ? addMemberSearchQuery : memberSearchQuery}
+                  onChange={(e) => (showAddMembers ? setAddMemberSearchQuery(e.target.value) : setMemberSearchQuery(e.target.value))}
+                  placeholder={showAddMembers ? 'Search people to add...' : 'Search members...'}
                   className="input input-search text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
                   onClick={(e) => e.stopPropagation()}
                 />
@@ -1162,73 +1274,179 @@ export default function ChatPopup({ chat, index }) {
             </div>
 
             {/* Members List */}
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 pt-2">
-              {chat.participants?.filter((member) => {
-                if (!memberSearchQuery.trim()) return true
-                const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase()
-                const code = (member.employeeCode || '').toLowerCase()
-                const query = memberSearchQuery.toLowerCase()
-                return fullName.includes(query) || code.includes(query)
-              }).map((member) => {
-                const memberId = member._id || member
-                const isAdmin = chat.admin?._id === memberId || chat.admin === memberId
-                const isCurrentUser = memberId === currentEmployeeId || memberId === currentUserId
+            {!showAddMembers && (
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 pt-2">
+                {chat.participants?.filter((member) => {
+                  if (!memberSearchQuery.trim()) return true
+                  const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase()
+                  const code = (member.employeeCode || '').toLowerCase()
+                  const query = memberSearchQuery.toLowerCase()
+                  return fullName.includes(query) || code.includes(query)
+                }).map((member) => {
+                  const memberId = member._id || member
+                  const isAdmin = chat.admin?._id === memberId || chat.admin === memberId
+                  const isCurrentUser = memberId === currentEmployeeId || memberId === currentUserId
 
-                return (
-                  <div
-                    key={memberId}
-                    className={`flex items-center gap-3 rounded-xl p-2.5 transition-colors ${isCurrentUser ? 'bg-blue-50 dark:bg-blue-950/50' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'
-                      }`}
-                  >
-                    <MemberAvatar
-                      member={member}
-                      background={`linear-gradient(135deg, ${primaryColor}, ${primaryDark})`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <p className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-zinc-100">
-                          {member.firstName || 'Unknown'} {member.lastName || ''}
-                        </p>
-                        {isCurrentUser && (
-                          <span className="flex-shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                            You
-                          </span>
-                        )}
-                        {isAdmin && (
-                          <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                            Admin
-                          </span>
+                  return (
+                    <div
+                      key={memberId}
+                      className={`flex items-center gap-3 rounded-xl p-2.5 transition-colors ${isCurrentUser ? 'bg-blue-50 dark:bg-blue-950/50' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'
+                        }`}
+                    >
+                      <MemberAvatar
+                        member={member}
+                        background={`linear-gradient(135deg, ${primaryColor}, ${primaryDark})`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <p className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-zinc-100">
+                            {member.firstName || 'Unknown'} {member.lastName || ''}
+                          </p>
+                          {isCurrentUser && (
+                            <span className="flex-shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                              You
+                            </span>
+                          )}
+                          {isAdmin && (
+                            <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                              Admin
+                            </span>
+                          )}
+                        </div>
+                        {member.employeeCode && (
+                          <p className="truncate text-[10px] text-gray-500 dark:text-zinc-400">{member.employeeCode}</p>
                         )}
                       </div>
-                      {member.employeeCode && (
-                        <p className="truncate text-[10px] text-gray-500 dark:text-zinc-400">{member.employeeCode}</p>
+                      {/* Send Message Button - Only for other members */}
+                      {!isCurrentUser && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // Close the members panel and the popup will remain for future DM feature
+                            // For now just close the panel - DM feature can be added later
+                            closeMembersPanel()
+                          }}
+                          className="flex-shrink-0 transition-colors hover:opacity-70"
+                          style={{ color: primaryColor }}
+                          title={`Message ${member.firstName || 'User'}`}
+                          aria-label={`Message ${member.firstName || 'user'}`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-4 h-4" fill="currentColor">
+                            <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />
+                          </svg>
+                        </button>
                       )}
                     </div>
-                    {/* Send Message Button - Only for other members */}
-                    {!isCurrentUser && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          // Close the members panel and the popup will remain for future DM feature
-                          // For now just close the panel - DM feature can be added later
-                          setShowMembersPanel(false)
-                          setMemberSearchQuery('')
-                        }}
-                        className="flex-shrink-0 transition-colors hover:opacity-70"
-                        style={{ color: primaryColor }}
-                        title={`Message ${member.firstName || 'User'}`}
-                        aria-label={`Message ${member.firstName || 'user'}`}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-4 h-4" fill="currentColor">
-                          <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Add Members View */}
+            {showAddMembers && (
+              <>
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 pt-2">
+                  {loadingDirectory ? (
+                    <div className="flex h-full items-center justify-center py-8">
+                      <Loader size="lg" />
+                    </div>
+                  ) : addMemberCandidates.length > 0 ? (
+                    addMemberCandidates.map((emp) => {
+                      const isSelected = selectedAddMembers.includes(emp._id)
+                      return (
+                        <button
+                          key={emp._id}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleAddMember(emp._id)
+                          }}
+                          className={`flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-950/50' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
+                          aria-pressed={isSelected}
+                        >
+                          <MemberAvatar
+                            member={emp}
+                            background={`linear-gradient(135deg, ${primaryColor}, ${primaryDark})`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-gray-900 dark:text-zinc-100">
+                              {emp.firstName} {emp.lastName}
+                            </p>
+                            <p className="truncate text-[10px] text-gray-500 dark:text-zinc-400">
+                              {emp.designation?.title || emp.department?.name || emp.employeeCode || emp.email}
+                            </p>
+                          </div>
+                          <span
+                            className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border"
+                            style={{
+                              color: isSelected ? 'white' : 'transparent',
+                              backgroundColor: isSelected ? primaryColor : 'transparent',
+                              borderColor: isSelected ? primaryColor : (isDarkMode ? '#52525b' : '#cbd5e1'),
+                            }}
+                            aria-hidden="true"
+                          >
+                            <FaCheck className="h-2.5 w-2.5" />
+                          </span>
+                        </button>
+                      )
+                    })
+                  ) : (
+                    <div className="p-6 text-center text-xs text-gray-500 dark:text-zinc-400">
+                      {addMemberSearchQuery.trim()
+                        ? 'No people found'
+                        : 'Everyone available is already in this group'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-shrink-0 space-y-2 border-t border-gray-100 px-3 py-2.5 dark:border-zinc-700">
+                  {addMembersError && (
+                    <div
+                      className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-[11px] text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
+                      role="alert"
+                    >
+                      {addMembersError}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      addMembersToGroup()
+                    }}
+                    disabled={!selectedAddMembers.length || addingMembers}
+                    className="flex min-h-9 w-full items-center justify-center rounded-xl px-4 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {addingMembers ? 'Adding...' : `Add${selectedAddMembers.length ? ` (${selectedAddMembers.length})` : ' Members'}`}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Panel Footer - Members view */}
+            {!showAddMembers && (
+              <div className="flex-shrink-0 border-t border-gray-100 px-3 py-2.5 dark:border-zinc-700">
+                {isGroupAdmin ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openAddMembersView()
+                    }}
+                    className="flex min-h-9 w-full items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold text-white transition hover:opacity-90"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <FaUserPlus className="h-3 w-3" /> Add Members
+                  </button>
+                ) : (
+                  <p className="text-center text-[11px] text-gray-500 dark:text-zinc-400">
+                    Only {groupAdminName} can add members to this group
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

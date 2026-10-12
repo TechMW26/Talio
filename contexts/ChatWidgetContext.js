@@ -128,6 +128,11 @@ export function ChatWidgetProvider({ children }) {
     zIndexCounter.current += 1
   }, [])
 
+  // Merge fresh data (for example new participants) into an already-open popup
+  const updateChat = useCallback((chatId, updates) => {
+    setOpenChats(prev => prev.map(c => (c._id === chatId ? { ...c, ...updates } : c)))
+  }, [])
+
   // Close a specific chat popup and reset positions for auto-alignment
   const closeChat = useCallback((chatId) => {
     setOpenChats(prev => prev.filter(c => c._id !== chatId))
@@ -211,6 +216,7 @@ export function ChatWidgetProvider({ children }) {
     openWidget,
     closeWidget,
     openChat,
+    updateChat,
     closeChat,
     closeAllChats,
     updateWidgetPosition,
@@ -248,6 +254,7 @@ export function useChatWidget() {
       openWidget: () => { },
       closeWidget: () => { },
       openChat: () => { },
+      updateChat: () => { },
       closeChat: () => { },
       closeAllChats: () => { },
       updateWidgetPosition: () => { },
