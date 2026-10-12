@@ -12,7 +12,9 @@ export async function POST(request) {
     if (raw.length > 256000) return NextResponse.json({ error: 'Conversation too large' }, { status: 413 })
     const body = JSON.parse(raw)
     let payload
-    try { payload = await verifyMiraBridgeCredential(body.mira_bridge_credential) }
+    // Agents nest customLlmExtraBody in elevenlabs_extra_body, rather than
+    // spreading it into the OpenAI request. Keep direct-call compatibility.
+    try { payload = await verifyMiraBridgeCredential(body.elevenlabs_extra_body?.mira_bridge_credential ?? body.mira_bridge_credential) }
     catch { return NextResponse.json({ error: 'Invalid or expired voice session' }, { status: 401 }) }
     const bucket = await rateLimit('MIRA_AGENT_GATEWAY', `${payload.databaseName}:${payload.userId}`)
     if (!bucket.allowed) return NextResponse.json({ error: 'Voice turn limit reached' }, { status: 429 })
