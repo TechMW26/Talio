@@ -102,6 +102,7 @@ export async function middleware(request) {
   // Public routes that don't require authentication
   const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/forgot-password', '/auth/reset-password', '/setup', '/join', '/download']
   const publicApiRoutes = [
+    '/api/ai/mira-agent/llm', // Dedicated short-lived voice credential is verified in this route.
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/session',
@@ -142,7 +143,8 @@ export async function middleware(request) {
   const isPublicRoute = publicRoutes.some(route =>
     route === '/' ? request.nextUrl.pathname === '/' : request.nextUrl.pathname.startsWith(route)
   )
-  const isPublicApiRoute = publicApiRoutes.some(route => request.nextUrl.pathname.startsWith(route))
+  const isPublicApiRoute = publicApiRoutes.some(route => route === '/api/ai/mira-agent/llm'
+    ? request.nextUrl.pathname === route : request.nextUrl.pathname.startsWith(route))
   const isPasswordChangeRoute = passwordChangeRoutes.some(route => request.nextUrl.pathname.startsWith(route))
   const isPasswordChangeApiRoute = passwordChangeApiRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
@@ -171,6 +173,7 @@ export async function middleware(request) {
     try {
       const cachedPayload = getCachedPayload(token)
       const payload = cachedPayload || (await jwtVerify(token, getJwtSecret())).payload
+      if (payload.purpose === 'mira-voice-bridge' || payload.aud === 'mira-voice-bridge') return NextResponse.json({ message: 'Invalid application credential' }, { status: 401 })
       if (!cachedPayload) {
         setCachedPayload(token, payload)
       }

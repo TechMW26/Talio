@@ -6,7 +6,7 @@ import { getTenantBlob, buildTenantBlobPrefix } from '@/lib/platform/blobStorage
 
 export async function GET(request, { params }) {
   const auth = await verifyTokenFromRequest(request)
-  if (!auth.success) return new NextResponse('Unauthorized', { status: 401 })
+  if (!auth.success) return new NextResponse(auth.message || 'Unauthorized', { status: auth.status || 401 })
   const { id } = await params
   if (!/^[a-f0-9]{24}$/i.test(id)) return new NextResponse('Not found', { status: 404 })
   const image = await (await getFirestoreTenantDatabase(auth.tenant.databaseName)).get('mirageneratedimages', id)

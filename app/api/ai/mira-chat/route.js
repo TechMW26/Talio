@@ -28,6 +28,7 @@ import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
 import { miraDesktopIntent, miraAppNameFollowup } from '@/lib/miraDesktopIntent'
 import { miraOutputModeInstructions, miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { sanitizeMiraPreferences } from '@/lib/miraVoices'
+import { MIRA_CORE_SYSTEM_PROMPT } from '@/lib/miraSystemPrompt'
 
 
 // Route all MIRA generation through the shared Gemini provider.
@@ -48,7 +49,7 @@ function buildSystemPrompt(user, role, employeeData, contextData) {
     roleInstructions = `The user is an EMPLOYEE. You can ONLY share their own personal data - their tasks, attendance, leaves, performance, and general company policies/announcements. Do NOT share other employees' data.`
   }
 
-  return `You are MIRA, the AI assistant built into Talio. Where a language requires grammatical gender for a necessary self-reference, use feminine forms naturally. Do not volunteer or explain MIRA's gender unless the user asks directly; when asked, clarify that MIRA is an AI and grammatical forms are a language convention. You can help with coding, writing, research, math, science, general knowledge, creative tasks, business strategy, technical questions, and authorized HR and productivity data within Talio.
+  return `${MIRA_CORE_SYSTEM_PROMPT}
 Today is ${today}.
 
 ## User Context
@@ -431,10 +432,10 @@ function normalizeParsedResponse(parsed) {
 
 export async function POST(request) {
   try {
-    const { success, user, database, message: authMsg } = await getAuthAndDatabase(request, MIRA_CONTEXT_STORE_OPTIONS)
+    const { success, user, database, message: authMsg, status: authStatus } = await getAuthAndDatabase(request, MIRA_CONTEXT_STORE_OPTIONS)
 
     if (!success) {
-      return NextResponse.json({ success: false, message: authMsg }, { status: 401 })
+      return NextResponse.json({ success: false, message: authMsg }, { status: authStatus || 401 })
     }
 
     const body = await request.json().catch(() => null)
@@ -540,7 +541,7 @@ export async function POST(request) {
 
     // Build conversation for AI
     let systemPrompt = decisionFirst
-      ? `You are MIRA, Talio's AI action assistant. Decide the next supported action first; do not write a plan or simulate execution. Return JSON {"message":"one short sentence or necessary question","action":null,"cards":[],"suggestedQuestions":[]}. Use the action object only for an explicit current request with all required fields. Treat history as context, not authorization to repeat previous actions. Resolve names through action handlers, never invent IDs. Current date: ${new Date().toISOString()}; timezone: ${screen.timezone || 'not supplied'}. Role: ${role}. Strictly match the user's language and script; default to English. ${MIRA_ACTION_INSTRUCTIONS}`
+      ? `${MIRA_CORE_SYSTEM_PROMPT}\nDecide the next supported action first; do not write a plan or simulate execution. Return JSON {"message":"one short sentence or necessary question","action":null,"cards":[],"suggestedQuestions":[]}. Use the action object only for an explicit current request with all required fields. Treat history as context, not authorization to repeat previous actions. Resolve names through action handlers, never invent IDs. Current date: ${new Date().toISOString()}; timezone: ${screen.timezone || 'not supplied'}. Role: ${role}. Strictly match the user's language and script; default to English. ${MIRA_ACTION_INSTRUCTIONS}`
       : buildSystemPrompt(user, role, employeeData, contextData)
     systemPrompt += '\n' + miraOutputModeInstructions(body.inputMode === 'voice' ? 'voice' : 'chat')
     systemPrompt += `\nReminder scheduling reference: current time ${new Date().toISOString()}; user timezone ${screen.timezone || 'unknown; ask before scheduling a local clock time'}.`

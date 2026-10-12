@@ -6,6 +6,11 @@ const mockStop = jest.fn()
 const mockStart = jest.fn()
 const mockPush = jest.fn()
 const mockOpenWidget = jest.fn()
+jest.mock('@elevenlabs/client', () => ({ Conversation: { startSession: async options => {
+  await mockStart({ onPartial: text => options.onMessage({ source: 'user', message: text, event_id: 1 }) })
+  options.onConnect?.({ conversationId: 'test' })
+  return { endSession: async () => mockStop() }
+} } }))
 jest.mock('@/contexts/ChatWidgetContext', () => ({ useChatWidget: () => ({ openWidget: mockOpenWidget }) }))
 const mockCloseChat = jest.fn()
 jest.mock('@/lib/miraSpeechPlayback', () => ({ createMiraSpeechPlayback: () => ({ close: jest.fn(), cancel: jest.fn(), speak: jest.fn() }) }))
@@ -36,6 +41,7 @@ jest.mock('@/contexts/MiraChatContext', () => ({ useMiraChat: () => {
 }) } }))
 
 beforeEach(() => {
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, signedUrl: 'wss://test', voiceId: 'voice', bridgeCredential: 'scoped' }) }))
   jest.spyOn(document, 'hasFocus').mockReturnValue(true)
   mockBeamProps = null
   mockOpen = true
@@ -210,11 +216,11 @@ test('stops capture if permission resolves after closing', async () => {
   let resolve
   mockStart.mockImplementation(() => new Promise(done => { resolve = done }))
   const view = render(<MiraChatSidebar />)
-  fireEvent.click(screen.getByLabelText('Start voice conversation'))
-  expect(mockStart).toHaveBeenCalledTimes(1)
+  await act(async () => fireEvent.click(screen.getByLabelText('Start voice conversation')))
+  await waitFor(() => expect(mockStart).toHaveBeenCalledTimes(1))
   mockOpen = false
   view.rerender(<MiraChatSidebar />)
-  expect(mockStart.mock.calls[0][0].signal.aborted).toBe(true)
+  expect(global.fetch.mock.calls.at(-1)[1].signal.aborted).toBe(true)
   await act(async () => { resolve({ stop: mockStop, stream: {} }) })
   expect(mockStop).toHaveBeenCalledTimes(1)
 })

@@ -34,8 +34,10 @@ test('natural response guidance covers accuracy, tone, and punctuation without c
 test('chat system prompt includes guidance while preserving JSON and access rules', () => {
   const route = fs.readFileSync(path.join(process.cwd(), 'app/api/ai/mira-chat/route.js'), 'utf8')
   expect(route).toContain('${MIRA_RESPONSE_GUIDELINES}')
-  expect(route).toContain('You are MIRA, the AI assistant built into Talio.')
-  expect(route).toContain("You are MIRA, Talio's AI action assistant.")
+  const sharedPrompt = fs.readFileSync(path.join(process.cwd(), 'lib/miraSystemPrompt.js'), 'utf8')
+  expect(route).toContain("import { MIRA_CORE_SYSTEM_PROMPT } from '@/lib/miraSystemPrompt'")
+  expect(route).toContain('${MIRA_CORE_SYSTEM_PROMPT}')
+  expect(sharedPrompt).toContain('You are MIRA, the AI assistant built into Talio.')
   expect(route).not.toContain('female AI assistant')
   expect(route).not.toContain('female action assistant')
   expect(route).toContain('You MUST respond in valid JSON')

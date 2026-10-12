@@ -5,7 +5,6 @@ import { useSocket } from '@/contexts/SocketContext'
 import { isFeatureEnabled as checkFeatureEnabled, mergeCompanyFeatures } from '@/lib/planFeatures'
 
 const CompanyFeaturesContext = createContext(null)
-const FEATURE_CACHE_TTL_MS = 5 * 60 * 1000
 
 function getStorageKey(databaseName) {
   return `talio_company_features_${databaseName}`
@@ -43,6 +42,7 @@ export function CompanyFeaturesProvider({ children }) {
     databaseName: null,
     plan: 'custom',
     features: null,
+    miraAccess: null,
     miraTokens: { perUserAllocation: 0 },
     updatedAt: null,
     loading: true,
@@ -53,7 +53,7 @@ export function CompanyFeaturesProvider({ children }) {
     const token = localStorage.getItem('token')
 
     if (!userData || !token) {
-      setState((prev) => ({ ...prev, loading: false }))
+      setState((prev) => ({ ...prev, miraAccess: null, loading: false }))
       return null
     }
 
@@ -71,7 +71,7 @@ export function CompanyFeaturesProvider({ children }) {
       return null
     }
 
-    if (inFlightRefreshRef.current?.databaseName === databaseName) {
+    if (inFlightRefreshRef.current?.databaseName === databaseName && inFlightRefreshRef.current.token === token) {
       return inFlightRefreshRef.current.promise
     }
 
@@ -86,6 +86,8 @@ export function CompanyFeaturesProvider({ children }) {
         }
 
         const data = await response.json()
+        // An old account's late response must not grant a newly signed-in user.
+        if (localStorage.getItem('token') !== token) return null
         if (!data.success) {
           throw new Error(data.message || 'Failed to fetch company features')
         }
@@ -94,6 +96,7 @@ export function CompanyFeaturesProvider({ children }) {
           databaseName,
           plan: data.plan || 'custom',
           features: mergeCompanyFeatures(data.features, data.plan || 'custom'),
+          miraAccess: data.miraAccess || { allowed: false },
           miraTokens: data.miraTokens || { perUserAllocation: 0 },
           updatedAt: data.updatedAt || new Date().toISOString(),
         }
@@ -112,7 +115,7 @@ export function CompanyFeaturesProvider({ children }) {
       }
     })()
 
-    inFlightRefreshRef.current = { databaseName, promise: refreshPromise }
+    inFlightRefreshRef.current = { databaseName, token, promise: refreshPromise }
     return refreshPromise
   }, [])
 
@@ -133,10 +136,8 @@ export function CompanyFeaturesProvider({ children }) {
 
       const cachedPayload = readCachedPayload(databaseName)
       if (cachedPayload?.features) {
-        setState({ ...cachedPayload, databaseName, loading: false })
-        if (Date.now() - Number(cachedPayload.cachedAt || 0) < FEATURE_CACHE_TTL_MS) {
-          return
-        }
+        // Cached tenant flags must never grant a new user's Mira permissions.
+        setState({ ...cachedPayload, miraAccess: null, databaseName, loading: true })
       } else {
         setState((prev) => ({ ...prev, databaseName, loading: true }))
       }
@@ -164,24 +165,23 @@ export function CompanyFeaturesProvider({ children }) {
       }
 
       writeCachedPayload(payload.databaseName, nextPayload)
-      setState({ ...nextPayload, loading: false })
+      setState(prev => ({ ...nextPayload, miraAccess: prev.miraAccess, loading: false }))
+      refreshFeatures(state.databaseName)
     })
 
     return unsubscribe
-  }, [state.databaseName, subscribe])
+  }, [state.databaseName, subscribe, refreshFeatures])
 
   useEffect(() => {
     if (!state.databaseName) return undefined
 
     const handleFocus = () => {
-      const cachedPayload = readCachedPayload(state.databaseName)
-      if (Date.now() - Number(cachedPayload?.cachedAt || 0) >= FEATURE_CACHE_TTL_MS) {
-        refreshFeatures(state.databaseName)
-      }
+      refreshFeatures(state.databaseName)
     }
 
     window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
+    window.addEventListener('mira:access-changed', handleFocus)
+    return () => { window.removeEventListener('focus', handleFocus); window.removeEventListener('mira:access-changed', handleFocus) }
   }, [refreshFeatures, state.databaseName])
 
   const isFeatureEnabled = useCallback(

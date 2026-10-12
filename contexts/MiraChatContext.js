@@ -44,6 +44,13 @@ export function MiraChatProvider({ children }) {
   const saveQueueRef = useRef(Promise.resolve())
   const sessionTargetRef = useRef({ id: null })
 
+  useEffect(() => () => {
+    abortControllerRef.current?.abort()
+    remoteCommandRef.current = null
+    sendingRef.current = false
+    window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false, source: 'chat' } }))
+  }, [])
+
   const fetchTokens = useCallback(async () => {
     try {
       const token = getAuthToken()
@@ -183,6 +190,12 @@ export function MiraChatProvider({ children }) {
     sendingRef.current = false
     setIsThinking(false)
     window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false, source: 'chat' } }))
+  }, [])
+
+  const interruptResponse = useCallback(() => {
+    abortControllerRef.current?.abort()
+    // Retain the controller until its execution loop unwinds; no automatic
+    // replay of writes that may already have reached the server.
   }, [])
 
   useEffect(() => {
@@ -524,7 +537,7 @@ export function MiraChatProvider({ children }) {
     <MiraChatContext.Provider value={{
       isOpen, openChat, closeChat, toggleChat,
       viewMode, setViewMode,
-      messages, sendMessage, clearHistory,
+      messages, sendMessage, clearHistory, interruptResponse,
       isThinking, tokens,
       sessions, activeSessionId, showHistory,
       toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
@@ -540,7 +553,7 @@ export function useMiraChat() {
     return {
       isOpen: false, openChat: () => {}, closeChat: () => {}, toggleChat: () => {},
       viewMode: 'chat', setViewMode: () => {},
-      messages: [], sendMessage: () => {}, clearHistory: () => {},
+      messages: [], sendMessage: () => {}, clearHistory: () => {}, interruptResponse: () => {},
       isThinking: false, tokens: { tokensUsed: 0, tokenLimit: 100, tokensRemaining: 100 },
       sessions: [], activeSessionId: null, showHistory: false,
       toggleHistory: () => {}, loadSession: () => {}, startNewChat: () => {},

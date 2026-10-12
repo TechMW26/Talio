@@ -13,7 +13,7 @@ export async function POST(request) {
     if (validation.action.type === 'schedule_reminder') {
       const { verifyTokenFromRequest } = await import('@/lib/auth')
       const auth = await verifyTokenFromRequest(request)
-      if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+      if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: auth.status || 401 })
       if (input.confirmed !== true) return NextResponse.json({ success: true, preview: validation.action })
       const { message, scheduledFor, timezone } = validation.action.fields
       const owner = auth.user.userId || auth.user._id

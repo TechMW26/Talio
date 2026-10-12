@@ -12,7 +12,7 @@ export const maxDuration = 180
 
 export async function POST(request) {
   const auth = await verifyTokenFromRequest(request)
-  if (!auth.success) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+  if (!auth.success) return NextResponse.json({ success: false, message: auth.message || 'Unauthorized' }, { status: auth.status || 401 })
   const body = await request.json().catch(() => null)
   const action = validateMiraImageAction(body?.action)
   if (!action || !/^[a-zA-Z0-9_-]{8,80}$/.test(body?.requestId || '')) return NextResponse.json({ success: false, message: 'A valid image prompt and request ID are required.' }, { status: 400 })

@@ -46,10 +46,8 @@ function MiraShell({ enabled, children }) {
 }
 
 export default function DashboardAIProviders({ children }) {
-  const { features } = useCompanyFeatures()
-  // Fail open until the feature payload arrives so MIRA is never hidden by a
-  // slow or failed features request.
-  const miraEnabled = features ? features.miraAI !== false : true
+  const { features, miraAccess } = useCompanyFeatures()
+  const miraEnabled = !!features && features.miraAI !== false && miraAccess?.allowed === true
 
   return (
     <AILoadingProvider>

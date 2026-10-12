@@ -18,13 +18,12 @@ import MiraActivityPointer from '@/components/ui/MiraActivityPointer'
 import MiraWakeSetup from '@/components/MiraWakeSetup'
 import ReactMarkdown from 'react-markdown'
 import { VoiceBeam } from 'voice-glow'
-import useMiraVoice from '@/hooks/useMiraVoice'
+import useMiraVoice, { prewarmMiraAgentVoice } from '@/hooks/useMiraAgentVoice'
 import useMiraSidebarDrag from '@/hooks/useMiraSidebarDrag'
 import useMiraPanelVisible from '@/hooks/useMiraPanelVisible'
 import { prepareMiraLocation } from '@/lib/miraClientContext'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
-import { prewarmMiraVoice } from '@/lib/miraVoiceReady'
 import MiraEditPrompt from './MiraEditPrompt'
 import { miraMessageDisplay, miraPlainCaption } from '@/lib/miraMessageDisplay'
 
@@ -454,7 +453,7 @@ export default function MiraChatSidebar() {
   const pathname = usePathname()
   const previousPath = useRef(pathname)
   const {
-    isOpen, openChat, closeChat, messages, sendMessage, isThinking, clearHistory, tokens,
+    isOpen, openChat, closeChat, messages, sendMessage, isThinking, clearHistory, tokens, interruptResponse,
     viewMode, setViewMode,
     sessions, activeSessionId, showHistory, toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
   } = useMiraChat()
@@ -466,12 +465,12 @@ export default function MiraChatSidebar() {
   const expanded = viewMode === 'expanded'
   const sidebarDragEnabled = isOpen && viewMode === 'chat'
   const sidebarDrag = useMiraSidebarDrag(sidebarDragEnabled)
-  useEffect(() => { if (isOpen) { void prepareMiraLocation(); void prewarmMiraVoice() } }, [isOpen])
+  useEffect(() => { if (isOpen) { void prepareMiraLocation(); void prewarmMiraAgentVoice().catch(() => {}) } }, [isOpen])
   const latestReply = messages.at(-1)
   const followUps = latestReply?.role === 'assistant' && Array.isArray(latestReply.data?.suggestedQuestions)
     ? [...new Set(latestReply.data.suggestedQuestions.filter(q => typeof q === 'string' && q.trim()).map(q => q.trim()))].slice(0, 3) : []
   useEffect(() => { setEditing(null); setReplying(null) }, [activeSessionId])
-  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, onDismiss: closeChat })
+  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, interruptResponse, onDismiss: closeChat })
   const [wakeRequested, setWakeRequested] = useState(false)
   useEffect(() => {
     if (isOpen && wakeRequested) { setWakeRequested(false); void voice.start() }
@@ -972,6 +971,7 @@ export default function MiraChatSidebar() {
             </button>
           </div>
           {voice.error && <p className="px-3 text-xs text-danger" role="alert">{voice.error}</p>}
+          {voice.notice && <p className="px-3 text-xs text-default-500" role="status">{voice.notice}</p>}
           <span className="sr-only" role="status">{voice.active ? voice.state : ''}</span>
         </div>
         )}

@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndDatabase } from '@/lib/auth';
 import { getTenantCompanyFeaturePayload } from '@/lib/companyFeatures.server';
+import { getMiraAccess } from '@/lib/miraAccess.server';
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +47,9 @@ export async function GET(request) {
       );
     }
 
-    return NextResponse.json(response);
+    // Do not put per-user access into the shared tenant feature cache.
+    const miraAccess = await getMiraAccess(auth.database, auth.user)
+    return NextResponse.json({ ...response, miraAccess }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('[Company Features GET] Error:', error);
     return NextResponse.json(

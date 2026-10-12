@@ -9,6 +9,7 @@ import MiraWakeReminder from '@/components/MiraWakeReminder'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useFocusTimer } from '@/contexts/FocusTimerContext'
 import { useMiraChat } from '@/contexts/MiraChatContext'
+import { useCompanyFeatures } from '@/contexts/CompanyFeaturesContext'
 import { Button } from '@heroui/react'
 
 export default function Header({ toggleSidebar, sidebarCollapsed }) {
@@ -17,6 +18,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [mounted, setMounted] = useState(false)
   const [isMiraHovered, setIsMiraHovered] = useState(false)
   const { openChat, isOpen: isMiraOpen, isThinking } = useMiraChat()
+  const { features, miraAccess } = useCompanyFeatures()
+  const miraEnabled = !!features && features.miraAI !== false && miraAccess?.allowed === true
 
   useEffect(() => {
     setMounted(true)
@@ -70,7 +73,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           </Button>
 
           {/* MIRA Cloud Pill Button - Desktop Only */}
-          <div className="relative hidden md:block">
+          {miraEnabled && <div className="relative hidden md:block">
           <button
             type="button"
             aria-label={isMiraOpen ? 'Return to MIRA conversation' : 'Ask Mira'}
@@ -113,8 +116,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
           {/* Separator */}
           <MiraWakeReminder />
-          </div>
-          <div className="hidden md:block w-px h-7 bg-slate-400 dark:bg-zinc-300/40 mx-1" />
+          </div>}
+          {miraEnabled && <div className="hidden md:block w-px h-7 bg-slate-400 dark:bg-zinc-300/40 mx-1" />}
 
           <HeaderSearch />
         </div>

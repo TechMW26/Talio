@@ -5,6 +5,7 @@ import { FaCheck, FaMicrophone, FaSave, FaVolumeUp } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { toast } from '@/utils/toast'
 import { createMiraSpeechPlayback } from '@/lib/miraSpeechPlayback'
+import MiraAdminSettings from './MiraAdminSettings'
 
 export default function MiraSettings() {
   const { data: response, isLoading, mutate } = useAuthedSWR('/api/mira/preferences')
@@ -61,6 +62,7 @@ export default function MiraSettings() {
   }
 
   return <div className="space-y-7">
+    <MiraAdminSettings />
     <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div><h3 className="text-lg font-semibold text-foreground">MIRA voice</h3><p className="mt-1 text-sm text-default-500">Choose how MIRA sounds in spoken replies. Your choice follows your account across devices.</p></div>
@@ -74,6 +76,7 @@ export default function MiraSettings() {
         </button>)}
       </div>
       <p className="mt-3 flex items-center gap-2 text-xs text-default-500"><FaMicrophone aria-hidden="true" />Voice previews use ElevenLabs and the current MIRA speech service.</p>
+      <p className="mt-2 text-xs text-default-500">For live agent conversations, choose Aria, Laura, Lily or Sarah. ElevenLabs does not support the instant-cloned MIRA and Mansi voices with custom-LLM agents; live voice uses Aria for those selections while previews keep your chosen voice.</p>
     </section>
 
     <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">
