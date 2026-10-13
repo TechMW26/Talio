@@ -36,7 +36,7 @@ test('private v4 Turbo agent uses hosted voice reasoning with authenticated acti
 test('does not attempt provider writes for a non-administrator', async () => {
   await expect(syncMiraAgent({}, { role: 'employee' }, 'tenant')).rejects.toMatchObject({ status: 403 })
 })
-test('instant-clone restriction is explicit without overwriting saved preferences', () => {
-  expect(miraAgentVoice('jJ0Hr51MaPgsgfPtFdR4')).toMatchObject({ voiceId: 'ftDdhfYtmfGP0tFlBYA1', voiceName: 'Alisha · Indian', notice: expect.stringContaining('instant-cloned') })
-  expect(miraAgentVoice('FGY2WhTYpPnrIDTdsKH5')).toMatchObject({ voiceId: 'FGY2WhTYpPnrIDTdsKH5', notice: '' })
+test('retired choices fall back to an Indian live-compatible voice', () => {
+  expect(miraAgentVoice('jJ0Hr51MaPgsgfPtFdR4')).toMatchObject({ voiceId: 'ftDdhfYtmfGP0tFlBYA1', voiceName: 'Alisha · Indian', notice: '' })
+  expect(miraAgentVoice('iWq9tCtTw1SYmVpvsRjY')).toMatchObject({ voiceId: 'iWq9tCtTw1SYmVpvsRjY', notice: '' })
 })

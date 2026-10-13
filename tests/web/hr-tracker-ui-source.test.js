@@ -60,7 +60,11 @@ describe('HR tracker UI regressions', () => {
   test('organogram keeps a visible viewport and never degrades to a blank canvas', () => {
     const source = read('app/dashboard/hierarchy/page.js')
     expect(source).toContain('className="hierarchy-viewport"')
-    expect(source).toContain('height: calc(100dvh - 108px)')
+    expect(source).toContain('height: 100dvh')
+    expect(source).toContain("position: 'fixed'")
+    expect(source).toContain('inset: 0')
+    expect(source).toContain('zIndex: 10')
+    expect(source).toContain('</>, portalRoot')
     expect(source).toContain('Unable to load the organogram')
     expect(source).toContain('No employees to display yet')
     expect(source).toContain('onClick={() => mutate()}')

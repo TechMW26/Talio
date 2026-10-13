@@ -9,7 +9,7 @@ import MiraAdminSettings from './MiraAdminSettings'
 
 export default function MiraSettings() {
   const { data: response, isLoading, mutate } = useAuthedSWR('/api/mira/preferences')
-  const [voiceId, setVoiceId] = useState('jJ0Hr51MaPgsgfPtFdR4')
+  const [voiceId, setVoiceId] = useState('ftDdhfYtmfGP0tFlBYA1')
   const [customInstructions, setCustomInstructions] = useState('')
   const [knowledge, setKnowledge] = useState('')
   const [saving, setSaving] = useState(false)
@@ -65,7 +65,7 @@ export default function MiraSettings() {
     <MiraAdminSettings />
     <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div><h3 className="text-lg font-semibold text-foreground">MIRA voice</h3><p className="mt-1 text-sm text-default-500">Choose how MIRA sounds in spoken replies. Your choice follows your account across devices.</p></div>
+        <div><h3 className="text-lg font-semibold text-foreground">MIRA voice</h3><p className="mt-1 text-sm text-default-500">Six Indian voices for previews and live calls. Your choice follows your account across devices.</p></div>
         <button type="button" onClick={preview} disabled={isLoading || previewing} className="inline-flex items-center gap-2 rounded-xl border border-default-200 px-4 py-2 text-sm font-medium text-foreground hover:bg-default-100 disabled:opacity-50">
           <FaVolumeUp aria-hidden="true" /> {previewing ? 'Playing preview…' : 'Preview selected voice'}
         </button>

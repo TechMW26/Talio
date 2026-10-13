@@ -25,22 +25,22 @@ test('streams the configured default voice with server-only credentials and igno
   expect(response.status).toBe(200)
   expect(response.headers.get('cache-control')).toBe('no-store')
   expect(await response.arrayBuffer()).toHaveProperty('byteLength', 4)
-  expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/jJ0Hr51MaPgsgfPtFdR4/stream?output_format=pcm_24000', expect.objectContaining({ headers: expect.objectContaining({ 'xi-api-key': 'test-key' }) }))
+  expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/ftDdhfYtmfGP0tFlBYA1/stream?output_format=pcm_24000', expect.objectContaining({ headers: expect.objectContaining({ 'xi-api-key': 'test-key' }) }))
   expect(rateLimit).toHaveBeenCalledWith('MIRA_VOICE', 'tenantA:u')
   expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ model_id: 'eleven_v4', apply_text_normalization: 'on' })
 })
 test('uses a saved per-user MIRA voice', async () => {
-  voicePreferences = { voiceId: 'komDQG4wp0wC5IDFwetv' }
+  voicePreferences = { voiceId: '6JsmTroalVewG1gA6Jmw' }
   const response = await run({ text: 'Hello' })
   expect(response.status).toBe(200)
   await response.arrayBuffer()
-  expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/komDQG4wp0wC5IDFwetv/stream?output_format=pcm_24000', expect.anything())
+  expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/6JsmTroalVewG1gA6Jmw/stream?output_format=pcm_24000', expect.anything())
 })
 test('allows only curated voices for an unsaved preview and rejects arbitrary provider IDs', async () => {
-  const response = await run({ text: 'Hello', voiceId: '9BWtsMINqrJLrRacOk9x' })
+  const response = await run({ text: 'Hello', voiceId: 'iWq9tCtTw1SYmVpvsRjY' })
   expect(response.status).toBe(200)
   await response.arrayBuffer()
-  expect(global.fetch.mock.calls[0][0]).toContain('/9BWtsMINqrJLrRacOk9x/stream?')
+  expect(global.fetch.mock.calls[0][0]).toContain('/iWq9tCtTw1SYmVpvsRjY/stream?')
   expect((await run({ text: 'Hello', voiceId: 'attacker-controlled-id' })).status).toBe(400)
 })
 test('rejects unauthenticated callers before generation', async () => {

@@ -451,8 +451,10 @@ export function MiraChatProvider({ children }) {
           window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: data.response.action.page } }))
           {
             const arrived = await waitForMiraPage(miraNavigationPath(data.response.action.page), requestController.signal)
-            data.response.actionResult = { success: arrived, message: arrived ? 'Requested page opened.' : 'The requested page did not become available. Please check access or loading status.' }
-            if (!arrived) data.response.message = data.response.actionResult.message
+            data.response.actionResult = { success: arrived, uncertain: !arrived, message: arrived ? 'Requested page opened.' : 'Navigation was requested, but I could not confirm it yet. The page may still be loading.' }
+            // Speak the verified outcome, not the model's pre-execution guess.
+            data.response.message = data.response.actionResult.message
+            data.response.speech = data.response.actionResult.message
           }
         }
         requestController.signal.throwIfAborted()
@@ -473,6 +475,7 @@ export function MiraChatProvider({ children }) {
           timestamp: new Date()
         }
         setMessages(prev => prev.some(m => m.id === replyId) ? prev.map(m => m.id === replyId ? aiMsg : m) : [...prev, aiMsg])
+        options.onActionResult?.(data.response.actionResult)
         // Start voice as soon as the reply is visible, without waiting on persistence.
         if (data.response.action?.type === 'dismiss') closeChat()
         else options.onResponse?.(aiMsg.content)

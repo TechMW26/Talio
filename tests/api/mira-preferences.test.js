@@ -22,17 +22,19 @@ beforeEach(() => {
 test('returns the default voice and curated choices to every authenticated user', async () => {
   const result = await (await GET(new Request('http://localhost/api/mira/preferences'))).json()
   expect(result.success).toBe(true)
-  expect(result.data.voiceId).toBe('jJ0Hr51MaPgsgfPtFdR4')
-  expect(result.voices).toHaveLength(7)
-  expect(result.voices.map(voice => voice.id)).toContain('komDQG4wp0wC5IDFwetv')
+  expect(result.data.voiceId).toBe('ftDdhfYtmfGP0tFlBYA1')
+  expect(result.voices).toHaveLength(6)
+  expect(new Set(result.voices.map(voice => voice.id)).size).toBe(6)
+  expect(new Set(result.voices.map(voice => voice.description)).size).toBe(6)
+  expect(result.voices.every(voice => voice.accent === 'Indian')).toBe(true)
 })
 
 test('saves only supported personal fields to the authenticated profile', async () => {
   profile.miraPreferences = { lastGreetingDate: '2026-09-27', voiceEnabled: false }
-  const result = await (await PUT(request({ voiceId: 'EXAVITQu4vr4xnSDxMaL', customInstructions: 'Be concise', knowledge: 'My team is Atlas', role: 'admin' }))).json()
+  const result = await (await PUT(request({ voiceId: '6JsmTroalVewG1gA6Jmw', customInstructions: 'Be concise', knowledge: 'My team is Atlas', role: 'admin' }))).json()
   expect(result.success).toBe(true)
   expect(database.get).toHaveBeenCalledWith('users', 'current-user')
-  expect(profile.miraPreferences).toMatchObject({ lastGreetingDate: '2026-09-27', voiceEnabled: false, voiceId: 'EXAVITQu4vr4xnSDxMaL', customInstructions: 'Be concise', knowledge: 'My team is Atlas' })
+  expect(profile.miraPreferences).toMatchObject({ lastGreetingDate: '2026-09-27', voiceEnabled: false, voiceId: '6JsmTroalVewG1gA6Jmw', customInstructions: 'Be concise', knowledge: 'My team is Atlas' })
   expect(profile).not.toHaveProperty('role')
   expect(database.mutate).toHaveBeenCalledTimes(1)
 })

@@ -47,6 +47,21 @@ test('visualizer samples both real SDK levels and becomes silent after ending', 
   expect(sidebar).toContain('level={voice.level}')
   expect(sidebar).toContain('isThinking && !voice.active')
 })
+test('verified navigation outcomes reach the voice agent alongside the spoken reply', async () => {
+  const sendMessage = jest.fn(async (_text, callbacks) => {
+    callbacks.onActionResult({ success: true, message: 'Requested page opened.' })
+    callbacks.onSpeech('Requested page opened.')
+    return 'Requested page opened.'
+  })
+  const { result } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage }))
+  await act(async () => result.current.start())
+  let outcome
+  await act(async () => {
+    options.onMessage({ source: 'user', message: 'Open the projects page', event_id: 1 })
+    outcome = await options.clientTools.ask_mira({ message: 'Open the projects page', utterance_id: '1' })
+  })
+  expect(JSON.parse(outcome)).toEqual({ speech: 'Requested page opened.', actionOutcome: { success: true, uncertain: false, message: 'Requested page opened.' } })
+})
 test('punctuation-only ASR placeholders during silence never become captions or billable turns', async () => {
   const recordVoiceMessage = jest.fn(), sendMessage = jest.fn()
   const { result } = renderHook(() => useMiraAgentVoice({ open: true, recordVoiceMessage, sendMessage }))

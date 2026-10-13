@@ -4,6 +4,7 @@
 import { NativeButton, NativeInput } from '@/components/ui/fernly/native'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import { useSocket } from '@/contexts/SocketContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -482,8 +483,10 @@ export default function HierarchyPage() {
   const { isDarkMode } = useTheme();
   const { data, error, isLoading, mutate } = useAuthedSWR('/api/hierarchy/tree');
   const { onEmployeeUpdated, onEmployeeCreated } = useSocket();
+  const [portalRoot, setPortalRoot] = useState(null);
 
   useEffect(() => {
+    setPortalRoot(document.body);
     const previousBody = document.body.style.overflow;
     const previousHtml = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -531,7 +534,7 @@ export default function HierarchyPage() {
     const ro = new ResizeObserver(resize);
     if (vpRef.current) ro.observe(vpRef.current);
     return () => ro.disconnect();
-  }, []);
+  }, [portalRoot]);
 
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(24);
@@ -735,21 +738,25 @@ export default function HierarchyPage() {
   const loading = isLoading && !data;
   const isEmpty = !loading && !error && totalEmployees === 0;
 
-  return (
+  return portalRoot ? createPortal(
     <>
       <style>{`
         @keyframes pulseRing { 0%,100%{opacity:0.5;transform:scale(1)} 50%{opacity:0.9;transform:scale(1.03)} }
         @keyframes spin { to { transform: rotate(360deg) } }
 
         .hierarchy-viewport {
-          height: calc(100dvh - 108px);
-          min-height: 480px;
+          height: 100dvh;
+          --organogram-controls-top: max(82px, calc(var(--desktop-safe-top, 0px) + 48px));
+          --organogram-controls-left: calc(var(--dashboard-rail-width, 76px) + var(--dashboard-navigation-inset, 6px) + 16px);
+          --organogram-controls-bottom: max(20px, env(safe-area-inset-bottom));
+        }
+        @media (max-width: 767px) {
+          .hierarchy-viewport { --organogram-controls-bottom: calc(88px + env(safe-area-inset-bottom)); }
         }
 
         @media (max-width: 639px) {
           .hierarchy-viewport {
-            height: calc(100dvh - 132px);
-            min-height: 360px;
+            --organogram-controls-left: 16px;
           }
         }
       `}</style>
@@ -758,7 +765,9 @@ export default function HierarchyPage() {
         ref={vpRef}
         className="hierarchy-viewport"
         style={{
-          position: 'relative',
+          position: 'fixed',
+          inset: 0,
+          zIndex: 10,
           width: '100%',
           overflow: 'hidden',
           background: isDarkMode ? '#000000' : '#ffffff',
@@ -858,8 +867,8 @@ export default function HierarchyPage() {
           <div
             style={{
               position: 'absolute',
-              top: 14,
-              left: 16,
+              top: 'var(--organogram-controls-top)',
+              left: 'var(--organogram-controls-left)',
               zIndex: 40,
               background: isDarkMode ? 'rgba(2,6,23,0.65)' : 'rgba(255,255,255,0.85)',
               backdropFilter: 'blur(8px)',
@@ -883,7 +892,7 @@ export default function HierarchyPage() {
         <div
           style={{
             position: 'absolute',
-            top: 14,
+            top: 'calc(var(--organogram-controls-top) + 44px)',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 41,
@@ -981,7 +990,7 @@ export default function HierarchyPage() {
         <div
           style={{
             position: 'absolute',
-            bottom: 20,
+            bottom: 'var(--organogram-controls-bottom)',
             right: 20,
             zIndex: 35,
             display: 'flex',
@@ -1114,6 +1123,6 @@ export default function HierarchyPage() {
           })}
         </div>
       </div>
-    </>
-  );
+    </>, portalRoot
+  ) : null;
 }

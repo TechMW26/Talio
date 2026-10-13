@@ -1,4 +1,26 @@
-import { executeMiraUiAction } from '@/lib/miraUiAction'
+import { executeMiraUiAction, waitForMiraPage } from '@/lib/miraUiAction'
+
+test('cold routes opening after five seconds are confirmed, not reported as failed', async () => {
+  jest.useFakeTimers()
+  try {
+    history.replaceState({}, '', '/dashboard')
+    const pending = waitForMiraPage('/dashboard/projects')
+    await jest.advanceTimersByTimeAsync(7000)
+    history.replaceState({}, '', '/dashboard/projects')
+    await jest.advanceTimersByTimeAsync(400)
+    expect(await pending).toBe(true)
+  } finally { jest.useRealTimers(); history.replaceState({}, '', '/') }
+})
+test('redirects during route confirmation cannot be reported as success', async () => {
+  jest.useFakeTimers()
+  try {
+    history.replaceState({}, '', '/dashboard/projects')
+    const pending = waitForMiraPage('/dashboard/projects')
+    history.replaceState({}, '', '/dashboard')
+    await jest.advanceTimersByTimeAsync(200)
+    expect(await pending).toBe(false)
+  } finally { jest.useRealTimers(); history.replaceState({}, '', '/') }
+})
 beforeEach(() => {
   document.body.innerHTML = '<main><button>Pending</button><button>Delete task</button></main>'
   document.querySelectorAll('button').forEach(button => {

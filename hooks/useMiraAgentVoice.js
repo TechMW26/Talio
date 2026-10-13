@@ -91,12 +91,14 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
                   stop(); current.current.onDismiss?.()
                   return JSON.stringify({ speech: '' })
                 }
-                let finalSpeech = ''
+                let finalSpeech = '', actionOutcome
                 const voiceHistory = run.captions.filter(m => !m.persisted).slice(-20).map(m => ({ role: m.source === 'user' ? 'user' : 'assistant', content: m.message }))
-                const reply = await current.current.sendMessage(text, { inputMode: 'voice', voiceTool: true, voiceHistory, onSpeech: speech => { finalSpeech = speech } })
+                const reply = await current.current.sendMessage(text, { inputMode: 'voice', voiceTool: true, voiceHistory, onSpeech: speech => { finalSpeech = speech }, onActionResult: result => {
+                  if (result) actionOutcome = { success: result.success === true, uncertain: result.uncertain === true, message: result.message }
+                } })
                 const speech = live() && generation === run.generation ? finalSpeech || miraSpeechSummary(reply || '') || 'Please check the reply in chat.' : ''
                 if (speech) run.echo.remember(speech)
-                return JSON.stringify({ speech })
+                return JSON.stringify({ speech, ...(actionOutcome ? { actionOutcome } : {}) })
               } finally { run.pending--; if (live()) setState(run.mode === 'speaking' ? 'speaking' : 'listening') }
             })
           },
