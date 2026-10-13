@@ -13,7 +13,8 @@ export async function POST(request) {
     const auth = await getAuthAndDatabase(request)
     if (!auth.success) return NextResponse.json({ message: 'Authentication required' }, { status: auth.status || 401 })
     const payload = await request.json()
-    const { text, voiceId: requestedVoiceId } = payload || {}
+    const { text, voiceId: requestedVoiceId, language } = payload || {}
+    if (language !== undefined && !['en', 'hi'].includes(language)) return NextResponse.json({ message: 'Choose English or Hindi for voice.' }, { status: 400 })
     if (typeof text !== 'string' || !text.trim() || text.length > 5000) {
       return NextResponse.json({ message: 'Speech must contain 1–5000 characters.' }, { status: 400 })
     }
@@ -23,7 +24,7 @@ export async function POST(request) {
     const bucket = await rateLimit('MIRA_VOICE', `${auth.tenant.databaseName}:${auth.user._id}`)
     if (!bucket.allowed) return NextResponse.json({ message: 'Please wait before requesting more speech.' }, { status: 429, headers: { 'Retry-After': String(bucket.retryAfterSeconds) } })
     const key = process.env.ELEVENLABS_API_KEY
-    const profile = await auth.database.get('users', auth.user._id)
+    const profile = requestedVoiceId ? null : await auth.database.get('users', auth.user._id)
     const preferences = sanitizeMiraPreferences(profile?.miraPreferences)
     // User choice takes precedence; the new MIRA ID is the fallback even when
     // a deployment still has a legacy ELEVENLABS_VOICE_ID environment value.
@@ -39,8 +40,8 @@ export async function POST(request) {
       method: 'POST',
       headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
       signal,
-      body: JSON.stringify({ text: chunk, model_id: model, apply_text_normalization: 'on',
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, use_speaker_boost: false } }),
+      body: JSON.stringify({ text: chunk, model_id: model, apply_text_normalization: 'on', ...(language ? { language_code: language } : {}),
+        voice_settings: { stability: 0.4, similarity_boost: 0.75, speed: 1.2, use_speaker_boost: false } }),
     })
     const upstream = await generate(chunks[0])
     if (!upstream.ok || !upstream.body) return NextResponse.json({ message: 'Voice service is temporarily unavailable. Your reply is still in chat.' }, { status: 502 })

@@ -19,3 +19,11 @@ test('team search delegates its border to its focusable container', () => {
   expect(component).toContain('className={styles.search} data-search-container')
   expect(css).toContain('.search:focus-within')
 })
+
+test('team search has equal breathing room above and below without changing card spacing', () => {
+  const css = fs.readFileSync(path.join(process.cwd(), 'components/widgets/TeamAttendanceWidget.module.css'), 'utf8')
+  const search = css.match(/\.search\s*\{([^}]+)\}/)[1]
+  expect(search).toContain('margin-top: 16px')
+  expect(search).toContain('margin-bottom: 16px')
+  expect(css.match(/\.metrics\s*\{([^}]+)\}/)[1]).toContain('gap: 12px')
+})

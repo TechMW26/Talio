@@ -3,22 +3,15 @@ import { useEffect, useState } from 'react'
 import { Button, Switch } from '@/components/ui/fernly'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { LEVELS } from '@/lib/designationLevels'
-import { miraSettingsRequest, saveMiraAccess } from '@/lib/client/miraSettings'
+import { saveMiraAccess } from '@/lib/client/miraSettings'
 
 function AdminPanel({ settings, mutate }) {
   const [enabled, setEnabled] = useState(settings.enabled), [allowedLevels, setAllowedLevels] = useState(settings.allowedLevels)
   const [busy, setBusy] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState('')
-  const { data: agentStatus, mutate: refreshAgent } = useAuthedSWR('/api/mira/agent')
   useEffect(() => { setEnabled(settings.enabled); setAllowedLevels(settings.allowedLevels) }, [settings])
   const save = async () => {
     setBusy('save'); setError(''); setNotice('')
     try { const result = await saveMiraAccess({ enabled, allowedLevels }); await mutate(previous => ({ ...previous, settings: result.settings }), false); setNotice('Mira access saved.') }
-    catch (err) { setError(err.message) }
-    finally { setBusy('') }
-  }
-  const sync = async () => {
-    setBusy('sync'); setError(''); setNotice('')
-    try { const result = await miraSettingsRequest('/api/mira/agent', {}); await refreshAgent(result, false); setNotice('Mira voice agent synced with the shared system prompt.') }
     catch (err) { setError(err.message) }
     finally { setBusy('') }
   }
@@ -34,12 +27,11 @@ function AdminPanel({ settings, mutate }) {
     <p className="text-xs text-default-500">After saving, users without an assigned designation level cannot use Mira. Turning Mira off preserves preferences and conversations. Administrators can always change these controls here.</p>
     <Button color="primary" onPress={save} isDisabled={!!busy || !dirty} isLoading={busy === 'save'}>Save access</Button>
     <div className="border-t border-default-200 pt-5 flex flex-wrap items-center justify-between gap-4">
-      <div><h4 className="font-medium">Mira voice agent</h4><p className="mt-1 text-sm text-default-500">Private live voice · secure Talio tools and permissions</p>
-        <p role="status" className="mt-1 text-xs text-default-500">{!agentStatus ? 'Checking agent…' : agentStatus.needsSync ? agentStatus.canStart ? 'Voice configuration ready · shared prompt update pending' : 'Agent setup or prompt sync required' : 'Shared prompt is synced'}{agentStatus?.agent?.syncedAt ? ` · Last confirmed: ${new Date(agentStatus.agent.syncedAt).toLocaleString()}` : ''}</p>
+      <div><h4 className="font-medium">Mira voice</h4><p className="mt-1 text-sm text-default-500">Direct Talio responses · expressive speech · secure tools and permissions</p>
+        <p role="status" className="mt-1 text-xs text-default-500">Uses the current shared prompt automatically. No agent sync required.</p>
       </div>
-      <Button onPress={sync} isLoading={busy === 'sync'} isDisabled={!!busy}>{agentStatus?.agent ? 'Sync shared prompt' : 'Create Mira agent'}</Button>
     </div>
-    <p className="text-xs text-default-500">Only shared instructions are synced to the agent. Each private call receives your saved name, company and gender when available; other workplace data is fetched only when needed. Personal details are never added to the shared prompt. Voice sessions last up to 10 minutes; reconnect to continue.</p>
+    <p className="text-xs text-default-500">Basic account context is kept in a short-lived private session. Recent conversation stays in a bounded context window; other workplace data is fetched only when needed. Permissions are checked on every turn.</p>
     {error && <p role="alert" className="text-sm text-danger">{error}</p>}
     {notice && <p role="status" className="text-sm text-success">{notice}</p>}
   </section>

@@ -1,12 +1,20 @@
 import { act, renderHook } from '@testing-library/react'
 import useMiraVoice from '@/hooks/useMiraVoice'
+import { generateMiraDirectVoice } from '@/lib/miraDirectVoiceClient'
+jest.mock('@/lib/miraDirectVoiceClient', () => ({ generateMiraDirectVoice: jest.fn() }))
 
 let mockOptions
 const mockCancel = jest.fn(), mockClose = jest.fn(), mockStop = jest.fn()
 const mockSpeak = jest.fn()
 jest.mock('@/lib/miraConversationRecognition', () => ({ startMiraConversationRecognition: async options => { mockOptions = options; return { stream: {}, stop: mockStop } } }))
 jest.mock('@/lib/miraSpeechPlayback', () => ({ createMiraSpeechPlayback: () => ({ cancel: mockCancel, close: mockClose, speak: mockSpeak }) }))
-beforeEach(() => { jest.clearAllMocks(); mockSpeak.mockImplementation((text, onStart) => { onStart(); return new Promise(() => {}) }) })
+beforeEach(() => {
+  jest.clearAllMocks()
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ bridgeCredential: 'private', voiceId: 'selected', language: 'en' }) }))
+  generateMiraDirectVoice.mockImplementation(async options => { options.onText('Your next meeting is at ten.'); return 'Your next meeting is at ten.' })
+  mockSpeak.mockImplementation((text, onStart) => { onStart(); return new Promise(() => {}) })
+})
+afterEach(() => { delete global.fetch })
 test('new speech interrupts playback, while echo does not', async () => {
   const sendMessage = jest.fn().mockResolvedValue('Your next meeting is at ten.')
   const { result, unmount } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))
@@ -19,21 +27,34 @@ test('new speech interrupts playback, while echo does not', async () => {
   expect(mockCancel).toHaveBeenCalledTimes(1)
   expect(result.current.state).toBe('listening')
   await act(async () => { void mockOptions.onResult({ text: 'What about tomorrow?' }); await Promise.resolve() })
-  expect(sendMessage).toHaveBeenLastCalledWith('What about tomorrow?', expect.objectContaining({ inputMode: 'voice', onSpeech: expect.any(Function) }))
+  expect(generateMiraDirectVoice.mock.calls.at(-1)[0].messages.at(-1).content).toBe('What about tomorrow?')
   unmount()
   expect(mockClose).toHaveBeenCalledTimes(1)
   expect(mockStop).toHaveBeenCalledTimes(1)
 })
 test('closing while awaiting MIRA prevents late playback', async () => {
   let resolve
-  const sendMessage = () => new Promise(done => { resolve = done })
+  generateMiraDirectVoice.mockImplementation(() => new Promise(done => { resolve = done }))
+  const sendMessage = jest.fn()
   const { result, rerender } = renderHook(({ open }) => useMiraVoice({ open, busy: false, sendMessage }), { initialProps: { open: true } })
   await act(async () => { await result.current.start() })
-  act(() => { void mockOptions.onResult({ text: 'Hello' }) })
+  await act(async () => { void mockOptions.onResult({ text: 'Hello' }); await Promise.resolve() })
   rerender({ open: false })
   await act(async () => resolve('Hello back'))
   expect(mockSpeak).not.toHaveBeenCalled()
   expect(result.current.active).toBe(false)
+})
+test('barge-in retains the interrupted request in the bounded context window', async () => {
+  generateMiraDirectVoice.mockImplementationOnce(() => new Promise(() => {}))
+  const { result } = renderHook(() => useMiraVoice({ open: true, sendMessage: jest.fn() }))
+  await act(async () => result.current.start())
+  await act(async () => { void mockOptions.onResult({ text: 'What is on my schedule today?' }); await Promise.resolve() })
+  act(() => mockOptions.onPartial('Actually tomorrow'))
+  await act(async () => { void mockOptions.onResult({ text: 'Actually tomorrow' }); await Promise.resolve() })
+  expect(generateMiraDirectVoice.mock.calls[1][0].messages).toEqual([
+    { role: 'user', content: 'What is on my schedule today?' },
+    { role: 'user', content: 'Actually tomorrow' },
+  ])
 })
 
 test('ignores fuzzy echo and delayed final transcripts after playback without blocking new speech', async () => {
@@ -49,7 +70,7 @@ test('ignores fuzzy echo and delayed final transcripts after playback without bl
   await act(async () => { finish(); await turn })
   expect(result.current.state).toBe('listening')
   await act(async () => { await mockOptions.onResult({ text: 'Your next meeting is at ten.' }) })
-  expect(sendMessage).toHaveBeenCalledTimes(1)
+  expect(generateMiraDirectVoice).toHaveBeenCalledTimes(1)
   await act(async () => { void mockOptions.onResult({ text: 'What about tomorrow?' }); await Promise.resolve() })
-  expect(sendMessage).toHaveBeenCalledTimes(2)
+  expect(generateMiraDirectVoice).toHaveBeenCalledTimes(2)
 })

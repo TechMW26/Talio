@@ -17,7 +17,8 @@ test('administrator receives master and nine accessible level switches', () => {
   render(<MiraAdminSettings />)
   expect(screen.getAllByRole('switch')).toHaveLength(10)
   expect(screen.getByRole('switch', { name: 'L6 · Manager' })).toBeChecked()
-  expect(screen.getByText('Shared prompt is synced', { exact: false })).toBeVisible()
+  expect(screen.getByText('Uses the current shared prompt automatically. No agent sync required.')).toBeVisible()
+  expect(screen.queryByRole('button', { name: /Sync shared prompt|Create Mira agent/ })).not.toBeInTheDocument()
 })
 test('level selection saves without changing roles and keeps agent sync separate', async () => {
   render(<MiraAdminSettings />)

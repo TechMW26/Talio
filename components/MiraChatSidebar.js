@@ -19,7 +19,7 @@ import MiraActivityPointer from '@/components/ui/MiraActivityPointer'
 import MiraWakeSetup from '@/components/MiraWakeSetup'
 import ReactMarkdown from 'react-markdown'
 import { VoiceBeam } from 'voice-glow'
-import useMiraVoice, { prewarmMiraAgentVoice } from '@/hooks/useMiraAgentVoice'
+import useMiraVoice, { prewarmMiraVoice } from '@/hooks/useMiraVoice'
 import useMiraSidebarDrag from '@/hooks/useMiraSidebarDrag'
 import useMiraPanelVisible from '@/hooks/useMiraPanelVisible'
 import useMiraWindowRadius from '@/hooks/useMiraWindowRadius'
@@ -468,12 +468,12 @@ export default function MiraChatSidebar() {
   const expanded = viewMode === 'expanded'
   const sidebarDragEnabled = isOpen && viewMode === 'chat'
   const sidebarDrag = useMiraSidebarDrag(sidebarDragEnabled)
-  useEffect(() => { if (isOpen) { void prepareMiraLocation(); void prewarmMiraAgentVoice().catch(() => {}) } }, [isOpen])
+  useEffect(() => { if (isOpen) { void prepareMiraLocation(); void prewarmMiraVoice().catch(() => {}) } }, [isOpen])
   const latestReply = messages.at(-1)
   const followUps = latestReply?.role === 'assistant' && Array.isArray(latestReply.data?.suggestedQuestions)
     ? [...new Set(latestReply.data.suggestedQuestions.filter(q => typeof q === 'string' && q.trim()).map(q => q.trim()))].slice(0, 3) : []
   useEffect(() => { setEditing(null); setReplying(null) }, [activeSessionId])
-  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, recordVoiceMessage, onTokens: updateVoiceTokens, interruptResponse, onDismiss: closeChat })
+  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, recordVoiceMessage, onTokens: updateVoiceTokens, interruptResponse, onDismiss: closeChat, history: messages })
   const voiceMeterRef = useRef(null)
   const pipVoiceMeterRef = useRef(null)
   const paintVoiceLevel = useCallback(level => [voiceMeterRef.current, pipVoiceMeterRef.current].forEach(el => el?.style.setProperty('--mira-voice-level', String(level))), [])
@@ -544,7 +544,7 @@ export default function MiraChatSidebar() {
     if (!isOpen || pip || showHistory) return
     const frame = requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' }))
     return () => cancelAnimationFrame(frame)
-  }, [messages, isThinking, isOpen, pip, showHistory])
+  }, [messages, isThinking, isOpen, pip, showHistory, voice.captions, voice.transcript])
 
   // Focus input when opened
   useEffect(() => {
@@ -783,7 +783,12 @@ export default function MiraChatSidebar() {
         {voice.active ? (
           <div className="flex flex-1 flex-col min-h-0 overflow-y-auto">
             <MiraVoiceCall ref={voiceMeterRef} state={voice.state} muted={voice.muted} />
+            <div role="log" aria-label="Voice transcript" aria-live="polite" className="px-4 space-y-3">
+              {voice.captions?.map(message => <p key={message.id} aria-label={message.role === 'user' ? 'You' : 'Mira'} className={message.role === 'user' ? 'ml-auto max-w-[85%] rounded-2xl bg-default-100 px-4 py-3 text-sm' : 'py-3 text-sm leading-relaxed'}>{message.content}</p>)}
+              {voice.transcript && <p className="ml-auto max-w-[85%] rounded-2xl bg-default-100 px-4 py-3 text-sm text-default-500" aria-label="Your live transcript">{voice.transcript}</p>}
+            </div>
             {voiceResults.map(message => <MessageBubble key={message.id} message={message} onSuggestionClick={handleSuggestionClick} onEdit={handleEdit} onRetry={handleRetry} onReply={handleReply} busy={isThinking} />)}
+            <div ref={messagesEndRef} />
           </div>
         ) : showHistory ? (
           <div className="flex-1 overflow-y-auto">

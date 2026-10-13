@@ -6,11 +6,8 @@ const mockStop = jest.fn()
 const mockStart = jest.fn()
 const mockPush = jest.fn()
 const mockOpenWidget = jest.fn()
-jest.mock('@elevenlabs/client', () => ({ Conversation: { startSession: async options => {
-  await mockStart({ onPartial: text => options.onMessage({ source: 'user', message: text, event_id: 1 }) })
-  options.onConnect?.({ conversationId: 'test' })
-  return { endSession: async () => mockStop() }
-} } }))
+const mockGenerate = jest.fn()
+jest.mock('@/lib/miraDirectVoiceClient', () => ({ generateMiraDirectVoice: (...args) => mockGenerate(...args) }))
 jest.mock('@/contexts/ChatWidgetContext', () => ({ useChatWidget: () => ({ openWidget: mockOpenWidget }) }))
 const mockCloseChat = jest.fn()
 jest.mock('@/lib/miraSpeechPlayback', () => ({ createMiraSpeechPlayback: () => ({ close: jest.fn(), cancel: jest.fn(), speak: jest.fn() }) }))
@@ -41,7 +38,7 @@ jest.mock('@/contexts/MiraChatContext', () => ({ useMiraChat: () => {
 }) } }))
 
 beforeEach(() => {
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, conversationToken: 'rtc-token', voiceId: 'voice', bridgeCredential: 'scoped' }) }))
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, voiceId: 'voice', bridgeCredential: 'scoped' }) }))
   jest.spyOn(document, 'hasFocus').mockReturnValue(true)
   mockBeamProps = null
   mockOpen = true
@@ -51,10 +48,27 @@ beforeEach(() => {
   mockStop.mockReset()
   mockPush.mockReset()
   mockCloseChat.mockReset()
+  mockGenerate.mockReset()
   window.speechSynthesis = { getVoices: () => [], cancel: jest.fn() }
   window.SpeechSynthesisUtterance = function () {}
   Element.prototype.scrollIntoView = jest.fn()
   HTMLMediaElement.prototype.pause = jest.fn()
+})
+test('direct voice keeps the orb and renders both live transcripts without expression tags', async () => {
+  let recognition
+  mockStart.mockImplementation(async callbacks => { recognition = callbacks; return { stop: mockStop } })
+  mockGenerate.mockImplementation(async ({ onText }) => { onText('[warm] I can hear you.'); return '[warm] I can hear you.' })
+  render(<MiraChatSidebar />)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Start voice conversation' })) })
+  act(() => recognition.onPartial('Can you hear'))
+  expect(screen.getByLabelText('Your live transcript')).toHaveTextContent('Can you hear')
+  await act(async () => recognition.onResult({ text: 'Can you hear me?' }))
+  const log = within(screen.getByRole('log', { name: 'Voice transcript' }))
+  expect(log.getByLabelText('You')).toHaveTextContent('Can you hear me?')
+  expect(log.getByLabelText('Mira')).toHaveTextContent('I can hear you.')
+  expect(log.queryByText(/\[warm\]/)).toBeNull()
+  expect(screen.getByLabelText('MIRA activity')).toBeInTheDocument()
+  expect(global.fetch.mock.calls.some(([url]) => url.includes('mira-agent/session'))).toBe(false)
 })
 test('voice beam reacts strongly and quickly without lowering the noise gate', () => {
   const { rerender } = render(<MiraChatSidebar />)

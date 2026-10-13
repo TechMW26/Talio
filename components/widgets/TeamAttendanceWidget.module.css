@@ -25,7 +25,7 @@
 .subheading h4 { font-size: 15px; font-weight: 650; }
 .subheading > span { color: #a9b8cd; font-size: 11px; border: 1px solid #394454; padding: 6px 12px; border-radius: 20px; }
 .list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.search { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 0 14px; min-height: 46px; border: 1px solid #394454; border-radius: 12px; background: #1d2027; color: #a9b8cd; }
+.search { display: flex; align-items: center; gap: 12px; margin-top: 16px; margin-bottom: 16px; padding: 0 14px; min-height: 46px; border: 1px solid #394454; border-radius: 12px; background: #1d2027; color: #a9b8cd; }
 .search:focus-within { border-color: #68aeff; outline: 2px solid #68aeff; outline-offset: 2px; }
 .search > svg { flex-shrink: 0; width: 15px; }
 .search input { width: 100%; min-width: 0; padding: 12px 0; color: #f3f5fa; background: transparent; border: 0; outline: none; font: inherit; font-size: 14px; }

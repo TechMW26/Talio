@@ -2,178 +2,120 @@ import { renderHook, act } from '@testing-library/react'
 import useMiraVoice, { speechText } from '@/hooks/useMiraVoice'
 import { startMiraConversationRecognition } from '@/lib/miraConversationRecognition'
 import { createMiraSpeechPlayback } from '@/lib/miraSpeechPlayback'
+import { generateMiraDirectVoice } from '@/lib/miraDirectVoiceClient'
 jest.mock('@/lib/miraConversationRecognition', () => ({ startMiraConversationRecognition: jest.fn() }))
 jest.mock('@/lib/miraSpeechPlayback', () => ({ createMiraSpeechPlayback: jest.fn() }))
-let callbacks, engine, spoken
-let playback
-describe('four-second idle voice timeout', () => {
-  beforeEach(() => jest.useFakeTimers())
-  afterEach(() => jest.useRealTimers())
-  test('stops idle capture at four seconds without dismissing chat', async () => {
-    const onDismiss = jest.fn()
-    const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage: jest.fn(), onDismiss }))
-    await act(async () => result.current.start())
-    act(() => jest.advanceTimersByTime(3999))
-    expect(result.current.active).toBe(true)
-    act(() => jest.advanceTimersByTime(1))
-    expect(result.current.state).toBe('idle')
-    expect(engine.stop).toHaveBeenCalledTimes(1)
-    expect(playback.close).toHaveBeenCalledTimes(1)
-    expect(onDismiss).not.toHaveBeenCalled()
-  })
-  test('speech resets the timer but empty transcripts do not', async () => {
-    const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage: jest.fn() }))
-    await act(async () => result.current.start())
-    act(() => { jest.advanceTimersByTime(3000); callbacks.onPartial('Hello Mira') })
-    act(() => { jest.advanceTimersByTime(3000); callbacks.onPartial('') })
-    expect(result.current.active).toBe(true)
-    act(() => jest.advanceTimersByTime(1000))
-    expect(result.current.active).toBe(false)
-  })
-  test('does not interrupt thinking or playback; re-arms after the reply', async () => {
-    let resolveReply, pending
-    const sendMessage = jest.fn(() => new Promise(resolve => { resolveReply = resolve }))
-    const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))
-    await act(async () => result.current.start())
-    act(() => { pending = callbacks.onResult({ text: 'Help me' }) })
-    act(() => jest.advanceTimersByTime(8000))
-    expect(result.current.state).toBe('thinking')
-    await act(async () => { resolveReply('Here is the answer.'); await Promise.resolve() })
-    act(() => jest.advanceTimersByTime(8000))
-    expect(result.current.state).toBe('speaking')
-    await act(async () => { spoken[0].onend(); await pending })
-    act(() => jest.advanceTimersByTime(4000))
-    expect(result.current.state).toBe('idle')
-  })
-  test('busy tasks suspend timeout and restarting gets a fresh timer', async () => {
-    const { result, rerender } = renderHook(({ busy }) => useMiraVoice({ open: true, busy, sendMessage: jest.fn() }), { initialProps: { busy: false } })
-    await act(async () => result.current.start())
-    act(() => jest.advanceTimersByTime(3000))
-    rerender({ busy: true })
-    act(() => jest.advanceTimersByTime(8000))
-    expect(result.current.active).toBe(true)
-    rerender({ busy: false })
-    act(() => jest.advanceTimersByTime(3000))
-    act(() => result.current.stop())
-    await act(async () => result.current.start())
-    act(() => jest.advanceTimersByTime(1000))
-    expect(result.current.active).toBe(true)
-    act(() => jest.advanceTimersByTime(3000))
-    expect(result.current.active).toBe(false)
-  })
-})
-test('hung voice initialization exits loading and releases a late microphone session', async () => {
-  jest.useFakeTimers()
-  let resolveEngine, pending
-  startMiraConversationRecognition.mockImplementationOnce(() => new Promise(resolve => { resolveEngine = resolve }))
-  const { result, unmount } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage: jest.fn() }))
-  try {
-    act(() => { pending = result.current.start() })
-    expect(result.current.state).toBe('loading')
-    await act(async () => { await jest.advanceTimersByTimeAsync(10000); await pending })
-    expect(result.current.state).toBe('idle')
-    expect(result.current.error).toMatch(/type now or retry/)
-    expect(playback.close).toHaveBeenCalled()
-    const late = { stop: jest.fn() }
-    await act(async () => { resolveEngine(late); await Promise.resolve() })
-    expect(late.stop).toHaveBeenCalled()
-    expect(result.current.state).toBe('idle')
-  } finally { unmount(); jest.useRealTimers() }
-})
-test('empty action return does not block subsequent voice turns or replay actions', async () => {
-  const sendMessage = jest.fn(async () => undefined)
-  const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))
-  await act(async () => result.current.start())
-  await act(async () => callbacks.onResult({ text: 'Open Notes' }))
-  expect(result.current.error).toBe('')
-  expect(result.current.state).toBe('listening')
-  await act(async () => callbacks.onResult({ text: 'Open Calendar' }))
-  expect(sendMessage).toHaveBeenCalledTimes(2)
-})
-test('callback speech is used even when the action has no return text', async () => {
-  playback = { ...playback, speak: jest.fn(async () => {}) }
-  createMiraSpeechPlayback.mockReturnValue(playback)
-  const sendMessage = jest.fn(async (_, options) => { options.onSpeech('Notes is open.'); return undefined })
-  const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))
-  await act(async () => result.current.start())
-  await act(async () => callbacks.onResult({ text: 'Open Notes' }))
-  expect(playback.speak).toHaveBeenCalled()
-  expect(result.current.error).toBe('')
-  expect(result.current.state).toBe('listening')
-})
+jest.mock('@/lib/miraDirectVoiceClient', () => ({ generateMiraDirectVoice: jest.fn() }))
+let callbacks, engine, playback
 beforeEach(() => {
-  spoken = []
-  engine = { stream: {}, stop: jest.fn(), setPaused: jest.fn() }
+  jest.clearAllMocks()
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ voiceId: 'selected', language: 'en', bridgeCredential: 'private', renewAfterMs: 540000 }) }))
+  engine = { stop: jest.fn(), getLevel: () => .2 }
   startMiraConversationRecognition.mockImplementation(async options => { callbacks = options; return engine })
-  playback = { close: jest.fn(), cancel: jest.fn(), speak: (text, onStart) => new Promise(resolve => { spoken.push({ text, onend: resolve }); onStart() }) }
+  playback = { close: jest.fn(), cancel: jest.fn(), getLevel: () => .4, speak: jest.fn(async (_, onStart) => onStart()) }
   createMiraSpeechPlayback.mockReturnValue(playback)
+  generateMiraDirectVoice.mockImplementation(async options => { options.onText('[warm][fast] Hello there.'); return '[warm][fast] Hello there.' })
 })
-test('recognized speech sends a turn, speaks its reply and resumes listening without echo', async () => {
-  const sendMessage = jest.fn(async () => 'Hello there.')
-  const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))
-  await act(async () => result.current.start())
-  expect(result.current.state).toBe('listening')
-  let pending
-  await act(async () => { pending = callbacks.onResult({ text: 'hello mira' }); await Promise.resolve() })
-  expect(sendMessage).toHaveBeenCalledWith('hello mira', expect.objectContaining({ inputMode: 'voice', onSpeech: expect.any(Function) }))
-  expect(engine.setPaused).not.toHaveBeenCalled()
-  expect(result.current.state).toBe('speaking')
-  await act(async () => callbacks.onResult({ text: 'hello there' }))
-  expect(sendMessage).toHaveBeenCalledTimes(1)
-  await act(async () => { spoken[0].onend(); await pending })
-  expect(result.current.state).toBe('listening')
-  expect(engine.setPaused).not.toHaveBeenCalled()
-})
-test('stopping during a network request prevents late playback', async () => {
-  let resolve
-  const sendMessage = jest.fn(() => new Promise(done => { resolve = done }))
-  const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage }))
-  await act(async () => result.current.start())
-  let pending
-  act(() => { pending = callbacks.onResult({ text: 'hello' }) })
-  act(() => result.current.stop())
-  await act(async () => { resolve('Late response'); await pending })
-  expect(spoken).toHaveLength(0)
-  expect(engine.stop).toHaveBeenCalled()
-})
-test('closing stops capture and speech playback', async () => {
-  const { result, rerender } = renderHook(({ open }) => useMiraVoice({ open, busy: false, sendMessage: async () => 'Hello.' }), { initialProps: { open: true } })
-  await act(async () => result.current.start())
-  await act(async () => { void callbacks.onResult({ text: 'hello' }); await Promise.resolve() })
-  rerender({ open: false })
-  expect(engine.stop).toHaveBeenCalled()
-  expect(playback.close).toHaveBeenCalled()
-  expect(result.current.state).toBe('idle')
-})
-test('speech output skips code syntax and markdown decoration', () => {
-  expect(speechText('**Hello**\n```js\nalert(1)\n```')).toBe('Hello')
-})
+afterEach(() => { jest.useRealTimers(); delete global.fetch })
 
-test('a final goodbye stops a busy session and passes through the local structured-dismiss path', async () => {
-  const sendMessage = jest.fn(), onDismiss = jest.fn()
-  const { result } = renderHook(() => useMiraVoice({ open: true, busy: true, sendMessage, onDismiss }))
+test('stays silently connected without a four-second cutoff or unsolicited generation', async () => {
+  jest.useFakeTimers()
+  const { result } = renderHook(() => useMiraVoice({ open: true }))
+  await act(async () => result.current.start())
+  act(() => jest.advanceTimersByTime(60000))
+  await act(async () => callbacks.onResult({ text: '...' }))
+  expect(result.current.state).toBe('listening')
+  expect(generateMiraDirectVoice).not.toHaveBeenCalled()
+  expect(engine.stop).not.toHaveBeenCalled()
+})
+test('shows user and generated transcripts, retains emotion for audio, and uses no chat request for conversation', async () => {
+  const sendMessage = jest.fn(), recordVoiceMessage = jest.fn()
+  const { result } = renderHook(() => useMiraVoice({ open: true, sendMessage, recordVoiceMessage }))
+  await act(async () => result.current.start())
+  act(() => callbacks.onPartial('Hello'))
+  expect(result.current.transcript).toBe('Hello')
+  await act(async () => callbacks.onResult({ text: 'Hello Mira' }))
+  expect(result.current.captions.map(m => m.content)).toEqual(['Hello Mira', 'Hello there.'])
+  expect(playback.speak.mock.calls[0][0]).toBe('[warm][fast] Hello there.')
+  expect(sendMessage).not.toHaveBeenCalled()
+  expect(global.fetch.mock.calls.map(([url]) => url)).toEqual(['/api/ai/mira-voice/session'])
+  expect(result.current.level()).toBe(.4)
+  act(() => result.current.stop())
+  expect(result.current.level()).toBe(0)
+  expect(recordVoiceMessage.mock.calls.at(-1)[0].messages).toHaveLength(2)
+})
+test('reuses session context and rolling history between turns, without fetching a profile again', async () => {
+  const { result } = renderHook(() => useMiraVoice({ open: true, history: [{ role: 'user', content: 'My project is Talio.' }] }))
+  await act(async () => result.current.start())
+  await act(async () => callbacks.onResult({ text: 'Hello Mira' }))
+  await act(async () => callbacks.onResult({ text: 'What is my project?' }))
+  expect(global.fetch).toHaveBeenCalledTimes(1)
+  expect(generateMiraDirectVoice.mock.calls[1][0].messages).toEqual([
+    { role: 'user', content: 'My project is Talio.' }, { role: 'user', content: 'Hello Mira' },
+    { role: 'assistant', content: '[warm][fast] Hello there.' }, { role: 'user', content: 'What is my project?' },
+  ])
+})
+test('only the exact accepted transcript can enter an action and verified failure remains a failure', async () => {
+  const sendMessage = jest.fn(async (text, opts) => { opts.onSpeech('Could not open it.'); opts.onActionResult({ success: false, uncertain: true }); return undefined })
+  let outcome
+  generateMiraDirectVoice.mockImplementation(async options => { outcome = await options.execute('ask_mira'); options.onText('[warm] Could not confirm it opened.'); return '[warm] Could not confirm it opened.' })
+  const { result } = renderHook(() => useMiraVoice({ open: true, sendMessage }))
+  await act(async () => result.current.start())
+  await act(async () => callbacks.onResult({ text: 'Open projects' }))
+  expect(sendMessage).toHaveBeenCalledTimes(1)
+  expect(sendMessage.mock.calls[0][0]).toBe('Open projects')
+  expect(outcome).toMatchObject({ speech: 'Could not open it.', actionOutcome: { success: false, uncertain: true } })
+})
+test('a final goodbye closes without asking the model, but a partial goodbye does not', async () => {
+  const onDismiss = jest.fn(), sendMessage = jest.fn()
+  const { result } = renderHook(() => useMiraVoice({ open: true, onDismiss, sendMessage }))
   await act(async () => result.current.start())
   act(() => callbacks.onPartial('bye'))
   expect(onDismiss).not.toHaveBeenCalled()
-  const goodbye = 'ठीक है, मेरा। Done, done. बस, ठीक है। Bye, bye.'
-  await act(async () => callbacks.onResult({ text: goodbye }))
+  await act(async () => callbacks.onResult({ text: 'Mira bye' }))
   expect(onDismiss).toHaveBeenCalledTimes(1)
   expect(engine.stop).toHaveBeenCalledTimes(1)
   expect(playback.close).toHaveBeenCalledTimes(1)
-  expect(result.current.active).toBe(false)
-  expect(sendMessage).toHaveBeenCalledWith(goodbye)
-  expect(spoken).toHaveLength(0)
+  expect(generateMiraDirectVoice).not.toHaveBeenCalled()
+  expect(sendMessage).not.toHaveBeenCalled()
 })
-
-test('dismissal cancels speaking and does not let a late reply reopen voice', async () => {
-  const onDismiss = jest.fn()
-  const { result } = renderHook(() => useMiraVoice({ open: true, busy: false, sendMessage: async () => 'Here is your answer.', onDismiss }))
+test('closing aborts generation and prevents late audio or captions', async () => {
+  let resolve
+  generateMiraDirectVoice.mockImplementation(() => new Promise(done => { resolve = done }))
+  const { result, rerender } = renderHook(({ open }) => useMiraVoice({ open }), { initialProps: { open: true } })
   await act(async () => result.current.start())
   let pending
-  await act(async () => { pending = callbacks.onResult({ text: 'Help me' }); await Promise.resolve() })
-  expect(result.current.state).toBe('speaking')
-  await act(async () => callbacks.onResult({ text: 'bye' }))
-  expect(onDismiss).toHaveBeenCalledTimes(1)
-  await act(async () => { spoken[0].onend(); await pending })
+  await act(async () => { pending = callbacks.onResult({ text: 'Hello' }); await Promise.resolve() })
+  const signal = generateMiraDirectVoice.mock.calls[0][0].signal
+  rerender({ open: false })
+  expect(signal.aborted).toBe(true)
+  await act(async () => { resolve('Late reply.'); await pending })
+  expect(playback.speak).not.toHaveBeenCalled()
   expect(result.current.state).toBe('idle')
+})
+test('hung startup exits loading and releases late microphone capture once', async () => {
+  jest.useFakeTimers()
+  let resolveEngine, pending
+  startMiraConversationRecognition.mockImplementationOnce(() => new Promise(resolve => { resolveEngine = resolve }))
+  const { result } = renderHook(() => useMiraVoice({ open: true }))
+  act(() => { pending = result.current.start() })
+  await act(async () => { await jest.advanceTimersByTimeAsync(10000); await pending })
+  expect(result.current.state).toBe('idle')
+  expect(result.current.error).toMatch(/type now or retry/)
+  const late = { stop: jest.fn() }
+  await act(async () => { resolveEngine(late) })
+  expect(late.stop).toHaveBeenCalledTimes(1)
+})
+test('closing and restarting does not leak the previous conversation into a different account/session', async () => {
+  const { result } = renderHook(() => useMiraVoice({ open: true, history: [] }))
+  await act(async () => result.current.start())
+  await act(async () => callbacks.onResult({ text: 'Private old question' }))
+  act(() => result.current.stop())
+  await act(async () => result.current.start())
+  expect(result.current.captions).toEqual([])
+  await act(async () => callbacks.onResult({ text: 'New question' }))
+  expect(generateMiraDirectVoice.mock.calls.at(-1)[0].messages).toEqual([{ role: 'user', content: 'New question' }])
+})
+test('speech cleans markdown but preserves expressive audio tags', () => {
+  expect(speechText('**[warm] Hello**')).toBe('[warm] Hello')
 })

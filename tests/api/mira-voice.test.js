@@ -36,6 +36,13 @@ test('uses a saved per-user MIRA voice', async () => {
   await response.arrayBuffer()
   expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/6JsmTroalVewG1gA6Jmw/stream?output_format=pcm_24000', expect.anything())
 })
+test('direct speech preserves expression and explicit Hindi pronunciation without rereading voice preferences', async () => {
+  const response = await run({ text: '[excited][fast] बहुत अच्छी खबर है!', voiceId: '6JsmTroalVewG1gA6Jmw', language: 'hi' })
+  expect(response.status).toBe(200)
+  await response.arrayBuffer()
+  expect(database.get).not.toHaveBeenCalled()
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ text: '[excited][fast] बहुत अच्छी खबर है!', model_id: 'eleven_v4', language_code: 'hi', voice_settings: { stability: 0.4, speed: 1.2 } })
+})
 test('allows only curated voices for an unsaved preview and rejects arbitrary provider IDs', async () => {
   const response = await run({ text: 'Hello', voiceId: 'iWq9tCtTw1SYmVpvsRjY' })
   expect(response.status).toBe(200)
