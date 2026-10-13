@@ -157,19 +157,19 @@ test('page navigation minimizes the mounted live session and can restore it', as
   await waitFor(() => expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible())
   expect(mockStop).not.toHaveBeenCalled()
   fireEvent.click(screen.getByLabelText('Restore MIRA chat'))
-  expect(screen.getByLabelText('Stop voice conversation')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'End live call' })).toBeVisible()
   expect(mockStart).toHaveBeenCalledTimes(1)
 })
 
-test('PiP shows live user transcription without reopening the chat', async () => {
+test('PiP stays voice-first without rendering live user transcription', async () => {
   mockStart.mockResolvedValue({ stop: mockStop, stream: {} })
   render(<MiraChatSidebar />)
   await act(async () => fireEvent.click(screen.getByLabelText('Start voice conversation')))
   act(() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: 'projects' } })))
   act(() => mockStart.mock.calls.at(-1)[0].onPartial('Mere projects dikhao'))
   const captions = screen.getByLabelText('MIRA live captions')
-  expect(captions).toHaveTextContent('You')
-  expect(captions).toHaveTextContent('Mere projects dikhao')
+  expect(captions).not.toHaveTextContent('Mere projects dikhao')
+  expect(captions).toHaveTextContent('Listening')
   await waitFor(() => expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible())
   expect(mockStop).not.toHaveBeenCalled()
 })

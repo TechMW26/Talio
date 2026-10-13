@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FaCheck, FaMicrophone, FaSave, FaVolumeUp } from 'react-icons/fa'
+import { FaCheck, FaSave, FaVolumeUp } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { toast } from '@/utils/toast'
 import { createMiraSpeechPlayback } from '@/lib/miraSpeechPlayback'
@@ -75,8 +75,6 @@ export default function MiraSettings() {
           <span className="flex items-start justify-between gap-3"><span><span className="block font-semibold text-foreground">{voice.name}</span><span className="mt-1 block text-sm text-default-500">{voice.description}</span><span className="mt-2 block text-xs text-default-400">{voice.accent}</span></span>{voiceId === voice.id && <FaCheck className="mt-1 text-primary-500" aria-label="Selected" />}</span>
         </button>)}
       </div>
-      <p className="mt-3 flex items-center gap-2 text-xs text-default-500"><FaMicrophone aria-hidden="true" />Voice previews use ElevenLabs and the current MIRA speech service.</p>
-      <p className="mt-2 text-xs text-default-500">Alisha is the Indian live-call default. You can also select Aria, Laura, Lily or Sarah. Instant-cloned MIRA and Mansi voices remain available for previews; live calls use Alisha for those selections.</p>
     </section>
 
     <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">

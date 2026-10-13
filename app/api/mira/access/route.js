@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { getMiraAccess, getMiraSettings, updateMiraSettings } from '@/lib/miraAccess.server'
+import { getIO } from '@/lib/socket'
 
 export const dynamic = 'force-dynamic'
 export async function GET(request) {
@@ -16,6 +17,8 @@ export async function PUT(request) {
     if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: auth.status || 401 })
     const { enabled, allowedLevels } = await request.json()
     await updateMiraSettings(auth.database, auth.user, { enabled, allowedLevels })
+    // Tenant-scoped invalidation only; each recipient rechecks its own access.
+    getIO()?.emit('mira-access-updated', { refresh: true }, auth.tenant.databaseName)
     return NextResponse.json({ success: true, settings: await getMiraSettings(auth.database) })
   } catch (error) {
     return NextResponse.json({ success: false, message: error.status ? error.message : 'Could not save Mira access' }, { status: error.status || 500 })

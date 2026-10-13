@@ -13,6 +13,7 @@ import OfflineIndicator from '@/components/OfflineIndicator'
 import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
 import DashboardAIProviders from '@/components/DashboardAIProviders'
+import MiraAccessBoundary from '@/components/MiraAccessBoundary'
 import { UnreadMessagesProvider } from '@/contexts/UnreadMessagesContext'
 import { InAppNotificationProvider } from '@/contexts/InAppNotificationContext'
 import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
@@ -486,7 +487,7 @@ export default function DashboardLayout({ children }) {
                       <RemoteSupportOverlay />
 
                       {/* MIRA AI Chat Sidebar */}
-                      <MiraChatSidebar />
+                      <MiraAccessBoundary><MiraChatSidebar /></MiraAccessBoundary>
 
                       {/* Birthday & Work Anniversary Celebrations */}
                       <CelebrationPopup />

@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import useMiraAgentVoice from '@/hooks/useMiraAgentVoice'
 
 const mockStartSession = jest.fn()
@@ -37,9 +37,46 @@ test('a closed session rejects late startup and never holds the microphone', asy
   const { result } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage: jest.fn() }))
   let starting
   await act(async () => { starting = result.current.start(); await Promise.resolve(); await Promise.resolve() })
+  expect(result.current.state).toBe('loading')
   await act(async () => { while (!finish) await new Promise(resolve => setTimeout(resolve, 0)); result.current.stop(); finish({ endSession: end }); await starting })
   expect(end).toHaveBeenCalledTimes(1)
   expect(result.current.state).toBe('idle')
+})
+test('stays loading through session preparation and switches only when voice connects', async () => {
+  let prepare, connect
+  global.fetch = jest.fn(() => new Promise(resolve => { prepare = resolve }))
+  mockStartSession.mockImplementation(config => {
+    options = config
+    return new Promise(resolve => { connect = resolve })
+  })
+  const { result } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage: jest.fn() }))
+  let starting
+  act(() => { starting = result.current.start() })
+  expect(result.current.state).toBe('loading')
+  expect(result.current.active).toBe(true)
+  await act(async () => {
+    prepare({ ok: true, json: async () => ({ success: true, conversationToken: 'rtc-token', voiceId: 'voice' }) })
+  })
+  await waitFor(() => expect(connect).toBeDefined())
+  expect(result.current.state).toBe('loading')
+  await act(async () => {
+    options.onConnect({ conversationId: 'one' })
+    connect({ endSession: end })
+    await starting
+  })
+  expect(result.current.state).toBe('listening')
+})
+test('failed voice preparation clears loading and exposes an error for retry', async () => {
+  let reject
+  global.fetch = jest.fn(() => new Promise((_resolve, fail) => { reject = fail }))
+  const { result } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage: jest.fn() }))
+  let starting
+  act(() => { starting = result.current.start() })
+  expect(result.current.state).toBe('loading')
+  await act(async () => { reject(new Error('Voice service unavailable')); await starting })
+  expect(result.current.state).toBe('idle')
+  expect(result.current.active).toBe(false)
+  expect(result.current.error).toBe('Voice service unavailable')
 })
 test('barge-in cancels current generation but never retries a previous write', async () => {
   const interruptResponse = jest.fn(), sendMessage = jest.fn()

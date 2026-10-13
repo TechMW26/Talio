@@ -61,13 +61,13 @@ export function CompanyFeaturesProvider({ children }) {
     try {
       parsedUser = JSON.parse(userData)
     } catch {
-      setState((prev) => ({ ...prev, loading: false }))
+      setState((prev) => ({ ...prev, miraAccess: null, loading: false }))
       return null
     }
 
     const databaseName = databaseNameOverride || parsedUser?.tenant?.databaseName || parsedUser?.databaseName || null
     if (!databaseName) {
-      setState((prev) => ({ ...prev, loading: false }))
+      setState((prev) => ({ ...prev, miraAccess: null, loading: false }))
       return null
     }
 
@@ -106,7 +106,7 @@ export function CompanyFeaturesProvider({ children }) {
         return nextPayload
       } catch (error) {
         console.error('[CompanyFeaturesContext] Failed to refresh company features:', error)
-        setState((prev) => ({ ...prev, loading: false }))
+        setState((prev) => ({ ...prev, miraAccess: null, loading: false }))
         return null
       } finally {
         if (inFlightRefreshRef.current?.promise === refreshPromise) {
@@ -122,7 +122,7 @@ export function CompanyFeaturesProvider({ children }) {
   useEffect(() => {
     const userData = localStorage.getItem('user')
     if (!userData) {
-      setState((prev) => ({ ...prev, loading: false }))
+      setState((prev) => ({ ...prev, miraAccess: null, loading: false }))
       return
     }
 
@@ -130,7 +130,7 @@ export function CompanyFeaturesProvider({ children }) {
       const parsedUser = JSON.parse(userData)
       const databaseName = parsedUser?.tenant?.databaseName || parsedUser?.databaseName || null
       if (!databaseName) {
-        setState((prev) => ({ ...prev, loading: false }))
+        setState((prev) => ({ ...prev, miraAccess: null, loading: false }))
         return
       }
 
@@ -144,7 +144,7 @@ export function CompanyFeaturesProvider({ children }) {
 
       refreshFeatures(databaseName)
     } catch {
-      setState((prev) => ({ ...prev, loading: false }))
+      setState((prev) => ({ ...prev, miraAccess: null, loading: false }))
     }
   }, [refreshFeatures])
 
@@ -170,6 +170,16 @@ export function CompanyFeaturesProvider({ children }) {
     })
 
     return unsubscribe
+  }, [state.databaseName, subscribe, refreshFeatures])
+
+  useEffect(() => {
+    if (!state.databaseName) return undefined
+
+    return subscribe('mira-access-updated', () => {
+      // Stop mic owners immediately while fetching fresh per-user permission.
+      setState(prev => ({ ...prev, miraAccess: null }))
+      refreshFeatures(state.databaseName)
+    })
   }, [state.databaseName, subscribe, refreshFeatures])
 
   useEffect(() => {

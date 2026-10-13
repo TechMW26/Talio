@@ -15,6 +15,13 @@ test('uses the actual designation, not admin role or client level claims', async
   expect((await getMiraAccess(makeDatabase({ enabled: true, allowedLevels: [6] }), { employeeId: 'employee' })).allowed).toBe(true)
   expect((await getMiraAccess(db, { role: 'admin' })).allowed).toBe(false)
 })
+test('honors a trusted employee L9 override independently of the Manager title default', async () => {
+  const database = makeDatabase({ enabled: true, allowedLevels: [9] })
+  const fallback = database.get
+  database.get = jest.fn((collection, id) => collection === 'employees'
+    ? Promise.resolve({ designation: 'designation', designationLevel: 9 }) : fallback(collection, id))
+  expect(await getMiraAccess(database, { employeeId: 'employee', role: 'admin' })).toEqual({ allowed: true, level: 9 })
+})
 test('requires fresh administrator authority inside the settings transaction', async () => {
   const changes = { enabled: true, allowedLevels: [6] }
   await expect(updateMiraSettings(makeDatabase(null), { _id: 'user', role: 'employee' }, changes)).rejects.toMatchObject({ status: 403 })

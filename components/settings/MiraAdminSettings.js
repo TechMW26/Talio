@@ -34,7 +34,7 @@ function AdminPanel({ settings, mutate }) {
     <p className="text-xs text-default-500">After saving, users without an assigned designation level cannot use Mira. Turning Mira off preserves preferences and conversations. Administrators can always change these controls here.</p>
     <Button color="primary" onPress={save} isDisabled={!!busy || !dirty} isLoading={busy === 'save'}>Save access</Button>
     <div className="border-t border-default-200 pt-5 flex flex-wrap items-center justify-between gap-4">
-      <div><h4 className="font-medium">Mira voice agent</h4><p className="mt-1 text-sm text-default-500">ElevenLabs v4 Turbo · private agent · Talio reasoning and permissions</p>
+      <div><h4 className="font-medium">Mira voice agent</h4><p className="mt-1 text-sm text-default-500">Private live voice · secure Talio tools and permissions</p>
         <p role="status" className="mt-1 text-xs text-default-500">{!agentStatus ? 'Checking agent…' : agentStatus.needsSync ? 'Agent setup or prompt sync required' : 'Shared prompt is synced'}{agentStatus?.agent?.syncedAt ? ` · ${new Date(agentStatus.agent.syncedAt).toLocaleString()}` : ''}</p>
       </div>
       <Button onPress={sync} isLoading={busy === 'sync'} isDisabled={!!busy}>{agentStatus?.agent ? 'Sync shared prompt' : 'Create Mira agent'}</Button>

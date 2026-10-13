@@ -128,7 +128,7 @@ export default function MiraWakeSetup({ onWake, onStream, suspended = false }) {
           <button onClick={() => { if (status === 'loading') stop(); setVisible(false) }}>{status === 'listening' ? 'Done' : 'Later'}</button>
         </div>
         <details className="text-xs text-default-500"><summary>Privacy & settings</summary>
-          <p className="mt-2">Wake audio stays on this device (40 MB model download). No new voice samples are saved. Other voices may activate MIRA. During voice chat, audio goes to ElevenLabs for automatic multilingual transcription, recognized text goes to MIRA, and reply text goes to ElevenLabs for speech. Location is shared with MIRA only when already permitted on this device. Listening resumes after voice chat and is attempted on reload. Your browser may require another click; closed or suspended apps cannot keep listening.</p>
+          <p className="mt-2">Wake audio stays on this device (40 MB model download). No new voice samples are saved. Other voices may activate MIRA. During a live call, microphone audio is sent to the voice service for transcription and spoken replies. Talio data and actions use your account permissions. Location is shared with MIRA only when already permitted on this device. Listening resumes after voice chat and is attempted on reload. Your browser may require another click; closed or suspended apps cannot keep listening.</p>
           <div className="mt-3 flex gap-4"><button onClick={stop}>Stop listening</button><button onClick={async () => { try { await storeMiraVoiceProfile(owner(), null); setError('') } catch (err) { setError(err.message) } }}>Delete old voice checks</button></div>
         </details>
       </section>

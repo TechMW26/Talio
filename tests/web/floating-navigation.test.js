@@ -2,6 +2,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 const read = file => fs.readFileSync(path.join(process.cwd(), file), 'utf8')
 
+test('mac navigation subtracts its inset from the native outer corner radius', () => {
+  const css = read('app/dashboard/dashboard-layout.css')
+  expect(css).toContain('--dashboard-window-radius: 14px')
+  expect(css).toContain('calc(var(--dashboard-window-radius) - var(--dashboard-navigation-inset))')
+  expect(css).toContain('html[data-desktop-platform="darwin"] :is(.talio-floating-rail, .talio-floating-expanded)')
+  expect(css).toContain('border-radius: var(--dashboard-desktop-sidebar-radius)')
+})
+
 test('header shares equal padding on every edge in loading and ready states', () => {
   const css = read('app/dashboard/dashboard-layout.css')
   const header = read('components/Header.js')

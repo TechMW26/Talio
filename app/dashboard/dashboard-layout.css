@@ -20,6 +20,10 @@
   --dashboard-rail-width: 76px;
   --dashboard-expanded-width: 19rem;
   --dashboard-shell-radius: 22px;
+  /* macOS owns the outer window curve. Its inset navigation must use the
+   * smaller concentric radius, not repeat an oversized inner curve. */
+  --dashboard-window-radius: 14px;
+  --dashboard-desktop-sidebar-radius: max(0px, calc(var(--dashboard-window-radius) - var(--dashboard-navigation-inset)));
   --dashboard-shell-motion: 360ms cubic-bezier(.22, 1, .36, 1);
   --dashboard-font: var(--font-montserrat);
   --dashboard-page-gutter: 2em;
@@ -77,6 +81,9 @@
 }
 .talio-floating-rail { width: var(--dashboard-rail-width); }
 .talio-floating-expanded { width: var(--dashboard-expanded-width); }
+html[data-desktop-platform="darwin"] :is(.talio-floating-rail, .talio-floating-expanded) {
+  border-radius: var(--dashboard-desktop-sidebar-radius);
+}
 /* Account for the rail's smaller left inset without shifting the content over it. */
 .talio-sidebar-spacer { width: calc(var(--dashboard-rail-width) + var(--dashboard-navigation-inset) - var(--dashboard-shell-inset)); }
 .talio-floating-rail[data-open="false"] { transform: translateX(-24px) scale(.94); opacity: 0; visibility: hidden; pointer-events: none; }

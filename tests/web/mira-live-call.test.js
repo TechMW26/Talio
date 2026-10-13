@@ -18,14 +18,15 @@ test('live-call default is a validated Indian voice and does not replace saved p
   expect(miraAgentVoice('komDQG4wp0wC5IDFwetv').voiceName).toContain('Indian')
   expect(miraAgentVoice(DEFAULT_MIRA_AGENT_VOICE_ID)).toMatchObject({ voiceId: DEFAULT_MIRA_AGENT_VOICE_ID, notice: '' })
 })
-test('call indicator distinguishes connecting and listening, exposes the voice and ends the call', () => {
+test('call indicator exposes controls without provider or voice-name disclaimers', () => {
   const onEnd = jest.fn()
   const { rerender } = render(<MiraLiveCallStatus state="loading" onEnd={onEnd} />)
   expect(screen.getByRole('status')).toHaveTextContent('Live call · Connecting')
   expect(screen.getByRole('button', { name: 'Cancel live call' })).toBeInTheDocument()
   rerender(<MiraLiveCallStatus state="listening" voiceName="Alisha · Indian" onEnd={onEnd} />)
   expect(screen.getByRole('status')).toHaveTextContent('Live call · Listening')
-  expect(screen.getByRole('status')).toHaveTextContent('Alisha · Indian')
+  expect(screen.getByRole('status')).not.toHaveTextContent('Alisha')
+  expect(screen.getByRole('status')).not.toHaveTextContent('ElevenLabs')
   fireEvent.click(screen.getByRole('button', { name: 'End live call' }))
   expect(onEnd).toHaveBeenCalledTimes(1)
   rerender(<MiraLiveCallStatus state="idle" onEnd={onEnd} />)

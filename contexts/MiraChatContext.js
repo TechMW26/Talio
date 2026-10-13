@@ -43,7 +43,6 @@ export function MiraChatProvider({ children }) {
   const sendingRef = useRef(false)
   const saveQueueRef = useRef(Promise.resolve())
   const sessionTargetRef = useRef({ id: null })
-  const nativeVoiceTurnRef = useRef(null)
 
   useEffect(() => () => {
     abortControllerRef.current?.abort()
@@ -130,13 +129,10 @@ export function MiraChatProvider({ children }) {
   }, [activeSessionId])
 
   // Save messages to session (create or append)
-  const saveToSession = useCallback(async (userMsg, aiMsg, branchHistory = null, target = sessionTargetRef.current) => {
+  const saveToSession = useCallback(async (userMsg, aiMsg, branchHistory = null, target = sessionTargetRef.current, completedMessages = null) => {
     try {
       const token = getAuthToken()
-      const newMsgs = [
-        ...(userMsg ? [{ role: 'user', content: userMsg.content, data: userMsg.data, timestamp: userMsg.timestamp }] : []),
-        ...(aiMsg ? [{ role: 'assistant', content: aiMsg.content, data: aiMsg.data, timestamp: aiMsg.timestamp }] : [])
-      ]
+      const newMsgs = (completedMessages || [userMsg, aiMsg].filter(Boolean)).map(message => ({ role: message.role, content: message.content, data: message.data, timestamp: message.timestamp }))
 
       if (target.id) {
         // Append to existing session
@@ -154,7 +150,7 @@ export function MiraChatProvider({ children }) {
         const createRes = await fetch('/api/ai/mira-chat/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ title: (userMsg?.content || 'MIRA task queue').slice(0, 50) })
+          body: JSON.stringify({ title: (userMsg?.content || completedMessages?.find(m => m.role === 'user')?.content || 'MIRA task queue').slice(0, 50) })
         })
         const createData = await createRes.json()
         if (createData.success) {
@@ -173,31 +169,21 @@ export function MiraChatProvider({ children }) {
     } catch (error) { toast.error(error.message || 'Could not save this conversation. Please try again.') }
   }, [activeSessionId, messages.length])
 
-  // Captions from the native live agent do not enter the DeepSeek chat pipeline.
-  // Persist completed turns in the existing ordered queue, off the audio path.
+  // The SDK supplies the transcript privately during the call. Publish and
+  // persist it only after disconnect, in bounded batches rather than per reply.
   const recordVoiceMessage = useCallback(event => {
-    if (event.source === 'tool') { nativeVoiceTurnRef.current = null; return }
-    if (event.source === 'end') {
-      const pending = nativeVoiceTurnRef.current
-      nativeVoiceTurnRef.current = null
-      if (pending) saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() => saveToSession(pending.message, null, null, pending.target))
-      return
+    if (event.source === 'start') return sessionTargetRef.current
+    if (event.source !== 'complete' || !Array.isArray(event.messages)) return
+    const target = event.target || sessionTargetRef.current
+    const completed = event.messages.filter(m => !m.persisted && ['user', 'ai'].includes(m.source) && typeof m.message === 'string' && m.message.trim()).map((m, i) => ({
+      id: Date.now() + i + Math.random(), role: m.source === 'user' ? 'user' : 'assistant', content: m.message,
+      data: { nativeVoice: true, ...(m.source === 'ai' ? { message: m.message, cards: [], suggestedQuestions: [] } : {}) }, timestamp: m.timestamp || new Date(),
+    }))
+    if (sessionTargetRef.current === target) setMessages(previous => [...previous, ...completed].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)))
+    for (let i = 0; i < completed.length; i += 30) {
+      const batch = completed.slice(i, i + 30)
+      saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() => saveToSession(null, null, null, target, batch))
     }
-    if (!['user', 'ai'].includes(event.source) || !event.message?.trim()) return
-    const message = { id: Date.now() + Math.random(), role: event.source === 'user' ? 'user' : 'assistant', content: event.message, data: { nativeVoice: true, ...(event.source === 'ai' ? { message: event.message, cards: [], suggestedQuestions: [] } : {}) }, timestamp: new Date() }
-    const pending = nativeVoiceTurnRef.current
-    const target = event.source === 'user' ? sessionTargetRef.current : pending?.target || sessionTargetRef.current
-    const queue = (user, reply, destination) => {
-      saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() => saveToSession(user, reply, null, destination))
-    }
-    if (event.source === 'user') {
-      if (pending) queue(pending.message, null, pending.target)
-      nativeVoiceTurnRef.current = { message, target: sessionTargetRef.current }
-    } else {
-      queue(pending?.message, message, target)
-      nativeVoiceTurnRef.current = null
-    }
-    if (sessionTargetRef.current === target) setMessages(previous => [...previous, message])
   }, [saveToSession])
 
   const openChat = useCallback((options = {}) => {
@@ -294,7 +280,7 @@ export function MiraChatProvider({ children }) {
       ? messages.slice(0, -1) : messages
     const visibleHistory = (branchIndex >= 0 ? messages.slice(0, branchIndex) : sourceHistory).map(m => m.id === options.resolvePerson?.messageId
       ? { ...m, data: { ...m.data, actionResult: { ...m.data.actionResult, resolved: true } } } : m)
-    const history = remoteSessionId ? [] : visibleHistory
+    const history = remoteSessionId ? [] : [...visibleHistory, ...(options.voiceHistory || []).slice(-20)]
 
     const nextId = Math.max(Date.now(), messages.reduce((max, message) => Math.max(max, Number(message.id) || 0), 0) + 1)
     const userMsg = { id: nextId, role: 'user', content: text, ...(options.attachments?.length ? { data: { attachments: options.attachments } } : {}), timestamp: new Date() }
@@ -483,7 +469,7 @@ export function MiraChatProvider({ children }) {
           id: replyId,
           role: 'assistant',
           content: data.response.message,
-          data: data.response,
+          data: { ...data.response, ...(options.voiceTool ? { voiceTool: true } : {}) },
           timestamp: new Date()
         }
         setMessages(prev => prev.some(m => m.id === replyId) ? prev.map(m => m.id === replyId ? aiMsg : m) : [...prev, aiMsg])
@@ -525,7 +511,7 @@ export function MiraChatProvider({ children }) {
           id: Date.now() + 1,
           role: 'assistant',
           content: data.message || 'I encountered an issue. Please try again.',
-          data: { message: data.message || 'I encountered an issue. Please try again.', cards: [], suggestedQuestions: [] },
+          data: { message: data.message || 'I encountered an issue. Please try again.', cards: [], suggestedQuestions: [], ...(options.voiceTool ? { voiceTool: true } : {}) },
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errMsg])
@@ -542,7 +528,7 @@ export function MiraChatProvider({ children }) {
           id: Date.now() + 1,
           role: 'assistant',
           content: 'I\'m having trouble connecting right now. Please try again in a moment.',
-          data: { message: 'I\'m having trouble connecting right now. Please try again in a moment.', cards: [], suggestedQuestions: [] },
+          data: { message: 'I\'m having trouble connecting right now. Please try again in a moment.', cards: [], suggestedQuestions: [], ...(options.voiceTool ? { voiceTool: true } : {}) },
           timestamp: new Date()
         }])
       }

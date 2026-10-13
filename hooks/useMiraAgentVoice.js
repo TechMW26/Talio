@@ -4,12 +4,14 @@ import { createMiraVoiceTurns } from '@/lib/miraVoiceTurns'
 import { createMiraVoiceEchoGuard } from '@/lib/miraVoiceEcho'
 import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { isMiraDismissal } from '@/lib/miraDismissal'
+import { buildMiraOutputLanguageDirective } from '@/lib/miraLanguage'
 
 export const prewarmMiraAgentVoice = () => import('@elevenlabs/client')
 
 export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoiceMessage, onTokens, onDismiss, interruptResponse }) {
-  const [state, setState] = useState('idle'), [transcript, setTranscript] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [state, setState] = useState('idle'), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [voiceName, setVoiceName] = useState('Mira')
+  const [muted, setMuted] = useState(false)
   const current = useRef({ open, busy, sendMessage, recordVoiceMessage, onTokens, onDismiss, interruptResponse }), session = useRef(null)
   current.current = { open, busy, sendMessage, recordVoiceMessage, onTokens, onDismiss, interruptResponse }
   // VoiceBeam samples this getter per frame; reuse the call's own analysers.
@@ -21,16 +23,23 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
   const stop = useCallback(() => {
     const run = session.current
     session.current = null
-    if (run) current.current.recordVoiceMessage?.({ source: 'end' })
+    if (run) current.current.recordVoiceMessage?.({ source: 'complete', messages: run.captions, target: run.voiceTarget })
     run?.abort.abort()
     run?.conversation?.endSession().catch(() => {})
-    setState('idle'); setTranscript('')
+    setState('idle'); setMuted(false)
+  }, [])
+  const toggleMute = useCallback(() => {
+    const run = session.current
+    if (!run?.conversation) return
+    run.muted = !run.muted
+    run.conversation.setMicMuted(run.muted)
+    setMuted(run.muted)
   }, [])
   useEffect(() => { if (!open) stop() }, [open, stop])
   useEffect(() => stop, [stop])
   const start = useCallback(async () => {
     if (session.current || !current.current.open) return
-    const run = { abort: new AbortController(), turns: createMiraVoiceTurns(), echo: createMiraVoiceEchoGuard(), mode: 'listening', pending: 0, generation: 0, toolTurn: false, replies: new Set(), accounting: Promise.resolve() }
+    const run = { abort: new AbortController(), turns: createMiraVoiceTurns(), echo: createMiraVoiceEchoGuard(), mode: 'listening', pending: 0, generation: 0, toolTurn: false, replies: new Set(), accounting: Promise.resolve(), captions: [], startedAt: Date.now(), voiceTarget: current.current.recordVoiceMessage?.({ source: 'start' }) }
     session.current = run
     const live = () => session.current === run && current.current.open
     setError(''); setNotice(''); setState('loading')
@@ -55,6 +64,12 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
         libsampleratePath: '/mira/worklets/libsamplerate-2.1.2/libsamplerate.worklet.js',
         overrides: { tts: { voiceId: config.voiceId } },
         clientTools: {
+          close_mira: params => {
+            const turn = run.turns.latest()
+            if (!live() || !turn?.text || run.echo.reject(params?.message, Date.now(), true)) return
+            if (turn.text.trim() !== params?.message?.trim()) return
+            stop(); current.current.onDismiss?.()
+          },
           ask_mira: params => {
             if (!live() || run.echo.reject(params?.message, Date.now(), true)) return JSON.stringify({ speech: '' })
             // The hosted model may rewrite tool parameters. Execution authority
@@ -69,14 +84,16 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
               try {
                 await run.accounting
                 if (!live()) return JSON.stringify({ speech: '' })
-                current.current.recordVoiceMessage?.({ source: 'tool' })
+                const userCaption = run.captions.at(-1)
+                if (userCaption?.source === 'user') userCaption.persisted = true
                 if (isMiraDismissal(text)) {
                   await current.current.sendMessage(text, { inputMode: 'voice' })
                   stop(); current.current.onDismiss?.()
                   return JSON.stringify({ speech: '' })
                 }
                 let finalSpeech = ''
-                const reply = await current.current.sendMessage(text, { inputMode: 'voice', voiceTool: true, onSpeech: speech => { finalSpeech = speech } })
+                const voiceHistory = run.captions.filter(m => !m.persisted).slice(-20).map(m => ({ role: m.source === 'user' ? 'user' : 'assistant', content: m.message }))
+                const reply = await current.current.sendMessage(text, { inputMode: 'voice', voiceTool: true, voiceHistory, onSpeech: speech => { finalSpeech = speech } })
                 const speech = live() && generation === run.generation ? finalSpeech || miraSpeechSummary(reply || '') || 'Please check the reply in chat.' : ''
                 if (speech) run.echo.remember(speech)
                 return JSON.stringify({ speech })
@@ -98,7 +115,7 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
             if (!run.toolTurn && !run.replies.has(key)) {
               run.replies.add(key)
               if (run.replies.size > 64) run.replies.delete(run.replies.values().next().value)
-              current.current.recordVoiceMessage?.(event)
+              run.captions.push({ ...event, timestamp: new Date() })
             }
             return
           }
@@ -106,8 +123,17 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
           if (!run.turns.transcript(event.message, event.event_id)) return
           run.generation++
           run.toolTurn = false
-          setTranscript(event.message)
-          current.current.recordVoiceMessage?.(event)
+          if (isMiraDismissal(event.message)) {
+            run.captions.push({ ...event, timestamp: new Date() })
+            stop(); current.current.onDismiss?.()
+            return
+          }
+          const language = buildMiraOutputLanguageDirective(event.message, run.captions.map(m => ({ role: m.source === 'user' ? 'user' : 'assistant', content: m.message })))
+          if (language !== run.language) {
+            run.language = language
+            run.conversation?.sendContextualUpdate?.(`Reply-language constraint for the user's current request: ${language} Keep feminine self-reference and the selected voice's dialect. No audio tags or silence check-ins.`)
+          }
+          run.captions.push({ ...event, timestamp: new Date() })
           const turn = run.turns.latest().sequence
           // Accounting stays off the speech path. Loss of authorization, balance
           // or connectivity ends the call; tool execution waits for this check.
@@ -135,5 +161,5 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
       if (live()) { stop(); if (err.name !== 'AbortError') setError(err.message || 'Could not start Mira voice') }
     }
   }, [stop])
-  return { state, stream: null, level, transcript, error, notice, voiceName, start, stop, active: state !== 'idle' }
+  return { state, stream: null, level, transcript: '', error, notice, voiceName, startedAt: session.current?.startedAt, muted, toggleMute, start, stop, active: state !== 'idle' }
 }

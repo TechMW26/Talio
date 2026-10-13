@@ -7,9 +7,9 @@ test.each(['done', 'ठीक है', 'bye but do not close', 'don’t close, b
   expect(buildMiraDismissalResponse(text)).toBeNull()
 })
 
-test.each(['bye', 'Goodbye!', 'Mira, bye.', 'adiós', 'adios Mira', 'see you later', 'thanks, bye', 'please go away', 'close the popup', 'go back to standby', 'stop the conversation', 'thats all for now', 'अलविदा', 'मीरा अब जाओ', 'फिर मिलेंगे'])('recognizes dismissal: %s', text => {
+test.each(['bye', 'Goodbye!', 'Mira, bye.', 'adiós', 'adios Mira', 'see you later', 'thanks, bye', 'please go away', 'close the popup', 'go back to standby', 'stop the conversation', 'thats all for now', 'अलविदा', 'मीरा अब जाओ', 'फिर मिलेंगे', 'End the call', 'Hang up', 'Mira, good night', 'call band karo', 'मीरा कॉल बंद करो'])('recognizes dismissal: %s', text => {
   expect(isMiraDismissal(text)).toBe(true)
 })
-test.each(['translate goodbye into Hindi', 'write a goodbye email', 'do not close', 'close the project', 'bye is a word', 'tell my colleague bye', 'stop', 'stop listening for the wake word', 'adios means goodbye'])('does not dismiss unrelated requests: %s', text => {
+test.each(['translate goodbye into Hindi', 'write a goodbye email', 'do not close', 'close the project', 'bye is a word', 'tell my colleague bye', 'stop', 'stop listening for the wake word', 'adios means goodbye', 'end the call after sending the report', 'do not end the call'])('does not dismiss unrelated requests: %s', text => {
   expect(isMiraDismissal(text)).toBe(false)
 })
