@@ -21,7 +21,8 @@ test('invalid messages and unmatched or unknown tool results fail before provide
 test('stream forwards text and persists a language switch while withholding reasoning', async () => {
   process.env.DEEPSEEK_API_KEY = 'test-only'
   const events = [
-    { choices: [{ delta: { reasoning_content: 'private reasoning', content: 'नमस्ते' } }] },
+    { choices: [{ delta: { reasoning_content: 'private reasoning', content: '[reass' } }] },
+    { choices: [{ delta: { content: 'uring] नमस्ते' } }] },
     { choices: [{ delta: { tool_calls: [{ index: 0, function: { name: 'language_detection', arguments: '{"language":' } }] } }] },
     { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"hi"}' } }] }, finish_reason: 'tool_calls' }] },
   ]
@@ -31,6 +32,8 @@ test('stream forwards text and persists a language switch while withholding reas
     const stream = await streamMiraAgentDeepSeek(body, { onLanguage })
     const text = await new Response(stream).text()
     expect(text).toContain('नमस्ते')
+    const spoken = text.split('\n').filter(line => line.startsWith('data: {')).map(line => JSON.parse(line.slice(6)).choices[0].delta.content || '').join('')
+    expect(spoken).toBe('[reassuring] नमस्ते')
     expect(text).not.toContain('private reasoning')
     expect(text).toMatch(/data: \[DONE\]\n\n$/)
     expect(onLanguage).toHaveBeenCalledWith('hi')

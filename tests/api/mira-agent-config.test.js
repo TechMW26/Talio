@@ -1,6 +1,6 @@
 jest.mock('jose', () => ({ SignJWT: jest.fn(), jwtVerify: jest.fn() }))
 import { miraAgentConfig, miraAgentPromptHash, syncMiraAgent, MIRA_AGENT_LANGUAGES } from '@/lib/miraVoiceAgent.server'
-import { MIRA_CORE_SYSTEM_PROMPT, MIRA_AGENT_SYSTEM_PROMPT } from '@/lib/miraSystemPrompt'
+import { MIRA_CORE_SYSTEM_PROMPT, MIRA_AGENT_SYSTEM_PROMPT, MIRA_VOICE_AUDIO_TAGS, MIRA_VOICE_EXPRESSION_POLICY } from '@/lib/miraSystemPrompt'
 import { miraAgentVoice } from '@/lib/miraVoices'
 
 test('private full v4 agent uses the authenticated DeepSeek gateway and internet tools', () => {
@@ -10,6 +10,8 @@ test('private full v4 agent uses the authenticated DeepSeek gateway and internet
   expect(config.conversation_config.tts.voice_id).toBe('ftDdhfYtmfGP0tFlBYA1')
   expect(config.conversation_config.tts.speed).toBe(1.2)
   expect(config.conversation_config.tts.expressive_mode).toBe(true)
+  expect(config.conversation_config.tts.suggested_audio_tags).toEqual(MIRA_VOICE_AUDIO_TAGS)
+  expect(config.conversation_config.agent.prompt.prompt).toContain(MIRA_VOICE_EXPRESSION_POLICY)
   expect(config.conversation_config.tts.suggested_audio_tags).toContainEqual(expect.objectContaining({ tag: 'laughs' }))
   expect(config.conversation_config.tts.suggested_audio_tags.some(tag => tag.tag === 'slow')).toBe(false)
   expect(config.conversation_config.turn.turn_eagerness).toBe('eager')
