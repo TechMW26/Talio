@@ -89,6 +89,9 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
         onError: () => { if (live()) { stop(); setError('Voice connection interrupted. Your conversation is still in chat; reconnect to continue.') } },
         onMessage: event => {
           if (!live()) return
+          // ASR can emit punctuation-only placeholders during silence. They are
+          // not utterances or replies and must not create captions/usage charges.
+          if (typeof event.message !== 'string' || !/[\p{L}\p{N}]/u.test(event.message)) return
           if (event.source === 'ai') {
             run.echo.remember(event.message)
             const key = `${run.generation}:${event.event_id ?? event.message}`

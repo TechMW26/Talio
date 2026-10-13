@@ -13,6 +13,7 @@ test('native captions persist a complete turn without chat generation or Thinkin
   await act(async () => result.current.recordVoiceMessage({ source: 'user', message: 'Hi' }))
   await act(async () => result.current.recordVoiceMessage({ source: 'ai', message: 'Hello!' }))
   expect(result.current.messages.map(m => [m.role, m.content])).toEqual([['user', 'Hi'], ['assistant', 'Hello!']])
+  expect(result.current.messages.at(-1).data).toMatchObject({ message: 'Hello!', nativeVoice: true, cards: [], suggestedQuestions: [] })
   expect(result.current.isThinking).toBe(false)
   const calls = global.fetch.mock.calls
   expect(calls.some(([url]) => url === '/api/ai/mira-chat')).toBe(false)

@@ -44,6 +44,18 @@ test('visualizer samples both real SDK levels and becomes silent after ending', 
   expect(sidebar).toContain('level={voice.level}')
   expect(sidebar).toContain('isThinking && !voice.active')
 })
+test('punctuation-only ASR placeholders during silence never become captions or billable turns', async () => {
+  const recordVoiceMessage = jest.fn(), sendMessage = jest.fn()
+  const { result } = renderHook(() => useMiraAgentVoice({ open: true, recordVoiceMessage, sendMessage }))
+  await act(async () => result.current.start())
+  await act(async () => {
+    options.onMessage({ source: 'user', message: '...', event_id: 1 })
+    options.onMessage({ source: 'ai', message: '...' })
+  })
+  expect(global.fetch).toHaveBeenCalledTimes(1)
+  expect(recordVoiceMessage).not.toHaveBeenCalled()
+  expect(sendMessage).not.toHaveBeenCalled()
+})
 test('native tools use the accepted user instruction, not rewritten model parameters, exactly once', async () => {
   const sendMessage = jest.fn(async (_text, config) => { config.onSpeech('The screen is open.'); return 'The screen is open.' })
   const recordVoiceMessage = jest.fn()

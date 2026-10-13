@@ -184,7 +184,7 @@ export function MiraChatProvider({ children }) {
       return
     }
     if (!['user', 'ai'].includes(event.source) || !event.message?.trim()) return
-    const message = { id: Date.now() + Math.random(), role: event.source === 'user' ? 'user' : 'assistant', content: event.message, data: { nativeVoice: true }, timestamp: new Date() }
+    const message = { id: Date.now() + Math.random(), role: event.source === 'user' ? 'user' : 'assistant', content: event.message, data: { nativeVoice: true, ...(event.source === 'ai' ? { message: event.message, cards: [], suggestedQuestions: [] } : {}) }, timestamp: new Date() }
     const pending = nativeVoiceTurnRef.current
     const target = event.source === 'user' ? sessionTargetRef.current : pending?.target || sessionTargetRef.current
     const queue = (user, reply, destination) => {
