@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createMiraVoiceTurns } from '@/lib/miraVoiceTurns'
+import { createMiraVoiceTurns, isMiraAudibilityCheck } from '@/lib/miraVoiceTurns'
 import { createMiraVoiceEchoGuard } from '@/lib/miraVoiceEcho'
 import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { isMiraDismissal } from '@/lib/miraDismissal'
@@ -80,6 +80,9 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
             if (!turn?.text) return JSON.stringify({ speech: 'Please repeat your request.' })
             return run.turns.execute({ message: turn.text, utterance_id: `native_${turn.sequence}` }, async text => {
               if (!live()) return JSON.stringify({ speech: '' })
+              // A model's unnecessary tool choice must not turn a basic audio
+              // check into a database/DeepSeek request or a rendered data card.
+              if (isMiraAudibilityCheck(text)) return JSON.stringify({ speech: 'Yes, your spoken words are reaching Mira.', noLookupNeeded: true, hardwareVerified: false })
               const generation = run.generation
               run.toolTurn = true
               run.pending++; setState('working')

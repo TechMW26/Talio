@@ -13,6 +13,31 @@ beforeEach(() => {
   mockStart.mockImplementation(async config => { options = config; config.onConnect({}); return call })
 })
 afterEach(() => { localStorage.clear(); jest.clearAllMocks(); delete global.fetch })
+test.each(['Mira, am I audible?', 'मीरा, am I audible?', 'Can you hear me?', 'क्या तुम मुझे सुन रही हो?'])('unnecessary audibility tools never start the chat brain: %s', async message => {
+  const sendMessage = jest.fn(), recordVoiceMessage = jest.fn()
+  const { result } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage, recordVoiceMessage }))
+  await act(async () => result.current.start())
+  let reply
+  await act(async () => {
+    options.onMessage({ source: 'user', message, event_id: 1 })
+    reply = JSON.parse(await options.clientTools.ask_mira({ message, utterance_id: '1' }))
+    options.onMessage({ source: 'ai', message: 'Your spoken words reached me.' })
+  })
+  expect(reply).toMatchObject({ noLookupNeeded: true, hardwareVerified: false })
+  expect(sendMessage).not.toHaveBeenCalled()
+  act(() => result.current.stop())
+  expect(recordVoiceMessage.mock.calls.at(-1)[0].messages).toHaveLength(2)
+})
+test('an audibility check combined with a real action still executes the authenticated tool', async () => {
+  const sendMessage = jest.fn(async () => 'Projects opened.')
+  const { result } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage }))
+  await act(async () => result.current.start())
+  await act(async () => {
+    options.onMessage({ source: 'user', message: 'Can you hear me and open projects?', event_id: 1 })
+    await options.clientTools.ask_mira({ message: 'Can you hear me and open projects?', utterance_id: '1' })
+  })
+  expect(sendMessage).toHaveBeenCalledTimes(1)
+})
 test('ordinary native voice captions never start the chat brain; accounting is deduplicated', async () => {
   const sendMessage = jest.fn(), recordVoiceMessage = jest.fn(), onTokens = jest.fn()
   const { result } = renderHook(() => useMiraAgentVoice({ open: true, sendMessage, recordVoiceMessage, onTokens }))
