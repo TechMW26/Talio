@@ -50,7 +50,8 @@ test('WebRTC keeps one connected call, ignores echoed playback and never request
     expect(JSON.parse(reply)).toEqual({ speech: '' })
     expect(sendMessage).toHaveBeenCalledTimes(1)
     expect(options.onVadScore).toBeUndefined()
-    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+    expect(global.fetch.mock.calls[1][0]).toBe('/api/ai/mira-agent/usage')
     expect(endSession).not.toHaveBeenCalled()
     expect(mockStart).toHaveBeenCalledTimes(1)
   } finally { unmount(); global.fetch = originalFetch; jest.clearAllMocks() }

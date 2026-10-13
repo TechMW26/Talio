@@ -43,6 +43,7 @@ export function MiraChatProvider({ children }) {
   const sendingRef = useRef(false)
   const saveQueueRef = useRef(Promise.resolve())
   const sessionTargetRef = useRef({ id: null })
+  const nativeVoiceTurnRef = useRef(null)
 
   useEffect(() => () => {
     abortControllerRef.current?.abort()
@@ -134,7 +135,7 @@ export function MiraChatProvider({ children }) {
       const token = getAuthToken()
       const newMsgs = [
         ...(userMsg ? [{ role: 'user', content: userMsg.content, data: userMsg.data, timestamp: userMsg.timestamp }] : []),
-        { role: 'assistant', content: aiMsg.content, data: aiMsg.data, timestamp: aiMsg.timestamp }
+        ...(aiMsg ? [{ role: 'assistant', content: aiMsg.content, data: aiMsg.data, timestamp: aiMsg.timestamp }] : [])
       ]
 
       if (target.id) {
@@ -171,6 +172,33 @@ export function MiraChatProvider({ children }) {
       }
     } catch (error) { toast.error(error.message || 'Could not save this conversation. Please try again.') }
   }, [activeSessionId, messages.length])
+
+  // Captions from the native live agent do not enter the DeepSeek chat pipeline.
+  // Persist completed turns in the existing ordered queue, off the audio path.
+  const recordVoiceMessage = useCallback(event => {
+    if (event.source === 'tool') { nativeVoiceTurnRef.current = null; return }
+    if (event.source === 'end') {
+      const pending = nativeVoiceTurnRef.current
+      nativeVoiceTurnRef.current = null
+      if (pending) saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() => saveToSession(pending.message, null, null, pending.target))
+      return
+    }
+    if (!['user', 'ai'].includes(event.source) || !event.message?.trim()) return
+    const message = { id: Date.now() + Math.random(), role: event.source === 'user' ? 'user' : 'assistant', content: event.message, data: { nativeVoice: true }, timestamp: new Date() }
+    const pending = nativeVoiceTurnRef.current
+    const target = event.source === 'user' ? sessionTargetRef.current : pending?.target || sessionTargetRef.current
+    const queue = (user, reply, destination) => {
+      saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() => saveToSession(user, reply, null, destination))
+    }
+    if (event.source === 'user') {
+      if (pending) queue(pending.message, null, pending.target)
+      nativeVoiceTurnRef.current = { message, target: sessionTargetRef.current }
+    } else {
+      queue(pending?.message, message, target)
+      nativeVoiceTurnRef.current = null
+    }
+    if (sessionTargetRef.current === target) setMessages(previous => [...previous, message])
+  }, [saveToSession])
 
   const openChat = useCallback((options = {}) => {
     setViewModeState(options.mode === 'pip' ? 'pip' : 'chat')
@@ -262,7 +290,9 @@ export function MiraChatProvider({ children }) {
     sendingRef.current = true
 
     const branchIndex = options.replaceFromId !== undefined ? messages.findIndex(m => m.id === options.replaceFromId && m.role === 'user') : -1
-    const visibleHistory = (branchIndex >= 0 ? messages.slice(0, branchIndex) : messages).map(m => m.id === options.resolvePerson?.messageId
+    const sourceHistory = options.voiceTool && messages.at(-1)?.role === 'user' && messages.at(-1)?.data?.nativeVoice
+      ? messages.slice(0, -1) : messages
+    const visibleHistory = (branchIndex >= 0 ? messages.slice(0, branchIndex) : sourceHistory).map(m => m.id === options.resolvePerson?.messageId
       ? { ...m, data: { ...m.data, actionResult: { ...m.data.actionResult, resolved: true } } } : m)
     const history = remoteSessionId ? [] : visibleHistory
 
@@ -537,7 +567,7 @@ export function MiraChatProvider({ children }) {
     <MiraChatContext.Provider value={{
       isOpen, openChat, closeChat, toggleChat,
       viewMode, setViewMode,
-      messages, sendMessage, clearHistory, interruptResponse,
+      messages, sendMessage, recordVoiceMessage, updateVoiceTokens: setTokens, clearHistory, interruptResponse,
       isThinking, tokens,
       sessions, activeSessionId, showHistory,
       toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
@@ -553,7 +583,7 @@ export function useMiraChat() {
     return {
       isOpen: false, openChat: () => {}, closeChat: () => {}, toggleChat: () => {},
       viewMode: 'chat', setViewMode: () => {},
-      messages: [], sendMessage: () => {}, clearHistory: () => {}, interruptResponse: () => {},
+      messages: [], sendMessage: () => {}, recordVoiceMessage: () => {}, updateVoiceTokens: () => {}, clearHistory: () => {}, interruptResponse: () => {},
       isThinking: false, tokens: { tokensUsed: 0, tokenLimit: 100, tokensRemaining: 100 },
       sessions: [], activeSessionId: null, showHistory: false,
       toggleHistory: () => {}, loadSession: () => {}, startNewChat: () => {},

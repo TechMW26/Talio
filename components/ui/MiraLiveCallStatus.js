@@ -3,7 +3,7 @@
 export default function MiraLiveCallStatus({ state, voiceName, onEnd }) {
   if (!state || state === 'idle') return null
   const connecting = state === 'loading'
-  const label = connecting ? 'Connecting…' : state === 'speaking' ? 'Mira speaking' : state === 'thinking' ? 'Preparing reply' : 'Listening'
+  const label = connecting ? 'Connecting…' : state === 'speaking' ? 'Mira speaking' : state === 'working' ? 'Using tools' : state === 'thinking' ? 'Preparing reply' : 'Listening'
   return <div className="mb-2 flex items-center gap-3 rounded-xl border border-default-200 bg-default-100/50 px-3 py-2">
     <span className={`h-2 w-2 shrink-0 rounded-full ${connecting ? 'bg-warning' : 'bg-success'}`} aria-hidden="true" />
     <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-1">

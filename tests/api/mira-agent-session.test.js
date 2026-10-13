@@ -2,12 +2,15 @@ jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/miraAccess.server', () => ({ getMiraSettings: jest.fn(async () => ({ agent: { agentId: 'owned-agent', promptHash: 'current' } })) }))
 jest.mock('@/lib/miraVoiceAgent.server', () => ({ createMiraBridgeCredential: jest.fn(async () => 'scoped-bridge'), miraAgentPromptHash: () => 'current', elevenAgentRequest: jest.fn() }))
 jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn(async () => ({ allowed: true })) }))
+jest.mock('@/lib/miraChatStore.server', () => ({ MIRA_CHAT_STORE_OPTIONS: {}, readMiraTokens: jest.fn(async () => ({ tokensRemaining: 100 })) }))
 import { POST } from '@/app/api/ai/mira-agent/session/route'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { elevenAgentRequest } from '@/lib/miraVoiceAgent.server'
+import { readMiraTokens } from '@/lib/miraChatStore.server'
 
 beforeEach(() => {
   jest.clearAllMocks()
+  readMiraTokens.mockResolvedValue({ tokensRemaining: 100 })
   getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user' }, tenant: { databaseName: 'tenant' }, database: { get: jest.fn(async () => ({})) } })
   elevenAgentRequest.mockResolvedValue({ token: 'rtc-credential', signed_url: 'wss://legacy.example/private' })
 })
@@ -35,5 +38,10 @@ test.each(['broken json', '{"transport":"anything"}', 'null'])('rejects invalid 
 test('denied access never creates provider credentials', async () => {
   getAuthAndDatabase.mockResolvedValue({ success: false, status: 403, message: 'Disabled' })
   expect((await POST(request('{"transport":"webrtc"}'))).status).toBe(403)
+  expect(elevenAgentRequest).not.toHaveBeenCalled()
+})
+test('exhausted allowance does not mint a native voice credential', async () => {
+  readMiraTokens.mockResolvedValue({ tokensRemaining: 0 })
+  expect((await POST(request('{"transport":"webrtc"}'))).status).toBe(429)
   expect(elevenAgentRequest).not.toHaveBeenCalled()
 })

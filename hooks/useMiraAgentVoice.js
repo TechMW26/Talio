@@ -7,14 +7,21 @@ import { isMiraDismissal } from '@/lib/miraDismissal'
 
 export const prewarmMiraAgentVoice = () => import('@elevenlabs/client')
 
-export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, interruptResponse }) {
+export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoiceMessage, onTokens, onDismiss, interruptResponse }) {
   const [state, setState] = useState('idle'), [transcript, setTranscript] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [voiceName, setVoiceName] = useState('Mira')
-  const current = useRef({ open, busy, sendMessage, onDismiss, interruptResponse }), session = useRef(null)
-  current.current = { open, busy, sendMessage, onDismiss, interruptResponse }
+  const current = useRef({ open, busy, sendMessage, recordVoiceMessage, onTokens, onDismiss, interruptResponse }), session = useRef(null)
+  current.current = { open, busy, sendMessage, recordVoiceMessage, onTokens, onDismiss, interruptResponse }
+  // VoiceBeam samples this getter per frame; reuse the call's own analysers.
+  // No second microphone, AudioContext or React render loop.
+  const level = useCallback(() => {
+    const call = session.current?.conversation
+    return Math.max(0, Math.min(1, Math.max(Number(call?.getInputVolume?.()) || 0, Number(call?.getOutputVolume?.()) || 0)))
+  }, [])
   const stop = useCallback(() => {
     const run = session.current
     session.current = null
+    if (run) current.current.recordVoiceMessage?.({ source: 'end' })
     run?.abort.abort()
     run?.conversation?.endSession().catch(() => {})
     setState('idle'); setTranscript('')
@@ -23,7 +30,7 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
   useEffect(() => stop, [stop])
   const start = useCallback(async () => {
     if (session.current || !current.current.open) return
-    const run = { abort: new AbortController(), turns: createMiraVoiceTurns(), echo: createMiraVoiceEchoGuard(), mode: 'listening', pending: 0, generation: 0 }
+    const run = { abort: new AbortController(), turns: createMiraVoiceTurns(), echo: createMiraVoiceEchoGuard(), mode: 'listening', pending: 0, generation: 0, toolTurn: false, replies: new Set(), accounting: Promise.resolve() }
     session.current = run
     const live = () => session.current === run && current.current.open
     setError(''); setNotice(''); setState('loading')
@@ -47,22 +54,29 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
         },
         libsampleratePath: '/mira/worklets/libsamplerate-2.1.2/libsamplerate.worklet.js',
         overrides: { tts: { voiceId: config.voiceId } },
-        customLlmExtraBody: { mira_bridge_credential: config.bridgeCredential },
         clientTools: {
           ask_mira: params => {
             if (!live() || run.echo.reject(params?.message, Date.now(), true)) return JSON.stringify({ speech: '' })
-            return run.turns.execute(params, async text => {
+            // The hosted model may rewrite tool parameters. Execution authority
+            // comes from the accepted final transcript, never model-authored text.
+            const turn = run.turns.latest()
+            if (!turn?.text) return JSON.stringify({ speech: 'Please repeat your request.' })
+            return run.turns.execute({ message: turn.text, utterance_id: `native_${turn.sequence}` }, async text => {
               if (!live()) return JSON.stringify({ speech: '' })
               const generation = run.generation
-              run.pending++; setState('thinking')
+              run.toolTurn = true
+              run.pending++; setState('working')
               try {
+                await run.accounting
+                if (!live()) return JSON.stringify({ speech: '' })
+                current.current.recordVoiceMessage?.({ source: 'tool' })
                 if (isMiraDismissal(text)) {
                   await current.current.sendMessage(text, { inputMode: 'voice' })
                   stop(); current.current.onDismiss?.()
                   return JSON.stringify({ speech: '' })
                 }
                 let finalSpeech = ''
-                const reply = await current.current.sendMessage(text, { inputMode: 'voice', onSpeech: speech => { finalSpeech = speech } })
+                const reply = await current.current.sendMessage(text, { inputMode: 'voice', voiceTool: true, onSpeech: speech => { finalSpeech = speech } })
                 const speech = live() && generation === run.generation ? finalSpeech || miraSpeechSummary(reply || '') || 'Please check the reply in chat.' : ''
                 if (speech) run.echo.remember(speech)
                 return JSON.stringify({ speech })
@@ -75,13 +89,37 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
         onError: () => { if (live()) { stop(); setError('Voice connection interrupted. Your conversation is still in chat; reconnect to continue.') } },
         onMessage: event => {
           if (!live()) return
-          if (event.source === 'ai') { run.echo.remember(event.message); return }
+          if (event.source === 'ai') {
+            run.echo.remember(event.message)
+            const key = `${run.generation}:${event.event_id ?? event.message}`
+            if (!run.toolTurn && !run.replies.has(key)) {
+              run.replies.add(key)
+              if (run.replies.size > 64) run.replies.delete(run.replies.values().next().value)
+              current.current.recordVoiceMessage?.(event)
+            }
+            return
+          }
           if (event.source !== 'user' || run.echo.reject(event.message, Date.now())) return
           if (!run.turns.transcript(event.message, event.event_id)) return
           run.generation++
+          run.toolTurn = false
           setTranscript(event.message)
+          current.current.recordVoiceMessage?.(event)
+          const turn = run.turns.latest().sequence
+          // Accounting stays off the speech path. Loss of authorization, balance
+          // or connectivity ends the call; tool execution waits for this check.
+          run.accounting = run.accounting.then(async () => {
+            if (!live()) return
+            const response = await fetch('/api/ai/mira-agent/usage', {
+              method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bridgeCredential: config.bridgeCredential, turn }), signal: run.abort.signal,
+            })
+            const balance = await response.json()
+            if (!response.ok || !balance.success) throw new Error(balance.message || 'Could not authorize this voice turn')
+            if (live()) current.current.onTokens?.(balance)
+          }).catch(err => { if (live()) { stop(); setError(err.message || 'Voice authorization interrupted. Reconnect to continue.') } })
         },
-        onModeChange: ({ mode }) => { run.mode = mode; run.echo.mode(mode, Date.now()); if (live()) setState(run.pending ? 'thinking' : mode) },
+        onModeChange: ({ mode }) => { run.mode = mode; run.echo.mode(mode, Date.now()); if (live()) setState(run.pending ? 'working' : mode) },
         onInterruption: () => {
           run.generation++
           // Stop generation, never automatically retry an uncertain action.
@@ -94,5 +132,5 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, onDismiss, 
       if (live()) { stop(); if (err.name !== 'AbortError') setError(err.message || 'Could not start Mira voice') }
     }
   }, [stop])
-  return { state, stream: null, transcript, error, notice, voiceName, start, stop, active: state !== 'idle' }
+  return { state, stream: null, level, transcript, error, notice, voiceName, start, stop, active: state !== 'idle' }
 }

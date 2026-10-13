@@ -454,7 +454,7 @@ export default function MiraChatSidebar() {
   const pathname = usePathname()
   const previousPath = useRef(pathname)
   const {
-    isOpen, openChat, closeChat, messages, sendMessage, isThinking, clearHistory, tokens, interruptResponse,
+    isOpen, openChat, closeChat, messages, sendMessage, recordVoiceMessage, updateVoiceTokens, isThinking, clearHistory, tokens, interruptResponse,
     viewMode, setViewMode,
     sessions, activeSessionId, showHistory, toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
   } = useMiraChat()
@@ -471,7 +471,7 @@ export default function MiraChatSidebar() {
   const followUps = latestReply?.role === 'assistant' && Array.isArray(latestReply.data?.suggestedQuestions)
     ? [...new Set(latestReply.data.suggestedQuestions.filter(q => typeof q === 'string' && q.trim()).map(q => q.trim()))].slice(0, 3) : []
   useEffect(() => { setEditing(null); setReplying(null) }, [activeSessionId])
-  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, interruptResponse, onDismiss: closeChat })
+  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, recordVoiceMessage, onTokens: updateVoiceTokens, interruptResponse, onDismiss: closeChat })
   const [wakeRequested, setWakeRequested] = useState(false)
   useEffect(() => {
     if (isOpen && wakeRequested) { setWakeRequested(false); void voice.start() }
@@ -685,7 +685,7 @@ export default function MiraChatSidebar() {
 
       {/* Floating Sidebar panel - glassmorphism */}
       <NativePipSurface ref={nativePipRef} enabled={isOpen} automatic onBackgroundChange={setBackgroundCompact}>
-      <VoiceBeam stream={voice.stream} processing={isThinking} active={isOpen && (voice.active || isThinking)} paused={!isOpen || (!voice.active && !isThinking)} theme="dark" colorVariant="mono" strength={0.95}
+      <VoiceBeam stream={voice.stream} level={voice.level} processing={isThinking} active={isOpen && (voice.active || isThinking)} paused={!isOpen || (!voice.active && !isThinking)} theme="dark" colorVariant="mono" strength={0.95}
         sensitivity={5.4} threshold={0.015} attack={0.12} release={0.42} reach={1.9} idle={0.14}
         borderRadius={16}
         role="dialog"
@@ -726,7 +726,7 @@ export default function MiraChatSidebar() {
           <button aria-label="Dismiss MIRA" onClick={event => { event.stopPropagation(); closeChat() }} className="absolute right-2 top-2 z-10 p-2 rounded-full hover:bg-default-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><FaTimes className="w-4 h-4" /></button>
           <button aria-label="Restore MIRA chat" className="w-full flex items-center gap-3 pr-10 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
             <MiraSphere size={28} isThinking={isThinking} />
-            <span className="flex-1 text-xs font-medium">MIRA · {isThinking ? 'Thinking' : voice.state === 'speaking' ? 'Speaking' : voice.active ? 'Listening' : 'Ready'}</span>
+            <span className="flex-1 text-xs font-medium">MIRA · {voice.state === 'working' ? 'Using tools' : voice.state === 'speaking' ? 'Speaking' : voice.active ? 'Listening' : isThinking ? 'Thinking' : 'Ready'}</span>
           </button>
           <div role="status" aria-live="polite" aria-label="MIRA live captions" className="mt-3 max-h-36 overflow-y-auto text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ minHeight: 'calc(3.25em + 24px)' }}>
             {pipCaption ? <><span className="block text-[11px] text-default-500 mb-1">{pipSpeaker}</span>{miraPlainCaption(pipCaption)}</> : <span className="text-default-500">{voice.active ? 'Speak naturally. Your words appear here.' : 'Your conversation captions appear here.'}</span>}
@@ -881,7 +881,7 @@ export default function MiraChatSidebar() {
               {messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} onSuggestionClick={handleSuggestionClick} onEdit={handleEdit} onRetry={handleRetry} onReply={handleReply} busy={isThinking} />
               ))}
-              {isThinking && messages.at(-1)?.role !== 'assistant' && <ThinkingIndicator />}
+              {isThinking && !voice.active && messages.at(-1)?.role !== 'assistant' && <ThinkingIndicator />}
               <div ref={messagesEndRef} />
             </>
           )}

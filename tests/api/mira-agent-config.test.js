@@ -3,7 +3,7 @@ import { miraAgentConfig, miraAgentPromptHash, syncMiraAgent } from '@/lib/miraV
 import { MIRA_CORE_SYSTEM_PROMPT, MIRA_AGENT_SYSTEM_PROMPT } from '@/lib/miraSystemPrompt'
 import { miraAgentVoice } from '@/lib/miraVoices'
 
-test('private v4 Turbo agent uses a single shared brain and forbids speculative execution', () => {
+test('private v4 Turbo agent uses hosted voice reasoning with authenticated action tools', () => {
   const config = miraAgentConfig()
   expect(config.name).toBe('Mira')
   expect(config.conversation_config.tts.model_id).toBe('eleven_v4_turbo')
@@ -15,12 +15,16 @@ test('private v4 Turbo agent uses a single shared brain and forbids speculative 
   expect(Object.keys(config.conversation_config.language_presets).sort()).toEqual(['en', 'hi'])
   expect(config.conversation_config.agent.prompt.prompt).toContain(MIRA_CORE_SYSTEM_PROMPT)
   expect(config.conversation_config.agent.prompt.prompt).toBe(MIRA_AGENT_SYSTEM_PROMPT)
-  expect(config.conversation_config.agent.prompt.llm).toBe('custom-llm')
-  expect(config.conversation_config.agent.prompt.custom_llm.url).toBe('https://app.talio.in/api/ai/mira-agent/llm')
+  expect(config.conversation_config.agent.prompt.llm).toBe('qwen36-35b-a3b')
+  expect(config.conversation_config.agent.prompt.custom_llm).toBeNull()
+  expect(config.conversation_config.agent.prompt).toMatchObject({ thinking_budget: 0, enable_reasoning_summary: false })
+  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('desktop/system control')
+  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('answer ordinary conversation')
+  expect(MIRA_AGENT_SYSTEM_PROMPT).not.toContain('Every final user utterance must go through')
   expect(config.conversation_config.turn.speculative_turn).toBe(false)
   expect(config.platform_settings.auth.enable_auth).toBe(true)
   expect(config.platform_settings.privacy).toMatchObject({ record_voice: false, delete_audio: true })
-  expect(config.platform_settings.overrides).toEqual({ custom_llm_extra_body: true, conversation_config_override: { tts: { voice_id: true } } })
+  expect(config.platform_settings.overrides).toEqual({ custom_llm_extra_body: false, conversation_config_override: { tts: { voice_id: true } } })
   expect(miraAgentPromptHash()).toMatch(/^[a-f0-9]{64}$/)
 })
 test('does not attempt provider writes for a non-administrator', async () => {
