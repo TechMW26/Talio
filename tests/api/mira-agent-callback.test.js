@@ -31,6 +31,15 @@ test('accepts the real ElevenLabs extra-body envelope and emits SSE', async () =
 test('the provider-appended OpenAI endpoint uses exactly the same secured handler', () => {
   expect(compatiblePOST).toBe(POST)
 })
+test('uses only signed caller context and makes no employee/company lookup per reply', async () => {
+  const userContext = { name: 'Asha', company: 'Example', gender: 'female' }
+  verifyMiraBridgeCredential.mockResolvedValue({ databaseName: 'tenant', userId: 'user', userContext })
+  const response = await POST(request({ mira_bridge_credential: 'scoped', userContext: { name: 'Spoof' }, messages: [{ role: 'user', content: 'What is my name?' }] }))
+  expect(response.status).toBe(200)
+  expect(streamMiraAgentDeepSeek).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ userContext }))
+  const auth = await getAuthAndDatabase.mock.results[0].value
+  expect(auth.database.get.mock.calls).toEqual([['users', 'user']])
+})
 test('rejects unsigned callback requests before database or rate-limit work', async () => {
   const response = await POST(request({ elevenlabs_extra_body: {}, messages: [] }))
   expect(response.status).toBe(401)

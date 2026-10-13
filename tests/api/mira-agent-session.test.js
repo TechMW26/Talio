@@ -5,7 +5,7 @@ jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn(async () => 
 jest.mock('@/lib/miraChatStore.server', () => ({ MIRA_CHAT_STORE_OPTIONS: {}, readMiraTokens: jest.fn(async () => ({ tokensRemaining: 100 })) }))
 import { POST } from '@/app/api/ai/mira-agent/session/route'
 import { getAuthAndDatabase } from '@/lib/auth'
-import { elevenAgentRequest } from '@/lib/miraVoiceAgent.server'
+import { elevenAgentRequest, createMiraBridgeCredential } from '@/lib/miraVoiceAgent.server'
 import { readMiraTokens } from '@/lib/miraChatStore.server'
 
 beforeEach(() => {
@@ -48,4 +48,12 @@ test('exhausted allowance does not mint a native voice credential', async () => 
 test('a new call resumes the language saved on the authenticated account', async () => {
   getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user' }, tenant: {}, database: { get: async () => ({ miraPreferences: { lastLanguage: 'hi' } }) } })
   expect(await (await POST(request('{"transport":"webrtc"}'))).json()).toMatchObject({ language: 'hi' })
+})
+test('signs basic context from the authenticated profile, never from the request body', async () => {
+  const database = { get: jest.fn(async collection => ({ users: { company: 'c1' }, employees: { firstName: 'Asha', lastName: 'Rao', gender: 'female', company: 'c1' }, companies: { name: 'Example' } })[collection]) }
+  const user = { _id: 'user', employeeId: 'e1' }, tenant = { databaseName: 'tenant' }
+  getAuthAndDatabase.mockResolvedValue({ success: true, user, tenant, database })
+  expect((await POST(request(JSON.stringify({ transport: 'webrtc', userContext: { name: 'Spoof' } })))).status).toBe(200)
+  expect(createMiraBridgeCredential).toHaveBeenCalledWith(user, tenant, { name: 'Asha Rao', company: 'Example', gender: 'female' })
+  expect(database.get.mock.calls).toEqual([['users', 'user'], ['employees', 'e1'], ['companies', 'c1']])
 })

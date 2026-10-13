@@ -5,6 +5,7 @@ import { createMiraBridgeCredential, elevenAgentRequest, miraAgentPromptHash, MI
 import { sanitizeMiraPreferences, miraAgentVoice } from '@/lib/miraVoices'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { MIRA_CHAT_STORE_OPTIONS, readMiraTokens } from '@/lib/miraChatStore.server'
+import { loadMiraVoiceContext } from '@/lib/miraVoiceContext'
 
 export const dynamic = 'force-dynamic'
 export async function POST(request) {
@@ -28,10 +29,11 @@ export async function POST(request) {
     catch { return NextResponse.json({ success: false, message: 'Invalid call request' }, { status: 400 }) }
     const transport = raw.trim() ? payload?.transport : 'websocket'
     if (!['webrtc', 'websocket'].includes(transport)) return NextResponse.json({ success: false, message: 'Choose a supported call transport' }, { status: 400 })
+    const userContext = await loadMiraVoiceContext(auth.database, auth.user, profile, auth.tenant)
     const result = await elevenAgentRequest(`/conversation/${transport === 'webrtc' ? 'token' : 'get-signed-url'}?agent_id=${encodeURIComponent(agent.agentId)}`)
     const connection = transport === 'webrtc' ? { conversationToken: result.token } : { signedUrl: result.signed_url }
     if (!Object.values(connection)[0]) throw new Error('Provider did not return a call credential')
-    return NextResponse.json({ success: true, connectionType: transport, ...connection, language, voiceId, voiceName, voiceNotice: notice, bridgeCredential: await createMiraBridgeCredential(auth.user, auth.tenant) }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ success: true, connectionType: transport, ...connection, language, voiceId, voiceName, voiceNotice: notice, bridgeCredential: await createMiraBridgeCredential(auth.user, auth.tenant, userContext) }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     return NextResponse.json({ success: false, message: error.status ? error.message : 'Could not start Mira voice' }, { status: error.status || 500 })
   }
