@@ -157,7 +157,8 @@ test('page navigation minimizes the mounted live session and can restore it', as
   await waitFor(() => expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible())
   expect(mockStop).not.toHaveBeenCalled()
   fireEvent.click(screen.getByLabelText('Restore MIRA chat'))
-  expect(screen.getByRole('button', { name: 'End live call' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Close MIRA' })).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'End live call' })).not.toBeInTheDocument()
   expect(mockStart).toHaveBeenCalledTimes(1)
 })
 
@@ -167,33 +168,33 @@ test('PiP stays voice-first without rendering live user transcription', async ()
   await act(async () => fireEvent.click(screen.getByLabelText('Start voice conversation')))
   act(() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: 'projects' } })))
   act(() => mockStart.mock.calls.at(-1)[0].onPartial('Mere projects dikhao'))
-  const captions = screen.getByLabelText('MIRA live captions')
-  expect(captions).not.toHaveTextContent('Mere projects dikhao')
-  expect(captions.querySelector('[aria-label="End live call"]')).toBeInTheDocument()
+  const pip = document.querySelector('[data-mira-pip-content]')
+  expect(pip).not.toHaveTextContent('Mere projects dikhao')
+  expect(pip.querySelector('[aria-label="End live call"]')).not.toBeInTheDocument()
+  expect(within(pip).queryByRole('status')).not.toBeInTheDocument()
   await waitFor(() => expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible())
   expect(mockStop).not.toHaveBeenCalled()
 })
 
-test('PiP shows streaming and completed assistant captions', () => {
+test('PiP remains orb-only even when assistant captions stream or complete', () => {
   mockMessages = [{ id: 1, role: 'assistant', content: 'Main project khol rahi hoon.', streaming: true }]
   const { rerender } = render(<MiraChatSidebar />)
   act(() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: 'projects' } })))
-  expect(screen.getByLabelText('MIRA live captions')).toHaveTextContent('Main project khol rahi hoon.')
+  expect(document.querySelector('[data-mira-pip-content]')).not.toHaveTextContent('Main project khol rahi hoon.')
   mockMessages = [{ id: 1, role: 'assistant', content: 'Project khul gaya hai.' }]
   rerender(<MiraChatSidebar />)
-  expect(screen.getByLabelText('MIRA live captions')).toHaveTextContent('Project khul gaya hai.')
+  expect(document.querySelector('[data-mira-pip-content]')).not.toHaveTextContent('Project khul gaya hai.')
 })
 
-test('PiP captions expand on click and its dismiss button does not expand', async () => {
+test('PiP orb restores the main panel, whose close button ends the conversation', async () => {
   render(<MiraChatSidebar />)
   fireEvent.click(screen.getByLabelText('Minimize MIRA to floating voice'))
   expect(screen.queryByText('↗')).toBeNull()
-  fireEvent.click(screen.getByLabelText('MIRA live captions'))
+  expect(screen.queryByLabelText('Dismiss MIRA')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByLabelText('Restore MIRA chat'))
   await waitFor(() => expect(screen.getByLabelText('Minimize MIRA to floating voice')).toBeVisible())
-  fireEvent.click(screen.getByLabelText('Minimize MIRA to floating voice'))
-  fireEvent.click(screen.getByLabelText('Dismiss MIRA'))
+  fireEvent.click(screen.getByLabelText('Close MIRA'))
   expect(mockCloseChat).toHaveBeenCalledTimes(1)
-  expect(screen.getByLabelText('Restore MIRA chat')).toBeVisible()
 })
 
 test('the same sidebar smoothly expands to full width and collapses', () => {

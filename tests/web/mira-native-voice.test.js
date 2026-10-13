@@ -52,7 +52,7 @@ test('ordinary native voice captions never start the chat brain; accounting is d
   expect(recordVoiceMessage.mock.calls.map(([event]) => event.source)).toEqual(['start'])
   expect(result.current.transcript).toBe('')
   expect(global.fetch.mock.calls.map(([url]) => url)).toEqual(['/api/ai/mira-agent/session', '/api/ai/mira-agent/usage'])
-  expect(options.customLlmExtraBody).toBeUndefined()
+  expect(options.customLlmExtraBody).toEqual({ mira_bridge_credential: 'scoped' })
   expect(onTokens).toHaveBeenCalledWith(expect.objectContaining({ tokensRemaining: 99 }))
   expect(result.current.state).toBe('listening')
   act(() => result.current.stop())

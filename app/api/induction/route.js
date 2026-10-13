@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { inductionStatus, publicInductionStatus, updateInductionProgress } from '@/lib/hrms/induction.server'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 export async function GET(request) {
   try {
     const auth = await getAuthAndDatabase(request)

@@ -92,3 +92,13 @@ test('no published presentation allows normal use', async () => {
   render(<InductionGate><p>Private dashboard</p></InductionGate>)
   await screen.findByText('Private dashboard')
 })
+
+test('initial failure presents a recoverable workspace card instead of a blank screen', async () => {
+  inductionRequest.mockRejectedValueOnce(new Error('The induction request timed out.')).mockResolvedValue({ required: false })
+  render(<InductionGate><p>Private dashboard</p></InductionGate>)
+  await screen.findByRole('heading', { name: 'Unable to check your induction' })
+  expect(screen.getByRole('alert')).toHaveTextContent('timed out')
+  expect(screen.queryByText('Private dashboard')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+  await screen.findByText('Private dashboard')
+})

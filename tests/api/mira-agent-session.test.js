@@ -1,6 +1,6 @@
 jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/miraAccess.server', () => ({ getMiraSettings: jest.fn(async () => ({ agent: { agentId: 'owned-agent', promptHash: 'current' } })) }))
-jest.mock('@/lib/miraVoiceAgent.server', () => ({ createMiraBridgeCredential: jest.fn(async () => 'scoped-bridge'), miraAgentPromptHash: () => 'current', elevenAgentRequest: jest.fn() }))
+jest.mock('@/lib/miraVoiceAgent.server', () => ({ MIRA_AGENT_LANGUAGES: ['en', 'hi', 'es'], createMiraBridgeCredential: jest.fn(async () => 'scoped-bridge'), miraAgentPromptHash: () => 'current', elevenAgentRequest: jest.fn() }))
 jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn(async () => ({ allowed: true })) }))
 jest.mock('@/lib/miraChatStore.server', () => ({ MIRA_CHAT_STORE_OPTIONS: {}, readMiraTokens: jest.fn(async () => ({ tokensRemaining: 100 })) }))
 import { POST } from '@/app/api/ai/mira-agent/session/route'
@@ -44,4 +44,8 @@ test('exhausted allowance does not mint a native voice credential', async () => 
   readMiraTokens.mockResolvedValue({ tokensRemaining: 0 })
   expect((await POST(request('{"transport":"webrtc"}'))).status).toBe(429)
   expect(elevenAgentRequest).not.toHaveBeenCalled()
+})
+test('a new call resumes the language saved on the authenticated account', async () => {
+  getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user' }, tenant: {}, database: { get: async () => ({ miraPreferences: { lastLanguage: 'hi' } }) } })
+  expect(await (await POST(request('{"transport":"webrtc"}'))).json()).toMatchObject({ language: 'hi' })
 })

@@ -1,0 +1,20 @@
+import { inductionRequest } from '@/lib/client/induction'
+beforeEach(() => { localStorage.setItem('token', 'test'); global.fetch = jest.fn() })
+afterEach(() => { delete global.fetch; localStorage.clear() })
+const ready = () => ({ ok: true, json: async () => ({ success: true, data: { required: false } }) })
+test('normal reads use one request; transient reads recover with one bounded retry', async () => {
+  fetch.mockResolvedValueOnce(ready())
+  expect(await inductionRequest()).toEqual({ required: false })
+  expect(fetch).toHaveBeenCalledTimes(1)
+  fetch.mockClear().mockRejectedValueOnce(new TypeError('Network failure')).mockResolvedValueOnce(ready())
+  expect(await inductionRequest()).toEqual({ required: false })
+  expect(fetch).toHaveBeenCalledTimes(2)
+})
+test('never automatically replays writes or retries denied access', async () => {
+  fetch.mockRejectedValueOnce(new TypeError('Network failure'))
+  await expect(inductionRequest({ action: 'acknowledge' })).rejects.toThrow('Network failure')
+  expect(fetch).toHaveBeenCalledTimes(1)
+  fetch.mockClear().mockResolvedValue({ ok: false, status: 401, json: async () => ({ success: false, message: 'Sign in' }) })
+  await expect(inductionRequest()).rejects.toThrow('Sign in')
+  expect(fetch).toHaveBeenCalledTimes(1)
+})

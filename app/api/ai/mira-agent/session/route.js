@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { getMiraSettings } from '@/lib/miraAccess.server'
-import { createMiraBridgeCredential, elevenAgentRequest, miraAgentPromptHash } from '@/lib/miraVoiceAgent.server'
+import { createMiraBridgeCredential, elevenAgentRequest, miraAgentPromptHash, MIRA_AGENT_LANGUAGES } from '@/lib/miraVoiceAgent.server'
 import { sanitizeMiraPreferences, miraAgentVoice } from '@/lib/miraVoices'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { MIRA_CHAT_STORE_OPTIONS, readMiraTokens } from '@/lib/miraChatStore.server'
@@ -18,6 +18,7 @@ export async function POST(request) {
     const { agent } = await getMiraSettings(auth.database)
     if (!agent?.agentId || agent.promptHash !== miraAgentPromptHash()) return NextResponse.json({ success: false, message: 'An administrator needs to sync the Mira voice agent in Settings → MIRA' }, { status: 409 })
     const profile = await auth.database.get('users', String(auth.user._id || auth.user.userId))
+    const language = MIRA_AGENT_LANGUAGES.includes(profile?.miraPreferences?.lastLanguage) ? profile.miraPreferences.lastLanguage : 'en'
     const { voiceId, voiceName, notice } = miraAgentVoice(sanitizeMiraPreferences(profile?.miraPreferences).voiceId)
     // Existing clients can still finish/start their signed-URL session. New
     // clients explicitly request WebRTC; never silently downgrade a live call.
@@ -30,7 +31,7 @@ export async function POST(request) {
     const result = await elevenAgentRequest(`/conversation/${transport === 'webrtc' ? 'token' : 'get-signed-url'}?agent_id=${encodeURIComponent(agent.agentId)}`)
     const connection = transport === 'webrtc' ? { conversationToken: result.token } : { signedUrl: result.signed_url }
     if (!Object.values(connection)[0]) throw new Error('Provider did not return a call credential')
-    return NextResponse.json({ success: true, connectionType: transport, ...connection, voiceId, voiceName, voiceNotice: notice, bridgeCredential: await createMiraBridgeCredential(auth.user, auth.tenant) }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ success: true, connectionType: transport, ...connection, language, voiceId, voiceName, voiceNotice: notice, bridgeCredential: await createMiraBridgeCredential(auth.user, auth.tenant) }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     return NextResponse.json({ success: false, message: error.status ? error.message : 'Could not start Mira voice' }, { status: error.status || 500 })
   }

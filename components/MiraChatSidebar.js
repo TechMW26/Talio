@@ -26,8 +26,7 @@ import { prepareMiraLocation } from '@/lib/miraClientContext'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import MiraEditPrompt from './MiraEditPrompt'
-import { miraMessageDisplay, miraPlainCaption } from '@/lib/miraMessageDisplay'
-import MiraLiveCallStatus from '@/components/ui/MiraLiveCallStatus'
+import { miraMessageDisplay } from '@/lib/miraMessageDisplay'
 import MiraVoiceCall from '@/components/ui/MiraVoiceCall'
 
 // ─── Copy Button ────────────────────────────────────────────────────
@@ -672,13 +671,6 @@ export default function MiraChatSidebar() {
     "Explain how async/await works",
   ]
 
-  const latestCaptionMessage = messages.at(-1)
-  const showMiraCaption = voice.state === 'speaking' || latestCaptionMessage?.streaming
-  const pipCaption = voice.error || (voice.active ? '' : (showMiraCaption
-    ? latestCaptionMessage?.content
-    : miraMessageDisplay(latestCaptionMessage))) || ''
-  const pipSpeaker = voice.error ? 'Voice issue' : showMiraCaption ? 'MIRA' : voice.transcript ? 'You' : latestCaptionMessage?.role === 'user' ? 'You' : 'MIRA'
-
   return (
     <>
       <MiraActivityPointer />
@@ -730,16 +722,10 @@ export default function MiraChatSidebar() {
         }}
       >
         {isOpen && (voiceConnecting || isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={16} />}
-        {pip && <div data-mira-pip-content className="p-3 text-foreground relative cursor-pointer flex-1 min-h-0 overflow-y-auto" onClick={restoreMira}>
-          <button aria-label="Dismiss MIRA" onClick={event => { event.stopPropagation(); closeChat() }} className="absolute right-2 top-2 z-10 p-2 rounded-full hover:bg-default-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><FaTimes className="w-4 h-4" /></button>
-          <button aria-label="Restore MIRA chat" className="w-full flex items-center gap-3 pr-10 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
-            <MiraSphere size={28} isThinking={isThinking || voiceConnecting} />
-            <span className="flex-1 text-xs font-medium">MIRA · {voiceConnecting ? 'Connecting' : voice.state === 'working' ? 'Using tools' : voice.state === 'speaking' ? 'Speaking' : voice.active ? 'Listening' : isThinking ? 'Thinking' : 'Ready'}</span>
+        {pip && <div data-mira-pip-content className="p-3 text-foreground relative flex flex-1 items-center justify-center min-h-[180px]">
+          <button aria-label="Restore MIRA chat" onClick={restoreMira} className="w-full flex items-center justify-center rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+            {voice.active ? <MiraVoiceCall ref={pipVoiceMeterRef} compact state={voice.state} muted={voice.muted} /> : <MiraSphere size={128} isThinking={isThinking || voiceConnecting} />}
           </button>
-          <div role="status" aria-live="polite" aria-label="MIRA live captions" className="mt-3 max-h-36 overflow-y-auto text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ minHeight: 'calc(3.25em + 24px)' }}>
-            {voice.active ? <><MiraVoiceCall ref={pipVoiceMeterRef} compact state={voice.state} muted={voice.muted} /><MiraLiveCallStatus state={voice.state} muted={voice.muted} onMute={voice.toggleMute} onEnd={voice.stop} /></> : voiceConnecting ? <span className="text-default-500">You can speak once Mira is connected.</span> : pipCaption ? <><span className="block text-[11px] text-default-500 mb-1">{pipSpeaker}</span>{miraPlainCaption(pipCaption)}</> : <span className="text-default-500">Your conversation captions appear here.</span>}
-          </div>
-          {latestReply?.data?.image && <div className="max-h-64 overflow-y-auto" onClick={event => event.stopPropagation()}><MiraGeneratedImage image={latestReply.data.image} compact /></div>}
         </div>}
         <MiraVoiceConnecting active={isOpen && voiceConnecting} onCancel={voice.stop} />
         <div className={pip ? 'hidden' : 'contents'}>
@@ -949,7 +935,6 @@ export default function MiraChatSidebar() {
             <span className="truncate">{`Replying to: ${replying.data?.message || replying.content}`}</span>
             <button aria-label="Cancel edit or reply" onClick={() => { setEditing(null); setReplying(null) }}><FaTimes /></button>
           </div>}
-          <MiraLiveCallStatus state={voice.state} muted={voice.muted} onMute={voice.toggleMute} onEnd={voice.stop} />
           {!voice.active && <>
           <MiraAttachments files={attachments} onChange={setAttachments} busy={isThinking} onBusyChange={setAttachmentsBusy} />
           <div className="flex items-end gap-2 p-2 rounded-2xl border border-default-200 bg-white/5">

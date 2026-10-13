@@ -65,8 +65,12 @@ export default function InductionGate({ children }) {
   }
   if (status && !required) return children
   // Wait for the authoritative status without presenting an incomplete induction.
-  if (!status) return <div className="min-h-32 p-6" role="status" aria-label="Checking induction status">
-    {error && <div role="alert" className="text-danger">{error}<Button className="ml-3" size="sm" onPress={refresh}>Retry</Button></div>}
+  if (!status) return <div className="flex min-h-[60dvh] items-center justify-center p-6" role="status" aria-label="Checking induction status">
+    <section className="w-full max-w-lg rounded-2xl border border-default-200 bg-content1 p-6 text-center">
+      <h1 className="text-lg font-semibold">{error ? 'Unable to check your induction' : 'Preparing your workspace'}</h1>
+      <p className="mt-2 text-sm text-default-500">{error ? 'Your saved progress is safe. Retry the connection to continue.' : 'Checking your induction requirements…'}</p>
+      {error ? <><div role="alert" className="mt-4 text-sm text-danger">{error}</div><Button className="mt-4" color="primary" onPress={refresh}>Retry</Button><a href="/login" className="ml-4 text-sm text-default-500 underline">Return to sign in</a></> : <div className="mx-auto mt-5 h-1 w-40 overflow-hidden rounded-full bg-default-200"><div className="h-full w-1/2 animate-pulse rounded-full bg-primary" /></div>}
+    </section>
   </div>
   return <div className="fixed inset-0 z-[2147483000] flex items-center justify-center bg-black/90 p-2 sm:p-6">
     <section role="dialog" aria-modal="true" aria-labelledby="induction-title" className="flex max-h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-default-200 bg-content1 shadow-2xl">

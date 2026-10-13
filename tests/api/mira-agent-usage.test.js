@@ -1,6 +1,6 @@
 jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/miraVoiceAgent.server', () => ({ verifyMiraBridgeCredential: jest.fn() }))
-jest.mock('@/lib/miraChatStore.server', () => ({ MIRA_CHAT_STORE_OPTIONS: {}, miraMonth: () => '2026-10', checkAndDeductMiraToken: jest.fn() }))
+jest.mock('@/lib/miraChatStore.server', () => ({ MIRA_CHAT_STORE_OPTIONS: {}, miraMonth: () => '2026-10', checkAndDeductMiraToken: jest.fn(), readMiraTokens: jest.fn(async () => ({ tokensRemaining: 0 })) }))
 import { POST } from '@/app/api/ai/mira-agent/usage/route'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { verifyMiraBridgeCredential } from '@/lib/miraVoiceAgent.server'
@@ -32,4 +32,10 @@ test('denied feature access or exhausted balance is fail-closed', async () => {
   expect(verifyMiraBridgeCredential).not.toHaveBeenCalled()
   checkAndDeductMiraToken.mockResolvedValue({ allowed: false, tokensRemaining: 0 })
   expect((await POST(request({ bridgeCredential: 'call', turn: 1 }))).status).toBe(429)
+})
+test('gateway accounting does not double-charge or interrupt the last paid reply', async () => {
+  verifyMiraBridgeCredential.mockResolvedValue({ userId: 'user', databaseName: 'tenant', tokenId: 'session', authVersion: 2, accounting: 'gateway' })
+  const response = await POST(request({ bridgeCredential: 'call', turn: 1 }))
+  expect(await response.json()).toMatchObject({ success: true, tokensRemaining: 0 })
+  expect(checkAndDeductMiraToken).not.toHaveBeenCalled()
 })

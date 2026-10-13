@@ -3,10 +3,10 @@ import { miraAgentConfig, miraAgentPromptHash, syncMiraAgent, MIRA_AGENT_LANGUAG
 import { MIRA_CORE_SYSTEM_PROMPT, MIRA_AGENT_SYSTEM_PROMPT } from '@/lib/miraSystemPrompt'
 import { miraAgentVoice } from '@/lib/miraVoices'
 
-test('private v4 Turbo agent uses hosted voice reasoning with authenticated action tools', () => {
+test('private full v4 agent uses the authenticated DeepSeek gateway and internet tools', () => {
   const config = miraAgentConfig()
   expect(config.name).toBe('Mira')
-  expect(config.conversation_config.tts.model_id).toBe('eleven_v4_turbo')
+  expect(config.conversation_config.tts.model_id).toBe('eleven_v4')
   expect(config.conversation_config.tts.voice_id).toBe('ftDdhfYtmfGP0tFlBYA1')
   expect(config.conversation_config.tts.speed).toBe(1.2)
   expect(config.conversation_config.tts.expressive_mode).toBe(true)
@@ -21,20 +21,23 @@ test('private v4 Turbo agent uses hosted voice reasoning with authenticated acti
   expect(config.conversation_config.agent.prompt.tools).toContainEqual(expect.objectContaining({ name: 'language_detection', params: { system_tool_type: 'language_detection', only_at_conversation_start: false } }))
   expect(config.conversation_config.agent.prompt.prompt).toContain(MIRA_CORE_SYSTEM_PROMPT)
   expect(config.conversation_config.agent.prompt.prompt).toBe(MIRA_AGENT_SYSTEM_PROMPT)
-  expect(config.conversation_config.agent.prompt.llm).toBe('qwen36-35b-a3b')
-  expect(config.conversation_config.agent.prompt.custom_llm).toBeNull()
+  expect(config.conversation_config.agent.prompt.llm).toBe('custom-llm')
+  expect(config.conversation_config.agent.prompt.custom_llm).toEqual({ url: 'https://app.talio.in/api/ai/mira-agent/llm', model_id: 'talio-mira', api_type: 'chat_completions' })
   expect(config.conversation_config.agent.prompt).toMatchObject({ thinking_budget: 0, enable_reasoning_summary: false })
   expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('desktop/system control')
   expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('answer ordinary conversation')
   expect(MIRA_AGENT_SYSTEM_PROMPT).not.toContain('Every final user utterance must go through')
-  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('main sun rahi hoon')
+  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('मैं सुन रही हूँ')
+  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('write Hindi words in Devanagari')
+  expect(MIRA_AGENT_SYSTEM_PROMPT).not.toContain('Hindi-English requests always receive natural Roman-script Hinglish')
+  expect(config.conversation_config.agent.prompt.tools).toContainEqual(expect.objectContaining({ name: 'search_internet', expects_response: true }))
   expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('Use [laughs] or [chuckles] only for genuinely humorous moments')
   expect(config.conversation_config.agent.prompt.tools).toContainEqual(expect.objectContaining({ name: 'skip_turn', pre_tool_speech: 'off', params: { system_tool_type: 'skip_turn', wait_timeout_secs: -1 } }))
   expect(config.conversation_config.turn).toMatchObject({ turn_timeout: 30, silence_end_call_timeout: -1 })
   expect(config.conversation_config.turn.speculative_turn).toBe(false)
   expect(config.platform_settings.auth.enable_auth).toBe(true)
   expect(config.platform_settings.privacy).toMatchObject({ record_voice: false, delete_audio: true })
-  expect(config.platform_settings.overrides).toEqual({ custom_llm_extra_body: false, conversation_config_override: { tts: { voice_id: true } } })
+  expect(config.platform_settings.overrides).toEqual({ custom_llm_extra_body: true, conversation_config_override: { agent: { language: true }, tts: { voice_id: true } } })
   expect(miraAgentPromptHash()).toMatch(/^[a-f0-9]{64}$/)
 })
 test('does not attempt provider writes for a non-administrator', async () => {

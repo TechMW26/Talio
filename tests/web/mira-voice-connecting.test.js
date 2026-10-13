@@ -24,7 +24,7 @@ test('sidebar shares the loading indicator across chat and compact modes', () =>
   expect(source).toContain("const voiceConnecting = voice.state === 'loading'")
   expect(source).toContain('<MiraVoiceConnecting active={isOpen && voiceConnecting} onCancel={voice.stop} />')
   expect(source.indexOf('<MiraVoiceConnecting active=')).toBeLessThan(source.indexOf("<div className={pip ? 'hidden' : 'contents'}>"))
-  expect(source).toContain("voiceConnecting ? 'Connecting'")
+  expect(source).not.toContain('MIRA ·')
   expect(source).toContain('processing={isThinking || voiceConnecting}')
   expect(source).toContain('suspended={voice.active || voiceConnecting}')
 })

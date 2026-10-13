@@ -57,6 +57,7 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
       setVoiceName(config.voiceName || 'Mira')
       const conversation = await sdk.Conversation.startSession({
         conversationToken: config.conversationToken, connectionType: 'webrtc', useWakeLock: false,
+        customLlmExtraBody: { mira_bridge_credential: config.bridgeCredential },
         // AudioWorklets obey script-src, not worker-src. Use same-origin static
         // modules rather than the SDK's CSP-blocked blob/data URLs or CDN fallback.
         workletPaths: {
@@ -64,8 +65,26 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
           audioConcatProcessor: '/mira/worklets/elevenlabs-1.27.0/audioConcatProcessor.js',
         },
         libsampleratePath: '/mira/worklets/libsamplerate-2.1.2/libsamplerate.worklet.js',
-        overrides: { tts: { voiceId: config.voiceId } },
+        overrides: { agent: { language: config.language || 'en' }, tts: { voiceId: config.voiceId } },
         clientTools: {
+          search_internet: () => {
+            const turn = run.turns.latest()
+            if (!live() || !turn?.text) return JSON.stringify({ unavailable: 'No accepted user request.' })
+            return run.turns.execute({ message: turn.text, utterance_id: `search_${turn.sequence}` }, async text => {
+              run.pending++; setState('searching')
+              try {
+                await run.accounting
+                if (!live()) return JSON.stringify({ unavailable: 'Call ended.' })
+                const response = await fetch('/api/ai/mira-agent/search', {
+                  method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ bridgeCredential: config.bridgeCredential, turn: turn.sequence, message: text }), signal: run.abort.signal,
+                })
+                const data = await response.json()
+                return JSON.stringify(response.ok && data.success ? data : { unavailable: data.message || 'Lookup unavailable. Do not claim verification.' })
+              } catch { return JSON.stringify({ unavailable: 'Lookup unavailable. Do not invent search results.' }) }
+              finally { run.pending--; if (live()) setState(run.mode === 'speaking' ? 'speaking' : 'listening') }
+            })
+          },
           close_mira: params => {
             const turn = run.turns.latest()
             if (!live() || !turn?.text || run.echo.reject(params?.message, Date.now(), true)) return

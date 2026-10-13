@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { verifyMiraBridgeCredential } from '@/lib/miraVoiceAgent.server'
-import { MIRA_CHAT_STORE_OPTIONS, checkAndDeductMiraToken, miraMonth } from '@/lib/miraChatStore.server'
+import { MIRA_CHAT_STORE_OPTIONS, checkAndDeductMiraToken, readMiraTokens, miraMonth } from '@/lib/miraChatStore.server'
 
 export const dynamic = 'force-dynamic'
 // Native speech bypasses chat generation, not authorization or usage limits.
@@ -16,6 +16,9 @@ export async function POST(request) {
     const call = await verifyMiraBridgeCredential(bridgeCredential)
     const userId = String(auth.user._id || auth.user.userId)
     if (call.userId !== userId || call.databaseName !== auth.tenant.databaseName || call.tokenId !== auth.user.tokenId || call.authVersion !== (auth.user.authVersion || 0)) return NextResponse.json({ success: false, message: 'Invalid voice session' }, { status: 403 })
+    // The authenticated model gateway owns charging, including the last paid
+    // reply and tool continuations. Client timing must not double-charge it.
+    if (call.accounting === 'gateway') return NextResponse.json({ success: true, ...await readMiraTokens(auth.database, userId) }, { headers: { 'Cache-Control': 'no-store' } })
     const key = createHash('sha256').update(`${bridgeCredential}:${turn}`).digest('hex')
     const balance = await checkAndDeductMiraToken(auth.database, userId, miraMonth(), key)
     return NextResponse.json({ success: balance.allowed, ...balance, ...(!balance.allowed ? { message: 'Your monthly Mira allowance is exhausted' } : {}) }, { status: balance.allowed ? 200 : 429, headers: { 'Cache-Control': 'no-store' } })

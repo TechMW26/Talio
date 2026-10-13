@@ -10,7 +10,7 @@ export function miraIdleOrbFrame(size, time) {
   return MODE_FRAMES.globe(size, time * 0.2, { ...resolvePreset('searching', size).opts, scanMul: 0 })
 }
 
-export default function MiraPet({ size = 40, isThinking = false, state, speed = 1, dark, paused = false }) {
+export default function MiraPet({ size = 40, isThinking = false, state, speed = 1, dark, color, paused = false }) {
   const activity = useMiraOrbState()
   const orbState = MIRA_ORB_STATES.includes(state) ? state : activity !== 'breathing' ? activity : isThinking ? 'solving' : 'breathing'
   const preset = size <= 28 ? 20 : 64
@@ -22,6 +22,7 @@ export default function MiraPet({ size = 40, isThinking = false, state, speed = 
         state={orbState}
         speed={speed}
         paused={paused}
+        color={color}
         frame={idle ? miraIdleOrbFrame : undefined}
         theme={dark === undefined ? 'auto' : dark ? 'dark' : 'light'}
         style={{ background: 'transparent', flexShrink: 0, transform: `scale(${size / preset})` }}

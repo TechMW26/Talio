@@ -16,7 +16,7 @@ test('does not acquire the microphone until explicitly started and keeps the app
   expect(mockStartSession).not.toHaveBeenCalled()
   await act(async () => result.current.start())
   expect(options.connectionType).toBe('webrtc')
-  expect(options.customLlmExtraBody).toBeUndefined()
+  expect(options.customLlmExtraBody).toEqual({ mira_bridge_credential: 'voice-scoped-only' })
   expect(JSON.stringify(options)).not.toContain('app-token')
   expect(result.current.state).toBe('listening')
   unmount(); expect(end).toHaveBeenCalledTimes(1)
