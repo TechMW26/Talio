@@ -15,12 +15,11 @@ test('tool continuations share billing while repeated new utterances count separ
   expect(miraGatewayTurnKey({ messages: [...body.messages, ...body.messages] }, 'call')).not.toBe(initial)
   expect(miraGatewayTurnKey(body, 'another-call')).not.toBe(initial)
 })
-test('narrows provider language tools to English and Hindi without mutating their schema', () => {
+test('keeps provider language selection out of the model tools without mutating their schema', () => {
   const tool = { type: 'function', function: { name: 'language_detection', parameters: { type: 'object', properties: { language: { type: 'string', enum: ['en', 'hi', 'es'] }, reason: { type: 'string' } }, required: ['language'] } } }
   const request = miraDeepSeekRequest({ ...body, tools: [tool] }, 'it')
   expect(request.messages[0].content).toContain('CURRENT SPEECH LANGUAGE: en')
-  expect(request.tools[0].function.parameters.properties.language.enum).toEqual(['en', 'hi'])
-  expect(request.tools[0].function.parameters.properties.reason).toEqual({ type: 'string' })
+  expect(request.tools).toBeUndefined()
   expect(tool.function.parameters.properties.language.enum).toEqual(['en', 'hi', 'es'])
 })
 test.each([
@@ -29,6 +28,8 @@ test.each([
   ['मुझे आज प्रमोशन मिला!', 'en', 'hi'], ['Sameer', 'hi', 'hi'], ['S-A-H-I-L', 'hi', 'hi'],
   ['Okay', 'hi', 'hi'], ['Com’è che sì?', 'en', 'en'], ['Please speak in Italian', 'hi', 'hi'],
   ['माझ्या बैठका दाखवा', 'en', 'en'], ['"हाँ मीरा तुम कैसी हो?"', 'en', 'en'],
+  ['Do not speak in Hindi.', 'en', 'en'], ['Please speak Hindi.', 'en', 'hi'],
+  ['Please speak English.', 'hi', 'en'], ['नमस्ते मीरा', 'en', 'hi'],
 ])('resolves only clear English/Hindi switches: %s', (text, current, expected) => {
   expect(resolveMiraSpokenLanguage(text, current)).toBe(expected)
 })
