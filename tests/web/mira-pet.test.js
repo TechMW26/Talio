@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
-import MiraPet from '@/components/ui/MiraPet'
+import MiraPet, { miraIdleOrbFrame } from '@/components/ui/MiraPet'
 import fs from 'fs'
 import path from 'path'
 
@@ -17,15 +17,16 @@ test('reply avatar allows animation overscan while retaining its fade and collap
 
 // Render the real package. Canvas painting is covered by browser verification;
 // jsdom still checks the library's public DOM, sizing and state transitions.
-test('MIRA uses the white circle avatar with a smiling face', () => {
+test('Mira uses ThinkingOrb with tuned sizes and no smiley avatar', () => {
   const { rerender } = render(<MiraPet size={32} />)
-  const avatar = screen.getByRole('img', { name: 'MIRA' })
+  const avatar = screen.getByRole('img', { name: 'Mira breathing' })
   expect(avatar.tagName).toBe('CANVAS')
-  expect(avatar).toHaveAttribute('data-bot-avatar', 'circle')
-  expect(avatar).toHaveAttribute('data-face', 'mouth')
-  expect(avatar).toHaveAttribute('data-state', 'default')
+  expect(avatar).not.toHaveAttribute('data-bot-avatar')
+  expect(avatar.parentElement).toHaveAttribute('data-mira-orb-state', 'breathing')
   expect(avatar.parentElement).toHaveStyle({ width: '32px', height: '32px' })
+  expect(avatar.parentElement.style.background).toContain('radial-gradient')
+  expect(miraIdleOrbFrame(64, 0).dots.length).toBeGreaterThan(30)
   rerender(<MiraPet size={64} isThinking />)
-  expect(screen.getByRole('img', { name: 'MIRA thinking' })).toHaveAttribute('data-state', 'working')
+  expect(screen.getByRole('img', { name: 'Mira solving' }).parentElement).toHaveAttribute('data-mira-orb-state', 'solving')
   expect(avatar.parentElement).toHaveStyle({ width: '64px', height: '64px' })
 })

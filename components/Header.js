@@ -106,7 +106,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             />
             {/* White circular background behind globe */}
             <div aria-hidden="true" className="mira-header-avatar relative z-10 flex items-center justify-center rounded-full bg-white dark:bg-white/90">
-              <MiraSphere size={32} isThinking={isThinking} />
+              <MiraSphere size={32} isThinking={isThinking} dark={false} paused={isMiraOpen} />
             </div>
             <span className="mira-header-label text-sm font-semibold whitespace-nowrap relative z-10" style={{ color: '#111111' }}>
               {isMiraOpen ? (isThinking ? 'On it…' : 'Mira is here') : 'Ask Mira'}

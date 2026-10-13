@@ -1,6 +1,6 @@
 'use client'
 
-import { FaSpinner } from 'react-icons/fa'
+import MiraPet from './MiraPet'
 
 export default function MiraVoiceConnecting({ active, onCancel }) {
   if (!active) return null
@@ -9,7 +9,7 @@ export default function MiraVoiceConnecting({ active, onCancel }) {
     <div data-mira-voice-preparing className="absolute inset-0 z-50 flex items-center justify-center bg-background/40 p-4 backdrop-blur-xl" onClick={event => event.stopPropagation()}>
     <div className="w-full max-w-sm rounded-2xl border border-default-200 bg-background/95 p-5 shadow-xl">
     <div className="flex items-center gap-3">
-      <FaSpinner aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none text-primary" />
+      <MiraPet size={20} state="connecting" />
       <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-1">
         <p className="text-sm font-medium text-foreground">Mira is getting ready…</p>
         <p className="mt-0.5 text-xs text-default-500">Connecting voice. Allow microphone access if prompted.</p>

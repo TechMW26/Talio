@@ -3,6 +3,12 @@ import { renderHook, act } from '@testing-library/react'
 import { MiraChatProvider, useMiraChat } from '@/contexts/MiraChatContext'
 jest.mock('@/lib/miraClientContext', () => ({ getMiraClientContext: () => ({}) }))
 const wrapper = ({ children }) => <MiraChatProvider>{children}</MiraChatProvider>
+test('native speech emotions do not appear as literal post-call transcript tags', async () => {
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => result.current.recordVoiceMessage({ source: 'complete', messages: [{ source: 'ai', message: '[fast] That was funny! [laughs]' }] }))
+  expect(result.current.messages[0].content).toBe('That was funny!')
+  expect(result.current.messages[0].data.message).toBe('That was funny!')
+})
 beforeEach(() => {
   localStorage.setItem('token', 'local-app-token')
   global.fetch = jest.fn(async url => ({ ok: true, json: async () => url === '/api/ai/mira-chat/sessions' ? { success: true, session: { _id: 'native-session' } } : { success: true } }))

@@ -213,7 +213,7 @@ html.dark .ai-glass-panel [class*="bg-gradient-to-"] { background-image: none; b
 html.dark .ai-glass-panel :is(.bg-violet-50, .bg-blue-50, .bg-emerald-50, .bg-amber-50, .bg-rose-50, .bg-cyan-50, .bg-red-50) { background: var(--ai-tint) !important; }
 html.dark .ai-glass-panel :is(.text-violet-600, .text-violet-700, .text-blue-700, .text-emerald-700, .text-amber-700, .text-rose-700, .text-cyan-700) { color: #c4caff !important; }
 
-/* BotAvatar overscans its canvas beyond the layout box for jumps and spins. */
+/* Reveal the shared Mira orb beside the currently active reply. */
 .mira-reply-avatar { width: 0; margin-right: 0; opacity: 0; overflow: visible; pointer-events: none; transition: width 400ms ease, margin-right 400ms ease, opacity 250ms ease; }
 .mira-reply-avatar[data-active="true"] { width: 28px; margin-right: 10px; opacity: 1; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .mira-reply-avatar { transition: none; } }

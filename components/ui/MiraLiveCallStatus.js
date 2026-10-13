@@ -1,16 +1,11 @@
 'use client'
+import { FaMicrophone, FaMicrophoneSlash, FaPhone } from 'react-icons/fa'
 
 export default function MiraLiveCallStatus({ state, muted, onMute, onEnd }) {
   if (!state || state === 'idle') return null
   const connecting = state === 'loading'
-  const label = connecting ? 'Connecting…' : state === 'speaking' ? 'Mira speaking' : state === 'working' ? 'Using tools' : state === 'thinking' ? 'Preparing reply' : 'Listening'
-  return <div className="mb-2 flex items-center gap-3 rounded-xl border border-default-200 bg-default-100/50 px-3 py-2">
-    <span className={`h-2 w-2 shrink-0 rounded-full ${connecting ? 'bg-warning' : 'bg-success'}`} aria-hidden="true" />
-    <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-1">
-      <p className="text-xs font-medium text-foreground">Live call · {label}</p>
-      <p className="text-[11px] text-default-500">{connecting ? 'Allow microphone access when prompted.' : muted ? 'Microphone muted' : 'Speak naturally. Interrupt anytime.'}</p>
-    </div>
-    {!connecting && onMute && <button type="button" onClick={event => { event.stopPropagation(); onMute() }} aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} aria-pressed={muted} className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-foreground">{muted ? 'Unmute' : 'Mute'}</button>}
-    <button type="button" onClick={event => { event.stopPropagation(); onEnd() }} aria-label={connecting ? 'Cancel live call' : 'End live call'} className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{connecting ? 'Cancel' : 'End call'}</button>
+  return <div className="flex items-center justify-center gap-4 py-2">
+    {!connecting && onMute && <button type="button" onClick={event => { event.stopPropagation(); onMute() }} aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} title={muted ? 'Unmute microphone' : 'Mute microphone'} aria-pressed={muted} className="flex h-11 w-11 items-center justify-center rounded-full bg-default-100 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{muted ? <FaMicrophoneSlash aria-hidden="true" /> : <FaMicrophone aria-hidden="true" />}</button>}
+    <button type="button" onClick={event => { event.stopPropagation(); onEnd() }} aria-label={connecting ? 'Cancel live call' : 'End live call'} title={connecting ? 'Cancel voice connection' : 'End call'} className="flex h-11 w-11 items-center justify-center rounded-full bg-danger/15 text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><FaPhone aria-hidden="true" className="rotate-[135deg]" /></button>
   </div>
 }

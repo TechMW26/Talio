@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect } f
 import toast from 'react-hot-toast'
 import { getMiraClientContext } from '@/lib/miraClientContext'
 import { executeMiraUiAction, waitForMiraPage } from '@/lib/miraUiAction'
+import { miraVoiceTranscript } from '@/lib/miraMessageDisplay'
+import { miraOrbActionState, miraOrbRequestState, publishMiraOrbState } from '@/lib/miraOrbState'
 import { searchMiraNavigation } from '@/lib/miraNavigationSearch'
 import { resolveMiraSnapshot } from '@/lib/miraSnapshotClient'
 import { advanceMiraTaskBank, mergeMiraTaskPlan, recordMiraTaskOutcome } from '@/lib/miraTaskBank'
@@ -48,6 +50,7 @@ export function MiraChatProvider({ children }) {
     abortControllerRef.current?.abort()
     remoteCommandRef.current = null
     sendingRef.current = false
+    publishMiraOrbState('chat', 'breathing')
     window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active: false, source: 'chat' } }))
   }, [])
 
@@ -176,9 +179,9 @@ export function MiraChatProvider({ children }) {
     if (event.source !== 'complete' || !Array.isArray(event.messages)) return
     const target = event.target || sessionTargetRef.current
     const completed = event.messages.filter(m => !m.persisted && ['user', 'ai'].includes(m.source) && typeof m.message === 'string' && m.message.trim()).map((m, i) => ({
-      id: Date.now() + i + Math.random(), role: m.source === 'user' ? 'user' : 'assistant', content: m.message,
-      data: { nativeVoice: true, ...(m.source === 'ai' ? { message: m.message, cards: [], suggestedQuestions: [] } : {}) }, timestamp: m.timestamp || new Date(),
-    }))
+      id: Date.now() + i + Math.random(), role: m.source === 'user' ? 'user' : 'assistant', content: m.source === 'ai' ? miraVoiceTranscript(m.message) : m.message,
+      data: { nativeVoice: true, ...(m.source === 'ai' ? { message: miraVoiceTranscript(m.message), cards: [], suggestedQuestions: [] } : {}) }, timestamp: m.timestamp || new Date(),
+    })).filter(message => message.content)
     if (sessionTargetRef.current === target) setMessages(previous => [...previous, ...completed].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)))
     for (let i = 0; i < completed.length; i += 30) {
       const batch = completed.slice(i, i + 30)
@@ -289,6 +292,7 @@ export function MiraChatProvider({ children }) {
     setMessages([...visibleHistory, userMsg])
     setIsThinking(true)
     const agentState = active => window.dispatchEvent(new CustomEvent('mira:agent-state', { detail: { active, source: 'chat' } }))
+    publishMiraOrbState('chat', miraOrbRequestState(text, { attachments: !!options.attachments?.length }))
     if (isMiraDecisionRequest(text, history)) agentState(true)
 
     const requestController = new AbortController()
@@ -306,6 +310,7 @@ export function MiraChatProvider({ children }) {
       const navigationSearches = new Set()
       let continuedPersonLookup = false
       for (let queueStep = 0; queueStep < 8; queueStep += 1) {
+      if (queueStep > 0) publishMiraOrbState('chat', 'weaving')
       const replyId = nextReplyId
       requestController.signal.throwIfAborted()
 
@@ -328,6 +333,7 @@ export function MiraChatProvider({ children }) {
           // Provisional model narration can be replaced by a tool failure or
           // clarification. Speak only the authoritative visible reply below.
           if (event.type === 'message') {
+            publishMiraOrbState('chat', 'composing')
             options.onPartialResponse?.(event.message)
             const partial = { id: replyId, role: 'assistant', content: event.message, streaming: true, timestamp: new Date() }
             setMessages(prev => prev.some(m => m.id === replyId) ? prev.map(m => m.id === replyId ? partial : m) : [...prev, partial])
@@ -338,6 +344,7 @@ export function MiraChatProvider({ children }) {
 
       requestController.signal.throwIfAborted()
       if (data.success) {
+        if (data.response.action) publishMiraOrbState('chat', miraOrbActionState(data.response.action.type))
         if (data.response.action) agentState(true)
         if (data.response.action?.type === 'read_screen') {
           if (!screenAttempted) {
@@ -540,6 +547,7 @@ export function MiraChatProvider({ children }) {
         agentState(false)
         sendingRef.current = false
         setIsThinking(false)
+        publishMiraOrbState('chat', 'breathing')
         abortControllerRef.current = null
       }
       if (remoteCommandRef.current?.controller === requestController) remoteCommandRef.current = null

@@ -21,6 +21,7 @@ test('honors a trusted employee L9 override independently of the Manager title d
   database.get = jest.fn((collection, id) => collection === 'employees'
     ? Promise.resolve({ designation: 'designation', designationLevel: 9 }) : fallback(collection, id))
   expect(await getMiraAccess(database, { employeeId: 'employee', role: 'admin' })).toEqual({ allowed: true, level: 9 })
+  expect(database.get).not.toHaveBeenCalledWith('designations', expect.anything())
 })
 test('requires fresh administrator authority inside the settings transaction', async () => {
   const changes = { enabled: true, allowedLevels: [6] }

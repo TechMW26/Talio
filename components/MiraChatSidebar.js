@@ -371,7 +371,7 @@ const MessageBubble = memo(function MessageBubble({ message, onSuggestionClick, 
       className="flex items-start px-4 py-1.5 group/msg"
     >
       <div aria-hidden={!message.streaming} className="mira-reply-avatar flex-shrink-0 mt-1" data-active={Boolean(message.streaming)}>
-        <MiraSphere size={28} isThinking={Boolean(message.streaming)} />
+        <MiraSphere size={28} state={message.streaming ? 'composing' : 'breathing'} />
       </div>
       <div className="flex-1 min-w-0">
         {/* Message text */}
@@ -998,7 +998,7 @@ export default function MiraChatSidebar() {
             setWakeRequested(true)
             if (!isOpen) openChat({ mode: background ? 'pip' : 'chat' })
             else if (background) setViewMode('pip')
-          }} onStream={() => {}} suspended={voice.active} />
+          }} onStream={() => {}} suspended={voice.active || voiceConnecting} />
         </div>
       </VoiceBeam>
       </NativePipSurface>
