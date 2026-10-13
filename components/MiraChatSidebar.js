@@ -544,7 +544,7 @@ export default function MiraChatSidebar() {
     if (!isOpen || pip || showHistory) return
     const frame = requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' }))
     return () => cancelAnimationFrame(frame)
-  }, [messages, isThinking, isOpen, pip, showHistory, voice.captions, voice.transcript])
+  }, [messages, isThinking, isOpen, pip, showHistory])
 
   // Focus input when opened
   useEffect(() => {
@@ -783,11 +783,7 @@ export default function MiraChatSidebar() {
         {voice.active ? (
           <div className="flex flex-1 flex-col min-h-0 overflow-y-auto">
             <MiraVoiceCall ref={voiceMeterRef} state={voice.state} muted={voice.muted} />
-            <div role="log" aria-label="Voice transcript" aria-live="polite" className="px-4 space-y-3">
-              {voice.captions?.map(message => <p key={message.id} aria-label={message.role === 'user' ? 'You' : 'Mira'} className={message.role === 'user' ? 'ml-auto max-w-[85%] rounded-2xl bg-default-100 px-4 py-3 text-sm' : 'py-3 text-sm leading-relaxed'}>{message.content}</p>)}
-              {voice.transcript && <p className="ml-auto max-w-[85%] rounded-2xl bg-default-100 px-4 py-3 text-sm text-default-500" aria-label="Your live transcript">{voice.transcript}</p>}
-            </div>
-            {voiceResults.map(message => <MessageBubble key={message.id} message={message} onSuggestionClick={handleSuggestionClick} onEdit={handleEdit} onRetry={handleRetry} onReply={handleReply} busy={isThinking} />)}
+            {voiceResults.filter(message => message.data?.cards?.length).map(message => <MessageBubble key={message.id} message={{ ...message, content: '', data: { ...message.data, message: '', speech: '', suggestedQuestions: [] } }} onSuggestionClick={handleSuggestionClick} onEdit={handleEdit} onRetry={handleRetry} onReply={handleReply} busy={isThinking} />)}
             <div ref={messagesEndRef} />
           </div>
         ) : showHistory ? (
@@ -951,7 +947,7 @@ export default function MiraChatSidebar() {
                 value={input}
                 onChange={(e) => { if (voice.active) voice.stop(); handleInputChange(e.target.value) }}
                 onKeyDown={handleKeyDown}
-                placeholder={voice.active ? (voice.transcript || (voice.state === 'loading' ? 'Connecting voice… or type here' : voice.state === 'speaking' ? 'MIRA is speaking…' : voice.state === 'thinking' ? 'Thinking…' : 'Listening…')) : 'Ask MIRA…'}
+                placeholder={voice.active ? 'Voice conversation active' : 'Ask MIRA…'}
                 rows={1}
                 className="block w-full resize-none rounded-xl text-default-800 text-sm px-3 py-2.5 focus:outline-none placeholder:text-default-400 disabled:opacity-50"
                 style={{

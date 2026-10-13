@@ -7,6 +7,8 @@ import { createMiraStreamingSpeech } from '@/lib/miraStreamingSpeech'
 import { createMiraVoiceEchoGuard } from '@/lib/miraVoiceEcho'
 import { isMiraPlaybackEcho } from '@/lib/miraEchoGuard'
 import { isMiraDismissal } from '@/lib/miraDismissal'
+import { resolveMiraSpokenLanguage } from '@/lib/miraLanguage'
+import { createMiraWaitingFeedback } from '@/lib/miraWaitingFeedback'
 import { naturalMiraSpeech, miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { miraVoiceTranscript } from '@/lib/miraMessageDisplay'
 import { compactMiraVoiceHistory, shortMiraVoiceReply } from '@/lib/miraDirectVoice'
@@ -26,6 +28,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
     const run = session.current
     session.current = null
     clearTimeout(run?.startupTimer)
+    run?.waiting?.stop()
     run?.abort.abort(); run?.turnAbort?.abort(); run?.engine?.stop(); run?.playback?.close()
     if (run) {
       current.current.interruptResponse?.()
@@ -56,12 +59,17 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
         run.pendingMessages = null; run.pendingReply = ''
       }
       run.generation++; run.turnAbort?.abort(); run.playback?.cancel()
+      run.waiting?.stop()
       current.current.interruptResponse?.()
       run.locked = false; run.speaking = false; run.echo.mode('listening', Date.now())
       if (live()) setState('listening')
     }
     try {
       run.playback = createMiraSpeechPlayback({ getPreferences: () => ({ voiceId: run.config?.voiceId, language: run.config?.language }) })
+      run.waiting = createMiraWaitingFeedback({ playback: run.playback, live,
+        onStart: phrase => { run.echo.remember(phrase); run.reply = phrase; run.speaking = true; run.echo.mode('speaking', Date.now()); setState('speaking') },
+        onEnd: () => { if (live()) { run.speaking = false; run.echoUntil = Date.now() + 1800; run.echo.mode('listening', Date.now()); setState(run.locked ? 'thinking' : 'listening') } },
+      })
       const authorization = authorize()
       const engineReady = startMiraConversationRecognition({ signal: run.abort.signal,
         onError: err => { if (live()) { stop(); setError(err.message) } },
@@ -72,7 +80,8 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
         },
         onResult: async result => {
           const text = result?.text?.trim()
-          if (!live() || !text || !/[\p{L}\p{N}]/u.test(text) || text.length > 3000 || isEcho(text)) return
+          const dismiss = isMiraDismissal(text)
+          if (!live() || !text || !/[\p{L}\p{N}]/u.test(text) || text.length > 3000 || (!dismiss && isEcho(text))) return
           if (run.locked && text === run.userText) return
           if (run.locked) interrupt()
           const generation = ++run.generation, turn = ++run.turn
@@ -83,7 +92,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
           const signal = AbortSignal.any([run.abort.signal, run.turnAbort.signal])
           const user = { source: 'user', message: text, timestamp: new Date() }
           run.captions.push(user); publish(); setTranscript('')
-          if (isMiraDismissal(text)) { stop(); current.current.onDismiss?.(); return }
+          if (dismiss) { stop(); current.current.onDismiss?.(); return }
           setState('thinking')
           const messages = [...compactMiraVoiceHistory(run.history), { role: 'user', content: text }]
           run.pendingMessages = messages; run.pendingReply = ''
@@ -92,9 +101,16 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
             await authorization
             if (Date.now() >= run.renewAt) await authorize()
             signal.throwIfAborted()
+            run.config.language = resolveMiraSpokenLanguage(text, run.config.language)
+            run.waiting.start(text, run.config.language)
             const speech = createMiraStreamingSpeech({ live: valid, clean: naturalMiraSpeech,
               prepare: run.playback.prepare,
-              speak: (spoken, prepared) => {
+              speak: async (spoken, prepared) => {
+                // Keep the optional filler playing only while real audio loads.
+                // Never await the filler or let it delay/cancel the answer.
+                if (prepared) await prepared.result
+                if (!valid()) return
+                run.waiting.stop()
                 run.echo.remember(spoken)
                 run.reply = `${run.reply} ${spoken}`.slice(-3000)
                 return run.playback.speak(spoken, () => { if (valid()) { run.speaking = true; run.echo.mode('speaking', Date.now()); setState('speaking') } }, prepared)
@@ -102,7 +118,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
             })
             reply = await generateMiraDirectVoice({ config: run.config, messages, turn, signal,
               onTokens: balance => { if (valid()) current.current.onTokens?.(balance) },
-              onLanguage: language => { run.config.language = language },
+              onLanguage: language => { if (run.config.language !== language) run.waiting.stop(); run.config.language = language },
               onText: content => {
                 if (!valid()) return
                 run.pendingReply = content
@@ -129,16 +145,18 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
             if (assistant) { assistant.message = reply; assistant.streaming = false; publish() }
             run.history = compactMiraVoiceHistory([...messages, ...(reply ? [{ role: 'assistant', content: reply }] : [])])
             run.pendingMessages = null; run.pendingReply = ''
+            if (!reply) run.waiting.stop()
             await speech.finish(reply)
           } catch (err) {
             if (valid() && err.name !== 'AbortError') {
+              run.waiting.stop()
               run.playback.cancel()
               setError(err.message || 'Voice interrupted. The transcript is still available.')
               if ([401, 403, 429].includes(err.status)) { stop(); return }
             }
           } finally {
             if (assistant) assistant.streaming = false
-            if (valid()) { run.locked = false; if (run.speaking) run.echoUntil = Date.now() + 1800; run.speaking = false; run.echo.mode('listening', Date.now()); setState('listening'); publish() }
+            if (valid()) { run.waiting.stop(); run.locked = false; if (run.speaking) run.echoUntil = Date.now() + 1800; run.speaking = false; run.echo.mode('listening', Date.now()); setState('listening'); publish() }
           }
         },
       }).then(engine => { if (!live()) { engine.stop(); return null } run.engine = engine; return engine })
