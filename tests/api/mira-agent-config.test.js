@@ -17,7 +17,7 @@ test('private full v4 agent uses the authenticated DeepSeek gateway and internet
   expect(config.conversation_config.tts.suggested_audio_tags).toContainEqual(expect.objectContaining({ tag: 'laughs' }))
   expect(config.conversation_config.tts.suggested_audio_tags.some(tag => tag.tag === 'slow')).toBe(false)
   expect(config.conversation_config.turn.turn_eagerness).toBe('eager')
-  expect(config.conversation_config.turn.soft_timeout_config.timeout_seconds).toBe(-1)
+  expect(config.conversation_config.turn.soft_timeout_config).toMatchObject({ timeout_seconds: 0.8, use_llm_generated_message: true, max_soft_timeouts_per_generation: 1, disable_until_first_user_message: true })
   expect(config.conversation_config.asr).toMatchObject({ provider: 'scribe_realtime', quality: 'high' })
   expect(config.conversation_config.agent).toMatchObject({ language: 'en', hinglish_mode: false })
   expect(Object.keys(config.conversation_config.language_presets).sort()).toEqual([...MIRA_AGENT_LANGUAGES].sort())

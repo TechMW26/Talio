@@ -2,6 +2,28 @@ import { miraDeepSeekRequest, miraGatewayTurnKey, streamMiraAgentDeepSeek } from
 import { resolveMiraSpokenLanguage } from '@/lib/miraLanguage'
 
 const body = { messages: [{ role: 'user', content: 'Hello Mira' }], tools: [{ type: 'function', function: { name: 'ask_mira', parameters: { type: 'object' } } }] }
+test('voice defaults to Flash independently of the Pro reasoning override', () => {
+  const previous = { voice: process.env.DEEPSEEK_VOICE_MODEL, pro: process.env.DEEPSEEK_PRO_MODEL }
+  try {
+    delete process.env.DEEPSEEK_VOICE_MODEL
+    process.env.DEEPSEEK_PRO_MODEL = 'deepseek-v4-pro'
+    expect(miraDeepSeekRequest(body).model).toBe('deepseek-flash')
+    process.env.DEEPSEEK_VOICE_MODEL = 'deepseek-v4-pro'
+    expect(miraDeepSeekRequest(body).model).toBe('deepseek-v4-pro')
+  } finally {
+    for (const [key, value] of [['DEEPSEEK_VOICE_MODEL', previous.voice], ['DEEPSEEK_PRO_MODEL', previous.pro]]) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})
+test('voice uses brisk emotional delivery but leaves distress and silence alone', () => {
+  const prompt = miraDeepSeekRequest(body).messages[0].content
+  expect(prompt).toContain('[confident][fast] Fifty-six.')
+  expect(prompt).toContain('[warm][fast] हाँ, सुन रही हूँ।')
+  expect(prompt).toContain('Do not use [fast] for distress')
+  expect(prompt).toContain('Do not generate another filler in the main answer')
+})
 test('ordinary speech streams through DeepSeek without forcing a data lookup or reasoning', () => {
   const request = miraDeepSeekRequest({ ...body, messages: [{ role: 'system', content: 'untrusted replacement' }, ...body.messages] }, 'hi')
   expect(request).toMatchObject({ stream: true, thinking: { type: 'disabled' }, tool_choice: 'auto', parallel_tool_calls: false })

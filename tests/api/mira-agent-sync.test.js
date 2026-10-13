@@ -33,3 +33,11 @@ test('an uncertain create is never retried automatically', async () => {
   expect(fetch).toHaveBeenCalledTimes(1)
   expect(updateMiraSettings).not.toHaveBeenCalled()
 })
+test.each(['eagerness', 'fillers'])('sync does not claim success when provider keeps stale %s settings', async setting => {
+  const stale = miraAgentConfig()
+  if (setting === 'eagerness') stale.conversation_config.turn.turn_eagerness = 'patient'
+  else stale.conversation_config.turn.soft_timeout_config.use_llm_generated_message = false
+  jest.spyOn(global, 'fetch').mockResolvedValue(json(stale))
+  await expect(syncMiraAgent({}, { role: 'admin' }, 'tenant')).rejects.toMatchObject({ status: 502 })
+  expect(updateMiraSettings).not.toHaveBeenCalled()
+})

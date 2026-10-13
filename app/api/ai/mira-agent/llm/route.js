@@ -34,7 +34,7 @@ export async function POST(request) {
       if (!MIRA_AGENT_LANGUAGES.includes(selected) || selected === language) return
       await auth.database.mutate('users', userId, fresh => ({ ...fresh, miraPreferences: { ...fresh.miraPreferences, lastLanguage: selected }, updatedAt: new Date() }))
     } })
-    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no',
+    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no',
       'Server-Timing': `voice_auth;dur=${Math.round(authorizedAt - started)}, voice_model;dur=${Math.round(performance.now() - authorizedAt)}` } })
   } catch {
     return NextResponse.json({ error: 'Invalid voice turn' }, { status: 400 })
