@@ -2,6 +2,7 @@ jest.mock('jose', () => ({ SignJWT: jest.fn(), jwtVerify: jest.fn() }))
 import { miraAgentConfig, miraAgentPromptHash, miraAgentCanStart, syncMiraAgent, MIRA_AGENT_LANGUAGES } from '@/lib/miraVoiceAgent.server'
 import { MIRA_CORE_SYSTEM_PROMPT, MIRA_AGENT_SYSTEM_PROMPT, MIRA_VOICE_AUDIO_TAGS, MIRA_VOICE_EXPRESSION_POLICY } from '@/lib/miraSystemPrompt'
 import { miraAgentVoice } from '@/lib/miraVoices'
+import { miraVoiceTranscript } from '@/lib/miraMessageDisplay'
 
 test('private full v4 agent uses the authenticated DeepSeek gateway and internet tools', () => {
   const config = miraAgentConfig()
@@ -9,6 +10,7 @@ test('private full v4 agent uses the authenticated DeepSeek gateway and internet
   expect(config.conversation_config.tts.model_id).toBe('eleven_v4')
   expect(config.conversation_config.tts.voice_id).toBe('ftDdhfYtmfGP0tFlBYA1')
   expect(config.conversation_config.tts.speed).toBe(1.2)
+  expect(config.conversation_config.tts.stability).toBe(0.4)
   expect(config.conversation_config.tts.expressive_mode).toBe(true)
   expect(config.conversation_config.tts.suggested_audio_tags).toEqual(MIRA_VOICE_AUDIO_TAGS)
   expect(config.conversation_config.agent.prompt.prompt).toContain(MIRA_VOICE_EXPRESSION_POLICY)
@@ -19,7 +21,12 @@ test('private full v4 agent uses the authenticated DeepSeek gateway and internet
   expect(config.conversation_config.asr).toMatchObject({ provider: 'scribe_realtime', quality: 'high' })
   expect(config.conversation_config.agent).toMatchObject({ language: 'en', hinglish_mode: false })
   expect(Object.keys(config.conversation_config.language_presets).sort()).toEqual([...MIRA_AGENT_LANGUAGES].sort())
-  expect(MIRA_AGENT_LANGUAGES).toEqual(expect.arrayContaining(['en', 'hi', 'mr', 'ta', 'te', 'gu', 'ar', 'es', 'fr', 'zh', 'ja']))
+  expect(MIRA_AGENT_LANGUAGES).toEqual(['en', 'hi'])
+  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('English and Hindi only')
+  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('not the numeric speed setting')
+  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('Make genuine emotion audible')
+  expect(MIRA_AGENT_SYSTEM_PROMPT).toContain('one fitting delivery cue in every spoken reply')
+  for (const { tag } of MIRA_VOICE_AUDIO_TAGS) expect(miraVoiceTranscript(`[${tag}] Hello`)).toBe('Hello')
   expect(config.conversation_config.agent.prompt.tools).toContainEqual(expect.objectContaining({ name: 'language_detection', params: { system_tool_type: 'language_detection', only_at_conversation_start: false } }))
   expect(config.conversation_config.agent.prompt.prompt).toContain(MIRA_CORE_SYSTEM_PROMPT)
   expect(config.conversation_config.agent.prompt.prompt).toBe(MIRA_AGENT_SYSTEM_PROMPT)

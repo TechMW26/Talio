@@ -1,6 +1,6 @@
 jest.mock('next/server', () => ({ NextResponse: { json: (body, options = {}) => new Response(JSON.stringify(body), options) } }))
 jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
-jest.mock('@/lib/miraVoiceAgent.server', () => ({ MIRA_AGENT_LANGUAGES: ['en', 'hi', 'es'], verifyMiraBridgeCredential: jest.fn(), miraBridgeAuthRequest: jest.fn() }))
+jest.mock('@/lib/miraVoiceAgent.server', () => ({ MIRA_AGENT_LANGUAGES: ['en', 'hi'], verifyMiraBridgeCredential: jest.fn(), miraBridgeAuthRequest: jest.fn() }))
 jest.mock('@/lib/miraChatStore.server', () => ({ MIRA_CHAT_STORE_OPTIONS: {}, miraMonth: () => '2026-10', checkAndDeductMiraToken: jest.fn(async () => ({ allowed: true })) }))
 jest.mock('@/lib/miraAgentGateway', () => ({ ...jest.requireActual('@/lib/miraAgentGateway'), streamMiraAgentDeepSeek: jest.fn(async () => new Response('data: [DONE]\n\n').body) }))
 jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn() }))
@@ -17,13 +17,14 @@ beforeEach(() => {
   jest.clearAllMocks()
   verifyMiraBridgeCredential.mockImplementation(async token => { if (token !== 'scoped') throw new Error('Invalid'); return { databaseName: 'tenant', userId: 'user' } })
   miraBridgeAuthRequest.mockResolvedValue(new Request('https://app.talio.in/api/ai/mira-agent/llm'))
-  getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user' }, database: { get: jest.fn(async () => ({ miraPreferences: { lastLanguage: 'hi' } })), mutate: jest.fn() } })
+  getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user', miraLanguage: 'hi' }, database: { get: jest.fn(), mutate: jest.fn() } })
   checkAndDeductMiraToken.mockResolvedValue({ allowed: true })
   rateLimit.mockResolvedValue({ allowed: true })
 })
 test('accepts the real ElevenLabs extra-body envelope and emits SSE', async () => {
   const response = await POST(request({ elevenlabs_extra_body: { mira_bridge_credential: 'scoped' }, messages: [{ role: 'user', content: 'Hello Mira' }] }))
   expect(response.status).toBe(200)
+  expect(response.headers.get('server-timing')).toMatch(/voice_auth;dur=\d+, voice_model;dur=\d+/)
   expect(verifyMiraBridgeCredential).toHaveBeenCalledWith('scoped')
   expect(await response.text()).toContain('[DONE]')
   expect(streamMiraAgentDeepSeek).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ language: 'hi' }))
@@ -38,7 +39,7 @@ test('uses only signed caller context and makes no employee/company lookup per r
   expect(response.status).toBe(200)
   expect(streamMiraAgentDeepSeek).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ userContext }))
   const auth = await getAuthAndDatabase.mock.results[0].value
-  expect(auth.database.get.mock.calls).toEqual([['users', 'user']])
+  expect(auth.database.get).not.toHaveBeenCalled()
 })
 test('rejects unsigned callback requests before database or rate-limit work', async () => {
   const response = await POST(request({ elevenlabs_extra_body: {}, messages: [] }))
@@ -59,10 +60,16 @@ test('only supported language changes update the current account without replaci
   await POST(request({ mira_bridge_credential: 'scoped', messages: [{ role: 'user', content: 'Hola' }] }))
   const { onLanguage } = streamMiraAgentDeepSeek.mock.calls[0][1]
   const auth = await getAuthAndDatabase.mock.results[0].value
-  await onLanguage('hi'); await onLanguage('invalid')
+  await onLanguage('hi'); await onLanguage('invalid'); await onLanguage('es')
   expect(auth.database.mutate).not.toHaveBeenCalled()
-  await onLanguage('es')
+  await onLanguage('en')
   expect(auth.database.mutate).toHaveBeenCalledWith('users', 'user', expect.any(Function))
   const updated = auth.database.mutate.mock.calls[0][2]({ miraPreferences: { voiceId: 'chosen', lastLanguage: 'hi' } })
-  expect(updated.miraPreferences).toEqual({ voiceId: 'chosen', lastLanguage: 'es' })
+  expect(updated.miraPreferences).toEqual({ voiceId: 'chosen', lastLanguage: 'en' })
+})
+test('legacy saved third languages safely fall back to English', async () => {
+  const auth = await getAuthAndDatabase()
+  auth.user.miraLanguage = 'it'
+  await POST(request({ mira_bridge_credential: 'scoped', messages: [{ role: 'user', content: 'Hello' }] }))
+  expect(streamMiraAgentDeepSeek).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ language: 'en' }))
 })

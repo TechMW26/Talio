@@ -32,3 +32,10 @@ test('a voice credential cannot become a Talio login even if incorrectly signed 
   expect(await verifyToken('different-fixture')).toBeNull()
   expect(getFirestoreTenantDatabase).not.toHaveBeenCalled()
 })
+test('voice language is taken from the fresh account, never stale JWT claims', async () => {
+  jwtVerify.mockResolvedValue({ payload: { userId: 'user', databaseName: 'talio_company_one', miraLanguage: 'it' } })
+  database.get.mockResolvedValue({ _id: 'user', isActive: true, miraPreferences: { lastLanguage: 'hi' } })
+  const result = await verifyTokenFromRequest(request('/api/mira/access'))
+  expect(result.user.miraLanguage).toBe('hi')
+  expect(database.get).toHaveBeenCalledTimes(1)
+})

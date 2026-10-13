@@ -8,6 +8,7 @@ import { rateLimit } from '@/lib/security/rateLimiter'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 export async function POST(request) {
+  const started = performance.now()
   try {
     if (Number(request.headers.get('content-length')) > 256000) return NextResponse.json({ error: 'Conversation too large' }, { status: 413 })
     const raw = await request.text()
@@ -26,13 +27,15 @@ export async function POST(request) {
     const userId = String(auth.user._id || auth.user.userId)
     const balance = await checkAndDeductMiraToken(auth.database, userId, miraMonth(), miraGatewayTurnKey(body, payload.jti))
     if (!balance.allowed) return NextResponse.json({ error: 'Your monthly Mira allowance is exhausted' }, { status: 429 })
-    const profile = await auth.database.get('users', userId)
-    const language = profile?.miraPreferences?.lastLanguage || 'en'
+    // Authentication already read this account fresh. Do not fetch it again.
+    const language = MIRA_AGENT_LANGUAGES.includes(auth.user.miraLanguage) ? auth.user.miraLanguage : 'en'
+    const authorizedAt = performance.now()
     const stream = await streamMiraAgentDeepSeek(body, { signal: request.signal, language, userContext: payload.userContext, onLanguage: async selected => {
       if (!MIRA_AGENT_LANGUAGES.includes(selected) || selected === language) return
       await auth.database.mutate('users', userId, fresh => ({ ...fresh, miraPreferences: { ...fresh.miraPreferences, lastLanguage: selected }, updatedAt: new Date() }))
     } })
-    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' } })
+    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no',
+      'Server-Timing': `voice_auth;dur=${Math.round(authorizedAt - started)}, voice_model;dur=${Math.round(performance.now() - authorizedAt)}` } })
   } catch {
     return NextResponse.json({ error: 'Invalid voice turn' }, { status: 400 })
   }
