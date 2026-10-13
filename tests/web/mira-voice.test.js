@@ -197,6 +197,31 @@ test('PiP orb restores the main panel, whose close button ends the conversation'
   expect(mockCloseChat).toHaveBeenCalledTimes(1)
 })
 
+test('internal PiP and its beam match the app curve while restored chat keeps the sidebar curve', async () => {
+  const rail = document.createElement('aside')
+  rail.className = 'talio-floating-rail'
+  rail.style.borderTopLeftRadius = '8px'
+  document.body.append(rail)
+  document.documentElement.dataset.desktopPlatform = 'darwin'
+  document.documentElement.style.setProperty('--dashboard-window-radius', '14px')
+  try {
+    render(<MiraChatSidebar />)
+    const panel = screen.getByRole('dialog', { name: 'MIRA assistant' })
+    expect(panel.style.borderRadius).toBe('8px')
+    fireEvent.click(screen.getByLabelText('Minimize MIRA to floating voice'))
+    expect(panel.style.borderRadius).toBe('14px')
+    expect(mockBeamProps.borderRadius).toBe(14)
+    await waitFor(() => expect(document.querySelector('[data-mira-pip-content]')).toBeVisible())
+    fireEvent.click(screen.getByLabelText('Restore MIRA chat'))
+    expect(panel.style.borderRadius).toBe('8px')
+    expect(mockBeamProps.borderRadius).toBe(8)
+  } finally {
+    rail.remove()
+    document.documentElement.removeAttribute('data-desktop-platform')
+    document.documentElement.style.removeProperty('--dashboard-window-radius')
+  }
+})
+
 test('the same sidebar smoothly expands to full width and collapses', () => {
   render(<MiraChatSidebar />)
   const card = screen.getByRole('dialog', { name: 'MIRA assistant' })

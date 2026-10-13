@@ -461,7 +461,6 @@ export default function MiraChatSidebar() {
     sessions, activeSessionId, showHistory, toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
   } = useMiraChat()
   const { theme, isDarkMode } = useTheme()
-  const windowRadius = useMiraWindowRadius(isOpen)
   const [input, setInput] = useState('')
   const [editing, setEditing] = useState(null)
   const [replying, setReplying] = useState(null)
@@ -508,6 +507,7 @@ export default function MiraChatSidebar() {
   const [backgroundCompact, setBackgroundCompact] = useState(false)
   const panelVisible = useMiraPanelVisible(isOpen)
   const pip = isOpen && (minimized || backgroundCompact)
+  const windowRadius = useMiraWindowRadius(isOpen, pip ? 'pip' : 'sidebar')
   useEffect(() => {
     let panel = null
     const update = () => document.documentElement.style.setProperty('--mira-pip-stack-height', pip && panel?.ownerDocument === document ? `${panel.getBoundingClientRect().height + 12}px` : '0px')
