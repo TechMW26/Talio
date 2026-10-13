@@ -58,8 +58,8 @@ beforeEach(() => {
 })
 test('voice beam reacts strongly and quickly without lowering the noise gate', () => {
   const { rerender } = render(<MiraChatSidebar />)
-  expect(mockBeamProps.borderRadius).toBe(16)
-  expect(screen.getByRole('dialog', { name: 'MIRA assistant' }).style.borderRadius).toBe('16px')
+  expect(mockBeamProps.borderRadius).toBe(22)
+  expect(screen.getByRole('dialog', { name: 'MIRA assistant' }).style.borderRadius).toBe('22px')
   expect(mockBeamProps).toEqual(expect.objectContaining({ sensitivity: 5.4, threshold: 0.015, attack: 0.12, release: 0.42, reach: 1.9, idle: 0.14, active: false, paused: true }))
   mockOpen = false
   rerender(<MiraChatSidebar />)

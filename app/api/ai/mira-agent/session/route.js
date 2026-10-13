@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { getMiraSettings } from '@/lib/miraAccess.server'
-import { createMiraBridgeCredential, elevenAgentRequest, miraAgentPromptHash, MIRA_AGENT_LANGUAGES } from '@/lib/miraVoiceAgent.server'
+import { createMiraBridgeCredential, elevenAgentRequest, miraAgentCanStart, MIRA_AGENT_LANGUAGES } from '@/lib/miraVoiceAgent.server'
 import { sanitizeMiraPreferences, miraAgentVoice } from '@/lib/miraVoices'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { MIRA_CHAT_STORE_OPTIONS, readMiraTokens } from '@/lib/miraChatStore.server'
@@ -17,7 +17,7 @@ export async function POST(request) {
     const balance = await readMiraTokens(auth.database, String(auth.user._id || auth.user.userId))
     if (!balance.tokensRemaining) return NextResponse.json({ success: false, message: 'Your monthly Mira allowance is exhausted' }, { status: 429 })
     const { agent } = await getMiraSettings(auth.database)
-    if (!agent?.agentId || agent.promptHash !== miraAgentPromptHash()) return NextResponse.json({ success: false, message: 'An administrator needs to sync the Mira voice agent in Settings → MIRA' }, { status: 409 })
+    if (!miraAgentCanStart(agent)) return NextResponse.json({ success: false, message: 'An administrator needs to sync the Mira voice agent in Settings → MIRA' }, { status: 409 })
     const profile = await auth.database.get('users', String(auth.user._id || auth.user.userId))
     const language = MIRA_AGENT_LANGUAGES.includes(profile?.miraPreferences?.lastLanguage) ? profile.miraPreferences.lastLanguage : 'en'
     const { voiceId, voiceName, notice } = miraAgentVoice(sanitizeMiraPreferences(profile?.miraPreferences).voiceId)

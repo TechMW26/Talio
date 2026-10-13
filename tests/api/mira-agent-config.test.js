@@ -1,5 +1,5 @@
 jest.mock('jose', () => ({ SignJWT: jest.fn(), jwtVerify: jest.fn() }))
-import { miraAgentConfig, miraAgentPromptHash, syncMiraAgent, MIRA_AGENT_LANGUAGES } from '@/lib/miraVoiceAgent.server'
+import { miraAgentConfig, miraAgentPromptHash, miraAgentCanStart, syncMiraAgent, MIRA_AGENT_LANGUAGES } from '@/lib/miraVoiceAgent.server'
 import { MIRA_CORE_SYSTEM_PROMPT, MIRA_AGENT_SYSTEM_PROMPT, MIRA_VOICE_AUDIO_TAGS, MIRA_VOICE_EXPRESSION_POLICY } from '@/lib/miraSystemPrompt'
 import { miraAgentVoice } from '@/lib/miraVoices'
 
@@ -44,6 +44,14 @@ test('private full v4 agent uses the authenticated DeepSeek gateway and internet
 })
 test('does not attempt provider writes for a non-administrator', async () => {
   await expect(syncMiraAgent({}, { role: 'employee' }, 'tenant')).rejects.toMatchObject({ status: 403 })
+})
+test('only the verified gateway configuration can keep serving during a prompt-only sync delay', () => {
+  expect(miraAgentCanStart({ agentId: 'owned', promptHash: miraAgentPromptHash() })).toBe(true)
+  const compatible = { agentId: 'owned', model: 'eleven_v4', promptHash: 'fcd643aac5053f63e607f4a0681b7be4cd68139ec113176d777a8433980fbaf3' }
+  expect(miraAgentCanStart(compatible)).toBe(true)
+  expect(miraAgentCanStart({ ...compatible, promptHash: 'unknown-native-agent' })).toBe(false)
+  expect(miraAgentCanStart({ ...compatible, model: 'other' })).toBe(false)
+  expect(miraAgentCanStart({ ...compatible, agentId: null })).toBe(false)
 })
 test('retired choices fall back to an Indian live-compatible voice', () => {
   expect(miraAgentVoice('jJ0Hr51MaPgsgfPtFdR4')).toMatchObject({ voiceId: 'ftDdhfYtmfGP0tFlBYA1', voiceName: 'Alisha · Indian', notice: '' })

@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v6.0.25'
+      - 'v6.0.26'
 permissions:
   contents: write
 jobs:
@@ -87,26 +87,26 @@ jobs:
           merge-multiple: true
       - name: Verify complete installer set
         run: |
-          for asset in Talio-6.0.25-arm64.dmg Talio-6.0.25-arm64.zip Talio-6.0.25-x64.dmg Talio-6.0.25-x64.zip Talio.Setup.6.0.25.exe Talio-6.0.25-x86_64.AppImage Talio-6.0.25-amd64.deb; do
+          for asset in Talio-6.0.26-arm64.dmg Talio-6.0.26-arm64.zip Talio-6.0.26-x64.dmg Talio-6.0.26-x64.zip Talio.Setup.6.0.26.exe Talio-6.0.26-x86_64.AppImage Talio-6.0.26-amd64.deb; do
             test -s "release-assets/$asset" || exit 1
           done
           cd release-assets
           sha256sum *.dmg *.zip *.exe *.AppImage *.deb > SHA256SUMS.txt
-      - name: Publish v6.0.25
+      - name: Publish v6.0.26
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.25
+          tag_name: v6.0.26
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.25 — Expressive Mira voice
+          name: Talio Desktop 6.0.26 — Mira context and matching windows
           draft: true
           prerelease: false
           generate_release_notes: false
           body: |
-            Mira live calls use streaming DeepSeek reasoning with full Eleven v4 speech, expressive Indian voices and on-demand internet search. Clear language changes update speech pronunciation and the account's saved language for future calls.
+            Mira voice replies use context-aware expression and a private per-call snapshot of the signed-in user's name, company and recorded gender. Missing details stay unspecified; personal details never enter the shared agent prompt.
 
-            Voice and picture-in-picture views use a larger centered orb. Removed waveform bars and redundant call controls; the main Mira panel close button and spoken goodbye still end the call. Header orbs use white dots on a dark circular background.
+            Mira chat and picture-in-picture windows match the navigation sidebar's corner radius on web and desktop. The orb-only PiP layout and close/restore controls are preserved.
 
-            Induction checks recover from transient read failures with a bounded retry and a clear recovery screen. Existing desktop actions, account permissions and tenant boundaries are preserved. Web interface changes are delivered through the hosted Talio app.
+            Shared-prompt sync now reports provider timeouts clearly and verifies uncertain updates before marking them synced. The previously verified DeepSeek gateway configuration remains compatible during prompt-only sync delays. Provider service availability is separate from these application fixes. Web interface changes are delivered through the hosted Talio app.
 
             CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 installers with freshly rebuilt local Agent S runtimes. Hands-on microphone and desktop-action acceptance on every operating system has not been performed.
 
@@ -123,15 +123,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view v6.0.25 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
+          gh release view v6.0.26 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
             let text = "";
             process.stdin.on("data", chunk => text += chunk);
             process.stdin.on("end", () => {
               const assets = JSON.parse(text);
-              const expected = ["Talio-6.0.25-arm64.dmg", "Talio-6.0.25-arm64.zip", "Talio-6.0.25-x64.dmg", "Talio-6.0.25-x64.zip", "Talio.Setup.6.0.25.exe", "Talio-6.0.25-x86_64.AppImage", "Talio-6.0.25-amd64.deb", "SHA256SUMS.txt"];
+              const expected = ["Talio-6.0.26-arm64.dmg", "Talio-6.0.26-arm64.zip", "Talio-6.0.26-x64.dmg", "Talio-6.0.26-x64.zip", "Talio.Setup.6.0.26.exe", "Talio-6.0.26-x86_64.AppImage", "Talio-6.0.26-amd64.deb", "SHA256SUMS.txt"];
               for (const name of expected) {
                 const asset = assets.find(item => item.name === name);
                 if (!asset || asset.size < (name.endsWith(".txt") ? 100 : 1048576)) throw new Error("Missing or truncated release asset: " + name);
               }
             });'
-          gh release edit v6.0.25 --repo "${{ github.repository }}" --draft=false --latest
+          gh release edit v6.0.26 --repo "${{ github.repository }}" --draft=false --latest

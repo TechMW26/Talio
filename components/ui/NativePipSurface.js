@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { readMiraWindowRadius } from '@/hooks/useMiraWindowRadius'
 
 // A tab may own one Document PiP window. Share it rather than closing an
 // ongoing meeting when the user also pops out MIRA.
@@ -111,30 +112,26 @@ async function getPipWindow(size) {
       const key = document.documentElement.style[i]
       if (key.startsWith('--')) target.document.documentElement.style.setProperty(key, document.documentElement.style.getPropertyValue(key))
     }
+    // Preserve the opener's navigation curve even after removing the desktop
+    // safe-area attribute from this child window.
+    target.document.documentElement.style.setProperty('--mira-window-radius', `${readMiraWindowRadius()}px`)
     const theme = document.documentElement.getAttribute('data-theme')
     if (theme) target.document.documentElement.setAttribute('data-theme', theme)
     const style = target.document.createElement('style')
     style.textContent = `html,body{margin:0;padding:0;${desktop ? 'background:transparent!important;' : ''}}body{display:flex;flex-direction:column;gap:12px;overflow:auto;background:${desktop ? 'transparent' : '#151518'};color:#f4f4f5}
-      [data-native-pip-surface]:has(.mira-workspace){order:2;z-index:2147483647}
+      [data-native-pip-surface]:has(.mira-workspace){order:2;z-index:2147483647;border-radius:var(--mira-window-radius,22px);overflow:hidden;clip-path:inset(0 round var(--mira-window-radius,22px))}
       [data-native-pip-surface]:has([data-meeting-pip]){order:1}
       ${desktop ? '[data-native-pip-surface]{user-select:none;-webkit-app-region:no-drag;app-region:no-drag}input,textarea{user-select:text}' : ''}
       [data-native-pip-surface]{position:relative;flex-shrink:0;width:100%;isolation:isolate}
       [data-native-pip-surface] [aria-label^="Pop out"]{display:none!important}
-      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:auto!important;min-height:180px!important;box-sizing:border-box;transform:none!important}
+      [data-native-pip-surface] .mira-workspace{position:relative!important;inset:auto!important;width:100%!important;height:auto!important;aspect-ratio:auto!important;min-height:180px!important;box-sizing:border-box;transform:none!important;border-radius:var(--mira-window-radius,22px)!important}
       [data-native-pip-surface] [data-meeting-pip]{position:relative!important;inset:auto!important;margin:0 0 0 auto!important;width:var(--native-panel-width,512px)!important;max-width:100%;box-sizing:border-box}
       [data-native-pip-surface] [data-meeting-pip="expanded"]{height:var(--native-panel-height,416px)!important;max-height:none!important}
       [data-native-pip-surface] [data-meeting-pip="bubble"]{width:56px!important}
       ${desktop ? '' : `
-      [data-native-pip-surface] .mira-workspace,
-      [data-native-pip-surface] .mira-workspace::before,
-      [data-native-pip-surface] .mira-workspace::after,
-      [data-native-pip-surface] .mira-workspace > [data-voice-beam-bloom],
-      [data-native-pip-surface] .mira-workspace > [data-voice-beam-warp],
       [data-native-pip-surface] [data-meeting-pip],
       [data-native-pip-surface] [data-meeting-pip] > header,
-      [data-native-pip-surface] [data-meeting-pip] > footer,
-      [data-native-pip-surface] .mira-workspace [data-ai-activity-beam],
-      [data-native-pip-surface] .mira-workspace [data-ai-activity-beam] *{border-radius:0!important}`}`
+      [data-native-pip-surface] [data-meeting-pip] > footer{border-radius:0!important}`}`
     target.document.head.append(style)
     if (desktop) {
       const sizing = target.document.createElement('style')
@@ -151,8 +148,7 @@ async function getPipWindow(size) {
         [data-native-pip-surface] .mira-workspace{height:auto!important;aspect-ratio:auto!important;min-height:180px!important;max-height:none!important;box-sizing:border-box;overflow:hidden!important}
         /* The mono VoiceBeam paints a second bright stroke at its corners.
            Keep its interior glow, but use one clipped native panel silhouette. */
-        html[data-desktop-pip="true"] [data-native-pip-surface]:has(.mira-workspace){border-radius:16px!important;overflow:hidden!important;clip-path:inset(0 round 16px)}
-        html[data-desktop-pip="true"] [data-native-pip-surface] .mira-workspace{border-radius:16px!important;box-shadow:none!important;outline:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+        html[data-desktop-pip="true"] [data-native-pip-surface] .mira-workspace{box-shadow:none!important;outline:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
         html[data-desktop-pip="true"] [data-native-pip-surface] .mira-workspace::after{content:none!important;display:none!important}
         [data-native-pip-surface] [data-mira-pip-content]{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
       `

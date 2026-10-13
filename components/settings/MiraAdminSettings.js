@@ -35,11 +35,11 @@ function AdminPanel({ settings, mutate }) {
     <Button color="primary" onPress={save} isDisabled={!!busy || !dirty} isLoading={busy === 'save'}>Save access</Button>
     <div className="border-t border-default-200 pt-5 flex flex-wrap items-center justify-between gap-4">
       <div><h4 className="font-medium">Mira voice agent</h4><p className="mt-1 text-sm text-default-500">Private live voice · secure Talio tools and permissions</p>
-        <p role="status" className="mt-1 text-xs text-default-500">{!agentStatus ? 'Checking agent…' : agentStatus.needsSync ? 'Agent setup or prompt sync required' : 'Shared prompt is synced'}{agentStatus?.agent?.syncedAt ? ` · ${new Date(agentStatus.agent.syncedAt).toLocaleString()}` : ''}</p>
+        <p role="status" className="mt-1 text-xs text-default-500">{!agentStatus ? 'Checking agent…' : agentStatus.needsSync ? agentStatus.canStart ? 'Voice configuration ready · shared prompt update pending' : 'Agent setup or prompt sync required' : 'Shared prompt is synced'}{agentStatus?.agent?.syncedAt ? ` · Last confirmed: ${new Date(agentStatus.agent.syncedAt).toLocaleString()}` : ''}</p>
       </div>
       <Button onPress={sync} isLoading={busy === 'sync'} isDisabled={!!busy}>{agentStatus?.agent ? 'Sync shared prompt' : 'Create Mira agent'}</Button>
     </div>
-    <p className="text-xs text-default-500">Only the shared system prompt is synced to the agent. Personal knowledge is resolved by authenticated Talio requests, not uploaded as a shared knowledge bank. Voice sessions last up to 10 minutes; reconnect to continue.</p>
+    <p className="text-xs text-default-500">Only shared instructions are synced to the agent. Each private call receives your saved name, company and gender when available; other workplace data is fetched only when needed. Personal details are never added to the shared prompt. Voice sessions last up to 10 minutes; reconnect to continue.</p>
     {error && <p role="alert" className="text-sm text-danger">{error}</p>}
     {notice && <p role="status" className="text-sm text-success">{notice}</p>}
   </section>

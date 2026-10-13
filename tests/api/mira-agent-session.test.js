@@ -1,6 +1,6 @@
 jest.mock('@/lib/auth', () => ({ getAuthAndDatabase: jest.fn() }))
 jest.mock('@/lib/miraAccess.server', () => ({ getMiraSettings: jest.fn(async () => ({ agent: { agentId: 'owned-agent', promptHash: 'current' } })) }))
-jest.mock('@/lib/miraVoiceAgent.server', () => ({ MIRA_AGENT_LANGUAGES: ['en', 'hi', 'es'], createMiraBridgeCredential: jest.fn(async () => 'scoped-bridge'), miraAgentPromptHash: () => 'current', elevenAgentRequest: jest.fn() }))
+jest.mock('@/lib/miraVoiceAgent.server', () => ({ MIRA_AGENT_LANGUAGES: ['en', 'hi', 'es'], createMiraBridgeCredential: jest.fn(async () => 'scoped-bridge'), miraAgentCanStart: agent => Boolean(agent?.agentId && agent.promptHash === 'current'), elevenAgentRequest: jest.fn() }))
 jest.mock('@/lib/security/rateLimiter', () => ({ rateLimit: jest.fn(async () => ({ allowed: true })) }))
 jest.mock('@/lib/miraChatStore.server', () => ({ MIRA_CHAT_STORE_OPTIONS: {}, readMiraTokens: jest.fn(async () => ({ tokensRemaining: 100 })) }))
 import { POST } from '@/app/api/ai/mira-agent/session/route'

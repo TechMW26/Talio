@@ -22,6 +22,7 @@ import { VoiceBeam } from 'voice-glow'
 import useMiraVoice, { prewarmMiraAgentVoice } from '@/hooks/useMiraAgentVoice'
 import useMiraSidebarDrag from '@/hooks/useMiraSidebarDrag'
 import useMiraPanelVisible from '@/hooks/useMiraPanelVisible'
+import useMiraWindowRadius from '@/hooks/useMiraWindowRadius'
 import { prepareMiraLocation } from '@/lib/miraClientContext'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
@@ -460,6 +461,7 @@ export default function MiraChatSidebar() {
     sessions, activeSessionId, showHistory, toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
   } = useMiraChat()
   const { theme, isDarkMode } = useTheme()
+  const windowRadius = useMiraWindowRadius(isOpen)
   const [input, setInput] = useState('')
   const [editing, setEditing] = useState(null)
   const [replying, setReplying] = useState(null)
@@ -686,13 +688,13 @@ export default function MiraChatSidebar() {
       <NativePipSurface ref={nativePipRef} enabled={isOpen} automatic onBackgroundChange={setBackgroundCompact}>
       <VoiceBeam stream={voice.stream} level={voice.level} onLevel={paintVoiceLevel} processing={isThinking || voiceConnecting} active={isOpen && (voice.active || isThinking)} paused={!isOpen || (!voice.active && !isThinking)} theme="dark" colorVariant="mono" strength={0.95}
         sensitivity={5.4} threshold={0.015} attack={0.12} release={0.42} reach={1.9} idle={0.14}
-        borderRadius={16}
+        borderRadius={windowRadius}
         role="dialog"
         aria-label="MIRA assistant"
         aria-busy={voiceConnecting}
         aria-hidden={!isOpen}
         inert={!isOpen ? true : undefined}
-        className="mira-workspace fixed flex flex-col z-[99999] rounded-2xl overflow-hidden shadow-2xl"
+        className="mira-workspace fixed flex flex-col z-[99999] overflow-hidden shadow-2xl"
         style={{
           opacity: panelVisible ? 1 : 0,
           transform: panelVisible ? 'translate3d(0, 0, 0)' : 'translate3d(-40px, 0, 0)',
@@ -702,7 +704,7 @@ export default function MiraChatSidebar() {
           left: pip ? 'auto' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
           right: pip ? '24px' : undefined,
           zIndex: pip ? 2147483647 : undefined,
-          borderRadius: 16,
+          borderRadius: windowRadius,
           top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? 'max(24px, env(safe-area-inset-bottom))' : 'auto',
           height: pip ? 'auto' : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
@@ -721,7 +723,7 @@ export default function MiraChatSidebar() {
             : `0 8px 60px -12px ${theme.primary[300]}60, 0 0 0 1px ${theme.primary[200]}40, inset 0 1px 0 rgba(255,255,255,0.6)`,
         }}
       >
-        {isOpen && (voiceConnecting || isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={16} />}
+        {isOpen && (voiceConnecting || isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={windowRadius} />}
         {pip && <div data-mira-pip-content className="p-3 text-foreground relative flex flex-1 items-center justify-center min-h-[180px]">
           <button aria-label="Restore MIRA chat" onClick={restoreMira} className="w-full flex items-center justify-center rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
             {voice.active ? <MiraVoiceCall ref={pipVoiceMeterRef} compact state={voice.state} muted={voice.muted} /> : <MiraSphere size={128} isThinking={isThinking || voiceConnecting} />}
@@ -739,7 +741,7 @@ export default function MiraChatSidebar() {
           title={sidebarDragEnabled ? 'Drag to move MIRA. Use arrow keys when focused.' : undefined}
           style={{
             background: 'transparent',
-            borderRadius: '16px 16px 0 0',
+            borderRadius: `${windowRadius}px ${windowRadius}px 0 0`,
             cursor: sidebarDragEnabled ? sidebarDrag.dragging ? 'grabbing' : 'grab' : undefined,
             touchAction: sidebarDragEnabled ? 'none' : undefined,
             userSelect: sidebarDragEnabled ? 'none' : undefined,
