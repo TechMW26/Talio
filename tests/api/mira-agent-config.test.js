@@ -1,5 +1,5 @@
 jest.mock('jose', () => ({ SignJWT: jest.fn(), jwtVerify: jest.fn() }))
-import { miraAgentConfig, miraAgentPromptHash, syncMiraAgent } from '@/lib/miraVoiceAgent.server'
+import { miraAgentConfig, miraAgentPromptHash, syncMiraAgent, MIRA_AGENT_LANGUAGES } from '@/lib/miraVoiceAgent.server'
 import { MIRA_CORE_SYSTEM_PROMPT, MIRA_AGENT_SYSTEM_PROMPT } from '@/lib/miraSystemPrompt'
 import { miraAgentVoice } from '@/lib/miraVoices'
 
@@ -15,8 +15,10 @@ test('private v4 Turbo agent uses hosted voice reasoning with authenticated acti
   expect(config.conversation_config.turn.turn_eagerness).toBe('eager')
   expect(config.conversation_config.turn.soft_timeout_config.timeout_seconds).toBe(-1)
   expect(config.conversation_config.asr).toMatchObject({ provider: 'scribe_realtime', quality: 'high' })
-  expect(config.conversation_config.agent).toMatchObject({ language: 'en', hinglish_mode: true })
-  expect(Object.keys(config.conversation_config.language_presets).sort()).toEqual(['en', 'hi'])
+  expect(config.conversation_config.agent).toMatchObject({ language: 'en', hinglish_mode: false })
+  expect(Object.keys(config.conversation_config.language_presets).sort()).toEqual([...MIRA_AGENT_LANGUAGES].sort())
+  expect(MIRA_AGENT_LANGUAGES).toEqual(expect.arrayContaining(['en', 'hi', 'mr', 'ta', 'te', 'gu', 'ar', 'es', 'fr', 'zh', 'ja']))
+  expect(config.conversation_config.agent.prompt.tools).toContainEqual(expect.objectContaining({ name: 'language_detection', params: { system_tool_type: 'language_detection', only_at_conversation_start: false } }))
   expect(config.conversation_config.agent.prompt.prompt).toContain(MIRA_CORE_SYSTEM_PROMPT)
   expect(config.conversation_config.agent.prompt.prompt).toBe(MIRA_AGENT_SYSTEM_PROMPT)
   expect(config.conversation_config.agent.prompt.llm).toBe('qwen36-35b-a3b')

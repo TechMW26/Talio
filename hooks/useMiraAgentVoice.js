@@ -4,7 +4,6 @@ import { createMiraVoiceTurns } from '@/lib/miraVoiceTurns'
 import { createMiraVoiceEchoGuard } from '@/lib/miraVoiceEcho'
 import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { isMiraDismissal } from '@/lib/miraDismissal'
-import { buildMiraOutputLanguageDirective } from '@/lib/miraLanguage'
 import { miraOrbVoiceState, publishMiraOrbState } from '@/lib/miraOrbState'
 
 export const prewarmMiraAgentVoice = () => import('@elevenlabs/client')
@@ -133,11 +132,9 @@ export default function useMiraAgentVoice({ open, busy, sendMessage, recordVoice
             stop(); current.current.onDismiss?.()
             return
           }
-          const language = buildMiraOutputLanguageDirective(event.message, run.captions.map(m => ({ role: m.source === 'user' ? 'user' : 'assistant', content: m.message })))
-          if (language !== run.language) {
-            run.language = language
-            run.conversation?.sendContextualUpdate?.(`Reply-language constraint for the user's current request: ${language} Keep feminine self-reference and the selected voice's dialect. Use only context-appropriate emotional cues and brisk pacing as defined in the voice instructions; never verbalize control tags or add silence check-ins.`)
-          }
+          // The agent's language_detection tool follows the spoken language
+          // throughout the call. Do not pin a client-side English/Hindi lock
+          // from an imperfect ASR transcript or a previous turn.
           run.captions.push({ ...event, timestamp: new Date() })
           const turn = run.turns.latest().sequence
           // Accounting stays off the speech path. Loss of authorization, balance

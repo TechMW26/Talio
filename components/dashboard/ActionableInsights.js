@@ -633,11 +633,10 @@ export default function ActionableInsights({ vertical = false }) {
       </div>
 
       {/* Tools Grid */}
-      <div tabIndex={vertical ? 0 : undefined} role={vertical ? 'region' : undefined} aria-label={vertical ? 'Scrollable quick tools' : undefined} className={vertical ? 'min-h-0 space-y-4 p-3 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'}>
+      <div tabIndex={vertical ? 0 : undefined} role={vertical ? 'region' : undefined} aria-label={vertical ? 'Scrollable quick tools' : undefined} className={vertical ? 'min-h-0 space-y-4 p-3 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'}>
         <FocusTimerCard />
         <CalculatorCard />
         {vertical && <StickyNoteCard />}
-        <LocationMapCard />
         <TicTacToeCard />
       </div>
 
@@ -656,8 +655,8 @@ function InsightsSkeleton() {
           <Skeleton className="h-3.5 w-64 rounded-lg" />
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[140px] rounded-2xl" />)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-[140px] rounded-2xl" />)}
       </div>
       <Skeleton className="h-[140px] rounded-2xl" />
     </div>

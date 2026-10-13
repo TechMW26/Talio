@@ -104,14 +104,13 @@ test('failed quota authorization ends the call and cannot run a tool', async () 
   expect(call.endSession).toHaveBeenCalledTimes(1)
   expect(sendMessage).not.toHaveBeenCalled()
 })
-test('mute preserves the same connection, and neutral follow-ups retain the user language', async () => {
+test('mute preserves the same connection, and client transcripts do not lock the agent language', async () => {
   const { result } = renderHook(() => useMiraAgentVoice({ open: true }))
   await act(async () => result.current.start())
   await act(async () => options.onMessage({ source: 'user', message: 'Mujhe meri tasks dikhao', event_id: 1 }))
-  expect(call.sendContextualUpdate).toHaveBeenLastCalledWith(expect.stringContaining('Roman-script Hinglish'))
-  const updates = call.sendContextualUpdate.mock.calls.length
   await act(async () => options.onMessage({ source: 'user', message: 'S-A-H-I-L', event_id: 2 }))
-  expect(call.sendContextualUpdate).toHaveBeenCalledTimes(updates)
+  await act(async () => options.onMessage({ source: 'user', message: '¿Cómo estás hoy?', event_id: 3 }))
+  expect(call.sendContextualUpdate).not.toHaveBeenCalled()
   act(() => result.current.toggleMute())
   expect(call.setMicMuted).toHaveBeenCalledWith(true)
   expect(result.current.muted).toBe(true)
