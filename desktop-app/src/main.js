@@ -1146,10 +1146,8 @@ function setupWindowEvents() {
       const features = Object.fromEntries(String(details.features || '').split(',').map(part => part.trim().split('=')));
       const width = Math.max(180, Math.min(1200, Number(features.width) || 400));
       const height = Math.max(80, Math.min(1200, Number(features.height) || 120));
-      const saved = store.get('livePipPositionV3', null);
-      const position = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? saved : null;
-      const display = position ? screen.getDisplayNearestPoint({ x: Math.round(position.x + width / 2), y: Math.round(position.y + height / 2) }) : screen.getDisplayMatching(mainWindow.getBounds());
-      Object.assign(pip.overrideBrowserWindowOptions, pipBounds(display.workArea, { width, height }, 16, position));
+      const display = screen.getDisplayMatching(mainWindow.getBounds());
+      Object.assign(pip.overrideBrowserWindowOptions, pipBounds(display.workArea, { width, height }, 16));
       return pip;
     }
     if (/^https?:\/\//i.test(details.url)) shell.openExternal(details.url);
@@ -1162,15 +1160,16 @@ function setupWindowEvents() {
     // closing that child from activating/revealing the main Talio window.
     child.setParentWindow(null);
     child.setAlwaysOnTop(true, 'screen-saver');
-    // Only explicit user drags write V3; old startup positions are not migrated.
-    const saved = store.get('livePipPositionV3', null);
-    let savedPipPosition = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? saved : null;
+    // Each new PiP opens bottom-right. A drag lasts only for this window, never
+    // resurrecting a stale top-left position on the next call.
+    child.miraUserPosition = null;
     let positioning = false;
     let applyingBounds = false;
     const positionPip = () => {
       if (positioning || child.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) return;
       positioning = true;
       try {
+        const savedPipPosition = child.miraUserPosition;
         const display = savedPipPosition && Number.isFinite(savedPipPosition.x) && Number.isFinite(savedPipPosition.y)
           ? screen.getDisplayNearestPoint({ x: Math.round(savedPipPosition.x + child.getBounds().width / 2), y: Math.round(savedPipPosition.y + child.getBounds().height / 2) })
           : screen.getDisplayMatching(mainWindow.getBounds());
@@ -1186,7 +1185,7 @@ function setupWindowEvents() {
       } finally { positioning = false; }
     };
     positionPip();
-    const rememberDrag = point => { savedPipPosition = point; };
+    const rememberDrag = point => { child.miraUserPosition = point; };
     child.on('mira-user-moved', rememberDrag);
     let hideAppAfterPipClose = false;
     child.on('close', () => {
@@ -1546,12 +1545,23 @@ function setupIPCHandlers() {
       size = { width: Math.round(Math.max(180, Math.min(1200, position.width))), height: Math.round(Math.max(80, Math.min(1200, position.height))) };
       livePipWindow.miraFaceInsets = Object.fromEntries(['top', 'right', 'bottom', 'left'].map(key => [key, Number.isFinite(position.insets?.[key]) ? Math.max(0, Math.min(40, position.insets[key])) : 0]));
     }
+    if (position.layoutOnly === true) {
+      // Renderer screenX/screenY can still be zero during startup. Resizing is
+      // not a user drag and must not save that transient position.
+      const previous = livePipWindow.getBounds();
+      const moved = livePipWindow.miraUserPosition;
+      const anchor = moved ? { x: moved.x + (previous.width - size.width) / 2, y: moved.y + previous.height - size.height } : undefined;
+      const display = moved ? screen.getDisplayNearestPoint({ x: previous.x + previous.width / 2, y: previous.y + previous.height / 2 }) : screen.getDisplayMatching(mainWindow.getBounds());
+      const bounds = pipBounds(display.workArea, size, 16, anchor, livePipWindow.miraFaceInsets);
+      if (moved) livePipWindow.emit('mira-user-moved', { x: bounds.x, y: bounds.y });
+      livePipWindow.setBounds(bounds);
+      return { success: true };
+    }
     // Use the visible window centre, not transparent padding on a neighbouring display.
     const display = screen.getDisplayNearestPoint({ x: point.x + Math.round(size.width / 2), y: point.y + Math.round(size.height / 2) });
     livePipWindow.emit('mira-user-moved', point);
     livePipWindow.setBounds(pipBounds(display.workArea, size, 0, point, livePipWindow.miraFaceInsets));
     const { x, y } = livePipWindow.getBounds();
-    store.set('livePipPositionV3', { x, y });
     livePipWindow.emit('mira-user-moved', { x, y });
     return { success: true };
   });

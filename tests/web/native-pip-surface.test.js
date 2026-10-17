@@ -128,9 +128,9 @@ test('native details grow upward and closing them restores face-only bounds atom
   await act(async () => { await ref.current.open() })
   const panel = target.document.querySelector('.mira-workspace')
   await act(async () => { panel.dataset.miraDetails = 'true' })
-  expect(moveLivePip).toHaveBeenLastCalledWith({ x: 432, y: 380, width: 360, height: 444, insets: { top: 0, left: 0, right: 0, bottom: 40 } })
+  expect(moveLivePip).toHaveBeenLastCalledWith({ x: 432, y: 380, width: 360, height: 444, insets: { top: 0, left: 0, right: 0, bottom: 40 }, layoutOnly: true })
   await act(async () => { panel.dataset.miraDetails = 'false' })
-  expect(moveLivePip).toHaveBeenLastCalledWith({ x: 500, y: 600, width: 224, height: 224, insets: { top: 40, left: 40, right: 40, bottom: 40 } })
+  expect(moveLivePip).toHaveBeenLastCalledWith({ x: 500, y: 600, width: 224, height: 224, insets: { top: 40, left: 40, right: 40, bottom: 40 }, layoutOnly: true })
   act(() => target.close())
 })
 

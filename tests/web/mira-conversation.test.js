@@ -66,13 +66,13 @@ test('only the exact accepted transcript can enter an action and verified failur
   expect(sendMessage.mock.calls[0][0]).toBe('Open projects')
   expect(outcome).toMatchObject({ speech: 'Could not open it.', actionOutcome: { success: false, uncertain: true } })
 })
-test('a final goodbye closes without asking the model, but a partial goodbye does not', async () => {
+test.each(['Mira bye', 'bye Mire', 'Mire close', "Let's end this conversation", 'मीरा बातचीत खत्म करो'])('final dismissal closes mic and playback without a model request: %s', async text => {
   const onDismiss = jest.fn(), sendMessage = jest.fn()
   const { result } = renderHook(() => useMiraVoice({ open: true, onDismiss, sendMessage }))
   await act(async () => result.current.start())
   act(() => callbacks.onPartial('bye'))
   expect(onDismiss).not.toHaveBeenCalled()
-  await act(async () => callbacks.onResult({ text: 'Mira bye' }))
+  await act(async () => callbacks.onResult({ text }))
   expect(onDismiss).toHaveBeenCalledTimes(1)
   expect(engine.stop).toHaveBeenCalledTimes(1)
   expect(playback.close).toHaveBeenCalledTimes(1)

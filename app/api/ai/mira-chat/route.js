@@ -25,7 +25,8 @@ import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
 import { MIRA_IMAGE_INSTRUCTIONS, validateMiraImageAction } from '@/lib/miraImageGeneration'
 import { compactMiraHistory, miraChatUseCase } from '@/lib/miraChatBudget'
 import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
-import { miraDesktopIntent, miraAppNameFollowup } from '@/lib/miraDesktopIntent'
+import { miraDesktopIntent, miraAppNameFollowup, miraAppRetryIntent } from '@/lib/miraDesktopIntent'
+import { resolveMiraDesktopGoal, resolveMiraDesktopRequest, isMiraDesktopAgreement } from '@/lib/miraDesktopGoal'
 import { miraOutputModeInstructions, miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { sanitizeMiraPreferences } from '@/lib/miraVoices'
 import { MIRA_CORE_SYSTEM_PROMPT } from '@/lib/miraSystemPrompt'
@@ -473,13 +474,15 @@ export async function POST(request) {
     }
 
     // External-app commands precede Talio lookup and stale workplace queues.
-    const desktopIntent = miraDesktopIntent(userMessage) || miraDesktopIntent(miraAppNameFollowup(userMessage, suppliedHistory))
+    const desktopGoal = resolveMiraDesktopGoal(userMessage, { taskBank, history: conversationHistory })
+    const desktopIntent = miraDesktopIntent(userMessage) || miraDesktopIntent(miraAppRetryIntent(userMessage, taskBank)) || miraDesktopIntent(miraAppNameFollowup(userMessage, suppliedHistory)) ||
+      (desktopGoal && isMiraDesktopAgreement(userMessage) ? { goal: desktopGoal } : null)
     if (!attachments.length && desktopIntent) {
       const available = sanitizeMiraClientContext(body.clientContext).desktopComputerAvailable === true
       return NextResponse.json({ success: true, response: {
         message: available ? '' : 'Please use an updated Talio desktop app for computer controls.',
-        action: available ? { type: 'desktop_task', goal: desktopIntent.goal } : null,
-        taskBank: available ? { tasks: [{ id: `desktop-${Date.now()}`, request: desktopIntent.goal.slice(0, 2000), action: { type: 'desktop_task', fields: {} }, status: 'pending' }] } : taskBank,
+        action: available ? { type: 'desktop_task', goal: desktopGoal || desktopIntent.goal } : null,
+        taskBank: available ? (taskBank.tasks.some(task => task.status !== 'completed') ? taskBank : { tasks: [{ id: `desktop-${Date.now()}`, request: (resolveMiraDesktopRequest(userMessage, { taskBank, history: conversationHistory }) || desktopIntent.goal).slice(0, 2000), action: { type: 'desktop_task', fields: {} }, status: 'pending' }] }) : taskBank,
         cards: [], suggestedQuestions: [],
       }, tokens: tokenResult })
     }
@@ -630,8 +633,9 @@ export async function POST(request) {
     delete parsed.image
     parsed.structured = true
     if (parsed.action?.type === 'desktop_task') {
-      parsed.action = screen.desktopComputerAvailable ? { type: 'desktop_task' } : undefined
-      if (!parsed.action) parsed.message = 'Please use an updated Talio desktop app for computer controls.'
+      const goal = desktopGoal || (!isMiraDesktopAgreement(userMessage) && !activeTask?.uncertain ? userMessage.slice(0, 3000) : null)
+      parsed.action = screen.desktopComputerAvailable && goal ? { type: 'desktop_task', goal } : undefined
+      if (!parsed.action) parsed.message = screen.desktopComputerAvailable ? 'Which app action would you like me to perform?' : 'Please use an updated Talio desktop app for computer controls.'
     } else if (parsed.action?.type === 'quick_note') {
       parsed.action = validateMiraQuickNote(parsed.action) || undefined
       if (!parsed.action) parsed.message = 'Please provide the text for your quick note (up to 5000 characters).'

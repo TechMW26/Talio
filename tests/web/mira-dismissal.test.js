@@ -1,4 +1,10 @@
 import { isMiraDismissal, buildMiraDismissalResponse } from '@/lib/miraDismissal'
+test.each(['bye mire', 'Mire, close', 'बाय मिरे', 'Okay bye Mira, see you later', "Let's end this conversation", 'You can close now', 'आज के लिए इतना ही', 'मीरा बातचीत खत्म करो'])('closes for recognition variants and natural conversation endings: %s', text => {
+  expect(isMiraDismissal(text)).toBe(true)
+})
+test.each(['Do not close Mire', 'Tell Mire bye', 'Translate "bye Mire"', 'end this conversation after sending the message'])('retains negation and quoted/incomplete-task safety: %s', text => {
+  expect(isMiraDismissal(text)).toBe(false)
+})
 
 test.each(['Bye-bye Mira', 'बाय-बाय मीरा', 'Mira, stop', 'Stop Mira', 'Mira, switch off', 'Turn yourself off', 'Can you close the chat please?', 'Could you stop talking now?', 'मीरा बंद करो', 'अब बंद करो', 'कॉल काट दो', 'Mira, shut down', 'stop listening', 'close voice mode', 'call kaat do'])('recognizes complete voice off commands: %s', text => {
   expect(isMiraDismissal(text)).toBe(true)

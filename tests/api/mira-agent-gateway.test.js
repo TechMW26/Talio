@@ -2,6 +2,19 @@ import { miraDeepSeekRequest, miraGatewayTurnKey, streamMiraAgentDeepSeek } from
 import { resolveMiraSpokenLanguage } from '@/lib/miraLanguage'
 
 const body = { messages: [{ role: 'user', content: 'Hello Mira' }], tools: [{ type: 'function', function: { name: 'ask_mira', parameters: { type: 'object' } } }] }
+test('direct Hindi speech has token headroom without weakening its concise prompt', async () => {
+  const previous = process.env.DEEPSEEK_API_KEY
+  process.env.DEEPSEEK_API_KEY = 'test-only'
+  const events = [{ choices: [{ delta: { content: 'भोपाल में अभी बारिश है।' }, finish_reason: 'stop' }] }]
+  const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(events.map(e => `data: ${JSON.stringify(e)}\n\n`).join('') + 'data: [DONE]\n\n'))
+  try {
+    const stream = await streamMiraAgentDeepSeek(body, { direct: true, language: 'hi' })
+    await new Response(stream).text()
+    const payload = JSON.parse(fetchSpy.mock.calls[0][1].body)
+    expect(payload.max_tokens).toBe(512)
+    expect(payload.messages[0].content).toContain('At most two short sentences and 40 words')
+  } finally { fetchSpy.mockRestore(); if (previous === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = previous }
+})
 test('voice defaults to Flash independently of the Pro reasoning override', () => {
   const previous = { voice: process.env.DEEPSEEK_VOICE_MODEL, pro: process.env.DEEPSEEK_PRO_MODEL }
   try {

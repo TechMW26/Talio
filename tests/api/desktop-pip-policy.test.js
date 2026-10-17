@@ -37,6 +37,30 @@ test.each([
 test('clamps oversized live windows to the work area', () => {
   expect(pipBounds({ x: 0, y: 0, width: 300, height: 200 }, { width: 500, height: 800 })).toEqual({ x: 16, y: 16, width: 268, height: 168 })
 })
+test('startup layout coordinates cannot turn into a saved drag or move PiP to the top', async () => {
+  const source = require('fs').readFileSync('desktop-app/src/main.js', 'utf8')
+  const start = source.indexOf("  ipcMain.handle('mira-move-pip'")
+  const end = source.indexOf('  const miraPermissions =', start)
+  let handler, bounds = { x: 1200, y: 700, width: 400, height: 120 }
+  const livePipWindow = {
+    isDestroyed: () => false, getBounds: () => bounds, miraUserPosition: null,
+    setBounds: jest.fn(next => { bounds = next }), emit: jest.fn(),
+  }
+  const store = { set: jest.fn() }
+  const area = { x: 0, y: 25, width: 1440, height: 815 }
+  require('vm').runInNewContext(source.slice(start, end), {
+    ipcMain: { handle: (_, fn) => { handler = fn } }, trustedMiraSender: () => true,
+    mainWindow: { getBounds: () => ({ x: 0, y: 25, width: 1200, height: 700 }) },
+    APP_ORIGIN: origin, livePipWindow, store, pipBounds,
+    screen: { getDisplayMatching: () => ({ workArea: area }), getDisplayNearestPoint: () => ({ workArea: area }) },
+  })
+  expect(await handler({}, { x: 0, y: 0, width: 224, height: 224, layoutOnly: true })).toEqual({ success: true })
+  expect(bounds).toEqual({ x: 1200, y: 600, width: 224, height: 224 })
+  expect(livePipWindow.emit).not.toHaveBeenCalled()
+  expect(store.set).not.toHaveBeenCalled()
+  expect(await handler({}, { x: 0, y: 0, width: 360, height: 444, layoutOnly: true })).toEqual({ success: true })
+  expect(bounds).toEqual({ x: 1064, y: 380, width: 360, height: 444 })
+})
 test('restores a saved position and clamps it after a display/work-area change', () => {
   const area = { x: 0, y: 0, width: 1440, height: 815 }
   expect(pipBounds(area, { width: 340, height: 180 }, 16, { x: 240, y: 180 })).toEqual({ x: 240, y: 180, width: 340, height: 180 })
@@ -87,17 +111,17 @@ test('native lifecycle corrects late top-left placement and resize without steal
   child.removeAllListeners()
   saved = { x: 240, y: 180 }
   mainWindow.webContents.emit('did-create-window', child, { frameName: 'talio-live-pip' })
-  expect(bounds).toMatchObject(saved)
+  expect(bounds).toMatchObject({ x: 1024, y: 624 })
   bounds = { ...bounds, x: 0, y: 0 }
   child.emit('show')
-  expect(bounds).toMatchObject(saved)
+  expect(bounds).toMatchObject({ x: 1024, y: 624 })
   child.emit('closed')
   expect(app.hide).not.toHaveBeenCalled()
   child.removeAllListeners()
   saved = { x: 9000, y: -500 }
   mainWindow.webContents.emit('did-create-window', child, { frameName: 'talio-live-pip' })
-  expect(bounds.x).toBe(1040)
-  expect(bounds.y).toBe(25)
+  expect(bounds.x).toBe(1024)
+  expect(bounds.y).toBe(624)
   child.emit('closed')
   expect(app.hide).not.toHaveBeenCalled()
 })

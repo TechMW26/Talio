@@ -1,7 +1,21 @@
-import { getMiraInternetContext } from '@/lib/miraInternet'
+import { getMiraInternetContext, miraWeatherPlace } from '@/lib/miraInternet'
 import { searchMiraInternet } from '@/lib/miraWebSearch'
 jest.mock('@/lib/miraWebSearch', () => ({ searchMiraInternet: jest.fn() }))
 beforeEach(() => { global.fetch = jest.fn(); delete process.env.BRAVE_SEARCH_API_KEY; delete process.env.OPEN_METEO_API_KEY })
+test.each([
+  ['Search the web for मीरा, बताओ ना भोपाल का weather कैसा है? भोपाल का आज का weather कैसा है, ये बताओ।', 'भोपाल'],
+  ['Mira, weather in Bhopal today', 'Bhopal'],
+  ['What is the weather like in New Delhi?', 'New Delhi'],
+  ['Search the web for New Delhi ka weather batao', 'New Delhi'],
+  ['मीरा का weather कैसा है?', null],
+  ['आज का मौसम', null],
+])('extracts the location, not the assistant address: %s', (message, city) => {
+  expect(miraWeatherPlace(message)).toBe(city)
+})
+test('voice search wrapper never sends Mira as the weather city', async () => {
+  await getMiraInternetContext('Search the web for मीरा, बताओ ना भोपाल का weather कैसा है?', {})
+  expect(searchMiraInternet).toHaveBeenLastCalledWith(expect.stringMatching(/^भोपाल weather today/))
+})
 test('ordinary workspace questions never go to public search', async () => {
   expect(await getMiraInternetContext('My pending tasks', {})).toBeNull()
   expect(fetch).not.toHaveBeenCalled()

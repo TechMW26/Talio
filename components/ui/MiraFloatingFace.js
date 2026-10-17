@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import MiraPet from './MiraPet'
 import { miraOrbVoiceState } from '@/lib/miraOrbState'
 import { clampMiraFloating, miraFloatingSize } from '@/lib/miraFloatingLayout'
@@ -7,9 +7,9 @@ import { clampMiraFloating, miraFloatingSize } from '@/lib/miraFloatingLayout'
 // The padded canvas can hop without clipping; the padding paints nothing.
 export default function MiraFloatingFace({ state, isThinking, onRestore, onClose, details, onCloseDetails }) {
   const drag = useRef(null), moved = useRef(false), face = useRef(null)
-  const previousSize = useRef({ width: 224, height: 224 })
+  const previousSize = useRef({ width: 224, height: 224 }), dragged = useRef(false)
   const hasDetails = Boolean(details)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const clamp = () => {
       const panel = face.current?.closest('.mira-workspace')
       if (!panel) return
@@ -18,7 +18,10 @@ export default function MiraFloatingFace({ state, isThinking, onRestore, onClose
       const size = miraFloatingSize(hasDetails, native ? {} : viewport)
       const rect = panel.getBoundingClientRect()
       if (!native) {
-        const point = clampMiraFloating({ x: rect.left + (previousSize.current.width - size.width) / 2, y: rect.top + previousSize.current.height - size.height }, size, viewport, hasDetails)
+        // Never inherit the expanded sidebar's top/left or entrance transform.
+        // Every newly opened PiP starts bottom-right; explicit drags stay local.
+        const initial = { x: viewport.width - size.width - 16, y: viewport.height - size.height - 16 }
+        const point = clampMiraFloating(dragged.current ? { x: rect.left + (previousSize.current.width - size.width) / 2, y: rect.top + previousSize.current.height - size.height } : initial, size, viewport, hasDetails)
         Object.assign(panel.style, { left: `${point.x}px`, top: `${point.y}px`, right: 'auto', bottom: 'auto' })
       }
       panel.style.setProperty('--mira-float-width', `${size.width}px`)
@@ -62,6 +65,7 @@ export default function MiraFloatingFace({ state, isThinking, onRestore, onClose
       const dx = event.screenX - active.x, dy = event.screenY - active.y
       if (!moved.current && Math.hypot(dx, dy) < 5) return
       moved.current = true
+      dragged.current = true
       if (active.native) window.electronAPI.moveLivePip({ x: active.left + dx, y: active.top + dy }).catch(() => {})
       else {
         const { x, y } = clampMiraFloating({ x: active.left + dx, y: active.top + dy }, { width: active.panel.offsetWidth, height: active.panel.offsetHeight }, { width: active.view.innerWidth, height: active.view.innerHeight }, Boolean(details))

@@ -20,6 +20,7 @@ import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
 import { readMiraDesktopScreen } from '@/lib/miraDesktopScreen'
 import { executeMiraFocusTimer, executeMiraQuickNote } from '@/lib/miraLocalActions'
 import { executeMiraComputerTask } from '@/lib/miraComputerClient'
+import { resolveMiraDesktopGoal } from '@/lib/miraDesktopGoal'
 import { isMiraHinglishReply } from '@/lib/miraLanguage'
 
 const MiraChatContext = createContext()
@@ -423,10 +424,9 @@ export function MiraChatProvider({ children }) {
         if (data.response.action?.type === 'desktop_task') {
           const pending = { id: replyId, role: 'assistant', content: 'Working on your desktop…', streaming: true, timestamp: new Date() }
           setMessages(prev => prev.some(m => m.id === replyId) ? prev.map(m => m.id === replyId ? pending : m) : [...prev, pending])
-          const pendingDesktop = data.response.taskBank?.tasks?.find(task => task.status !== 'completed' && task.action?.type === 'desktop_task')
-          const goal = data.response.action.goal || (pendingDesktop?.request && pendingDesktop.request !== text
-            ? `Original task: ${pendingDesktop.request}\nUser clarification: ${text}`.slice(0, 3000) : text.slice(0, 3000))
-          const outcome = await executeMiraComputerTask(goal, { token, signal: requestController.signal })
+          const goal = data.response.action.goal || resolveMiraDesktopGoal(queueMessage, { taskBank: data.response.taskBank, history: conversationHistory })
+          const outcome = goal ? await executeMiraComputerTask(goal, { token, signal: requestController.signal })
+            : { success: false, message: 'Which app action would you like me to perform?' }
           data.response.actionResult = outcome
           data.response.message = outcome.message
           data.response.speech = outcome.message

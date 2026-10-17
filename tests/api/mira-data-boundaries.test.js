@@ -26,6 +26,35 @@ beforeEach(() => {
   generateContent.mockResolvedValue(JSON.stringify({ message: 'Here is your data.', cards: [], suggestedQuestions: [] }))
 })
 const run = body => POST(new Request('http://localhost/api/ai/mira-chat', { method: 'POST', body: JSON.stringify(body) }))
+test.each(['नहीं खुला है, freshly open करो।', 'जी, कोशिश कीजिए।'])('pure app recovery bypasses the uncertain-write gate: %s', async message => {
+  const taskBank = { tasks: [{ request: 'Open YouTube Music', action: { type: 'desktop_task' }, status: 'blocked', uncertain: true }] }
+  const data = await (await run({ message, taskBank, clientContext: { desktopComputerAvailable: true } })).json()
+  expect(data.response.action).toEqual({ type: 'desktop_task', goal: 'Open YouTube Music' })
+  expect(data.response.taskBank.tasks[0]).toMatchObject({ uncertain: false, status: 'pending' })
+  expect(generateContent).not.toHaveBeenCalled()
+})
+test('voice confirmation hands the original WhatsApp task to desktop control, not just yes', async () => {
+  const original = 'Text Mansi on WhatsApp that I love you.'
+  const body = { message: 'Uh, yes, please.', conversationHistory: [{ role: 'user', content: original }, { role: 'assistant', content: 'Shall I message Mansi on WhatsApp?' }], clientContext: { desktopComputerAvailable: true } }
+  const data = await (await run(body)).json()
+  expect(data.response.action.type).toBe('desktop_task')
+  expect(data.response.action.goal).toContain(original)
+  expect(data.response.action.goal).toContain(body.message)
+  expect(generateContent).not.toHaveBeenCalled()
+})
+test('model-authored desktop goals cannot replace a pending user task', async () => {
+  generateContent.mockResolvedValue(JSON.stringify({ message: '', action: { type: 'desktop_task', goal: 'Send something else to a different person' } }))
+  const original = 'Text Mansi on WhatsApp hello'
+  const data = await (await run({ message: 'M-A-N-S-I', taskBank: { tasks: [{ request: original, action: { type: 'desktop_task' }, status: 'awaiting_details' }] }, clientContext: { desktopComputerAvailable: true } })).json()
+  expect(data.response.action.goal).toContain(original)
+  expect(data.response.action.goal).toContain('M-A-N-S-I')
+  expect(data.response.action.goal).not.toContain('different person')
+})
+test('an unanchored yes cannot become a model-invented desktop task', async () => {
+  generateContent.mockResolvedValue(JSON.stringify({ message: '', action: { type: 'desktop_task', goal: 'Send hello to Mansi' }, taskPlan: [{ request: 'Send hello to Mansi on WhatsApp', action: { type: 'desktop_task' } }] }))
+  const data = await (await run({ message: 'Yes, please.', clientContext: { desktopComputerAvailable: true } })).json()
+  expect(data.response.action).toBeUndefined()
+})
 test('image decisions include generation capability instructions', async () => {
   await run({ message: 'Create an image of a forest' })
   expect(generateContent.mock.calls[0][1]).toContain('generate_image')

@@ -87,7 +87,7 @@ function fitWindow(target) {
       target.__miraGeometry = signature
       // Grow upwards around the face's bottom-centre; one atomic native update
       // prevents resize/move handlers from fighting over the saved position.
-      window.electronAPI.moveLivePip({ width, height, insets,
+      window.electronAPI.moveLivePip({ width, height, insets, layoutOnly: true,
         x: target.screenX + ((target.innerWidth || width) - width) / 2,
         y: target.screenY + (target.innerHeight || height) - height,
       }).catch(() => { target.__miraGeometry = null })

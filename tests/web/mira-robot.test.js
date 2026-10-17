@@ -7,6 +7,15 @@ import { miraOrbVoiceState } from '@/lib/miraOrbState'
 
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => jest.useRealTimers())
+test('web PiP starts bottom-right rather than inheriting a top-left sidebar rectangle', () => {
+  const { container, unmount } = render(<div className="mira-workspace"><MiraFloatingFace onRestore={() => {}} onClose={() => {}} /></div>)
+  const panel = container.firstChild
+  expect(panel.style.left).toBe(`${window.innerWidth - 224 - 16}px`)
+  expect(panel.style.top).toBe(`${window.innerHeight - 224 - 16}px`)
+  act(() => window.dispatchEvent(new Event('resize')))
+  expect(panel.style.top).toBe(`${window.innerHeight - 224 - 16}px`)
+  unmount()
+})
 test('all nine robot expressions and all existing activity phases are mapped', () => {
   for (const state of MIRA_ROBOT_STATES) expect(miraRobotState(state)).toBe(state)
   expect(miraRobotState('solving')).toBe('thinking')

@@ -3,6 +3,12 @@ import { normalizePresenceUpdates } from '@/lib/chatPresence'
 
 const draft = { type: 'create_meeting', fields: { title: 'Planning', invitees: ['Sahil'] } }
 const oldDesktop = { tasks: [{ id: 'old', request: 'Open WhatsApp and text Harshad Hi', action: { type: 'desktop_task', fields: {} }, status: 'blocked' }] }
+test.each(['नहीं खुला है, freshly open करो।', 'जी, कोशिश कीजिए।', 'It did not open, try again', 'retry', 'Yes, please'])('natural retry unblocks only a pure app launch: %s', message => {
+  const bank = { tasks: [{ request: 'Open YouTube Music', action: { type: 'desktop_task' }, status: 'blocked', uncertain: true }] }
+  expect(advanceMiraTaskBank(bank, message).tasks[0]).toMatchObject({ status: 'pending', uncertain: false })
+  const write = { tasks: [{ ...oldDesktop.tasks[0], uncertain: true }] }
+  expect(advanceMiraTaskBank(write, message).tasks[0]).toMatchObject({ status: 'blocked', uncertain: true })
+})
 test.each([
   "Uh, Mira, let's skip that task. Uh, first, check what Priyanka was doing at 11:00.",
   'Can you check what Priyanka Srivastava was doing at 11:00 a.m. today?',

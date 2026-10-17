@@ -1,5 +1,36 @@
 import { executeMiraComputerTask, fetchMiraDesktopPlan } from '@/lib/miraComputerClient'
 afterEach(() => { delete window.electronAPI })
+test('network failure recovers with a fresh observation without repeating native inputs', async () => {
+  jest.useFakeTimers()
+  let observations = 0
+  const originalFetch = global.fetch
+  try {
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network unavailable'))
+    window.electronAPI = { computerTask: jest.fn(async input => {
+      if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+      if (input.operation === 'observe') return { success: true, observationId: `o${++observations}` }
+      if (input.operation === 'plan') return observations === 1 ? { success: true, kind: 'model_request', messages: [] } : { success: true, done: true, message: 'Fresh state verified.' }
+      return { success: true }
+    }) }
+    const result = executeMiraComputerTask('Read Notes', { token: 't' })
+    await jest.runAllTimersAsync()
+    expect(await result).toMatchObject({ success: true })
+    expect(global.fetch).toHaveBeenCalledTimes(3)
+    expect(observations).toBe(2)
+    expect(window.electronAPI.computerTask.mock.calls.some(([input]) => input.operation === 'act')).toBe(false)
+  } finally { global.fetch = originalFetch; jest.useRealTimers() }
+})
+test('uncertain app activation re-observes and verifies instead of blocking like a send', async () => {
+  let observations = 0
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+    if (input.operation === 'observe') return { success: true, observationId: `o${++observations}`, app: observations === 1 ? 'Finder' : 'YouTube Music' }
+    if (input.operation === 'act') return { success: false, uncertain: true }
+    return { success: true }
+  }) }
+  expect(await executeMiraComputerTask('Open YouTube Music', { token: 't' })).toMatchObject({ success: true, message: 'YouTube Music is open.' })
+  expect(window.electronAPI.computerTask.mock.calls.filter(([input]) => input.operation === 'act')).toHaveLength(1)
+})
 test('a three-input navigation uses one observation then verifies with the next screenshot', async () => {
   let observations = 0
   window.electronAPI = { computerTask: jest.fn(async input => {

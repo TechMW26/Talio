@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v6.0.29'
+      - 'v6.0.30'
 permissions:
   contents: write
 jobs:
@@ -87,30 +87,32 @@ jobs:
           merge-multiple: true
       - name: Verify complete installer set
         run: |
-          for asset in Talio-6.0.29-arm64.dmg Talio-6.0.29-arm64.zip Talio-6.0.29-x64.dmg Talio-6.0.29-x64.zip Talio.Setup.6.0.29.exe Talio-6.0.29-x86_64.AppImage Talio-6.0.29-amd64.deb; do
+          for asset in Talio-6.0.30-arm64.dmg Talio-6.0.30-arm64.zip Talio-6.0.30-x64.dmg Talio-6.0.30-x64.zip Talio.Setup.6.0.30.exe Talio-6.0.30-x86_64.AppImage Talio-6.0.30-amd64.deb; do
             test -s "release-assets/$asset" || exit 1
           done
           cd release-assets
           sha256sum *.dmg *.zip *.exe *.AppImage *.deb > SHA256SUMS.txt
-      - name: Publish v6.0.29
+      - name: Publish v6.0.30
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.29
+          tag_name: v6.0.30
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.29 — Faster Mira executor and guarded Jev decisions
+          name: Talio Desktop 6.0.30 — Reliable Mira control and bottom-right PiP
           draft: true
           prerelease: false
           generate_release_notes: false
           body: |
-            DeepSeek now prepares a bounded, task-local plan for supported same-app desktop steps. On macOS, Jev selects among freshly observed accessibility controls. Signed plans are scoped to the authenticated user and tenant, expire after five minutes, and never authorize arbitrary code or completion claims. Low-confidence, stale or unavailable selections fall back to the existing visual planner.
+            Mira now preserves the original user task and clarification context when confirming desktop actions. Natural English/Hindi retries can reopen an app without the duplicate-send block. Uncertain sends and submissions remain protected; success still requires observed completion.
 
-            Native helpers stay warm for the task instead of restarting for every input. Execution uses shorter input delays, bounded model deadlines and Retry-After-aware retries. Uncertain native inputs are never automatically replayed; completed structured plans receive fresh visual verification. Existing consent, foreground checks, emergency stop and protected-app rules remain in place.
+            Restored settling time after native input, increased visual planning headroom, and added recovery from interrupted model requests using fresh observations. Warm native helpers and guarded Jev selections remain alongside the existing visual fallback, consent, foreground checks, emergency stop and protected-app rules.
 
             Jev semantic selection currently requires macOS accessibility controls. Windows and Linux use the improved persistent native helper and existing visual planning. TypeSafe credentials remain server-side and are not embedded in installers.
 
-            Mira's current UI, floating robot, detail widgets, direct DeepSeek voice generation, expressive voice playback, concise replies and dismissal commands are preserved. Web changes arrive through the hosted Talio app, not the installers.
+            New PiP windows open bottom-right instead of restoring stale top-left coordinates. Automatic sizing no longer masquerades as a user drag. The transparent floating robot and detail widgets remain; explicit drags are local to the open window. Browser Mira remains an in-page floating bot.
 
-            Validated with the Mira regression suite, Swift type checking, a production web build and synthetic live DeepSeek/Jev calls. Synthetic latency is not a guarantee for real multi-step desktop tasks. Hands-on desktop-action acceptance on every operating system has not been performed.
+            Broader English/Hindi conversation-ending commands include recognition variants such as "bye Mire". Fixed voice weather location parsing and increased Hindi generation token headroom while keeping replies concise. Web changes arrive through the hosted Talio app.
+
+            Validated with automated Mira/control/PiP regressions and a production web build. Hands-on desktop-action and microphone/speaker acceptance on every operating system has not been performed; no real personal messages were sent during testing.
 
             CI rebuilds local Agent S runtimes and installers for macOS Apple Silicon and Intel, Windows x64 and Linux x64, then verifies all seven installers and their uploaded SHA-256 digests before publication.
 
@@ -127,12 +129,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view v6.0.29 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
+          gh release view v6.0.30 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
             let text = "";
             process.stdin.on("data", chunk => text += chunk);
             process.stdin.on("end", () => {
               const assets = JSON.parse(text);
-              const expected = ["Talio-6.0.29-arm64.dmg", "Talio-6.0.29-arm64.zip", "Talio-6.0.29-x64.dmg", "Talio-6.0.29-x64.zip", "Talio.Setup.6.0.29.exe", "Talio-6.0.29-x86_64.AppImage", "Talio-6.0.29-amd64.deb", "SHA256SUMS.txt"];
+              const expected = ["Talio-6.0.30-arm64.dmg", "Talio-6.0.30-arm64.zip", "Talio-6.0.30-x64.dmg", "Talio-6.0.30-x64.zip", "Talio.Setup.6.0.30.exe", "Talio-6.0.30-x86_64.AppImage", "Talio-6.0.30-amd64.deb", "SHA256SUMS.txt"];
               for (const name of expected) {
                 const asset = assets.find(item => item.name === name);
                 if (!asset || asset.size < (name.endsWith(".txt") ? 100 : 1048576)) throw new Error("Missing or truncated release asset: " + name);
@@ -141,4 +143,4 @@ jobs:
                 if (asset.digest !== digest) throw new Error("Uploaded asset checksum mismatch: " + name);
               }
             });'
-          gh release edit v6.0.29 --repo "${{ github.repository }}" --draft=false --latest
+          gh release edit v6.0.30 --repo "${{ github.repository }}" --draft=false --latest
