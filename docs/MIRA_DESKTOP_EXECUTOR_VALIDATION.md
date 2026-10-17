@@ -146,7 +146,16 @@ surface and subsequently opened App Store. The test was stopped before typing.
 An application-PID change between observation and input now ends the task with
 no input, rather than allowing retries to chase an unrelated app. Same-app
 window-layout changes still re-observe safely. This is regression-tested; the
-new-document workflow remains pending live acceptance in an uninterrupted run.
+new-document workflow was then repeated in an uninterrupted run.
+
+The final signed build created a new Untitled TextEdit document and entered
+`Mira control test — नमस्ते दुनिया`, independently read back through native AX.
+The app gave an accurate completion response. No explicit save or send occurred;
+the disposable document remains open. Electron again returned an empty image,
+and the ScreenCaptureKit fallback successfully supplied the verification image
+in 215 ms. This is live evidence of the fallback, superseding its earlier
+unit-test-only status. Broader missing/ambiguous-target and installed-update
+acceptance cases below remain required before public release.
 
 Automated validation:
 
