@@ -7,6 +7,13 @@ const nextConfig = require(path.join(root, 'next.config.js'))
 const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'))
 
 describe('Vercel production build configuration', () => {
+  test('ships the pinned robot postinstall patch and its child-window runtime', () => {
+    const ignore = require('ignore')().add(fs.readFileSync(path.join(root, '.vercelignore'), 'utf8'))
+    expect(packageJson.scripts.postinstall).toBe('node scripts/patch-robot-heads.cjs')
+    expect(ignore.ignores('scripts/patch-robot-heads.cjs')).toBe(false)
+    expect(ignore.ignores('lib/miraRobotWindowLoop.js')).toBe(false)
+    expect(packageJson.dependencies['robot-heads']).toBe('0.3.0')
+  })
   test('includes the shared MIRA action policy without desktop build artifacts', () => {
     const ignore = require('ignore')().add(fs.readFileSync(path.join(root, '.vercelignore'), 'utf8'))
     expect(ignore.ignores('desktop-app/src/miraActionPlan.js')).toBe(false)

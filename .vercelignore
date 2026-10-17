@@ -21,6 +21,7 @@ tmp
 docs
 scripts/*
 !scripts/generate-mira-app-map.cjs
+!scripts/patch-robot-heads.cjs
 deploy-production.sh
 *.dmg
 *.exe
