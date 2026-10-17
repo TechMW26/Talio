@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "6.0.30",
+  "version": "6.0.31",
   "description": "Talio - Organisational Super Intelligence",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@electron/notarize": "^2.5.0",
+    "@electron/osx-sign": "1.3.3",
     "cross-env": "^7.0.3",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.0"
@@ -65,7 +66,10 @@
         "NSLocationWhenInUseUsageDescription": "Talio uses your location when checking attendance and workplace geofencing."
       },
       "extraResources": [
-        { "from": "build/agent-s-darwin-${arch}", "to": "agent-s" },
+        {
+          "from": "build/agent-s-darwin-${arch}",
+          "to": "agent-s"
+        },
         {
           "from": "build/mira-control-${arch}",
           "to": "mira-control"
@@ -82,6 +86,14 @@
       ],
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
+      "forceCodeSigning": true,
+      "identity": "Sameer Sagar (37R3XLT7BG)",
+      "sign": "scripts/sign-mac.js",
+      "binaries": [
+        "Contents/Resources/mira-control",
+        "Contents/Resources/agent-s/mira-agent-s"
+      ],
+      "notarize": false,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
@@ -95,7 +107,12 @@
     },
     "afterSign": "scripts/notarize.js",
     "win": {
-      "extraResources": [{ "from": "build/agent-s-win32-${arch}", "to": "agent-s" }],
+      "extraResources": [
+        {
+          "from": "build/agent-s-win32-${arch}",
+          "to": "agent-s"
+        }
+      ],
       "target": [
         {
           "target": "nsis",
@@ -134,7 +151,12 @@
       "artifactName": "${productName}.Setup.${version}.${ext}"
     },
     "linux": {
-      "extraResources": [{ "from": "build/agent-s-linux-${arch}", "to": "agent-s" }],
+      "extraResources": [
+        {
+          "from": "build/agent-s-linux-${arch}",
+          "to": "agent-s"
+        }
+      ],
       "target": [
         {
           "target": "deb",

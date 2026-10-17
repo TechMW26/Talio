@@ -1,9 +1,15 @@
 name: Desktop local Agent S builds
 on:
   workflow_dispatch:
+    inputs:
+      desktop_acceptance_verified:
+        description: 'Signed-app desktop control and update permission continuity have passed hands-on acceptance'
+        type: boolean
+        required: true
+        default: false
   push:
     tags:
-      - 'v6.0.30'
+      - 'v6.0.31'
 permissions:
   contents: write
 jobs:
@@ -42,6 +48,23 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libfuse2 xclip x11-utils wmctrl xvfb
       - run: npm ci
         working-directory: desktop-app
+      - name: Require macOS release signing credentials
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_ID_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing macOS signing/notarization secret: $name. Refusing to produce an ad-hoc release."
+              exit 1
+            fi
+          done
+          test "$APPLE_TEAM_ID" = '37R3XLT7BG' || { echo '::error::Apple Team ID does not match the Talio signing policy'; exit 1; }
       - name: Build local planner runtime
         if: runner.os != 'Linux'
         run: npm run build:agent-s
@@ -62,7 +85,13 @@ jobs:
         run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }} --publish never
         working-directory: desktop-app
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ runner.os == 'macOS' && 'true' || 'false' }}
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_ID_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_ID_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+          REQUIRE_NOTARIZATION: ${{ runner.os == 'macOS' && 'true' || 'false' }}
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
@@ -77,6 +106,8 @@ jobs:
   publish:
     name: Publish desktop release
     needs: build
+    # Build artifacts are not proof of desktop task completion or TCC continuity.
+    if: github.event_name == 'workflow_dispatch' && inputs.desktop_acceptance_verified
     runs-on: ubuntu-22.04
     steps:
       - name: Download desktop packages
@@ -87,21 +118,27 @@ jobs:
           merge-multiple: true
       - name: Verify complete installer set
         run: |
-          for asset in Talio-6.0.30-arm64.dmg Talio-6.0.30-arm64.zip Talio-6.0.30-x64.dmg Talio-6.0.30-x64.zip Talio.Setup.6.0.30.exe Talio-6.0.30-x86_64.AppImage Talio-6.0.30-amd64.deb; do
+          for asset in Talio-6.0.31-arm64.dmg Talio-6.0.31-arm64.zip Talio-6.0.31-x64.dmg Talio-6.0.31-x64.zip Talio.Setup.6.0.31.exe Talio-6.0.31-x86_64.AppImage Talio-6.0.31-amd64.deb; do
             test -s "release-assets/$asset" || exit 1
           done
           cd release-assets
           sha256sum *.dmg *.zip *.exe *.AppImage *.deb > SHA256SUMS.txt
-      - name: Publish v6.0.30
+      - name: Publish v6.0.31
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.30
+          tag_name: v6.0.31
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.30 — Reliable Mira control and bottom-right PiP
+          name: Talio Desktop 6.0.31 — Native control recovery and stable Mac signing
           draft: true
           prerelease: false
           generate_release_notes: false
           body: |
+            Stable Developer ID identities now cover Talio and both desktop-control helpers. Native permission prompts no longer hold the startup loader open, and version-check requests have a bounded deadline. Existing ad-hoc installations may need one final approval when moving to the signed app.
+
+            Mira now observes menu controls, retains a short task-local hybrid plan across proven-not-executed inputs, and discards stale accessibility evidence from later model requests while preserving task and action history. Deterministic exact matching avoids unnecessary Jev calls; uncertain selections retain visual recovery and completion verification.
+
+            The approved Quiet Focus update screen uses the actual Talio logo, responsive spacing and scrollable short-window error states.
+
             Mira now preserves the original user task and clarification context when confirming desktop actions. Natural English/Hindi retries can reopen an app without the duplicate-send block. Uncertain sends and submissions remain protected; success still requires observed completion.
 
             Restored settling time after native input, increased visual planning headroom, and added recovery from interrupted model requests using fresh observations. Warm native helpers and guarded Jev selections remain alongside the existing visual fallback, consent, foreground checks, emergency stop and protected-app rules.
@@ -112,11 +149,11 @@ jobs:
 
             Broader English/Hindi conversation-ending commands include recognition variants such as "bye Mire". Fixed voice weather location parsing and increased Hindi generation token headroom while keeping replies concise. Web changes arrive through the hosted Talio app.
 
-            Validated with automated Mira/control/PiP regressions and a production web build. Hands-on desktop-action and microphone/speaker acceptance on every operating system has not been performed; no real personal messages were sent during testing.
+            Publication requires an explicit signed-desktop acceptance confirmation in the release workflow, in addition to successful platform packaging and macOS notarization. Refer to docs/MIRA_DESKTOP_EXECUTOR_VALIDATION.md for the recorded test scope and limitations.
 
             CI rebuilds local Agent S runtimes and installers for macOS Apple Silicon and Intel, Windows x64 and Linux x64, then verifies all seven installers and their uploaded SHA-256 digests before publication.
 
-            Signing: CI packages are not Developer ID signed or Apple notarized; Windows packages are unsigned. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
+            Signing: macOS packages require the stable Talio Developer ID and Apple notarization; Windows packages are unsigned. Moving from an older ad-hoc macOS build may require one final permission approval. Subsequent releases preserve the app and desktop-helper signing identities. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
           files: |
             release-assets/**/*.dmg
             release-assets/**/*.zip
@@ -129,12 +166,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view v6.0.30 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
+          gh release view v6.0.31 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
             let text = "";
             process.stdin.on("data", chunk => text += chunk);
             process.stdin.on("end", () => {
               const assets = JSON.parse(text);
-              const expected = ["Talio-6.0.30-arm64.dmg", "Talio-6.0.30-arm64.zip", "Talio-6.0.30-x64.dmg", "Talio-6.0.30-x64.zip", "Talio.Setup.6.0.30.exe", "Talio-6.0.30-x86_64.AppImage", "Talio-6.0.30-amd64.deb", "SHA256SUMS.txt"];
+              const expected = ["Talio-6.0.31-arm64.dmg", "Talio-6.0.31-arm64.zip", "Talio-6.0.31-x64.dmg", "Talio-6.0.31-x64.zip", "Talio.Setup.6.0.31.exe", "Talio-6.0.31-x86_64.AppImage", "Talio-6.0.31-amd64.deb", "SHA256SUMS.txt"];
               for (const name of expected) {
                 const asset = assets.find(item => item.name === name);
                 if (!asset || asset.size < (name.endsWith(".txt") ? 100 : 1048576)) throw new Error("Missing or truncated release asset: " + name);
@@ -143,4 +180,4 @@ jobs:
                 if (asset.digest !== digest) throw new Error("Uploaded asset checksum mismatch: " + name);
               }
             });'
-          gh release edit v6.0.30 --repo "${{ github.repository }}" --draft=false --latest
+          gh release edit v6.0.31 --repo "${{ github.repository }}" --draft=false --latest

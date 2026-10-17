@@ -45,6 +45,22 @@ test('silence needs no speech, action or second generation', async () => {
   expect(execute).not.toHaveBeenCalled(); expect(onText).not.toHaveBeenCalled()
   expect(global.fetch).toHaveBeenCalledTimes(1)
 })
+test('AI dismissal ends the session once without a second generation or action execution', async () => {
+  global.fetch.mockResolvedValue(sse([event({ tool_calls: [{ index: 0, id: 'close', function: { name: 'close_mira', arguments: '{}' } }] }, 'tool_calls')]))
+  const execute = jest.fn(), onText = jest.fn(), onClose = jest.fn()
+  expect(await run({ execute, onText, onClose })).toBe('')
+  expect(onClose).toHaveBeenCalledTimes(1)
+  expect(execute).not.toHaveBeenCalled(); expect(onText).not.toHaveBeenCalled()
+  expect(global.fetch).toHaveBeenCalledTimes(1)
+})
+test.each(['view_camera', 'close_camera'])('AI camera action %s uses the client permission flow then the actual result', async name => {
+  global.fetch.mockResolvedValueOnce(sse([event({ tool_calls: [{ index: 0, id: 'camera', function: { name, arguments: '{}' } }] }, 'tool_calls')]))
+    .mockResolvedValueOnce(sse([event({ content: 'I can see your drawing.' }, 'stop')]))
+  const execute = jest.fn(async () => ({ success: true }))
+  await run({ execute })
+  expect(execute).toHaveBeenCalledWith(name)
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body).messages.at(-1).content).toBe('{"success":true}')
+})
 test('incomplete streams fail and unauthorized requests preserve their status', async () => {
   global.fetch.mockResolvedValueOnce(sse([event({ content: 'Incomplete' })]))
   await expect(run()).rejects.toThrow('interrupted')

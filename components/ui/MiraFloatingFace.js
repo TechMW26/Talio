@@ -2,7 +2,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import MiraPet from './MiraPet'
 import { miraOrbVoiceState } from '@/lib/miraOrbState'
-import { clampMiraFloating, miraFloatingSize } from '@/lib/miraFloatingLayout'
+import { clampMiraFloating, miraFloatingSize, readMiraFloatingPosition, saveMiraFloatingPosition } from '@/lib/miraFloatingLayout'
 
 // The padded canvas can hop without clipping; the padding paints nothing.
 export default function MiraFloatingFace({ state, isThinking, onRestore, onClose, details, onCloseDetails }) {
@@ -19,8 +19,8 @@ export default function MiraFloatingFace({ state, isThinking, onRestore, onClose
       const rect = panel.getBoundingClientRect()
       if (!native) {
         // Never inherit the expanded sidebar's top/left or entrance transform.
-        // Every newly opened PiP starts bottom-right; explicit drags stay local.
-        const initial = { x: viewport.width - size.width - 16, y: viewport.height - size.height - 16 }
+        // Restore the user's face anchor; only first use defaults bottom-right.
+        const initial = readMiraFloatingPosition(size) || { x: viewport.width - size.width - 16, y: viewport.height - size.height - 16 }
         const point = clampMiraFloating(dragged.current ? { x: rect.left + (previousSize.current.width - size.width) / 2, y: rect.top + previousSize.current.height - size.height } : initial, size, viewport, hasDetails)
         Object.assign(panel.style, { left: `${point.x}px`, top: `${point.y}px`, right: 'auto', bottom: 'auto' })
       }
@@ -72,7 +72,10 @@ export default function MiraFloatingFace({ state, isThinking, onRestore, onClose
         Object.assign(active.panel.style, { left: `${x}px`, top: `${y}px`, right: 'auto', bottom: 'auto' })
       }
     }}
-    onPointerUp={event => { drag.current = null; event.currentTarget.releasePointerCapture?.(event.pointerId) }}
+    onPointerUp={event => {
+      if (moved.current && drag.current && !drag.current.native) saveMiraFloatingPosition(drag.current.panel.getBoundingClientRect())
+      drag.current = null; event.currentTarget.releasePointerCapture?.(event.pointerId)
+    }}
     onPointerCancel={() => { drag.current = null; moved.current = true }}
     onClickCapture={event => { if (moved.current) { event.preventDefault(); event.stopPropagation(); moved.current = false } }}
     onClick={onRestore}>

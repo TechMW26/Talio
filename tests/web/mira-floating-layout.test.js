@@ -1,4 +1,15 @@
-import { clampMiraFloating, miraFloatingSize, miraFloatingResult } from '@/lib/miraFloatingLayout'
+import { clampMiraFloating, miraFloatingSize, miraFloatingResult, readMiraFloatingPosition, saveMiraFloatingPosition } from '@/lib/miraFloatingLayout'
+
+test('browser PiP remembers a drag, keeps its bottom anchor, and rejects corrupted storage', () => {
+  localStorage.clear()
+  expect(readMiraFloatingPosition({ width: 224, height: 224 })).toBeNull()
+  saveMiraFloatingPosition({ left: 30, top: 100, width: 224, height: 224 })
+  expect(readMiraFloatingPosition({ width: 224, height: 224 })).toEqual({ x: 30, y: 100 })
+  expect(readMiraFloatingPosition({ width: 360, height: 444 })).toEqual({ x: -38, y: -120 })
+  localStorage.setItem('talio:mira-floating-position:v1', '{bad')
+  expect(readMiraFloatingPosition({ width: 224, height: 224 })).toBeNull()
+  localStorage.clear()
+})
 
 test('transparent face padding may cross left and bottom edges without hiding the face', () => {
   expect(clampMiraFloating({ x: -999, y: 9999 }, { width: 224, height: 224 }, { width: 390, height: 650 }, false)).toEqual({ x: -40, y: 466 })

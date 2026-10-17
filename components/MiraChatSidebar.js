@@ -21,6 +21,8 @@ import MiraWakeSetup from '@/components/MiraWakeSetup'
 import ReactMarkdown from 'react-markdown'
 import { VoiceBeam } from 'voice-glow'
 import useMiraVoice, { prewarmMiraVoice } from '@/hooks/useMiraVoice'
+import useMiraCamera from '@/hooks/useMiraCamera'
+import MiraCameraNotch from '@/components/ui/MiraCameraNotch'
 import useMiraSidebarDrag from '@/hooks/useMiraSidebarDrag'
 import useMiraPanelVisible from '@/hooks/useMiraPanelVisible'
 import useMiraWindowRadius from '@/hooks/useMiraWindowRadius'
@@ -459,7 +461,7 @@ export default function MiraChatSidebar() {
   const previousPath = useRef(pathname)
   const {
     isOpen, openChat, closeChat, messages, sendMessage, recordVoiceMessage, updateVoiceTokens, isThinking, clearHistory, tokens, interruptResponse,
-    viewMode, setViewMode,
+    viewMode, setViewMode, registerCamera,
     sessions, activeSessionId, showHistory, toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
   } = useMiraChat()
   const { theme, isDarkMode } = useTheme()
@@ -475,7 +477,9 @@ export default function MiraChatSidebar() {
   const followUps = latestReply?.role === 'assistant' && Array.isArray(latestReply.data?.suggestedQuestions)
     ? [...new Set(latestReply.data.suggestedQuestions.filter(q => typeof q === 'string' && q.trim()).map(q => q.trim()))].slice(0, 3) : []
   useEffect(() => { setEditing(null); setReplying(null) }, [activeSessionId])
-  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, recordVoiceMessage, onTokens: updateVoiceTokens, interruptResponse, onDismiss: closeChat, history: messages })
+  const camera = useMiraCamera(isOpen)
+  useEffect(() => registerCamera?.(camera), [registerCamera, camera.inspect, camera.stop])
+  const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, recordVoiceMessage, onTokens: updateVoiceTokens, interruptResponse, onDismiss: closeChat, history: messages, camera })
   const voiceMeterRef = useRef(null)
   const paintVoiceLevel = useCallback(level => voiceMeterRef.current?.style.setProperty('--mira-voice-level', String(level)), [])
   const voiceResults = messages.filter(message => message.role === 'assistant' && message.data?.voiceTool && !message.streaming && new Date(message.timestamp).getTime() >= (voice.startedAt || 0))
@@ -681,6 +685,7 @@ export default function MiraChatSidebar() {
   return (
     <>
       <MiraActivityPointer />
+      <MiraCameraNotch camera={camera} />
       {/* Backdrop */}
         <div
           aria-hidden="true"

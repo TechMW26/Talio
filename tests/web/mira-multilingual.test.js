@@ -1,14 +1,16 @@
 import { waitFor } from '@testing-library/react'
 import { startMiraConversationRecognition } from '@/lib/miraConversationRecognition'
 
-let socket, processor, track, context
+let socket, processor, track, context, highpass
 beforeEach(() => {
   localStorage.setItem('token', 'test-session')
   socket = null
   track = { stop: jest.fn(), addEventListener: jest.fn() }
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: jest.fn().mockResolvedValue({ getTracks: () => [track], getAudioTracks: () => [track] }) } })
   window.AudioContext = function () {
+    highpass = { connect: jest.fn(), disconnect: jest.fn(), frequency: { value: 0 }, Q: { value: 0 } }
     context = { sampleRate: 16000, state: 'running', resume: async () => {}, close: jest.fn().mockResolvedValue(), audioWorklet: { addModule: jest.fn(async () => {}) }, createMediaStreamSource: () => ({ connect: jest.fn(), disconnect: jest.fn() }) }
+    context.createBiquadFilter = () => highpass
     return context
   }
   window.AudioWorkletNode = function () { processor = { port: { close: jest.fn() }, connect: jest.fn(), disconnect: jest.fn() }; return processor }
@@ -25,6 +27,9 @@ test('auto-detects language and forwards Hindi and English transcripts without d
   expect(new URL(socket.url).searchParams.has('language_code')).toBe(false)
   socket.onmessage({ data: JSON.stringify({ message_type: 'session_started' }) })
   const engine = await pending
+  expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: false }, video: false })
+  expect(new URL(socket.url).searchParams.get('filter_background_audio')).toBe('true')
+  expect(highpass).toMatchObject({ type: 'highpass', frequency: { value: 80 } })
   socket.onmessage({ data: JSON.stringify({ message_type: 'partial_transcript', text: 'मेरी' }) })
   socket.onmessage({ data: JSON.stringify({ message_type: 'committed_transcript', text: 'मेरी attendance बताओ' }) })
   socket.onmessage({ data: JSON.stringify({ message_type: 'committed_transcript_with_timestamps', text: 'मेरी attendance बताओ' }) })
@@ -37,6 +42,7 @@ test('auto-detects language and forwards Hindi and English transcripts without d
   expect(track.stop).toHaveBeenCalled()
   expect(socket.close).toHaveBeenCalled()
   expect(context.close).toHaveBeenCalled()
+  expect(highpass.disconnect).toHaveBeenCalled()
 })
 test('permission resolving after cancellation releases the microphone without connecting', async () => {
   let resolve

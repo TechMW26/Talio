@@ -1,4 +1,4 @@
-const { pipWindowOptions } = require('../../desktop-app/src/pipWindowPolicy')
+const { pipWindowOptions, savedPipPoint, cameraWindowOptions } = require('../../desktop-app/src/pipWindowPolicy')
 const origin = 'https://app.talio.in'
 test('only the trusted app can create the named isolated live window', () => {
   const request = { url: 'about:blank', frameName: 'talio-live-pip' }
@@ -91,9 +91,9 @@ test('native lifecycle corrects late top-left placement and resize without steal
     webContents: Object.assign(new EventEmitter(), { setWindowOpenHandler: jest.fn() }),
   })
   let saved = null
-  const store = { get: () => saved }
+  const store = { get: () => saved, set: jest.fn() }
   const app = { hide: jest.fn() }
-  vm.runInNewContext(source.slice(start, end), { app, mainWindow, screen, store, pipBounds, process: { platform: 'darwin' }, setImmediate: fn => fn() })
+  vm.runInNewContext(source.slice(start, end), { app, mainWindow, screen, store, pipBounds, savedPipPoint, setTimeout, clearTimeout, process: { platform: 'darwin' }, setImmediate: fn => fn() })
   mainWindow.webContents.emit('did-create-window', child, { frameName: 'talio-live-pip' })
   expect(child.setParentWindow).toHaveBeenCalledWith(null)
   for (const event of ['show', 'move', 'moved', 'ready-to-show']) {
@@ -111,17 +111,17 @@ test('native lifecycle corrects late top-left placement and resize without steal
   child.removeAllListeners()
   saved = { x: 240, y: 180 }
   mainWindow.webContents.emit('did-create-window', child, { frameName: 'talio-live-pip' })
-  expect(bounds).toMatchObject({ x: 1024, y: 624 })
+  expect(bounds).toMatchObject({ x: 240, y: 180 })
   bounds = { ...bounds, x: 0, y: 0 }
   child.emit('show')
-  expect(bounds).toMatchObject({ x: 1024, y: 624 })
+  expect(bounds).toMatchObject({ x: 240, y: 180 })
   child.emit('closed')
   expect(app.hide).not.toHaveBeenCalled()
   child.removeAllListeners()
   saved = { x: 9000, y: -500 }
   mainWindow.webContents.emit('did-create-window', child, { frameName: 'talio-live-pip' })
-  expect(bounds.x).toBe(1024)
-  expect(bounds.y).toBe(624)
+  expect(bounds.x).toBe(1040)
+  expect(bounds.y).toBe(25)
   child.emit('closed')
   expect(app.hide).not.toHaveBeenCalled()
 })
@@ -137,9 +137,21 @@ test('closing desktop PiP while Talio is not focused does not reveal the dashboa
   const screen = Object.assign(new EventEmitter(), { getDisplayMatching: () => ({ workArea: area }), getDisplayNearestPoint: () => ({ workArea: area }) })
   const child = Object.assign(new EventEmitter(), { isDestroyed: () => false, getBounds: () => ({ x: 100, y: 100, width: 400, height: 120 }), setParentWindow: jest.fn(), setBounds: jest.fn(), setAlwaysOnTop: jest.fn(), setVisibleOnAllWorkspaces: jest.fn(), showInactive: jest.fn(), webContents: Object.assign(new EventEmitter(), { setWindowOpenHandler: jest.fn() }) })
   const app = { hide: jest.fn() }
-  vm.runInNewContext(source.slice(start, end), { app, mainWindow, screen, store: { get: () => null }, pipBounds, process: { platform: 'darwin' }, setImmediate: fn => fn() })
+  vm.runInNewContext(source.slice(start, end), { app, mainWindow, screen, store: { get: () => null }, pipBounds, savedPipPoint, setTimeout, clearTimeout, process: { platform: 'darwin' }, setImmediate: fn => fn() })
   mainWindow.webContents.emit('did-create-window', child, { frameName: 'talio-live-pip' })
   child.emit('close')
   child.emit('closed')
   expect(app.hide).toHaveBeenCalledTimes(1)
+})
+
+test('restored native face keeps its bottom center when details change size', () => {
+  expect(savedPipPoint({ x: 100, y: 200, width: 224, height: 224 }, { width: 360, height: 444 })).toEqual({ x: 32, y: -20 })
+  expect(savedPipPoint({ x: 100, y: 200, width: 'bad', height: Infinity }, { width: 224, height: 224 })).toEqual({ x: 100, y: 200 })
+  expect(savedPipPoint({ x: NaN, y: 1 }, { width: 224, height: 224 })).toBeUndefined()
+})
+test('camera window is isolated and only available to the trusted app origin', () => {
+  const request = { url: 'about:blank', frameName: 'talio-camera-notch' }
+  expect(cameraWindowOptions(request, origin, origin)).toMatchObject({ action: 'allow', overrideBrowserWindowOptions: { title: 'Mira camera', width: 360, transparent: true, webPreferences: { nodeIntegration: false, webSecurity: true } } })
+  expect(cameraWindowOptions(request, 'https://app.talio.in.evil.test', origin)).toBeNull()
+  expect(cameraWindowOptions({ ...request, url: 'https://evil.test' }, origin, origin)).toBeNull()
 })

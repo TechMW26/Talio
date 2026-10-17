@@ -22,7 +22,8 @@ const { revealMiraWindow } = require('./miraWakeBridge');
 const { captureMiraAppSnapshot } = require('./miraAppSnapshot');
 const { createMiraDesktopScreenCapture } = require('./miraDesktopScreen');
 const captureMiraDesktopScreen = createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, systemPreferences, platform: process.platform, hasDesktopConsent: () => store.get('miraDesktopConsentV1') === true });
-const { pipWindowOptions, pipBounds } = require('./pipWindowPolicy');
+const { pipWindowOptions, pipBounds, savedPipPoint, cameraWindowOptions } = require('./pipWindowPolicy');
+const { verifyMacApp } = require('./macSigningPolicy');
 let livePipWindow = null;
 
 // PERFORMANCE: Optimized GPU and rendering settings
@@ -32,38 +33,11 @@ if (forceDisableGPU) {
   app.disableHardwareAcceleration();
   app.commandLine.appendSwitch('disable-gpu');
   logger.log('warn', 'Main', 'GPU acceleration disabled via environment flag');
-} else {
-  // GPU rasterization — offloads tile rasterization from CPU to GPU
-  app.commandLine.appendSwitch('enable-gpu-rasterization');
-  // Zero-copy GPU rasterization — avoids extra memcpy from GPU tiles
-  app.commandLine.appendSwitch('enable-zero-copy');
-  // Smooth scrolling via compositor
-  app.commandLine.appendSwitch('enable-smooth-scrolling');
-  // Use GPU for 2D canvas operations
-  app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
-  // Compositing on all pages (even ones without explicit compositing triggers)
-  app.commandLine.appendSwitch('force-gpu-rasterization');
-
-  if (process.platform === 'win32') {
-    // Use D3D11 on Windows for best GPU interop
-    app.commandLine.appendSwitch('use-angle', 'd3d11');
-  }
-
-  if (process.platform === 'linux') {
-    // Use GL on Linux for wider driver compatibility
-    app.commandLine.appendSwitch('use-gl', 'desktop');
-  }
-
-  // Prevent GPU process crashes from killing the app
-  app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
 }
-
-// PERFORMANCE: Reduce IPC serialisation overhead
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512');
-// Disable background timer throttling — keeps intervals accurate when window is hidden
-app.commandLine.appendSwitch('disable-background-timer-throttling');
-// Disable renderer backgrounding to keep the UI responsive when minimised
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
+// Chromium selects a supported GPU backend and retains its driver/crash fallback.
+// Do not force a tiny V8 heap: it causes repeated GC on large dashboards. Active
+// voice windows have their own background policy; other renderers may throttle.
+app.on('gpu-info-update', () => logger.log('info', 'GPU', JSON.stringify(app.getGPUFeatureStatus())));
 
 // Note: The actual fix for the "Checking session" crash loop requires
 // deploying the Providers.js fix to production (app.talio.in)
@@ -236,7 +210,7 @@ function checkScreenRecordingPermission() {
 }
 
 /**
- * Show the screen recording permission dialog and open System Preferences (macOS)
+ * Native screen permission setup. Only open Settings after an explicit choice.
  */
 async function promptScreenRecordingPermission(parentWindow) {
   if (process.platform !== 'darwin') return;
@@ -248,14 +222,19 @@ async function promptScreenRecordingPermission(parentWindow) {
     type: 'warning',
     title: 'Screen Recording Permission Required',
     message: 'Talio needs Screen Recording permission to capture work activity and enable AI-powered insights.',
-    detail: 'Steps to enable:\n1. Click "Open System Preferences" below\n2. Find "Talio" in the list and check the box\n3. If Talio is already checked, uncheck it, then re-check it\n4. You may need to restart Talio after granting permission',
-    buttons: ['Open System Preferences', 'Remind Me Later'],
+    detail: 'Choose Request access to use the macOS prompt. If you previously denied access, macOS may require System Settings instead. Talio cannot change OS permissions for you. Restart only if macOS asks.',
+    buttons: ['Request access', 'Open System Settings', 'Not now'],
     defaultId: 0,
-    cancelId: 1
+    cancelId: 2
   });
 
   if (result.response === 0) {
-    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    try {
+      // Register Talio with the OS without retaining any screenshot.
+      await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+    } catch (error) { logger.log('warn', 'Permissions', 'Screen permission request was not granted'); }
+  } else if (result.response === 1) {
+    await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
   }
 }
 
@@ -360,21 +339,12 @@ async function requestPermissions() {
   if (process.platform === 'darwin') {
     logger.log('debug', 'Main', 'Checking macOS permissions...');
 
-    // Camera permission
-    var cameraStatus = systemPreferences.getMediaAccessStatus('camera');
-    if (cameraStatus !== 'granted') {
-      logger.log('info', 'Main', 'Requesting camera permission...');
-      try {
-        var camGranted = await systemPreferences.askForMediaAccess('camera');
-        logger.log('info', 'Main', 'Camera permission: ' + (camGranted ? 'granted' : 'denied'));
-      } catch (e) {
-        logger.log('warn', 'Main', 'Camera permission request failed: ' + e.message);
-      }
-    }
+    // Camera permission is requested on demand by getUserMedia after the
+    // visible camera/meeting consent flow, never simply on app startup.
 
     // Microphone permission
     var micStatus = systemPreferences.getMediaAccessStatus('microphone');
-    if (micStatus !== 'granted') {
+    if (micStatus === 'not-determined') {
       logger.log('info', 'Main', 'Requesting microphone permission...');
       try {
         var micGranted = await systemPreferences.askForMediaAccess('microphone');
@@ -1141,28 +1111,52 @@ function setupWindowEvents() {
 
   // Handle new window requests (open in browser)
   mainWindow.webContents.setWindowOpenHandler(function (details) {
+    const camera = cameraWindowOptions(details, mainWindow.webContents.getURL(), APP_ORIGIN);
+    if (camera) {
+      const area = screen.getDisplayMatching(mainWindow.getBounds()).workArea;
+      Object.assign(camera.overrideBrowserWindowOptions, { x: Math.round(area.x + (area.width - 360) / 2), y: area.y });
+      return camera;
+    }
     const pip = pipWindowOptions(details, mainWindow.webContents.getURL(), APP_ORIGIN);
     if (pip) {
       const features = Object.fromEntries(String(details.features || '').split(',').map(part => part.trim().split('=')));
       const width = Math.max(180, Math.min(1200, Number(features.width) || 400));
       const height = Math.max(80, Math.min(1200, Number(features.height) || 120));
-      const display = screen.getDisplayMatching(mainWindow.getBounds());
-      Object.assign(pip.overrideBrowserWindowOptions, pipBounds(display.workArea, { width, height }, 16));
+      const saved = savedPipPoint(store.get('miraPipPositionV1'), { width, height });
+      const display = saved ? screen.getDisplayNearestPoint({ x: Math.round(saved.x + width / 2), y: Math.round(saved.y + height / 2) }) : screen.getDisplayMatching(mainWindow.getBounds());
+      Object.assign(pip.overrideBrowserWindowOptions, pipBounds(display.workArea, { width, height }, 16, saved));
       return pip;
     }
     if (/^https?:\/\//i.test(details.url)) shell.openExternal(details.url);
     return { action: 'deny' };
   });
   mainWindow.webContents.on('did-create-window', function (child, details) {
+    if (details.frameName === 'talio-camera-notch') {
+      const parent = mainWindow;
+      const positionCamera = () => {
+        if (child.isDestroyed() || parent.isDestroyed()) return;
+        const area = screen.getDisplayMatching(parent.getBounds()).workArea;
+        child.setBounds({ x: Math.round(area.x + (area.width - Math.min(360, area.width)) / 2), y: area.y, width: Math.min(360, area.width), height: Math.min(340, area.height) });
+      };
+      child.setParentWindow(null); child.setAlwaysOnTop(true, 'floating');
+      if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+      child.once('ready-to-show', () => { positionCamera(); child.showInactive(); });
+      parent.on('move', positionCamera); screen.on('display-metrics-changed', positionCamera); screen.on('display-removed', positionCamera);
+      const stopCamera = () => { if (!child.isDestroyed()) child.close(); };
+      powerMonitor.on('lock-screen', stopCamera); powerMonitor.on('suspend', stopCamera);
+      child.once('closed', () => { parent.removeListener('move', positionCamera); screen.removeListener('display-metrics-changed', positionCamera); screen.removeListener('display-removed', positionCamera); powerMonitor.removeListener('lock-screen', stopCamera); powerMonitor.removeListener('suspend', stopCamera); });
+      child.webContents.on('will-navigate', event => event.preventDefault());
+      child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      return;
+    }
     if (details.frameName === 'talio-live-pip') livePipWindow = child;
     if (details.frameName !== 'talio-live-pip') return;
     // The live MIRA PiP is an independent desktop surface. Disowning it keeps
     // closing that child from activating/revealing the main Talio window.
     child.setParentWindow(null);
     child.setAlwaysOnTop(true, 'screen-saver');
-    // Each new PiP opens bottom-right. A drag lasts only for this window, never
-    // resurrecting a stale top-left position on the next call.
-    child.miraUserPosition = null;
+    // Restore only an intentional drag, clamped to currently connected displays.
+    child.miraUserPosition = savedPipPoint(store.get('miraPipPositionV1'), child.getBounds()) || null;
     let positioning = false;
     let applyingBounds = false;
     const positionPip = () => {
@@ -1185,10 +1179,19 @@ function setupWindowEvents() {
       } finally { positioning = false; }
     };
     positionPip();
-    const rememberDrag = point => { child.miraUserPosition = point; };
+    let savePositionTimer;
+    const rememberDrag = point => {
+      child.miraUserPosition = point;
+      clearTimeout(savePositionTimer);
+      savePositionTimer = setTimeout(() => {
+        if (!child.isDestroyed()) store.set('miraPipPositionV1', { ...child.getBounds(), ...child.miraUserPosition });
+      }, 200);
+    };
     child.on('mira-user-moved', rememberDrag);
     let hideAppAfterPipClose = false;
     child.on('close', () => {
+      clearTimeout(savePositionTimer);
+      if (child.miraUserPosition) store.set('miraPipPositionV1', { ...child.getBounds(), ...child.miraUserPosition });
       // On macOS, closing the last visible child can activate the owning app.
       // If Talio's main window was not focused before close, return to the app
       // the user was using instead of surfacing the dashboard.
@@ -1553,7 +1556,7 @@ function setupIPCHandlers() {
       const anchor = moved ? { x: moved.x + (previous.width - size.width) / 2, y: moved.y + previous.height - size.height } : undefined;
       const display = moved ? screen.getDisplayNearestPoint({ x: previous.x + previous.width / 2, y: previous.y + previous.height / 2 }) : screen.getDisplayMatching(mainWindow.getBounds());
       const bounds = pipBounds(display.workArea, size, 16, anchor, livePipWindow.miraFaceInsets);
-      if (moved) livePipWindow.emit('mira-user-moved', { x: bounds.x, y: bounds.y });
+      if (moved) livePipWindow.miraUserPosition = { x: bounds.x, y: bounds.y };
       livePipWindow.setBounds(bounds);
       return { success: true };
     }
@@ -1989,7 +1992,8 @@ function setupIPCHandlers() {
     sendUpdateStatus('checking');
     try {
       var response = await fetch(MIN_VERSION_CHECK_URL, {
-        headers: { 'x-app-version': app.getVersion() }
+        headers: { 'x-app-version': app.getVersion() },
+        signal: AbortSignal.timeout(8000)
       });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       var data = await response.json();
@@ -2612,6 +2616,11 @@ async function performUpdateDownload(latestVersion) {
         var newAppPath = path.join(mountPoint, newApp);
         logger.log('info', 'Updater', 'Found app in DMG: ' + newAppPath);
 
+        // Reject unsigned, wrong-team or unstable helper identities BEFORE
+        // replacing the installed app. Future updates must retain TCC identity.
+        await verifyMacApp(newAppPath);
+        logger.log('info', 'Updater', 'Verified stable Talio Developer ID and helper signatures');
+
         // Phase C & F: Copy the new .app to the install directory
         var targetPath = path.join(installDir, appBundleName);
         var hasWriteAccess = false;
@@ -2732,7 +2741,8 @@ async function checkForUpdates() {
 
   try {
     var response = await fetch(MIN_VERSION_CHECK_URL, {
-      headers: { 'x-app-version': app.getVersion() }
+      headers: { 'x-app-version': app.getVersion() },
+      signal: AbortSignal.timeout(8000)
     });
 
     if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -2767,7 +2777,9 @@ async function checkForUpdates() {
 async function checkForceUpdate() {
   try {
     var response = await fetch(MIN_VERSION_CHECK_URL, {
-      headers: { 'x-app-version': app.getVersion() }
+      headers: { 'x-app-version': app.getVersion() },
+      // A stalled connection/body must not leave the app on its loader forever.
+      signal: AbortSignal.timeout(8000)
     });
 
     if (!response.ok) {
@@ -3770,8 +3782,11 @@ app.whenReady().then(async function () {
   // Setup network connectivity monitoring
   setupNetworkMonitoring();
 
-  // Request permissions on macOS (camera, mic, screen recording)
-  await requestPermissions();
+  // OS dialogs may stay open until the user responds. Keep startup usable;
+  // capture and desktop control independently enforce permissions before use.
+  requestPermissions().catch(function () {
+    logger.log('warn', 'Permissions', 'Startup permission setup did not finish; access can be requested again when needed.');
+  });
 
   // Setup periodic update version checker
   setupAutoUpdater();

@@ -6,7 +6,6 @@ import { createMiraSpeechPlayback } from '@/lib/miraSpeechPlayback'
 import { createMiraStreamingSpeech } from '@/lib/miraStreamingSpeech'
 import { createMiraVoiceEchoGuard } from '@/lib/miraVoiceEcho'
 import { isMiraPlaybackEcho } from '@/lib/miraEchoGuard'
-import { isMiraDismissal } from '@/lib/miraDismissal'
 import { resolveMiraSpokenLanguage } from '@/lib/miraLanguage'
 import { createMiraWaitingFeedback } from '@/lib/miraWaitingFeedback'
 import { naturalMiraSpeech, miraSpeechSummary } from '@/lib/miraSpokenReply'
@@ -18,10 +17,10 @@ import { publishMiraRobotFeedback } from '@/lib/miraRobotState'
 
 export const speechText = naturalMiraSpeech
 export { prewarmMiraVoice }
-export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, onDismiss, onTokens, interruptResponse, history = [] }) {
+export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, onDismiss, onTokens, interruptResponse, camera, history = [] }) {
   const [state, setState] = useState('idle'), [error, setError] = useState(''), [transcript, setTranscript] = useState(''), [captions, setCaptions] = useState([])
   const current = useRef({}), session = useRef(null)
-  current.current = { open, sendMessage, recordVoiceMessage, onDismiss, onTokens, interruptResponse, history }
+  current.current = { open, sendMessage, recordVoiceMessage, onDismiss, onTokens, interruptResponse, camera, history }
   useEffect(() => { publishMiraOrbState('voice', miraOrbVoiceState(state)) }, [state])
   useEffect(() => { if (error) publishMiraRobotFeedback('error') }, [error])
   useEffect(() => () => publishMiraOrbState('voice', 'breathing'), [])
@@ -32,6 +31,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
     clearTimeout(run?.startupTimer)
     run?.waiting?.stop()
     run?.abort.abort(); run?.turnAbort?.abort(); run?.engine?.stop(); run?.playback?.close()
+    if (run) current.current.camera?.stop()
     if (run) {
       current.current.interruptResponse?.()
       current.current.recordVoiceMessage?.({ source: 'complete', messages: run.captions, target: run.target })
@@ -78,13 +78,13 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
         onPartial: text => {
           if (!live() || !text?.trim() || isEcho(text)) return
           publishMiraRobotFeedback('awake')
-          if (run.locked && text.trim() !== run.userText) interrupt()
+          // Partial ASR can be our own speaker audio before echo matching has
+          // enough words. Only a committed, echo-filtered utterance interrupts.
           setTranscript(text)
         },
         onResult: async result => {
           const text = result?.text?.trim()
-          const dismiss = isMiraDismissal(text)
-          if (!live() || !text || !/[\p{L}\p{N}]/u.test(text) || text.length > 3000 || (!dismiss && isEcho(text))) return
+          if (!live() || !text || !/[\p{L}\p{N}]/u.test(text) || text.length > 3000 || isEcho(text)) return
           if (run.locked && text === run.userText) return
           publishMiraRobotFeedback('awake')
           if (run.locked) interrupt()
@@ -96,7 +96,6 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
           const signal = AbortSignal.any([run.abort.signal, run.turnAbort.signal])
           const user = { source: 'user', message: text, timestamp: new Date() }
           run.captions.push(user); publish(); setTranscript('')
-          if (dismiss) { stop(); current.current.onDismiss?.(); return }
           setState('thinking')
           const messages = [...compactMiraVoiceHistory(run.history), { role: 'user', content: text }]
           run.pendingMessages = messages; run.pendingReply = ''
@@ -121,6 +120,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
               },
             })
             reply = await generateMiraDirectVoice({ config: run.config, messages, turn, signal,
+              onClose: () => { if (valid()) { stop(); current.current.onDismiss?.() } },
               onTokens: balance => { if (valid()) current.current.onTokens?.(balance) },
               onLanguage: language => { if (run.config.language !== language) run.waiting.stop(); run.config.language = language },
               onText: content => {
@@ -131,6 +131,8 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
               },
               execute: async name => {
                 if (!valid()) throw new DOMException('Cancelled', 'AbortError')
+                if (name === 'view_camera') { run.waiting.stop(); return current.current.camera?.inspect({ signal, question: text }) || { unavailable: 'Camera preview is unavailable.' } }
+                if (name === 'close_camera') { current.current.camera?.stop(); return { success: true, message: 'Camera stopped.' } }
                 setState(name === 'search_internet' ? 'searching' : 'working')
                 if (name === 'search_internet') {
                   const response = await fetch('/api/ai/mira-agent/search', { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ bridgeCredential: run.config.bridgeCredential, turn, message: text }), signal })

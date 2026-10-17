@@ -22,6 +22,7 @@
 
 const { notarize } = require('@electron/notarize');
 const path = require('path');
+const { verifyMacApp } = require('../src/macSigningPolicy');
 
 function getNotarizeOptions(appPath) {
   const keychainProfile = process.env.APPLE_KEYCHAIN_PROFILE;
@@ -84,8 +85,11 @@ exports.default = async function notarizing(context) {
     return;
   }
 
+  await verifyMacApp(appPath);
+  const required = process.env.REQUIRE_NOTARIZATION === 'true' || process.env.CI === 'true';
   const notarizeOptions = getNotarizeOptions(appPath);
   if (!notarizeOptions) {
+    if (required) throw new Error('macOS release blocked: notarization credentials are required. Configure an Apple keychain profile, API key, or Apple ID credentials.');
     logMissingCredentialHelp();
     return;
   }
@@ -100,7 +104,7 @@ exports.default = async function notarizing(context) {
     console.error('Notarization failed:', error.message);
     // Don't fail the build if notarization fails
     // This allows building without credentials for testing
-    if (process.env.REQUIRE_NOTARIZATION === 'true') {
+    if (required) {
       throw error;
     }
   }

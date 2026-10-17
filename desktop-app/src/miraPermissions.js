@@ -7,6 +7,7 @@ function trustedMiraSender(event, window, origin) {
 
 function createMiraPermissions({ systemPreferences, shell, platform, store, dialog, desktopCapturer }) {
   let screenVerified = false;
+  const prompted = new Set();
   function status() {
     const media = kind => {
       if (!['darwin', 'win32'].includes(platform)) return 'runtime';
@@ -17,7 +18,10 @@ function createMiraPermissions({ systemPreferences, shell, platform, store, dial
   async function request(kind) {
     const settingsOnly = typeof kind === 'string' && kind.endsWith(':settings');
     if (settingsOnly) kind = kind.slice(0, -9);
+    if (!settingsOnly && status()[kind] === 'granted') return { success: true, permissions: status() };
     if (kind === 'screenRecording' && desktopCapturer && !settingsOnly) {
+      if (platform === 'darwin' && prompted.has(kind)) return offerMacSettings(kind);
+      prompted.add(kind);
       // Request through Electron so macOS registers Talio, not a helper binary.
       // Enumerate only; do not retain, upload or return any screen image.
       try {
@@ -25,7 +29,7 @@ function createMiraPermissions({ systemPreferences, shell, platform, store, dial
         screenVerified = sources.length > 0;
       } catch { screenVerified = false; }
       const permissions = status();
-      return { success: true, permissions, ...(permissions.screenRecording !== 'granted' ? { message: 'Screen access was not granted. Use Open settings if macOS requires approval there, then restart Talio if requested.' } : {}) };
+      return { success: true, permissions, ...(permissions.screenRecording !== 'granted' ? { requiresSettings: platform === 'darwin', message: 'Respond to the macOS screen capture prompt. If access is still blocked, choose Allow again for guided setup, or Open settings. Restart Talio if macOS asks.' } : {}) };
     }
     if (kind === 'desktopControl' && dialog && store) {
       const stopKey = platform === 'darwin' ? 'Command+Shift+Escape' : 'Control+Alt+Shift+Escape';
@@ -41,8 +45,15 @@ function createMiraPermissions({ systemPreferences, shell, platform, store, dial
         await systemPreferences.askForMediaAccess(kind);
         return { success: true, permissions: status() };
       }
-      else if (kind === 'accessibility') systemPreferences.isTrustedAccessibilityClient(true);
-      if (status()[kind] !== 'granted') await shell.openExternal(kind === 'notifications' ? 'x-apple.systempreferences:com.apple.preference.notifications' : `x-apple.systempreferences:com.apple.preference.security?Privacy_${panels[kind]}`);
+      if (!settingsOnly && kind === 'accessibility' && !prompted.has(kind)) {
+        prompted.add(kind);
+        systemPreferences.isTrustedAccessibilityClient(true);
+        // The OS owns this prompt. Do not open Settings over it or treat a
+        // nonblocking prompt as denial. A later request can offer guided setup.
+        return { success: true, permissions: status(), requiresSettings: status().accessibility !== 'granted', message: status().accessibility === 'granted' ? undefined : 'Follow the macOS Accessibility prompt. macOS requires you to enable Talio in System Settings; Talio cannot switch this on itself.' };
+      }
+      if (!settingsOnly) return offerMacSettings(kind);
+      if (status()[kind] !== 'granted') await openMacSettings(kind);
     } else if (platform === 'win32') {
       const targets = { camera: 'ms-settings:privacy-webcam', microphone: 'ms-settings:privacy-microphone', location: 'ms-settings:privacy-location', notifications: 'ms-settings:notifications' };
       if (targets[kind]) await shell.openExternal(targets[kind]);
@@ -51,6 +62,22 @@ function createMiraPermissions({ systemPreferences, shell, platform, store, dial
       return { success: true, permissions: status(), message: 'Open your Linux desktop Settings → Privacy or Notifications. Screen sharing may use a system portal; desktop control depends on X11/Wayland support. Talio cannot grant these permissions for you.' };
     }
     return { success: true, permissions: status() };
+  }
+  const macPanels = { microphone: 'Microphone', camera: 'Camera', screenRecording: 'ScreenCapture', accessibility: 'Accessibility', location: 'LocationServices', notifications: 'Notifications' };
+  async function openMacSettings(kind) {
+    if (!macPanels[kind]) return;
+    await shell.openExternal(kind === 'notifications' ? 'x-apple.systempreferences:com.apple.preference.notifications' : `x-apple.systempreferences:com.apple.preference.security?Privacy_${macPanels[kind]}`);
+  }
+  async function offerMacSettings(kind) {
+    const permissions = status();
+    if (permissions[kind] === 'granted') return { success: true, permissions };
+    if (permissions[kind] === 'restricted') return { success: true, permissions, message: 'macOS or your organization restricts this permission. Contact your device administrator; Talio cannot override it.' };
+    const message = 'macOS requires this approval in System Settings. Talio can take you directly to the correct panel, but cannot grant or change the permission for you.';
+    if (dialog) {
+      const result = await dialog.showMessageBox({ type: 'info', title: 'Talio permission setup', message: `Enable ${macPanels[kind] === 'ScreenCapture' ? 'Screen Recording' : macPanels[kind]} for Talio`, detail: message + '\n\nEnable Talio, then return here. Restart Talio only if macOS asks.', buttons: ['Not now', 'Open System Settings', 'Recheck access'], defaultId: 2, cancelId: 0, noLink: true });
+      if (result.response === 1) await openMacSettings(kind);
+    }
+    return { success: true, permissions: status(), requiresSettings: status()[kind] !== 'granted', message: status()[kind] === 'granted' ? undefined : message };
   }
   let pendingSetup = null;
   async function ensureDesktopAccess() {
@@ -66,7 +93,6 @@ function createMiraPermissions({ systemPreferences, shell, platform, store, dial
         if (answer.response !== 1) return { success: false, message: 'Desktop permissions are still required. No input was sent.' };
         // Ask one OS permission at a time so settings panes do not replace each other.
         await request(missing[0]);
-        if (missing[0] === 'screenRecording' && status().screenRecording !== 'granted') await request('screenRecording:settings');
       }
       const remaining = required.filter(kind => status()[kind] !== 'granted');
       return remaining.length

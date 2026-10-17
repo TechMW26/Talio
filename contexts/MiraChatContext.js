@@ -43,6 +43,8 @@ export function MiraChatProvider({ children }) {
   const [showHistory, setShowHistory] = useState(false)
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const abortControllerRef = useRef(null)
+  const cameraRef = useRef(null)
+  const registerCamera = useCallback(camera => { cameraRef.current = camera; return () => { if (cameraRef.current === camera) cameraRef.current = null } }, [])
   const remoteCommandRef = useRef(null)
   const sendingRef = useRef(false)
   const saveQueueRef = useRef(Promise.resolve())
@@ -309,6 +311,7 @@ export function MiraChatProvider({ children }) {
       let lastReply = ''
       let screenAttachment = null
       let screenAttempted = false
+      let cameraAttempted = false
       const navigationSearches = new Set()
       let continuedPersonLookup = false
       for (let queueStep = 0; queueStep < 8; queueStep += 1) {
@@ -322,7 +325,7 @@ export function MiraChatProvider({ children }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: queueMessage, originalUserMessage: text, attachments: screenAttachment ? [...(options.attachments || []), screenAttachment] : options.attachments || [], screenContextAttempted: screenAttempted, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
+        body: JSON.stringify({ message: queueMessage, originalUserMessage: text, attachments: screenAttachment ? [...(options.attachments || []), screenAttachment] : options.attachments || [], screenContextAttempted: screenAttempted, cameraContextAttempted: cameraAttempted, cameraAvailable: !remoteSessionId && Boolean(cameraRef.current), conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
         signal: requestController.signal
       })
 
@@ -348,6 +351,24 @@ export function MiraChatProvider({ children }) {
       if (data.success) {
         if (data.response.action) publishMiraOrbState('chat', miraOrbActionState(data.response.action.type))
         if (data.response.action) agentState(true)
+        if (data.response.action?.type === 'read_camera') {
+          if (!cameraAttempted && !remoteSessionId && cameraRef.current) {
+            cameraAttempted = true
+            const result = await cameraRef.current.inspect({ signal: requestController.signal, question: text })
+            if (result.success) {
+              screenAttachment = { name: 'Requested camera snapshot', text: result.untrustedVisualContext }
+              queueStep -= 1
+              continue
+            }
+            data.response.message = result.message || 'Camera context is unavailable.'
+          } else data.response.message = 'Please attach a photo so I can look at it.'
+          delete data.response.action
+          data.response.speech = data.response.message
+        }
+        if (data.response.action?.type === 'close_camera') {
+          if (!remoteSessionId) cameraRef.current?.stop()
+          delete data.response.action
+        }
         if (data.response.action?.type === 'read_screen') {
           if (!screenAttempted) {
             screenAttempted = true
@@ -570,6 +591,7 @@ export function MiraChatProvider({ children }) {
   return (
     <MiraChatContext.Provider value={{
       isOpen, openChat, closeChat, toggleChat,
+      registerCamera,
       viewMode, setViewMode,
       messages, sendMessage, recordVoiceMessage, updateVoiceTokens: setTokens, clearHistory, interruptResponse,
       isThinking, tokens,

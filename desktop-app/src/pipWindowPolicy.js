@@ -31,4 +31,18 @@ function pipBounds(workArea, size, margin = 16, saved, insets = {}) {
   };
 }
 
-module.exports = { pipWindowOptions, pipBounds };
+function savedPipPoint(saved, size) {
+  if (!Number.isFinite(saved?.x) || !Number.isFinite(saved?.y)) return undefined;
+  const width = Number.isFinite(saved.width) && saved.width > 0 ? saved.width : size.width;
+  const height = Number.isFinite(saved.height) && saved.height > 0 ? saved.height : size.height;
+  return { x: saved.x + (width - size.width) / 2, y: saved.y + height - size.height };
+}
+
+function cameraWindowOptions(details, openerUrl, appOrigin) {
+  if (details.frameName !== 'talio-camera-notch') return null;
+  const options = pipWindowOptions({ ...details, frameName: 'talio-live-pip' }, openerUrl, appOrigin);
+  if (options) Object.assign(options.overrideBrowserWindowOptions, { title: 'Mira camera', width: 360, height: 340 });
+  return options;
+}
+
+module.exports = { pipWindowOptions, pipBounds, savedPipPoint, cameraWindowOptions };

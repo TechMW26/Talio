@@ -46,6 +46,7 @@ test('goodbye while waiting cancels the filler and prevents late answer playback
   let turn
   await act(async () => { turn = callbacks.onResult({ text: 'Check my task deadline' }); await Promise.resolve() })
   await act(async () => jest.advanceTimersByTimeAsync(700))
+  generateMiraDirectVoice.mockImplementationOnce(async options => { options.onClose(); return '' })
   await act(async () => callbacks.onResult({ text: 'Bye-bye Mira' }))
   await act(async () => { ready({ response: {} }); await turn })
   expect(onDismiss).toHaveBeenCalledTimes(1)

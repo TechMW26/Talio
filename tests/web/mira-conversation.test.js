@@ -66,7 +66,8 @@ test('only the exact accepted transcript can enter an action and verified failur
   expect(sendMessage.mock.calls[0][0]).toBe('Open projects')
   expect(outcome).toMatchObject({ speech: 'Could not open it.', actionOutcome: { success: false, uncertain: true } })
 })
-test.each(['Mira bye', 'bye Mire', 'Mire close', "Let's end this conversation", 'मीरा बातचीत खत्म करो'])('final dismissal closes mic and playback without a model request: %s', async text => {
+test.each(['Mira bye', 'bye Mire', 'Mire close', "Let's end this conversation", 'मीरा बातचीत खत्म करो'])('AI-selected dismissal closes mic and playback: %s', async text => {
+  generateMiraDirectVoice.mockImplementation(async options => { options.onClose(); return '' })
   const onDismiss = jest.fn(), sendMessage = jest.fn()
   const { result } = renderHook(() => useMiraVoice({ open: true, onDismiss, sendMessage }))
   await act(async () => result.current.start())
@@ -76,8 +77,26 @@ test.each(['Mira bye', 'bye Mire', 'Mire close', "Let's end this conversation", 
   expect(onDismiss).toHaveBeenCalledTimes(1)
   expect(engine.stop).toHaveBeenCalledTimes(1)
   expect(playback.close).toHaveBeenCalledTimes(1)
-  expect(generateMiraDirectVoice).not.toHaveBeenCalled()
+  expect(generateMiraDirectVoice).toHaveBeenCalledTimes(1)
   expect(sendMessage).not.toHaveBeenCalled()
+})
+test('partial speech cannot interrupt playback, but committed non-echo speech can', async () => {
+  let finishSpeech
+  playback.speak.mockImplementation((_, onStart) => { onStart(); return new Promise(resolve => { finishSpeech = resolve }) })
+  const { result } = renderHook(() => useMiraVoice({ open: true }))
+  await act(async () => result.current.start())
+  let speaking
+  await act(async () => { speaking = callbacks.onResult({ text: 'Hi Mira' }); await Promise.resolve() })
+  const before = playback.cancel.mock.calls.length
+  act(() => callbacks.onPartial('hello there'))
+  act(() => callbacks.onPartial('different partial from the microphone'))
+  expect(playback.cancel).toHaveBeenCalledTimes(before)
+  await act(async () => callbacks.onResult({ text: 'Hello there.' }))
+  expect(generateMiraDirectVoice).toHaveBeenCalledTimes(1)
+  generateMiraDirectVoice.mockResolvedValueOnce('')
+  await act(async () => callbacks.onResult({ text: 'Stop, I have another question' }))
+  expect(playback.cancel.mock.calls.length).toBeGreaterThan(before)
+  await act(async () => { finishSpeech(); await speaking })
 })
 test('closing aborts generation and prevents late audio or captions', async () => {
   let resolve
