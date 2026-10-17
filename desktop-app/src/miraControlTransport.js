@@ -22,7 +22,7 @@ function createControlTransport(command, args = [], spawnProcess = spawn) {
     process.stdout.on('data', chunk => {
       if (child !== process) return;
       buffer += typeof chunk === 'string' ? chunk : decoder.write(chunk);
-      if (buffer.length > 100000) { stop(); return; }
+      if (buffer.length > (pending?.maxReplyBytes || 100000)) { stop(); return; }
       const end = buffer.indexOf('\n');
       if (end < 0) return;
       const line = buffer.slice(0, end); buffer = buffer.slice(end + 1);
@@ -39,7 +39,7 @@ function createControlTransport(command, args = [], spawnProcess = spawn) {
       if (pending) throw new Error('A native input is already running.');
       if (!child) start();
       return new Promise((resolve, reject) => {
-        pending = { resolve, reject, timer: setTimeout(stop, 12000) };
+        pending = { resolve, reject, maxReplyBytes: action.type === 'capture' ? 2000000 : 100000, timer: setTimeout(stop, 12000) };
         const activeChild = child;
         activeChild.stdin.write(JSON.stringify(action) + '\n', error => { if (error && child === activeChild) stop(); });
       });

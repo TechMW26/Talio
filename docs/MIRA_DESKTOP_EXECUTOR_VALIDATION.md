@@ -63,13 +63,95 @@ No messages were sent to third parties as part of these tests.
 2026-10-18: a local arm64 test bundle built and opened the authenticated dashboard.
 The app then showed its required-permissions checklist with Screen capture denied
 (camera and microphone allowed). The user asked to defer Apple/permission setup;
-no permission was granted or bypassed. Consequently this remains **blocked for
-live desktop acceptance**, not a verified fix on the user's desktop. Apple account
-setup and public release remain paused. The local bundle is not notarized.
+no permission was granted or bypassed at that point. The local bundle is not
+notarized, and Apple account setup remains paused.
+
+Later on 2026-10-18, the user explicitly authorized Screen Recording for the
+rebuilt `desktop-app/dist/mac-arm64/Talio.app`. Adding it alongside the existing
+entry did not fix access: Show in Finder still resolved the old `/Applications`
+copy. Removing only the stale Screen Recording entry, re-adding the rebuilt
+bundle and restarting cleared the app's required screen-capture setup gate.
+The existing persistent-app quit interception also prevented macOS's first
+Quit & Reopen attempt; the app was stopped through its existing explicit-quit
+sequence and reopened. No application or user data was deleted.
+
+The restarted dashboard initially reported **Accessibility — desktop controls
+denied**. After explicit user authorization and the user's private macOS
+authentication, the stale Accessibility entry was replaced with the rebuilt
+bundle; the in-app permission warning cleared.
+
+The subsequent real-app test opened Calculator successfully. The compound task
+to switch to Scientific mode while preserving a disposable value of 42 failed
+with the desktop-capture error; Calculator remained in Basic mode with 42 intact.
+OS permission checks passed, but this did not prove a usable captured image.
+Capture diagnostics now distinguish an unmatched display from an empty image,
+with an unambiguous single-screen fallback for Electron's optional display ID.
+Full desktop acceptance and public release remain blocked until this workflow
+and the remaining cases below pass. No real messages were sent.
+
+The next signed local build retained both grants without re-adding permissions.
+Its compound Calculator test reached input execution but did not preserve 42;
+the task reported no verified progress. Isolated View-menu and Scientific-menu
+requests subsequently succeeded, verified against Calculator's native mode.
+An additional native-boundary guard now rejects editing inputs, keyboard input
+and approximate clicks when the original user goal explicitly requires content
+preservation. It allows fresh native menu/toolbar navigation targets; this is
+enforced independently of the planner. Metadata-only native diagnostics contain
+action types/roles, outcomes, target counts and durations, not typed text, goals,
+UI labels, screenshots or credentials.
+
+The preservation guard kept 42 intact on the following two compound attempts,
+but the workflow still stalled. UI inspection then showed Talio's View menu
+selected while Calculator was unchanged. The persistent Swift helper was using
+`NSWorkspace.frontmostApplication` while blocked in a `readLine()` loop. Its
+notification-backed snapshot could stay on the app from before activation;
+observations and their foreground guards therefore agreed on the wrong app.
+The helper now drains workspace notifications and obtains the focused application's
+PID from the live system-wide Accessibility object on every command. On systems
+where that attribute is absent, it uses the notification-refreshed workspace
+instead of its stale cached value. Missing focus fails closed. Apple documents
+the Accessibility attribute as identifying the application
+currently accepting keyboard input:
+[kAXFocusedApplicationAttribute](https://developer.apple.com/documentation/applicationservices/kaxfocusedapplicationattribute).
+
+Visual navigation clicks are also resolved to a unique safe native control when
+strictly inside its current bounds. Overlaps, edge hits and destructive controls
+are not converted; native reference/foreground/geometry checks still apply.
+The signed build with this foreground fix successfully switched Calculator from
+Basic to Scientific while preserving 42. Native menu actions took 22 ms and 15 ms;
+these are input timings, not end-to-end task latency. Final verification still
+failed because Electron returned an empty thumbnail despite permission being
+granted. A ScreenCaptureKit fallback now requests only the exact current display,
+uses the existing TCC grant, bounds image size/time, keeps images in memory, and
+retains the post-capture foreground/window check.
+
+The next signed packaged build completed both real compound tasks: Hindi
+Scientific-to-Basic and English Basic-to-Scientific, preserving 42 and returning
+accurate completion messages. The observed native task intervals were about
+25 and 28 seconds, respectively; these are single-run samples, not latency SLAs.
+Electron capture succeeded in these runs, so the ScreenCaptureKit fallback is
+unit-tested and compiled but has not yet been exercised by a live empty-image
+failure. Both OS permissions remained granted after rebuilding/restarting.
+
+A new-unsaved-document test exposed an overly broad preservation clause: the
+restriction on editing existing documents blocked even the requested new one.
+The task was stopped with the emergency shortcut. The view-only input guard now
+distinguishes that specifically scoped clause when creating a new document;
+the full original constraint still goes to the planner. Current-document/value
+constraints and Hinglish preservation requests retain the native guard.
+
+The next TextEdit run activated the intended app, but focus then moved to ChatGPT
+while planning. The old retry path treated the new foreground as a new planning
+surface and subsequently opened App Store. The test was stopped before typing.
+An application-PID change between observation and input now ends the task with
+no input, rather than allowing retries to chase an unrelated app. Same-app
+window-layout changes still re-observe safely. This is regression-tested; the
+new-document workflow remains pending live acceptance in an uninterrupted run.
 
 Automated validation:
 
-- 261 JavaScript tests across 12 focused suites passed.
+- 285 JavaScript tests across 13 focused suites passed.
+- 53 permission, startup, signing-policy and update-UI tests passed separately.
 - 15 Agent S Python tests passed.
 - `swiftc -typecheck desktop-app/src/miraControl.swift` passed.
 - Integrated simulated desktop tests use the real client, signed plan service,

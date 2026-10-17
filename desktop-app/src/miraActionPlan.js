@@ -4,6 +4,26 @@
 const BROWSER_APP = /^(?:google chrome|chrome|chromium|safari|microsoft edge|edge|firefox|brave browser|brave|opera|vivaldi|arc)(?:\.exe)?$/i;
 const KEY_ACTIONS = ['space', 'enter', 'tab', 'escape', 'backspace', 'up', 'down', 'left', 'right', 'select_all', 'copy', 'paste', 'find', 'open_location', 'app_switch', 'app_search', 'browser_address', 'new_tab', 'close_tab', 'refresh', 'save', 'undo', 'redo'];
 
+function requiresContentPreservation(goal) {
+  let constraint = String(goal || '');
+  // A new-document request may protect OTHER, existing documents. That is not
+  // a navigation-only task. Keep the full goal in the planner; exclude only
+  // this specifically scoped clause from the additional view-only input guard.
+  if (/\bcreate\s+(?:a\s+)?new\s+(?:unsaved\s+)?document\b/i.test(constraint)) {
+    constraint = constraint.replace(/\b(?:do not|don't|never)\s+edit\s+(?:any\s+)?existing\s+documents?\b/gi, '');
+  }
+  return /\b(?:do not|don't|never|without)\s+(?:\w+\s+){0,3}(?:chang\w*|edit\w*|clear\w*|modif\w*|alter\w*)\b[^.!?]{0,70}\b(?:calculation|document|content|value|text|data)\b|\b(?:preserve|keep)\b[^.!?]{0,50}\b(?:calculation|document|content|value|text|data)\b[^.!?]{0,20}\b(?:unchanged|intact)\b|(?:गणना|कैलकुलेशन|दस्तावेज़|वैल्यू|टेक्स्ट|calculation|document|value|text)[^।.!?]{0,40}(?:मत बदल|नहीं बदल)/i.test(constraint);
+}
+
+function preservesContent(action, target) {
+  if (action.type === 'open_app' || action.type === 'scroll') return true;
+  // A shortcut such as Escape can clear a calculator; pixels can hit a keypad.
+  // Require a fresh native navigation target rather than trusting model intent.
+  if (action.type !== 'semantic' || action.operation !== 'click' || !target) return false;
+  return (target.navigation === true || /^AXMenu(?:Bar)?Item$/.test(target.role))
+    && !/\b(?:clear|cut|paste|undo|redo|replace|reset|delete|remove|save|close|quit)\b/i.test(target.label);
+}
+
 function validateComputerAction(value) {
   if (!value || typeof value !== 'object') return null;
   const { type } = value;
@@ -77,4 +97,4 @@ function channelContext(goal, app, targets = []) {
   return { requested, observed, mismatch: Boolean(requested && observed && (requested === 'dm' ? observed === 'email' : requested !== observed)), requiresVisualVerification: true };
 }
 
-module.exports = { BROWSER_APP, DESKTOP_PLANNING_POLICY, safeNavigationUrl, allowsNewTab, validateActionBatch, channelContext, validateComputerAction, KEY_ACTIONS };
+module.exports = { BROWSER_APP, DESKTOP_PLANNING_POLICY, safeNavigationUrl, allowsNewTab, validateActionBatch, channelContext, validateComputerAction, KEY_ACTIONS, requiresContentPreservation, preservesContent };

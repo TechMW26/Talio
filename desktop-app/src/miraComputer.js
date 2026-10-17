@@ -5,10 +5,11 @@ const { trustedMiraSender } = require('./miraPermissions');
 const { createMiraFile } = require('./miraFiles');
 const { decideDesktopRoute, sameWindowFrame } = require('./miraDecision');
 const { createMiraDesktopContext } = require('./miraDesktopContext');
-const { BROWSER_APP, DESKTOP_PLANNING_POLICY, allowsNewTab, channelContext, validateComputerAction, KEY_ACTIONS } = require('./miraActionPlan');
+const { BROWSER_APP, DESKTOP_PLANNING_POLICY, allowsNewTab, channelContext, validateComputerAction, KEY_ACTIONS, requiresContentPreservation, preservesContent } = require('./miraActionPlan');
 const os = require('os');
 const { createControlTransport } = require('./miraControlTransport');
 const { semanticCandidates, semanticFingerprint } = require('./miraSemantic');
+const logger = require('./logger');
 const protectedApp = /terminal|iterm|powershell|command prompt|^(cmd|pwsh|regedit|mmc)(\.exe)?$|system settings|keychain|password|keepass|lastpass|bitwarden/i;
 function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform, resourcesPath, packaged, runControl, agentS, ensurePermissions, revealMainWindow, appVersion = 'unknown', electronVersion = process.versions.electron, arch = process.arch, osModule = os, isLocked = () => false }) {
   let session = null;
@@ -26,7 +27,10 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
       return { success: true, message: 'Talio main window restored and focused.' };
     }
     if (runControl) return runControl(action);
-    return transport.request(action);
+    const started = Date.now();
+    const result = await transport.request(action);
+    if (packaged) logger.log('info', 'MiraControl', JSON.stringify({ type: action.type, operation: action.operation, role: action.role, key: action.type === 'key' ? action.key : undefined, pid: result.pid, success: result.success, notExecuted: result.notExecuted, verified: result.verified, targets: result.elements?.length, ms: Date.now() - started }));
+    return result;
   }
   async function cancel() {
     const previous = session;
@@ -139,7 +143,7 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
                 if (!frame || !['x', 'y', 'width', 'height'].every(key => Number.isFinite(frame[key]))) return [];
                 const x = (frame.x + frame.width / 2 - display.bounds.x) / display.bounds.width;
                 const y = (frame.y + frame.height / 2 - display.bounds.y) / display.bounds.height;
-                return x >= 0 && x <= 1 && y >= 0 && y <= 1 ? [{ ref: element.ref, frame, role: String(element.role).slice(0, 40), label: String(element.label).slice(0, 100), x: +x.toFixed(4), y: +y.toFixed(4) }] : [];
+                return x >= 0 && x <= 1 && y >= 0 && y <= 1 ? [{ ref: element.ref, frame, role: String(element.role).slice(0, 40), label: String(element.label).slice(0, 100), navigation: element.navigation === true, x: +x.toFixed(4), y: +y.toFixed(4) }] : [];
               }).slice(0, 60);
             }
           } catch { /* Older helpers and apps without AX support use visual grounding. */ }
@@ -147,9 +151,22 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         let image;
         if (!input.semantic || !targets.some(t => t.ref)) {
           const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1440, height: 900 }, fetchWindowIcons: false });
-          const source = sources.find(item => String(item.display_id) === String(display.id));
-          if (!source || source.thumbnail.isEmpty()) throw new Error('Screen capture is unavailable. Check Screen Recording permission.');
-          image = source.thumbnail.toJPEG(75).toString('base64');
+          // Electron may omit display_id. Never guess between multiple displays.
+          const source = sources.find(item => String(item.display_id) === String(display.id))
+            || (sources.length === 1 && !sources[0].display_id && screen.getAllDisplays?.().length === 1 ? sources[0] : null);
+          if (!source || source.thumbnail.isEmpty()) {
+            if (packaged) logger.log('warn', 'MiraCapture', JSON.stringify({ displayId: display.id, sources: sources.map(item => ({ id: item.id, displayId: item.display_id, empty: item.thumbnail.isEmpty() })), permission: platform === 'darwin' ? systemPreferences.getMediaAccessStatus('screen') : 'runtime' }));
+            // ScreenCaptureKit avoids Electron's intermittent empty-thumbnail
+            // path on macOS. Exact display only, same TCC grant, no disk image.
+            if (platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') === 'granted') {
+              const native = await control({ type: 'capture', displayId: display.id });
+              if (native.success && typeof native.image === 'string' && native.image.length > 0 && native.image.length < 2000000) image = native.image;
+            }
+            if (!image) throw new Error(!source
+              ? 'The active display could not be matched to a screen capture source. Please retry after reconnecting or changing displays.'
+              : 'Screen Recording is enabled, but macOS returned an empty screen image. Restart Talio and retry.');
+          }
+          if (!image) image = source.thumbnail.toJPEG(75).toString('base64');
         }
         const after = await control({ type: 'status' });
         if (after.pid !== foreground.pid || after.windowId !== foreground.windowId || !sameWindowFrame(after.frame, foreground.frame)) return { success: false, retryable: true, message: 'Window changed during capture; observing again.' };
@@ -204,9 +221,24 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         return { success: true, ...result };
       }
       const observation = active.observation;
-      const semantic = input.action?.type === 'semantic';
-      const target = semantic && semanticCandidates(observation?.targets || [], input.action.operation).find(t => t.ref === input.action.ref);
-      const action = semantic ? (target && ['click', 'fill'].includes(input.action.operation) && (input.action.operation !== 'fill' || typeof input.action.text === 'string' && input.action.text.length <= 2000 && !/[\x00-\x1f\x7f]/.test(input.action.text)) ? { type: 'semantic', operation: input.action.operation, text: input.action.text } : null) : validateComputerAction(input.action);
+      let semantic = input.action?.type === 'semantic';
+      let target = semantic && semanticCandidates(observation?.targets || [], input.action.operation).find(t => t.ref === input.action.ref);
+      let action = semantic ? (target && ['click', 'fill'].includes(input.action.operation) && (input.action.operation !== 'fill' || typeof input.action.text === 'string' && input.action.text.length <= 2000 && !/[\x00-\x1f\x7f]/.test(input.action.text)) ? { type: 'semantic', operation: input.action.operation, text: input.action.text } : null) : validateComputerAction(input.action);
+      // Ground a visual menu click in the current native snapshot. Never choose
+      // the nearest item or guess between overlapping controls, and execute the
+      // AX reference (not the pixels) through the usual foreground checks below.
+      if (action?.type === 'click' && observation) {
+        const x = observation.bounds.x + action.x * observation.bounds.width;
+        const y = observation.bounds.y + action.y * observation.bounds.height;
+        const matches = semanticCandidates(observation.targets, 'click').filter(item =>
+          preservesContent({ type: 'semantic', operation: 'click' }, item) &&
+          x > item.frame.x + 2 && x < item.frame.x + item.frame.width - 2 &&
+          y > item.frame.y + 2 && y < item.frame.y + item.frame.height - 2);
+        if (matches.length === 1) {
+          target = matches[0]; semantic = true;
+          action = { type: 'semantic', operation: 'click' };
+        }
+      }
       if (active.steps >= 24) throw new Error('This task reached its step limit. Please try again.');
       if (!action || !observation || observation.id !== input.observationId) {
         active.observation = null;
@@ -217,6 +249,12 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         active.observation = null;
         active.lastOutcome = 'The proposed input was NOT executed because the observation expired. Replan from the fresh screen.';
         return { success: false, retryable: true, message: 'Observation expired; capture a fresh screen before acting.' };
+      }
+      if (requiresContentPreservation(active.goal) && !preservesContent(action, target)) {
+        if (packaged) logger.log('info', 'MiraControl', JSON.stringify({ type: 'preservation_rejected', proposedType: action.type, role: target?.role, navigation: target?.navigation, targets: observation.targets.length }));
+        active.observation = null;
+        active.lastOutcome = 'No input executed: the user explicitly required existing content to remain unchanged. Use agent.click_target(ref) for a current native menu or toolbar navigation control. Do not clear, type, press keys, drag, or use approximate clicks.';
+        return { success: false, retryable: true, message: 'Keeping existing content unchanged; choosing an observed navigation control.' };
       }
       active.executing = true;
       try {
@@ -229,9 +267,12 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         active.lastOutcome = 'The proposed input was NOT executed because keyboard activity changed the screen. Replan from the fresh screen.';
         return { success: false, retryable: true, message: 'Input changed the screen; refreshing before continuing.' };
       }
+      // A different application taking focus while a plan is in flight is not
+      // permission to replan against it. Stop rather than chase the user's app.
+      if (foreground.pid !== observation.pid) throw new Error('The active application changed while Mira was planning. Desktop control stopped without sending this input. Return to the intended app and retry.');
       // Window activation/maximization can settle during planning. Do not click
       // stale coordinates, but recover by observing again rather than ending the task.
-      if (foreground.pid !== observation.pid || foreground.windowId !== observation.windowId || !sameWindowFrame(foreground.frame, observation.frame)) {
+      if (foreground.windowId !== observation.windowId || !sameWindowFrame(foreground.frame, observation.frame)) {
         active.observation = null;
         active.lastOutcome = 'The proposed input was NOT executed because the foreground window changed. Replan from the fresh screen and restore the requested app if necessary.';
         return { success: false, retryable: true, message: 'The window layout changed. Observing the current screen again before acting.' };

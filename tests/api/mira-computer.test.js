@@ -1,7 +1,25 @@
 const { createMiraComputer, validateComputerAction } = require('../../desktop-app/src/miraComputer')
 const { createMiraPermissions, trustedMiraSender } = require('../../desktop-app/src/miraPermissions')
 const { decideDesktopRoute, sameWindowFrame } = require('../../desktop-app/src/miraDecision')
-const { channelContext, allowsNewTab } = require('../../desktop-app/src/miraActionPlan')
+const { channelContext, allowsNewTab, requiresContentPreservation } = require('../../desktop-app/src/miraActionPlan')
+
+test('preservation distinguishes new content from view-only changes, including Hinglish', () => {
+  expect(requiresContentPreservation('Create a new unsaved document and type hello. Do not edit any existing document.')).toBe(false);
+  expect(requiresContentPreservation('Do not edit any existing document.')).toBe(true);
+  expect(requiresContentPreservation('Create a new document. Do not change the current calculation.')).toBe(true);
+  expect(requiresContentPreservation('Calculator खोलकर Basic mode पर कर दो। मौजूदा calculation और 42 की value बिल्कुल मत बदलना।')).toBe(true);
+});
+
+test('warm macOS helper resolves live AX focus for every command, not cached workspace focus', () => {
+  const native = require('fs').readFileSync(require('path').join(__dirname, '../../desktop-app/src/miraControl.swift'), 'utf8');
+  const execute = native.slice(native.indexOf('func execute('), native.indexOf('case "ax_action":'));
+  expect(execute).toContain('attribute(AXUIElementCreateSystemWide(), kAXFocusedApplicationAttribute)');
+  expect(execute).toContain('AXUIElementGetPid(focusedApp as! AXUIElement, &focusedPid)');
+  expect(execute).toContain('NSRunningApplication(processIdentifier: focusedPid)');
+  expect(execute.indexOf('RunLoop.current.run')).toBeLessThan(execute.indexOf('workspace.frontmostApplication'));
+  expect(execute).not.toMatch(/let front\s*=\s*NSWorkspace\.shared\.frontmostApplication/);
+  expect(execute).toContain('"success": front != nil || !AXIsProcessTrusted()');
+});
 
 test('batch grammar allows predictable edits but never sends or nested actions', () => {
   expect(validateComputerAction({ type: 'batch', actions: [{ type: 'key', key: 'find' }, { type: 'type', text: 'Mansi' }] })).not.toBeNull()
@@ -283,6 +301,97 @@ function semanticHarness(outcome = { success: true, verified: true }) {
     ? { success: true, pid: 1, elements: [{ ref: 'observed-search', role: 'AXSearchField', label: 'Search', frame: { x: 100, y: 100, width: 200, height: 40 } }, { ref: 'send', role: 'AXButton', label: 'Send message', frame: { x: 100, y: 200, width: 200, height: 40 } }] }
     : action.type === 'ax_action' ? outcome : { success: true, pid: 1, app: 'Notes' }) })
 }
+test.each([1, 2])('missing capture display ID is accepted only for one physical display (%i)', async count => {
+  const { call, deps } = harness();
+  deps.screen.getAllDisplays = () => Array.from({ length: count }, (_, id) => ({ id: id + 1 }));
+  deps.desktopCapturer.getSources.mockResolvedValue([{ id: 'screen:0:0', display_id: '', thumbnail: { isEmpty: () => false, toJPEG: () => Buffer.from('image') } }]);
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const start = await call({ operation: 'begin', goal: 'Inspect Calculator' });
+    const result = await call({ operation: 'observe', sessionId: start.sessionId });
+    expect(result.success).toBe(count === 1);
+    if (count === 2) expect(result.message).toContain('could not be matched');
+    await call({ operation: 'cancel', sessionId: start.sessionId });
+  } finally { warning.mockRestore(); }
+});
+test('empty capture is distinguished from a missing permission', async () => {
+  const { call, deps } = harness();
+  deps.desktopCapturer.getSources.mockResolvedValue([{ display_id: '1', thumbnail: { isEmpty: () => true } }]);
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const start = await call({ operation: 'begin', goal: 'Inspect Calculator' });
+    const result = await call({ operation: 'observe', sessionId: start.sessionId });
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('empty screen image');
+    await call({ operation: 'cancel', sessionId: start.sessionId });
+  } finally { warning.mockRestore(); }
+});
+test('empty Electron thumbnails fall back to native capture of the exact display', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'capture'
+    ? { success: true, image: 'native-screen-image' }
+    : { success: true, pid: 1, app: 'Calculator' }) });
+  deps.desktopCapturer.getSources.mockResolvedValue([{ display_id: '1', thumbnail: { isEmpty: () => true } }]);
+  const start = await call({ operation: 'begin', goal: 'Inspect Calculator' });
+  const result = await call({ operation: 'observe', sessionId: start.sessionId });
+  expect(result).toMatchObject({ success: true, image: 'native-screen-image' });
+  expect(deps.runControl).toHaveBeenCalledWith({ type: 'capture', displayId: 1 });
+  await call({ operation: 'cancel', sessionId: start.sessionId });
+});
+test('native capture fallback still checks foreground identity after capture', async () => {
+  let pid = 1;
+  const { call, deps } = harness({ runControl: jest.fn(async action => {
+    if (action.type === 'capture') { pid = 2; return { success: true, image: 'native-screen-image' }; }
+    return { success: true, pid, app: 'Calculator' };
+  }) });
+  deps.desktopCapturer.getSources.mockResolvedValue([{ display_id: '1', thumbnail: { isEmpty: () => true } }]);
+  const start = await call({ operation: 'begin', goal: 'Inspect Calculator' });
+  const result = await call({ operation: 'observe', sessionId: start.sessionId });
+  expect(result).toMatchObject({ success: false, retryable: true });
+  expect(result.image).toBeUndefined();
+  await call({ operation: 'cancel', sessionId: start.sessionId });
+});
+test.each([
+  { type: 'key', key: 'escape' },
+  { type: 'type', text: '42' },
+  { type: 'click', x: .3, y: .4 },
+  { type: 'semantic', operation: 'click', ref: 'clear' },
+])('preserve-content tasks reject potentially editing inputs: %j', async action => {
+  const { call, deps } = harness({ runControl: jest.fn(async request => request.type === 'ui_elements'
+    ? { success: true, pid: 1, elements: [{ ref: 'clear', role: 'AXButton', label: 'Clear', frame: { x: 200, y: 200, width: 50, height: 50 } }] }
+    : { success: true, pid: 1, app: 'Calculator' }) });
+  const start = await call({ operation: 'begin', goal: 'Switch Calculator to Scientific. Do not change the current calculation or its value of 42.' });
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true });
+  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action });
+  expect(result).toMatchObject({ success: false, retryable: true });
+  expect(deps.runControl.mock.calls.some(([input]) => ['key', 'type', 'click', 'ax_action'].includes(input.type))).toBe(false);
+  await call({ operation: 'cancel', sessionId: start.sessionId });
+});
+test('preserve-content tasks allow observed menu navigation', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async request => request.type === 'ui_elements'
+    ? { success: true, pid: 1, elements: [{ ref: 'view', role: 'AXMenuBarItem', label: 'View', frame: { x: 200, y: 0, width: 50, height: 24 } }] }
+    : { success: true, pid: 1, app: 'Calculator' }) });
+  const start = await call({ operation: 'begin', goal: 'Switch Calculator view without changing the current calculation.' });
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true });
+  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'semantic', operation: 'click', ref: 'view' } });
+  expect(result.success).toBe(true);
+  expect(deps.runControl).toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action', ref: 'view' }));
+  await call({ operation: 'cancel', sessionId: start.sessionId });
+});
+test.each(['unique', 'overlap', 'edge', 'destructive', 'non-navigation'])('visual navigation clicks require unique safe native grounding: %s', async kind => {
+  const item = { ref: 'mode', role: 'AXMenuItem', label: kind === 'destructive' ? 'Clear' : 'Scientific', frame: { x: 200, y: 100, width: 100, height: 40 } };
+  if (kind === 'non-navigation') item.role = 'AXButton';
+  const { call, deps } = harness({ runControl: jest.fn(async request => request.type === 'ui_elements'
+    ? { success: true, pid: 1, elements: kind === 'overlap' ? [item, { ...item, ref: 'duplicate' }] : [item] }
+    : { success: true, pid: 1, app: 'Calculator' }) });
+  const start = await call({ operation: 'begin', goal: 'Switch Calculator view without changing the current calculation.' });
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true });
+  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'click', x: kind === 'edge' ? .201 : .25, y: .15 } });
+  expect(result.success).toBe(kind === 'unique');
+  if (kind === 'unique') expect(deps.runControl).toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action', ref: 'mode' }));
+  else expect(deps.runControl.mock.calls.some(([input]) => ['click', 'ax_action'].includes(input.type))).toBe(false);
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }));
+  await call({ operation: 'cancel', sessionId: start.sessionId });
+});
 test('semantic observation skips screenshots and only resolves an observed reference', async () => {
   const { call, deps } = semanticHarness()
   const start = await call({ operation: 'begin', goal: 'Search Notes for hello' })
@@ -435,6 +544,19 @@ test('mouse movement alone does not stop the desktop session', async () => {
   expect(deps.runControl.mock.calls.some(([a]) => a.type === 'click')).toBe(true)
   await call({ operation: 'cancel', sessionId: start.sessionId })
 })
+test('an unrelated app taking focus stops instead of replanning against it', async () => {
+  let pid = 1;
+  const runControl = jest.fn(async () => ({ success: true, pid, app: pid === 1 ? 'TextEdit' : 'ChatGPT', keyIdleSeconds: 999 }));
+  const { call } = harness({ runControl });
+  const start = await call({ operation: 'begin', goal: 'Type in TextEdit' });
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId });
+  pid = 2;
+  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'type', text: 'test' } });
+  expect(result).toMatchObject({ success: false, message: expect.stringContaining('active application changed') });
+  expect(result.retryable).not.toBe(true);
+  expect(runControl.mock.calls.some(([action]) => action.type === 'type')).toBe(false);
+  expect((await call({ operation: 'observe', sessionId: start.sessionId })).success).toBe(false);
+});
 test('window layout changes re-observe without executing stale input or ending the session', async () => {
   let frame = { x: 0, y: 0, width: 800, height: 600 }
   const runControl = jest.fn(async () => ({ success: true, pid: 1, windowId: 'one', frame, app: 'Notes', keyIdleSeconds: 999 }))

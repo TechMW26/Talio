@@ -49,3 +49,15 @@ test('timeout and explicit cancellation reject in-flight input without replay', 
     expect(child.stdin.write).toHaveBeenCalledTimes(1)
   } finally { jest.useRealTimers() }
 })
+test('only capture replies have a larger bounded image budget', async () => {
+  const { transport, child } = harness()
+  const pending = transport.request({ type: 'capture', displayId: 1 })
+  const image = 'a'.repeat(150000)
+  child.stdout.emit('data', JSON.stringify({ success: true, image }) + '\n')
+  expect((await pending).image).toHaveLength(image.length)
+  const oversized = transport.request({ type: 'capture', displayId: 1 })
+  const rejected = expect(oversized).rejects.toThrow('uncertain')
+  child.stdout.emit('data', 'a'.repeat(2000001))
+  await rejected
+  expect(child.kill).toHaveBeenCalledTimes(1)
+})

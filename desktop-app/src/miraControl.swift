@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import ScreenCaptureKit
 
 var didOutput = false
 var references: [String: AXUIElement] = [:]
@@ -27,13 +28,23 @@ func resize(_ window: AXUIElement, _ frame: [String: Double]) -> Bool {
 }
 func execute(_ action: [String: Any]) {
     guard let type = action["type"] as? String else { return }
-    let front = NSWorkspace.shared.frontmostApplication
+    // A warm command-line helper blocks in readLine(), so NSWorkspace's
+    // notification-backed frontmostApplication can remain on the old app.
+    // Drain workspace notifications before reading focus. Some macOS versions
+    // omit system-wide AXFocusedApplication for command-line helpers, so keep
+    // the notification-refreshed workspace as a fallback, never a frozen cache.
+    let workspace = NSWorkspace.shared
+    RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    var focusedPid: pid_t = 0
+    let focusedApp = attribute(AXUIElementCreateSystemWide(), kAXFocusedApplicationAttribute)
+    if let focusedApp { AXUIElementGetPid(focusedApp as! AXUIElement, &focusedPid) }
+    let front = focusedPid > 0 ? NSRunningApplication(processIdentifier: focusedPid) : workspace.frontmostApplication
 if let session = CGSessionCopyCurrentDictionary() as? [String: Any], session["CGSSessionScreenIsLocked"] as? Bool == true {
     output(["success": false, "message": "Unlock your Mac before using desktop controls."]); return
 }
 if type == "status" {
     let point = CGEvent(source:nil)?.location ?? .zero
-    var result: [String: Any] = ["success": true, "accessibility": AXIsProcessTrusted(), "app": front?.localizedName ?? "Unknown", "pid": front?.processIdentifier ?? 0,"x":point.x,"y":point.y]
+    var result: [String: Any] = ["success": front != nil || !AXIsProcessTrusted(), "accessibility": AXIsProcessTrusted(), "app": front?.localizedName ?? "Unknown", "pid": front?.processIdentifier ?? 0,"x":point.x,"y":point.y]
     result["keyIdleSeconds"] = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown)
     if let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) {
         let window = focused as! AXUIElement
@@ -50,6 +61,35 @@ func key(_ code: CGKeyCode, _ flags: CGEventFlags = []) {
     for down in [true, false] { let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down); event?.flags = flags; event?.post(tap: .cghidEventTap) }
 }
 switch type {
+case "capture":
+    // Use the same already-granted recording permission. Never prompt or bypass
+    // TCC here; this is a fallback for empty Electron desktop thumbnails.
+    guard CGPreflightScreenCaptureAccess(), let displayID = action["displayId"] as? UInt32 else {
+        output(["success": false, "message": "Screen capture permission is unavailable."]); return
+    }
+    var captureResult: [String: Any]?
+    SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, _ in
+        guard let display = content?.displays.first(where: { $0.displayID == displayID }) else {
+            DispatchQueue.main.async { captureResult = ["success": false, "message": "Requested display is unavailable."] }; return
+        }
+        let configuration = SCStreamConfiguration()
+        let scale = min(1, min(1440 / display.frame.width, 900 / display.frame.height))
+        configuration.width = max(1, Int(display.frame.width * scale))
+        configuration.height = max(1, Int(display.frame.height * scale))
+        configuration.showsCursor = false
+        let filter = SCContentFilter(display: display, excludingWindows: [])
+        SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) { image, _ in
+            let data = image.flatMap { NSBitmapImageRep(cgImage: $0).representation(using: .jpeg, properties: [.compressionFactor: 0.75]) }
+            DispatchQueue.main.async {
+                if let data, !data.isEmpty, data.count < 1400000 {
+                    captureResult = ["success": true, "image": data.base64EncodedString()]
+                } else { captureResult = ["success": false, "message": "macOS could not produce a screen image."] }
+            }
+        }
+    }
+    let deadline = Date().addingTimeInterval(6)
+    while captureResult == nil && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
+    output(captureResult ?? ["success": false, "message": "Screen capture timed out."]); return
 case "ax_action":
     guard let ref = action["ref"] as? String, let element = references.removeValue(forKey: ref),
           let expectedPid = action["pid"] as? Int32, front?.processIdentifier == expectedPid,
@@ -82,9 +122,9 @@ case "ui_elements":
     guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); return }
     let root = focused as! AXUIElement
     AXUIElementSetMessagingTimeout(root, 0.15)
-    var queue: [(AXUIElement, Int)] = [(root, 0)]
+    var queue: [(AXUIElement, Int, Bool)] = [(root, 0, false)]
     if let menuBar = attribute(AXUIElementCreateApplication(pid), kAXMenuBarAttribute) {
-        queue.insert((menuBar as! AXUIElement, 0), at: 0)
+        queue.insert((menuBar as! AXUIElement, 0, true), at: 0)
     }
     // Pop-up menus may live outside the focused window's AX children. Include
     // only the focused element's menu ancestry, not unrelated app windows.
@@ -92,7 +132,7 @@ case "ui_elements":
         var ancestor = focus as! AXUIElement
         for _ in 0..<8 {
             if attribute(ancestor, kAXRoleAttribute) as? String == "AXMenu" {
-                queue.insert((ancestor, 0), at: 0)
+                queue.insert((ancestor, 0, true), at: 0)
                 break
             }
             guard let parent = attribute(ancestor, kAXParentAttribute) else { break }
@@ -104,10 +144,11 @@ case "ui_elements":
     var visited = 0
     let deadline = Date().addingTimeInterval(0.8)
     while !queue.isEmpty && visited < 250 && Date() < deadline {
-        let (element, depth) = queue.removeFirst()
+        let (element, depth, parentNavigation) = queue.removeFirst()
         if seen.contains(where: { CFEqual($0, element) }) { continue }
         seen.append(element); visited += 1
         let role = attribute(element, kAXRoleAttribute) as? String ?? ""
+        let navigation = parentNavigation || ["AXToolbar", "AXMenu", "AXMenuBar"].contains(role)
         let label = [kAXTitleAttribute, kAXDescriptionAttribute, "AXPlaceholderValue"].compactMap { attribute(element, $0) as? String }.first(where: { !$0.isEmpty }) ?? ""
         // Do not read AXValue or secure text; collect bounded visible labels only.
         if !label.isEmpty && role != "AXSecureTextField" && attribute(element, kAXSubroleAttribute) as? String != "AXSecureTextField",
@@ -116,10 +157,10 @@ case "ui_elements":
            ["AXButton", "AXTextField", "AXTextArea", "AXSearchField", "AXStaticText", "AXLink", "AXCheckBox", "AXPopUpButton", "AXMenuItem", "AXMenuBarItem"].contains(role) {
             let ref = UUID().uuidString
             references[ref] = element
-            elements.append(["ref":ref, "role":role, "label":String(label.prefix(100)), "frame":frame])
+            elements.append(["ref":ref, "role":role, "label":String(label.prefix(100)), "frame":frame, "navigation":navigation])
         }
         if depth < 12, role != "AXSecureTextField", let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] {
-            queue.append(contentsOf: children.prefix(100).map { ($0, depth + 1) })
+            queue.append(contentsOf: children.prefix(100).map { ($0, depth + 1, navigation) })
         }
     }
     // Paragraphs must not crowd out late toolbar/menu/search controls.
