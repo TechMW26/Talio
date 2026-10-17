@@ -14,6 +14,7 @@ import { miraVoiceTranscript } from '@/lib/miraMessageDisplay'
 import { compactMiraVoiceHistory, shortMiraVoiceReply } from '@/lib/miraDirectVoice'
 import { generateMiraDirectVoice } from '@/lib/miraDirectVoiceClient'
 import { miraOrbVoiceState, publishMiraOrbState } from '@/lib/miraOrbState'
+import { publishMiraRobotFeedback } from '@/lib/miraRobotState'
 
 export const speechText = naturalMiraSpeech
 export { prewarmMiraVoice }
@@ -22,6 +23,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
   const current = useRef({}), session = useRef(null)
   current.current = { open, sendMessage, recordVoiceMessage, onDismiss, onTokens, interruptResponse, history }
   useEffect(() => { publishMiraOrbState('voice', miraOrbVoiceState(state)) }, [state])
+  useEffect(() => { if (error) publishMiraRobotFeedback('error') }, [error])
   useEffect(() => () => publishMiraOrbState('voice', 'breathing'), [])
   const level = useCallback(() => Math.max(session.current?.engine?.getLevel?.() || 0, session.current?.playback?.getLevel?.() || 0), [])
   const stop = useCallback(() => {
@@ -75,6 +77,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
         onError: err => { if (live()) { stop(); setError(err.message) } },
         onPartial: text => {
           if (!live() || !text?.trim() || isEcho(text)) return
+          publishMiraRobotFeedback('awake')
           if (run.locked && text.trim() !== run.userText) interrupt()
           setTranscript(text)
         },
@@ -83,6 +86,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
           const dismiss = isMiraDismissal(text)
           if (!live() || !text || !/[\p{L}\p{N}]/u.test(text) || text.length > 3000 || (!dismiss && isEcho(text))) return
           if (run.locked && text === run.userText) return
+          publishMiraRobotFeedback('awake')
           if (run.locked) interrupt()
           const generation = ++run.generation, turn = ++run.turn
           const valid = () => live() && generation === run.generation

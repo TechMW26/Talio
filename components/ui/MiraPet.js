@@ -1,33 +1,20 @@
 'use client'
 
-import { ThinkingOrb, MODE_FRAMES, resolvePreset } from 'thinking-orbs'
+import { useRef } from 'react'
+import { RobotHead } from 'robot-heads'
 import useMiraOrbState from '@/hooks/useMiraOrbState'
-import { MIRA_ORB_STATES } from '@/lib/miraOrbState'
+import useMiraRobotState from '@/hooks/useMiraRobotState'
+import { miraRobotState, MIRA_ROBOT_COLORS } from '@/lib/miraRobotState'
 
-// Keep the ready state calm and visible using spherical geometry, not a backing fill.
-// Reuse the library's tuned globe geometry without its active search sweep.
-export function miraIdleOrbFrame(size, time) {
-  return MODE_FRAMES.globe(size, time * 0.2, { ...resolvePreset('searching', size).opts, scanMul: 0 })
-}
-
-export default function MiraPet({ size = 40, isThinking = false, state, speed = 1, dark, color, paused = false }) {
+// Keep one canvas mounted so pose easing and face transitions remain continuous.
+export default function MiraPet({ size = 40, isThinking = false, state, speed = 1, paused = false }) {
   const activity = useMiraOrbState()
-  const orbState = MIRA_ORB_STATES.includes(state) ? state : activity !== 'breathing' ? activity : isThinking ? 'solving' : 'breathing'
-  const preset = size <= 28 ? 20 : 64
-  const idle = orbState === 'breathing'
-  return (
-    <span data-mira-orb-state={orbState} className="inline-flex shrink-0 items-center justify-center align-middle" style={{ width: size, height: size, background: 'transparent' }}>
-      <ThinkingOrb
-        size={preset}
-        state={orbState}
-        speed={speed}
-        paused={paused}
-        color={color}
-        frame={idle ? miraIdleOrbFrame : undefined}
-        theme={dark === undefined ? 'auto' : dark ? 'dark' : 'light'}
-        style={{ background: 'transparent', flexShrink: 0, transform: `scale(${size / preset})` }}
-        aria-label={`Mira ${orbState}`}
-      />
-    </span>
-  )
+  const canvas = useRef(null)
+  const phase = state || (activity !== 'breathing' ? activity : isThinking ? 'solving' : 'breathing')
+  const expression = useMiraRobotState(miraRobotState(phase), canvas)
+  return <span data-mira-orb-state={phase} data-mira-robot-state={expression} className="inline-flex shrink-0 items-center justify-center align-middle" style={{ width: size, height: size, background: 'transparent' }}>
+    <RobotHead ref={canvas} shape="circle" state={expression} size={size}
+      {...MIRA_ROBOT_COLORS} antenna={false} floorShadow={false}
+      interactive speed={speed} paused={paused} aria-label={`Mira ${expression}`} />
+  </span>
 }

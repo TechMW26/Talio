@@ -6,6 +6,7 @@
     "node": ">=20 <23"
   },
   "scripts": {
+    "postinstall": "node scripts/patch-robot-heads.cjs",
     "mira:map": "node scripts/generate-mira-app-map.cjs",
     "prebuild": "npm run mira:map",
     "prevercel-build": "npm run mira:map",
@@ -73,9 +74,9 @@
     "react-markdown": "^9.1.0",
     "recharts": "^2.14.1",
     "redis": "^4.6.13",
+    "robot-heads": "0.3.0",
     "sharp": "^0.35.4",
     "swr": "^2.3.8",
-    "thinking-orbs": "^0.3.2",
     "three": "^0.185.1",
     "voice-glow": "^0.2.1",
     "vosk-browser": "^0.0.8",

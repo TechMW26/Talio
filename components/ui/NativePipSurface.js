@@ -52,6 +52,7 @@ function panelSize(host) {
     return size
   }
   if (panel?.matches('.mira-workspace')) {
+    if (panel.dataset.miraFaceOnly === 'true') return { width: 224, height: 224 }
     const width = Math.min(400, host.ownerDocument.defaultView?.innerWidth || 400)
     return { width, height: Math.max(180, Math.ceil(panel.offsetHeight || panel.getBoundingClientRect().height || 0)) }
   }
@@ -133,6 +134,13 @@ async function getPipWindow(size) {
       [data-native-pip-surface] [data-meeting-pip] > header,
       [data-native-pip-surface] [data-meeting-pip] > footer{border-radius:0!important}`}`
     target.document.head.append(style)
+    const faceStyle = target.document.createElement('style')
+    faceStyle.textContent = `
+      [data-native-pip-surface]:has([data-mira-face-only="true"]){border-radius:0!important;clip-path:none!important;overflow:visible!important;background:transparent!important}
+      [data-native-pip-surface] .mira-workspace[data-mira-face-only="true"]{width:224px!important;height:224px!important;min-height:224px!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;overflow:visible!important}
+      [data-mira-face-only="true"]::before,[data-mira-face-only="true"]::after,[data-mira-face-only="true"]>canvas,[data-mira-face-only="true"]>[data-voice-beam-bloom],[data-mira-face-only="true"]>[data-voice-beam-warp],[data-mira-face-only="true"]>[data-voice-beam-core]{display:none!important}
+    `
+    target.document.head.append(faceStyle)
     if (desktop) {
       const sizing = target.document.createElement('style')
       sizing.textContent = `
@@ -188,7 +196,7 @@ async function getPipWindow(size) {
   }
 }
 
-const NativePipSurface = forwardRef(function NativePipSurface({ children, enabled = true, automatic = false, onBackgroundChange }, ref) {
+const NativePipSurface = forwardRef(function NativePipSurface({ children, enabled = true, automatic = false, faceOnly = false, onBackgroundChange }, ref) {
   const placeholder = useRef(null)
   const [host, setHost] = useState(null)
   const targetRef = useRef(null)
@@ -236,6 +244,9 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
   useEffect(() => { if (!enabled) restore() }, [enabled, host]) // Preserve the portal target and live media components.
 
   async function open(fromBrowser = false) {
+      // Browsers cannot create an alpha/frameless desktop window. Keep the
+      // robot free-floating in-page rather than introduce an opaque PiP box.
+      if (faceOnly && window.electronAPI?.nativePip !== true) return
       if (automaticRef.current && !isAppAway()) return
       setError('')
       try {
@@ -305,7 +316,7 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
       window.removeEventListener('focus', returnWhenVisible)
       window.removeEventListener('blur', returnWhenVisible)
     }
-  }, [automatic, enabled, host])
+  }, [automatic, enabled, host, faceOnly])
 
   useImperativeHandle(ref, () => ({ restore, open }))
 

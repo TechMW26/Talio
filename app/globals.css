@@ -69,10 +69,10 @@ html[data-desktop-platform] .talioboard-window-error {
   transition: padding-left 300ms ease-out;
 }
 .mira-header-avatar {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
-  overflow: hidden;
+  overflow: visible;
   opacity: 1;
   transform: scale(1);
   transition: width 300ms ease-out, opacity 200ms ease-out, transform 300ms ease-out;
@@ -441,9 +441,26 @@ html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-20
   animation-delay: var(--widget-enter-delay, 0ms);
 }
 
+/* PiP is just the robot's alpha canvas, never a glass card or a glow frame. */
+.mira-workspace[data-mira-face-only] {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+}
+.mira-workspace[data-mira-face-only]::before,
+.mira-workspace[data-mira-face-only]::after,
+.mira-workspace[data-mira-face-only] > canvas,
+.mira-workspace[data-mira-face-only] > [data-voice-beam-bloom],
+.mira-workspace[data-mira-face-only] > [data-voice-beam-warp],
+.mira-workspace[data-mira-face-only] > [data-voice-beam-core] { display: none !important; }
+
 /* Avoid costly glass repainting on touch devices and honor motion preferences. */
 @media (pointer: coarse), (prefers-reduced-motion: reduce) {
-  .mira-workspace { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: #121212 !important; }
+  .mira-workspace:not([data-mira-face-only]) { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: #121212 !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mira-workspace { transition: none !important; }

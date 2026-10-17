@@ -2,6 +2,7 @@ import React from 'react'
 import { act, render, screen } from '@testing-library/react'
 import MiraPet from '@/components/ui/MiraPet'
 import { MIRA_ORB_STATES, miraOrbVoiceState, miraOrbRequestState, miraOrbActionState, publishMiraOrbState } from '@/lib/miraOrbState'
+import { miraRobotState } from '@/lib/miraRobotState'
 
 test('all nine states map to real voice, reasoning and action phases', () => {
   expect(new Set([
@@ -15,7 +16,7 @@ test('all nine states map to real voice, reasoning and action phases', () => {
 test('the shared orb follows live activity with tool-specific states and resets after the call', () => {
   render(<MiraPet size={20} />)
   act(() => publishMiraOrbState('voice', 'connecting'))
-  expect(screen.getByRole('img', { name: 'Mira connecting' })).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Mira thinking' })).toBeInTheDocument()
   act(() => publishMiraOrbState('voice', 'working'))
   act(() => publishMiraOrbState('chat', 'searching'))
   expect(screen.getByRole('img', { name: 'Mira searching' })).toBeInTheDocument()
@@ -23,10 +24,10 @@ test('the shared orb follows live activity with tool-specific states and resets 
   act(() => publishMiraOrbState('voice', 'listening'))
   expect(screen.getByRole('img', { name: 'Mira listening' })).toBeInTheDocument()
   act(() => publishMiraOrbState('voice', 'breathing'))
-  expect(screen.getByRole('img', { name: 'Mira breathing' })).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Mira idle' })).toBeInTheDocument()
 })
 test.each(MIRA_ORB_STATES)('explicit state %s renders with caller theme/pause props', state => {
   const { container } = render(<MiraPet size={64} state={state} dark={false} paused speed={1.2} />)
   expect(container.querySelector('[data-mira-orb-state]')).toHaveAttribute('data-mira-orb-state', state)
-  expect(screen.getByRole('img', { name: `Mira ${state}` })).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: `Mira ${miraRobotState(state)}` })).toBeInTheDocument()
 })

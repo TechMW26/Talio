@@ -1,0 +1,57 @@
+import React from 'react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import MiraPet from '@/components/ui/MiraPet'
+import MiraFloatingFace from '@/components/ui/MiraFloatingFace'
+import { miraRobotState, MIRA_ROBOT_COLORS, MIRA_ROBOT_STATES, MIRA_ROBOT_SLEEP_MS, publishMiraRobotFeedback } from '@/lib/miraRobotState'
+import { miraOrbVoiceState } from '@/lib/miraOrbState'
+
+beforeEach(() => jest.useFakeTimers())
+afterEach(() => jest.useRealTimers())
+test('all nine robot expressions and all existing activity phases are mapped', () => {
+  for (const state of MIRA_ROBOT_STATES) expect(miraRobotState(state)).toBe(state)
+  expect(miraRobotState('solving')).toBe('thinking')
+  expect(miraRobotState('connecting')).toBe('thinking')
+  expect(miraRobotState('weaving')).toBe('working')
+  expect(miraRobotState('shaping')).toBe('working')
+  expect(miraRobotState('composing')).toBe('speaking')
+  expect(miraRobotState('breathing')).toBe('idle')
+  expect(miraRobotState(miraOrbVoiceState('thinking'))).toBe('thinking')
+  expect(MIRA_ROBOT_COLORS).toEqual({ color: '#787878', trimColor: '#2a2c31', screenColor: '#e8f2ff' })
+})
+test('idle and silent listening sleep visually, then wake on speech or pointer input', () => {
+  const { rerender } = render(<MiraPet state="listening" />)
+  act(() => jest.advanceTimersByTime(MIRA_ROBOT_SLEEP_MS))
+  expect(screen.getByRole('img', { name: 'Mira sleeping' })).toBeInTheDocument()
+  act(() => publishMiraRobotFeedback('awake'))
+  expect(screen.getByRole('img', { name: 'Mira listening' })).toBeInTheDocument()
+  act(() => jest.advanceTimersByTime(MIRA_ROBOT_SLEEP_MS))
+  fireEvent.pointerMove(document, { clientX: 30, clientY: 50 })
+  expect(screen.getByRole('img', { name: 'Mira listening' })).toBeInTheDocument()
+  rerender(<MiraPet state="working" />)
+  act(() => jest.advanceTimersByTime(MIRA_ROBOT_SLEEP_MS * 2))
+  expect(screen.getByRole('img', { name: 'Mira working' })).toBeInTheDocument()
+})
+test('success and errors have bounded expressions without hiding active work', () => {
+  const { rerender } = render(<MiraPet state="working" />)
+  act(() => publishMiraRobotFeedback('happy'))
+  expect(screen.getByRole('img', { name: 'Mira working' })).toBeInTheDocument()
+  rerender(<MiraPet state="idle" />)
+  expect(screen.getByRole('img', { name: 'Mira happy' })).toBeInTheDocument()
+  act(() => jest.advanceTimersByTime(1800))
+  expect(screen.getByRole('img', { name: 'Mira idle' })).toBeInTheDocument()
+  act(() => publishMiraRobotFeedback('error'))
+  expect(screen.getByRole('img', { name: 'Mira error' })).toBeInTheDocument()
+  act(() => jest.advanceTimersByTime(4000))
+  expect(screen.getByRole('img', { name: 'Mira idle' })).toBeInTheDocument()
+})
+test('floating face has only the robot and accessible restore/close interactions', () => {
+  const onRestore = jest.fn(), onClose = jest.fn()
+  const { container } = render(<MiraFloatingFace state="listening" onRestore={onRestore} onClose={onClose} />)
+  expect(container.textContent).toBe('')
+  const face = screen.getByRole('button', { name: 'Restore MIRA chat' })
+  expect(face).toHaveStyle('background: transparent')
+  fireEvent.keyDown(face, { key: 'Enter' })
+  fireEvent.keyDown(face, { key: 'Escape' })
+  expect(onRestore).toHaveBeenCalledTimes(1)
+  expect(onClose).toHaveBeenCalledTimes(1)
+})

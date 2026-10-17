@@ -6,6 +6,7 @@ import { getMiraClientContext } from '@/lib/miraClientContext'
 import { executeMiraUiAction, waitForMiraPage } from '@/lib/miraUiAction'
 import { miraVoiceTranscript } from '@/lib/miraMessageDisplay'
 import { miraOrbActionState, miraOrbRequestState, publishMiraOrbState } from '@/lib/miraOrbState'
+import { publishMiraRobotFeedback } from '@/lib/miraRobotState'
 import { searchMiraNavigation } from '@/lib/miraNavigationSearch'
 import { resolveMiraSnapshot } from '@/lib/miraSnapshotClient'
 import { advanceMiraTaskBank, mergeMiraTaskPlan, recordMiraTaskOutcome } from '@/lib/miraTaskBank'
@@ -483,6 +484,10 @@ export function MiraChatProvider({ children }) {
         }
         setMessages(prev => prev.some(m => m.id === replyId) ? prev.map(m => m.id === replyId ? aiMsg : m) : [...prev, aiMsg])
         options.onActionResult?.(data.response.actionResult)
+        if (data.response.actionResult) {
+          const outcome = data.response.actionResult
+          publishMiraRobotFeedback(outcome.resolution ? 'awake' : outcome.success && !outcome.uncertain ? 'happy' : 'error')
+        }
         // Start voice as soon as the reply is visible, without waiting on persistence.
         if (data.response.action?.type === 'dismiss') closeChat()
         else options.onResponse?.(aiMsg.content)
@@ -517,6 +522,7 @@ export function MiraChatProvider({ children }) {
         nextReplyId += 1
       } else {
         if (data.tokens) setTokens(data.tokens)
+        publishMiraRobotFeedback('error')
         const errMsg = {
           id: Date.now() + 1,
           role: 'assistant',
@@ -534,6 +540,7 @@ export function MiraChatProvider({ children }) {
       window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: 'Stopped', phase: 'done' } }))
       setMessages(prev => prev.filter(m => m.id !== nextReplyId))
       if (err.name !== 'AbortError') {
+        publishMiraRobotFeedback('error')
         setMessages(prev => [...prev, {
           id: Date.now() + 1,
           role: 'assistant',

@@ -15,6 +15,7 @@ import MiraAttachments from '@/components/ui/MiraAttachments'
 import MiraVoiceConnecting from '@/components/ui/MiraVoiceConnecting'
 import AIActivityBeam from '@/components/ui/AIActivityBeam'
 import NativePipSurface from '@/components/ui/NativePipSurface'
+import MiraFloatingFace from '@/components/ui/MiraFloatingFace'
 import MiraActivityPointer from '@/components/ui/MiraActivityPointer'
 import MiraWakeSetup from '@/components/MiraWakeSetup'
 import ReactMarkdown from 'react-markdown'
@@ -475,8 +476,7 @@ export default function MiraChatSidebar() {
   useEffect(() => { setEditing(null); setReplying(null) }, [activeSessionId])
   const voice = useMiraVoice({ open: isOpen, busy: isThinking, sendMessage, recordVoiceMessage, onTokens: updateVoiceTokens, interruptResponse, onDismiss: closeChat, history: messages })
   const voiceMeterRef = useRef(null)
-  const pipVoiceMeterRef = useRef(null)
-  const paintVoiceLevel = useCallback(level => [voiceMeterRef.current, pipVoiceMeterRef.current].forEach(el => el?.style.setProperty('--mira-voice-level', String(level))), [])
+  const paintVoiceLevel = useCallback(level => voiceMeterRef.current?.style.setProperty('--mira-voice-level', String(level)), [])
   const voiceResults = messages.filter(message => message.role === 'assistant' && message.data?.voiceTool && !message.streaming && new Date(message.timestamp).getTime() >= (voice.startedAt || 0))
   const voiceConnecting = voice.state === 'loading'
   const [wakeRequested, setWakeRequested] = useState(false)
@@ -685,7 +685,7 @@ export default function MiraChatSidebar() {
         />
 
       {/* Floating Sidebar panel - glassmorphism */}
-      <NativePipSurface ref={nativePipRef} enabled={isOpen} automatic onBackgroundChange={setBackgroundCompact}>
+      <NativePipSurface ref={nativePipRef} enabled={isOpen} automatic faceOnly onBackgroundChange={setBackgroundCompact}>
       <VoiceBeam stream={voice.stream} level={voice.level} onLevel={paintVoiceLevel} processing={isThinking || voiceConnecting} active={isOpen && (voice.active || isThinking)} paused={!isOpen || (!voice.active && !isThinking)} theme="dark" colorVariant="mono" strength={0.95}
         sensitivity={5.4} threshold={0.015} attack={0.12} release={0.42} reach={1.9} idle={0.14}
         borderRadius={windowRadius}
@@ -694,7 +694,8 @@ export default function MiraChatSidebar() {
         aria-busy={voiceConnecting}
         aria-hidden={!isOpen}
         inert={!isOpen ? true : undefined}
-        className="mira-workspace fixed flex flex-col z-[99999] overflow-hidden shadow-2xl"
+        data-mira-face-only={pip ? 'true' : undefined}
+        className={`mira-workspace fixed flex flex-col z-[99999] ${pip ? 'mira-floating-workspace' : 'overflow-hidden shadow-2xl'}`}
         style={{
           opacity: panelVisible ? 1 : 0,
           transform: panelVisible ? 'translate3d(0, 0, 0)' : 'translate3d(-40px, 0, 0)',
@@ -707,10 +708,10 @@ export default function MiraChatSidebar() {
           borderRadius: windowRadius,
           top: pip ? 'auto' : `max(var(--mira-panel-top, 73px), ${expanded ? 12 : sidebarDrag.position?.y ?? 12}px)`,
           bottom: pip ? 'max(24px, env(safe-area-inset-bottom))' : 'auto',
-          height: pip ? 'auto' : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
-          minHeight: pip ? 180 : undefined,
+          height: pip ? 224 : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
+          minHeight: pip ? 224 : undefined,
           transitionProperty: sidebarDrag.dragging ? 'none' : pip ? 'opacity, transform' : 'opacity, transform, left, top, width',
-          width: pip ? 'min(400px, calc(100vw - 48px))' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
+          width: pip ? 'min(224px, 100vw)' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode
             ? 'rgba(18, 18, 18, 0.72)'
             : `linear-gradient(135deg, rgba(255,255,255,0.78), rgba(250,252,255,0.85))`,
@@ -723,13 +724,11 @@ export default function MiraChatSidebar() {
             : `0 8px 60px -12px ${theme.primary[300]}60, 0 0 0 1px ${theme.primary[200]}40, inset 0 1px 0 rgba(255,255,255,0.6)`,
         }}
       >
-        {isOpen && (voiceConnecting || isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={windowRadius} />}
-        {pip && <div data-mira-pip-content className="p-3 text-foreground relative flex flex-1 items-center justify-center min-h-[180px]">
-          <button aria-label="Restore MIRA chat" onClick={restoreMira} className="w-full flex items-center justify-center rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
-            {voice.active ? <MiraVoiceCall ref={pipVoiceMeterRef} compact state={voice.state} muted={voice.muted} /> : <MiraSphere size={128} isThinking={isThinking || voiceConnecting} />}
-          </button>
+        {!pip && isOpen && (voiceConnecting || isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={windowRadius} />}
+        {pip && <div data-mira-pip-content className="relative flex flex-1 items-center justify-center">
+          <MiraFloatingFace state={voice.active ? voice.state : undefined} isThinking={isThinking || voiceConnecting} onRestore={restoreMira} onClose={closeChat} />
         </div>}
-        <MiraVoiceConnecting active={isOpen && voiceConnecting} onCancel={voice.stop} />
+        <MiraVoiceConnecting active={!pip && isOpen && voiceConnecting} onCancel={voice.stop} />
         <div className={pip ? 'hidden' : 'contents'}>
         {/* Compact controls; identity stays in the conversation, not the toolbar. */}
         <div

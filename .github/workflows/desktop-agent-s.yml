@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v6.0.26'
+      - 'v6.0.27'
 permissions:
   contents: write
 jobs:
@@ -87,26 +87,28 @@ jobs:
           merge-multiple: true
       - name: Verify complete installer set
         run: |
-          for asset in Talio-6.0.26-arm64.dmg Talio-6.0.26-arm64.zip Talio-6.0.26-x64.dmg Talio-6.0.26-x64.zip Talio.Setup.6.0.26.exe Talio-6.0.26-x86_64.AppImage Talio-6.0.26-amd64.deb; do
+          for asset in Talio-6.0.27-arm64.dmg Talio-6.0.27-arm64.zip Talio-6.0.27-x64.dmg Talio-6.0.27-x64.zip Talio.Setup.6.0.27.exe Talio-6.0.27-x86_64.AppImage Talio-6.0.27-amd64.deb; do
             test -s "release-assets/$asset" || exit 1
           done
           cd release-assets
           sha256sum *.dmg *.zip *.exe *.AppImage *.deb > SHA256SUMS.txt
-      - name: Publish v6.0.26
+      - name: Publish v6.0.27
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.26
+          tag_name: v6.0.27
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.26 — Mira context and matching windows
+          name: Talio Desktop 6.0.27 — Floating Mira robot
           draft: true
           prerelease: false
           generate_release_notes: false
           body: |
-            Mira voice replies use context-aware expression and a private per-call snapshot of the signed-in user's name, company and recorded gender. Missing details stay unspecified; personal details never enter the shared agent prompt.
+            Mira now uses the circular robot-heads avatar with a #787878 shell, Black trim, White screen and no antenna. It replaces the particle orb across Mira's interface.
 
-            Mira chat and picture-in-picture windows match the navigation sidebar's corner radius on web and desktop. The orb-only PiP layout and close/restore controls are preserved.
+            Desktop mini-mode is a transparent floating robot face without a card, frame, background or status bar. Click to restore Mira, drag to move, or press Escape to close. Web mini-mode stays transparently inside the page because browser-owned detached windows cannot be made frameless and transparent.
 
-            Shared-prompt sync now reports provider timeouts clearly and verifies uncertain updates before marking them synced. The previously verified DeepSeek gateway configuration remains compatible during prompt-only sync delays. Provider service availability is separate from these application fixes. Web interface changes are delivered through the hosted Talio app.
+            Animated expressions follow listening, thinking, searching, speaking, working, success and errors. Listening includes small acknowledgement nods; the face tracks the pointer and visually sleeps after 60 seconds of inactivity. Sleep does not end calls or change microphone access. The animation clock follows the detached window so the face stays animated while the main app is hidden.
+
+            Existing direct DeepSeek generation, expressive voice playback, concise replies, fillers and English/Hindi dismissal commands are preserved. Web interface changes are delivered through the hosted Talio app; the desktop installers do not embed the web application.
 
             CI builds macOS Apple Silicon and Intel, Windows x64, and Linux x64 installers with freshly rebuilt local Agent S runtimes. Hands-on microphone and desktop-action acceptance on every operating system has not been performed.
 
@@ -123,15 +125,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view v6.0.26 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
+          gh release view v6.0.27 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
             let text = "";
             process.stdin.on("data", chunk => text += chunk);
             process.stdin.on("end", () => {
               const assets = JSON.parse(text);
-              const expected = ["Talio-6.0.26-arm64.dmg", "Talio-6.0.26-arm64.zip", "Talio-6.0.26-x64.dmg", "Talio-6.0.26-x64.zip", "Talio.Setup.6.0.26.exe", "Talio-6.0.26-x86_64.AppImage", "Talio-6.0.26-amd64.deb", "SHA256SUMS.txt"];
+              const expected = ["Talio-6.0.27-arm64.dmg", "Talio-6.0.27-arm64.zip", "Talio-6.0.27-x64.dmg", "Talio-6.0.27-x64.zip", "Talio.Setup.6.0.27.exe", "Talio-6.0.27-x86_64.AppImage", "Talio-6.0.27-amd64.deb", "SHA256SUMS.txt"];
               for (const name of expected) {
                 const asset = assets.find(item => item.name === name);
                 if (!asset || asset.size < (name.endsWith(".txt") ? 100 : 1048576)) throw new Error("Missing or truncated release asset: " + name);
+                const file = require("fs").readFileSync("release-assets/" + name);
+                const digest = "sha256:" + require("crypto").createHash("sha256").update(file).digest("hex");
+                if (asset.digest !== digest) throw new Error("Uploaded asset checksum mismatch: " + name);
               }
             });'
-          gh release edit v6.0.26 --repo "${{ github.repository }}" --draft=false --latest
+          gh release edit v6.0.27 --repo "${{ github.repository }}" --draft=false --latest

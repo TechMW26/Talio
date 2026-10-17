@@ -9,7 +9,7 @@ test('shows an accessible loading indicator and lets the user cancel', () => {
   const { rerender } = render(<MiraVoiceConnecting active onCancel={onCancel} />)
   expect(screen.getByRole('status')).toHaveTextContent('Mira is getting ready…')
   expect(screen.getByRole('status')).toHaveTextContent('Allow microphone access if prompted.')
-  expect(screen.getByRole('img', { name: 'Mira connecting' })).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Mira thinking' })).toBeInTheDocument()
   expect(screen.getByRole('progressbar', { name: 'Preparing Mira voice' })).toHaveAttribute('aria-valuetext', 'Connecting to the live call')
   expect(document.querySelector('[data-mira-voice-preparing]')).toHaveClass('absolute', 'inset-0', 'backdrop-blur-xl')
   fireEvent.click(screen.getByRole('button', { name: 'Cancel voice connection' }))
@@ -19,10 +19,11 @@ test('shows an accessible loading indicator and lets the user cancel', () => {
   expect(screen.queryByRole('button')).not.toBeInTheDocument()
 })
 
-test('sidebar shares the loading indicator across chat and compact modes', () => {
+test('sidebar shows the loading overlay in chat and only the thinking face in PiP', () => {
   const source = fs.readFileSync(path.join(process.cwd(), 'components/MiraChatSidebar.js'), 'utf8')
   expect(source).toContain("const voiceConnecting = voice.state === 'loading'")
-  expect(source).toContain('<MiraVoiceConnecting active={isOpen && voiceConnecting} onCancel={voice.stop} />')
+  expect(source).toContain('<MiraVoiceConnecting active={!pip && isOpen && voiceConnecting} onCancel={voice.stop} />')
+  expect(source).toContain('<MiraFloatingFace state={voice.active ? voice.state : undefined}')
   expect(source.indexOf('<MiraVoiceConnecting active=')).toBeLessThan(source.indexOf("<div className={pip ? 'hidden' : 'contents'}>"))
   expect(source).not.toContain('MIRA ·')
   expect(source).toContain('processing={isThinking || voiceConnecting}')

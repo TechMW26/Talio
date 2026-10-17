@@ -97,6 +97,27 @@ test('desktop MIRA starts at stable dimensions and fits without phantom browser 
 })
 afterEach(() => { delete window.documentPictureInPicture; delete window.electronAPI; delete document.visibilityState; delete navigator.mediaSession; jest.restoreAllMocks(); jest.useRealTimers() })
 
+test('face-only browser mode stays in-page without opening an opaque native window', async () => {
+  const ref = createRef()
+  window.documentPictureInPicture = { requestWindow: jest.fn() }
+  render(<NativePipSurface ref={ref} faceOnly><div className="mira-workspace" data-mira-face-only="true">Face</div></NativePipSurface>)
+  await act(async () => { await ref.current.open() })
+  expect(window.documentPictureInPicture.requestWindow).not.toHaveBeenCalled()
+  expect(screen.getByText('Face').ownerDocument).toBe(document)
+})
+
+test('desktop floating face opens a transparent 224px window with no card clipping', async () => {
+  const target = fakeWindow(), ref = createRef()
+  window.electronAPI = { nativePip: true }
+  const open = jest.spyOn(window, 'open').mockReturnValue(target)
+  render(<NativePipSurface ref={ref} faceOnly><div className="mira-workspace" data-mira-face-only="true">Face</div></NativePipSurface>)
+  await act(async () => { await ref.current.open() })
+  expect(open).toHaveBeenCalledWith('about:blank', 'talio-live-pip', 'width=224,height=224')
+  expect(target.document.body.style.backgroundColor).toBe('transparent')
+  expect(target.document.head.textContent).toContain('clip-path:none!important;overflow:visible!important;background:transparent!important')
+  act(() => target.close())
+})
+
 test('a background browser wake attempts PiP and explains blocked activation without losing the panel', async () => {
   jest.useFakeTimers()
   jest.spyOn(document, 'hasFocus').mockReturnValue(false)
@@ -126,7 +147,7 @@ test('desktop blur opens a transparent external panel and focus restores the sam
   expect(target.document.body.style.getPropertyValue('background')).toBe('transparent')
   expect(target.document.body.style.getPropertyPriority('background')).toBe('important')
   expect(target.document.documentElement.style.backgroundImage).toBe('none')
-  expect(target.document.head.textContent).not.toContain('border-radius:0!important')
+  expect(target.document.head.textContent).toContain('.mira-workspace[data-mira-face-only="true"]')
   expect(target.document.head.textContent).toContain('clip-path:inset(0 round var(--mira-window-radius,22px))')
   expect(target.document.documentElement.style.getPropertyValue('--mira-window-radius')).toBe('22px')
   expect(target.document.head.textContent).toContain('.mira-workspace::after{content:none!important;display:none!important}')
