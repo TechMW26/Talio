@@ -1,8 +1,8 @@
 import { requestHybridDesktop, validateHybridRequest } from '@/lib/ai/miraHybridDesktop'
-import { semanticCandidates, semanticFingerprint } from '../../desktop-app/src/miraSemantic'
+import { semanticCandidates, semanticFingerprint, exactSemanticTarget } from '../../desktop-app/src/miraSemantic'
 
 const input = { operation: 'plan', goal: 'Search Notes for नमस्ते', app: 'Notes', targets: [{ ref: 'a', role: 'AXSearchField', label: 'Search' }] }
-const planReply = { choices: [{ message: { content: JSON.stringify({ steps: [{ operation: 'fill', app: 'Notes', target: 'Search', text: 'नमस्ते' }] }) } }] }
+const planReply = { choices: [{ message: { content: JSON.stringify({ steps: [{ operation: 'fill', app: 'Notes', target: 'note search box', text: 'नमस्ते' }] }) } }] }
 const choice = (ref = 'a', confidence = .99) => ({ answers: { target: { type: 'choice', choice: ref, confidence, probabilities: { [ref]: .99 } } } })
 const respond = data => ({ ok: true, json: async () => data })
 beforeEach(() => {
@@ -14,12 +14,14 @@ test('one DeepSeek plan followed by Jev control selection preserves Hindi and re
   const plan = await requestHybridDesktop(input, 'tenant:user')
   expect(plan.count).toBe(1)
   const result = await requestHybridDesktop({ ...input, operation: 'select', plan: plan.plan, index: 0 }, 'tenant:user')
-  expect(result).toEqual({ success: true, action: { type: 'semantic', operation: 'fill', ref: 'a', text: 'नमस्ते' } })
+  expect(result).toEqual({ success: true, action: { type: 'semantic', operation: 'fill', ref: 'a', text: 'नमस्ते' }, decision: 'jev_target' })
   expect(fetch.mock.calls.map(call => call[0])).toEqual(['https://api.deepseek.com/chat/completions', 'https://api.typesafe.ai/v1/systemone'])
   const body = JSON.parse(fetch.mock.calls[1][1].body)
   expect(body).not.toHaveProperty('assets')
   expect(body.state).not.toHaveProperty('text')
   expect(body.model).toBe('jev-1.13.0')
+  expect(Object.keys(body.questions)).toEqual(['target'])
+  expect(body.state).not.toHaveProperty('goal')
 })
 test('signed plan cannot cross tenant, user, goal or expiration boundaries', async () => {
   const plan = await requestHybridDesktop(input, 'tenant:user')
@@ -36,6 +38,24 @@ test.each([choice('NONE'), choice('invented'), choice('a', .4), { answers: { tar
   const plan = await requestHybridDesktop(input, 't:u')
   fetch.mockResolvedValue(respond(answer))
   expect(await requestHybridDesktop({ ...input, operation: 'select', plan: plan.plan, index: 0 }, 't:u')).toMatchObject({ fallback: true })
+})
+test('high model confidence cannot choose between indistinguishable native controls', async () => {
+  const plan = await requestHybridDesktop(input, 't:u')
+  expect(await requestHybridDesktop({ ...input, operation: 'select', plan: plan.plan, index: 0, targets: [...input.targets, { ...input.targets[0], ref: 'duplicate' }] }, 't:u')).toMatchObject({ fallback: true, reason: 'uncertain_target' })
+})
+test('exact unique targets bypass a model call, including first selection in one request', async () => {
+  fetch.mockReset().mockResolvedValue(respond({ choices: [{ message: { content: JSON.stringify({ steps: [{ operation: 'click', app: 'Notes', target: 'View' }] }) } }] }))
+  const result = await requestHybridDesktop({ ...input, selectInitial: true, targets: [{ ref: 'menu', role: 'AXMenuBarItem', label: 'View' }] }, 't:u')
+  expect(result.count).toBe(1)
+  expect(result.selection).toMatchObject({ success: true, decision: 'exact_target', action: { ref: 'menu' } })
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+test('exact matching never picks duplicate, committing or non-pressable controls', () => {
+  const target = { ref: 'a', role: 'AXMenuItem', label: 'Scientific' }
+  expect(exactSemanticTarget([target], 'click', ' scientific ')).toBe(target)
+  expect(exactSemanticTarget([target, { ...target, ref: 'b' }], 'click', 'Scientific')).toBeNull()
+  expect(exactSemanticTarget([{ ...target, label: 'Delete' }], 'click', 'Delete')).toBeNull()
+  expect(exactSemanticTarget(input.targets, 'click', 'Search')).toBeNull()
 })
 test('missing configuration and provider rate limits fall back, without an internal retry loop', async () => {
   delete process.env.TYPESAFE_API_KEY

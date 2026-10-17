@@ -1,6 +1,7 @@
 """Talio's data-only Agent S action interface. Never evaluates generated code."""
 import ast
 import math
+import re
 from urllib.parse import urlparse
 
 
@@ -41,6 +42,13 @@ class SafeACI:
         if any(type(v) not in (float, int) or not math.isfinite(v) or not 0 <= v <= 1 for v in (x,y,toX,toY)):
             raise ValueError('Invalid drag')
         return {"type":"drag", "x":x, "y":y, "toX":toX, "toY":toY}
+
+    @action
+    def click_target(self, ref: str):
+        """Press an observed native accessibility control by its current ref instead of estimating coordinates. Only use a ref from the CURRENT native UI targets, for a button, link, popup or menu item matching the screenshot. Native validation rejects stale, sensitive or committing controls; use the normal verified workflow for those."""
+        if not isinstance(ref, str) or not re.fullmatch(r'[\w-]{1,80}', ref, flags=re.ASCII):
+            raise ValueError('Invalid native target reference')
+        return {"type": "semantic", "operation": "click", "ref": ref}
 
     @action
     def click(self, x: float, y: float):

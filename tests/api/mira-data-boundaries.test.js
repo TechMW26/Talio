@@ -26,6 +26,13 @@ beforeEach(() => {
   generateContent.mockResolvedValue(JSON.stringify({ message: 'Here is your data.', cards: [], suggestedQuestions: [] }))
 })
 const run = body => POST(new Request('http://localhost/api/ai/mira-chat', { method: 'POST', body: JSON.stringify(body) }))
+test('preservation constraints reach the desktop executor without another chat model call', async () => {
+  const message = 'Open Calculator and switch to Scientific mode. Do not change the current calculation.'
+  const data = await (await run({ message, clientContext: { desktopComputerAvailable: true } })).json()
+  expect(data.response.action).toEqual({ type: 'desktop_task', goal: message })
+  expect(data.response.taskBank.tasks[0].request).toBe(message)
+  expect(generateContent).not.toHaveBeenCalled()
+})
 test.each(['नहीं खुला है, freshly open करो।', 'जी, कोशिश कीजिए।'])('pure app recovery bypasses the uncertain-write gate: %s', async message => {
   const taskBank = { tasks: [{ request: 'Open YouTube Music', action: { type: 'desktop_task' }, status: 'blocked', uncertain: true }] }
   const data = await (await run({ message, taskBank, clientContext: { desktopComputerAvailable: true } })).json()

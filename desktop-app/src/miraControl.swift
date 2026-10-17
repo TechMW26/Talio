@@ -83,18 +83,37 @@ case "ui_elements":
     let root = focused as! AXUIElement
     AXUIElementSetMessagingTimeout(root, 0.15)
     var queue: [(AXUIElement, Int)] = [(root, 0)]
+    if let menuBar = attribute(AXUIElementCreateApplication(pid), kAXMenuBarAttribute) {
+        queue.insert((menuBar as! AXUIElement, 0), at: 0)
+    }
+    // Pop-up menus may live outside the focused window's AX children. Include
+    // only the focused element's menu ancestry, not unrelated app windows.
+    if let focus = attribute(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute) {
+        var ancestor = focus as! AXUIElement
+        for _ in 0..<8 {
+            if attribute(ancestor, kAXRoleAttribute) as? String == "AXMenu" {
+                queue.insert((ancestor, 0), at: 0)
+                break
+            }
+            guard let parent = attribute(ancestor, kAXParentAttribute) else { break }
+            ancestor = parent as! AXUIElement
+        }
+    }
     var elements: [[String:Any]] = []
+    var seen: [AXUIElement] = []
     var visited = 0
     let deadline = Date().addingTimeInterval(0.8)
-    while !queue.isEmpty && visited < 250 && elements.count < 60 && Date() < deadline {
-        let (element, depth) = queue.removeFirst(); visited += 1
+    while !queue.isEmpty && visited < 250 && Date() < deadline {
+        let (element, depth) = queue.removeFirst()
+        if seen.contains(where: { CFEqual($0, element) }) { continue }
+        seen.append(element); visited += 1
         let role = attribute(element, kAXRoleAttribute) as? String ?? ""
         let label = [kAXTitleAttribute, kAXDescriptionAttribute, "AXPlaceholderValue"].compactMap { attribute(element, $0) as? String }.first(where: { !$0.isEmpty }) ?? ""
         // Do not read AXValue or secure text; collect bounded visible labels only.
         if !label.isEmpty && role != "AXSecureTextField" && attribute(element, kAXSubroleAttribute) as? String != "AXSecureTextField",
            attribute(element, "AXHidden") as? Bool != true, attribute(element, kAXEnabledAttribute) as? Bool != false,
            let frame = geometry(element), frame["width"]! > 0, frame["height"]! > 0,
-           ["AXButton", "AXTextField", "AXTextArea", "AXSearchField", "AXStaticText", "AXLink", "AXCheckBox", "AXPopUpButton"].contains(role) {
+           ["AXButton", "AXTextField", "AXTextArea", "AXSearchField", "AXStaticText", "AXLink", "AXCheckBox", "AXPopUpButton", "AXMenuItem", "AXMenuBarItem"].contains(role) {
             let ref = UUID().uuidString
             references[ref] = element
             elements.append(["ref":ref, "role":role, "label":String(label.prefix(100)), "frame":frame])
@@ -103,7 +122,11 @@ case "ui_elements":
             queue.append(contentsOf: children.prefix(100).map { ($0, depth + 1) })
         }
     }
-    output(["success":true,"pid":pid,"elements":elements]); return
+    // Paragraphs must not crowd out late toolbar/menu/search controls.
+    let controls = elements.filter { $0["role"] as? String != "AXStaticText" }
+    let labels = elements.filter { $0["role"] as? String == "AXStaticText" }
+    let visible = Array(controls.prefix(50)) + Array(labels.prefix(60 - min(50, controls.count)))
+    output(["success":true,"pid":pid,"elements":visible]); return
 case "prepare_window":
     guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); return }
     let window = focused as! AXUIElement

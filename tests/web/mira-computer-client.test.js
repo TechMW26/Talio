@@ -122,6 +122,27 @@ test('planner fallback automatically re-observes and resumes without asking the 
   expect(plans).toBe(2)
   expect(window.electronAPI.computerTask.mock.calls.some(([i]) => i.operation === 'act')).toBe(false)
 })
+test('one successful UI transition cannot continually refill the planner retry budget', async () => {
+  jest.useFakeTimers()
+  let inputs = 0, plans = 0
+  try {
+    window.electronAPI = { computerTask: jest.fn(async input => {
+      if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+      if (input.operation === 'observe') return { success: true, observationId: 'o', fingerprint: inputs ? 'menu-open' : 'menu-closed' }
+      if (input.operation === 'plan') {
+        plans++
+        return inputs ? { success: false, retryable: true } : { success: true, action: { type: 'key', key: 'find' } }
+      }
+      if (input.operation === 'act') inputs++
+      return { success: true }
+    }) }
+    const pending = executeMiraComputerTask('Find a note', { token: 't' })
+    await jest.runAllTimersAsync()
+    expect(await pending).toMatchObject({ success: false, message: expect.stringContaining('several fresh observations') })
+    expect(inputs).toBe(1)
+    expect(plans).toBe(6) // One input plan, then five bounded attempts.
+  } finally { jest.useRealTimers() }
+})
 test('voice override aborts recovery without another observation or input', async () => {
   const controller = new AbortController()
   window.electronAPI = { computerTask: jest.fn(async input => {

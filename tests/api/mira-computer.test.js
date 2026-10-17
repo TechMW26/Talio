@@ -247,7 +247,7 @@ test('permission setup never mistakes opening settings for granted access', asyn
   expect(two.success).toBe(false)
   expect(one.message).toContain('Accessibility and Screen Recording')
   expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
-  expect(shell.openExternal).toHaveBeenCalledTimes(1)
+  expect(shell.openExternal).not.toHaveBeenCalled()
 })
 
 test('screen capture permission uses Electron registration and does not upload a frame', async () => {
@@ -256,7 +256,7 @@ test('screen capture permission uses Electron registration and does not upload a
   const permissions = createMiraPermissions({ platform: 'darwin', store: { get: () => true }, dialog: { showMessageBox: async () => ({ response: 1 }) }, systemPreferences: { getMediaAccessStatus: () => 'denied', isTrustedAccessibilityClient: () => true }, desktopCapturer, shell })
   expect((await permissions.ensureDesktopAccess()).success).toBe(false)
   expect(desktopCapturer.getSources).toHaveBeenCalledWith({ types: ['screen'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false })
-  expect(shell.openExternal).toHaveBeenCalledWith('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+  expect(shell.openExternal).not.toHaveBeenCalled()
 })
 
 function harness(overrides = {}) {
@@ -333,7 +333,7 @@ test('local planner consumes native observations and relays only expected model 
   const args = { sessionId: start.sessionId, observationId: observation.observationId }
   expect((await call({ ...args, operation: 'plan', image: 'untrusted renderer image' })).kind).toBe('model_request')
   expect(agentS.begin).toHaveBeenCalledWith('Find a contact in WhatsApp', expect.stringContaining('shortest reliable'))
-  expect(agentS.predict).toHaveBeenCalledWith({ image: Buffer.from('image').toString('base64'), app: expect.stringContaining('TextEdit') })
+  expect(agentS.predict).toHaveBeenCalledWith({ image: Buffer.from('image').toString('base64'), app: expect.stringContaining('TextEdit'), evidence: '' })
   expect((await call({ ...args, operation: 'model_response', text: 'agent.key("find")' })).action.type).toBe('key')
   expect((await call({ ...args, operation: 'model_response', text: 'unsolicited' })).success).toBe(false)
   expect(agentS.stop).toHaveBeenCalled()
@@ -343,6 +343,21 @@ test('locked desktop never begins or captures screenshots', async () => {
   expect((await call({ operation: 'begin', goal: 'Open WhatsApp' })).success).toBe(false)
   expect(deps.runControl).not.toHaveBeenCalled()
   expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
+})
+test.each(['foreground', 'keyboard', 'expired'])('completion is rechecked when %s changes during model inference', async change => {
+  const now = Date.now(); let finished = false
+  const clock = jest.spyOn(Date, 'now').mockImplementation(() => now + (finished ? change === 'expired' ? 47000 : 2000 : 1000))
+  const agentS = { begin: jest.fn(), stop: jest.fn(), predict: jest.fn(async () => ({ kind: 'model_request', messages: [] })), respond: jest.fn(async () => { finished = true; return { kind: 'result', done: true, message: 'Done' } }) }
+  const { call, deps } = harness({ agentS, runControl: jest.fn(async () => ({ success: true, pid: finished && change === 'foreground' ? 2 : 1, app: 'TextEdit', keyIdleSeconds: finished && change === 'keyboard' ? 0 : 999 })) })
+  try {
+    const start = await call({ operation: 'begin', goal: 'Read TextEdit' })
+    const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+    const args = { sessionId: start.sessionId, observationId: obs.observationId }
+    await call({ ...args, operation: 'plan' })
+    expect(await call({ ...args, operation: 'model_response', text: 'done' })).toMatchObject({ success: false, retryable: true })
+    expect(deps.runControl.mock.calls.every(([a]) => ['status', 'ui_elements'].includes(a.type))).toBe(true)
+    await call({ operation: 'cancel', sessionId: start.sessionId })
+  } finally { clock.mockRestore() }
 })
 test('native app opening is independent of a failing planner startup', async () => {
   const agentS = { begin: jest.fn(async () => { throw new Error('Planner unavailable') }), stop: jest.fn() }
@@ -482,6 +497,8 @@ test('permission requests only open allowlisted OS settings and recheck actual s
   const permissions = createMiraPermissions({ platform: 'darwin', shell, systemPreferences: { getMediaAccessStatus: () => 'denied', isTrustedAccessibilityClient: () => false } })
   expect(permissions.status().microphone).toBe('denied')
   await permissions.request('microphone')
+  expect(shell.openExternal).not.toHaveBeenCalled()
+  await permissions.request('microphone:settings')
   expect(shell.openExternal).toHaveBeenCalledWith('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone')
   expect((await permissions.request('arbitrary')).success).toBe(false)
 })

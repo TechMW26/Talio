@@ -47,3 +47,14 @@ test('cancelled external app commands never restart desktop automation', () => {
   expect(miraDesktopIntent('Skip sending the WhatsApp message; check Priyanka instead.')).toBeNull()
   expect(miraDesktopIntent('Mira, cancel the WhatsApp task')).toBeNull()
 })
+test.each([
+  'Open Calculator and switch to Scientific mode. Do not change the current calculation.',
+  'Open Notes but do not edit anything',
+  'WhatsApp खोलो। कोई मैसेज मत भेजना।',
+])('keeps preservation constraints on an explicit desktop command: %s', goal => {
+  expect(miraDesktopIntent(goal)).toMatchObject({ goal })
+  expect(miraOpenAppIntent(goal)).toBeNull()
+})
+test.each(['Do not open Calculator. Open Notes', 'Do not open WhatsApp but open Telegram', 'Tell me a joke. Do not open WhatsApp', "Open Notes. Actually don't open it", 'Open Notes but do not do that', 'WhatsApp खोलो। नहीं, मत खोलो।'])('never routes a cancelled or informational command: %s', text => {
+  expect(miraDesktopIntent(text)).toBeNull()
+})
