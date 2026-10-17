@@ -2,6 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Face-only PiP: transparent hit area, with a separate, dismissible results lens. */
+.mira-workspace[data-mira-face-only="true"] {
+  width: var(--mira-float-width, 224px) !important;
+  height: var(--mira-float-height, 224px) !important;
+  min-height: 0 !important;
+  pointer-events: none !important;
+}
+.mira-floating-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(178, 218, 255, .25);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(25, 35, 48, .97), rgba(15, 17, 25, .97));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), inset 0 0 32px rgba(89, 150, 213, .08);
+  color: #f4f4f5;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.mira-floating-details-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+  padding: 0 16px 14px;
+  scrollbar-width: thin;
+}
+.mira-floating-details header { flex-shrink: 0; }
+.mira-floating-details a { color: #a5d8ff; }
+
 /* Action columns stay reachable while wide tables scroll. Opt in by marking
    the final header, or through HRMSTable's stickyActions prop. Never pin a
    colspan loading/empty-state row as though it were an action cell. */

@@ -118,6 +118,22 @@ test('desktop floating face opens a transparent 224px window with no card clippi
   act(() => target.close())
 })
 
+test('native details grow upward and closing them restores face-only bounds atomically', async () => {
+  const target = fakeWindow(), ref = createRef()
+  Object.assign(target, { screenX: 500, screenY: 600, innerWidth: 224, innerHeight: 224 })
+  const moveLivePip = jest.fn(async geometry => { Object.assign(target, { screenX: geometry.x, screenY: geometry.y, innerWidth: geometry.width, innerHeight: geometry.height }); return { success: true } })
+  window.electronAPI = { nativePip: true, nativePipGeometry: true, moveLivePip }
+  jest.spyOn(window, 'open').mockReturnValue(target)
+  render(<NativePipSurface ref={ref} faceOnly><div className="mira-workspace" data-mira-face-only="true" data-mira-details="false">Face</div></NativePipSurface>)
+  await act(async () => { await ref.current.open() })
+  const panel = target.document.querySelector('.mira-workspace')
+  await act(async () => { panel.dataset.miraDetails = 'true' })
+  expect(moveLivePip).toHaveBeenLastCalledWith({ x: 432, y: 380, width: 360, height: 444, insets: { top: 0, left: 0, right: 0, bottom: 40 } })
+  await act(async () => { panel.dataset.miraDetails = 'false' })
+  expect(moveLivePip).toHaveBeenLastCalledWith({ x: 500, y: 600, width: 224, height: 224, insets: { top: 40, left: 40, right: 40, bottom: 40 } })
+  act(() => target.close())
+})
+
 test('a background browser wake attempts PiP and explains blocked activation without losing the panel', async () => {
   jest.useFakeTimers()
   jest.spyOn(document, 'hasFocus').mockReturnValue(false)

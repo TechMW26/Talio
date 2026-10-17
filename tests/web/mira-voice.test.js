@@ -189,14 +189,30 @@ test('PiP stays voice-first without rendering live user transcription', async ()
   expect(mockStop).not.toHaveBeenCalled()
 })
 
-test('PiP remains orb-only even when assistant captions stream or complete', () => {
+test('voice PiP remains face-only even when assistant captions stream or complete', async () => {
+  mockStart.mockResolvedValue({ stop: mockStop, stream: {} })
   mockMessages = [{ id: 1, role: 'assistant', content: 'Main project khol rahi hoon.', streaming: true }]
   const { rerender } = render(<MiraChatSidebar />)
+  await act(async () => fireEvent.click(screen.getByLabelText('Start voice conversation')))
   act(() => window.dispatchEvent(new CustomEvent('mira:navigate', { detail: { page: 'projects' } })))
   expect(document.querySelector('[data-mira-pip-content]')).not.toHaveTextContent('Main project khol rahi hoon.')
   mockMessages = [{ id: 1, role: 'assistant', content: 'Project khul gaya hai.' }]
   rerender(<MiraChatSidebar />)
   expect(document.querySelector('[data-mira-pip-content]')).not.toHaveTextContent('Project khul gaya hai.')
+})
+
+test('PiP displays completed information above the face and dismissal survives rerenders', () => {
+  mockMessages = [{ id: 'result1', role: 'assistant', content: 'Two tasks are due today.' }]
+  const { rerender } = render(<MiraChatSidebar />)
+  fireEvent.click(screen.getByLabelText('Minimize MIRA to floating voice'))
+  expect(screen.getByRole('region', { name: 'Mira details' })).toHaveTextContent('Two tasks are due today.')
+  fireEvent.click(screen.getByLabelText('Close Mira details'))
+  rerender(<MiraChatSidebar />)
+  expect(screen.queryByRole('region', { name: 'Mira details' })).toBeNull()
+  expect(mockCloseChat).not.toHaveBeenCalled()
+  mockMessages = [{ id: 'result2', role: 'assistant', content: 'Three meetings tomorrow.' }]
+  rerender(<MiraChatSidebar />)
+  expect(screen.getByRole('region', { name: 'Mira details' })).toHaveTextContent('Three meetings tomorrow.')
 })
 
 test('PiP orb restores the main panel, whose close button ends the conversation', async () => {

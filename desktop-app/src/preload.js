@@ -9,6 +9,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Expose protected methods to the renderer
 contextBridge.exposeInMainWorld('electronAPI', {
   nativePip: true,
+  nativePipGeometry: true,
   captureMiraAppSnapshot: () => ipcRenderer.invoke('mira-app-snapshot'),
   captureMiraDesktopScreen: () => ipcRenderer.invoke('mira-desktop-screen'),
   activateMira: function() {

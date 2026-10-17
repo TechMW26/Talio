@@ -20,12 +20,13 @@ function pipWindowOptions(details, openerUrl, appOrigin) {
 
 // workArea excludes the macOS Dock/menu bar and Windows taskbar, including
 // side taskbars and displays with negative coordinates. Electron uses DIP units.
-function pipBounds(workArea, size, margin = 16, saved) {
+function pipBounds(workArea, size, margin = 16, saved, insets = {}) {
+  const pad = key => Number.isFinite(insets[key]) ? Math.max(0, Math.min(40, insets[key])) : 0;
   const width = Math.min(size.width, Math.max(1, workArea.width - margin * 2));
   const height = Math.min(size.height, Math.max(1, workArea.height - margin * 2));
   return {
-    x: Math.max(workArea.x, Math.min(workArea.x + workArea.width - width, Number.isFinite(saved?.x) ? saved.x : workArea.x + workArea.width - width - margin)),
-    y: Math.max(workArea.y, Math.min(workArea.y + workArea.height - height, Number.isFinite(saved?.y) ? saved.y : workArea.y + workArea.height - height - margin)),
+    x: Math.max(workArea.x - pad('left'), Math.min(workArea.x + workArea.width - width + pad('right'), Number.isFinite(saved?.x) ? saved.x : workArea.x + workArea.width - width - margin)),
+    y: Math.max(workArea.y - pad('top'), Math.min(workArea.y + workArea.height - height + pad('bottom'), Number.isFinite(saved?.y) ? saved.y : workArea.y + workArea.height - height - margin)),
     width, height,
   };
 }

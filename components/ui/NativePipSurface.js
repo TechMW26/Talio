@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { readMiraWindowRadius } from '@/hooks/useMiraWindowRadius'
+import { miraFloatingSize, MIRA_FACE_PADDING } from '@/lib/miraFloatingLayout'
 
 // A tab may own one Document PiP window. Share it rather than closing an
 // ongoing meeting when the user also pops out MIRA.
@@ -52,7 +53,14 @@ function panelSize(host) {
     return size
   }
   if (panel?.matches('.mira-workspace')) {
-    if (panel.dataset.miraFaceOnly === 'true') return { width: 224, height: 224 }
+    if (panel.dataset.miraFaceOnly === 'true') {
+      const size = miraFloatingSize(panel.dataset.miraDetails === 'true')
+      if (host.ownerDocument !== document) {
+        panel.style.setProperty('--mira-float-width', `${size.width}px`)
+        panel.style.setProperty('--mira-float-height', `${size.height}px`)
+      }
+      return size
+    }
     const width = Math.min(400, host.ownerDocument.defaultView?.innerWidth || 400)
     return { width, height: Math.max(180, Math.ceil(panel.offsetHeight || panel.getBoundingClientRect().height || 0)) }
   }
@@ -70,6 +78,22 @@ function fitWindow(target) {
   const height = sizes.reduce((sum, size) => sum + size.height, 0) + Math.max(0, sizes.length - 1) * 12
   // Browser-owned title bars and minimum dimensions cannot be removed.
   const desktop = target.document.documentElement.dataset.desktopPip === 'true'
+  if (desktop && window.electronAPI?.nativePipGeometry && window.electronAPI?.moveLivePip) {
+    const face = surfaces.length === 1 && surfaces[0].querySelector('[data-mira-face-only="true"]')
+    const side = face && face.dataset.miraDetails !== 'true' ? MIRA_FACE_PADDING : 0
+    const insets = { top: side, right: side, left: side, bottom: face ? MIRA_FACE_PADDING : 0 }
+    const signature = JSON.stringify({ width, height, insets })
+    if (target.__miraGeometry !== signature) {
+      target.__miraGeometry = signature
+      // Grow upwards around the face's bottom-centre; one atomic native update
+      // prevents resize/move handlers from fighting over the saved position.
+      window.electronAPI.moveLivePip({ width, height, insets,
+        x: target.screenX + ((target.innerWidth || width) - width) / 2,
+        y: target.screenY + (target.innerHeight || height) - height,
+      }).catch(() => { target.__miraGeometry = null })
+    }
+    return
+  }
   const chromeWidth = desktop ? 0 : Math.max(0, (target.outerWidth || width) - (target.innerWidth || width))
   const chromeHeight = desktop ? 0 : Math.max(0, (target.outerHeight || height) - (target.innerHeight || height))
   if (Math.abs((target.innerWidth || 0) - width) > 1 || Math.abs((target.innerHeight || 0) - height) > 1) {
@@ -137,7 +161,8 @@ async function getPipWindow(size) {
     const faceStyle = target.document.createElement('style')
     faceStyle.textContent = `
       [data-native-pip-surface]:has([data-mira-face-only="true"]){border-radius:0!important;clip-path:none!important;overflow:visible!important;background:transparent!important}
-      [data-native-pip-surface] .mira-workspace[data-mira-face-only="true"]{width:224px!important;height:224px!important;min-height:224px!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;overflow:visible!important}
+      [data-native-pip-surface] .mira-workspace[data-mira-face-only="true"]{width:100%!important;height:var(--mira-float-height,224px)!important;max-height:100vh!important;min-height:0!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;overflow:visible!important}
+      [data-native-pip-surface] [data-mira-face-only="true"] [data-mira-pip-content]{overflow:visible!important;min-height:0!important}
       [data-mira-face-only="true"]::before,[data-mira-face-only="true"]::after,[data-mira-face-only="true"]>canvas,[data-mira-face-only="true"]>[data-voice-beam-bloom],[data-mira-face-only="true"]>[data-voice-beam-warp],[data-mira-face-only="true"]>[data-voice-beam-core]{display:none!important}
     `
     target.document.head.append(faceStyle)
@@ -171,7 +196,7 @@ async function getPipWindow(size) {
         pendingPoint = null
       }
       target.document.addEventListener('pointerdown', event => {
-        if (event.button !== 0 || event.target.closest('button,input,textarea,a,select,[role="button"],[role="slider"]')) return
+        if (event.button !== 0 || event.target.closest('button,input,textarea,a,select,[role="button"],[role="slider"],[data-mira-floating-details]')) return
         moved = false
         drag = { x: event.screenX, y: event.screenY, left: target.screenX, top: target.screenY }
         event.target.setPointerCapture?.(event.pointerId)
@@ -221,7 +246,10 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
     targetRef.current = null
     // Re-appending an already inline host detaches its rendered subtree and
     // cancels CSS transitions (notably MIRA's fade-out on enabled=false).
-    if (host && placeholder.current && host.parentNode !== placeholder.current) placeholder.current.append(host)
+    if (host && placeholder.current && host.parentNode !== placeholder.current) {
+      placeholder.current.append(host)
+      window.dispatchEvent(new Event('resize'))
+    }
     if (target && !target.closed && !target.document.querySelector('[data-native-pip-surface]')) target.close()
     else fitWindow(target)
   }
@@ -279,7 +307,7 @@ const NativePipSurface = forwardRef(function NativePipSurface({ children, enable
         // Mode changes can replace a fixed-size panel without changing its host
         // until sizing is applied. Observe those changes as well as actual sizes.
         const modeObserver = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => fitWindow(target))
-        modeObserver?.observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-meeting-pip'] })
+        modeObserver?.observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-meeting-pip', 'data-mira-details', 'data-mira-face-only'] })
         fitWindow(target)
         cleanupRef.current = () => { observer?.disconnect(); modeObserver?.disconnect(); target.removeEventListener('pagehide', onClose) }
       } catch (cause) {

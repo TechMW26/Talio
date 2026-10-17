@@ -55,3 +55,16 @@ test('floating face has only the robot and accessible restore/close interactions
   expect(onRestore).toHaveBeenCalledTimes(1)
   expect(onClose).toHaveBeenCalledTimes(1)
 })
+
+test('results have an independent accessible close control above the robot', () => {
+  const onRestore = jest.fn(), onClose = jest.fn(), onCloseDetails = jest.fn()
+  const { rerender } = render(<MiraFloatingFace onRestore={onRestore} onClose={onClose} onCloseDetails={onCloseDetails} details={<p>Two tasks due today</p>} />)
+  expect(screen.getByRole('region', { name: 'Mira details' })).toHaveTextContent('Two tasks due today')
+  fireEvent.click(screen.getByRole('button', { name: 'Close Mira details' }))
+  expect(onCloseDetails).toHaveBeenCalledTimes(1)
+  expect(onClose).not.toHaveBeenCalled()
+  expect(onRestore).not.toHaveBeenCalled()
+  rerender(<MiraFloatingFace onRestore={onRestore} onClose={onClose} />)
+  expect(screen.queryByRole('region', { name: 'Mira details' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Restore MIRA chat' })).toBeInTheDocument()
+})

@@ -1148,7 +1148,7 @@ function setupWindowEvents() {
       const height = Math.max(80, Math.min(1200, Number(features.height) || 120));
       const saved = store.get('livePipPositionV3', null);
       const position = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? saved : null;
-      const display = position ? screen.getDisplayNearestPoint({ x: Math.round(position.x), y: Math.round(position.y) }) : screen.getDisplayMatching(mainWindow.getBounds());
+      const display = position ? screen.getDisplayNearestPoint({ x: Math.round(position.x + width / 2), y: Math.round(position.y + height / 2) }) : screen.getDisplayMatching(mainWindow.getBounds());
       Object.assign(pip.overrideBrowserWindowOptions, pipBounds(display.workArea, { width, height }, 16, position));
       return pip;
     }
@@ -1172,9 +1172,9 @@ function setupWindowEvents() {
       positioning = true;
       try {
         const display = savedPipPosition && Number.isFinite(savedPipPosition.x) && Number.isFinite(savedPipPosition.y)
-          ? screen.getDisplayNearestPoint({ x: Math.round(savedPipPosition.x), y: Math.round(savedPipPosition.y) })
+          ? screen.getDisplayNearestPoint({ x: Math.round(savedPipPosition.x + child.getBounds().width / 2), y: Math.round(savedPipPosition.y + child.getBounds().height / 2) })
           : screen.getDisplayMatching(mainWindow.getBounds());
-        const bounds = pipBounds(display.workArea, child.getBounds(), 16, savedPipPosition);
+        const bounds = pipBounds(display.workArea, child.getBounds(), 16, savedPipPosition, child.miraFaceInsets);
         const current = child.getBounds();
         if (Object.keys(bounds).some(key => bounds[key] !== current[key])) {
           applyingBounds = true;
@@ -1541,9 +1541,15 @@ function setupIPCHandlers() {
   ipcMain.handle('mira-move-pip', (event, position) => {
     if (!trustedMiraSender(event, mainWindow, APP_ORIGIN) || !livePipWindow || livePipWindow.isDestroyed() || !Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return { success: false };
     const point = { x: Math.round(Math.max(-100000, Math.min(100000, position.x))), y: Math.round(Math.max(-100000, Math.min(100000, position.y))) };
-    const display = screen.getDisplayNearestPoint(point);
+    let size = livePipWindow.getBounds();
+    if (Number.isFinite(position.width) && Number.isFinite(position.height)) {
+      size = { width: Math.round(Math.max(180, Math.min(1200, position.width))), height: Math.round(Math.max(80, Math.min(1200, position.height))) };
+      livePipWindow.miraFaceInsets = Object.fromEntries(['top', 'right', 'bottom', 'left'].map(key => [key, Number.isFinite(position.insets?.[key]) ? Math.max(0, Math.min(40, position.insets[key])) : 0]));
+    }
+    // Use the visible window centre, not transparent padding on a neighbouring display.
+    const display = screen.getDisplayNearestPoint({ x: point.x + Math.round(size.width / 2), y: point.y + Math.round(size.height / 2) });
     livePipWindow.emit('mira-user-moved', point);
-    livePipWindow.setBounds(pipBounds(display.workArea, livePipWindow.getBounds(), 0, point));
+    livePipWindow.setBounds(pipBounds(display.workArea, size, 0, point, livePipWindow.miraFaceInsets));
     const { x, y } = livePipWindow.getBounds();
     store.set('livePipPositionV3', { x, y });
     livePipWindow.emit('mira-user-moved', { x, y });

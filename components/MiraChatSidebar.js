@@ -30,6 +30,7 @@ import { sanitizeMiraCards } from '@/lib/miraStructuredCards'
 import MiraEditPrompt from './MiraEditPrompt'
 import { miraMessageDisplay } from '@/lib/miraMessageDisplay'
 import MiraVoiceCall from '@/components/ui/MiraVoiceCall'
+import { miraFloatingResult } from '@/lib/miraFloatingLayout'
 
 // ─── Copy Button ────────────────────────────────────────────────────
 
@@ -479,6 +480,10 @@ export default function MiraChatSidebar() {
   const paintVoiceLevel = useCallback(level => voiceMeterRef.current?.style.setProperty('--mira-voice-level', String(level)), [])
   const voiceResults = messages.filter(message => message.role === 'assistant' && message.data?.voiceTool && !message.streaming && new Date(message.timestamp).getTime() >= (voice.startedAt || 0))
   const voiceConnecting = voice.state === 'loading'
+  const [dismissedDetails, setDismissedDetails] = useState(null)
+  const floatingResult = miraFloatingResult(latestReply, voice.active)
+  const detailsKey = floatingResult ? `${activeSessionId}:${floatingResult.id}` : null
+  const floatingDetails = detailsKey && detailsKey !== dismissedDetails ? floatingResult : null
   const [wakeRequested, setWakeRequested] = useState(false)
   useEffect(() => {
     if (isOpen && wakeRequested) { setWakeRequested(false); void voice.start() }
@@ -726,7 +731,15 @@ export default function MiraChatSidebar() {
       >
         {!pip && isOpen && (voiceConnecting || isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={windowRadius} />}
         {pip && <div data-mira-pip-content className="relative flex flex-1 items-center justify-center">
-          <MiraFloatingFace state={voice.active ? voice.state : undefined} isThinking={isThinking || voiceConnecting} onRestore={restoreMira} onClose={closeChat} />
+          <MiraFloatingFace state={voice.active ? voice.state : undefined} isThinking={isThinking || voiceConnecting} onRestore={restoreMira} onClose={closeChat}
+            onCloseDetails={() => setDismissedDetails(detailsKey)}
+            details={floatingDetails ? <>
+              {(!voice.active || floatingDetails.data?.voiceTool) && <div className="text-sm leading-relaxed mira-markdown"><ReactMarkdown>{String(floatingDetails.data?.message || floatingDetails.content || '').slice(0, 900)}</ReactMarkdown></div>}
+              {sanitizeMiraCards(floatingDetails.data?.cards).map((card, index) => <AICard key={index} card={card} />)}
+              {floatingDetails.data?.image && <MiraGeneratedImage image={floatingDetails.data.image} />}
+              {floatingDetails.data?.gallery && <MiraScreenshotGallery gallery={floatingDetails.data.gallery} />}
+              <MiraActionPreview action={floatingDetails.data?.action} result={floatingDetails.data?.actionResult} messageId={floatingDetails.id} busy={isThinking} />
+            </> : null} />
         </div>}
         <MiraVoiceConnecting active={!pip && isOpen && voiceConnecting} onCancel={voice.stop} />
         <div className={pip ? 'hidden' : 'contents'}>

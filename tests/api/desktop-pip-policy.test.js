@@ -22,6 +22,11 @@ test('desktop retains screenshot entitlements and enables real audio by default'
 })
 
 const { pipBounds } = require('../../desktop-app/src/pipWindowPolicy')
+test('only bounded transparent insets can cross native work-area edges', () => {
+  const area = { x: -1920, y: 25, width: 1920, height: 1000 }
+  expect(pipBounds(area, { width: 224, height: 224 }, 0, { x: -9999, y: 9999 }, { left: 40, bottom: 40 })).toEqual({ x: -1960, y: 841, width: 224, height: 224 })
+  expect(pipBounds(area, { width: 224, height: 224 }, 0, { x: -9999, y: 9999 }, { left: Infinity, bottom: 9999 })).toEqual({ x: -1920, y: 841, width: 224, height: 224 })
+})
 test.each([
   [{ x: 0, y: 25, width: 1440, height: 815 }, { x: 1084, y: 644, width: 340, height: 180 }],
   [{ x: 0, y: 0, width: 1920, height: 1040 }, { x: 1564, y: 844, width: 340, height: 180 }],

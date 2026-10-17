@@ -2,25 +2,46 @@
 import { useEffect, useRef } from 'react'
 import MiraPet from './MiraPet'
 import { miraOrbVoiceState } from '@/lib/miraOrbState'
+import { clampMiraFloating, miraFloatingSize } from '@/lib/miraFloatingLayout'
 
 // The padded canvas can hop without clipping; the padding paints nothing.
-export default function MiraFloatingFace({ state, isThinking, onRestore, onClose }) {
+export default function MiraFloatingFace({ state, isThinking, onRestore, onClose, details, onCloseDetails }) {
   const drag = useRef(null), moved = useRef(false), face = useRef(null)
+  const previousSize = useRef({ width: 224, height: 224 })
+  const hasDetails = Boolean(details)
   useEffect(() => {
     const clamp = () => {
       const panel = face.current?.closest('.mira-workspace')
-      if (!panel || panel.ownerDocument !== document || !panel.style.left || panel.style.left === 'auto') return
+      if (!panel) return
+      const native = panel.ownerDocument !== document
+      const viewport = { width: window.innerWidth, height: window.innerHeight }
+      const size = miraFloatingSize(hasDetails, native ? {} : viewport)
       const rect = panel.getBoundingClientRect()
-      panel.style.left = `${Math.max(0, Math.min(rect.left, window.innerWidth - panel.offsetWidth))}px`
-      panel.style.top = `${Math.max(0, Math.min(rect.top, window.innerHeight - panel.offsetHeight))}px`
+      if (!native) {
+        const point = clampMiraFloating({ x: rect.left + (previousSize.current.width - size.width) / 2, y: rect.top + previousSize.current.height - size.height }, size, viewport, hasDetails)
+        Object.assign(panel.style, { left: `${point.x}px`, top: `${point.y}px`, right: 'auto', bottom: 'auto' })
+      }
+      panel.style.setProperty('--mira-float-width', `${size.width}px`)
+      panel.style.setProperty('--mira-float-height', `${size.height}px`)
+      panel.dataset.miraDetails = hasDetails ? 'true' : 'false'
+      previousSize.current = size
     }
+    clamp()
     window.addEventListener('resize', clamp)
     return () => { drag.current = null; window.removeEventListener('resize', clamp) }
-  }, [])
-  return <div ref={face} data-mira-floating-face role="button" tabIndex={0}
+  }, [hasDetails])
+  return <div className="flex h-full w-full flex-col items-center" style={{ pointerEvents: 'none' }}>
+    {details && <section data-mira-floating-details aria-label="Mira details" className="mira-floating-details dark" style={{ pointerEvents: 'auto' }}>
+      <header className="flex items-center justify-between gap-3 px-4 py-2">
+        <span className="text-xs font-semibold tracking-wide text-neutral-300">Mira details</span>
+        <button type="button" aria-label="Close Mira details" onClick={onCloseDetails} className="rounded-full px-2 py-1 text-lg text-neutral-300 hover:bg-white/10 focus-visible:outline" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onCloseDetails() } }}>×</button>
+      </header>
+      <div className="mira-floating-details-body">{details}</div>
+    </section>}
+    <div ref={face} data-mira-floating-face role="button" tabIndex={0}
     aria-label="Restore MIRA chat" title="Click to open Mira · drag to move · Escape to close"
-    className="flex h-full w-full items-center justify-center outline-none focus-visible:rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-    style={{ touchAction: 'none', cursor: 'grab', background: 'transparent' }}
+    className="flex shrink-0 items-center justify-center outline-none focus-visible:rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+    style={{ width: 224, height: 224, touchAction: 'none', cursor: 'grab', background: 'transparent', pointerEvents: 'auto' }}
     onKeyDown={event => {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onRestore() }
       if (event.key === 'Escape') { event.preventDefault(); onClose() }
@@ -43,8 +64,7 @@ export default function MiraFloatingFace({ state, isThinking, onRestore, onClose
       moved.current = true
       if (active.native) window.electronAPI.moveLivePip({ x: active.left + dx, y: active.top + dy }).catch(() => {})
       else {
-        const x = Math.max(0, Math.min(active.view.innerWidth - active.panel.offsetWidth, active.left + dx))
-        const y = Math.max(0, Math.min(active.view.innerHeight - active.panel.offsetHeight, active.top + dy))
+        const { x, y } = clampMiraFloating({ x: active.left + dx, y: active.top + dy }, { width: active.panel.offsetWidth, height: active.panel.offsetHeight }, { width: active.view.innerWidth, height: active.view.innerHeight }, Boolean(details))
         Object.assign(active.panel.style, { left: `${x}px`, top: `${y}px`, right: 'auto', bottom: 'auto' })
       }
     }}
@@ -53,5 +73,5 @@ export default function MiraFloatingFace({ state, isThinking, onRestore, onClose
     onClickCapture={event => { if (moved.current) { event.preventDefault(); event.stopPropagation(); moved.current = false } }}
     onClick={onRestore}>
     <MiraPet size={160} state={state && state !== 'working' ? miraOrbVoiceState(state) : undefined} isThinking={isThinking} />
-  </div>
+  </div></div>
 }
