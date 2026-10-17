@@ -152,7 +152,7 @@ def control(value):
         return {"success": True}
     import pyautogui
     pyautogui.FAILSAFE = True
-    pyautogui.PAUSE = 0.08
+    pyautogui.PAUSE = 0.025
     if kind == "click":
         x, y = value["x"], value["y"]
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)) or not pyautogui.onScreen(x, y):
@@ -222,8 +222,17 @@ def control(value):
     return {"success": True, "message": "Input delivered; verify the next screenshot."}
 
 
-def main():
-    try:
-        print(json.dumps(control(json.loads(sys.stdin.readline(10000)))))
-    except Exception:
-        print(json.dumps({"success": False, "message": "Desktop input is unavailable. Check session permissions and required desktop utilities."}))
+def main(serve=False):
+    while True:
+        line = sys.stdin.readline(10001)
+        if not line:
+            return
+        try:
+            if len(line) > 10000 or not line.endswith('\n'):
+                return  # Never split an oversized action into multiple inputs.
+            result = control(json.loads(line))
+        except Exception:
+            result = {"success": False, "message": "Desktop input is unavailable. Check session permissions and required desktop utilities."}
+        print(json.dumps(result), flush=True)
+        if not serve:
+            return

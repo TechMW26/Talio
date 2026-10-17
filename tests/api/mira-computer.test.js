@@ -278,6 +278,41 @@ function harness(overrides = {}) {
   const handler = createMiraComputer(deps)
   return { deps, event, window, call: input => handler(event, window, 'https://app.talio.in', input) }
 }
+function semanticHarness(outcome = { success: true, verified: true }) {
+  return harness({ runControl: jest.fn(async action => action.type === 'ui_elements'
+    ? { success: true, pid: 1, elements: [{ ref: 'observed-search', role: 'AXSearchField', label: 'Search', frame: { x: 100, y: 100, width: 200, height: 40 } }, { ref: 'send', role: 'AXButton', label: 'Send message', frame: { x: 100, y: 200, width: 200, height: 40 } }] }
+    : action.type === 'ax_action' ? outcome : { success: true, pid: 1, app: 'Notes' }) })
+}
+test('semantic observation skips screenshots and only resolves an observed reference', async () => {
+  const { call, deps } = semanticHarness()
+  const start = await call({ operation: 'begin', goal: 'Search Notes for hello' })
+  expect(start.capabilities.semanticControl).toBe(true)
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true })
+  expect(obs.image).toBeUndefined(); expect(obs.fingerprint).toBeTruthy(); expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'semantic', operation: 'fill', ref: 'observed-search', text: 'hello' } })).toMatchObject({ success: true, verified: true })
+  expect(deps.runControl).toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action', ref: 'observed-search', pid: 1, label: 'Search', text: 'hello' }))
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+test.each([
+  { type: 'semantic', operation: 'click', ref: 'invented' },
+  { type: 'semantic', operation: 'click', ref: 'send' },
+  { type: 'semantic', operation: 'fill', ref: 'observed-search', text: 'a\nsubmit' },
+  { type: 'semantic', operation: 'exec', ref: 'observed-search' },
+])('semantic action cannot bypass native allowlists: %j', async action => {
+  const { call, deps } = semanticHarness()
+  const start = await call({ operation: 'begin', goal: 'Search Notes' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true })
+  expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action })).success).toBe(false)
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action' }))
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+test.each([true, false])('only proven-not-executed semantic failures may be retried: %s', async notExecuted => {
+  const { call } = semanticHarness({ success: false, notExecuted })
+  const start = await call({ operation: 'begin', goal: 'Search Notes' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'semantic', operation: 'fill', ref: 'observed-search', text: 'hello' } })).toMatchObject({ success: false, retryable: notExecuted })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
 test('old session cancellation and observations cannot stop a replacement session', async () => {
   const { call } = harness()
   const first = await call({ operation: 'begin', goal: 'Open WhatsApp' })

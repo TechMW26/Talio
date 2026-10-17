@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
-import { rateLimit } from '@/lib/security/rateLimiter'
+import { rateLimit, buildRateLimitHeaders } from '@/lib/security/rateLimiter'
 import { requestAgentSModel, validateAgentSMessages } from '@/lib/ai/agentSProxy'
 
 export const runtime = 'nodejs'
@@ -10,7 +10,7 @@ export async function POST(request) {
   const auth = await getAuthAndDatabase(request)
   if (!auth.success) return reply({ success: false }, 401)
   const limit = await rateLimit('MIRA_COMPUTER', `${auth.tenant.databaseName}:${auth.user._id}`)
-  if (!limit.allowed) return reply({ success: false, message: 'Desktop vision is busy. Please try again shortly.' }, 429)
+  if (!limit.allowed) return NextResponse.json({ success: false, message: 'Desktop vision is busy. Please try again shortly.' }, { status: 429, headers: { 'Cache-Control': 'no-store', ...buildRateLimitHeaders(limit) } })
   let body
   try {
     const reader = request.body?.getReader()

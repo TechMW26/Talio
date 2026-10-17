@@ -177,7 +177,9 @@ test('spelling clarification preserves pending work and does not switch language
 
 test('Agent S receives the same language and clarification contract as chat', () => {
   const messages = validateAgentSMessages([{ role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,YQ==' } }] }])
-  for (const entry of [messages[0], messages.at(-1)]) {
+  // Keep the complete contract once, rather than doubling every visual request.
+  expect(messages.filter(entry => entry.role === 'system')).toHaveLength(1)
+  for (const entry of [messages[0]]) {
     expect(entry.content).toContain(MIRA_LANGUAGE_POLICY)
     expect(entry.content).toContain(MIRA_CLARIFICATION_POLICY)
     expect(entry.content).toContain(MIRA_SELF_REFERENCE_POLICY)

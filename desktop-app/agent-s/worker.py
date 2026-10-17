@@ -115,8 +115,8 @@ def main():
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--control"]:
+    if sys.argv[1:] in (["--control"], ["--control-serve"]):
         from control import main as control_main
-        control_main()
+        control_main(serve=sys.argv[1:] == ["--control-serve"])
     else:
         main()

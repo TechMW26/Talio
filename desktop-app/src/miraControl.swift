@@ -1,13 +1,13 @@
 import AppKit
 import ApplicationServices
 
-func output(_ value: [String: Any]) { let data = try! JSONSerialization.data(withJSONObject: value); print(String(data: data, encoding: .utf8)!) }
+var didOutput = false
+var references: [String: AXUIElement] = [:]
+func output(_ value: [String: Any]) { didOutput = true; let data = try! JSONSerialization.data(withJSONObject: value); print(String(data: data, encoding: .utf8)!); fflush(stdout) }
 // Some installed apps prefix their display names with invisible bidi marks.
 func appKey(_ name: String) -> String {
     String(name.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) && ![0x200B, 0x200E, 0x200F, 0xFEFF].contains(Int($0.value)) }).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 }
-guard CommandLine.arguments.count == 2, let data = CommandLine.arguments[1].data(using: .utf8), let action = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let type = action["type"] as? String else { output(["success": false]); exit(1) }
-let front = NSWorkspace.shared.frontmostApplication
 func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
     var value: CFTypeRef?; AXUIElementCopyAttributeValue(element, name as CFString, &value); return value
 }
@@ -25,8 +25,11 @@ func resize(_ window: AXUIElement, _ frame: [String: Double]) -> Bool {
     let s = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, AXValueCreate(.cgSize, &size)!)
     return p == .success && s == .success
 }
+func execute(_ action: [String: Any]) {
+    guard let type = action["type"] as? String else { return }
+    let front = NSWorkspace.shared.frontmostApplication
 if let session = CGSessionCopyCurrentDictionary() as? [String: Any], session["CGSSessionScreenIsLocked"] as? Bool == true {
-    output(["success": false, "message": "Unlock your Mac before using desktop controls."]); exit(0)
+    output(["success": false, "message": "Unlock your Mac before using desktop controls."]); return
 }
 if type == "status" {
     let point = CGEvent(source:nil)?.location ?? .zero
@@ -40,15 +43,43 @@ if type == "status" {
             result["center"] = ["x": frame["x"]! + frame["width"]! / 2, "y": frame["y"]! + frame["height"]! / 2]
         }
     }
-    output(result); exit(0)
+    output(result); return
 }
-guard AXIsProcessTrusted() else { output(["success": false, "message": "Enable Accessibility for Talio in System Settings."]); exit(0) }
+guard AXIsProcessTrusted() else { output(["success": false, "message": "Enable Accessibility for Talio in System Settings."]); return }
 func key(_ code: CGKeyCode, _ flags: CGEventFlags = []) {
     for down in [true, false] { let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down); event?.flags = flags; event?.post(tap: .cghidEventTap) }
 }
 switch type {
+case "ax_action":
+    guard let ref = action["ref"] as? String, let element = references.removeValue(forKey: ref),
+          let expectedPid = action["pid"] as? Int32, front?.processIdentifier == expectedPid,
+          let expectedRole = action["role"] as? String, attribute(element, kAXRoleAttribute) as? String == expectedRole,
+          attribute(element, kAXSubroleAttribute) as? String != "AXSecureTextField",
+          attribute(element, "AXHidden") as? Bool != true, attribute(element, kAXEnabledAttribute) as? Bool != false,
+          let oldFrame = action["frame"] as? [String: Double], let frame = geometry(element),
+          frame.allSatisfy({ abs($0.value - (oldFrame[$0.key] ?? -99999)) < 2 }) else {
+        output(["success": false, "notExecuted": true]); return
+    }
+    let label = [kAXTitleAttribute, kAXDescriptionAttribute, "AXPlaceholderValue"].compactMap { attribute(element, $0) as? String }.first(where: { !$0.isEmpty }) ?? ""
+    guard String(label.prefix(100)) == action["label"] as? String else { output(["success": false, "notExecuted": true]); return }
+    if action["operation"] as? String == "fill" {
+        guard ["AXTextField", "AXTextArea", "AXSearchField"].contains(expectedRole), let text = action["text"] as? String, text.count <= 2000,
+              !text.contains("\n"), !text.contains("\r") else { output(["success": false, "notExecuted": true]); return }
+        var settable: DarwinBoolean = false
+        guard AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue else { output(["success": false, "notExecuted": true]); return }
+        let changed = AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, text as CFTypeRef)
+        // Read only the specific non-secure field just written; never export its value.
+        let verified = changed == .success && attribute(element, kAXValueAttribute) as? String == text
+        output(["success": verified, "verified": verified, "message": verified ? "Field value verified." : "Field outcome uncertain; do not replay."]); return
+    }
+    var actions: CFArray?
+    AXUIElementCopyActionNames(element, &actions)
+    guard (actions as? [String] ?? []).contains(kAXPressAction) else { output(["success": false, "notExecuted": true]); return }
+    let result = AXUIElementPerformAction(element, kAXPressAction as CFString)
+    output(["success": result == .success, "message": "Control invoked; verify the updated state."]); return
 case "ui_elements":
-    guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); exit(0) }
+    references.removeAll()
+    guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); return }
     let root = focused as! AXUIElement
     AXUIElementSetMessagingTimeout(root, 0.15)
     var queue: [(AXUIElement, Int)] = [(root, 0)]
@@ -64,34 +95,36 @@ case "ui_elements":
            attribute(element, "AXHidden") as? Bool != true, attribute(element, kAXEnabledAttribute) as? Bool != false,
            let frame = geometry(element), frame["width"]! > 0, frame["height"]! > 0,
            ["AXButton", "AXTextField", "AXTextArea", "AXSearchField", "AXStaticText", "AXLink", "AXCheckBox", "AXPopUpButton"].contains(role) {
-            elements.append(["role":role, "label":String(label.prefix(100)), "frame":frame])
+            let ref = UUID().uuidString
+            references[ref] = element
+            elements.append(["ref":ref, "role":role, "label":String(label.prefix(100)), "frame":frame])
         }
         if depth < 12, role != "AXSecureTextField", let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] {
             queue.append(contentsOf: children.prefix(100).map { ($0, depth + 1) })
         }
     }
-    output(["success":true,"pid":pid,"elements":elements]); exit(0)
+    output(["success":true,"pid":pid,"elements":elements]); return
 case "prepare_window":
-    guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); exit(0) }
+    guard let pid = front?.processIdentifier, let focused = attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute) else { output(["success":false]); return }
     let window = focused as! AXUIElement
-    guard let index = windows(pid).firstIndex(where: { CFEqual($0, window) }), let frame = geometry(window), attribute(window, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole else { output(["success":false]); exit(0) }
-    if attribute(window, "AXFullScreen") as? Bool == true { output(["success":true]); exit(0) }
+    guard let index = windows(pid).firstIndex(where: { CFEqual($0, window) }), let frame = geometry(window), attribute(window, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole else { output(["success":false]); return }
+    if attribute(window, "AXFullScreen") as? Bool == true { output(["success":true]); return }
     let top = NSScreen.screens.first?.frame.maxY ?? 0
     let center = CGPoint(x: frame["x"]! + frame["width"]! / 2, y: top - frame["y"]! - frame["height"]! / 2)
-    guard let display = NSScreen.screens.first(where: { $0.frame.contains(center) }) else { output(["success":false]); exit(0) }
+    guard let display = NSScreen.screens.first(where: { $0.frame.contains(center) }) else { output(["success":false]); return }
     let visible = display.visibleFrame
     let expanded: [String: Double] = ["x":Double(visible.minX), "y":Double(top - visible.maxY), "width":Double(visible.width), "height":Double(visible.height)]
     let success = resize(window, expanded)
     usleep(150000)
-    output(["success":success, "state":["pid":pid,"index":index,"title":attribute(window, kAXTitleAttribute) as? String ?? "", "frame":frame,"expanded":geometry(window) ?? expanded]]); exit(0)
+    output(["success":success, "state":["pid":pid,"index":index,"title":attribute(window, kAXTitleAttribute) as? String ?? "", "frame":frame,"expanded":geometry(window) ?? expanded]]); return
 case "restore_window":
-    guard let state = action["state"] as? [String:Any], let pid = state["pid"] as? Int32, let index = state["index"] as? Int, let frame = state["frame"] as? [String:Double], let expanded = state["expanded"] as? [String:Double] else { exit(1) }
+    guard let state = action["state"] as? [String:Any], let pid = state["pid"] as? Int32, let index = state["index"] as? Int, let frame = state["frame"] as? [String:Double], let expanded = state["expanded"] as? [String:Double] else { return }
     let list = windows(pid)
     // Do not undo a resize performed by the user while MIRA was active.
     if list.indices.contains(index), (attribute(list[index], kAXTitleAttribute) as? String ?? "") == state["title"] as? String, let current = geometry(list[index]), current.allSatisfy({ abs($0.value - (expanded[$0.key] ?? -99999)) < 3 }) { _ = resize(list[index], frame) }
-    output(["success":true]); exit(0)
+    output(["success":true]); return
 case "drag":
-    guard let x = action["x"] as? Double, let y = action["y"] as? Double, let tx = action["toX"] as? Double, let ty = action["toY"] as? Double else { exit(1) }
+    guard let x = action["x"] as? Double, let y = action["y"] as? Double, let tx = action["toX"] as? Double, let ty = action["toY"] as? Double else { return }
     let start = CGPoint(x:x,y:y)
     CGEvent(mouseEventSource:nil, mouseType:.leftMouseDown, mouseCursorPosition:start, mouseButton:.left)?.post(tap:.cghidEventTap)
     for step in 1...30 {
@@ -101,19 +134,19 @@ case "drag":
     }
     CGEvent(mouseEventSource:nil, mouseType:.leftMouseUp, mouseCursorPosition:CGPoint(x:tx,y:ty), mouseButton:.left)?.post(tap:.cghidEventTap)
 case "click":
-    guard let x = action["x"] as? Double, let y = action["y"] as? Double else { exit(1) }
+    guard let x = action["x"] as? Double, let y = action["y"] as? Double else { return }
     let point = CGPoint(x: x, y: y)
     let start = CGEvent(source: nil)?.location ?? point
-    for step in 1...12 {
-        let t = Double(step) / 12.0
+    for step in 1...4 {
+        let t = Double(step) / 4.0
         let eased = t * t * (3 - 2 * t)
         let intermediate = CGPoint(x: start.x + (point.x - start.x) * eased, y: start.y + (point.y - start.y) * eased)
         CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: intermediate, mouseButton: .left)?.post(tap: .cghidEventTap)
-        usleep(16000)
+        usleep(8000)
     }
-    for kind in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] { CGEvent(mouseEventSource: nil, mouseType: kind, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap); usleep(50000) }
+    for kind in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] { CGEvent(mouseEventSource: nil, mouseType: kind, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap); usleep(10000) }
 case "type":
-    guard let text = action["text"] as? String, text.count <= 2000 else { exit(1) }
+    guard let text = action["text"] as? String, text.count <= 2000 else { return }
     // Catalyst apps (including WhatsApp) can ignore synthetic Unicode key
     // payloads. Paste into the verified focused field, preserving all clipboard
     // formats and never overwriting a concurrent user clipboard change.
@@ -130,7 +163,7 @@ case "type":
         }
         usleep(50000)
         output(["success":true,"message":"Input delivered; verify the updated screen."])
-        exit(0)
+        return
     }
     let board = NSPasteboard.general
     let previous = (board.pasteboardItems ?? []).map { item -> NSPasteboardItem in
@@ -157,16 +190,16 @@ case "key":
         "save": (1, .maskCommand), "undo": (6, .maskCommand),
         "redo": (6, [.maskCommand, .maskShift])
     ]
-    guard let name = action["key"] as? String else { exit(1) }
+    guard let name = action["key"] as? String else { return }
     if let (code, flags) = shortcuts[name] { key(code, flags); break }
-    guard let code = keys[name] else { exit(1) }
+    guard let code = keys[name] else { return }
     key(code, ["select_all","copy","paste","find"].contains(name) ? .maskCommand : [])
 case "scroll":
-    guard let amount = action["amount"] as? Int, abs(amount) <= 10 else { exit(1) }
+    guard let amount = action["amount"] as? Int, abs(amount) <= 10 else { return }
     CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: Int32(-amount), wheel2: 0, wheel3: 0)?.post(tap: .cghidEventTap)
 case "lock": key(12, [.maskCommand, .maskControl])
 case "open_app":
-    guard let name = action["name"] as? String else { exit(1) }
+    guard let name = action["name"] as? String else { return }
     if let running = NSWorkspace.shared.runningApplications.first(where: { appKey($0.localizedName ?? "") == appKey(name) && $0.activationPolicy == .regular }) {
         running.unhide()
         let application = AXUIElementCreateApplication(running.processIdentifier)
@@ -178,20 +211,34 @@ case "open_app":
         }
         let activated = running.activate(options: [.activateAllWindows])
         output(["success": activated, "message": activated ? "Existing application brought to front; verify the screen." : "Application could not be focused."])
-        exit(0)
+        return
     }
     let roots = ["/Applications", NSHomeDirectory() + "/Applications", "/System/Applications", "/System/Applications/Utilities"]
     let matches = roots.flatMap { root -> [URL] in
         ((try? FileManager.default.contentsOfDirectory(atPath: root)) ?? []).filter { $0.hasSuffix(".app") && String($0.dropLast(4)).caseInsensitiveCompare(name) == .orderedSame }.map { URL(fileURLWithPath: root).appendingPathComponent($0) }
     }
-    guard let app = matches.first else { output(["success":false,"notInstalled":true,"message":"No installed app matched that exact name."]); exit(0) }
+    guard let app = matches.first else { output(["success":false,"notInstalled":true,"message":"No installed app matched that exact name."]); return }
     let configuration = NSWorkspace.OpenConfiguration()
     configuration.activates = true
+    var completed = false
     NSWorkspace.shared.openApplication(at: app, configuration: configuration) { _, error in
-        output(["success":error == nil,"message":error == nil ? "Application opened." : "The application could not be opened."]); exit(0)
+        output(["success":error == nil,"message":error == nil ? "Application opened." : "The application could not be opened."]); completed = true
     }
-    RunLoop.main.run()
-default: output(["success":false]); exit(1)
+    let deadline = Date().addingTimeInterval(8)
+    while !completed && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
+    if !completed { output(["success": false, "message": "App activation timed out."]); exit(1) }
+    return
+default: output(["success":false]); return
 }
 usleep(50000)
 output(["success":true,"message":"Input delivered; verify the updated screen."])
+
+}
+func handle(_ line: String) {
+    didOutput = false
+    if line.utf8.count <= 10000, let data = line.data(using: .utf8), let action = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { execute(action) }
+    if !didOutput { output(["success": false, "message": "Invalid native action."]) }
+}
+if CommandLine.arguments.count == 2 && CommandLine.arguments[1] == "--serve" {
+    while let line = readLine() { autoreleasepool { handle(line) } }
+} else if CommandLine.arguments.count == 2 { handle(CommandLine.arguments[1]) }
