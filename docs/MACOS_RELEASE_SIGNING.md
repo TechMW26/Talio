@@ -12,6 +12,20 @@ release. Certificate renewal within the same team retains the standard Apple DR.
 
 ## Release credentials
 
+### Owner-approved 6.0.31 exception (2026-10-18)
+
+The owner explicitly requested publication with Developer ID signing retained
+and Apple notarization skipped for now. The manual workflow input
+`signed_unnotarized_release` defaults to false and permits this 6.0.31 release
+only. The after-sign hook still verifies the app and both helper identities
+before honoring the version-scoped exception. The updater's signature checks
+are unchanged. Release notes disclose the absence of notarization and remaining
+cross-platform hands-on/update-permission-continuity testing; this is not a claim
+that those checks passed. Gatekeeper may require manual approval on a fresh Mac.
+
+The standard notarized release requirements below remain the default for future
+releases. Do not enable `desktop_acceptance_verified` for this exception.
+
 Configure these GitHub Actions repository secrets using an administrator account:
 
 - `MAC_CSC_LINK`: base64-encoded password-protected Developer ID Application P12,

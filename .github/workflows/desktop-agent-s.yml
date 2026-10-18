@@ -7,6 +7,11 @@ on:
         type: boolean
         required: true
         default: false
+      signed_unnotarized_release:
+        description: 'Owner-approved 6.0.31 release: retain Developer ID signing, skip notarization, disclose remaining acceptance limits'
+        type: boolean
+        required: true
+        default: false
   push:
     tags:
       - 'v6.0.31'
@@ -57,8 +62,13 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SIGNED_UNNOTARIZED_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.signed_unnotarized_release && 'true' || 'false' }}
         run: |
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_ID_PASSWORD APPLE_TEAM_ID; do
+          required_secrets='CSC_LINK CSC_KEY_PASSWORD APPLE_TEAM_ID'
+          if [ "$SIGNED_UNNOTARIZED_RELEASE" != 'true' ]; then
+            required_secrets="$required_secrets APPLE_ID APPLE_ID_PASSWORD"
+          fi
+          for name in $required_secrets; do
             if [ -z "${!name}" ]; then
               echo "::error::Missing macOS signing/notarization secret: $name. Refusing to produce an ad-hoc release."
               exit 1
@@ -92,6 +102,7 @@ jobs:
           APPLE_ID_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_ID_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
           REQUIRE_NOTARIZATION: ${{ runner.os == 'macOS' && 'true' || 'false' }}
+          TALIO_SIGNED_UNNOTARIZED_RELEASE: ${{ runner.os == 'macOS' && github.event_name == 'workflow_dispatch' && inputs.signed_unnotarized_release && '6.0.31' || '' }}
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
@@ -107,7 +118,7 @@ jobs:
     name: Publish desktop release
     needs: build
     # Build artifacts are not proof of desktop task completion or TCC continuity.
-    if: github.event_name == 'workflow_dispatch' && inputs.desktop_acceptance_verified
+    if: github.event_name == 'workflow_dispatch' && (inputs.desktop_acceptance_verified || inputs.signed_unnotarized_release)
     runs-on: ubuntu-22.04
     steps:
       - name: Download desktop packages
@@ -133,6 +144,8 @@ jobs:
           prerelease: false
           generate_release_notes: false
           body: |
+            Release mode: ${{ inputs.signed_unnotarized_release && 'Owner-approved signed but UNNOTARIZED macOS release. Apple Gatekeeper may require manual approval; this release does not claim Apple notarization or completed cross-platform hands-on/update-permission-continuity acceptance.' || 'Developer ID signed and Apple notarized macOS release.' }}
+
             Stable Developer ID identities now cover Talio and both desktop-control helpers. Native permission prompts no longer hold the startup loader open, and version-check requests have a bounded deadline. Existing ad-hoc installations may need one final approval when moving to the signed app.
 
             Mira now observes menu controls, retains a short task-local hybrid plan across proven-not-executed inputs, and discards stale accessibility evidence from later model requests while preserving task and action history. Deterministic exact matching avoids unnecessary Jev calls; uncertain selections retain visual recovery and completion verification.
@@ -145,15 +158,19 @@ jobs:
 
             Jev semantic selection currently requires macOS accessibility controls. Windows and Linux use the improved persistent native helper and existing visual planning. TypeSafe credentials remain server-side and are not embedded in installers.
 
-            New PiP windows open bottom-right instead of restoring stale top-left coordinates. Automatic sizing no longer masquerades as a user drag. The transparent floating robot and detail widgets remain; explicit drags are local to the open window. Browser Mira remains an in-page floating bot.
+            Mira prefers installed applications, including Chrome-installed apps such as YouTube Music, before native app search and browser fallback. Explicit browser requests remain respected. A live Mac test opened the installed YouTube Music application without opening Safari.
+
+            PiP remembers the user's dragged position, with bottom-right placement for first use. The transparent floating robot and detail widgets remain. Browser Mira remains an in-page floating bot.
+
+            Added consented camera preview and vision context, semantic voice dismissal, microphone echo filtering and GPU-aware performance defaults. Live camera preview, one consented vision snapshot and user-reported spoken dismissal were checked; varied-noise echo behavior still needs broader testing.
 
             Broader English/Hindi conversation-ending commands include recognition variants such as "bye Mire". Fixed voice weather location parsing and increased Hindi generation token headroom while keeping replies concise. Web changes arrive through the hosted Talio app.
 
-            Publication requires an explicit signed-desktop acceptance confirmation in the release workflow, in addition to successful platform packaging and macOS notarization. Refer to docs/MIRA_DESKTOP_EXECUTOR_VALIDATION.md for the recorded test scope and limitations.
+            Automated validation includes 1,034 passing Mira/desktop regression tests and a successful production web build. Refer to docs/MIRA_DESKTOP_EXECUTOR_VALIDATION.md for the recorded live test scope and limitations. Packaging success does not prove hands-on behavior on every operating system or permission continuity through an installed update.
 
             CI rebuilds local Agent S runtimes and installers for macOS Apple Silicon and Intel, Windows x64 and Linux x64, then verifies all seven installers and their uploaded SHA-256 digests before publication.
 
-            Signing: macOS packages require the stable Talio Developer ID and Apple notarization; Windows packages are unsigned. Moving from an older ad-hoc macOS build may require one final permission approval. Subsequent releases preserve the app and desktop-helper signing identities. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11.
+            Signing: macOS packages retain the stable Talio Developer ID and helper identities; notarization status is stated above. Windows packages are unsigned. Moving from an older ad-hoc macOS build may require one final permission approval. macOS desktop control requires macOS 14+, Accessibility and Screen Recording approval. Linux desktop control requires X11. Hosted web changes are delivered separately from desktop installers.
           files: |
             release-assets/**/*.dmg
             release-assets/**/*.zip
