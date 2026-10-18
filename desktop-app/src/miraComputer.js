@@ -95,12 +95,8 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         active.steps++;
         active.lastOutcome = outcome.message || 'Application activation requested; verify the foreground app.';
         if (outcome.notInstalled) {
-          const fallback = { whatsapp: 'https://web.whatsapp.com/', gmail: 'https://mail.google.com/', slack: 'https://app.slack.com/' }[action.name.toLowerCase()];
-          if (fallback) {
-            active.pendingNavigation = fallback;
-            active.lastOutcome = `Desktop app not installed. Focus an existing browser, then navigate to ${fallback} in its current tab. Do not open a new tab.`;
-            return { success: true, done: false, message: 'Opening the web app in the current browser tab.' };
-          }
+          active.lastOutcome = `Native lookup did not find ${action.name}. Use key app_search, type the app name, then observe the device's search results. Open only a matching application result, never a web suggestion. Use a browser fallback only after confirming no suitable installed application is available.`;
+          return { success: true, done: false, message: active.lastOutcome };
         }
         if (!outcome.success) return outcome;
         const foreground = await control({ type: 'status' });
@@ -363,12 +359,8 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
       const outcome = await control(action);
       active.lastOutcome = outcome.message || 'Input delivered; verify the next screen.';
       if (action.type === 'open_app' && outcome.notInstalled) {
-        const fallback = { whatsapp: 'https://web.whatsapp.com/', gmail: 'https://mail.google.com/', slack: 'https://app.slack.com/' }[action.name.toLowerCase()];
-        if (fallback) {
-          active.pendingNavigation = fallback;
-          active.lastOutcome = `Desktop app not installed. Focus an existing browser and navigate to ${fallback} in its current tab; do not open a new tab.`;
-          return { success: true, message: active.lastOutcome };
-        }
+        active.lastOutcome = `Native lookup did not find ${action.name}. Use key app_search, type the app name, then observe the device's search results. Open only a matching application result, never a web suggestion. Use a browser fallback only after confirming no suitable installed application is available.`;
+        return { success: true, message: active.lastOutcome };
       }
       if (action.type === 'lock') cancel();
       if (!outcome.success) {

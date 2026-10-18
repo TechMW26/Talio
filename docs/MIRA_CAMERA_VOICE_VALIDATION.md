@@ -77,8 +77,9 @@
 
 ## Remaining acceptance / release gate
 
-Real microphone/speaker echo and spoken-dismissal testing requires the user's
-voice; a short English/Hindi closure test has been requested. Windows camera,
+The user subsequently confirmed that the requested real spoken-dismissal check
+closed Mira. This is user-reported acceptance, not a new automated acoustic
+measurement; echo rejection in varying speaker/noise conditions remains pending. Windows camera,
 native preview placement, PiP reopen positioning and cross-platform acoustic
 checks remain pending. Automated fixtures do not replace those checks.
 

@@ -147,12 +147,44 @@ test('click-and-type batches require an observed editable accessibility target',
   await call({ operation: 'cancel', sessionId: start.sessionId })
 })
 
-test('web-app fallback reuses the foreground browser instead of shell-opening another tab', async () => {
+test('a native lookup miss searches installed apps before proposing a browser fallback', async () => {
   const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'open_app' ? { success: false, notInstalled: true } : { success: true, pid: 1, app: 'Safari' }) })
   const start = await call({ operation: 'begin', goal: 'Open WhatsApp' })
-  expect(await call({ operation: 'fast', sessionId: start.sessionId })).toMatchObject({ success: true, done: false })
+  expect(await call({ operation: 'fast', sessionId: start.sessionId })).toMatchObject({ success: true, done: false, message: expect.stringContaining('app_search') })
   const obs = await call({ operation: 'observe', sessionId: start.sessionId })
-  expect(obs.suggestedAction).toEqual({ type: 'navigate', url: 'https://web.whatsapp.com/' })
+  expect(obs.suggestedAction).toBeUndefined()
+  expect(deps.shell.openExternal).not.toHaveBeenCalled()
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('YouTube Music launches natively before compound-task planning without claiming playback', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, app: 'YouTube Music' })) })
+  const start = await call({ operation: 'begin', goal: 'Open YouTube Music and play some music' })
+  expect(start.decision).toMatchObject({ route: 'FAST', continueCognitive: true, action: { type: 'open_app', name: 'YouTube Music' } })
+  expect(await call({ operation: 'fast', sessionId: start.sessionId })).toMatchObject({ success: true, done: false })
+  expect(deps.runControl).toHaveBeenCalledWith({ type: 'open_app', name: 'YouTube Music' })
+  expect(deps.shell.openExternal).not.toHaveBeenCalled()
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+  expect(decideDesktopRoute('Open YouTube Music in Safari').route).toBe('COGNITIVE')
+  expect(decideDesktopRoute('Open YouTube Music website').route).toBe('COGNITIVE')
+  expect(decideDesktopRoute('Open YouTube Music Player').route).toBe('COGNITIVE')
+})
+
+test('a planner lookup miss requests OS app search without opening a website', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'open_app' ? { success: false, notInstalled: true, notExecuted: true } : { success: true, pid: 1, app: 'Safari' }) })
+  const start = await call({ operation: 'begin', goal: 'Use the installed music player' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'open_app', name: 'YouTube Music' } })
+  expect(result.message).toContain('app_search')
+  expect(result.message).toContain('never a web suggestion')
+  expect(deps.shell.openExternal).not.toHaveBeenCalled()
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('failed launch is not interpreted as an absent application', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'open_app' ? { success: false, message: 'Application could not be focused.' } : { success: true, pid: 1, app: 'Safari' }) })
+  const start = await call({ operation: 'begin', goal: 'Open YouTube Music' })
+  expect(await call({ operation: 'fast', sessionId: start.sessionId })).toMatchObject({ success: false, message: 'Application could not be focused.' })
   expect(deps.shell.openExternal).not.toHaveBeenCalled()
   await call({ operation: 'cancel', sessionId: start.sessionId })
 })

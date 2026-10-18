@@ -198,6 +198,45 @@ MIRA_LIVE_DESKTOP_TESTS=1 npx jest tests/api/mira-hybrid-live.test.js --runInBan
 
 ## Required before release
 
+### Installed-app routing follow-up — 2026-10-18
+
+The reported YouTube Music fallback had a concrete native lookup gap: the app is
+installed inside `~/Applications/Chrome Apps.localized`, while the old launcher
+only inspected the top level of Applications folders. The Mac resolver now
+searches bounded application subfolders and bundle display names, without
+descending into app bundles or symlinks. Multiple matching apps require a choice.
+YouTube Music has a deterministic native-launch route; compound tasks continue
+planning after launch and do not claim that playback has started.
+
+Both fast and planned native lookup misses now request OS app search before a
+browser fallback. Shared planner instructions cover Spotlight, Windows Start
+search and supported Linux launchers, require inspection of application results,
+and preserve explicit browser/website requests. The hybrid planner must defer
+cross-app activation to the native launcher rather than planning a browser
+substitute. This is not an installed-app inventory upload.
+
+Validation: 1,034 regression tests passed, 19 optional tests skipped; Swift
+type-check and the production web build passed. Seven compiled native lookup
+fixture assertions passed. A read-only lookup found the actual installed
+YouTube Music bundle in 140 ms (one sample, not whole-task latency). Reproduce
+without launching any app:
+
+```sh
+node desktop-app/scripts/test-mira-app-lookup.cjs 'YouTube Music'
+```
+
+Live macOS acceptance: the final arm64 6.0.31 build was repackaged and Developer
+ID signature verification passed for the application and both control helpers.
+Packaged routing files were byte-compared with source. Through the rebuilt
+Talio chat UI, `Open YouTube Music` launched the installed Chrome app bundle
+`com.google.Chrome.app.cinhimbnkkaeohfgghhklpknlkffjgod`. Its native window and
+music search field were observed, with the player paused at 0:00. Safari was
+not running in the post-launch application inventory. No playback was requested
+or started during this launch-only test. Notarization remains unavailable.
+
+Windows/Linux native app launch behavior and GUI search fallback still require
+hands-on acceptance on those platforms.
+
 Run the changed native helper and changed Agent S worker, not the old installed
 binaries, in an isolated development session with valid OS permission. Record:
 

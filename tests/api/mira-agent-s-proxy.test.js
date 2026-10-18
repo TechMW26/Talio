@@ -9,6 +9,8 @@ test('model relay keeps only supported content and adds desktop policy', () => {
   expect(messages[0].content).toContain('must be approved by the user')
   expect(messages[0].content).toContain('English is the selected reply language for this turn')
   expect(messages[0].content).toContain('shortest reliable supported route')
+  expect(messages[0].content).toContain('Installed applications come first')
+  expect(messages[0].content).toContain('Spotlight on macOS, Start search on Windows')
   expect(messages[0].content).toContain('CURRENT browser tab')
   expect(messages[0].content).toContain('Email needs a mail composer')
   expect(messages[1].content[1].image_url.detail).toBe('original')

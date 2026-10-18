@@ -9,6 +9,31 @@ func output(_ value: [String: Any]) { didOutput = true; let data = try! JSONSeri
 func appKey(_ name: String) -> String {
     String(name.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) && ![0x200B, 0x200E, 0x200F, 0xFEFF].contains(Int($0.value)) }).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 }
+func installedAppMatches(_ name: String, roots: [String]) -> [URL] {
+    let key = appKey(name).filter { $0.isLetter || $0.isNumber }
+    guard !key.isEmpty else { return [] }
+    var matches: [URL] = [], seen = Set<String>()
+    // Include Chrome/Safari web apps and vendor subfolders, but never descend
+    // into app bundles, symlinks or arbitrary user documents.
+    func visit(_ root: URL, _ depth: Int) {
+        guard depth <= 3, let entries = try? FileManager.default.contentsOfDirectory(at: root,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles]) else { return }
+        for url in entries.sorted(by: { $0.path < $1.path }) {
+            let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            guard values?.isDirectory == true, values?.isSymbolicLink != true else { continue }
+            if url.pathExtension.lowercased() == "app" {
+                let bundle = Bundle(url: url)
+                let names = [url.deletingPathExtension().lastPathComponent,
+                    bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "",
+                    bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String ?? ""]
+                if names.contains(where: { appKey($0).filter { $0.isLetter || $0.isNumber } == key }), seen.insert(url.standardizedFileURL.path).inserted { matches.append(url) }
+            } else if url.pathExtension.isEmpty || url.pathExtension == "localized" { visit(url, depth + 1) }
+        }
+    }
+    roots.forEach { visit(URL(fileURLWithPath: $0), 0) }
+    return matches
+}
+let applicationRoots = [NSHomeDirectory() + "/Applications", "/Applications", "/System/Applications"]
 func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
     var value: CFTypeRef?; AXUIElementCopyAttributeValue(element, name as CFString, &value); return value
 }
@@ -277,11 +302,9 @@ case "open_app":
         output(["success": activated, "message": activated ? "Existing application brought to front; verify the screen." : "Application could not be focused."])
         return
     }
-    let roots = ["/Applications", NSHomeDirectory() + "/Applications", "/System/Applications", "/System/Applications/Utilities"]
-    let matches = roots.flatMap { root -> [URL] in
-        ((try? FileManager.default.contentsOfDirectory(atPath: root)) ?? []).filter { $0.hasSuffix(".app") && String($0.dropLast(4)).caseInsensitiveCompare(name) == .orderedSame }.map { URL(fileURLWithPath: root).appendingPathComponent($0) }
-    }
-    guard let app = matches.first else { output(["success":false,"notInstalled":true,"message":"No installed app matched that exact name."]); return }
+    let matches = installedAppMatches(name, roots: applicationRoots)
+    guard matches.count <= 1 else { output(["success":false,"notExecuted":true,"message":"Multiple installed apps match. Ask which application to use; do not choose a browser instead."]); return }
+    guard let app = matches.first else { output(["success":false,"notInstalled":true,"notExecuted":true,"message":"No installed app matched in the application folders. Use app_search to inspect the device's app search results before choosing a web fallback."]); return }
     let configuration = NSWorkspace.OpenConfiguration()
     configuration.activates = true
     var completed = false
