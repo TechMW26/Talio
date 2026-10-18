@@ -54,13 +54,33 @@
   paid provider checks. Finite examples are regression evidence, not a guarantee
   of perfect language intent recognition.
 
+## Live macOS follow-up
+
+- After the user unlocked the Mac and explicitly authorized preview plus one
+  vision snapshot, the exact rebuilt `dist/mac-arm64/Talio.app` was opened.
+  A single camera inspection was requested through the normal Mira chat UI.
+  The separate native camera preview displayed live video, and the completed
+  response correctly reported that the scene was too dark to distinguish objects.
+  No second snapshot was requested. The camera window closed afterward; the
+  two-minute auto-off elapsed before the attempted manual-close click.
+- The resulting brief description appeared in the closable PiP details widget.
+  Closing those details returned to the face-only surface. A deliberate drag
+  persisted a 224-by-224 native PiP position in `app-data.json`. Reopening chat
+  preserved that stored position. Exact subsequent native-window placement and
+  browser refresh restoration still need separate visual acceptance.
+- The rebuilt app's GPU diagnostics reported enabled compositing, canvas,
+  rasterization, video decode/encode, WebGL/WebGL2 and WebGPU. This verifies
+  hardware acceleration is available, not a frame-time or latency guarantee.
+- GitHub reported Vercel deployment success for implementation commit
+  `be74716cd30f2ab58a0c273322de9dfdce05b2ba`; the rebuilt desktop loaded the
+  production dashboard and completed the camera flow there.
+
 ## Remaining acceptance / release gate
 
-The Mac locked during final UI checks. Live camera activation/vision needs the
-user's confirmation, an unlocked Mac, and a non-private test scene. No camera was
-activated in this run. Microphone/speaker acoustic testing, top-center native
-preview, and reopening the rebuilt PiP at a dragged position remain to be checked
-hands-on on macOS and Windows. Automated fixtures do not replace those checks.
+Real microphone/speaker echo and spoken-dismissal testing requires the user's
+voice; a short English/Hindi closure test has been requested. Windows camera,
+native preview placement, PiP reopen positioning and cross-platform acoustic
+checks remain pending. Automated fixtures do not replace those checks.
 
 Earlier packaged native-control evidence (Calculator state preservation,
 bilingual TextEdit entry, native capture recovery and focus-drift stop) is in
