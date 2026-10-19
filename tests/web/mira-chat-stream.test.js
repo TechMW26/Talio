@@ -8,6 +8,22 @@ global.TextDecoder = TextDecoder
 const wrapper = ({ children }) => <MiraChatProvider>{children}</MiraChatProvider>
 const bytes = value => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`)
 
+test('duplicate in-flight submits do not repeat or cancel a tool request', async () => {
+  let finish, signal, first
+  global.fetch = jest.fn(async (url, options) => {
+    if (url !== '/api/ai/mira-chat') return { json: async () => ({ success: false }) }
+    signal = options.signal
+    return new Promise(resolve => { finish = () => resolve({ json: async () => ({ success: true, response: { message: 'Completed.' } }) }) })
+  })
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { first = result.current.sendMessage('Inspect one camera snapshot') })
+  await act(async () => { await result.current.sendMessage('Inspect one camera snapshot') })
+  expect(fetch.mock.calls.filter(([url]) => url === '/api/ai/mira-chat')).toHaveLength(1)
+  expect(signal.aborted).toBe(false)
+  await act(async () => { finish(); await first })
+  expect(result.current.messages.filter(message => message.role === 'user')).toHaveLength(1)
+})
+
 test('unique person lookup continues the original activity request once', async () => {
   let chats = 0
   global.fetch = jest.fn(async url => ({ json: async () => {

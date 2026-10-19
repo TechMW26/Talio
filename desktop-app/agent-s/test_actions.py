@@ -3,50 +3,15 @@ from actions import SafeACI, parse_action
 
 
 class ActionsTest(unittest.TestCase):
-    def test_provider_messages_drop_old_ax_buffers_not_actions_or_task(self):
-        from worker import compact_observation_messages
-        import copy
-        messages = [{'role': 'system', 'content': [{'type': 'text', 'text': 'Keep the task and safety policy.'}]}]
-        for index in range(24):
-            messages.extend([
-                {'role': 'user', 'content': [{'type': 'text', 'text': f'Observation {index}\nCurrent Text Buffer = [old-tree-{index}-' + 'x' * 12000 + ']\n'}]},
-                {'role': 'assistant', 'content': [{'type': 'text', 'text': f'Action {index}, verify result before retrying.'}]},
-            ])
-        before = copy.deepcopy(messages)
-        compacted = compact_observation_messages(messages)
-        text = str(compacted)
-        self.assertEqual(messages, before)
-        self.assertEqual(compacted[0], messages[0])
-        self.assertNotIn('old-tree-0-', text)
-        self.assertNotIn('old-tree-22-', text)
-        self.assertIn('old-tree-23-', text)
-        self.assertIn('Action 0, verify result before retrying.', text)
-        self.assertIn('Action 23, verify result before retrying.', text)
-        self.assertLess(len(text), 22000)
-        self.assertEqual(compact_observation_messages(compacted), compacted)
-
-    def test_compaction_preserves_formatter_and_non_observation_messages(self):
-        from worker import compact_observation_messages
-        messages = [{'role': 'user', 'content': 'Format this action'},
-                    {'role': 'assistant', 'content': [{'type': 'text', 'text': 'agent.done("Verified")'}]}]
-        self.assertEqual(compact_observation_messages(messages), messages)
-
-    def test_current_targets_replace_stale_trees_but_retain_compact_outcomes(self):
-        from worker import observation_notes
-        notes = []
-        for index in range(20):
-            notes = observation_notes(notes, f'current-ref-{index}', f'input {index} delivered; verify')
-        text = '\n'.join(notes)
-        self.assertIn('current-ref-19', text)
-        self.assertNotIn('current-ref-18', text)
-        self.assertIn('input 18 delivered', text)
-        self.assertEqual(len(notes), 9)
-        self.assertLess(len(text), 1000)
-
     def test_bounded_literal_sequences(self):
         self.assertEqual(parse_action(SafeACI(), 'agent.navigate("https://example.com")', {})['type'], 'navigate')
         result = parse_action(SafeACI(), 'agent.batch([{"type":"key","key":"find"},{"type":"type","text":"Mansi"}])', {})
         self.assertEqual(len(result['actions']), 2)
+        for sequence in [
+            '[{"type":"key","key":"find"},{"type":"key","key":"select_all"},{"type":"type","text":"revenue"},{"type":"key","key":"escape"}]',
+            '[{"type":"key","key":"browser_address"},{"type":"key","key":"select_all"},{"type":"type","text":"https://example.com"},{"type":"key","key":"enter"}]',
+        ]:
+            self.assertEqual(len(parse_action(SafeACI(), 'agent.batch(' + sequence + ')', {})['actions']), 4)
         for code in [
             'agent.navigate("javascript:alert(1)")',
             'agent.navigate("https://user:pass@example.com")',
@@ -59,7 +24,6 @@ class ActionsTest(unittest.TestCase):
                 parse_action(SafeACI(), code, {})
 
     def test_supported(self):
-        self.assertEqual(parse_action(SafeACI(), 'agent.click_target("current-ref")', {}), {"type": "semantic", "operation": "click", "ref": "current-ref"})
         self.assertEqual(parse_action(SafeACI(), 'agent.click(0.2, 0.7)', {}), {"type": "click", "x": 0.2, "y": 0.7})
         self.assertEqual(parse_action(SafeACI(), 'agent.type("hello")', {}), {"type": "type", "text": "hello"})
         self.assertEqual(parse_action(SafeACI(), 'agent.open_app("WhatsApp")', {}), {"type": "open_app", "name": "WhatsApp"})
@@ -75,8 +39,7 @@ class ActionsTest(unittest.TestCase):
                      'agent.__class__()', 'agent.type(str(123))', 'agent.type(**{})',
                      'agent.click(-1,0)', 'agent.key("command")', 'agent.scroll(True)',
                      'agent.open_app("foo;bar")', 'agent.type("a"*3000)',
-                     'agent.assign_screenshot({})', 'agent.click(x=0,y=0,x=1)',
-                     'agent.click_target("stale ref;code")', 'agent.click_target(1)']:
+                     'agent.assign_screenshot({})', 'agent.click(x=0,y=0,x=1)']:
             with self.subTest(code=code), self.assertRaises(Exception):
                 parse_action(SafeACI(), code, {})
 

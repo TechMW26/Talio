@@ -109,17 +109,19 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
             const speech = createMiraStreamingSpeech({ live: valid, clean: naturalMiraSpeech,
               prepare: run.playback.prepare,
               speak: async (spoken, prepared) => {
-                // Keep the optional filler playing only while real audio loads.
-                // Never await the filler or let it delay/cancel the answer.
+                // Cancel an unstarted filler, or let a short playing phrase
+                // finish before the answer takes ownership of the speaker.
                 if (prepared) await prepared.result
                 if (!valid()) return
-                run.waiting.stop()
+                await run.waiting.handoff()
+                if (!valid()) return
                 run.echo.remember(spoken)
                 run.reply = `${run.reply} ${spoken}`.slice(-3000)
                 return run.playback.speak(spoken, () => { if (valid()) { run.speaking = true; run.echo.mode('speaking', Date.now()); setState('speaking') } }, prepared)
               },
             })
             reply = await generateMiraDirectVoice({ config: run.config, messages, turn, signal,
+              getCameraContext: () => current.current.camera?.getContext?.(),
               onClose: () => { if (valid()) { stop(); current.current.onDismiss?.() } },
               onTokens: balance => { if (valid()) current.current.onTokens?.(balance) },
               onLanguage: language => { if (run.config.language !== language) run.waiting.stop(); run.config.language = language },
@@ -131,7 +133,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
               },
               execute: async name => {
                 if (!valid()) throw new DOMException('Cancelled', 'AbortError')
-                if (name === 'view_camera') { run.waiting.stop(); return current.current.camera?.inspect({ signal, question: text }) || { unavailable: 'Camera preview is unavailable.' } }
+                if (name === 'view_camera') { return current.current.camera?.inspect({ signal, question: text }) || { unavailable: 'Camera preview is unavailable.' } }
                 if (name === 'close_camera') { current.current.camera?.stop(); return { success: true, message: 'Camera stopped.' } }
                 setState(name === 'search_internet' ? 'searching' : 'working')
                 if (name === 'search_internet') {

@@ -38,19 +38,19 @@ test('local signed validation may run without notarization', async () => {
   expect(notarize).not.toHaveBeenCalled()
   log.mockRestore()
 })
-test('explicit 6.0.31 exception skips notarization only after verifying signing', async () => {
-  process.env = { CI: 'true', REQUIRE_NOTARIZATION: 'true', TALIO_SIGNED_UNNOTARIZED_RELEASE: '6.0.31' }
+test('explicit 6.0.32 exception skips notarization only after verifying signing', async () => {
+  process.env = { CI: 'true', REQUIRE_NOTARIZATION: 'true', TALIO_SIGNED_UNNOTARIZED_RELEASE: '6.0.32' }
   await afterSign(context)
   expect(verifyMacApp).toHaveBeenCalledWith('/build/Talio.app')
   expect(notarize).not.toHaveBeenCalled()
 })
 test('signed-unnotarized exception still rejects invalid signatures', async () => {
-  process.env = { CI: 'true', TALIO_SIGNED_UNNOTARIZED_RELEASE: '6.0.31' }
+  process.env = { CI: 'true', TALIO_SIGNED_UNNOTARIZED_RELEASE: '6.0.32' }
   verifyMacApp.mockRejectedValueOnce(new Error('Invalid signature'))
   await expect(afterSign(context)).rejects.toThrow('Invalid signature')
   expect(notarize).not.toHaveBeenCalled()
 })
-test.each(['true', '6.0.32', ''])('other exception values do not bypass notarization: %s', async value => {
+test.each(['true', '6.0.31', ''])('other exception values do not bypass notarization: %s', async value => {
   process.env = { CI: 'true', TALIO_SIGNED_UNNOTARIZED_RELEASE: value }
   await expect(afterSign(context)).rejects.toThrow('credentials are required')
 })

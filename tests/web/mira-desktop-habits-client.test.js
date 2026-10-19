@@ -1,0 +1,25 @@
+import { withDesktopHabits } from '@/lib/miraDesktopHabitsClient'
+afterEach(() => jest.restoreAllMocks())
+test('resolves defaults before control and learns original request only after verified completion', async () => {
+  global.fetch = jest.fn(async (_url, options) => ({ ok: true, json: async () => JSON.parse(options.body).operation === 'prepare' ? { success: true, goal: 'Play on YouTube Music', ticket: 'receipt' } : { success: true } }))
+  const execute = jest.fn(async () => ({ success: true, message: 'Playback verified' }))
+  expect(await withDesktopHabits('Play some music', { token: 'account' }, execute)).toMatchObject({ success: true })
+  expect(execute).toHaveBeenCalledWith('Play on YouTube Music', { token: 'account' })
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({ operation: 'complete', ticket: 'receipt' })
+})
+test('failures and cancellations never create learned success', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, goal: 'Play music', ticket: 'receipt' }) }))
+  await withDesktopHabits('Play music', { token: 't' }, async () => ({ success: false }))
+  expect(global.fetch).toHaveBeenCalledTimes(1)
+  const controller = new AbortController()
+  await expect(withDesktopHabits('Play music', { token: 't', signal: controller.signal }, async () => { controller.abort(); throw new DOMException('Stopped', 'AbortError') })).rejects.toThrow()
+  expect(global.fetch).toHaveBeenCalledTimes(2)
+})
+test('unavailable preferences never block normal control; non-music requests skip the lookup', async () => {
+  global.fetch = jest.fn(async () => { throw new Error('Offline') })
+  const execute = jest.fn(async () => ({ success: true }))
+  await withDesktopHabits('Play music', { token: 't' }, execute)
+  expect(execute).toHaveBeenCalledWith('Play music', { token: 't' })
+  await withDesktopHabits('Open Notes', { token: 't' }, execute)
+  expect(global.fetch).toHaveBeenCalledTimes(1)
+})

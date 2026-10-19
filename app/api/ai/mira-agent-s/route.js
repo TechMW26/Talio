@@ -27,6 +27,6 @@ export async function POST(request) {
     validateAgentSMessages(body.messages)
   } catch { return reply({ success: false, message: 'Invalid desktop model request.' }, 400) }
   try {
-    return reply({ success: true, text: await requestAgentSModel(body.messages, { signal: request.signal }) })
+    return reply({ success: true, text: await requestAgentSModel(body.messages, { signal: request.signal, bypassCache: body.bypassCache === true, cacheScope: { tenant: auth.tenant.databaseName, user: String(auth.user._id) } }) })
   } catch { return reply({ success: false, message: 'Desktop vision could not respond. No new input was sent.' }, 502) }
 }

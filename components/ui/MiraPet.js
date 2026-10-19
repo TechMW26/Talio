@@ -1,13 +1,13 @@
 'use client'
 
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 import { RobotHead } from 'robot-heads'
 import useMiraOrbState from '@/hooks/useMiraOrbState'
 import useMiraRobotState from '@/hooks/useMiraRobotState'
 import { miraRobotState, MIRA_ROBOT_COLORS } from '@/lib/miraRobotState'
 
 // Keep one canvas mounted so pose easing and face transitions remain continuous.
-export default function MiraPet({ size = 40, isThinking = false, state, speed = 1, paused = false }) {
+export default memo(function MiraPet({ size = 40, isThinking = false, state, speed = 1, paused = false }) {
   const activity = useMiraOrbState()
   const canvas = useRef(null)
   const phase = state || (activity !== 'breathing' ? activity : isThinking ? 'solving' : 'breathing')
@@ -17,4 +17,4 @@ export default function MiraPet({ size = 40, isThinking = false, state, speed = 
       {...MIRA_ROBOT_COLORS} antenna={false} floorShadow={false}
       interactive speed={speed} paused={paused} aria-label={`Mira ${expression}`} />
   </span>
-}
+})

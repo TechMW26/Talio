@@ -18,3 +18,19 @@ if (!source.includes(marker)) {
   source = marker + '\nimport { subscribeRobotFrame, robotPointer } from "../../../lib/miraRobotWindowLoop.js";\n' + source
   fs.writeFileSync(target, source)
 }
+// Keep the same geometry/emotes with bounded raster resolution. Small header
+// avatars at Retina resolution otherwise redraw four times as many pixels.
+const performanceMarker = '// Talio bounded robot raster and offscreen culling'
+if (!source.includes(performanceMarker)) {
+  const changes = [
+    ['function Wn(n, ownerDocument) { return subscribeRobotFrame(n, ownerDocument); }', 'function Wn(n, ownerDocument, element) { return subscribeRobotFrame(n, ownerDocument, element); }'],
+    ['}, () => u.current?.ownerDocument);', '}, () => u.current?.ownerDocument, () => u.current);'],
+    ['Math.min(2, typeof devicePixelRatio == "number" && devicePixelRatio || 1)', 'Math.min(1.5, g.ownerDocument?.defaultView?.devicePixelRatio || 1)'],
+  ]
+  for (const [from, to] of changes) {
+    if (!source.includes(from)) throw new Error('robot-heads performance patch source changed')
+    source = source.replace(from, to)
+  }
+  source = performanceMarker + '\n' + source
+  fs.writeFileSync(target, source)
+}

@@ -47,3 +47,19 @@ test('multiple heads share one clock per document and stop when hidden', () => {
   expect(second).toHaveBeenCalledTimes(2)
   stop2()
 })
+
+test('offscreen heads skip raster work and resume when visible or moved into PiP', () => {
+  const main = fakeDocument(), child = fakeDocument(), draw = jest.fn()
+  main.doc.defaultView.innerHeight = 600; main.doc.defaultView.innerWidth = 800
+  child.doc.defaultView.innerHeight = 600; child.doc.defaultView.innerWidth = 800
+  let owner = main.doc, top = 900
+  const element = { getBoundingClientRect: jest.fn(() => ({ top, bottom: top + 40, left: 10, right: 50, width: 40, height: 40 })) }
+  const stop = subscribeRobotFrame(draw, () => owner, () => element)
+  main.tick(10); main.tick(44)
+  expect(draw).not.toHaveBeenCalled()
+  expect(element.getBoundingClientRect).toHaveBeenCalledTimes(1)
+  owner = child.doc; top = 10
+  jest.advanceTimersByTime(250); child.tick(100)
+  expect(draw).toHaveBeenCalledTimes(1)
+  stop()
+})

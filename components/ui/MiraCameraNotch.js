@@ -2,47 +2,46 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-// The camera has its own surface: it must never displace the floating Mira face.
 export default function MiraCameraNotch({ camera }) {
-  const [host, setHost] = useState(null), video = useRef(null), child = useRef(null)
+  const [host, setHost] = useState(null), [mounted, setMounted] = useState(false)
+  const video = useRef(null)
   const visible = camera.state !== 'off'
   useEffect(() => {
-    if (!visible) return
+    if (visible) { setMounted(true); return }
+    const timer = setTimeout(() => setMounted(false), 320)
+    return () => clearTimeout(timer)
+  }, [visible])
+  useEffect(() => {
+    if (!mounted) return
     let popup
     if (window.electronAPI) {
-      popup = window.open('about:blank', 'talio-camera-notch', 'width=360,height=300')
+      popup = window.open('about:blank', 'talio-camera-notch', 'width=240,height=200')
       if (popup) {
         popup.document.title = 'Mira camera'
-        popup.document.body.style.cssText = 'margin:0;background:transparent;color:#fff;font-family:system-ui'
-        child.current = popup
+        popup.document.body.style.cssText = 'margin:0;background:transparent;color:#fff;font-family:system-ui;overflow:hidden'
         popup.addEventListener('pagehide', camera.stop, { once: true })
       }
     }
     setHost(popup?.document.body || document.body)
-    return () => { setHost(null); if (popup && !popup.closed) { popup.removeEventListener('pagehide', camera.stop); popup.close() }; child.current = null }
-  }, [visible, camera.stop])
+    return () => { setHost(null); if (popup && !popup.closed) { popup.removeEventListener('pagehide', camera.stop); popup.close() } }
+  }, [mounted, camera.stop])
   useEffect(() => {
-    if (!video.current) return
-    video.current.srcObject = camera.stream
-    if (camera.stream) void video.current.play().catch(() => {})
-    return () => { if (video.current) video.current.srcObject = null }
+    const element = video.current
+    if (!element) return
+    element.srcObject = camera.stream
+    if (camera.stream) void element.play().catch(() => {})
+    return () => { element.srcObject = null }
   }, [camera.stream, host])
-  if (!visible || !host) return null
-  return createPortal(<section aria-label="Mira camera" role="region" style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 2147483646, width: 'min(360px, 100vw)', boxSizing: 'border-box', padding: '12px 14px 14px', borderRadius: '0 0 28px 28px', background: '#0b0d10', color: '#f5f7fa', border: '1px solid #ffffff26', boxShadow: '0 12px 36px #0005', font: '13px/1.4 system-ui', animation: 'mira-camera-enter .3s ease-out' }}>
-    <style>{`@keyframes mira-camera-enter{from{opacity:0;translate:0 -16px;scale:.96}to{opacity:1;translate:0 0;scale:1}}@media(prefers-reduced-motion:reduce){[aria-label="Mira camera"]{animation:none!important}}`}</style>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-      <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: camera.stream ? '#59e3aa' : '#e5bc62' }} />
-      <span style={{ flex: 1 }}>{camera.stream ? 'Camera on · auto-closes after 2 minutes' : 'Camera preview'}</span>
-      <button aria-label="Close camera" onClick={camera.stop} style={{ border: 0, background: '#ffffff16', color: 'white', borderRadius: 12, width: 30, height: 30, cursor: 'pointer' }}>×</button>
+  if (!mounted || !host) return null
+  const native = host.ownerDocument !== document
+  return createPortal(<section aria-label="Mira camera" role="region" data-open={visible} style={{ position: 'fixed', top: 0, left: '50%', translate: '-50% 0', zIndex: 2147483646, width: native ? '100vw' : 'min(240px, 100vw)', boxSizing: 'border-box', padding: 'calc(var(--mira-camera-inset, 0px) + 6px) 8px 8px', borderRadius: '0 0 14px 14px', background: '#000', color: '#fff', border: 0, boxShadow: 'none', font: '12px/1.3 system-ui', transformOrigin: '50% 0', animation: visible ? 'mira-notch-emerge 620ms both' : 'mira-notch-retract 300ms both', animationPlayState: native ? 'var(--mira-camera-animation-state, paused)' : 'running' }}>
+    <style>{`@keyframes mira-notch-emerge{0%{transform:translateY(-85%) scale(.88,.2);border-radius:0 0 45% 45%;opacity:0}45%{transform:translateY(0) scale(1.035,1.07);opacity:1}72%{transform:scale(.99,.975);border-radius:0 0 18px 18px}100%{transform:scale(1);opacity:1}}@keyframes mira-notch-retract{0%{transform:scale(1);opacity:1}45%{transform:scale(.97,1.04)}100%{transform:translateY(-100%) scale(.85,.2);border-radius:0 0 50% 50%;opacity:0}}@media(prefers-reduced-motion:reduce){[aria-label="Mira camera"]{animation:none!important}[aria-label="Mira camera"][data-open="false"]{opacity:0}}`}</style>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 24 }}>
+      <span aria-hidden style={{ width: 5, height: 5, borderRadius: '50%', background: camera.stream ? '#59e3aa' : '#e5bc62' }} />
+      <span style={{ flex: 1 }}>{camera.stream ? 'Camera on' : camera.error ? 'Camera unavailable' : 'Starting camera…'}</span>
+      <button aria-label="Close camera" onClick={camera.stop} style={{ border: 0, background: 'transparent', color: 'white', width: 28, height: 24, cursor: 'pointer', fontSize: 20 }}>×</button>
     </div>
-    {camera.state === 'consent' ? <>
-      <p>Mira would like to look through your camera. Only a requested snapshot is sent for visual analysis; no video is recorded.</p>
-      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-        <button onClick={camera.allow} style={{ padding: '10px 16px', borderRadius: 16, background: '#98d5c5', color: '#081610', border: 0, cursor: 'pointer' }}>Enable camera</button>
-        <button onClick={camera.stop} style={{ padding: '10px 16px', borderRadius: 16, background: '#ffffff16', color: 'white', border: 0, cursor: 'pointer' }}>Not now</button>
-      </div>
-    </> : <video ref={video} muted autoPlay playsInline aria-label="Your camera preview" style={{ width: '100%', height: 187, objectFit: 'cover', borderRadius: 18, background: '#171a20', transform: 'scaleX(-1)' }} />}
-    {camera.state === 'starting' && <p role="status">Starting camera…</p>}
-    {camera.error && <p role="alert" style={{ color: '#ffbbb7', marginBottom: 0 }}>{camera.error}</p>}
+    <video ref={video} muted autoPlay playsInline aria-label="Your camera preview" style={{ display: camera.error ? 'none' : 'block', width: '100%', aspectRatio: '16 / 10', objectFit: 'cover', borderRadius: 9, background: '#000', transform: 'scaleX(-1)' }} />
+    {camera.error && <p role="alert" style={{ color: '#ffbbb7', margin: '6px 0 0', fontSize: 11 }}>{camera.error}</p>}
   </section>, host)
 }

@@ -66,6 +66,6 @@ test('release CI requires credentials and notarization rather than disabling Mac
   expect(workflow).toContain("CSC_IDENTITY_AUTO_DISCOVERY: ${{ runner.os == 'macOS' && 'true' || 'false' }}")
   expect(workflow).toContain("REQUIRE_NOTARIZATION: ${{ runner.os == 'macOS' && 'true' || 'false' }}")
   expect(workflow).toContain("required_secrets='CSC_LINK CSC_KEY_PASSWORD APPLE_TEAM_ID'")
-  expect(workflow).toContain("inputs.signed_unnotarized_release && '6.0.31' || ''")
+  expect(workflow).toContain("inputs.signed_unnotarized_release && '6.0.32' || ''")
   expect(workflow).toContain('signed but UNNOTARIZED')
 })

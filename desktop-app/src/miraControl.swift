@@ -53,6 +53,14 @@ func resize(_ window: AXUIElement, _ frame: [String: Double]) -> Bool {
 }
 func execute(_ action: [String: Any]) {
     guard let type = action["type"] as? String else { return }
+    // Display geometry requires neither Accessibility nor camera access.
+    if type == "notch_geometry" {
+        let id = action["displayId"] as? UInt32
+        guard let display = NSScreen.screens.first(where: { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == id }) else { output(["success": false]); return }
+        let left = display.auxiliaryTopLeftArea, right = display.auxiliaryTopRightArea
+        let width = display.safeAreaInsets.top > 0 ? max(0, (right?.minX ?? 0) - (left?.maxX ?? 0)) : 0
+        output(["success": true, "displayId": id ?? 0, "notchWidth": width, "notchHeight": display.safeAreaInsets.top, "notchLeft": (left?.maxX ?? display.frame.midX) - display.frame.minX]); return
+    }
     // A warm command-line helper blocks in readLine(), so NSWorkspace's
     // notification-backed frontmostApplication can remain on the old app.
     // Drain workspace notifications before reading focus. Some macOS versions

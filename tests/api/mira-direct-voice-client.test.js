@@ -67,3 +67,11 @@ test('incomplete streams fail and unauthorized requests preserve their status', 
   global.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Disabled' }), { status: 403 }))
   await expect(run()).rejects.toMatchObject({ status: 403 })
 })
+test('camera closure refreshes device context for the tool continuation', async () => {
+  let state = 'active'
+  global.fetch.mockResolvedValueOnce(sse([event({ tool_calls: [{ index: 0, id: 'camera', function: { name: 'close_camera', arguments: '{}' } }] }, 'tool_calls')]))
+    .mockResolvedValueOnce(sse([event({ content: 'The camera is off.' }, 'stop')]))
+  await run({ getCameraContext: () => ({ state }), execute: async () => { state = 'off'; return { success: true } } })
+  expect(JSON.parse(fetch.mock.calls[0][1].body).cameraContext.state).toBe('active')
+  expect(JSON.parse(fetch.mock.calls[1][1].body).cameraContext.state).toBe('off')
+})

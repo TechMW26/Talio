@@ -1,7 +1,6 @@
 """Talio's data-only Agent S action interface. Never evaluates generated code."""
 import ast
 import math
-import re
 from urllib.parse import urlparse
 
 
@@ -44,13 +43,6 @@ class SafeACI:
         return {"type":"drag", "x":x, "y":y, "toX":toX, "toY":toY}
 
     @action
-    def click_target(self, ref: str):
-        """Press an observed native accessibility control by its current ref instead of estimating coordinates. Only use a ref from the CURRENT native UI targets, for a button, link, popup or menu item matching the screenshot. Native validation rejects stale, sensitive or committing controls; use the normal verified workflow for those."""
-        if not isinstance(ref, str) or not re.fullmatch(r'[\w-]{1,80}', ref, flags=re.ASCII):
-            raise ValueError('Invalid native target reference')
-        return {"type": "semantic", "operation": "click", "ref": ref}
-
-    @action
     def click(self, x: float, y: float):
         """Click a visible target. x and y are normalized screenshot coordinates from 0 to 1."""
         if any(type(v) not in (float, int) or not math.isfinite(v) or not 0 <= v <= 1 for v in (x, y)):
@@ -83,7 +75,7 @@ class SafeACI:
 
     @action
     def batch(self, actions: list):
-        """Execute 2..4 predictable inputs grounded in ONE screenshot. Literal dicts only. Allowed: browser_address,type HTTP(S) URL,enter; find,type; click verified editable input,type; click,select_all,type; select_all,type. No newlines, sends, submissions, app/tab changes or unknown next-screen targets. Use navigate for URLs. Observe after the batch."""
+        """Prefer 3..4 predictable inputs from ONE screenshot, maximum 4. Literal dicts only. Allowed: browser_address,[select_all],type HTTP(S) URL,enter; find,[select_all],type,[escape]; click verified editable input,[select_all],type; select_all,type. escape only closes the Find overlay. No newlines, sends, submissions, app/tab changes or unknown next-screen targets. Use navigate for URLs. Observe after the batch."""
         if not isinstance(actions, list) or not 2 <= len(actions) <= 4:
             raise ValueError('Invalid batch')
         validated = []
@@ -95,7 +87,9 @@ class SafeACI:
         signature = ','.join(item['key'] if item['type'] == 'key' else item['type'] for item in validated)
         if signature == 'browser_address,type,enter':
             self.navigate(validated[1]['text'])
-        elif signature in ('find,type', 'click,type', 'click,select_all,type', 'select_all,type'):
+        elif signature == 'browser_address,select_all,type,enter':
+            self.navigate(validated[2]['text'])
+        elif signature in ('find,type', 'find,select_all,type', 'find,select_all,type,escape', 'click,type', 'click,select_all,type', 'select_all,type'):
             if any(item['type'] == 'type' and any(ord(char) < 32 or ord(char) == 127 for char in item['text']) for item in validated):
                 raise ValueError('Control characters forbidden in editing batches')
         else:

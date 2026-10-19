@@ -1,4 +1,8 @@
-# Mira desktop executor: Jev integration and release gate
+# Mira desktop executor: validation history
+
+Current implementation: the pre-Jev visual controller is restored as described
+in the 2026-10-19 entry below. Earlier Jev integration notes are historical, not
+the current execution path.
 
 Status: local implementation and component/integration validation, 2026-10-18.
 Not a packaged-app acceptance certificate. Do not publish a release on the
@@ -253,3 +257,158 @@ Only after those pass: package, sign and notarize; test an installed update and
 permission continuity; then publish fresh release assets. Keep the Developer ID
 identity and helper identifiers stable. Signing and permission setup are deferred
 at the user's request; this control-only change does not remove release checks.
+
+## Pre-Jev visual controller restored — 2026-10-19
+
+At the owner's request, the control flow is restored from `cff26d3c` (6.0.28),
+the parent of the Jev integration commit `2674cb55`. The client, executor,
+Agent S action interface/worker and model relay use the earlier visual loop:
+observe screenshot, request an Agent S/DeepSeek action, execute a guarded native
+input, observe again, verify completion. Native calls use the earlier per-command
+process instead of the Jev-era persistent transport. The Jev provider, plan cache,
+semantic selector and their provider-specific tests are removed, recoverable in
+Git. No TypeSafe/Jev network call remains in the active application source.
+
+The authenticated `/api/ai/mira-desktop-plan` compatibility endpoint returns
+`fallback: true` without contacting any provider, so cached older web clients
+fall back to visual planning. Credentials are not printed, changed or revoked.
+
+This is a targeted control rollback, not a repository reset. Camera, voice,
+PiP position, updater UI and Developer ID signing are retained. Later native
+focus/Unicode fixes, exact-display capture recovery and installed-app lookup are
+retained, as are stop-on-uncertain-input and foreground-change guards. Repeated
+system policy duplication is not restored. New simulated integration tests
+exercise multi-step screenshot planning, fresh-observation recovery, uncertain
+input stopping and no-progress stopping without any Jev calls. These are not
+live-device acceptance or evidence that the public release has been replaced.
+
+## Visual batching, rendering and personal defaults — 2026-10-19
+
+The subsequent performance work stays on the restored visual controller, with
+no Jev calls. Both the Python action interface and privileged JavaScript boundary
+accept bounded four-input Find/edit/close and browser-address sequences. One
+screenshot grounds a batch; native foreground/window/consent/cancellation checks
+still run before each input. Navigation, app changes and uncertain state require
+a new screenshot. Sends and submissions are not blindly batched or replayed.
+
+Idle hidden dashboard renderers now throttle. Voice, chat, native desktop work
+and playing media acquire independent activity exemptions, cleared on navigation,
+crash or completion; desktop/request exemptions have a bounded lease. Chromium
+keeps its normal GPU/driver fallback. Recurring guardian heartbeat writes are
+asynchronous. Mira faces retain their 30fps clock and expressions, skip offscreen
+raster work, use their actual owner window's DPR capped at 1.5, and memoize parent
+renders. This reduces rendering work; it is not a measured all-platform FPS claim.
+
+Desktop model proposals have a 60-second, 100-entry process-local cache keyed by
+tenant, account, model, full validated history/policy and exact screenshot hash.
+It stores no screenshots. Recoveries bypass it; native guards still validate every
+hit. Completion, arbitrary clicks, sends and externally visible submission results
+are not cached. A separate 150-entry, five-minute answer cache only admits bounded
+timeless text queries and action-free JSON responses, with account, language,
+personal context and model in its key. Live facts, screen/camera and tool outcomes
+bypass answer caching. These are opportunistic caches, not durable workflow replay
+or guaranteed hits across server instances.
+
+The first habit-learning scope is music: successful explicit Mira requests to
+YouTube Music, Spotify or Apple Music, and named songs. Nothing passively monitors
+other app usage. Defaults require repeated evidence, never override an explicit
+choice, and inferred choices do not reinforce their own counts. Bounded preferences
+live on the authenticated user's tenant-local profile, expire after 90 days and
+can be disabled/cleared in Mira Settings. Completion receipts bind the original
+request to that account, expire after 15 minutes and are deduplicated; clearing or
+disabling invalidates outstanding receipts. These receipts authenticate the request,
+not independent server-side proof of desktop execution. The client reports success
+only after the existing native/visual completion path.
+
+Validation: 1,039 JavaScript tests passed, 18 optional tests skipped; 12 Python
+tests passed. Production web build and packaged Agent S startup/prediction/
+continuity/restart checks passed. Simulated tests prove four inputs use one
+screenshot, retries bypass caches, accounts cannot reuse each other's receipts or
+cache entries, partial batches stop, and preference deletion survives late results.
+Real desktop task and FPS acceptance on macOS, Windows and Linux remains separate
+from these fixture checks. No new GitHub release or production deployment is
+implied by this local validation.
+
+Local arm64 app packaging also passed at
+`/tmp/talio-visual-performance-20261019/mac-arm64/Talio.app`. The app and both
+native helpers passed Developer ID signature verification; main/preload,
+performance policy, visual executor and action validator in app.asar match the
+current source byte-for-byte. The removed semantic/transport modules are absent.
+Notarization was skipped as previously requested. This validation bundle is not
+installed over the user's app and is not a new public release. The web build
+configuration skips lint and static type checking; those are not claimed passed.
+
+## 2026-10-19 camera notch and contextual filler refinement (local)
+
+- Camera preview is black with no border/shadow, rounded lower corners and an
+  elastic enter/retract animation. Native animation waits until the window is
+  shown. Reduced-motion mode disables it. Mac width comes from NSScreen auxiliary
+  top areas and joins the bottom of the hardware notch; the helper measured 185
+  points wide, 32 high on this Mac. Apple exposes notch geometry, not corner radius;
+  the lower curve is visually tuned to 14px. Other displays/web use a compact
+  top-center fallback. A browser cannot read physical Mac notch geometry.
+- AI-requested camera use calls getUserMedia directly using setup/OS permission,
+  without another in-app consent dialog. OS/browser permission gates remain intact.
+  Close, device-ended, Mira-dismiss and the two-minute timeout still stop tracks.
+- Snapshot capture waits for three decoded frames and rejects black/white/flat
+  startup buffers within an eight-second readiness deadline. Track state is checked
+  before upload and after analysis; closing aborts and discards late results.
+- Voice and chat requests carry bounded current camera state and capture time.
+  Tool continuations refresh that state. Prompt policy distinguishes a historical
+  snapshot from live sight and forbids claiming current vision after closure.
+- 720 unique English/Hindi filler variants: 12 categories, 10 curated cores per
+  language/category, three openings. Selection avoids recent exact phrases and
+  nearby core paraphrases within a call. Only selected phrases are synthesized,
+  using the current voice/language; there is no bulk generation or query storage.
+  An audible filler finishes before answer playback; an unstarted filler is
+  cancelled. Interruption/closure cancels immediately; a stalled handoff is bounded.
+
+Validation: 1,061 JavaScript tests passed, 18 optional tests skipped; production
+web build passed (its existing configuration skips lint/type checks). Swift
+type-check and native compilation passed. Browser fixture verified a black,
+borderless centered 240px preview at a 320px viewport, with no horizontal overflow,
+working close/reopen and error states. The fixture never opened a camera.
+
+Signed arm64 validation bundle:
+`/tmp/talio-camera-fillers-final-20261019/mac-arm64/Talio.app`.
+Deep/strict signature verification passed. Packaged main.js and notch geometry
+module match source; packaged helper returned the measured hardware geometry.
+Notarization remains skipped. This is not an installed app, deployment, or GitHub
+release. Real camera/provider, audible-speaker, and Windows/Linux native visual
+acceptance remain unverified by this pass.
+
+## 2026-10-19 live follow-up and 6.0.32 preparation
+
+- Ran the signed arm64 validation bundle against the local production web build
+  on port 3010 (not the older hosted application). The authenticated dashboard
+  and real microphone started successfully.
+- The user reported passing English speech, switching to Hindi, interruption,
+  non-overlapping fillers and spoken dismissal. The closed Mira UI was then
+  independently observed. This is user-reported acoustic acceptance, not a
+  measurement of echo rejection in every environment. Unrelated background
+  speech appeared in the conversation history; nearby-speaker rejection is not
+  guaranteed and is not claimed by this release.
+- Live DeepSeek semantic regression: 10/10 cases passed. Baseline regression:
+  1,061 JavaScript tests passed, 18 optional cases skipped; 12 Python worker
+  tests passed.
+- The user authorized one camera snapshot to Pollinations. A delayed UI submit
+  was mistakenly retried by the tester, causing two provider requests (both
+  succeeded). This exceeded the one-frame test authorization and was disclosed
+  immediately. Mira was closed and no further snapshots were requested.
+- Added synchronous duplicate-in-flight chat suppression and concurrent camera
+  inspection rejection, with regression tests. Different instructions still
+  interrupt a chat turn; intentional retries remain possible after completion.
+- Final regression after those guards and 6.0.32 release metadata: 1,063
+  JavaScript tests passed, 18 optional cases skipped. The production web build
+  passed; its existing configuration skips lint and type checking.
+- After closure, the live reply explicitly said the camera was off and it could
+  not currently see the user. It did not reopen the camera. The separate native
+  preview placement was not independently observed during this capture pass.
+- Release 6.0.32 retains Developer ID signing and the owner's explicit
+  signed-but-unnotarized mode. Windows/Linux hands-on camera/audio checks and
+  installed-update permission continuity remain unverified. CI artifact builds
+  are not substitutes for those hardware checks.
+
+References: Apple NSScreen auxiliaryTopLeftArea/safeAreaInsets; MDN
+HTMLVideoElement.requestVideoFrameCallback; Electron BrowserWindow.setBounds
+(macOS menu-bar positioning constraints).

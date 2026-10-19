@@ -150,6 +150,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   computerTask: function(input) {
     return ipcRenderer.invoke('mira-computer', input);
   },
+  setMiraRendererActivity: function(input) {
+    return ipcRenderer.invoke('mira-renderer-activity', input);
+  },
   moveLivePip: function(position) {
     return ipcRenderer.invoke('mira-move-pip', position);
   },

@@ -1,14 +1,7 @@
 const { createMiraComputer, validateComputerAction } = require('../../desktop-app/src/miraComputer')
 const { createMiraPermissions, trustedMiraSender } = require('../../desktop-app/src/miraPermissions')
 const { decideDesktopRoute, sameWindowFrame } = require('../../desktop-app/src/miraDecision')
-const { channelContext, allowsNewTab, requiresContentPreservation } = require('../../desktop-app/src/miraActionPlan')
-
-test('preservation distinguishes new content from view-only changes, including Hinglish', () => {
-  expect(requiresContentPreservation('Create a new unsaved document and type hello. Do not edit any existing document.')).toBe(false);
-  expect(requiresContentPreservation('Do not edit any existing document.')).toBe(true);
-  expect(requiresContentPreservation('Create a new document. Do not change the current calculation.')).toBe(true);
-  expect(requiresContentPreservation('Calculator खोलकर Basic mode पर कर दो। मौजूदा calculation और 42 की value बिल्कुल मत बदलना।')).toBe(true);
-});
+const { channelContext, allowsNewTab } = require('../../desktop-app/src/miraActionPlan')
 
 test('warm macOS helper resolves live AX focus for every command, not cached workspace focus', () => {
   const native = require('fs').readFileSync(require('path').join(__dirname, '../../desktop-app/src/miraControl.swift'), 'utf8');
@@ -55,6 +48,19 @@ test('browser navigation delivers three inputs from one screenshot and consumes 
   expect(deps.runControl.mock.calls.map(([a]) => a).filter(a => ['key', 'type'].includes(a.type))).toEqual([{ type: 'key', key: 'browser_address' }, { type: 'type', text: 'https://example.com/' }, { type: 'key', key: 'enter' }])
   expect(deps.desktopCapturer.getSources).toHaveBeenCalledTimes(1)
   expect((await call(input)).success).toBe(false)
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('four predictable Find inputs use one screenshot, with a guard before every input', async () => {
+  const { call, deps } = harness({ runControl: jest.fn(async () => ({ success: true, pid: 1, app: 'Google Chrome' })) })
+  const start = await call({ operation: 'begin', goal: 'Find quarterly revenue on this page' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  const actions = [{ type: 'key', key: 'find' }, { type: 'key', key: 'select_all' }, { type: 'type', text: 'quarterly revenue' }, { type: 'key', key: 'escape' }]
+  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'batch', actions } })
+  expect(result).toMatchObject({ success: true, completedActions: 4 })
+  expect(deps.desktopCapturer.getSources).toHaveBeenCalledTimes(1)
+  expect(deps.runControl.mock.calls.map(([a]) => a).filter(a => ['key', 'type'].includes(a.type))).toEqual(actions)
+  expect(deps.runControl.mock.calls.filter(([a]) => a.type === 'status').length).toBeGreaterThanOrEqual(5)
   await call({ operation: 'cancel', sessionId: start.sessionId })
 })
 
@@ -382,56 +388,22 @@ test('native capture fallback still checks foreground identity after capture', a
   expect(result.image).toBeUndefined();
   await call({ operation: 'cancel', sessionId: start.sessionId });
 });
-test.each([
-  { type: 'key', key: 'escape' },
-  { type: 'type', text: '42' },
-  { type: 'click', x: .3, y: .4 },
-  { type: 'semantic', operation: 'click', ref: 'clear' },
-])('preserve-content tasks reject potentially editing inputs: %j', async action => {
-  const { call, deps } = harness({ runControl: jest.fn(async request => request.type === 'ui_elements'
-    ? { success: true, pid: 1, elements: [{ ref: 'clear', role: 'AXButton', label: 'Clear', frame: { x: 200, y: 200, width: 50, height: 50 } }] }
-    : { success: true, pid: 1, app: 'Calculator' }) });
-  const start = await call({ operation: 'begin', goal: 'Switch Calculator to Scientific. Do not change the current calculation or its value of 42.' });
-  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true });
-  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action });
-  expect(result).toMatchObject({ success: false, retryable: true });
-  expect(deps.runControl.mock.calls.some(([input]) => ['key', 'type', 'click', 'ax_action'].includes(input.type))).toBe(false);
-  await call({ operation: 'cancel', sessionId: start.sessionId });
-});
-test('preserve-content tasks allow observed menu navigation', async () => {
-  const { call, deps } = harness({ runControl: jest.fn(async request => request.type === 'ui_elements'
-    ? { success: true, pid: 1, elements: [{ ref: 'view', role: 'AXMenuBarItem', label: 'View', frame: { x: 200, y: 0, width: 50, height: 24 } }] }
-    : { success: true, pid: 1, app: 'Calculator' }) });
-  const start = await call({ operation: 'begin', goal: 'Switch Calculator view without changing the current calculation.' });
-  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true });
-  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'semantic', operation: 'click', ref: 'view' } });
-  expect(result.success).toBe(true);
-  expect(deps.runControl).toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action', ref: 'view' }));
-  await call({ operation: 'cancel', sessionId: start.sessionId });
-});
-test.each(['unique', 'overlap', 'edge', 'destructive', 'non-navigation'])('visual navigation clicks require unique safe native grounding: %s', async kind => {
-  const item = { ref: 'mode', role: 'AXMenuItem', label: kind === 'destructive' ? 'Clear' : 'Scientific', frame: { x: 200, y: 100, width: 100, height: 40 } };
-  if (kind === 'non-navigation') item.role = 'AXButton';
-  const { call, deps } = harness({ runControl: jest.fn(async request => request.type === 'ui_elements'
-    ? { success: true, pid: 1, elements: kind === 'overlap' ? [item, { ...item, ref: 'duplicate' }] : [item] }
-    : { success: true, pid: 1, app: 'Calculator' }) });
-  const start = await call({ operation: 'begin', goal: 'Switch Calculator view without changing the current calculation.' });
-  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true });
-  const result = await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'click', x: kind === 'edge' ? .201 : .25, y: .15 } });
-  expect(result.success).toBe(kind === 'unique');
-  if (kind === 'unique') expect(deps.runControl).toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action', ref: 'mode' }));
-  else expect(deps.runControl.mock.calls.some(([input]) => ['click', 'ax_action'].includes(input.type))).toBe(false);
-  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }));
-  await call({ operation: 'cancel', sessionId: start.sessionId });
-});
-test('semantic observation skips screenshots and only resolves an observed reference', async () => {
+test('visual observations always include screenshots even for an older semantic-mode caller', async () => {
   const { call, deps } = semanticHarness()
-  const start = await call({ operation: 'begin', goal: 'Search Notes for hello' })
-  expect(start.capabilities.semanticControl).toBe(true)
+  const start = await call({ operation: 'begin', goal: 'Search Notes' })
+  expect(start.capabilities.semanticControl).toBeUndefined()
   const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true })
-  expect(obs.image).toBeUndefined(); expect(obs.fingerprint).toBeTruthy(); expect(deps.desktopCapturer.getSources).not.toHaveBeenCalled()
-  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'semantic', operation: 'fill', ref: 'observed-search', text: 'hello' } })).toMatchObject({ success: true, verified: true })
-  expect(deps.runControl).toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action', ref: 'observed-search', pid: 1, label: 'Search', text: 'hello' }))
+  expect(obs.image).toBeTruthy()
+  expect(deps.desktopCapturer.getSources).toHaveBeenCalled()
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+test('screen clicks use the original coordinate executor, not semantic target conversion', async () => {
+  const { call, deps } = semanticHarness()
+  const start = await call({ operation: 'begin', goal: 'Search Notes' })
+  const obs = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'click', x: .2, y: .3 } })).success).toBe(true)
+  expect(deps.runControl).toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }))
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action' }))
   await call({ operation: 'cancel', sessionId: start.sessionId })
 })
 test.each([
@@ -445,13 +417,6 @@ test.each([
   const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true })
   expect((await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action })).success).toBe(false)
   expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ax_action' }))
-  await call({ operation: 'cancel', sessionId: start.sessionId })
-})
-test.each([true, false])('only proven-not-executed semantic failures may be retried: %s', async notExecuted => {
-  const { call } = semanticHarness({ success: false, notExecuted })
-  const start = await call({ operation: 'begin', goal: 'Search Notes' })
-  const obs = await call({ operation: 'observe', sessionId: start.sessionId, semantic: true })
-  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'semantic', operation: 'fill', ref: 'observed-search', text: 'hello' } })).toMatchObject({ success: false, retryable: notExecuted })
   await call({ operation: 'cancel', sessionId: start.sessionId })
 })
 test('old session cancellation and observations cannot stop a replacement session', async () => {
@@ -474,7 +439,7 @@ test('local planner consumes native observations and relays only expected model 
   const args = { sessionId: start.sessionId, observationId: observation.observationId }
   expect((await call({ ...args, operation: 'plan', image: 'untrusted renderer image' })).kind).toBe('model_request')
   expect(agentS.begin).toHaveBeenCalledWith('Find a contact in WhatsApp', expect.stringContaining('shortest reliable'))
-  expect(agentS.predict).toHaveBeenCalledWith({ image: Buffer.from('image').toString('base64'), app: expect.stringContaining('TextEdit'), evidence: '' })
+  expect(agentS.predict).toHaveBeenCalledWith({ image: Buffer.from('image').toString('base64'), app: expect.stringContaining('TextEdit') })
   expect((await call({ ...args, operation: 'model_response', text: 'agent.key("find")' })).action.type).toBe('key')
   expect((await call({ ...args, operation: 'model_response', text: 'unsolicited' })).success).toBe(false)
   expect(agentS.stop).toHaveBeenCalled()

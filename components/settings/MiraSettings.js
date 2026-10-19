@@ -6,6 +6,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { toast } from '@/utils/toast'
 import { createMiraSpeechPlayback } from '@/lib/miraSpeechPlayback'
 import MiraAdminSettings from './MiraAdminSettings'
+import MiraDesktopHabits from './MiraDesktopHabits'
 
 export default function MiraSettings() {
   const { data: response, isLoading, mutate } = useAuthedSWR('/api/mira/preferences')
@@ -63,6 +64,7 @@ export default function MiraSettings() {
 
   return <div className="space-y-7">
     <MiraAdminSettings />
+    <MiraDesktopHabits />
     <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div><h3 className="text-lg font-semibold text-foreground">MIRA voice</h3><p className="mt-1 text-sm text-default-500">Six Indian voices for previews and live calls. Your choice follows your account across devices.</p></div>

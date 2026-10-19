@@ -152,7 +152,7 @@ def control(value):
         return {"success": True}
     import pyautogui
     pyautogui.FAILSAFE = True
-    pyautogui.PAUSE = 0.025
+    pyautogui.PAUSE = 0.08
     if kind == "click":
         x, y = value["x"], value["y"]
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)) or not pyautogui.onScreen(x, y):

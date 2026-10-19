@@ -1,59 +1,54 @@
-// Integrated simulated desktop: real client, native session guards, signed-plan
-// service and hybrid selector. Only OS I/O and provider responses are fixtures.
+// Real restored client + native session executor + authenticated model service.
+// OS I/O and model responses are fixtures; this never controls a real desktop.
 import { executeMiraComputerTask } from '@/lib/miraComputerClient'
-import { requestHybridDesktop } from '@/lib/ai/miraHybridDesktop'
+import { requestAgentSModel } from '@/lib/ai/agentSProxy'
 const { createMiraComputer } = require('../../desktop-app/src/miraComputer')
-
-const response = body => ({ ok: true, json: async () => body })
-const envNames = ['TYPESAFE_API_KEY', 'DEEPSEEK_API_KEY', 'JWT_SECRET', 'MIRA_JEV_ENABLED']
-let savedEnv, savedWindow, savedFetch
+let savedWindow, savedFetch, savedKey
 beforeEach(() => {
-  savedEnv = Object.fromEntries(envNames.map(key => [key, process.env[key]]))
-  savedWindow = global.window; savedFetch = global.fetch
-  for (const key of envNames) process.env[key] = key === 'MIRA_JEV_ENABLED' ? 'true' : 'fixture-secret'
+  savedWindow = global.window; savedFetch = global.fetch; savedKey = process.env.DEEPSEEK_API_KEY
+  process.env.DEEPSEEK_API_KEY = 'fixture'
 })
 afterEach(() => {
-  for (const key of envNames) savedEnv[key] === undefined ? delete process.env[key] : process.env[key] = savedEnv[key]
   global.window = savedWindow; global.fetch = savedFetch
+  if (savedKey === undefined) delete process.env.DEEPSEEK_API_KEY
+  else process.env.DEEPSEEK_API_KEY = savedKey
 })
-
-function fixture({ rejectOnce = false, uncertain = false, providerDown = false, noEffect = false } = {}) {
-  let app = 'Talio', mode = 'Basic', openedMenu = false, revision = 0, rejected = false
-  const calculation = '42'
-  const operations = [], inputs = [], snapshots = [], diagnostics = []
+function fixture({ uncertain = false, noEffect = false, rejectPlanOnce = false } = {}) {
+  let app = 'Talio', stage = 0, plans = 0
+  const operations = [], inputs = [], snapshots = []
   const contents = { mainFrame: { url: 'https://app.talio.in/dashboard' } }
   const event = { sender: contents, senderFrame: contents.mainFrame }
   const nativeWindow = { webContents: contents, isDestroyed: () => false }
   const status = () => ({ success: true, pid: 1, app, keyIdleSeconds: 999 })
   const agentS = {
     begin: jest.fn(async () => ({ kind: 'ready' })), stop: jest.fn(),
-    predict: jest.fn(async () => mode === 'Scientific'
-      ? { kind: 'result', done: true, message: 'Scientific mode verified; calculation unchanged.' }
-      : { kind: 'result', question: 'The requested mode is not yet verified.' }),
+    predict: jest.fn(async observation => {
+      expect(observation.image).toBeTruthy()
+      if (rejectPlanOnce && plans++ === 0) throw new Error('Transient planner error')
+      return { kind: 'model_request', messages: [{ role: 'user', content: [
+        { type: 'text', text: 'Switch Calculator view. Do not change calculation. Stage ' + stage },
+        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + observation.image } },
+      ] }] }
+    }),
+    respond: jest.fn(async text => ({ kind: 'result', ...JSON.parse(text) })),
   }
   const native = createMiraComputer({
-    platform: 'darwin', packaged: false, agentS,
-    store: { get: () => true },
+    platform: 'darwin', packaged: false, agentS, store: { get: () => true },
     systemPreferences: { getMediaAccessStatus: () => 'granted', isTrustedAccessibilityClient: () => true },
     globalShortcut: { register: () => true, unregister: () => {} },
     screen: { getCursorScreenPoint: () => ({ x: 1, y: 1 }), getDisplayNearestPoint: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1000, height: 800 } }) },
     desktopCapturer: { getSources: async () => {
-      snapshots.push({ mode, calculation })
-      return [{ display_id: '1', thumbnail: { isEmpty: () => false, toJPEG: () => Buffer.from(mode) } }]
+      snapshots.push(stage)
+      return [{ display_id: '1', thumbnail: { isEmpty: () => false, toJPEG: () => Buffer.from('screen-' + stage) } }]
     } },
     runControl: async action => {
       if (action.type === 'open_app') { app = 'Calculator'; return { success: true } }
-      if (action.type === 'ui_elements') {
-        revision++
-        return { success: true, pid: 1, elements: [{ ref: `ref-${revision}`, role: openedMenu ? 'AXMenuItem' : 'AXMenuBarItem', label: openedMenu ? 'Scientific' : 'View', frame: { x: 100, y: 100, width: 100, height: 40 } }] }
-      }
-      if (action.type === 'ax_action') {
+      if (action.type === 'ui_elements') return { success: true, pid: 1, elements: [] }
+      if (action.type === 'click') {
         inputs.push(action)
-        expect(action.ref).toBe(`ref-${revision}`)
         if (uncertain) return { success: false, notExecuted: false }
-        if (rejectOnce && !rejected) { rejected = true; return { success: false, notExecuted: true } }
-        if (!noEffect) { if (action.label === 'View') openedMenu = true; else mode = 'Scientific' }
-        return { success: true, message: 'Control invoked; verify.' }
+        if (!noEffect) stage++
+        return { success: true }
       }
       expect(['status', 'prepare_window', 'restore_window']).toContain(action.type)
       return status()
@@ -65,53 +60,40 @@ function fixture({ rejectOnce = false, uncertain = false, providerDown = false, 
   } } }
   global.fetch = jest.fn(async (url, options) => {
     const body = JSON.parse(options.body)
-    if (url === '/api/ai/mira-desktop-plan') return response(await requestHybridDesktop(body, 'tenant:user', options.signal))
-    if (url === 'https://api.deepseek.com/chat/completions') {
-      if (providerDown) return { ok: false, status: 503 }
-      expect(JSON.parse(body.messages[1].content).goal).toContain('Do not change')
-      return response({ choices: [{ message: { content: JSON.stringify({ steps: [
-        { operation: 'click', app: 'Calculator', target: 'View' },
-        { operation: 'click', app: 'Calculator', target: 'Scientific' },
-      ] }) } }] })
-    }
-    // Exact matches must not cost a Jev request. Unknown targets may not be clicked.
-    if (url === 'https://api.typesafe.ai/v1/systemone') return response({ answers: { target: { type: 'choice', choice: 'NONE', confidence: 1, probabilities: { NONE: 1 } }, unique: { type: 'noul', noul: 0 } } })
-    throw new Error('Unexpected network request')
+    if (url === '/api/ai/mira-agent-s') return { ok: true, json: async () => ({ success: true, text: await requestAgentSModel(body.messages) }) }
+    expect(url).toBe('https://api.deepseek.com/chat/completions')
+    expect(body.messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url'))).toBe(true)
+    const action = stage >= 2 ? { done: true, message: 'Scientific mode verified.' }
+      : { action: { type: 'click', x: .2, y: stage === 0 ? .2 : .3 } }
+    return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(action) } }] }) }
   })
-  return { operations, inputs, snapshots, diagnostics, agentS,
-    run: () => executeMiraComputerTask('Open Calculator and switch to Scientific mode. Do not change the current calculation.', { token: 'fixture', onDiagnostic: x => diagnostics.push(x) }) }
+  return { inputs, snapshots, operations, agentS,
+    run: () => executeMiraComputerTask('Open Calculator and switch to Scientific mode.', { token: 'fixture' }) }
 }
-
-test('launch → two fresh native selections → independent verification, with no typing or pixel clicks', async () => {
+test('restored visual flow observes every step, executes screen inputs and verifies completion without Jev', async () => {
   const f = fixture()
-  expect(await f.run()).toMatchObject({ success: true })
-  expect(f.inputs.map(input => input.label)).toEqual(['View', 'Scientific'])
-  expect(f.snapshots).toEqual([{ mode: 'Scientific', calculation: '42' }])
-  expect(f.operations).toEqual(['begin', 'fast', 'observe', 'act', 'observe', 'act', 'observe', 'plan', 'cancel'])
-  expect(f.diagnostics.some(x => x.decision === 'exact_target')).toBe(true)
-  expect(f.agentS.predict).toHaveBeenCalledTimes(1)
+  expect(await f.run()).toEqual({ success: true, message: 'Scientific mode verified.' })
+  expect(f.inputs).toHaveLength(2)
+  expect(f.snapshots).toEqual([0, 1, 2])
+  expect(f.agentS.predict).toHaveBeenCalledTimes(3)
+  expect(f.operations.at(-1)).toBe('cancel')
+  expect(fetch.mock.calls.every(([url]) => ['/api/ai/mira-agent-s', 'https://api.deepseek.com/chat/completions'].includes(url))).toBe(true)
 })
-test('proven not-executed input retries from a new observation, retaining the plan', async () => {
-  const f = fixture({ rejectOnce: true })
-  expect(await f.run()).toMatchObject({ success: true })
-  expect(f.inputs.map(input => input.ref)).toEqual(['ref-1', 'ref-2', 'ref-3'])
-  expect(fetch.mock.calls.filter(([url]) => url.includes('deepseek.com'))).toHaveLength(1)
+test('failed planning restarts from a fresh screenshot before any input', async () => {
+  const f = fixture({ rejectPlanOnce: true })
+  expect((await f.run()).success).toBe(true)
+  expect(f.snapshots).toEqual([0, 0, 1, 2])
+  expect(f.inputs).toHaveLength(2)
 })
-test('uncertain native effect is never replayed or called complete', async () => {
+test('uncertain input is not blindly replayed or claimed complete', async () => {
   const f = fixture({ uncertain: true })
-  expect(await f.run()).toMatchObject({ success: false })
+  expect((await f.run()).success).toBe(false)
   expect(f.inputs).toHaveLength(1)
   expect(f.operations.at(-1)).toBe('cancel')
 })
-test('provider failure returns to the existing visual executor without input', async () => {
-  const f = fixture({ providerDown: true })
-  expect(await f.run()).toMatchObject({ success: false, message: 'The requested mode is not yet verified.' })
-  expect(f.inputs).toHaveLength(0)
-  expect(f.agentS.predict).toHaveBeenCalledTimes(1)
-})
-test('a successful native press without the desired state is not completion', async () => {
+test('unchanged screenshots stop repeated actions without false completion', async () => {
   const f = fixture({ noEffect: true })
-  expect(await f.run()).toMatchObject({ success: false })
+  expect((await f.run()).success).toBe(false)
   expect(f.inputs).toHaveLength(1)
-  expect(f.snapshots).toEqual([{ mode: 'Basic', calculation: '42' }])
+  expect(f.operations.at(-1)).toBe('cancel')
 })

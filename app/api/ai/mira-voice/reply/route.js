@@ -35,7 +35,7 @@ export async function POST(request) {
     if (!balance.allowed) return NextResponse.json({ message: 'Your monthly Mira allowance is exhausted.' }, { status: 429 })
     const language = resolveMiraSpokenLanguage(text, auth.user.miraLanguage)
     if (language !== (auth.user.miraLanguage || 'en')) await auth.database.mutate('users', userId, fresh => ({ ...fresh, miraPreferences: { ...fresh.miraPreferences, lastLanguage: language }, updatedAt: new Date() }))
-    const stream = await streamMiraAgentDeepSeek(payload, { signal: request.signal, language, userContext: call.userContext, direct: true })
+    const stream = await streamMiraAgentDeepSeek(payload, { signal: request.signal, language, userContext: call.userContext, direct: true, cameraContext: body.cameraContext })
     return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no', 'X-Mira-Language': language,
       'X-Mira-Balance': JSON.stringify({ tokensUsed: balance.tokensUsed, tokenLimit: balance.tokenLimit, tokensRemaining: balance.tokensRemaining }),
     } })

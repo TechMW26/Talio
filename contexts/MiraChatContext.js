@@ -47,6 +47,7 @@ export function MiraChatProvider({ children }) {
   const registerCamera = useCallback(camera => { cameraRef.current = camera; return () => { if (cameraRef.current === camera) cameraRef.current = null } }, [])
   const remoteCommandRef = useRef(null)
   const sendingRef = useRef(false)
+  const submittedTextRef = useRef(null)
   const saveQueueRef = useRef(Promise.resolve())
   const sessionTargetRef = useRef({ id: null })
 
@@ -241,6 +242,9 @@ export function MiraChatProvider({ children }) {
     const remoteSessionId = options.remoteSessionId ? String(options.remoteSessionId) : null
     // Relayed requests must never interrupt an employee's own in-progress MIRA work.
     if (remoteSessionId && sendingRef.current) return null
+    // A double submit must not repeat a tool side effect. Different instructions
+    // still interrupt; the same request can be retried once the turn has ended.
+    if (sendingRef.current && submittedTextRef.current === text && !options.attachments?.length && options.replaceFromId === undefined && !options.resolvePerson) return null
     if (!remoteSessionId && remoteCommandRef.current) remoteCommandRef.current = null
     const dismissal = !remoteSessionId && !options.attachments?.length && buildMiraDismissalResponse(text)
     if (dismissal) {
@@ -263,6 +267,7 @@ export function MiraChatProvider({ children }) {
       return reply
     }
     if (!text.trim()) return
+    submittedTextRef.current = text
     // A new user instruction interrupts generation/automation, rather than being
     // silently dropped while an earlier task is still running.
     abortControllerRef.current?.abort()
@@ -325,7 +330,7 @@ export function MiraChatProvider({ children }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: queueMessage, originalUserMessage: text, attachments: screenAttachment ? [...(options.attachments || []), screenAttachment] : options.attachments || [], screenContextAttempted: screenAttempted, cameraContextAttempted: cameraAttempted, cameraAvailable: !remoteSessionId && Boolean(cameraRef.current), conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
+        body: JSON.stringify({ message: queueMessage, originalUserMessage: text, attachments: screenAttachment ? [...(options.attachments || []), screenAttachment] : options.attachments || [], screenContextAttempted: screenAttempted, cameraContextAttempted: cameraAttempted, cameraAvailable: !remoteSessionId && Boolean(cameraRef.current), cameraContext: !remoteSessionId ? cameraRef.current?.getContext?.() : undefined, conversationHistory, taskBank, clientContext: getMiraClientContext(), stream: true, inputMode: options.inputMode === 'voice' ? 'voice' : 'chat' }),
         signal: requestController.signal
       })
 
@@ -356,7 +361,7 @@ export function MiraChatProvider({ children }) {
             cameraAttempted = true
             const result = await cameraRef.current.inspect({ signal: requestController.signal, question: text })
             if (result.success) {
-              screenAttachment = { name: 'Requested camera snapshot', text: result.untrustedVisualContext }
+              screenAttachment = { name: 'Requested camera snapshot', text: `Single frame captured at ${result.capturedAt}. Not continuous live video.\n${result.untrustedVisualContext}` }
               queueStep -= 1
               continue
             }

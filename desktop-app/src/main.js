@@ -23,8 +23,14 @@ const { captureMiraAppSnapshot } = require('./miraAppSnapshot');
 const { createMiraDesktopScreenCapture } = require('./miraDesktopScreen');
 const captureMiraDesktopScreen = createMiraDesktopScreenCapture({ desktopCapturer, screen, dialog, systemPreferences, platform: process.platform, hasDesktopConsent: () => store.get('miraDesktopConsentV1') === true });
 const { pipWindowOptions, pipBounds, savedPipPoint, cameraWindowOptions } = require('./pipWindowPolicy');
+const cameraNotchGeometry = require('./cameraNotchGeometry').createCameraNotchGeometry({ platform: process.platform, packaged: app.isPackaged, resourcesPath: process.resourcesPath });
 const { verifyMacApp } = require('./macSigningPolicy');
 let livePipWindow = null;
+const performancePolicies = new WeakMap();
+function performanceFor(contents) {
+  if (!performancePolicies.has(contents)) performancePolicies.set(contents, require('./rendererPerformance').manageRendererPerformance(contents));
+  return performancePolicies.get(contents);
+}
 
 // PERFORMANCE: Optimized GPU and rendering settings
 const forceDisableGPU = process.env.TALIO_DISABLE_GPU === '1';
@@ -340,7 +346,7 @@ async function requestPermissions() {
     logger.log('debug', 'Main', 'Checking macOS permissions...');
 
     // Camera permission is requested on demand by getUserMedia after the
-    // visible camera/meeting consent flow, never simply on app startup.
+    // setup or requested camera/meeting use, never simply on app startup.
 
     // Microphone permission
     var micStatus = systemPreferences.getMediaAccessStatus('microphone');
@@ -466,8 +472,8 @@ function createWindow() {
       webSecurity: true,
       allowRunningInsecureContent: false,
       devTools: !app.isPackaged,
-      // PERFORMANCE: Keep timers accurate when window is hidden/minimized
-      backgroundThrottling: false,
+      // Live work acquires a temporary exemption; idle hidden dashboards sleep.
+      backgroundThrottling: true,
       // PERFORMANCE: Spellcheck triggers heavy dictionary lookups, disable
       spellcheck: false,
       // PERFORMANCE: WebGL for GPU-accelerated rendering
@@ -502,6 +508,7 @@ function createWindow() {
     roundedCorners: true,
     thickFrame: process.platform === 'win32'
   });
+  performanceFor(mainWindow.webContents);
 
   // Show window when ready to prevent white flash
   mainWindow.once('ready-to-show', function () {
@@ -1133,14 +1140,23 @@ function setupWindowEvents() {
   mainWindow.webContents.on('did-create-window', function (child, details) {
     if (details.frameName === 'talio-camera-notch') {
       const parent = mainWindow;
-      const positionCamera = () => {
+      let cameraPositionRevision = 0;
+      const positionCamera = async () => {
         if (child.isDestroyed() || parent.isDestroyed()) return;
-        const area = screen.getDisplayMatching(parent.getBounds()).workArea;
-        child.setBounds({ x: Math.round(area.x + (area.width - Math.min(360, area.width)) / 2), y: area.y, width: Math.min(360, area.width), height: Math.min(340, area.height) });
+        const revision = ++cameraPositionRevision;
+        const { inset, ...bounds } = await cameraNotchGeometry(screen.getDisplayMatching(parent.getBounds()));
+        if (child.isDestroyed() || parent.isDestroyed() || revision !== cameraPositionRevision) return;
+        child.setBounds(bounds);
+        await child.webContents.executeJavaScript(`document.documentElement.style.setProperty('--mira-camera-inset', '${inset}px')`).catch(() => {});
       };
       child.setParentWindow(null); child.setAlwaysOnTop(true, 'floating');
       if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-      child.once('ready-to-show', () => { positionCamera(); child.showInactive(); });
+      child.once('ready-to-show', async () => {
+        await positionCamera();
+        if (child.isDestroyed()) return;
+        child.showInactive();
+        await child.webContents.executeJavaScript("document.documentElement.style.setProperty('--mira-camera-animation-state', 'running')").catch(() => {});
+      });
       parent.on('move', positionCamera); screen.on('display-metrics-changed', positionCamera); screen.on('display-removed', positionCamera);
       const stopCamera = () => { if (!child.isDestroyed()) child.close(); };
       powerMonitor.on('lock-screen', stopCamera); powerMonitor.on('suspend', stopCamera);
@@ -1538,8 +1554,20 @@ function setupIPCHandlers() {
   powerMonitor.on('unlock-screen', () => { miraScreenLocked = false; });
   app.once('before-quit', () => agentS.stop());
   const computer = createMiraComputer({ desktopCapturer, screen, store, pointer, systemPreferences, shell, globalShortcut, platform: process.platform, arch: process.arch, appVersion: app.getVersion(), electronVersion: process.versions.electron, resourcesPath: process.resourcesPath, packaged: app.isPackaged, agentS, revealMainWindow, ensurePermissions: () => miraPermissions.ensureDesktopAccess(), isLocked: () => miraScreenLocked });
-  ipcMain.handle('mira-computer', (event, input) => computer(event, mainWindow, APP_ORIGIN, input));
+  ipcMain.handle('mira-computer', async (event, input) => {
+    const result = await computer(event, mainWindow, APP_ORIGIN, input);
+    if (trustedMiraSender(event, mainWindow, APP_ORIGIN)) {
+      if (input?.operation === 'begin' && result.success) performanceFor(event.sender).set('desktop', true, 310000);
+      if (input?.operation === 'cancel') performanceFor(event.sender).set('desktop', false);
+    }
+    return result;
+  });
   const { trustedMiraSender, createMiraPermissions } = require('./miraPermissions');
+  ipcMain.handle('mira-renderer-activity', (event, input) => {
+    if (!trustedMiraSender(event, mainWindow, APP_ORIGIN) || !['voice', 'request'].includes(input?.source) || typeof input.active !== 'boolean') return false;
+    performanceFor(event.sender).set(input.source, input.active, input.source === 'request' ? 310000 : 0);
+    return true;
+  });
   ipcMain.handle('mira-move-pip', (event, position) => {
     if (!trustedMiraSender(event, mainWindow, APP_ORIGIN) || !livePipWindow || livePipWindow.isDestroyed() || !Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return { success: false };
     const point = { x: Math.round(Math.max(-100000, Math.min(100000, position.x))), y: Math.round(Math.max(-100000, Math.min(100000, position.y))) };
@@ -3011,7 +3039,7 @@ function startHeartbeat() {
   try { fs.writeFileSync(paths.heartbeatFile, String(Date.now())); } catch (e) { /* ignore */ }
   // Update heartbeat every 10 seconds
   guardianHeartbeatInterval = setInterval(function () {
-    try { fs.writeFileSync(paths.heartbeatFile, String(Date.now())); } catch (e) { /* ignore */ }
+    fs.writeFile(paths.heartbeatFile, String(Date.now()), () => {});
   }, 10000);
 }
 

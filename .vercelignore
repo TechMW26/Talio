@@ -13,7 +13,6 @@ desktop-app/*
 !desktop-app/src
 desktop-app/src/*
 !desktop-app/src/miraActionPlan.js
-!desktop-app/src/miraSemantic.js
 talioapp
 release
 android
