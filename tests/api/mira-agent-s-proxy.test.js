@@ -1,4 +1,4 @@
-import { validateAgentSMessages, requestAgentSModel } from '@/lib/ai/agentSProxy'
+import { validateAgentSMessages, requestAgentSModel, validateDesktopExecutionHistory } from '@/lib/ai/agentSProxy'
 const valid = () => [{ role: 'user', content: [{ type: 'text', text: 'Open WhatsApp' }, { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,aGVsbG8=' } }] }]
 afterEach(() => jest.restoreAllMocks())
 test('model relay keeps only supported content and adds desktop policy', () => {
@@ -41,4 +41,23 @@ test('uses server-owned API key and fixed API host only', async () => {
   expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer test-server-key')
   expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe('deepseek-flash')
   delete process.env.DEEPSEEK_API_KEY
+})
+test('bounded input ledger survives native planner compaction and tells recovery not to loop', async () => {
+  const oldKey = process.env.DEEPSEEK_API_KEY, oldFetch = global.fetch
+  process.env.DEEPSEEK_API_KEY = 'test'
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'agent.key("enter")' } }] }) }))
+  try {
+    const executionHistory = [{ action: { type: 'type', text: '12*14=' }, result: 'Input delivered; not yet verified.' }]
+    await requestAgentSModel(valid(), { executionHistory })
+    const policy = JSON.parse(fetch.mock.calls[0][1].body).messages[0].content
+    expect(policy).toContain('12*14=')
+    expect(policy).toContain('even if older planner turns were compacted')
+    expect(policy).toContain('do NOT loop')
+    expect(policy).toContain('Never mark an unfinished expression as a completed calculation')
+    expect(policy).toContain('Never repeat an uncertain send')
+  } finally { global.fetch = oldFetch; if (oldKey === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = oldKey }
+})
+test('input ledger is bounded and accepts older clients without one', () => {
+  expect(validateDesktopExecutionHistory(undefined)).toEqual([])
+  for (const value of [null, {}, Array(9).fill({ action: { type: 'key' }, result: '' }), [{ action: { type: 'type', text: 'x'.repeat(16001) }, result: '' }], [{ action: { type: 'key' }, result: 42 }]]) expect(() => validateDesktopExecutionHistory(value)).toThrow()
 })

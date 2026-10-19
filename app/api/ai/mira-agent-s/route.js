@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit, buildRateLimitHeaders } from '@/lib/security/rateLimiter'
-import { requestAgentSModel, validateAgentSMessages } from '@/lib/ai/agentSProxy'
+import { requestAgentSModel, validateAgentSMessages, validateDesktopExecutionHistory } from '@/lib/ai/agentSProxy'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -25,8 +25,9 @@ export async function POST(request) {
     }
     body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
     validateAgentSMessages(body.messages)
+    validateDesktopExecutionHistory(body.executionHistory)
   } catch { return reply({ success: false, message: 'Invalid desktop model request.' }, 400) }
   try {
-    return reply({ success: true, text: await requestAgentSModel(body.messages, { signal: request.signal, bypassCache: body.bypassCache === true, cacheScope: { tenant: auth.tenant.databaseName, user: String(auth.user._id) } }) })
+    return reply({ success: true, text: await requestAgentSModel(body.messages, { executionHistory: body.executionHistory, signal: request.signal, bypassCache: body.bypassCache === true, cacheScope: { tenant: auth.tenant.databaseName, user: String(auth.user._id) } }) })
   } catch { return reply({ success: false, message: 'Desktop vision could not respond. No new input was sent.' }, 502) }
 }

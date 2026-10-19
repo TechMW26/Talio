@@ -1,5 +1,30 @@
-import { executeMiraComputerTask, fetchMiraDesktopPlan } from '@/lib/miraComputerClient'
+import { executeMiraComputerTask, fetchMiraDesktopPlan, miraDesktopExecutionLedger } from '@/lib/miraComputerClient'
 afterEach(() => { delete window.electronAPI })
+test('large editing batches cannot overflow the recovery ledger request budget', () => {
+  const history = Array(24).fill({ action: { type: 'batch', actions: Array(4).fill({ type: 'type', text: 'x'.repeat(2000) }) }, result: 'x'.repeat(3000) })
+  const ledger = miraDesktopExecutionLedger(history)
+  expect(ledger.length).toBeGreaterThan(0)
+  expect(ledger.length).toBeLessThanOrEqual(8)
+  expect(JSON.stringify(ledger).length).toBeLessThanOrEqual(14000)
+  expect(history[0].action.actions[0].text).toHaveLength(2000)
+})
+test('forwards delivered inputs to the model after native history compaction', async () => {
+  const originalFetch = global.fetch
+  let observations = 0
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, text: 'agent.done("Verified")' }) }))
+  window.electronAPI = { computerTask: jest.fn(async input => {
+    if (input.operation === 'begin') return { success: true, sessionId: 's', planner: 'agent-s-local' }
+    if (input.operation === 'observe') return { success: true, observationId: `o${++observations}`, app: 'Calculator', image: `screen${observations}` }
+    if (input.operation === 'plan') return observations === 1 ? { success: true, action: { type: 'key', key: 'enter' } } : { success: true, kind: 'model_request', messages: [] }
+    if (input.operation === 'model_response') return { success: true, done: true, message: 'Verified' }
+    if (input.operation === 'act') return { success: true, message: 'Input delivered, not yet verified.' }
+    return { success: true }
+  }) }
+  try {
+    expect((await executeMiraComputerTask('Calculate the correction', { token: 't' })).success).toBe(true)
+    expect(JSON.parse(fetch.mock.calls[0][1].body).executionHistory).toEqual([{ action: { type: 'key', key: 'enter' }, result: 'Input delivered, not yet verified.' }])
+  } finally { global.fetch = originalFetch }
+})
 test('a three-input navigation uses one observation then verifies with the next screenshot', async () => {
   let observations = 0
   window.electronAPI = { computerTask: jest.fn(async input => {
