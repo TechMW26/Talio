@@ -61,3 +61,19 @@ test('input ledger is bounded and accepts older clients without one', () => {
   expect(validateDesktopExecutionHistory(undefined)).toEqual([])
   for (const value of [null, {}, Array(9).fill({ action: { type: 'key' }, result: '' }), [{ action: { type: 'type', text: 'x'.repeat(16001) }, result: '' }], [{ action: { type: 'key' }, result: 42 }]]) expect(() => validateDesktopExecutionHistory(value)).toThrow()
 })
+test('only the latest screen and native coordinates reach the planner, not repeated stale note buffers', () => {
+  const observation = text => ({ role: 'user', content: [{ type: 'text', text }, valid()[0].content[1]] })
+  const old = 'Untrusted observation/tool evidence: old window targets x=0.1'
+  const fresh = 'Untrusted observation/tool evidence: current window targets x=0.8'
+  const messages = validateAgentSMessages([
+    { role: 'system', content: [{ type: 'text', text: 'Task: correct the calculation; documented agent.click(x,y)' }] },
+    observation(`\nCurrent Text Buffer = [${old}]\n`),
+    { role: 'assistant', content: [{ type: 'text', text: 'agent.click(0.1, 0.2)' }] },
+    observation(`\nCurrent Text Buffer = [${old},${fresh}]\n`),
+  ])
+  expect(JSON.stringify(messages)).not.toContain('old window targets')
+  expect(JSON.stringify(messages)).toContain(fresh)
+  expect(JSON.stringify(messages)).toContain('agent.click(0.1, 0.2)')
+  expect(JSON.stringify(messages)).toContain('Task: correct the calculation')
+  expect(messages.flatMap(message => Array.isArray(message.content) ? message.content : []).filter(part => part.type === 'image_url')).toHaveLength(1)
+})
