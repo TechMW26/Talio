@@ -37,10 +37,10 @@ export default function MiraWakeReminder() {
     setDismissed({ owner, until })
     setDue(false)
   }
-  return <aside aria-label="Enable Hey MIRA reminder" className="absolute left-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-default-200 bg-content1 p-4 text-foreground shadow-xl z-50">
-    <button onClick={dismiss} aria-label="Dismiss Hey MIRA reminder for one hour" className="absolute right-2 top-2 rounded-lg px-2 py-1 text-default-500 hover:bg-default-100">×</button>
-    <p className="pr-6 text-sm font-semibold">Enable Hey MIRA</p>
-    <p className="mt-1 text-xs text-default-500">Say “Hey MIRA” to start voice chat.</p>
+  return <aside aria-label="Enable MIRA wake word reminder" className="absolute left-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-default-200 bg-content1 p-4 text-foreground shadow-xl z-50">
+    <button onClick={dismiss} aria-label="Dismiss MIRA wake word reminder for one hour" className="absolute right-2 top-2 rounded-lg px-2 py-1 text-default-500 hover:bg-default-100">×</button>
+    <p className="pr-6 text-sm font-semibold">Enable MIRA wake word</p>
+    <p className="mt-1 text-xs text-default-500">Say “Mira” clearly on its own to start voice chat.</p>
     <button onClick={enable} className="mt-3 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">Enable</button>
   </aside>
 }

@@ -13,11 +13,16 @@ const cases = [
   ['मीरा, मेरे हाथ में यह क्या है? ज़रा कैमरे से देखकर बताओ।', 'view_camera'],
   ['Turn your camera off but stay with me.', 'close_camera'],
   ['What materials would I need to start drawing?', 'not_camera'],
+  ['Play Yellow on YouTube Music', 'ask_mira'],
+  ['YouTube Music पर Yellow बजाओ', 'ask_mira'],
+  [[{ role: 'user', content: 'Play Yellow on YouTube Music' }, { role: 'assistant', content: 'I can try opening YouTube Music and searching for Yellow on your laptop.' }, { role: 'user', content: 'No. Please proceed.' }], 'ask_mira'],
+  [[{ role: 'user', content: 'Play Yellow on YouTube Music' }, { role: 'assistant', content: 'I need the actual request again—open YouTube Music and play Yellow, right?' }, { role: 'user', content: 'Yes.' }], 'ask_mira'],
 ]
 liveTest.each(cases)('live intent: %s → %s', async (text, expected) => {
   require('dotenv').config({ path: '.env.local', quiet: true })
   if (!process.env.DEEPSEEK_API_KEY) throw new Error('DeepSeek credential is not configured')
-  const payload = miraDeepSeekRequest({ messages: [{ role: 'user', content: text }], tools: MIRA_DIRECT_VOICE_TOOLS }, /[\u0900-\u097f]/u.test(text) ? 'hi' : 'en')
+  const messages = Array.isArray(text) ? text : [{ role: 'user', content: text }]
+  const payload = miraDeepSeekRequest({ messages, tools: MIRA_DIRECT_VOICE_TOOLS }, /[\u0900-\u097f]/u.test(messages.at(-1).content) ? 'hi' : 'en')
   payload.messages[0].content += '\n' + MIRA_DIRECT_VOICE_INSTRUCTIONS
   const response = await fetch('https://api.deepseek.com/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, stream: false }), signal: AbortSignal.timeout(45000) })
   expect(response.status).toBe(200)

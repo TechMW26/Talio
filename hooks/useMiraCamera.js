@@ -4,6 +4,7 @@ import { inspectMiraCamera } from '@/lib/miraCamera'
 
 export default function useMiraCamera(open) {
   const [state, setState] = useState('off'), [stream, setStream] = useState(null), [error, setError] = useState('')
+  const [capturing, setCapturing] = useState(false)
   const active = useRef(null), pending = useRef(null), generation = useRef(0), inspection = useRef(null), timer = useRef(null)
   const context = useRef({ state: 'off', capturedAt: null })
   const getContext = useCallback(() => ({ ...context.current }), [])
@@ -14,7 +15,7 @@ export default function useMiraCamera(open) {
     pending.current?.resolve(null); pending.current = null
     active.current?.getTracks().forEach(track => track.stop()); active.current = null
     context.current = { state: 'off', capturedAt: null }
-    setStream(null); setState('off'); setError('')
+    setStream(null); setState('off'); setError(''); setCapturing(false)
   }, [])
   const allow = useCallback(async () => {
     const request = pending.current
@@ -44,6 +45,7 @@ export default function useMiraCamera(open) {
     setError('')
     const controller = new AbortController()
     inspection.current = controller
+    setCapturing(true)
     const combined = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
     const cancelled = () => { pending.current?.resolve(null); pending.current = null; if (!active.current) stop() }
     combined.addEventListener('abort', cancelled, { once: true })
@@ -57,7 +59,9 @@ export default function useMiraCamera(open) {
       combined.throwIfAborted()
       if (!media) return { success: false, message: 'Camera access was not granted. Do not claim to see anything.' }
       clearTimeout(timer.current); timer.current = setTimeout(stop, 120000)
-      const result = await inspectMiraCamera(media, { signal: combined, token: localStorage.getItem('token') || '', question })
+      const result = await inspectMiraCamera(media, { signal: combined, token: localStorage.getItem('token') || '', question,
+        onCaptured: () => { if (inspection.current === controller) setCapturing(false) },
+      })
       combined.throwIfAborted()
       if (active.current !== media) return { success: false, message: 'Camera is off. No current view is available.' }
       context.current.capturedAt = result.capturedAt
@@ -67,9 +71,9 @@ export default function useMiraCamera(open) {
       if (combined.aborted) return { success: false, message: 'The camera was closed or declined. Do not claim to see anything.' }
       setError(err.message)
       return { success: false, message: err.message }
-    } finally { combined.removeEventListener('abort', cancelled); if (inspection.current === controller) inspection.current = null }
+    } finally { combined.removeEventListener('abort', cancelled); if (inspection.current === controller) { inspection.current = null; setCapturing(false) } }
   }, [open, stop, allow, getContext])
   useEffect(() => { if (!open) stop() }, [open, stop])
   useEffect(() => { window.addEventListener('pagehide', stop); return () => { window.removeEventListener('pagehide', stop); stop() } }, [stop])
-  return { state, stream, error, stop, inspect, getContext }
+  return { state, stream, error, capturing, stop, inspect, getContext }
 }

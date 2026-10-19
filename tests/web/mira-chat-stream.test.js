@@ -3,10 +3,34 @@ import { renderHook, act } from '@testing-library/react'
 import { MiraChatProvider, useMiraChat } from '@/contexts/MiraChatContext'
 import { ReadableStream } from 'stream/web'
 import { TextEncoder, TextDecoder } from 'util'
+import { resolveMiraDesktopGoal } from '@/lib/miraDesktopGoal'
+import { executeMiraComputerTask } from '@/lib/miraComputerClient'
+jest.mock('@/lib/miraComputerClient', () => ({ executeMiraComputerTask: jest.fn() }))
 jest.mock('@/lib/miraClientContext', () => ({ getMiraClientContext: () => ({}) }))
 global.TextDecoder = TextDecoder
 const wrapper = ({ children }) => <MiraChatProvider>{children}</MiraChatProvider>
 const bytes = value => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`)
+
+test('voice confirmation hands the original music request through the provider to the executor', async () => {
+  const voiceHistory = [
+    { role: 'user', content: 'Play Yellow on YouTube Music' },
+    { role: 'assistant', content: 'I can try opening YouTube Music and searching for Yellow on your laptop.' },
+    { role: 'user', content: 'No. Please proceed.' },
+    { role: 'assistant', content: 'I need the actual request again—open YouTube Music and play Yellow, right?' },
+  ]
+  executeMiraComputerTask.mockResolvedValueOnce({ success: true, message: 'Yellow is playing.' })
+  global.fetch = jest.fn(async (url, options) => {
+    if (url !== '/api/ai/mira-chat') return { json: async () => ({ success: false }) }
+    const body = JSON.parse(options.body)
+    expect(body.conversationHistory).toEqual(voiceHistory)
+    const goal = resolveMiraDesktopGoal(body.message, { history: body.conversationHistory, taskBank: body.taskBank })
+    return { json: async () => ({ success: true, response: { message: 'Working.', action: { type: 'desktop_task', goal } } }) }
+  })
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { await result.current.sendMessage('Yes.', { inputMode: 'voice', voiceTool: true, voiceHistory }) })
+  expect(executeMiraComputerTask).toHaveBeenCalledWith(expect.stringContaining('Original user task: Play Yellow on YouTube Music'), expect.any(Object))
+  expect(result.current.messages.at(-1).content).toBe('Yellow is playing.')
+})
 
 test('duplicate in-flight submits do not repeat or cancel a tool request', async () => {
   let finish, signal, first

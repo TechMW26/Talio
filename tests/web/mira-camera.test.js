@@ -4,6 +4,7 @@ import useMiraCamera from '@/hooks/useMiraCamera'
 import MiraCameraNotch from '@/components/ui/MiraCameraNotch'
 import { inspectMiraCamera } from '@/lib/miraCamera'
 jest.mock('@/lib/miraCamera', () => ({ inspectMiraCamera: jest.fn() }))
+jest.mock('@/components/ui/AIActivityBeam', () => function Beam() { return <div data-testid="capture-beam" /> })
 let stopTrack, media, getUserMedia
 beforeEach(() => {
   stopTrack = jest.fn()
@@ -61,14 +62,16 @@ test('late OS permission resolution after close releases the device without uplo
   expect(stopTrack).toHaveBeenCalledTimes(1)
   expect(inspectMiraCamera).not.toHaveBeenCalled()
 })
-test('camera preview is black and borderless with a close control, no repeated consent', () => {
+test('camera preview joins the top edge with bottom-only curves and no status or controls', () => {
   const camera = { state: 'starting', stop: jest.fn() }
   render(<MiraCameraNotch camera={camera} />)
   expect(screen.getByRole('region', { name: 'Mira camera' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Enable camera' })).not.toBeInTheDocument()
   expect(screen.getByRole('region')).toHaveStyle({ background: '#000', border: '0px', boxShadow: 'none' })
-  fireEvent.click(screen.getByRole('button', { name: 'Close camera' }))
-  expect(camera.stop).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.queryByText('Camera on')).not.toBeInTheDocument()
+  expect(screen.getByRole('region')).toHaveStyle({ top: '0px', borderRadius: '0 0 14px 14px', paddingTop: '0px' })
+  expect(screen.getByLabelText('Your camera preview')).toHaveStyle({ borderRadius: '0 0 9px 9px' })
 })
 test('camera times out and stops every track instead of remaining on unattended', async () => {
   jest.useFakeTimers()
@@ -82,6 +85,30 @@ test('camera times out and stops every track instead of remaining on unattended'
     expect(result.current.state).toBe('off')
     unmount()
   } finally { jest.useRealTimers() }
+})
+test('preview follows decoded camera dimensions and removes the capture beam immediately', () => {
+  const camera = { state: 'active', stop: jest.fn(), capturing: true }
+  const { rerender } = render(<MiraCameraNotch camera={camera} />)
+  const video = screen.getByLabelText('Your camera preview')
+  Object.defineProperties(video, { videoWidth: { value: 640 }, videoHeight: { value: 480 } })
+  fireEvent.loadedMetadata(video)
+  expect(video.style.aspectRatio).toBe(String(4 / 3))
+  expect(video).toHaveStyle({ objectFit: 'contain' })
+  expect(screen.getByTestId('capture-beam')).toBeInTheDocument()
+  rerender(<MiraCameraNotch camera={{ ...camera, capturing: false }} />)
+  expect(screen.queryByTestId('capture-beam')).not.toBeInTheDocument()
+})
+test('capture feedback ends before the vision provider responds', async () => {
+  let complete, captured
+  inspectMiraCamera.mockImplementation((media, options) => { captured = options.onCaptured; return new Promise(resolve => { complete = resolve }) })
+  const { result } = renderHook(() => useMiraCamera(true))
+  let request
+  await act(async () => { request = result.current.inspect(); await Promise.resolve() })
+  expect(result.current.capturing).toBe(true)
+  act(() => captured())
+  expect(result.current.capturing).toBe(false)
+  expect(result.current.state).toBe('active')
+  await act(async () => { complete({ success: true }); await request })
 })
 test('closing clears current visual context and discards late provider results', async () => {
   let resolve

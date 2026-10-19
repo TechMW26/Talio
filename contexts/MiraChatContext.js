@@ -14,7 +14,7 @@ import { miraNavigationPath } from '@/lib/miraNavigation'
 import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
 import { readMiraEvents } from '@/lib/miraStream'
 import { matchMiraViewMode } from '@/lib/miraViewMode'
-import { compactMiraHistory } from '@/lib/miraChatBudget'
+import { compactMiraHistory, mergeMiraVoiceHistory } from '@/lib/miraChatBudget'
 import { miraSpeechSummary } from '@/lib/miraSpokenReply'
 import { isMiraDecisionRequest } from '@/lib/miraDecisionRouting'
 import { readMiraDesktopScreen } from '@/lib/miraDesktopScreen'
@@ -292,7 +292,7 @@ export function MiraChatProvider({ children }) {
       ? messages.slice(0, -1) : messages
     const visibleHistory = (branchIndex >= 0 ? messages.slice(0, branchIndex) : sourceHistory).map(m => m.id === options.resolvePerson?.messageId
       ? { ...m, data: { ...m.data, actionResult: { ...m.data.actionResult, resolved: true } } } : m)
-    const history = remoteSessionId ? [] : [...visibleHistory, ...(options.voiceHistory || []).slice(-20)]
+    const history = remoteSessionId ? [] : mergeMiraVoiceHistory(visibleHistory, options.voiceHistory)
 
     const nextId = Math.max(Date.now(), messages.reduce((max, message) => Math.max(max, Number(message.id) || 0), 0) + 1)
     const userMsg = { id: nextId, role: 'user', content: text, ...(options.attachments?.length ? { data: { attachments: options.attachments } } : {}), timestamp: new Date() }
@@ -311,7 +311,7 @@ export function MiraChatProvider({ children }) {
       const token = getAuthToken()
 
       let conversationHistory = compactMiraHistory(history)
-      let taskBank = advanceMiraTaskBank([...history].reverse().find(message => message.data?.taskBank)?.data.taskBank, text)
+      let taskBank = advanceMiraTaskBank([...(remoteSessionId ? [] : visibleHistory)].reverse().find(message => message.data?.taskBank)?.data.taskBank, text)
       let queueMessage = text
       let lastReply = ''
       let screenAttachment = null

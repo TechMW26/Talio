@@ -151,7 +151,7 @@ test('restored native face keeps its bottom center when details change size', ()
 })
 test('camera window is isolated and only available to the trusted app origin', () => {
   const request = { url: 'about:blank', frameName: 'talio-camera-notch' }
-  expect(cameraWindowOptions(request, origin, origin)).toMatchObject({ action: 'allow', overrideBrowserWindowOptions: { title: 'Mira camera', width: 360, transparent: true, webPreferences: { nodeIntegration: false, webSecurity: true } } })
+  expect(cameraWindowOptions(request, origin, origin)).toMatchObject({ action: 'allow', overrideBrowserWindowOptions: { title: 'Mira camera', width: 240, roundedCorners: false, transparent: true, webPreferences: { nodeIntegration: false, webSecurity: true } } })
   expect(cameraWindowOptions(request, 'https://app.talio.in.evil.test', origin)).toBeNull()
   expect(cameraWindowOptions({ ...request, url: 'https://evil.test' }, origin, origin)).toBeNull()
 })

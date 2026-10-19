@@ -1121,7 +1121,7 @@ function setupWindowEvents() {
     const camera = cameraWindowOptions(details, mainWindow.webContents.getURL(), APP_ORIGIN);
     if (camera) {
       const area = screen.getDisplayMatching(mainWindow.getBounds()).workArea;
-      Object.assign(camera.overrideBrowserWindowOptions, { x: Math.round(area.x + (area.width - 360) / 2), y: area.y });
+      Object.assign(camera.overrideBrowserWindowOptions, { x: Math.round(area.x + (area.width - camera.overrideBrowserWindowOptions.width) / 2), y: area.y });
       return camera;
     }
     const pip = pipWindowOptions(details, mainWindow.webContents.getURL(), APP_ORIGIN);
@@ -1141,15 +1141,24 @@ function setupWindowEvents() {
     if (details.frameName === 'talio-camera-notch') {
       const parent = mainWindow;
       let cameraPositionRevision = 0;
+      let cameraAspectRatio = 16 / 9;
       const positionCamera = async () => {
         if (child.isDestroyed() || parent.isDestroyed()) return;
         const revision = ++cameraPositionRevision;
-        const { inset, ...bounds } = await cameraNotchGeometry(screen.getDisplayMatching(parent.getBounds()));
+        const { inset, ...bounds } = await cameraNotchGeometry(screen.getDisplayMatching(parent.getBounds()), cameraAspectRatio);
         if (child.isDestroyed() || parent.isDestroyed() || revision !== cameraPositionRevision) return;
         child.setBounds(bounds);
         await child.webContents.executeJavaScript(`document.documentElement.style.setProperty('--mira-camera-inset', '${inset}px')`).catch(() => {});
       };
       child.setParentWindow(null); child.setAlwaysOnTop(true, 'floating');
+      const resizeCamera = (event, layout) => {
+        if (event.sender !== parent.webContents || event.senderFrame !== parent.webContents.mainFrame) return;
+        try { if (new URL(event.senderFrame.url).origin !== APP_ORIGIN) return; } catch { return; }
+        if (!Number.isFinite(layout?.aspectRatio) || layout.aspectRatio < .25 || layout.aspectRatio > 4) return;
+        cameraAspectRatio = layout.aspectRatio;
+        void positionCamera();
+      };
+      ipcMain.on('mira-camera-layout', resizeCamera);
       if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
       child.once('ready-to-show', async () => {
         await positionCamera();
@@ -1160,7 +1169,7 @@ function setupWindowEvents() {
       parent.on('move', positionCamera); screen.on('display-metrics-changed', positionCamera); screen.on('display-removed', positionCamera);
       const stopCamera = () => { if (!child.isDestroyed()) child.close(); };
       powerMonitor.on('lock-screen', stopCamera); powerMonitor.on('suspend', stopCamera);
-      child.once('closed', () => { parent.removeListener('move', positionCamera); screen.removeListener('display-metrics-changed', positionCamera); screen.removeListener('display-removed', positionCamera); powerMonitor.removeListener('lock-screen', stopCamera); powerMonitor.removeListener('suspend', stopCamera); });
+      child.once('closed', () => { ipcMain.removeListener('mira-camera-layout', resizeCamera); parent.removeListener('move', positionCamera); screen.removeListener('display-metrics-changed', positionCamera); screen.removeListener('display-removed', positionCamera); powerMonitor.removeListener('lock-screen', stopCamera); powerMonitor.removeListener('suspend', stopCamera); });
       child.webContents.on('will-navigate', event => event.preventDefault());
       child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       return;

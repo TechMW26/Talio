@@ -27,5 +27,5 @@ test('sidebar shows the loading overlay in chat and only the thinking face in Pi
   expect(source.indexOf('<MiraVoiceConnecting active=')).toBeLessThan(source.indexOf("<div className={pip ? 'hidden' : 'contents'}>"))
   expect(source).not.toContain('MIRA ·')
   expect(source).toContain('processing={isThinking || voiceConnecting}')
-  expect(source).toContain('suspended={voice.active || voiceConnecting}')
+  expect(source).toContain('suspended={isOpen || isThinking || voice.active || voiceConnecting}')
 })

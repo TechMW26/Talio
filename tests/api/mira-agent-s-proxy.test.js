@@ -3,6 +3,8 @@ const valid = () => [{ role: 'user', content: [{ type: 'text', text: 'Open Whats
 afterEach(() => jest.restoreAllMocks())
 test('model relay keeps only supported content and adds desktop policy', () => {
   const messages = validateAgentSMessages(valid())
+  expect(messages[0].content).toContain('a player showing a Play button is paused, not playing')
+  expect(messages[0].content).toContain('Search-result Play buttons are not the player state')
   expect(messages[0].content).toContain('never Talio')
   expect(messages[0].content).toContain('Ordinary display/sound settings are allowed')
   expect(messages[0].content).toContain('open Photo Booth on macOS')

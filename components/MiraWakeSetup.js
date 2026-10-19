@@ -15,6 +15,7 @@ export default function MiraWakeSetup({ onWake, onStream, suspended = false }) {
   const engine = useRef(null)
   const controller = useRef(null)
   const lastWake = useRef(0)
+  const wasSuspended = useRef(suspended)
   const confirmation = useRef(null)
   const wake = useRef(onWake)
   const setupVisible = useRef(visible)
@@ -72,8 +73,12 @@ export default function MiraWakeSetup({ onWake, onStream, suspended = false }) {
   }
   useEffect(() => () => { controller.current?.abort(); engine.current?.stop() }, [])
   useEffect(() => {
-    if (suspended) { stop(false); setVisible(false) }
-    else if (wanted.current) start()
+    if (suspended) { lastWake.current = Date.now(); stop(false); setVisible(false) }
+    else {
+      if (wasSuspended.current) lastWake.current = Date.now()
+      if (wanted.current) start()
+    }
+    wasSuspended.current = suspended
   }, [suspended])
   const start = async () => {
     if (suspended || (controller.current && !controller.current.signal.aborted)) return
@@ -116,11 +121,11 @@ export default function MiraWakeSetup({ onWake, onStream, suspended = false }) {
   }
   startRef.current = start
   return <>
-    {status === 'off' && !suspended && <button className="px-4 py-2 text-xs text-default-600 text-left" onClick={() => setVisible(true)}>Enable Hey MIRA</button>}
+    {status === 'off' && !suspended && <button className="px-4 py-2 text-xs text-default-600 text-left" onClick={() => setVisible(true)}>Enable MIRA wake word</button>}
     {visible && createPortal(<div className="fixed inset-0 z-[100010] flex items-center justify-center bg-black/70 p-4">
       <section role="dialog" aria-modal="true" aria-labelledby="mira-wake-title" className="w-full max-w-md rounded-2xl bg-content1 text-foreground border border-default-200 p-6 space-y-4">
-        <h2 id="mira-wake-title" className="text-lg font-semibold">Hey MIRA</h2>
-        <p className="text-sm text-default-600">Say “Hey MIRA” to open voice chat. Wake listening starts by default while Talio is running, subject to microphone permission. Stop turns it off on this device until you enable it again.</p>
+        <h2 id="mira-wake-title" className="text-lg font-semibold">MIRA wake word</h2>
+        <p className="text-sm text-default-600">Say “Mira” clearly on its own to open voice chat. High-confidence detection helps avoid accidental activation. Wake listening pauses while Mira is open or working. Stop turns it off on this device until you enable it again.</p>
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         {status === 'loading' && <p role="status">Preparing local voice…</p>}
         <div className="flex gap-3 text-sm">

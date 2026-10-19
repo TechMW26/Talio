@@ -3,6 +3,7 @@ import { getAuthAndDatabase } from '@/lib/auth'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { splitMiraSpeech } from '@/lib/miraSpeechChunks'
 import { DEFAULT_MIRA_VOICE_ID, isMiraVoiceId, sanitizeMiraPreferences } from '@/lib/miraVoices'
+import { MIRA_CHAT_STORE_OPTIONS } from '@/lib/miraChatStore.server'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -10,7 +11,7 @@ export const maxDuration = 60
 // A fixed provider/voice prevents clients from turning this into an open proxy.
 export async function POST(request) {
   try {
-    const auth = await getAuthAndDatabase(request)
+    const auth = await getAuthAndDatabase(request, MIRA_CHAT_STORE_OPTIONS)
     if (!auth.success) return NextResponse.json({ message: 'Authentication required' }, { status: auth.status || 401 })
     const payload = await request.json()
     const { text, voiceId: requestedVoiceId, language } = payload || {}
@@ -40,7 +41,7 @@ export async function POST(request) {
       method: 'POST',
       headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
       signal,
-      body: JSON.stringify({ text: chunk, model_id: model, apply_text_normalization: 'on', ...(language ? { language_code: language } : {}),
+      body: JSON.stringify({ text: chunk, model_id: model, apply_text_normalization: 'auto', ...(language ? { language_code: language } : {}),
         voice_settings: { stability: 0.4, similarity_boost: 0.75, speed: 1.2, use_speaker_boost: false } }),
     })
     const upstream = await generate(chunks[0])

@@ -1003,7 +1003,7 @@ export default function MiraChatSidebar() {
             setWakeRequested(true)
             if (!isOpen) openChat({ mode: background ? 'pip' : 'chat' })
             else if (background) setViewMode('pip')
-          }} onStream={() => {}} suspended={voice.active || voiceConnecting} />
+          }} onStream={() => {}} suspended={isOpen || isThinking || voice.active || voiceConnecting} />
         </div>
       </VoiceBeam>
       </NativePipSurface>

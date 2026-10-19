@@ -45,6 +45,16 @@ test('silence needs no speech, action or second generation', async () => {
   expect(execute).not.toHaveBeenCalled(); expect(onText).not.toHaveBeenCalled()
   expect(global.fetch).toHaveBeenCalledTimes(1)
 })
+test('an AI farewell attached to close_mira still closes rather than returning to listening', async () => {
+  global.fetch.mockResolvedValueOnce(sse([
+    event({ content: 'Bye, take care!' }),
+    event({ tool_calls: [{ index: 0, id: 'close', function: { name: 'close_mira', arguments: '{}' } }] }, 'tool_calls'),
+  ]))
+  const execute = jest.fn(), onClose = jest.fn()
+  expect(await run({ execute, onClose })).toBe('')
+  expect(onClose).toHaveBeenCalledTimes(1)
+  expect(execute).not.toHaveBeenCalled()
+})
 test('AI dismissal ends the session once without a second generation or action execution', async () => {
   global.fetch.mockResolvedValue(sse([event({ tool_calls: [{ index: 0, id: 'close', function: { name: 'close_mira', arguments: '{}' } }] }, 'tool_calls')]))
   const execute = jest.fn(), onText = jest.fn(), onClose = jest.fn()

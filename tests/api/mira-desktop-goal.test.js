@@ -2,6 +2,23 @@ import { resolveMiraDesktopGoal, isMiraDesktopAgreement } from '@/lib/miraDeskto
 
 const request = 'Text Mansi on WhatsApp that I love you.'
 const history = [{ role: 'user', content: request }, { role: 'assistant', content: 'Shall I send that to Mansi on WhatsApp?' }]
+const musicRequest = 'Play Yellow on YouTube Music'
+test.each(['Please proceed.', 'No. Please proceed.', 'Yes.'])('retains playback through the reported offer: %s', message => {
+  const turns = [{ role: 'user', content: musicRequest }, { role: 'assistant', content: 'I can try opening YouTube Music and searching for Yellow on your laptop.' }]
+  expect(resolveMiraDesktopGoal(message, { history: turns })).toContain(musicRequest)
+})
+test('recovers the original user task across repeated clarification, not the latest yes', () => {
+  const turns = [
+    { role: 'user', content: musicRequest },
+    { role: 'assistant', content: 'I can try opening YouTube Music and searching for Yellow on your laptop.' },
+    { role: 'user', content: 'No. Please proceed.' },
+    { role: 'assistant', content: 'I need the actual request again—open YouTube Music and play Yellow, right?' },
+  ]
+  expect(resolveMiraDesktopGoal('Yes.', { history: turns })).toContain(musicRequest)
+})
+test.each(['No, do not proceed.', 'No. Please cancel.', 'Do not play it'])('negative replies never continue pending playback: %s', message => {
+  expect(resolveMiraDesktopGoal(message, { history, taskBank: { tasks: [{ request: musicRequest, action: { type: 'desktop_task' }, status: 'pending' }] } })).toBeNull()
+})
 test.each(['नहीं खुला है, freshly open करो।', 'जी, कोशिश कीजिए।', 'It did not open, try again'])('app recovery preserves the launch instead of the retry phrase: %s', message => {
   const taskBank = { tasks: [{ request: 'Open YouTube Music', action: { type: 'desktop_task' }, status: 'blocked', uncertain: true }] }
   expect(resolveMiraDesktopGoal(message, { taskBank })).toBe('Open YouTube Music')
@@ -20,6 +37,9 @@ test.each(['Yes, please.', 'Uh, yes, please.', 'Mm, yes.', 'हाँ', 'haan ji
 })
 test('supports confirmation before voice has created a task bank', () => {
   expect(resolveMiraDesktopGoal('Yes, please.', { history, taskBank: { tasks: [] } })).toContain(request)
+})
+test('an unrelated completed task does not block a fresh confirmation', () => {
+  expect(resolveMiraDesktopGoal('Yes.', { history, taskBank: { tasks: [{ request: 'Open Calculator', action: { type: 'desktop_task' }, status: 'completed' }] } })).toContain(request)
 })
 test.each(['जी', 'हाँ, भेज दो'])('Hindi confirmation retains the user-authored request: %s', message => {
   const turns = [history[0], { role: 'assistant', content: 'क्या मैं Mansi को WhatsApp पर यह संदेश भेज दूँ?' }]

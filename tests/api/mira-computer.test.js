@@ -228,6 +228,10 @@ test('decision router activates apps first but keeps dynamic tasks cognitive', (
   expect(decideDesktopRoute('Restore WhatsApp')).toMatchObject({ route: 'FAST', needsScreen: false })
   expect(decideDesktopRoute('Open WhatsApp')).toMatchObject({ route: 'FAST', needsScreen: false, continueCognitive: false })
   expect(decideDesktopRoute('Open WhatsApp and text Mansi Hi')).toMatchObject({ route: 'FAST', needsScreen: true, continueCognitive: true })
+  expect(decideDesktopRoute('Play Yellow by Coldplay on YouTube Music. Use the installed application.')).toMatchObject({ route: 'FAST', needsScreen: true, continueCognitive: true, action: { type: 'open_app', name: 'YouTube Music' } })
+  expect(decideDesktopRoute('Play Yellow on YouTube Music in Safari').route).toBe('COGNITIVE')
+  expect(decideDesktopRoute('Do not play music on Spotify').route).toBe('COGNITIVE')
+  expect(decideDesktopRoute("Play Yellow on YouTube Music. Actually don't open it.").route).toBe('COGNITIVE')
   for (const goal of ['Do not open WhatsApp', 'Find the red folder', 'Click Sign In', 'Open Terminal', 'Explain how to open WhatsApp']) expect(decideDesktopRoute(goal).route).toBe('COGNITIVE')
 })
 

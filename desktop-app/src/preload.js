@@ -10,6 +10,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   nativePip: true,
   nativePipGeometry: true,
+  resizeMiraCamera: layout => ipcRenderer.send('mira-camera-layout', layout),
   captureMiraAppSnapshot: () => ipcRenderer.invoke('mira-app-snapshot'),
   captureMiraDesktopScreen: () => ipcRenderer.invoke('mira-desktop-screen'),
   activateMira: function() {

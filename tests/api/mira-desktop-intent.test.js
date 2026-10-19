@@ -1,6 +1,11 @@
 import { miraDesktopIntent, miraOpenAppIntent, miraAppNameFollowup } from '@/lib/miraDesktopIntent'
 import { advanceMiraTaskBank } from '@/lib/miraTaskBank'
 
+test.each(['Play Yellow on YouTube Music', 'Play some music on Spotify', 'YouTube Music पर Yellow बजाओ'])('routes explicit playback directly: %s', text => {
+  expect(miraDesktopIntent(text)?.goal).toBe(text)
+  expect(advanceMiraTaskBank({ tasks: [{ request: 'Text Sam on WhatsApp', action: { type: 'desktop_task' }, status: 'blocked', uncertain: true }] }, text).tasks).toEqual([])
+})
+
 test.each(['Reduce my laptop brightness', 'Set volume to 30%', 'Mute the sound', 'Turn on my camera and take a selfie', 'मेरे laptop पर camera on करो और मेरी एक selfie ले लो।', 'उसकी brightness कम कर दे।', 'volume kam kar do'])('routes an explicit local control without a named app: %s', text => {
   expect(miraDesktopIntent(text)).toEqual({ goal: text })
 })

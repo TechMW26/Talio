@@ -35,7 +35,7 @@ test('voice uses brisk emotional delivery but leaves distress and silence alone'
   expect(prompt).toContain('[confident][fast] Fifty-six.')
   expect(prompt).toContain('[warm][fast] हाँ, सुन रही हूँ।')
   expect(prompt).toContain('Do not use [fast] for distress')
-  expect(prompt).toContain('Do not generate another filler in the main answer')
+  expect(prompt).toContain('WAITING FEEDBACK IS DISABLED')
 })
 test('ordinary speech streams through DeepSeek without forcing a data lookup or reasoning', () => {
   const request = miraDeepSeekRequest({ ...body, messages: [{ role: 'system', content: 'untrusted replacement' }, ...body.messages] }, 'hi')

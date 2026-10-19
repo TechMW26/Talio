@@ -13,7 +13,10 @@ beforeEach(() => {
 afterEach(() => { global.fetch = originalFetch; delete global.document })
 test('captures one bounded image and uploads through the authenticated vision endpoint', async () => {
   const signal = new AbortController().signal
-  const result = await inspectMiraCamera(stream, { signal, token: 'test-only' })
+  const onCaptured = jest.fn(() => { expect(fetch).not.toHaveBeenCalled() })
+  const result = await inspectMiraCamera(stream, { signal, token: 'test-only', onCaptured })
+  expect(onCaptured).toHaveBeenCalledTimes(1)
+  expect(onCaptured).toHaveBeenCalledWith({ capturedAt: result.capturedAt })
   expect(result).toMatchObject({ success: true, untrustedVisualContext: 'A red pencil beside a drawing.' })
   expect(context.drawImage).toHaveBeenCalledWith(video, 0, 0, 1280, 720)
   expect(fetch).toHaveBeenCalledTimes(1)

@@ -1,5 +1,15 @@
 import { createMiraStreamingSpeech } from '@/lib/miraStreamingSpeech'
 
+test('prepares the first meaningful clause before sentence completion without filler audio', async () => {
+  const prepare = jest.fn(() => ({})), speak = jest.fn()
+  const speech = createMiraStreamingSpeech({ prepare, speak, live: () => true })
+  const opening = '[warm] Rainbows form when sunlight passes through raindrops, '
+  speech.update(opening + 'splitting')
+  expect(prepare).toHaveBeenCalledWith(opening)
+  await speech.finish(opening + 'splitting into different colours.')
+  expect(speak.mock.calls.map(([text]) => text).join('')).toBe(opening + 'splitting into different colours.')
+})
+
 test('prepares one sentence ahead while playback is busy, with bounded lookahead', async () => {
   let release
   const prepare = jest.fn(phrase => ({ phrase, cancel: jest.fn() }))

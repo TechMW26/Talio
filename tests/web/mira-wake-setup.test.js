@@ -26,7 +26,7 @@ test('new users start wake listening by default without a training prompt', asyn
   await act(async () => { view = render(<MiraWakeSetup onWake={jest.fn()} onStream={jest.fn()} />) })
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(startMiraLocalRecognition).toHaveBeenCalledTimes(1)
-  expect(screen.queryByRole('button', { name: 'Stop Hey MIRA listening' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Stop MIRA wake word listening' })).not.toBeInTheDocument()
   act(() => window.dispatchEvent(new Event('mira:voice-settings')))
   fireEvent.click(screen.getByText('Privacy & settings'))
   fireEvent.click(screen.getByText('Stop listening'))
@@ -37,7 +37,7 @@ test('new users start wake listening by default without a training prompt', asyn
 })
 test('mounting and opening setup never activates the microphone', async () => {
   render(<MiraWakeSetup onWake={jest.fn()} onStream={jest.fn()} />)
-  await act(async () => fireEvent.click(screen.getByText('Enable Hey MIRA')))
+  await act(async () => fireEvent.click(screen.getByText('Enable MIRA wake word')))
   expect(startMiraLocalRecognition).not.toHaveBeenCalled()
   expect(storeMiraVoiceProfile).not.toHaveBeenCalled()
 })
@@ -46,7 +46,7 @@ test('stop cancels a pending model and stops a late stream', async () => {
   startMiraLocalRecognition.mockImplementation(() => new Promise(resolve => { finish = resolve }))
   const stop = jest.fn()
   render(<MiraWakeSetup onWake={jest.fn()} onStream={jest.fn()} />)
-  await act(async () => fireEvent.click(screen.getByText('Enable Hey MIRA')))
+  await act(async () => fireEvent.click(screen.getByText('Enable MIRA wake word')))
   fireEvent.click(screen.getByText('Enable'))
   const signal = startMiraLocalRecognition.mock.calls[0][0].signal
   fireEvent.click(screen.getByText('Stop listening'))
@@ -56,7 +56,7 @@ test('stop cancels a pending model and stops a late stream', async () => {
 })
 test('deleting local samples uses the signed-in account scope', async () => {
   render(<MiraWakeSetup onWake={jest.fn()} onStream={jest.fn()} />)
-  await act(async () => fireEvent.click(screen.getByText('Enable Hey MIRA')))
+  await act(async () => fireEvent.click(screen.getByText('Enable MIRA wake word')))
   await act(async () => fireEvent.click(screen.getByText('Delete old voice checks')))
   expect(storeMiraVoiceProfile).toHaveBeenCalledWith('tenant-a:user-a', null)
 })
@@ -70,7 +70,7 @@ test('accepted wake plays the supplied sound once; blocked audio does not block 
   playConfirmation.mockImplementation(() => Promise.reject(new Error('Autoplay blocked')))
   const onWake = jest.fn()
   await act(async () => render(<MiraWakeSetup onWake={onWake} onStream={jest.fn()} />))
-  await act(async () => fireEvent.click(screen.getByText('Enable Hey MIRA')))
+  await act(async () => fireEvent.click(screen.getByText('Enable MIRA wake word')))
   await act(async () => fireEvent.click(screen.getByText('Enable')))
   expect(playConfirmation).not.toHaveBeenCalled()
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -90,12 +90,12 @@ test('remembered opt-in starts once and resumes after voice chat, but not after 
   await act(async () => { view = render(<MiraWakeSetup {...props} />) })
   expect(startMiraLocalRecognition).toHaveBeenCalledTimes(1)
   await act(async () => view.rerender(<MiraWakeSetup {...props} suspended />))
-  expect(screen.queryByText('Enable Hey MIRA')).not.toBeInTheDocument()
-  expect(screen.queryByText('Hey MIRA controls')).not.toBeInTheDocument()
+  expect(screen.queryByText('Enable MIRA wake word')).not.toBeInTheDocument()
+  expect(screen.queryByText('MIRA wake word controls')).not.toBeInTheDocument()
   expect(engineStop).toHaveBeenCalled()
   await act(async () => view.rerender(<MiraWakeSetup {...props} suspended={false} />))
   expect(startMiraLocalRecognition).toHaveBeenCalledTimes(2)
-  expect(screen.queryByText('Enable Hey MIRA')).not.toBeInTheDocument()
+  expect(screen.queryByText('Enable MIRA wake word')).not.toBeInTheDocument()
   act(() => window.dispatchEvent(new Event('mira:voice-settings')))
   fireEvent.click(screen.getByText('Privacy & settings'))
   fireEvent.click(screen.getByText('Stop listening'))
@@ -114,10 +114,28 @@ test('blocked automatic startup shows a recovery prompt without a retry loop', a
   expect(screen.getByText('Enable')).toBeInTheDocument()
 })
 
+test('closing voice does not immediately wake again from the tail of its goodbye', async () => {
+  jest.useFakeTimers()
+  try {
+    localStorage.setItem('mira-wake-enabled:tenant-a:user-a', 'true')
+    let recognition
+    startMiraLocalRecognition.mockImplementation(async options => { recognition = options; return { stream: {}, stop: jest.fn() } })
+    const props = { onWake: jest.fn(), onStream: jest.fn() }
+    const view = render(<MiraWakeSetup {...props} suspended />)
+    await act(async () => view.rerender(<MiraWakeSetup {...props} suspended={false} />))
+    await act(async () => recognition.onResult({}))
+    expect(props.onWake).not.toHaveBeenCalled()
+    await act(async () => jest.advanceTimersByTimeAsync(6001))
+    await act(async () => recognition.onResult({}))
+    expect(props.onWake).toHaveBeenCalledTimes(1)
+    view.unmount()
+  } finally { jest.useRealTimers() }
+})
+
 test('header reminder starts the actual wake listener and disappears on success', async () => {
   startMiraLocalRecognition.mockResolvedValue({ stream: {}, stop: jest.fn() })
   await act(async () => render(<><MiraWakeReminder /><MiraWakeSetup onWake={jest.fn()} onStream={jest.fn()} /></>))
-  expect(screen.getByRole('complementary', { name: 'Enable Hey MIRA reminder' })).toBeInTheDocument()
+  expect(screen.getByRole('complementary', { name: 'Enable MIRA wake word reminder' })).toBeInTheDocument()
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Enable' })))
   expect(startMiraLocalRecognition).toHaveBeenCalledTimes(1)
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument()

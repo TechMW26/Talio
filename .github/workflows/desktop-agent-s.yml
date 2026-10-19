@@ -8,13 +8,13 @@ on:
         required: true
         default: false
       signed_unnotarized_release:
-        description: 'Owner-approved 6.0.32 release: retain Developer ID signing, skip notarization, disclose remaining acceptance limits'
+        description: 'Owner-approved 6.0.33 release: retain Developer ID signing, skip notarization, disclose remaining acceptance limits'
         type: boolean
         required: true
         default: false
   push:
     tags:
-      - 'v6.0.32'
+      - 'v6.0.33'
 permissions:
   contents: write
 jobs:
@@ -102,7 +102,7 @@ jobs:
           APPLE_ID_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_ID_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
           REQUIRE_NOTARIZATION: ${{ runner.os == 'macOS' && 'true' || 'false' }}
-          TALIO_SIGNED_UNNOTARIZED_RELEASE: ${{ runner.os == 'macOS' && github.event_name == 'workflow_dispatch' && inputs.signed_unnotarized_release && '6.0.32' || '' }}
+          TALIO_SIGNED_UNNOTARIZED_RELEASE: ${{ runner.os == 'macOS' && github.event_name == 'workflow_dispatch' && inputs.signed_unnotarized_release && '6.0.33' || '' }}
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
@@ -129,30 +129,30 @@ jobs:
           merge-multiple: true
       - name: Verify complete installer set
         run: |
-          for asset in Talio-6.0.32-arm64.dmg Talio-6.0.32-arm64.zip Talio-6.0.32-x64.dmg Talio-6.0.32-x64.zip Talio.Setup.6.0.32.exe Talio-6.0.32-x86_64.AppImage Talio-6.0.32-amd64.deb; do
+          for asset in Talio-6.0.33-arm64.dmg Talio-6.0.33-arm64.zip Talio-6.0.33-x64.dmg Talio-6.0.33-x64.zip Talio.Setup.6.0.33.exe Talio-6.0.33-x86_64.AppImage Talio-6.0.33-amd64.deb; do
             test -s "release-assets/$asset" || exit 1
           done
           cd release-assets
           sha256sum *.dmg *.zip *.exe *.AppImage *.deb > SHA256SUMS.txt
-      - name: Publish v6.0.32
+      - name: Publish v6.0.33
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.32
+          tag_name: v6.0.33
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.32 — Restored visual control, camera and voice refinement
+          name: Talio Desktop 6.0.33 — Mira task continuity, seamless camera and voice
           draft: true
           prerelease: false
           generate_release_notes: false
           body: |
             Release mode: ${{ inputs.signed_unnotarized_release && 'Owner-approved signed but UNNOTARIZED macOS release. Apple Gatekeeper may require manual approval; this release does not claim Apple notarization or completed cross-platform hands-on/update-permission-continuity acceptance.' || 'Developer ID signed and Apple notarized macOS release.' }}
 
-            Restored the pre-Jev screenshot-grounded controller while retaining installed-app-first routing, permission checks, focus protection, emergency stop and verified completion. Jev is no longer used. Safe input sequences can use up to four steps per observation; changed screens still require fresh evidence.
+            Fixed desktop-task continuity across voice confirmations and retries, preserving the original app, song and action rather than executing a standalone "yes". Installed-app-first activation now covers explicit music playback requests; visual verification still determines completion. Jev remains removed.
 
-            Added bounded account-isolated response caches and opt-out, clearable music preferences learned from explicit successful tasks. No passive activity monitoring is used.
+            Preserved bounded account-isolated caches, explicit-task music preferences, permission checks, focus protection and safe retries. No passive activity monitoring is used.
 
-            Camera preview is borderless black with measured Mac notch width and a top-center fallback elsewhere. Capture waits for decoded, nonblank frames. Current camera state distinguishes old snapshots from ongoing sight. Concurrent inspections and duplicate in-flight chat submissions are blocked.
+            Camera preview uses the notch edge with square top corners, bottom-only curves and height derived from the camera aspect ratio. Removed the camera status row, dot and close button; voice camera-off, conversation closure and automatic shutdown remain. The chat-style edge animation stops immediately when a decoded nonblank frame is captured, before remote analysis completes.
 
-            Added 720 categorized English/Hindi filler variants with recent-phrase avoidance and non-overlapping handoff to the answer. Direct DeepSeek generation and selected-voice TTS remain.
+            Removed waiting fillers. Direct DeepSeek replies start streaming meaningful completed clauses to selected-voice ElevenLabs v4 PCM speech, with automatic normalization and 1.2x delivery. The sole wake word is "Mira" with higher confidence and cooldown protection; semantic farewell tool calls close even when accompanied by a short goodbye.
 
             Reduced hidden-window rendering and robot animation work while preserving active voice, camera and desktop-control activity. No universal frame-rate or sub-250 ms latency claim is made.
 
@@ -171,12 +171,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view v6.0.32 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
+          gh release view v6.0.33 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
             let text = "";
             process.stdin.on("data", chunk => text += chunk);
             process.stdin.on("end", () => {
               const assets = JSON.parse(text);
-              const expected = ["Talio-6.0.32-arm64.dmg", "Talio-6.0.32-arm64.zip", "Talio-6.0.32-x64.dmg", "Talio-6.0.32-x64.zip", "Talio.Setup.6.0.32.exe", "Talio-6.0.32-x86_64.AppImage", "Talio-6.0.32-amd64.deb", "SHA256SUMS.txt"];
+              const expected = ["Talio-6.0.33-arm64.dmg", "Talio-6.0.33-arm64.zip", "Talio-6.0.33-x64.dmg", "Talio-6.0.33-x64.zip", "Talio.Setup.6.0.33.exe", "Talio-6.0.33-x86_64.AppImage", "Talio-6.0.33-amd64.deb", "SHA256SUMS.txt"];
               for (const name of expected) {
                 const asset = assets.find(item => item.name === name);
                 if (!asset || asset.size < (name.endsWith(".txt") ? 100 : 1048576)) throw new Error("Missing or truncated release asset: " + name);
@@ -185,4 +185,4 @@ jobs:
                 if (asset.digest !== digest) throw new Error("Uploaded asset checksum mismatch: " + name);
               }
             });'
-          gh release edit v6.0.32 --repo "${{ github.repository }}" --draft=false --latest
+          gh release edit v6.0.33 --repo "${{ github.repository }}" --draft=false --latest

@@ -87,11 +87,11 @@ exports.default = async function notarizing(context) {
 
   await verifyMacApp(appPath);
   // Explicit owner-approved exception for this release only. Signing is never skipped.
-  if (process.env.TALIO_SIGNED_UNNOTARIZED_RELEASE === '6.0.32') {
-    if (require('../package.json').version !== '6.0.32') {
-      throw new Error('The signed-unnotarized exception is only valid for Talio 6.0.32.');
+  if (process.env.TALIO_SIGNED_UNNOTARIZED_RELEASE === '6.0.33') {
+    if (require('../package.json').version !== '6.0.33') {
+      throw new Error('The signed-unnotarized exception is only valid for Talio 6.0.33.');
     }
-    console.log('Talio 6.0.32: Developer ID signatures verified; notarization explicitly skipped for this release.');
+    console.log('Talio 6.0.33: Developer ID signatures verified; notarization explicitly skipped for this release.');
     return;
   }
   const required = process.env.REQUIRE_NOTARIZATION === 'true' || process.env.CI === 'true';
