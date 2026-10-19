@@ -1,6 +1,8 @@
 // Opt-in provider acceptance. Synthetic conversations only; never executes tools.
 import { miraDeepSeekRequest } from '@/lib/miraAgentGateway'
 import { MIRA_DIRECT_VOICE_INSTRUCTIONS, MIRA_DIRECT_VOICE_TOOLS } from '@/lib/miraDirectVoice'
+import { MIRA_COMPUTER_INSTRUCTIONS, MIRA_DESKTOP_CONTINUITY_INSTRUCTIONS } from '@/lib/miraComputerClient'
+import { generateDeepSeekContent } from '@/lib/ai/providers/deepseekProvider'
 const liveTest = process.env.MIRA_SEMANTIC_LIVE === '1' ? test : test.skip
 const cases = [
   ['bye Mire', 'close_mira'],
@@ -19,6 +21,8 @@ const cases = [
   ['What song did I tell you I liked in our previous chat?', 'ask_mira'],
   ['दूसरी चैट में मैंने जो बजट बताया था, वो याद है?', 'ask_mira'],
   ['YouTube Music पर Yellow बजाओ', 'ask_mira'],
+  [[{ role: 'user', content: 'Open YouTube Music' }, { role: 'assistant', content: 'YouTube Music is open.' }, { role: 'user', content: 'Now play Yellow' }], 'ask_mira'],
+  [[{ role: 'user', content: 'YouTube Music पर Yellow बजाओ' }, { role: 'assistant', content: 'Yellow चल रहा है।' }, { role: 'user', content: 'गलत गाना है, Coldplay वाला चलाओ' }], 'ask_mira'],
   [[{ role: 'user', content: 'Play Yellow on YouTube Music' }, { role: 'assistant', content: 'I can try opening YouTube Music and searching for Yellow on your laptop.' }, { role: 'user', content: 'No. Please proceed.' }], 'ask_mira'],
   [[{ role: 'user', content: 'Play Yellow on YouTube Music' }, { role: 'assistant', content: 'I need the actual request again—open YouTube Music and play Yellow, right?' }, { role: 'user', content: 'Yes.' }], 'ask_mira'],
 ]
@@ -36,3 +40,19 @@ liveTest.each(cases)('live intent: %s → %s', async (text, expected) => {
   else if (expected === 'not_camera') expect(tool).not.toBe('view_camera')
   else expect(tool).toBe(expected)
 }, 50000)
+
+liveTest.each([
+  ['Now play Yellow', 'followup'],
+  ['Wrong song, play the Coldplay version', 'correction'],
+  ['गलत गाना है, Coldplay वाला चलाओ', 'correction'],
+  ['Check what happened and try again', 'retry'],
+  ['Open Calculator', 'new'],
+])('live desktop continuity: %s → %s', async (message, mode) => {
+  require('dotenv').config({ path: '.env.local', quiet: true })
+  const output = await generateDeepSeekContent(JSON.stringify({
+    message, desktopComputerAvailable: true,
+    taskBank: { desktopHistory: [mode === 'followup' ? { request: 'Open YouTube Music', result: 'YouTube Music is open.', success: true } : { request: 'Play Yellow on YouTube Music', result: 'Playing Yellow by a different artist.', success: true }] },
+  }), `${MIRA_COMPUTER_INSTRUCTIONS}\n${MIRA_DESKTOP_CONTINUITY_INSTRUCTIONS}\nReturn only JSON {"action":{"type":"desktop_task","continuation":"new|followup|correction|retry"}} when a desktop action is requested; otherwise action:null.`, { useCase: 'mira', thinking: false, maxTokens: 200, timeoutMs: 40000 })
+  const parsed = JSON.parse(output.replace(/^```(?:json)?\s*|\s*```$/g, ''))
+  expect(parsed.action).toMatchObject({ type: 'desktop_task', continuation: mode })
+}, 45000)

@@ -61,3 +61,10 @@ test('uncertain outcomes stay blocked until explicitly verified, and queue can b
   expect(advanceMiraTaskBank(bank, 'clear task queue').tasks).toEqual([])
   expect(sanitizeMiraTaskBank({ tasks: [null] }).tasks).toEqual([])
 })
+test('executor evidence survives completed tasks and fresh same-chat commands', () => {
+  const bank = recordMiraTaskOutcome(oldDesktop, { success: true, message: 'Verified in target app' })
+  expect(bank.desktopHistory[0]).toMatchObject({ request: oldDesktop.tasks[0].request, success: true, result: 'Verified in target app' })
+  expect(advanceMiraTaskBank(bank, 'Open Calculator').desktopHistory).toEqual(bank.desktopHistory)
+  expect(advanceMiraTaskBank(bank, 'Cancel the previous task').desktopHistory).toBeUndefined()
+  expect(sanitizeMiraTaskBank({ desktopHistory: [...Array(10)].map(() => ({ request: 'x'.repeat(9000) })) }).desktopHistory).toHaveLength(4)
+})

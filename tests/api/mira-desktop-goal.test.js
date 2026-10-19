@@ -1,4 +1,4 @@
-import { resolveMiraDesktopGoal, isMiraDesktopAgreement } from '@/lib/miraDesktopGoal'
+import { resolveMiraDesktopGoal, resolveMiraDesktopContinuation, isMiraDesktopAgreement } from '@/lib/miraDesktopGoal'
 
 const request = 'Text Mansi on WhatsApp that I love you.'
 const history = [{ role: 'user', content: request }, { role: 'assistant', content: 'Shall I send that to Mansi on WhatsApp?' }]
@@ -68,4 +68,34 @@ test('a fresh launch replaces the old messaging goal', () => {
 })
 test('bare acknowledgement is not an executable task, even if a model creates a draft for it', () => {
   expect(resolveMiraDesktopGoal('Yes', { taskBank: { tasks: [{ request: 'Yes', action: { type: 'desktop_task' } }] } })).toBeNull()
+})
+
+const desktopHistory = [{ request: musicRequest, result: 'Playing a different artist.', success: true }]
+test.each([
+  ['now play Yellow', 'followup'],
+  ['That is wrong, play the Coldplay version', 'correction'],
+  ['गलत गाना है, Coldplay वाला चलाओ', 'correction'],
+  ['जाँच कर फिर कोशिश करो', 'retry'],
+])('model-selected continuation keeps the actual task and correction: %s', (message, mode) => {
+  const goal = resolveMiraDesktopContinuation(message, { mode, taskBank: { desktopHistory } })
+  expect(goal).toContain(message)
+  expect(goal).toContain(musicRequest)
+  expect(goal).toContain('Inspect the current screen first')
+  expect(goal).toContain('Do not replay completed steps')
+  expect(goal.length).toBeLessThanOrEqual(3000)
+})
+test('uncertain write retries carry inspection constraints and are not blind replays', () => {
+  const goal = resolveMiraDesktopContinuation('Check and retry', { mode: 'retry', taskBank: { tasks: [{ request, result: 'Input sent but not verified', action: { type: 'desktop_task' }, status: 'blocked', uncertain: true }] } })
+  expect(goal).toContain(request)
+  expect(goal).toContain('"uncertain":true')
+  expect(goal).toContain('only if you verify it did not occur')
+})
+test.each(['new', undefined, 'cancel'])('does not inject historical targets for mode %s', mode => {
+  expect(resolveMiraDesktopContinuation('Send Alice an email', { mode, taskBank: { desktopHistory } })).toBeNull()
+})
+test('bare yes after completion never replays desktop work', () => {
+  expect(resolveMiraDesktopContinuation('Yes', { mode: 'retry', taskBank: { desktopHistory }, history: [{ role: 'assistant', content: 'Playing Yellow.' }] })).toBeNull()
+})
+test('explicit retry offer can resolve agreement to an inspect-first task', () => {
+  expect(resolveMiraDesktopContinuation('Yes', { mode: 'retry', taskBank: { desktopHistory }, history: [{ role: 'assistant', content: 'Want me to check and try again?' }] })).toContain(musicRequest)
 })
