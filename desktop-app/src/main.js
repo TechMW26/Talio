@@ -1142,30 +1142,32 @@ function setupWindowEvents() {
       const parent = mainWindow;
       let cameraPositionRevision = 0;
       let cameraAspectRatio = 16 / 9;
-      const positionCamera = async () => {
+      const positionCamera = async (reveal = false) => {
         if (child.isDestroyed() || parent.isDestroyed()) return;
         const revision = ++cameraPositionRevision;
         const { inset, ...bounds } = await cameraNotchGeometry(screen.getDisplayMatching(parent.getBounds()), cameraAspectRatio);
         if (child.isDestroyed() || parent.isDestroyed() || revision !== cameraPositionRevision) return;
         child.setBounds(bounds);
         await child.webContents.executeJavaScript(`document.documentElement.style.setProperty('--mira-camera-inset', '${inset}px')`).catch(() => {});
+        if (reveal === true && !child.isDestroyed()) {
+          child.showInactive();
+          await child.webContents.executeJavaScript("document.documentElement.style.setProperty('--mira-camera-animation-state', 'running')").catch(() => {});
+        }
       };
-      child.setParentWindow(null); child.setAlwaysOnTop(true, 'floating');
+      child.setParentWindow(null); child.setAlwaysOnTop(true, process.platform === 'darwin' ? 'pop-up-menu' : 'floating');
       const resizeCamera = (event, layout) => {
         if (event.sender !== parent.webContents || event.senderFrame !== parent.webContents.mainFrame) return;
         try { if (new URL(event.senderFrame.url).origin !== APP_ORIGIN) return; } catch { return; }
         if (!Number.isFinite(layout?.aspectRatio) || layout.aspectRatio < .25 || layout.aspectRatio > 4) return;
         cameraAspectRatio = layout.aspectRatio;
-        void positionCamera();
+        // about:blank can paint before did-create-window attaches ready-to-show.
+        // The opener sends layout after React commits the portal; this is the
+        // reliable content-ready signal, not a timer or a missed native event.
+        void positionCamera(true);
       };
       ipcMain.on('mira-camera-layout', resizeCamera);
       if (process.platform === 'darwin') child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-      child.once('ready-to-show', async () => {
-        await positionCamera();
-        if (child.isDestroyed()) return;
-        child.showInactive();
-        await child.webContents.executeJavaScript("document.documentElement.style.setProperty('--mira-camera-animation-state', 'running')").catch(() => {});
-      });
+      child.once('ready-to-show', () => { void positionCamera(true); });
       parent.on('move', positionCamera); screen.on('display-metrics-changed', positionCamera); screen.on('display-removed', positionCamera);
       const stopCamera = () => { if (!child.isDestroyed()) child.close(); };
       powerMonitor.on('lock-screen', stopCamera); powerMonitor.on('suspend', stopCamera);

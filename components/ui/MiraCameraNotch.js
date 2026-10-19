@@ -21,6 +21,10 @@ export default function MiraCameraNotch({ camera }) {
       if (popup) {
         popup.document.title = 'Mira camera'
         popup.document.body.style.cssText = 'margin:0;background:transparent;color:#fff;font-family:system-ui;overflow:hidden'
+        for (const element of [popup.document.documentElement, popup.document.body]) {
+          element.style.setProperty('background', 'transparent', 'important')
+          element.style.setProperty('background-image', 'none', 'important')
+        }
         document.querySelectorAll('style, link[rel="stylesheet"]').forEach(node => popup.document.head.append(node.cloneNode(true)))
         popup.addEventListener('pagehide', camera.stop, { once: true })
       }
@@ -46,7 +50,7 @@ export default function MiraCameraNotch({ camera }) {
   const native = host.ownerDocument !== document
   return createPortal(<section aria-label="Mira camera" role="region" data-open={visible} style={{
     position: 'fixed', top: 0, left: '50%', translate: '-50% 0', zIndex: 2147483646,
-    width: native ? '100vw' : 'min(240px, 100vw)', boxSizing: 'border-box', padding: '0 6px 6px',
+    width: native ? '100vw' : 'min(240px, 100vw)', boxSizing: 'border-box', padding: native ? 'var(--mira-camera-inset, 0px) 6px 6px' : '0 6px 6px',
     overflow: 'hidden', borderRadius: '0 0 14px 14px', background: '#000', color: '#fff',
     border: 0, boxShadow: 'none', font: '12px/1.3 system-ui', transformOrigin: '50% 0',
     animationName: visible ? 'mira-notch-emerge' : 'mira-notch-retract',

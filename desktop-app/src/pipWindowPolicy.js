@@ -41,7 +41,7 @@ function savedPipPoint(saved, size) {
 function cameraWindowOptions(details, openerUrl, appOrigin) {
   if (details.frameName !== 'talio-camera-notch') return null;
   const options = pipWindowOptions({ ...details, frameName: 'talio-live-pip' }, openerUrl, appOrigin);
-  if (options) Object.assign(options.overrideBrowserWindowOptions, { title: 'Mira camera', width: 240, height: 156, roundedCorners: false });
+  if (options) Object.assign(options.overrideBrowserWindowOptions, { title: 'Mira camera', width: 240, height: 135, minHeight: 1, roundedCorners: false, enableLargerThanScreen: true, focusable: false });
   return options;
 }
 

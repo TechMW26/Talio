@@ -98,6 +98,19 @@ test('preview follows decoded camera dimensions and removes the capture beam imm
   rerender(<MiraCameraNotch camera={{ ...camera, capturing: false }} />)
   expect(screen.queryByTestId('capture-beam')).not.toBeInTheDocument()
 })
+test('native portal announces content readiness and aspect ratio without waiting for a window paint event', () => {
+  const popup = { document: document.implementation.createHTMLDocument('camera'), addEventListener: jest.fn(), removeEventListener: jest.fn(), close: jest.fn() }
+  const open = jest.spyOn(window, 'open').mockReturnValue(popup)
+  window.electronAPI = { resizeMiraCamera: jest.fn() }
+  try {
+    const stream = { getVideoTracks: () => [{ getSettings: () => ({ width: 640, height: 480 }) }] }
+    const { unmount } = render(<MiraCameraNotch camera={{ state: 'active', stream, stop: jest.fn() }} />)
+    expect(popup.document.querySelector('video')).not.toBeNull()
+    expect(window.electronAPI.resizeMiraCamera).toHaveBeenLastCalledWith({ aspectRatio: 4 / 3 })
+    unmount()
+    expect(popup.close).toHaveBeenCalled()
+  } finally { open.mockRestore(); delete window.electronAPI }
+})
 test('capture feedback ends before the vision provider responds', async () => {
   let complete, captured
   inspectMiraCamera.mockImplementation((media, options) => { captured = options.onCaptured; return new Promise(resolve => { complete = resolve }) })
