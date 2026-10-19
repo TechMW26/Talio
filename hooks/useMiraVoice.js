@@ -124,7 +124,7 @@ export default function useMiraVoice({ open, sendMessage, recordVoiceMessage, on
                 if (name === 'close_camera') { current.current.camera?.stop(); return { success: true, message: 'Camera stopped.' } }
                 setState(name === 'search_internet' ? 'searching' : 'working')
                 if (name === 'search_internet') {
-                  const response = await fetch('/api/ai/mira-agent/search', { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ bridgeCredential: run.config.bridgeCredential, turn, message: text }), signal })
+                  const response = await fetch('/api/ai/mira-agent/search', { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ bridgeCredential: run.config.bridgeCredential, turn, message: text, conversationHistory: run.history.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1200) })) }), signal })
                   const result = await response.json()
                   return response.ok ? result : { unavailable: result.message || 'Lookup failed; do not claim verification.' }
                 }

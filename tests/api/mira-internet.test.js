@@ -9,6 +9,9 @@ test.each([
   ['Search the web for New Delhi ka weather batao', 'New Delhi'],
   ['मीरा का weather कैसा है?', null],
   ['आज का मौसम', null],
+  ['Search the web for Bhopal weather today', 'Bhopal'],
+  ['New Delhi weather', 'New Delhi'],
+  ['What is the weather today?', null],
 ])('extracts the location, not the assistant address: %s', (message, city) => {
   expect(miraWeatherPlace(message)).toBe(city)
 })

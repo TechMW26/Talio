@@ -5,6 +5,7 @@ import { verifyMiraBridgeCredential } from '@/lib/miraVoiceAgent.server'
 import { MIRA_CHAT_STORE_OPTIONS, checkAndDeductMiraToken, hasMiraVoiceReceipt, miraMonth } from '@/lib/miraChatStore.server'
 import { rateLimit } from '@/lib/security/rateLimiter'
 import { getMiraInternetContext, miraPublicVoiceQuery } from '@/lib/miraInternet'
+import { planMiraRetrieval } from '@/lib/miraRetrieval.server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -12,7 +13,8 @@ export async function POST(request) {
   try {
     const auth = await getAuthAndDatabase(request, MIRA_CHAT_STORE_OPTIONS)
     if (!auth.success) return NextResponse.json({ success: false, message: auth.message }, { status: auth.status || 401 })
-    const { bridgeCredential, turn, message } = await request.json()
+    const { bridgeCredential, turn, message, conversationHistory = [] } = await request.json()
+    if (!Array.isArray(conversationHistory) || conversationHistory.length > 6 || conversationHistory.some(m => !['user', 'assistant'].includes(m?.role) || typeof m.content !== 'string' || m.content.length > 1200)) return NextResponse.json({ success: false, message: 'Invalid search context' }, { status: 400 })
     if (!Number.isSafeInteger(turn) || turn < 1 || turn > 1000 || typeof bridgeCredential !== 'string') return NextResponse.json({ success: false, message: 'Invalid voice turn' }, { status: 400 })
     const query = miraPublicVoiceQuery(message)
     if (!query) return NextResponse.json({ success: false, message: 'Use the private Talio tool for workplace data. Public search accepts only a short public question.' }, { status: 400 })
@@ -27,7 +29,9 @@ export async function POST(request) {
       ? { allowed: await hasMiraVoiceReceipt(auth.database, userId, call.jti, message) }
       : await checkAndDeductMiraToken(auth.database, userId, miraMonth(), key)
     if (!balance.allowed) return NextResponse.json({ success: false, message: 'Your monthly Mira allowance is exhausted' }, { status: 429 })
-    const result = await getMiraInternetContext(`Search the web for ${query}`, {})
+    const plan = await planMiraRetrieval(query, conversationHistory, { signal: request.signal, forceWeb: true })
+    if (plan.kind !== 'web') return NextResponse.json({ success: false, message: 'Use ask_mira for private information or saved conversations.' }, { status: 400 })
+    const result = await getMiraInternetContext(`Search the web for ${plan.query}`, {})
     return NextResponse.json({ success: true, ...result }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     return NextResponse.json({ success: false, message: 'Public lookup is unavailable. Do not claim internet verification.' }, { status: error instanceof SyntaxError ? 400 : 502 })

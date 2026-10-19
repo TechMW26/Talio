@@ -161,6 +161,7 @@ export function MiraChatProvider({ children }) {
           body: JSON.stringify({ title: (userMsg?.content || completedMessages?.find(m => m.role === 'user')?.content || 'MIRA task queue').slice(0, 50) })
         })
         const createData = await createRes.json()
+        if (!createRes.ok || !createData.success) throw new Error(createData.message || 'Could not save this conversation. Your response is still visible here.')
         if (createData.success) {
           const sessionId = createData.session._id
           target.id = sessionId

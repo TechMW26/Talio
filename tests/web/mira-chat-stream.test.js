@@ -176,7 +176,7 @@ test('completed replies release thinking while ordered session creation is still
   let finishCreate
   global.fetch = jest.fn(async url => {
     if (url === '/api/ai/mira-chat') return { json: async () => ({ success: true, response: { message: 'Done.' } }) }
-    if (url === '/api/ai/mira-chat/sessions') return new Promise(resolve => { finishCreate = () => resolve({ json: async () => ({ success: true, session: { _id: 'session-one' } }) }) })
+    if (url === '/api/ai/mira-chat/sessions') return new Promise(resolve => { finishCreate = () => resolve({ ok: true, json: async () => ({ success: true, session: { _id: 'session-one' } }) }) })
     return { ok: true, json: async () => ({ success: true }) }
   })
   const { result } = renderHook(useMiraChat, { wrapper })
@@ -195,7 +195,7 @@ test('a delayed save cannot attach an old session to a new chat', async () => {
   let finishCreate
   global.fetch = jest.fn(async url => {
     if (url === '/api/ai/mira-chat') return { json: async () => ({ success: true, response: { message: 'Saved later.' } }) }
-    if (url === '/api/ai/mira-chat/sessions') return new Promise(resolve => { finishCreate = () => resolve({ json: async () => ({ success: true, session: { _id: 'old-session' } }) }) })
+    if (url === '/api/ai/mira-chat/sessions') return new Promise(resolve => { finishCreate = () => resolve({ ok: true, json: async () => ({ success: true, session: { _id: 'old-session' } }) }) })
     return { ok: true, json: async () => ({ success: true }) }
   })
   const { result } = renderHook(useMiraChat, { wrapper })
