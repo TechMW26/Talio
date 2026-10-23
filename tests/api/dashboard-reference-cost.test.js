@@ -3,7 +3,9 @@ jest.mock('@/lib/tasks.server', () => ({ taskHandler: fn => fn }))
 jest.mock('@/lib/organization.server', () => ({ organizationEmployee: async (db, id) => id ? db.get('employees', id) : null }))
 jest.mock('@/lib/companyFeatures.server', () => ({ getTenantCompanyFeaturePayload: async () => ({ features: { gpsAttendance: false } }) }))
 jest.mock('@/lib/communicationsStore.server', () => ({ announcementApplies: () => true, policyApplies: () => true }))
-jest.mock('@/lib/leaveData', () => ({ normalizeLeaveBalances: rows => rows }))
+jest.mock('@/lib/leaveBalances.server', () => ({
+  getLeaveBalance: jest.fn(async (db, employeeId, year) => [{ _id: `balance-${year}`, leaveType: { _id: 'annual', name: 'Annual Leave' }, total: 7, used: 2 }]),
+}))
 jest.mock('@/lib/projects.server', () => ({
   projectId: value => String(value?._id || value || ''),
   projectFilter: (field, value, operator = '==') => ({ field, value, operator }),
@@ -12,27 +14,29 @@ jest.mock('@/lib/projects.server', () => ({
   employeeSummary: row => row ? { _id: row._id, firstName: row.firstName } : null,
 }))
 import { unifiedDashboard } from '@/lib/dashboardData.server'
+import { getLeaveBalance } from '@/lib/leaveBalances.server'
+import { currentFiscalYear } from '@/lib/leavePolicy'
 import { teamViewAuth } from '@/lib/teamViews.server'
 
-test('dashboard batches announcement authors, departments and leave types', async () => {
+test('dashboard batches announcement authors and departments and reads the computed leave balance', async () => {
   const db = {
     databaseName: 'talio_company_a',
     get: jest.fn(async () => ({ _id: 'employee-a' })),
     getMany: jest.fn(async (collection, ids) => ids.map(_id => ({ _id, firstName: collection }))),
     list: jest.fn(async collection => ({ records: collection === 'announcements'
       ? Array.from({ length: 5 }, (_, i) => ({ _id: `a${i}`, status: 'published', createdBy: 'author', departments: ['d1', 'd1', 'd2'], createdAt: new Date(2026, 0, i + 1) }))
-      : [{ _id: 'b1', leaveType: 'annual' }, { _id: 'b2', leaveType: 'annual' }] })),
+      : [] })),
   }
   teamViewAuth.mockResolvedValue({ database: db, user: { _id: 'user-a', employeeId: 'employee-a', role: 'employee' }, tenant: { companySlug: 'tenant-a' } })
   const result = await (await unifiedDashboard(new Request('https://app.test/api/dashboard?widgets=announcements,leaveBalance'))).json()
   expect(result.announcements).toHaveLength(5)
   expect(result.announcements[0].departments.map(row => row._id)).toEqual(['d1', 'd2'])
   expect(result.announcements[0].createdBy._id).toBe('author')
-  expect(result.leaveBalance.map(row => row.leaveType._id)).toEqual(['annual', 'annual'])
-  expect(db.getMany).toHaveBeenCalledTimes(3)
+  expect(result.leaveBalance.map(row => row.leaveType._id)).toEqual(['annual'])
+  expect(getLeaveBalance).toHaveBeenCalledWith(db, 'employee-a', currentFiscalYear())
+  expect(db.getMany).toHaveBeenCalledTimes(2)
   expect(db.getMany).toHaveBeenCalledWith('employees', ['author'])
   expect(db.getMany).toHaveBeenCalledWith('departments', ['d1', 'd2'])
-  expect(db.getMany).toHaveBeenCalledWith('leavetypes', ['annual'])
   expect(db.get).toHaveBeenCalledTimes(1)
 })
 

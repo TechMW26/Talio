@@ -29,6 +29,7 @@ const rolePermissions = {
     '/dashboard/leave/requests',
     '/dashboard/leave/approvals',
     '/dashboard/leave-types',
+    '/dashboard/leave/encashment',
     '/dashboard/payroll/generate',
     '/dashboard/payroll/payslips',
     '/dashboard/performance/create',

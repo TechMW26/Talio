@@ -44,7 +44,7 @@ function files(dir) {
 }
 test('every dashboard route uses shared controls and native tables, not direct library imports', () => {
   const pages = files('app/dashboard').filter(file => /page\.(js|jsx|tsx)$/.test(file))
-  expect(pages).toHaveLength(90)
+  expect(pages).toHaveLength(91)
   for (const file of pages) {
     const source = fs.readFileSync(file, 'utf8')
     expect(source).not.toMatch(/from ['"]@heroui\/react['"]|<table\b|<button\b|<input\b/)

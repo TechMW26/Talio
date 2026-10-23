@@ -7,11 +7,24 @@ import { FaCalendarAlt } from 'react-icons/fa'
 import { Card, CardBody, Progress, Skeleton, ScrollShadow } from '@/components/ui/fernly'
 import { normalizeLeaveBalances } from '@/lib/leaveData'
 
+const formatUnlockDate = value => {
+    if (!value) return ''
+    const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`)
+    return Number.isNaN(date.getTime())
+        ? String(value)
+        : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
+
+const leaveTypeLabel = balance => balance.leaveType?.name
+    || balance.leaveType?.code
+    || balance.leaveTypeName
+    || 'Leave'
+
 export default function LeaveBalanceWidget({ employeeId, initialData }) {
-    // If initialData is provided by the unified endpoint, use it without a
-    // duplicate mount request. Mutations and realtime events revalidate it.
+    // Same computed projection as the Leave Balance and Apply pages. The unified
+    // endpoint already carries that payload, so a mounted widget reuses it.
     const { data, error, isLoading } = useAuthedSWR(
-        employeeId ? `/api/leave/balance?employeeId=${employeeId}` : null,
+        employeeId ? `/api/leave/balance?employeeId=${employeeId}&summary=1` : null,
         {
             refreshInterval: 0,
             fallbackData: initialData ? { success: true, data: initialData } : undefined,
@@ -75,20 +88,33 @@ export default function LeaveBalanceWidget({ employeeId, initialData }) {
                 ) : (
                     <ScrollShadow data-widget-list="" className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                         {balances.map((balance, index) => {
-                            const usedPercentage = Math.min(100, ((balance.used || 0) / (balance.total || 1)) * 100)
+                            const credited = Number(balance.total || 0)
+                            const consumed = (balance.used || 0) + (balance.pending || 0)
+                            const usedPercentage = credited > 0 ? Math.min(100, (consumed / credited) * 100) : 0
+                            const unlimited = balance.requiresBalance === false
+                            const locked = balance.isLocked === true
+                            const lockLabel = balance.unlocksOn ? `Locked till ${formatUnlockDate(balance.unlocksOn)}` : 'Locked'
                             return (
                                 <Card data-widget-card=""
-                                    key={balance._id || index}
+                                    key={balance._id || balance.leaveType?.code || index}
                                     className="border border-default-100"
                                 >
                                     <CardBody className="p-3">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm font-semibold text-default-900">
-                                                {balance.leaveType?.name || 'Leave'}
+                                                {leaveTypeLabel(balance)}
                                             </span>
-                                            <span className="text-lg font-bold text-primary-600">
-                                                {balance.remaining || 0} <span className="text-xs font-normal text-default-500">days</span>
-                                            </span>
+                                            {unlimited ? (
+                                                <span className="text-xs font-medium text-default-500">No limit</span>
+                                            ) : locked ? (
+                                                <span className="text-xs font-semibold text-warning-600" title={lockLabel}>
+                                                    {lockLabel}
+                                                </span>
+                                            ) : (
+                                                <span className="text-lg font-bold text-primary-600">
+                                                    {balance.remaining || 0} <span className="text-xs font-normal text-default-500">days</span>
+                                                </span>
+                                            )}
                                         </div>
                                         <Progress
                                             value={usedPercentage}
@@ -100,8 +126,8 @@ export default function LeaveBalanceWidget({ employeeId, initialData }) {
                                             }}
                                         />
                                         <div className="flex justify-between text-xs text-default-500">
-                                            <span>Used: {balance.used || 0}</span>
-                                            <span>Total: {balance.total || 0}</span>
+                                            <span>Used: {balance.used || 0}{balance.pending ? ` · Pending: ${balance.pending}` : ''}</span>
+                                            <span>Total: {credited}</span>
                                         </div>
                                     </CardBody>
                                 </Card>

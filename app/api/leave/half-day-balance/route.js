@@ -7,13 +7,6 @@ import { getHalfDayLimit, normalizeHalfDayPolicy } from '@/lib/halfDayPolicy'
 
 export const dynamic = 'force-dynamic'
 
-function yearBounds(year) {
-  return {
-    start: new Date(Date.UTC(year, 0, 1)),
-    end: new Date(Date.UTC(year + 1, 0, 1)),
-  }
-}
-
 export async function GET(request) {
   try {
     const auth = await getAuthAndDatabase(request, LEAVE_STORE_OPTIONS)
@@ -38,7 +31,6 @@ export async function GET(request) {
     }
 
     const annualLimit = getHalfDayLimit(policy, employee.designationLevel)
-    const { start, end } = yearBounds(year)
 
     const [approved, pending] = await Promise.all([
       database.count('leaves', halfDayFilters(employee._id, year, 'approved')),
