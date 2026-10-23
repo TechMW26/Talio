@@ -484,6 +484,16 @@ export function withManpowerRequests(items, user, { isDepartmentHead = false, is
   return items
 }
 
+const LEAVE_ENCASHMENT_ITEM = { name: 'Leave Encashment', path: '/dashboard/leave/encashment' }
+
+/** Admin/HR only: add the encashment page to the existing leave submenu. */
+function withLeaveEncashment(items, role) {
+  if (!['admin', 'hr', 'super_admin', 'superadmin'].includes(role)) return items
+  return items.map(item => item.path === '/dashboard/attendance' && Array.isArray(item.submenu)
+    ? { ...item, submenu: [...item.submenu.filter(sub => sub.path !== LEAVE_ENCASHMENT_ITEM.path), LEAVE_ENCASHMENT_ITEM] }
+    : item)
+}
+
 export const getMenuItemsForRole = (role) => {
   const base = [...(roleBasedMenus[role] || roleBasedMenus.employee), {
     name: 'Resignations & Exits', icon: HiOutlineUserGroup, path: '/dashboard/resignations', group: 'People',
@@ -497,7 +507,7 @@ export const getMenuItemsForRole = (role) => {
   }]
 
   const hasHierarchy = base.some((item) => item.path === '/dashboard/hierarchy')
-  if (hasHierarchy) return annotateIsNew(base)
+  if (hasHierarchy) return annotateIsNew(withLeaveEncashment(base, role))
 
   const hierarchyItem = {
     name: 'Organogram',
@@ -507,5 +517,5 @@ export const getMenuItemsForRole = (role) => {
   }
 
   // Place hierarchy at the very top (right under the fixed Profile link in sidebar)
-  return annotateIsNew([hierarchyItem, ...base])
+  return annotateIsNew(withLeaveEncashment([hierarchyItem, ...base], role))
 }

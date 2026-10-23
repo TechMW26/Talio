@@ -7,18 +7,25 @@ import BackIcon from '@/components/ui/BackIcon'
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
-import { FaCalendarAlt, FaPlus, FaCheck } from 'react-icons/fa'
+import { FaCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useLeaveBalance from '@/hooks/useLeaveBalance'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
-import {
-  calculateLeaveDays,
-  normalizeLeaveBalances,
-} from '@/lib/leaveData'
+import BalanceStrip from '@/components/leave/BalanceStrip'
+import { countLeaveDays, formatLeaveDays } from '@/lib/leaveDays'
+import { currentFiscalYear, fiscalYearFor } from '@/lib/leavePolicy'
+
+const formatUnlockDate = value => {
+  if (!value) return ''
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`)
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
 
 export default function ApplyLeavePage() {
   const router = useRouter()
@@ -34,30 +41,42 @@ export default function ApplyLeavePage() {
     emergencyContact: '',
     handoverNotes: '',
   })
-  const balanceYear = Number(formData.startDate.slice(0, 4)) || new Date().getFullYear()
+  const balanceYear = formData.startDate ? fiscalYearFor(formData.startDate) : currentFiscalYear()
 
-  // SWR data fetching
-  const { data: leaveTypesRes, error: leaveTypesError, isLoading: leaveTypesLoading, isValidating: leaveTypesValidating } = useAuthedSWR('/api/leave/types')
-  const { data: leaveBalanceRes, error: leaveBalanceError, isLoading: leaveBalanceLoading, isValidating: leaveBalanceValidating, mutate: refreshBalance } = useAuthedSWR(
-    employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${balanceYear}` : null
-  )
+  // The computed balance is the single source for the dropdown: manual types
+  // (WL/BL) only appear once HR has allocated days, and the order is fixed.
+  const {
+    balances: leaveBalance,
+    preview,
+    loading: leaveBalanceLoading,
+    isValidating: leaveBalanceValidating,
+    error: leaveBalanceError,
+    refresh: refreshBalance,
+    getBalance,
+  } = useLeaveBalance({
+    year: balanceYear,
+    employeeId,
+    enabled: Boolean(employeeId),
+    startDate: formData.startDate || undefined,
+    endDate: formData.endDate || undefined,
+  })
 
-  const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
-  const leaveBalance = useMemo(
-    () => normalizeLeaveBalances(leaveBalanceRes?.data || []),
-    [leaveBalanceRes]
-  )
-  const loading = leaveTypesLoading || leaveBalanceLoading
-  const isValidating = leaveTypesValidating || leaveBalanceValidating
-  const error = leaveTypesError || leaveBalanceError
+  const loading = leaveBalanceLoading
+  const isValidating = leaveBalanceValidating
+  const error = leaveBalanceError
+
+  const selectedBalance = useMemo(() => {
+    if (!formData.leaveType) return null
+    return getBalance(formData.leaveType)
+  }, [formData.leaveType, getBalance])
+  const selectedType = selectedBalance?.leaveType || null
 
   // Submit mutation
   const submitLeave = useApiMutation({
     method: 'POST',
     invalidateKeys: [
-      employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${balanceYear}` : null,
       /^\/api\/leave/,
-    ].filter(Boolean),
+    ],
     onSuccess: () => {
       toast.success('Leave application submitted successfully!')
       setFormData({
@@ -68,6 +87,7 @@ export default function ApplyLeavePage() {
         emergencyContact: '',
         handoverNotes: '',
       })
+      refreshBalance()
       setTimeout(() => {
         router.push('/dashboard/leave/requests')
       }, 2000)
@@ -86,25 +106,28 @@ export default function ApplyLeavePage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const calculateDays = () => calculateLeaveDays(
-    formData.startDate,
-    formData.endDate,
-    false
-  )
-
-  const getAvailableBalance = () => {
-    if (!formData.leaveType) return 0
-    const balance = leaveBalance.find(balanceItem =>
-      String(balanceItem.leaveType?._id || balanceItem.leaveType) === String(formData.leaveType)
-    )
-    return balance?.remainingDays ?? 0
-  }
+  const calculateDays = () => countLeaveDays(formData.startDate, formData.endDate)
+  const days = calculateDays()
+  const requiresBalance = selectedBalance?.requiresBalance !== false
+  const availableBalance = requiresBalance ? Number(selectedBalance?.available ?? 0) : null
+  const paidDays = preview ? Number(preview.paidDays || 0) : days
+  const lockedTill = selectedBalance?.isLocked ? formatUnlockDate(selectedBalance.unlocksOn) : ''
+  const hasDates = Boolean(formData.startDate && formData.endDate)
+  const dateError = hasDates && formData.endDate < formData.startDate
+    ? 'End date cannot be before start date'
+    : ''
+  const noWorkingDays = hasDates && !dateError && days === 0
+    ? 'The selected dates contain no working days. Sundays are excluded.'
+    : ''
+  const lockedError = lockedTill ? `${selectedType?.name || 'This leave type'} is locked till ${lockedTill}` : ''
+  const noticeError = preview?.violation?.message || ''
+  const balanceError = requiresBalance && formData.leaveType && hasDates && !dateError && paidDays > availableBalance
+    ? `Only ${availableBalance} ${selectedType?.code || 'leave'} available for ${paidDays} paid day${paidDays === 1 ? '' : 's'}`
+    : ''
+  const inlineError = dateError || noWorkingDays || lockedError || noticeError || balanceError
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
-    const days = calculateDays()
-    const availableBalance = getAvailableBalance()
 
     // Full-day leave requires a leave type; WFH and half-day have separate flows.
     if (!formData.leaveType) {
@@ -117,8 +140,18 @@ export default function ApplyLeavePage() {
       return
     }
 
-    if (formData.leaveType && days > availableBalance) {
-      toast.error(`Insufficient leave balance. Available: ${availableBalance} days`)
+    if (lockedTill) {
+      toast.error(`${selectedType?.name || 'This leave type'} is locked till ${lockedTill}`)
+      return
+    }
+
+    if (noticeError) {
+      toast.error(noticeError)
+      return
+    }
+
+    if (requiresBalance && paidDays > availableBalance) {
+      toast.error(`Insufficient leave balance. Available: ${formatLeaveDays(availableBalance)}`)
       return
     }
 
@@ -130,14 +163,6 @@ export default function ApplyLeavePage() {
       workFromHome: false,
       employee: employeeId,
       numberOfDays: days,
-    })
-  }
-
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
     })
   }
 
@@ -196,11 +221,27 @@ export default function ApplyLeavePage() {
                       onSelectionChange={(keys) => setFormData({ ...formData, leaveType: Array.from(keys)[0] || '' })}
                       isRequired
                     >
-                      {leaveTypes.map((type) => (
-                        <SelectItem key={type._id} textValue={`${type.name} (${type.code})`}>
-                          {type.name} ({type.code})
-                        </SelectItem>
-                      ))}
+                      {leaveBalance.map((balance) => {
+                        const code = String(balance.leaveType?.code || balance.leaveType?._id || '')
+                        const name = balance.leaveType?.name || code
+                        const locked = Boolean(balance.isLocked)
+                        const unlimited = balance.requiresBalance === false
+                        const left = Number(balance.available ?? 0)
+                        const label = locked
+                          ? `${name} (${code}) · Locked till ${formatUnlockDate(balance.unlocksOn)}`
+                          : unlimited
+                            ? `${name} (${code}) · No balance needed`
+                            : `${name} (${code}) · ${left} left`
+                        return (
+                          <SelectItem
+                            key={code}
+                            textValue={label}
+                            isDisabled={locked || (!unlimited && left <= 0)}
+                          >
+                            {label}
+                          </SelectItem>
+                        )
+                      })}
                     </Select>
                   </div>
 
@@ -225,18 +266,20 @@ export default function ApplyLeavePage() {
                     />
                   </div>
 
-                  {/* Days Calculation */}
-                  {formData.startDate && formData.endDate && (
-                    <div className="bg-primary-50 p-4 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-primary-800">
-                          Total Days: {calculateDays()} day{calculateDays() !== 1 ? 's' : ''}
-                        </span>
-                        <span className="text-sm text-primary-600">
-                          {`Available Balance: ${getAvailableBalance()} days`}
-                        </span>
-                      </div>
-                    </div>
+                  {/* Live balance impact, including the notice-period split */}
+                  {!leaveBalanceLoading && formData.leaveType && formData.startDate && formData.endDate && (
+                    <BalanceStrip
+                      balance={selectedBalance}
+                      days={days}
+                      typeLabel={selectedType?.code || 'leave'}
+                      error={dateError || noWorkingDays}
+                      preview={preview}
+                      lockedTill={lockedTill}
+                      requiresBalance={requiresBalance}
+                    />
+                  )}
+                  {!formData.leaveType && (dateError || noWorkingDays) && (
+                    <p className="text-sm text-danger">{dateError || noWorkingDays}</p>
                   )}
 
                   {/* Reason */}
@@ -281,6 +324,8 @@ export default function ApplyLeavePage() {
                       type="submit"
                       color="primary"
                       isLoading={submitLeave.isLoading}
+                      loadingText="Submitting..."
+                      isDisabled={submitLeave.isLoading || !formData.leaveType || days === 0 || Boolean(inlineError)}
                       startContent={!submitLeave.isLoading && <FaCheck className="w-4 h-4" />}
                     >
                       {submitLeave.isLoading ? 'Submitting...' : 'Submit Application'}
@@ -301,36 +346,68 @@ export default function ApplyLeavePage() {
                 <p className="text-default-500 text-sm">No leave balance found</p>
               ) : (
                 <div className="space-y-4">
-                  {leaveBalance.map((balance) => (
-                    <div key={balance._id} className="border border-default-200 rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium text-default-800">{balance.leaveType?.name}</h4>
-                        <span className="text-sm text-default-500">{balance.leaveType?.code}</span>
+                  {leaveBalance.map((balance) => {
+                    const isSelected = String(balance.leaveType?.code || balance.leaveType?._id) === String(formData.leaveType)
+                    // totalDays already includes carried-forward days on the server projection.
+                    const capacity = balance.totalDays
+                    const usedPercent = capacity > 0 ? Math.min(100, ((balance.usedDays + balance.pending) / capacity) * 100) : 0
+                    const credited = balance.yearlyEntitlement != null
+                      ? `${balance.accrued} of ${balance.yearlyEntitlement} credited`
+                      : balance.manualAllocation
+                        ? `Allocated: ${formatLeaveDays(balance.totalDays)}`
+                        : 'No balance needed'
+                    const locked = balance.isLocked === true
+                    const unlimited = balance.requiresBalance === false
+                    return (
+                      <div
+                        key={balance._id}
+                        className={`border rounded-lg p-4 transition-colors ${isSelected ? 'border-primary bg-primary-50' : 'border-default-200'}`}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-medium text-default-800">{balance.leaveType?.name}</h4>
+                          <span className="text-sm text-default-500">{balance.leaveType?.code}</span>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-default-600">Credited:</span>
+                            <span className="font-medium text-success">{credited}</span>
+                          </div>
+                          {balance.carriedForward > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-default-600">Carried forward:</span>
+                              <span className="font-medium">{formatLeaveDays(balance.carriedForward)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between">
+                            <span className="text-default-600">Used:</span>
+                            <span className="text-danger">{formatLeaveDays(balance.usedDays)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-default-600">Pending:</span>
+                            <span className="text-warning-600">{formatLeaveDays(balance.pending)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-default-600">Available:</span>
+                            <span className={`font-medium ${locked || unlimited ? 'text-default-500' : 'text-blue-600'}`}>
+                              {unlimited
+                                ? 'No limit'
+                                : locked
+                                  ? `Locked till ${formatUnlockDate(balance.unlocksOn)}`
+                                  : formatLeaveDays(balance.available)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          <div className="w-full bg-default-200 rounded-full h-2">
+                            <div
+                              className="bg-primary h-2 rounded-full"
+                              style={{ width: `${usedPercent}%` }}
+                            ></div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-default-600">Total:</span>
-                          <span className="font-medium">{balance.totalDays} days</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-default-600">Used:</span>
-                          <span className="text-danger">{balance.usedDays} days</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-default-600">Remaining:</span>
-                          <span className="text-success font-medium">{balance.remainingDays} days</span>
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="w-full bg-default-200 rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full"
-                            style={{ width: `${(balance.usedDays / balance.totalDays) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardBody>

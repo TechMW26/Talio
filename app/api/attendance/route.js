@@ -14,6 +14,7 @@ import { randomBytes } from 'node:crypto'
 import { ATTENDANCE_DATABASE_OPTIONS, listAttendanceRecords, populateAttendanceEmployee, attendanceId } from '@/lib/platform/firestoreAttendance.server'
 import { saveAttendancePunch } from '@/lib/platform/firestoreAttendancePunch.server'
 import { isHolidayApplicable } from '@/lib/holidayPolicy'
+import { normalizeWorkingDays, resolveWorkingDays } from '@/lib/officeHours'
 import { getProductivityVisibility, queryProductivityByIds } from '@/lib/platform/firestoreProductivityView.server'
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
 import { createDailyMosaicOnCheckout } from '@/lib/productivityMosaic'
@@ -34,6 +35,17 @@ const isValidDateString = (value) => {
   if (!value) return false
   const parsed = new Date(value)
   return !Number.isNaN(parsed.getTime())
+}
+
+// The employee's linked company owns the work policy. Employees created without a
+// company link (single-company tenants) must still inherit that company's working days
+// instead of silently falling back to the Mon-Fri default.
+async function resolveCompanyPolicy(database, employee) {
+  const linked = employee?.company || null
+  if (normalizeWorkingDays(linked?.workingHours?.workingDays).length) return linked
+  const { records } = await database.list('companies', { limit: 2 })
+  const onlyCompany = records.length === 1 ? records[0] : null
+  return normalizeWorkingDays(onlyCompany?.workingHours?.workingDays).length ? onlyCompany : linked || onlyCompany
 }
 
 // GET is read-only. Background recovery is handled by the attendance scheduler.
@@ -147,8 +159,10 @@ export async function POST(request) {
 
     // Resolve the employee's company policy before any attendance branch uses it.
     let settings = (await database.list('companysettings', { limit: 1 })).records[0] || {}
-    if (employee.company?.workingHours) {
-      const companySettings = employee.company
+    const companyPolicy = await resolveCompanyPolicy(database, employee)
+    if (companyPolicy?.workingHours) {
+      const companySettings = companyPolicy
+      const companyWorkingDays = normalizeWorkingDays(companySettings.workingHours.workingDays)
       settings = {
         ...settings,
         checkInTime: companySettings.workingHours.checkInTime,
@@ -158,7 +172,8 @@ export async function POST(request) {
         halfDayHours: companySettings.workingHours.halfDayHours,
         geofence: companySettings.geofence,
         breakTimings: companySettings.breakTimings,
-        workingDays: companySettings.workingHours.workingDays,
+        // Keep the tenant-level days when the company has not configured any.
+        workingDays: companyWorkingDays.length ? companyWorkingDays : settings.workingDays,
         timezone: companySettings.timezone || DEFAULT_TIMEZONE,
       }
     }
@@ -327,15 +342,20 @@ export async function POST(request) {
       // Use Company Timezone for day checks to align with business operations
       const currentDayName = getDayNameInTimezone(new Date(), companyTimezone);
 
-      // Default to Mon-Fri if not specified
-      const workingDays = settings?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      // Configured working days (company first, then tenant settings, then Mon-Fri).
+      const workingDays = resolveWorkingDays(settings?.workingDays);
 
       // Allow check-in if it's a working day OR if there is an approved leave/WFH (handled later but we should check here)
       // Actually, if it's a non-working day, you shouldn't check in unless you have specific permission.
       // For now, strict blocking as requested.
       if (!workingDays.includes(currentDayName)) {
+        const configuredDays = workingDays.map((day) => day.charAt(0).toUpperCase() + day.slice(1)).join(', ')
         return NextResponse.json(
-          { success: false, message: `Check-in is not allowed today (${currentDayName} is not a working day).` },
+          {
+            success: false,
+            reason: 'non_working_day',
+            message: `Check-in is not allowed today (${currentDayName} is not a working day). Configured working days: ${configuredDays}. An admin can enable ${currentDayName} in Settings → Company Settings → Working Days.`,
+          },
           { status: 403 }
         )
       }

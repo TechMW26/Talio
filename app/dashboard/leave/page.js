@@ -84,7 +84,7 @@ export default function LeavePage() {
   const leaves = leavesRes?.data || []
 
   const { data: balanceRes, error: balanceError, isLoading: balanceLoading, mutate: refreshBalance } = useAuthedSWR(
-    employeeId ? `/api/leave/balance?employeeId=${employeeId}` : null
+    employeeId ? `/api/leave/balance?employeeId=${employeeId}&summary=1` : null
   )
   const leaveBalance = useMemo(
     () => normalizeLeaveBalances(balanceRes?.data || []),
@@ -100,7 +100,7 @@ export default function LeavePage() {
   const submitMutation = useApiMutation({
     invalidateKeys: [
       employeeId ? `/api/leave?employeeId=${employeeId}` : null,
-      employeeId ? `/api/leave/balance?employeeId=${employeeId}` : null,
+      /^\/api\/leave\/balance/,
     ].filter(Boolean),
     onSuccess: () => {
       toast.success('Leave request submitted successfully')
@@ -226,9 +226,17 @@ export default function LeavePage() {
               <p className="text-xs text-default-500">
                 Used: {balance.used} / Total: {balance.total}
               </p>
+              <p className="text-xs text-warning-600">
+                Pending: {balance.pending} · Available: {balance.available}
+              </p>
             </CardBody>
           </Card>
         ))}
+        {leaveBalance.length === 0 && (
+          <Card shadow="sm" className="col-span-full">
+            <CardBody className="p-4 text-sm text-default-500">No leave balance allocated</CardBody>
+          </Card>
+        )}
       </div>
 
       {/* Leave Requests */}
@@ -250,7 +258,7 @@ export default function LeavePage() {
                   <div key={leave._id} className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <Heading3 className="font-semibold text-default-800">{leave.leaveType?.name || 'N/A'}</Heading3>
+                        <Heading3 className="font-semibold text-default-800">{leave.leaveType?.name || leave.leaveTypeName || leave.leaveTypeCode || leave.requestLabel || 'Leave'}</Heading3>
                         <p className="text-sm text-default-600">{leave.numberOfDays} {leave.isHalfDay ? '(Half Day)' : 'days'}</p>
                       </div>
                       <Chip
@@ -318,7 +326,7 @@ export default function LeavePage() {
                   leaves.map((leave) => (
                     <tr key={leave._id} className="hover:bg-default-50">
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-default-800">
-                        {leave.leaveType?.name || 'N/A'}
+                        {leave.leaveType?.name || leave.leaveTypeName || leave.leaveTypeCode || leave.requestLabel || 'Leave'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-default-800">
                         {formatDate(leave.startDate)}

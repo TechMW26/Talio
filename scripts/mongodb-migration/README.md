@@ -49,6 +49,20 @@ Leaving the source freeze deferred does not authorize activating stale imported
 production catalogs. Final reconciliation, missing-media disposition and queued
 job preservation remain required before changing the live deployment.
 
+## Leave request backfill
+
+Requests created before leave types were stored as codes can be inspected without
+writing anything:
+
+```sh
+MONGODB_URI=... MONGODB_DATABASE=talio_company_x MONGODB_DATASET=... \
+  node scripts/mongodb-migration/backfill-leave-requests.cjs
+```
+
+The dry-run reports scanned/updated records, unresolved leave types, and example
+IDs. Add `--apply` only after reviewing that output. The script updates
+`leaveType`/`days`/`numberOfDays`; it never deletes records.
+
 ## Protected export first
 
 Local artifacts live under ignored `.migration-data/<run>/`, mode 0700/0600.

@@ -31,6 +31,9 @@ export default function EditEmployeePage() {
   const { data: desigRes } = useAuthedSWR(accessDenied ? null : '/api/designations')
   const designations = desigRes?.data || []
 
+  const { data: compRes } = useAuthedSWR(accessDenied ? null : '/api/companies')
+  const companies = compRes?.data || []
+
   const { data: assignRes } = useAuthedSWR(accessDenied ? null : '/api/employees?all=true&status=active&limit=500&sortBy=firstName&sortOrder=asc')
   const assignmentEmployees = assignRes?.data || []
 
@@ -120,6 +123,7 @@ export default function EditEmployeePage() {
     address: '',
     departments: [],
     department: '',
+    company: '',
     designation: '',
     designationLevel: '',
     designationLevelName: '',
@@ -216,6 +220,7 @@ export default function EditEmployeePage() {
       address: formatEmployeeAddress(emp.address),
       departments: deptIds.length > 0 ? deptIds : (primaryDept ? [primaryDept] : []),
       department: primaryDept,
+      company: emp.company?._id?.toString() || emp.company?.toString() || '',
       designation: emp.designation?._id?.toString() || emp.designation?.toString() || '',
       designationLevel: emp.designationLevel || emp.designation?.level || 1,
       designationLevelName: emp.designationLevelName || emp.designation?.levelName || '',
@@ -293,6 +298,15 @@ export default function EditEmployeePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    // The system role is resolved against the employee's company, so both are required.
+    if (!formData.company) {
+      toast.error('Please select a company')
+      return
+    }
+    if (!formData.systemRole) {
+      toast.error('Please select a system role')
+      return
+    }
     const payload = { ...formData }
 
     if (String(payload.designation || '').startsWith('preset:')) {
@@ -585,6 +599,34 @@ export default function EditEmployeePage() {
                       </Surface>
                     )}
                   </div>
+                </div>
+
+                {/* Company */}
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-2">
+                    Company *
+                  </label>
+                  <Select
+                    isRequired
+                    selectedKeys={formData.company ? new Set([String(formData.company)]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return
+                      const value = Array.from(keys)[0] || ''
+                      setFormData((prev) => ({ ...prev, company: String(value) }))
+                    }}
+                    aria-label="Company"
+                    placeholder="Select Company"
+                    classNames={{ trigger: "bg-white" }}
+                  >
+                    {companies.map((company) => (
+                      <SelectItem key={String(company._id)} textValue={`${company.name} (${company.code})`}>
+                        {company.name} ({company.code})
+                      </SelectItem>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-default-500 mt-1">
+                    Company assignments and the system role are linked — pick the employee&apos;s company to save a role.
+                  </p>
                 </div>
 
                 {/* Designation & Level - Side by Side */}
