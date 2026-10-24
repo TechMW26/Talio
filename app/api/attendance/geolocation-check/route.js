@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
-import { ATTENDANCE_DATABASE_OPTIONS, attendanceId, attendanceError, populateAttendanceEmployee } from '@/lib/platform/firestoreAttendance.server'
+import { ATTENDANCE_DATABASE_OPTIONS, attendanceId, attendanceError, populateAttendanceEmployee, pickCanonicalAttendance } from '@/lib/platform/firestoreAttendance.server'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { evaluateEmployeeGeofence, isValidCoordinate } from '@/lib/geofencing'
 import { getAttendanceDayRange } from '@/lib/attendanceAutoCheckout'
@@ -19,9 +19,8 @@ export async function POST(request) {
     const global = (await database.list('companysettings', { limit: 1 })).records[0] || {}
     const settings = { ...global, ...employee.company?.workingHours, geofence: employee.company?.geofence || global.geofence, breakTimings: employee.company?.breakTimings || global.breakTimings || [], timezone: getTimezone(employee.company?.timezone || global.timezone) }
     const range = getAttendanceDayRange(new Date(), settings.timezone)
-    const records = (await database.list('attendances', { filters: [{ field: 'employee', operator: '==', value: employee._id }, { field: 'date', operator: '>=', value: range.start }, { field: 'date', operator: '<=', value: range.end }], limit: 2 })).records
-    if (records.length > 1) throw attendanceError('Duplicate attendance records require reconciliation', 409)
-    const attendance = records[0]
+    const records = (await database.list('attendances', { filters: [{ field: 'employee', operator: '==', value: employee._id }, { field: 'date', operator: '>=', value: range.start }, { field: 'date', operator: '<=', value: range.end }], limit: 10 })).records
+    const attendance = pickCanonicalAttendance(records, null)
     if (!attendance?.checkIn || attendance.checkOut) return NextResponse.json({ success: true, message: 'Not checked in or already checked out', isCheckedIn: false })
     const result = await evaluateEmployeeGeofence({ database, settings, latitude, longitude, accuracy, locationSource, employeeId: employee._id, departmentId: employee.department?._id, companyId: employee.company?._id })
     if (!result.enabled || result.withinGeofence) return NextResponse.json({ success: true, message: result.message, withinGeofence: true, isCheckedIn: true, location: result.closestLocation?.name })

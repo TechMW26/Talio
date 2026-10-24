@@ -11,7 +11,7 @@ import { validateLocationData } from '@/lib/geocoding'
 import { emitAttendanceUpdate, emitDashboardRefresh, emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { randomBytes } from 'node:crypto'
-import { ATTENDANCE_DATABASE_OPTIONS, listAttendanceRecords, populateAttendanceEmployee, attendanceId } from '@/lib/platform/firestoreAttendance.server'
+import { ATTENDANCE_DATABASE_OPTIONS, listAttendanceRecords, populateAttendanceEmployee, attendanceId, attendanceKey, pickCanonicalAttendance } from '@/lib/platform/firestoreAttendance.server'
 import { saveAttendancePunch } from '@/lib/platform/firestoreAttendancePunch.server'
 import { isHolidayApplicable } from '@/lib/holidayPolicy'
 import { normalizeWorkingDays, resolveWorkingDays } from '@/lib/officeHours'
@@ -266,12 +266,17 @@ export async function POST(request) {
     // Check for approved leave or work from home for today
     const [leaves, dayRecords] = await Promise.all([
       listAttendanceRecords(database, 'leaves', [{ field: 'employee', operator: '==', value: employeeId }, { field: 'status', operator: '==', value: 'approved' }, { field: 'startDate', operator: '<=', value: new Date() }, { field: 'endDate', operator: '>=', value: today }]),
-      database.list('attendances', { filters: [{ field: 'employee', operator: '==', value: employeeId }, { field: 'date', operator: '>=', value: today }, { field: 'date', operator: '<', value: tomorrow }], limit: 2 }),
+      database.list('attendances', { filters: [{ field: 'employee', operator: '==', value: employeeId }, { field: 'date', operator: '>=', value: today }, { field: 'date', operator: '<', value: tomorrow }], limit: 10 }),
     ])
-    if (dayRecords.records.length > 1) return NextResponse.json({ success: false, message: 'Duplicate attendance records require reconciliation' }, { status: 409 })
+    let canonicalAttendance = null
+    try {
+      canonicalAttendance = pickCanonicalAttendance(dayRecords.records, attendanceKey(employeeId, today))
+    } catch (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.status || 409 })
+    }
     const todayLeave = leaves.find(l => l.requestType !== 'early_leave')
     const todayEarlyLeave = leaves.find(l => l.requestType === 'early_leave')
-    let attendance = dayRecords.records[0] || null
+    let attendance = canonicalAttendance
     const originalAttendance = attendance ? { ...attendance } : null
 
     const evaluateAttendanceLocation = async () => {
