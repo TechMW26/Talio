@@ -7,6 +7,39 @@ import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 import { clearCachePattern, buildCachePattern } from '@/lib/cache'
 import { normalizeLeaveTypes } from '@/lib/leaveData'
 import { EMPLOYED_STATUSES, LEAVE_BALANCE_STORE_OPTIONS } from '@/lib/leaveAllocation.server'
+import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
+
+const csvCell = value => {
+  const text = value instanceof Date ? value.toISOString().slice(0, 10) : String(value ?? '')
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+// Excel files are binary (zip). Convert the first sheet to CSV text before AI parsing.
+async function readImportFileAsText(fileName, buffer) {
+  const name = String(fileName || '').toLowerCase()
+  if (name.endsWith('.xls')) {
+    throw Object.assign(new Error('Old .xls files are not supported. Please save the sheet as .xlsx or .csv and try again.'), { status: 400 })
+  }
+  if (name.endsWith('.xlsx')) {
+    let rows
+    try {
+      rows = await readFirstWorksheetRows(buffer)
+    } catch {
+      throw Object.assign(new Error('Could not read the Excel file. Please check it is a valid .xlsx file.'), { status: 400 })
+    }
+    return rows
+      .filter(row => row.some(cell => String(cell ?? '').trim() !== ''))
+      .map(row => row.map(csvCell).join(','))
+      .join('\n')
+  }
+  return buffer.toString('utf-8')
+}
+
+export const maxDuration = 300
+
+const IMPORT_BATCH_ROWS = 10
+const IMPORT_MAX_BATCHES = 60
+const IMPORT_CONCURRENCY = 4
 
 // POST - Bulk import leave balances from CSV/text data using AI parsing
 export async function POST(request) {
@@ -49,7 +82,7 @@ export async function POST(request) {
     if (mode === 'preview') {
       // Read file content
       const arrayBuffer = await file.arrayBuffer()
-      const fileContent = Buffer.from(arrayBuffer).toString('utf-8')
+      const fileContent = await readImportFileAsText(file.name, Buffer.from(arrayBuffer))
 
       if (!fileContent.trim()) {
         return NextResponse.json({ success: false, message: 'File is empty' }, { status: 400 })
@@ -75,7 +108,7 @@ ${leaveTypeList}
 RULES:
 - Match employees by employee code, name, or email (fuzzy match is OK).
 - Match leave types by code or name (fuzzy match is OK, e.g. "CL" matches "Casual Leave" with code "CL").
-- The totalDays must be a positive integer.
+- totalDays must be a non-negative number. Keep decimals exactly as in the file (e.g. 3.34, 1.5).
 - If you cannot confidently match an employee or leave type, set matched to false and provide the original text in unmatchedEmployee or unmatchedLeaveType.
 - Return ONLY valid JSON, no markdown, no code fences.
 
@@ -95,15 +128,43 @@ OUTPUT FORMAT (JSON array):
   }
 ]`
 
-      const prompt = `Parse the following uploaded file data and extract leave balance allocations. Match each row to the correct employee and leave type from the lists provided in the system instruction.
+      // Large sheets exceed the AI output limit in one call, so parse in small row batches.
+      const lines = fileContent.split(/\r?\n/).filter(line => line.trim())
+      const [headerLine = '', ...dataLines] = lines
+      const batches = []
+      for (let offset = 0; offset < Math.max(dataLines.length, 1); offset += IMPORT_BATCH_ROWS) {
+        batches.push({ offset, rows: dataLines.slice(offset, offset + IMPORT_BATCH_ROWS) })
+      }
+      if (batches.length > IMPORT_MAX_BATCHES) {
+        return NextResponse.json(
+          { success: false, message: `File is too large. Please import at most ${IMPORT_BATCH_ROWS * IMPORT_MAX_BATCHES} rows at a time.` },
+          { status: 400 }
+        )
+      }
+
+      const parseBatch = async ({ offset, rows }) => {
+        const prompt = `Parse the following uploaded file data and extract leave balance allocations. Match each row to the correct employee and leave type from the lists provided in the system instruction. The first data row below is row ${offset + 2} of the file.
 
 FILE CONTENT:
-${fileContent.substring(0, 15000)}`
+${[headerLine, ...rows].join('\n')}`
+        const aiResponse = await generateContent(prompt, systemInstruction, { useCase: 'json' })
+        const result = parseAIJsonResponse(aiResponse, { expectedRoot: 'array' })
+        return Array.isArray(result) ? result : []
+      }
 
       let parsedData
       try {
-        const aiResponse = await generateContent(prompt, systemInstruction, { useCase: 'json' })
-        parsedData = parseAIJsonResponse(aiResponse, { expectedRoot: 'array' })
+        const results = new Array(batches.length)
+        let nextBatch = 0
+        await Promise.all(
+          Array.from({ length: Math.min(IMPORT_CONCURRENCY, batches.length) }, async () => {
+            while (nextBatch < batches.length) {
+              const index = nextBatch++
+              results[index] = await parseBatch(batches[index])
+            }
+          })
+        )
+        parsedData = results.flat()
       } catch (parseError) {
         console.error('AI parsing error:', parseError)
         return NextResponse.json(
