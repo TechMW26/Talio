@@ -7,12 +7,14 @@ import { toast } from '@/utils/toast'
 import { createMiraSpeechPlayback } from '@/lib/miraSpeechPlayback'
 import MiraAdminSettings from './MiraAdminSettings'
 import MiraDesktopHabits from './MiraDesktopHabits'
+import { sanitizeMiraProactive } from '@/lib/miraProactive'
 
 export default function MiraSettings() {
   const { data: response, isLoading, mutate } = useAuthedSWR('/api/mira/preferences')
   const [voiceId, setVoiceId] = useState('ftDdhfYtmfGP0tFlBYA1')
   const [customInstructions, setCustomInstructions] = useState('')
   const [knowledge, setKnowledge] = useState('')
+  const [proactive, setProactive] = useState(() => sanitizeMiraProactive())
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const playbackRef = useRef(null)
@@ -23,6 +25,7 @@ export default function MiraSettings() {
     setVoiceId(response.data.voiceId)
     setCustomInstructions(response.data.customInstructions || '')
     setKnowledge(response.data.knowledge || '')
+    setProactive(sanitizeMiraProactive(response.data.proactive))
   }, [response])
 
   useEffect(() => () => {
@@ -36,11 +39,12 @@ export default function MiraSettings() {
       const token = localStorage.getItem('token')
       const result = await fetch('/api/mira/preferences', {
         method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ voiceId, customInstructions, knowledge }),
+        body: JSON.stringify({ voiceId, customInstructions, knowledge, proactive }),
       })
       const body = await result.json()
       if (!result.ok || !body.success) throw new Error(body.message || 'Could not save MIRA settings.')
       await mutate({ ...response, data: body.data }, false)
+      window.dispatchEvent(new Event('mira:preferences-updated'))
       toast.success('MIRA settings saved')
     } catch (error) { toast.error(error.message || 'Could not save MIRA settings.') }
     finally { setSaving(false) }
@@ -65,6 +69,23 @@ export default function MiraSettings() {
   return <div className="space-y-7">
     <MiraAdminSettings />
     <MiraDesktopHabits />
+    <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">
+      <h3 className="text-lg font-semibold text-foreground">Proactive MIRA</h3>
+      <p className="mt-1 text-sm text-default-500">Bring up timely, relevant items from your own connected work. Reminders you request are delivered even when proactive assistance is off.</p>
+      <label className="mt-4 flex items-center gap-3 text-sm font-medium"><input type="checkbox" checked={proactive.enabled} onChange={event => setProactive(value => ({ ...value, enabled: event.target.checked }))} />Let MIRA keep track of my work</label>
+      <fieldset disabled={!proactive.enabled} className="mt-4 grid gap-3 sm:grid-cols-2 disabled:opacity-50">
+        {[['meetings', 'Upcoming meetings and follow-ups'], ['tasks', 'Upcoming and overdue tasks'], ['messages', 'Unread messages and recorded calls'], ['email', 'Unread email from connected accounts']].map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm text-default-600"><input type="checkbox" checked={proactive[key]} onChange={event => setProactive(value => ({ ...value, [key]: event.target.checked }))} />{label}</label>)}
+      </fieldset>
+      <div className="mt-5 border-t border-default-100 pt-4">
+        <label className="flex items-center gap-2 text-sm text-default-600"><input type="checkbox" checked={proactive.quietHoursEnabled} onChange={event => setProactive(value => ({ ...value, quietHoursEnabled: event.target.checked }))} />Keep proactive interruptions quiet during these hours</label>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <label className="text-xs text-default-500">From<input aria-label="Quiet hours start" type="time" value={proactive.quietStart} onChange={event => setProactive(value => ({ ...value, quietStart: event.target.value }))} className="mt-1 block w-full rounded-lg border border-default-200 bg-default-50 p-2 text-sm text-foreground" /></label>
+          <label className="text-xs text-default-500">Until<input aria-label="Quiet hours end" type="time" value={proactive.quietEnd} onChange={event => setProactive(value => ({ ...value, quietEnd: event.target.value }))} className="mt-1 block w-full rounded-lg border border-default-200 bg-default-50 p-2 text-sm text-foreground" /></label>
+          <label className="col-span-2 text-xs text-default-500 sm:col-span-1">Timezone<input aria-label="Proactive timezone" value={proactive.timezone} onChange={event => setProactive(value => ({ ...value, timezone: event.target.value }))} placeholder="Asia/Kolkata" className="mt-1 block w-full rounded-lg border border-default-200 bg-default-50 p-2 text-sm text-foreground" /></label>
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-default-400">MIRA uses saved meeting summaries and action items when available. WhatsApp and external phone calls are not connected.</p>
+    </section>
     <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div><h3 className="text-lg font-semibold text-foreground">MIRA voice</h3><p className="mt-1 text-sm text-default-500">Six Indian voices for previews and live calls. Your choice follows your account across devices.</p></div>

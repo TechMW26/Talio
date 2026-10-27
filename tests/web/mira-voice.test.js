@@ -259,7 +259,7 @@ test('the same sidebar smoothly expands to full width and collapses', () => {
   fireEvent.click(screen.getByLabelText('Expand MIRA workspace'))
   expect(card.style.width).toBe('calc(100vw - 24px)')
   expect(card.style.left).toBe('12px')
-  expect(card.style.transitionProperty).toContain('left, top, width')
+  expect(card.style.transitionProperty).toBe('opacity, transform')
   expect(screen.getByRole('dialog', { name: 'MIRA assistant' })).toBe(card)
   fireEvent.click(screen.getByLabelText('Collapse MIRA sidebar'))
   expect(card.style.width).toContain('460px')

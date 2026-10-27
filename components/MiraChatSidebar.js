@@ -3,6 +3,10 @@
 import BackIcon from '@/components/ui/BackIcon'
 
 import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useReducedMotion } from 'framer-motion'
+import useMiraProactive from '@/hooks/useMiraProactive'
+import MiraAttention from '@/components/ui/MiraAttention'
+import { getCurrentUser, getUserId } from '@/utils/userHelper'
 import { FaTimes, FaPaperPlane, FaTrash, FaExternalLinkAlt, FaHistory, FaPlus, FaRegTrashAlt, FaCopy, FaCheck, FaDownload, FaSlash, FaBolt, FaTasks, FaCalendarAlt, FaProjectDiagram, FaBriefcase, FaUserClock, FaLightbulb, FaExpand, FaCompress, FaMicrophone, FaStop, FaPen, FaUndo } from 'react-icons/fa'
 import { useRouter, usePathname } from 'next/navigation'
 import { useMiraChat } from '@/contexts/MiraChatContext'
@@ -465,6 +469,10 @@ export default function MiraChatSidebar() {
     sessions, activeSessionId, showHistory, toggleHistory, loadSession, startNewChat, deleteSession, sessionsLoading
   } = useMiraChat()
   const { theme, isDarkMode } = useTheme()
+  const account = getCurrentUser()
+  const accountId = getUserId(account)
+  const attentionAccountKey = accountId ? `${account?.tenant?.databaseName || account?.databaseName || ''}:${accountId}` : ''
+  const attention = useMiraProactive({ enabled: Boolean(accountId), accountKey: attentionAccountKey, backgroundActive: isOpen })
   const [input, setInput] = useState('')
   const [editing, setEditing] = useState(null)
   const [replying, setReplying] = useState(null)
@@ -485,9 +493,12 @@ export default function MiraChatSidebar() {
   const voiceResults = messages.filter(message => message.role === 'assistant' && message.data?.voiceTool && !message.streaming && new Date(message.timestamp).getTime() >= (voice.startedAt || 0))
   const voiceConnecting = voice.state === 'loading'
   const [dismissedDetails, setDismissedDetails] = useState(null)
+  const [dismissedAttentionDetails, setDismissedAttentionDetails] = useState(null)
   const floatingResult = miraFloatingResult(latestReply, voice.active)
   const detailsKey = floatingResult ? `${activeSessionId}:${floatingResult.id}` : null
   const floatingDetails = detailsKey && detailsKey !== dismissedDetails ? floatingResult : null
+  const attentionDetailsKey = attention.events.length ? `${attentionAccountKey}:${attention.events.map(item => `${item.id}:${item.dueAt || item.occurredAt || ''}`).join('|')}` : null
+  const floatingAttention = attentionDetailsKey && attentionDetailsKey !== dismissedAttentionDetails
   const [wakeRequested, setWakeRequested] = useState(false)
   useEffect(() => {
     if (isOpen && wakeRequested) { setWakeRequested(false); void voice.start() }
@@ -515,6 +526,7 @@ export default function MiraChatSidebar() {
   }, [router, setViewMode, openWidget])
   const [backgroundCompact, setBackgroundCompact] = useState(false)
   const panelVisible = useMiraPanelVisible(isOpen)
+  const reducedMotion = useReducedMotion()
   const pip = isOpen && (minimized || backgroundCompact)
   const windowRadius = useMiraWindowRadius(isOpen, pip ? 'pip' : 'sidebar')
   useEffect(() => {
@@ -539,6 +551,12 @@ export default function MiraChatSidebar() {
   const restoreMira = () => {
     nativePipRef.current?.restore({ focus: true })
     setViewMode('chat')
+  }
+  const openAttentionItem = item => {
+    // The details can be portaled into an external PiP; open its destination in the main app.
+    if (window.electronAPI?.activateMira) window.electronAPI.activateMira().catch(() => {})
+    else window.focus()
+    router.push(item.link)
   }
   const toggleMicrophone = () => voice.active ? voice.stop() : voice.start()
   const [slashResults, setSlashResults] = useState([])
@@ -690,7 +708,7 @@ export default function MiraChatSidebar() {
         <div
           aria-hidden="true"
           className="fixed inset-0 bg-black/30 transition-opacity motion-reduce:transition-none z-[99998]"
-          style={{ opacity: panelVisible && !pip ? 1 : 0, pointerEvents: isOpen && !pip ? 'auto' : 'none', transitionDuration: '450ms', transitionTimingFunction: 'ease-in-out' }}
+          style={{ opacity: panelVisible && !pip ? 1 : 0, pointerEvents: isOpen && !pip ? 'auto' : 'none', transitionDuration: reducedMotion ? '0ms' : '120ms', transitionTimingFunction: 'ease-out' }}
           onClick={closeChat}
         />
 
@@ -708,10 +726,10 @@ export default function MiraChatSidebar() {
         className={`mira-workspace fixed flex flex-col z-[99999] ${pip ? 'mira-floating-workspace' : 'overflow-hidden shadow-2xl'}`}
         style={{
           opacity: panelVisible ? 1 : 0,
-          transform: panelVisible ? 'translate3d(0, 0, 0)' : 'translate3d(-40px, 0, 0)',
+          transform: panelVisible || reducedMotion ? 'none' : 'scale(.96)',
           pointerEvents: isOpen ? 'auto' : 'none',
-          transitionDuration: '450ms',
-          transitionTimingFunction: panelVisible ? 'cubic-bezier(0.22, 0.65, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.6, 1)',
+          transitionDuration: reducedMotion ? '0ms' : panelVisible ? '180ms' : '120ms',
+          transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)',
           left: pip ? 'auto' : expanded ? 12 : sidebarDrag.position?.x ?? 12,
           right: pip ? '24px' : undefined,
           zIndex: pip ? 2147483647 : undefined,
@@ -720,7 +738,7 @@ export default function MiraChatSidebar() {
           bottom: pip ? 'max(24px, env(safe-area-inset-bottom))' : 'auto',
           height: pip ? 224 : 'calc(100dvh - var(--mira-panel-top, 73px) - 12px)',
           minHeight: pip ? 224 : undefined,
-          transitionProperty: sidebarDrag.dragging ? 'none' : pip ? 'opacity, transform' : 'opacity, transform, left, top, width',
+          transitionProperty: sidebarDrag.dragging ? 'none' : 'opacity, transform',
           width: pip ? 'min(224px, 100vw)' : expanded ? 'calc(100vw - 24px)' : 'min(460px, calc(100vw - 24px))',
           background: isDarkMode
             ? 'rgba(18, 18, 18, 0.72)'
@@ -737,13 +755,16 @@ export default function MiraChatSidebar() {
         {!pip && isOpen && (voiceConnecting || isThinking || latestReply?.streaming || voice.state === 'speaking') && <AIActivityBeam active theme="dark" borderRadius={windowRadius} />}
         {pip && <div data-mira-pip-content className="relative flex flex-1 items-center justify-center">
           <MiraFloatingFace state={voice.active ? voice.state : undefined} isThinking={isThinking || voiceConnecting} onRestore={restoreMira} onClose={closeChat}
-            onCloseDetails={() => setDismissedDetails(detailsKey)}
-            details={floatingDetails ? <>
+            onCloseDetails={() => { setDismissedDetails(detailsKey); setDismissedAttentionDetails(attentionDetailsKey) }}
+            details={floatingDetails || floatingAttention ? <>
+              {floatingAttention && <MiraAttention attention={attention} onOpen={openAttentionItem} />}
+              {floatingDetails && <>
               {(!voice.active || floatingDetails.data?.voiceTool) && <div className="text-sm leading-relaxed mira-markdown"><ReactMarkdown>{String(floatingDetails.data?.message || floatingDetails.content || '').slice(0, 900)}</ReactMarkdown></div>}
               {sanitizeMiraCards(floatingDetails.data?.cards).map((card, index) => <AICard key={index} card={card} />)}
               {floatingDetails.data?.image && <MiraGeneratedImage image={floatingDetails.data.image} />}
               {floatingDetails.data?.gallery && <MiraScreenshotGallery gallery={floatingDetails.data.gallery} />}
               <MiraActionPreview action={floatingDetails.data?.action} result={floatingDetails.data?.actionResult} messageId={floatingDetails.id} busy={isThinking} />
+              </>}
             </> : null} />
         </div>}
         <MiraVoiceConnecting active={!pip && isOpen && voiceConnecting} onCancel={voice.stop} />
@@ -795,6 +816,8 @@ export default function MiraChatSidebar() {
             </button>
           </div>
         </div>
+
+        {!pip && <MiraAttention attention={attention} onOpen={openAttentionItem} />}
 
         {/* Chat History Panel */}
         {voice.active ? (

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function ActiveSessionsSection() {
   const [sessions, setSessions] = useState([])
@@ -149,13 +150,13 @@ export default function ActiveSessionsSection() {
           {[1, 2].map((i) => (
             <div
               key={i}
-              className="p-4 rounded-2xl bg-slate-50 border border-slate-100 animate-pulse"
+              className="p-4 rounded-2xl bg-slate-50 border border-slate-100 "
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-slate-200" />
+                <TalioSkeleton className="w-12 h-12 rounded-xl bg-slate-200" />
                 <div className="flex-1">
-                  <div className="h-4 bg-slate-200 rounded w-32 mb-2" />
-                  <div className="h-3 bg-slate-200 rounded w-48" />
+                  <TalioSkeleton className="h-4 bg-slate-200 rounded w-32 mb-2" />
+                  <TalioSkeleton className="h-3 bg-slate-200 rounded w-48" />
                 </div>
               </div>
             </div>

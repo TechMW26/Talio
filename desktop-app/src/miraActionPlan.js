@@ -1,4 +1,5 @@
 'use strict';
+const { DESKTOP_ORCHESTRATION_POLICY, DESKTOP_SKILLS } = require('./miraOrchestration');
 
 // Shared by the native boundary and the fallback planner. No OS dependencies.
 const BROWSER_APP = /^(?:google chrome|chrome|chromium|safari|microsoft edge|edge|firefox|brave browser|brave|opera|vivaldi|arc)(?:\.exe)?$/i;
@@ -79,4 +80,4 @@ function channelContext(goal, app, targets = []) {
   return { requested, observed, mismatch: Boolean(requested && observed && (requested === 'dm' ? observed === 'email' : requested !== observed)), requiresVisualVerification: true };
 }
 
-module.exports = { BROWSER_APP, DESKTOP_PLANNING_POLICY, safeNavigationUrl, allowsNewTab, validateActionBatch, channelContext, validateComputerAction, KEY_ACTIONS };
+module.exports = { BROWSER_APP, DESKTOP_PLANNING_POLICY: `${DESKTOP_PLANNING_POLICY}\n${DESKTOP_ORCHESTRATION_POLICY}\nAvailable planning skills: ${JSON.stringify(DESKTOP_SKILLS)}`, safeNavigationUrl, allowsNewTab, validateActionBatch, channelContext, validateComputerAction, KEY_ACTIONS };

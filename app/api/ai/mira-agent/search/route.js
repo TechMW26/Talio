@@ -31,7 +31,7 @@ export async function POST(request) {
     if (!balance.allowed) return NextResponse.json({ success: false, message: 'Your monthly Mira allowance is exhausted' }, { status: 429 })
     const plan = await planMiraRetrieval(query, conversationHistory, { signal: request.signal, forceWeb: true })
     if (plan.kind !== 'web') return NextResponse.json({ success: false, message: 'Use ask_mira for private information or saved conversations.' }, { status: 400 })
-    const result = await getMiraInternetContext(`Search the web for ${plan.query}`, {})
+    const result = await getMiraInternetContext(`Search the web for ${plan.query}`, {}, '', { signal: request.signal })
     return NextResponse.json({ success: true, ...result }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     return NextResponse.json({ success: false, message: 'Public lookup is unavailable. Do not claim internet verification.' }, { status: error instanceof SyntaxError ? 400 : 502 })

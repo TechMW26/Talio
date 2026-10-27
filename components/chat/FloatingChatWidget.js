@@ -395,16 +395,9 @@ export default function FloatingChatWidget() {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.15); }
     }
-    @keyframes bounceIn {
-      0% { transform: scale(0.3); opacity: 0; }
-      50% { transform: scale(1.05); }
-      70% { transform: scale(0.9); }
-      100% { transform: scale(1); opacity: 1; }
-    }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(20px) scale(0.95); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
+    @keyframes bounceIn { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes slideUp { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .talio-chat-widget { animation: none !important; } }
     @keyframes float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-5px); }
@@ -419,13 +412,13 @@ export default function FloatingChatWidget() {
       {isWidgetOpen && (
         <div
           ref={widgetRef}
-          className="fixed rounded-2xl overflow-hidden overflow-x-hidden z-[9999] flex flex-col"
+          className="talio-chat-widget fixed rounded-2xl overflow-hidden overflow-x-hidden z-[9999] flex flex-col"
           style={{
             width: '340px',
             height: '480px',
             ...glassStyle,
             ...widgetStyle,
-            animation: 'slideUp 0.3s ease-out',
+            animation: 'slideUp 0.18s ease-out',
           }}
         >
           {/* Header - Draggable */}

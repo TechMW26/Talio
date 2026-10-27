@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function EmailPage() {
   const [companies, setCompanies] = useState([])
@@ -143,9 +144,9 @@ export default function EmailPage() {
   if (loading) {
     return (
       <div className="p-6 lg:p-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-48"></div>
-          <div className="h-96 bg-gray-100 rounded-2xl"></div>
+        <div className="space-y-6">
+          <TalioSkeleton className="h-8 bg-gray-200 rounded w-48" />
+          <TalioSkeleton className="h-96 bg-gray-100 rounded-2xl" />
         </div>
       </div>
     )

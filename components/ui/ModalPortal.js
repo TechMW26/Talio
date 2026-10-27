@@ -35,7 +35,7 @@ export default function ModalPortal({ isOpen, children }) {
   if (typeof window === 'undefined') return null
 
   return createPortal(
-    <div style={{ position: 'relative', zIndex: 99999 }}>
+    <div data-talio-popup-portal style={{ position: 'relative', zIndex: 99999 }}>
       {children}
     </div>,
     document.body

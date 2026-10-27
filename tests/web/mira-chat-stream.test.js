@@ -11,6 +11,50 @@ global.TextDecoder = TextDecoder
 const wrapper = ({ children }) => <MiraChatProvider>{children}</MiraChatProvider>
 const bytes = value => new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`)
 
+test('cancelling an in-flight write preserves the uncertain task and stable execution identity', async () => {
+  let sent, turn
+  global.fetch = jest.fn(async (url, options) => {
+    if (url === '/api/ai/mira-chat') return { json: async () => ({ success: true, response: { message: '', action: { type: 'create_task', fields: { title: 'Review' } } } }) }
+    if (url === '/api/ai/mira-actions') {
+      sent = JSON.parse(options.body)
+      return new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(new DOMException('Stopped', 'AbortError')), { once: true }))
+    }
+    return { json: async () => ({ success: false }) }
+  })
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { turn = result.current.sendMessage('Create a task called Review') })
+  expect(sent.requestId).toBeTruthy()
+  await act(async () => { result.current.interruptResponse(); await turn })
+  const receipt = result.current.messages.at(-1)
+  expect(receipt.data.actionResult).toMatchObject({ success: false, uncertain: true })
+  expect(receipt.data.taskBank.tasks[0]).toMatchObject({ status: 'blocked', uncertain: true, executionId: sent.requestId })
+  expect(fetch.mock.calls.filter(([url]) => url === '/api/ai/mira-actions')).toHaveLength(1)
+})
+
+test('an immediate retry receives the in-flight write receipt before the abort handler settles', async () => {
+  let sent, original
+  global.fetch = jest.fn(async (url, options) => {
+    if (url === '/api/ai/mira-chat') {
+      const body = JSON.parse(options.body)
+      if (body.message === 'Retry') {
+        expect(body.taskBank.tasks[0]).toMatchObject({ status: 'blocked', uncertain: true, executionId: sent.requestId })
+        return { json: async () => ({ success: true, response: { message: 'Check the destination before retrying.', taskBank: body.taskBank } }) }
+      }
+      return { json: async () => ({ success: true, response: { message: '', action: { type: 'create_task', fields: { title: 'Review' } } } }) }
+    }
+    if (url === '/api/ai/mira-actions') {
+      sent = JSON.parse(options.body)
+      return new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(new DOMException('Stopped', 'AbortError')), { once: true }))
+    }
+    return { json: async () => ({ success: false }) }
+  })
+  const { result } = renderHook(useMiraChat, { wrapper })
+  await act(async () => { original = result.current.sendMessage('Create a task called Review') })
+  await act(async () => { await result.current.sendMessage('Retry'); await original })
+  expect(fetch.mock.calls.filter(([url]) => url === '/api/ai/mira-actions')).toHaveLength(1)
+  expect(result.current.messages.at(-1).content).toBe('Check the destination before retrying.')
+})
+
 test('voice confirmation hands the original music request through the provider to the executor', async () => {
   const voiceHistory = [
     { role: 'user', content: 'Play Yellow on YouTube Music' },

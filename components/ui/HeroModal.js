@@ -20,7 +20,7 @@ export default function Modal({ isOpen, defaultOpen = false, onOpenChange, onClo
     change(false)
   }
   const control = isValidElement(closeButton) ? closeButton : <button type="button"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
-  return <HeroModal motionProps={fernlyDialogMotion} {...props} disableAnimation={reducedMotion || props.disableAnimation} isOpen={isOpen ?? localOpen} onOpenChange={change} closeButton={cloneElement(control, {
+  return <HeroModal {...props} classNames={{ ...props.classNames, backdrop: `talio-popup-backdrop ${props.classNames?.backdrop || ''}` }} motionProps={{ ...props.motionProps, ...fernlyDialogMotion }} disableAnimation={reducedMotion || props.disableAnimation} isOpen={isOpen ?? localOpen} onOpenChange={change} closeButton={cloneElement(control, {
     onClickCapture: close,
     onKeyDownCapture: event => {
       if (event.key === 'Enter' || event.key === ' ') close(event)

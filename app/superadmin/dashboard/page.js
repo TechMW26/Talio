@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from '@/utils/toast'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function SuperAdminDashboard() {
   const [stats, setStats] = useState(null)
@@ -34,11 +35,11 @@ export default function SuperAdminDashboard() {
   if (loading) {
     return (
       <div className="p-6 lg:p-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-48"></div>
+        <div className="space-y-6">
+          <TalioSkeleton className="h-8 bg-gray-200 rounded w-48" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-100 rounded-2xl"></div>
+              <TalioSkeleton key={i} className="h-32 bg-gray-100 rounded-2xl" />
             ))}
           </div>
         </div>

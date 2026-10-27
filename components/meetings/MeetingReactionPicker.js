@@ -1,6 +1,7 @@
 'use client'
 
-import { Popover, PopoverContent, PopoverTrigger } from '@heroui/react'
+import { PopoverContent, PopoverTrigger } from '@heroui/react'
+import { Popover } from '@/components/ui/PopupMotion'
 import { BsEmojiSmile } from 'react-icons/bs'
 import { MEETING_REACTIONS, MeetingReactionIcon } from '@/components/meetings/MeetingVisualIcons'
 

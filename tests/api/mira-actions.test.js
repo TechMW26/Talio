@@ -41,8 +41,8 @@ test('explicit owners survive validation; malformed ownership and reassignment n
   expect(validateMiraAction({ type: 'assign_task', fields: { taskTitle: 'Draft' } }).error).toContain('assignees')
 })
 test('personal reminder targets only the authenticated user and persists its due time', async () => {
-  const create = jest.fn(async () => ({ _id: 'reminder' }))
-  store.create = create
+  const create = jest.fn(async (_collection, row) => row)
+  store.transaction = callback => callback({ get: async collection => collection === 'users' ? { _id: 'self', employeeId: 'employee', isActive: true } : null, create })
   verifyTokenFromRequest.mockResolvedValue({ success: true, user: { userId: 'self', employeeId: 'employee', role: 'employee' }, tenant: context })
   const scheduledFor = new Date(Date.now() + 1200000).toISOString()
   const result = await (await run({ confirmed: true, action: { type: 'schedule_reminder', fields: { message: 'Drink water', scheduledFor, timezone: 'Asia/Kolkata', targetUsers: ['other'] } } })).json()

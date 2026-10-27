@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function CompaniesPage() {
   const searchParams = useSearchParams()
@@ -164,7 +165,7 @@ export default function CompaniesPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-48 bg-gray-100 rounded-2xl animate-pulse"></div>
+            <TalioSkeleton key={i} className="h-48 bg-gray-100 rounded-2xl " />
           ))}
         </div>
       ) : companies.length === 0 ? (

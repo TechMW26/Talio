@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { Skeleton } from '@/components/ui/AsciiLoading'
 import { dashboardRequest, isRequestCancelled } from '@/lib/client/dashboardRequest'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -1129,16 +1130,16 @@ export default function UnifiedDashboard({ user: userProp }) {
     if (loading) {
         return (
             <div data-dashboard-home className={`page-container ${homeStyles.page}`}>
-                <div className="animate-pulse space-y-4">
-                    <div className="h-16 bg-white dark:bg-[#18181b] rounded-xl shadow-sm dark:shadow-none"></div>
+                <div className="space-y-4">
+                    <Skeleton className="h-16 rounded-xl" />
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="h-24 bg-white dark:bg-[#18181b] rounded-xl shadow-sm dark:shadow-none"></div>
+                            <Skeleton key={i} className="h-24 rounded-xl" />
                         ))}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[1, 2, 3, 4, 5, 6].map(i => (
-                            <div key={i} className="h-48 bg-white dark:bg-[#18181b] rounded-xl shadow-sm dark:shadow-none"></div>
+                            <Skeleton key={i} className="h-48 rounded-xl" />
                         ))}
                     </div>
                 </div>

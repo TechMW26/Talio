@@ -37,6 +37,7 @@ import { useSWRConfig } from 'swr'
 import { patchProfilePhotoResponse } from '@/lib/client/profilePhoto'
 import ProfilePhotoEditor from '@/components/profile/ProfilePhotoEditor'
 import { DEFAULT_PHOTO_VIEWPORT } from '@/lib/profilePhotoViewport'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 // Dynamically import Lanyard with no SSR and error boundary
 const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) => {
@@ -760,9 +761,9 @@ export default function ProfilePage() {
   if (!mounted) {
     return (
       <div className="page-container pb-24 md:pb-6 px-2 sm:px-4 lg:px-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-gray-200 dark:bg-zinc-700 rounded w-1/4"></div>
-          <div className="h-64 bg-gray-200 dark:bg-zinc-700 rounded"></div>
+        <div className="space-y-4">
+          <TalioSkeleton className="h-10 bg-gray-200 dark:bg-zinc-700 rounded w-1/4" />
+          <TalioSkeleton className="h-64 bg-gray-200 dark:bg-zinc-700 rounded" />
         </div>
       </div>
     )

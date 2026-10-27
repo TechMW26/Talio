@@ -39,6 +39,7 @@
     "@vercel/blob": "^2.8.0",
     "@vercel/functions": "^3.9.5",
     "@vercel/queue": "^0.5.1",
+    "ascii-reveal": "0.3.0",
     "bcryptjs": "^2.4.3",
     "border-beam": "^1.4.1",
     "canvas-confetti": "^1.9.4",

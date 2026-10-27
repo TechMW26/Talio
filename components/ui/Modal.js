@@ -51,7 +51,7 @@ export default function Modal({
       className="modal-overlay"
       onClick={handleBackdropClick}
     >
-      {/* Backdrop with blur */}
+      {/* Backdrop is supplied by the overlay; retained for legacy styling. */}
       <div className="modal-backdrop" />
       
       {/* Modal */}

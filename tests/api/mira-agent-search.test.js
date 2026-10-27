@@ -19,7 +19,7 @@ const request = overrides => new Request('https://app.talio.in/api/ai/mira-agent
 test('voice internet lookup uses public utterance only and normalizes spelling', async () => {
   const response = await POST(request({ message: 'A-L-G-A-E-T-R-Double-E', context: 'private workplace record' }))
   expect(response.status).toBe(200)
-  expect(searchMiraInternet).toHaveBeenCalledWith('ALGAETREE')
+  expect(searchMiraInternet).toHaveBeenCalledWith('ALGAETREE', { signal: expect.any(AbortSignal) })
   expect(checkAndDeductMiraToken).toHaveBeenCalledWith({}, 'user', '2026-10', expect.stringMatching(/^[a-f0-9]{64}$/))
 })
 test.each([{ userId: 'other' }, { databaseName: 'other' }, { tokenId: 'revoked' }, { authVersion: 1 }])('voice search protects the call identity: %s', async override => {

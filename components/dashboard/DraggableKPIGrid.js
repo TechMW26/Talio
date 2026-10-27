@@ -18,6 +18,7 @@ import {
 import DraggableKPICard from './DraggableKPICard'
 import { useDashboardLayout } from '@/hooks/useDashboardLayout'
 import { FaUndo } from 'react-icons/fa'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function DraggableKPIGrid({
     stats,
@@ -72,15 +73,15 @@ export default function DraggableKPIGrid({
                 {stats.map((_, index) => (
                     <div
                         key={index}
-                        className="rounded-lg shadow-md p-3 sm:p-6 animate-pulse"
+                        className="rounded-lg shadow-md p-3 sm:p-6 "
                         style={{ backgroundColor: 'var(--color-bg-card)' }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex-1">
-                                <div className="h-4 bg-gray-200 dark:bg-zinc-600 rounded w-24 mb-2"></div>
-                                <div className="h-8 bg-gray-200 dark:bg-zinc-600 rounded w-16"></div>
+                                <TalioSkeleton className="h-4 bg-gray-200 dark:bg-zinc-600 rounded w-24 mb-2" />
+                                <TalioSkeleton className="h-8 bg-gray-200 dark:bg-zinc-600 rounded w-16" />
                             </div>
-                            <div className="w-12 h-12 bg-gray-200 dark:bg-zinc-600 rounded-lg"></div>
+                            <TalioSkeleton className="w-12 h-12 bg-gray-200 dark:bg-zinc-600 rounded-lg" />
                         </div>
                     </div>
                 ))}

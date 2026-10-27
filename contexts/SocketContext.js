@@ -97,6 +97,12 @@ export function SocketProvider({ children }) {
       }
     }
 
+    // Toast replay protection belongs to this authenticated connection only.
+    // Keep realtime/inbox listeners independent so every hint still refreshes data.
+    const displayedNotificationToasts = new Map()
+    const notificationToastLimit = 256
+    const notificationToastTtl = 24 * 60 * 60 * 1000
+
     // Managed Pusher connection; no local WebSocket endpoint is required
     const socketInstance = createRealtimeClient({
       token,
@@ -316,6 +322,18 @@ export function SocketProvider({ children }) {
     // CRITICAL: Wrapped in try-catch to prevent app crashes
     socketInstance.on('new-notification', (data) => {
       try {
+        const activeUser = JSON.parse(localStorage.getItem('user') || 'null')
+        const activeId = activeUser?.userId || activeUser?._id || activeUser?.id
+        const activeTenant = activeUser?.tenant?.databaseName || activeUser?.databaseName || null
+        // A late callback from an old connection must not expose its toast after
+        // logout/account replacement. A newly mounted connection has its own ledger.
+        if (!userId || !localStorage.getItem('token') || String(activeId?._id || activeId || '') !== String(userId || '') || activeTenant !== tenantDatabaseName) return
+        const rawId = data?._id ?? data?.id
+        const notificationId = ['string', 'number'].includes(typeof rawId) && String(rawId).length <= 200 ? String(rawId) : ''
+        const now = Date.now()
+        for (const [id, shownAt] of displayedNotificationToasts) if (shownAt <= now - notificationToastTtl) displayedNotificationToasts.delete(id)
+        if (notificationId && displayedNotificationToasts.has(notificationId)) return
+
         console.log('🔔 [Socket.IO Client] New notification received:', data)
 
         // Safely extract data with defaults
@@ -360,6 +378,10 @@ export function SocketProvider({ children }) {
           duration: 5000,
           position: 'top-right',
         })
+        if (notificationId) {
+          displayedNotificationToasts.set(notificationId, now)
+          if (displayedNotificationToasts.size > notificationToastLimit) displayedNotificationToasts.delete(displayedNotificationToasts.keys().next().value)
+        }
       } catch (error) {
         console.error('❌ [Socket.IO Client] Error handling notification:', error)
       }

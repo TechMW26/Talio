@@ -82,13 +82,32 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
         // visual plan is actually needed, not before the first native action.
         session.goal = input.goal;
         session.decision = decideDesktopRoute(input.goal);
-        return { success: true, sessionId: session.id, planner: agentS ? 'agent-s-local' : 'legacy', decision: session.decision, capabilities: { actionBatch: true, navigateCurrentTab: true } };
+        return { success: true, sessionId: session.id, planner: agentS ? 'agent-s-local' : 'legacy', decision: session.decision, capabilities: { actionBatch: true, navigateCurrentTab: true, completionCheck: true } };
       }
       const active = session;
       if (store?.get('miraDesktopConsentV1') !== true) { cancel(); return { success: false, message: 'Desktop control permission was revoked.' }; }
       if (!active || input?.sessionId !== active.id) return { success: false, message: 'Desktop task stopped or expired.' };
       if (Date.now() > active.expires) { cancel(); return { success: false, message: 'Desktop task stopped or expired.' }; }
       if (active.executing) return { success: false, message: 'A desktop input is still running. Wait for its result.' };
+      if (input.operation === 'verify') {
+        const observed = active.observation;
+        if (!observed || observed.id !== input.observationId || active.planning) return { success: false, retryable: true, message: 'Observe the current desktop before confirming completion.' };
+        // Verification shares the foreground owner with native inputs. A second
+        // IPC call must not consume/replace the evidence while status is awaited.
+        active.executing = true;
+        try {
+          const current = await control({ type: 'status' });
+          if (session !== active || isLocked() || store?.get('miraDesktopConsentV1') !== true || Date.now() > active.expires) throw new Error('Desktop task stopped.');
+          const age = Date.now() - observed.time;
+          if (active.observation !== observed || !current.success || age > 45000 || current.pid !== observed.pid || current.windowId !== observed.windowId ||
+              !sameWindowFrame(current.frame, observed.frame) || Number.isFinite(current.keyIdleSeconds) && current.keyIdleSeconds < age / 1000 - .1) {
+            active.observation = null;
+            active.lastOutcome = 'The desktop changed after the completion observation. Inspect again; do not replay previous inputs.';
+            return { success: false, retryable: true, message: 'Checking the current desktop before confirming completion.' };
+          }
+          return { success: true, observationVerified: true };
+        } finally { active.executing = false; }
+      }
       if (input.operation === 'fast') {
         // The main process derives this action from the original user goal.
         // Ignore renderer-supplied actions and consume the route before awaiting.
@@ -290,8 +309,8 @@ function createMiraComputer({ desktopCapturer, screen, store, pointer, systemPre
             const outcome = await control(nativeAction);
             checkpoint = Date.now();
             if (!outcome.success) {
-              active.lastOutcome = `Sequence input failed after ${completedActions} completed inputs; its effects are uncertain. Inspect the current screen, do not replay.`;
-              return { success: false, completedActions, message: active.lastOutcome };
+              active.lastOutcome = `Sequence input failed after ${completedActions} completed inputs; ${outcome.notExecuted === true ? 'this input was not delivered' : 'its effects are uncertain'}. Inspect the current screen, do not replay the whole sequence.`;
+              return { success: false, completedActions, uncertain: outcome.notExecuted !== true, retryable: completedActions === 0 && outcome.notExecuted === true, message: active.lastOutcome };
             }
             completedActions++;
           }

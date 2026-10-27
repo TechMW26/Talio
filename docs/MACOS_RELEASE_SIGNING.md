@@ -12,11 +12,11 @@ release. Certificate renewal within the same team retains the standard Apple DR.
 
 ## Release credentials
 
-### Owner-approved 6.0.31 exception (2026-10-18)
+### Owner-approved signed, unnotarized releases (current: 6.0.34)
 
 The owner explicitly requested publication with Developer ID signing retained
 and Apple notarization skipped for now. The manual workflow input
-`signed_unnotarized_release` defaults to false and permits this 6.0.31 release
+`signed_unnotarized_release` defaults to false and permits this 6.0.34 release
 only. The after-sign hook still verifies the app and both helper identities
 before honoring the version-scoped exception. The updater's signature checks
 are unchanged. Release notes disclose the absence of notarization and remaining

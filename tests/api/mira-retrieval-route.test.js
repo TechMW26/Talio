@@ -40,7 +40,7 @@ test('semantic web routing supplies real sources to the answer without loading c
   generateDeepSeekContent.mockResolvedValue('{"kind":"web","query":"Algaetree"}')
   searchMiraInternet.mockResolvedValue({ source: 'test web', results: [{ title: 'Algaetree', url: 'https://example.com/algaetree', snippet: 'Public description' }] })
   expect((await run('Tell me about Algaetree')).status).toBe(200)
-  expect(searchMiraInternet).toHaveBeenCalledWith('Algaetree')
+  expect(searchMiraInternet).toHaveBeenCalledWith('Algaetree', { signal: expect.any(AbortSignal) })
   expect(generateContent.mock.calls[0][1]).toContain('https://example.com/algaetree')
   expect(database.list.mock.calls.some(([collection]) => collection === 'mirachatsessions')).toBe(false)
 })

@@ -12,6 +12,7 @@ import Loader from '@/components/ui/Loader'
 import ModalPortal from '@/components/ui/ModalPortal'
 import { FEATURE_DEFINITIONS, FEATURE_BUNDLES, ALL_BUNDLE_KEYS, ALL_FEATURE_KEYS, getFeaturesForPlan, PLAN_TEMPLATES, isBundleEnabled, toggleBundle } from '@/lib/planFeatures'
 import HrmsModuleControls from '@/components/superadmin/HrmsModuleControls'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function CompanyDetailPage({ params }) {
   const router = useRouter()
@@ -438,9 +439,9 @@ export default function CompanyDetailPage({ params }) {
   if (loading) {
     return (
       <div className="p-6 lg:p-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-48"></div>
-          <div className="h-64 bg-gray-100 rounded-2xl"></div>
+        <div className="space-y-6">
+          <TalioSkeleton className="h-8 bg-gray-200 rounded w-48" />
+          <TalioSkeleton className="h-64 bg-gray-100 rounded-2xl" />
         </div>
       </div>
     )
@@ -716,9 +717,9 @@ export default function CompanyDetailPage({ params }) {
 
             {/* Admins List */}
             {loadingAdmins ? (
-              <div className="animate-pulse space-y-4">
+              <div className="space-y-4">
                 {[1, 2].map((i) => (
-                  <div key={i} className="bg-gray-100 rounded-2xl h-24"></div>
+                  <TalioSkeleton key={i} className="bg-gray-100 rounded-2xl h-24" />
                 ))}
               </div>
             ) : admins.length === 0 ? (

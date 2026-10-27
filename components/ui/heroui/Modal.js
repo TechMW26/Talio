@@ -38,7 +38,7 @@ export function HRMSModal({
       isDismissable={isDismissable}
       hideCloseButton={hideCloseButton}
       classNames={{
-        backdrop: 'bg-black/50 backdrop-blur-[10px] animate-[overlay-blur-in_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards]',
+        backdrop: 'bg-black/50',
         base: 'bg-content1 shadow-xl !rounded-[30px]',
         wrapper: 'z-[99999]',
         header: 'border-b border-default-100',

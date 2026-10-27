@@ -18,6 +18,7 @@ import {
 import DraggableDashboardSection from './DraggableDashboardSection'
 import { useDashboardSectionLayout } from '@/hooks/useDashboardSectionLayout'
 import { FaUndo, FaGripVertical } from 'react-icons/fa'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function DraggableDashboard({
     sections,
@@ -69,11 +70,11 @@ export default function DraggableDashboard({
                 {sections.map((section, index) => (
                     <div
                         key={index}
-                        className="rounded-2xl p-6 animate-pulse"
+                        className="rounded-2xl p-6 "
                         style={{ backgroundColor: 'var(--color-bg-card)', minHeight: '150px' }}
                     >
-                        <div className="h-6 bg-gray-200 dark:bg-zinc-600 rounded w-1/4 mb-4"></div>
-                        <div className="h-24 bg-gray-200 dark:bg-zinc-600 rounded"></div>
+                        <TalioSkeleton className="h-6 bg-gray-200 dark:bg-zinc-600 rounded w-1/4 mb-4" />
+                        <TalioSkeleton className="h-24 bg-gray-200 dark:bg-zinc-600 rounded" />
                     </div>
                 ))}
             </div>

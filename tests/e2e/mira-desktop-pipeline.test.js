@@ -72,10 +72,11 @@ function fixture({ uncertain = false, noEffect = false, rejectPlanOnce = false }
 }
 test('restored visual flow observes every step, executes screen inputs and verifies completion without Jev', async () => {
   const f = fixture()
-  expect(await f.run()).toEqual({ success: true, message: 'Scientific mode verified.' })
+  expect(await f.run()).toMatchObject({ success: true, verified: true, message: 'Scientific mode verified.', orchestration: { observations: 3, executedInputs: 2, recoveries: 0, recentFailures: [] } })
   expect(f.inputs).toHaveLength(2)
   expect(f.snapshots).toEqual([0, 1, 2])
   expect(f.agentS.predict).toHaveBeenCalledTimes(3)
+  expect(f.operations.filter(operation => operation === 'verify')).toHaveLength(1)
   expect(f.operations.at(-1)).toBe('cancel')
   expect(fetch.mock.calls.every(([url]) => ['/api/ai/mira-agent-s', 'https://api.deepseek.com/chat/completions'].includes(url))).toBe(true)
 })

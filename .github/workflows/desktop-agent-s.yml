@@ -8,13 +8,13 @@ on:
         required: true
         default: false
       signed_unnotarized_release:
-        description: 'Owner-approved 6.0.33 release: retain Developer ID signing, skip notarization, disclose remaining acceptance limits'
+        description: 'Owner-approved 6.0.34 release: retain Developer ID signing, skip notarization, disclose remaining acceptance limits'
         type: boolean
         required: true
         default: false
   push:
     tags:
-      - 'v6.0.33'
+      - 'v6.0.34'
 permissions:
   contents: write
 jobs:
@@ -102,7 +102,7 @@ jobs:
           APPLE_ID_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_ID_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
           REQUIRE_NOTARIZATION: ${{ runner.os == 'macOS' && 'true' || 'false' }}
-          TALIO_SIGNED_UNNOTARIZED_RELEASE: ${{ runner.os == 'macOS' && github.event_name == 'workflow_dispatch' && inputs.signed_unnotarized_release && '6.0.33' || '' }}
+          TALIO_SIGNED_UNNOTARIZED_RELEASE: ${{ runner.os == 'macOS' && github.event_name == 'workflow_dispatch' && inputs.signed_unnotarized_release && '6.0.34' || '' }}
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
@@ -129,22 +129,26 @@ jobs:
           merge-multiple: true
       - name: Verify complete installer set
         run: |
-          for asset in Talio-6.0.33-arm64.dmg Talio-6.0.33-arm64.zip Talio-6.0.33-x64.dmg Talio-6.0.33-x64.zip Talio.Setup.6.0.33.exe Talio-6.0.33-x86_64.AppImage Talio-6.0.33-amd64.deb; do
+          for asset in Talio-6.0.34-arm64.dmg Talio-6.0.34-arm64.zip Talio-6.0.34-x64.dmg Talio-6.0.34-x64.zip Talio.Setup.6.0.34.exe Talio-6.0.34-x86_64.AppImage Talio-6.0.34-amd64.deb; do
             test -s "release-assets/$asset" || exit 1
           done
           cd release-assets
           sha256sum *.dmg *.zip *.exe *.AppImage *.deb > SHA256SUMS.txt
-      - name: Publish v6.0.33
+      - name: Publish v6.0.34
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v6.0.33
+          tag_name: v6.0.34
           target_commitish: ${{ github.sha }}
-          name: Talio Desktop 6.0.33 — Mira task continuity, seamless camera and voice
+          name: Talio Desktop 6.0.34 — Mira orchestration, reminders and search
           draft: true
           prerelease: false
           generate_release_notes: false
           body: |
             Release mode: ${{ inputs.signed_unnotarized_release && 'Owner-approved signed but UNNOTARIZED macOS release. Apple Gatekeeper may require manual approval; this release does not claim Apple notarization or completed cross-platform hands-on/update-permission-continuity acceptance.' || 'Developer ID signed and Apple notarized macOS release.' }}
+
+            New in 6.0.34: dependency-aware Mira task orchestration with execution receipts, bounded retries and verified desktop completion. Added authenticated internet research, recoverable reminder delivery and opt-in account-isolated attention cards. Updated loading states with ASCII skeleton/reveal and lightweight popup transitions.
+
+            Automated validation covers task dependencies, uncertain writes, authorization, reminders, search and UI regressions. Hosted features require the corresponding web deployment. External WhatsApp/phone accounts and full standalone/Talio account linking are not included; no always-on or sub-250 ms claim is made. Native cross-platform hands-on and signed-update permission continuity remain unverified for this release.
 
             Fixed desktop-task continuity across voice confirmations and retries, preserving the original app, song and action rather than executing a standalone "yes". Installed-app-first activation now covers explicit music playback requests; visual verification still determines completion. Jev remains removed.
 
@@ -171,12 +175,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view v6.0.33 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
+          gh release view v6.0.34 --repo "${{ github.repository }}" --json assets --jq '.assets' | node -e '
             let text = "";
             process.stdin.on("data", chunk => text += chunk);
             process.stdin.on("end", () => {
               const assets = JSON.parse(text);
-              const expected = ["Talio-6.0.33-arm64.dmg", "Talio-6.0.33-arm64.zip", "Talio-6.0.33-x64.dmg", "Talio-6.0.33-x64.zip", "Talio.Setup.6.0.33.exe", "Talio-6.0.33-x86_64.AppImage", "Talio-6.0.33-amd64.deb", "SHA256SUMS.txt"];
+              const expected = ["Talio-6.0.34-arm64.dmg", "Talio-6.0.34-arm64.zip", "Talio-6.0.34-x64.dmg", "Talio-6.0.34-x64.zip", "Talio.Setup.6.0.34.exe", "Talio-6.0.34-x86_64.AppImage", "Talio-6.0.34-amd64.deb", "SHA256SUMS.txt"];
               for (const name of expected) {
                 const asset = assets.find(item => item.name === name);
                 if (!asset || asset.size < (name.endsWith(".txt") ? 100 : 1048576)) throw new Error("Missing or truncated release asset: " + name);
@@ -185,4 +189,4 @@ jobs:
                 if (asset.digest !== digest) throw new Error("Uploaded asset checksum mismatch: " + name);
               }
             });'
-          gh release edit v6.0.33 --repo "${{ github.repository }}" --draft=false --latest
+          gh release edit v6.0.34 --repo "${{ github.repository }}" --draft=false --latest

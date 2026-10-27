@@ -45,3 +45,18 @@ test('rejects unsupported voices and overlong personalization', async () => {
   expect((await PUT(request({ knowledge: 'x'.repeat(8001) }))).status).toBe(400)
   expect(database.get).not.toHaveBeenCalled()
 })
+
+test('proactive preferences stay personal and preserve unspecified switches', async () => {
+  profile.miraPreferences = { proactive: { enabled: true, tasks: false, quietStart: '21:30' } }
+  const result = await (await PUT(request({ proactive: { meetings: false, timezone: 'Europe/London' }, owner: 'another-user' }))).json()
+  expect(result.success).toBe(true)
+  expect(profile.miraPreferences.proactive).toMatchObject({ enabled: true, tasks: false, meetings: false, timezone: 'Europe/London', quietStart: '21:30' })
+  expect(profile).not.toHaveProperty('owner')
+})
+
+test('invalid proactive schedules and switches are rejected before a profile write', async () => {
+  for (const proactive of [{ enabled: 'yes' }, { quietStart: '25:99' }, { timezone: 'Mars/Nowhere' }, []]) {
+    expect((await PUT(request({ proactive }))).status).toBe(400)
+  }
+  expect(database.mutate).not.toHaveBeenCalled()
+})

@@ -96,7 +96,7 @@ export default function HeaderSearch() {
     </div>
     <AnimatePresence>
       {expanded && <motion.div className={styles.results} id={`${id}-results`} key="header-search-results"
-        initial={{ opacity: 0, y: reducedMotion ? 0 : -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -4 }} transition={{ duration: reducedMotion ? 0 : 0.18 }}>
+        initial={{ opacity: 0, scale: reducedMotion ? 1 : .96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: reducedMotion ? 1 : .96 }} transition={{ duration: reducedMotion ? 0 : 0.18 }}>
         {term.length < 2 ? <p className={styles.message}>Find pages, tasks, people and more. Type at least 2 characters.</p> : busy ? <p className={styles.message} role="status">Searching…</p> : error ? <p className={styles.message} role="alert">Search unavailable. <NativeButton type="button" onClick={() => mutate()}>Retry search</NativeButton></p> : !results.length ? <p className={styles.message}>No results for “{term}”.</p> : null}
         <div role="listbox" aria-label="Search results" className={styles.list}>
           {results.map((item, index) => <NativeButton type="button" role="option" aria-selected={selected === index} id={`${id}-option-${index}`} key={`${item.category}-${item._id || item.link}-${index}`} className={styles.result} onClick={() => choose(item.link)}>

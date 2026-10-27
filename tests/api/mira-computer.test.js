@@ -3,6 +3,60 @@ const { createMiraPermissions, trustedMiraSender } = require('../../desktop-app/
 const { decideDesktopRoute, sameWindowFrame } = require('../../desktop-app/src/miraDecision')
 const { channelContext, allowsNewTab } = require('../../desktop-app/src/miraActionPlan')
 
+test('both desktop planners can verify completion against the native observation identity', async () => {
+  const { call } = harness()
+  const start = await call({ operation: 'begin', goal: 'Use the current app' })
+  expect(start.capabilities.completionCheck).toBe(true)
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(await call({ operation: 'verify', sessionId: start.sessionId, observationId: observation.observationId })).toMatchObject({ success: true, observationVerified: true })
+  expect(await call({ operation: 'verify', sessionId: start.sessionId, observationId: 'stale' })).toMatchObject({ success: false, retryable: true })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('completion check rejects a foreground app change instead of claiming success', async () => {
+  let pid = 1
+  const { call } = harness({ runControl: jest.fn(async () => ({ success: true, pid, app: 'Chrome' })) })
+  const start = await call({ operation: 'begin', goal: 'Use the current app' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  pid = 2
+  expect(await call({ operation: 'verify', sessionId: start.sessionId, observationId: observation.observationId })).toMatchObject({ success: false, retryable: true })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('completion verification holds foreground ownership until its identity check finishes', async () => {
+  let hold = false, release, entered
+  const waiting = new Promise(resolve => { release = resolve })
+  const started = new Promise(resolve => { entered = resolve })
+  const { call, deps } = harness({ runControl: jest.fn(async action => {
+    if (hold && action.type === 'status') { entered(); await waiting }
+    return { success: true, pid: 1, app: 'Chrome' }
+  }) })
+  const start = await call({ operation: 'begin', goal: 'Read the current page' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  hold = true
+  const checking = call({ operation: 'verify', sessionId: start.sessionId, observationId: observation.observationId })
+  await started
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'key', key: 'enter' } })).toMatchObject({ success: false })
+  expect(await call({ operation: 'observe', sessionId: start.sessionId })).toMatchObject({ success: false })
+  release()
+  expect(await checking).toMatchObject({ success: true, observationVerified: true })
+  expect(deps.runControl).not.toHaveBeenCalledWith({ type: 'key', key: 'enter' })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test('revoked consent during a completion check cannot produce a verified result', async () => {
+  let checking = false
+  const store = { get: jest.fn(() => true) }
+  const { call } = harness({ store, runControl: jest.fn(async () => {
+    if (checking) store.get.mockReturnValue(false)
+    return { success: true, pid: 1, app: 'Chrome' }
+  }) })
+  const start = await call({ operation: 'begin', goal: 'Read the current page' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  checking = true
+  expect(await call({ operation: 'verify', sessionId: start.sessionId, observationId: observation.observationId })).toMatchObject({ success: false })
+})
+
 test('warm macOS helper resolves live AX focus for every command, not cached workspace focus', () => {
   const native = require('fs').readFileSync(require('path').join(__dirname, '../../desktop-app/src/miraControl.swift'), 'utf8');
   const execute = native.slice(native.indexOf('func execute('), native.indexOf('case "ax_action":'));
@@ -105,8 +159,17 @@ test('uncertain native batch failure never executes remaining inputs', async () 
   const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'type' ? { success: false } : { success: true, pid: 1, app: 'Chrome' }) })
   const start = await call({ operation: 'begin', goal: 'Open example.com' })
   const obs = await call({ operation: 'observe', sessionId: start.sessionId })
-  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'navigate', url: 'https://example.com' } })).toMatchObject({ success: false, completedActions: 1 })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: obs.observationId, action: { type: 'navigate', url: 'https://example.com' } })).toMatchObject({ success: false, completedActions: 1, uncertain: true, retryable: false })
   expect(deps.runControl).not.toHaveBeenCalledWith({ type: 'key', key: 'enter' })
+  await call({ operation: 'cancel', sessionId: start.sessionId })
+})
+
+test.each([false, true])('first batch input failure distinguishes known non-delivery (%s) from uncertain effects', async notExecuted => {
+  const { call, deps } = harness({ runControl: jest.fn(async action => action.type === 'key' ? { success: false, notExecuted } : { success: true, pid: 1, app: 'Chrome' }) })
+  const start = await call({ operation: 'begin', goal: 'Open example.com' })
+  const observation = await call({ operation: 'observe', sessionId: start.sessionId })
+  expect(await call({ operation: 'act', sessionId: start.sessionId, observationId: observation.observationId, action: { type: 'navigate', url: 'https://example.com' } })).toMatchObject({ success: false, completedActions: 0, uncertain: !notExecuted, retryable: notExecuted })
+  expect(deps.runControl).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'type' }))
   await call({ operation: 'cancel', sessionId: start.sessionId })
 })
 

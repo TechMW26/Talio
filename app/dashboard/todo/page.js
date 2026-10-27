@@ -40,6 +40,7 @@ import CategoryModal from './components/CategoryModal'
 import AnalyticsPanel from './components/AnalyticsPanel'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function TodoPage() {
   const [activeTab, setActiveTab] = useState('all') // all, today, upcoming, completed, project-tasks, or category id
@@ -542,12 +543,12 @@ export default function TodoPage() {
           {loading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
-                <Surface key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
+                <Surface key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
+                    <TalioSkeleton className="w-5 h-5 bg-gray-200 rounded-full" />
                     <div className="flex-1">
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                      <TalioSkeleton className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                      <TalioSkeleton className="h-3 bg-gray-200 rounded w-1/2" />
                     </div>
                   </div>
                 </Surface>

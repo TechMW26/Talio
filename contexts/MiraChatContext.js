@@ -10,6 +10,7 @@ import { publishMiraRobotFeedback } from '@/lib/miraRobotState'
 import { searchMiraNavigation } from '@/lib/miraNavigationSearch'
 import { resolveMiraSnapshot } from '@/lib/miraSnapshotClient'
 import { advanceMiraTaskBank, mergeMiraTaskPlan, recordMiraTaskOutcome } from '@/lib/miraTaskBank'
+import { nextMiraTask, readyMiraTasks } from '@/lib/miraOrchestration'
 import { miraNavigationPath } from '@/lib/miraNavigation'
 import { buildMiraDismissalResponse } from '@/lib/miraDismissal'
 import { readMiraEvents } from '@/lib/miraStream'
@@ -22,8 +23,15 @@ import { executeMiraFocusTimer, executeMiraQuickNote } from '@/lib/miraLocalActi
 import { executeMiraComputerTask } from '@/lib/miraComputerClient'
 import { resolveMiraDesktopGoal } from '@/lib/miraDesktopGoal'
 import { isMiraHinglishReply } from '@/lib/miraLanguage'
+import { refreshMiraExecutionReceipt } from '@/lib/miraActionReceiptClient'
 
 const MiraChatContext = createContext()
+const durableWrites = new Set(['schedule_reminder', 'create_task', 'create_project', 'create_meeting', 'assign_task', 'send_message', 'invite_project', 'invite_meeting'])
+function interruptedMiraReceipt({ replyId, response, taskId, voiceTool }) {
+  const outcome = response.actionResult || { success: false, uncertain: true, message: 'Stopped while the action was in flight. It may have completed; inspect the destination before retrying.' }
+  const data = { ...response, message: outcome.message, actionResult: outcome, taskBank: recordMiraTaskOutcome(response.taskBank, outcome, taskId), ...(voiceTool ? { voiceTool: true } : {}) }
+  return { id: replyId, role: 'assistant', content: outcome.message, data, timestamp: new Date() }
+}
 
 function getAuthToken() {
   return localStorage.getItem('token') || document.cookie.match(/token=([^;]+)/)?.[1] || ''
@@ -47,6 +55,7 @@ export function MiraChatProvider({ children }) {
   const registerCamera = useCallback(camera => { cameraRef.current = camera; return () => { if (cameraRef.current === camera) cameraRef.current = null } }, [])
   const remoteCommandRef = useRef(null)
   const sendingRef = useRef(false)
+  const pendingExecutionRef = useRef(null)
   const submittedTextRef = useRef(null)
   const saveQueueRef = useRef(Promise.resolve())
   const sessionTargetRef = useRef({ id: null })
@@ -291,8 +300,18 @@ export function MiraChatProvider({ children }) {
     const branchIndex = options.replaceFromId !== undefined ? messages.findIndex(m => m.id === options.replaceFromId && m.role === 'user') : -1
     const sourceHistory = options.voiceTool && messages.at(-1)?.role === 'user' && messages.at(-1)?.data?.nativeVoice
       ? messages.slice(0, -1) : messages
-    const visibleHistory = (branchIndex >= 0 ? messages.slice(0, branchIndex) : sourceHistory).map(m => m.id === options.resolvePerson?.messageId
+    let visibleHistory = (branchIndex >= 0 ? messages.slice(0, branchIndex) : sourceHistory).map(m => m.id === options.resolvePerson?.messageId
       ? { ...m, data: { ...m.data, actionResult: { ...m.data.actionResult, resolved: true } } } : m)
+    // Abort handlers settle asynchronously. A follow-up must see the in-flight
+    // write receipt now, before it can plan another effect with a new identity.
+    const previousExecution = pendingExecutionRef.current
+    const previousUserIndex = previousExecution ? visibleHistory.findIndex(message => message.id === previousExecution.userId) : -1
+    if (!remoteSessionId && previousUserIndex >= 0) {
+      const receipt = interruptedMiraReceipt(previousExecution)
+      visibleHistory = visibleHistory.some(message => message.id === receipt.id)
+        ? visibleHistory.map(message => message.id === receipt.id ? receipt : message)
+        : [...visibleHistory.slice(0, previousUserIndex + 1), receipt, ...visibleHistory.slice(previousUserIndex + 1)]
+    }
     const history = remoteSessionId ? [] : mergeMiraVoiceHistory(visibleHistory, options.voiceHistory)
 
     const nextId = Math.max(Date.now(), messages.reduce((max, message) => Math.max(max, Number(message.id) || 0), 0) + 1)
@@ -306,6 +325,7 @@ export function MiraChatProvider({ children }) {
     if (isMiraDecisionRequest(text, history)) agentState(true)
 
     const requestController = new AbortController()
+    let pendingExecution = null
     abortControllerRef.current = requestController
     if (remoteSessionId) remoteCommandRef.current = { sessionId: remoteSessionId, controller: requestController }
     try {
@@ -313,6 +333,10 @@ export function MiraChatProvider({ children }) {
 
       let conversationHistory = compactMiraHistory(history)
       let taskBank = advanceMiraTaskBank([...(remoteSessionId ? [] : visibleHistory)].reverse().find(message => message.data?.taskBank)?.data.taskBank, text)
+      const interruptedTask = nextMiraTask(taskBank)
+      if (interruptedTask?.uncertain && interruptedTask.executionId && durableWrites.has(interruptedTask.action?.type)) {
+        taskBank = await refreshMiraExecutionReceipt(taskBank, { token, signal: requestController.signal })
+      }
       let queueMessage = text
       let lastReply = ''
       let screenAttachment = null
@@ -463,17 +487,27 @@ export function MiraChatProvider({ children }) {
           window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: data.response.action.type.replaceAll('_', ' '), phase: 'working' } }))
           // Execute only a newly generated requested action, never a rendered/saved message.
           let outcome
+          const executingTask = nextMiraTask(data.response.taskBank)
+          const executionId = executingTask?.executionId || `${userMsg.id}:${executingTask?.id || queueStep}`
+          if (durableWrites.has(data.response.action.type)) {
+            if (executingTask) executingTask.executionId = executionId
+            pendingExecution = { replyId, response: data.response, taskId: executingTask?.id, queueStep, userId: userMsg.id, voiceTool: options.voiceTool }
+            pendingExecutionRef.current = pendingExecution
+          }
           try {
             const actionResponse = await fetch('/api/ai/mira-actions', {
               method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ action: data.response.action, confirmed: true }),
+              body: JSON.stringify({ action: data.response.action, confirmed: true, requestId: executionId }),
               signal: requestController.signal,
             })
             outcome = await actionResponse.json()
           } catch {
-            outcome = { success: false, uncertain: true, message: 'The connection was interrupted. Check the destination before trying again; the action may have completed.' }
+            outcome = { success: false, uncertain: durableWrites.has(data.response.action.type), message: durableWrites.has(data.response.action.type)
+              ? 'The connection was interrupted. Check the destination before trying again; the action may have completed.'
+              : 'The lookup was interrupted. No change was made.' }
           }
           data.response.actionResult = outcome
+          if (data.response.action.type === 'schedule_reminder' && outcome.success) window.dispatchEvent(new Event('mira:reminder-created'))
           window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: outcome.success ? 'Completed' : outcome.resolution ? 'Waiting for your choice' : 'Action failed', phase: 'done' } }))
           if (outcome.success && outcome.gallery) data.response.gallery = outcome.gallery
           if (outcome.resolution) data.response.selectionId = String(userMsg.id)
@@ -500,8 +534,10 @@ export function MiraChatProvider({ children }) {
           queueMessage = text
           continue
         }
-        data.response.taskBank = recordMiraTaskOutcome(data.response.taskBank, data.response.actionResult)
-        const remainingTasks = data.response.taskBank.tasks.filter(task => task.status !== 'completed')
+        data.response.taskBank = recordMiraTaskOutcome(data.response.taskBank, data.response.actionResult, data.response.taskId)
+        if (pendingExecutionRef.current === pendingExecution) pendingExecutionRef.current = null
+        pendingExecution = null
+        const nextReadyTask = readyMiraTasks(data.response.taskBank).find(task => task.status === 'pending')
         const aiMsg = {
           id: replyId,
           role: 'assistant',
@@ -542,10 +578,10 @@ export function MiraChatProvider({ children }) {
           await new Promise(resolve => setTimeout(resolve, 120))
           continue
         }
-        if (!data.response.actionResult?.success || data.response.actionResult.uncertain || !remainingTasks.length || remainingTasks[0].status !== 'pending') return lastReply
+        if (!data.response.actionResult || !nextReadyTask) return lastReply
         taskBank = data.response.taskBank
         conversationHistory = [...conversationHistory, ...(queueStep === 0 ? [{ role: 'user', content: text }] : []), ...compactMiraHistory([aiMsg])].slice(-10)
-        queueMessage = remainingTasks[0].request
+        queueMessage = nextReadyTask.request
         nextReplyId += 1
       } else {
         if (data.tokens) setTokens(data.tokens)
@@ -563,10 +599,22 @@ export function MiraChatProvider({ children }) {
       }
       return lastReply
     } catch (err) {
+      if (pendingExecution) {
+        // Cancellation cannot undo a server write. Preserve its request identity
+        // and uncertainty even if a newer turn now owns the UI controller.
+        const { replyId, queueStep } = pendingExecution
+        const receipt = interruptedMiraReceipt(pendingExecution)
+        setMessages(previous => {
+          if (previous.some(message => message.id === replyId)) return previous.map(message => message.id === replyId ? receipt : message)
+          const at = previous.findIndex(message => message.id === userMsg.id)
+          return at < 0 ? previous : [...previous.slice(0, at + 1), receipt, ...previous.slice(at + 1)]
+        })
+        saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() => saveToSession(queueStep === 0 ? userMsg : null, receipt, queueStep === 0 && branchIndex >= 0 ? history : null, saveTarget))
+      }
       if (abortControllerRef.current !== requestController) return
       window.dispatchEvent(new CustomEvent('mira:activity', { detail: { label: 'Stopped', phase: 'done' } }))
-      setMessages(prev => prev.filter(m => m.id !== nextReplyId))
-      if (err.name !== 'AbortError') {
+      if (!pendingExecution) setMessages(prev => prev.filter(m => m.id !== nextReplyId))
+      if (err.name !== 'AbortError' && !pendingExecution) {
         publishMiraRobotFeedback('error')
         setMessages(prev => [...prev, {
           id: Date.now() + 1,
@@ -577,6 +625,7 @@ export function MiraChatProvider({ children }) {
         }])
       }
     } finally {
+      if (pendingExecutionRef.current === pendingExecution) pendingExecutionRef.current = null
       if (abortControllerRef.current === requestController) {
         agentState(false)
         sendingRef.current = false

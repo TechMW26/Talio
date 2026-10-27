@@ -3,7 +3,7 @@
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import MiraSphere from '@/components/ui/MiraPet';
 import AIActivityBeam from '@/components/ui/AIActivityBeam';
 import { requestWhiteboardAI } from '@/lib/whiteboardAIClient';
@@ -335,6 +335,7 @@ export default function MiraAgentSidebar({
   onSelectGeneration,
 }) {
   // State
+  const reducedMotion = useReducedMotion();
   const [step, setStep] = useState('template'); // template, input, loading, preview, history
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [userInput, setUserInput] = useState('');
@@ -694,10 +695,10 @@ export default function MiraAgentSidebar({
 
   return (
     <motion.div
-      initial={{ x: -400, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: -400, opacity: 0 }}
-      transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+      initial={reducedMotion ? false : { scale: 0.96, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.96, opacity: 0 }}
+      transition={{ duration: reducedMotion ? 0 : 0.18, ease: 'easeOut' }}
       data-theme="light"
       role="dialog"
       aria-label="MIRA agent workspace"

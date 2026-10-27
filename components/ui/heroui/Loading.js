@@ -1,6 +1,7 @@
 'use client'
 
-import { Spinner, Skeleton, Progress, CircularProgress } from '@heroui/react'
+import { Spinner, Progress, CircularProgress } from '@heroui/react'
+import { Skeleton } from '@/components/ui/AsciiLoading'
 import { cn } from '@/utils/cn'
 
 /**
@@ -13,7 +14,7 @@ export function PageLoader({ message = 'Loading...', className }) {
       'fixed inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-[10px] z-50',
       className
     )}>
-      <Spinner size="lg" color="primary" />
+      <Skeleton className="h-32 w-full max-w-lg rounded-xl" />
       {message && (
         <p className="mt-4 text-default-600 text-sm font-medium animate-pulse">
           {message}
@@ -33,7 +34,7 @@ export function SectionLoader({ className }) {
       'flex items-center justify-center py-12',
       className
     )}>
-      <Spinner size="md" color="primary" />
+      <Skeleton className="h-20 w-full rounded-xl" />
     </div>
   )
 }
@@ -132,7 +133,7 @@ export function KPISkeleton({ className }) {
  */
 export function DashboardSkeleton() {
   return (
-    <div className="p-4 sm:p-6 space-y-6 animate-pulse">
+    <div className="p-4 sm:p-6 space-y-6 ">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Skeleton className="h-8 w-48 rounded-lg" />

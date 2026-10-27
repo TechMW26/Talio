@@ -35,6 +35,9 @@ export async function POST(request) {
     const signal = AbortSignal.any([request.signal, controller.signal, AbortSignal.timeout(55000)])
     const chunks = splitMiraSpeech(text)
     const model = 'eleven_v4'
+    // Full V4 on the proven TTS stream endpoint. V4 accepts stability and
+    // similarity_boost; pace/emotion come from the generated delivery tags.
+    // Numeric speed/style/speaker-boost settings are not V4 controls.
     // Let the multilingual provider detect language. Script is not language:
     // Devanagari also includes Marathi, Nepali and other non-Hindi languages.
     const generate = chunk => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, {
@@ -42,7 +45,7 @@ export async function POST(request) {
       headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
       signal,
       body: JSON.stringify({ text: chunk, model_id: model, apply_text_normalization: 'auto', ...(language ? { language_code: language } : {}),
-        voice_settings: { stability: 0.4, similarity_boost: 0.75, speed: 1.2, use_speaker_boost: false } }),
+        voice_settings: { stability: 0.4, similarity_boost: 0.75 } }),
     })
     const upstream = await generate(chunks[0])
     if (!upstream.ok || !upstream.body) return NextResponse.json({ message: 'Voice service is temporarily unavailable. Your reply is still in chat.' }, { status: 502 })

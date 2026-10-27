@@ -5,11 +5,13 @@
 // React Aria can continue discovering their collection metadata.
 import { element } from './native'
 import { forwardRef } from 'react'
-import { Button as HeroButton, Card as HeroCard, Input as HeroInput, Textarea as HeroTextarea, Select as HeroSelect, Autocomplete as HeroAutocomplete, Chip as HeroChip, Tabs as HeroTabs, Table as HeroTable, PopoverContent as HeroPopoverContent, DropdownMenu as HeroDropdownMenu } from '@heroui/react'
+import { Button as HeroButton, Card as HeroCard, Input as HeroInput, Textarea as HeroTextarea, Chip as HeroChip, Tabs as HeroTabs, Table as HeroTable, PopoverContent as HeroPopoverContent, DropdownMenu as HeroDropdownMenu } from '@heroui/react'
+import { Select as HeroSelect, Autocomplete as HeroAutocomplete } from '../PopupMotion'
 import TalioModal from '../HeroModal'
 
 
-export { Accordion, AccordionItem, Avatar, AutocompleteItem, CardBody, CardFooter, CardHeader, Checkbox, Divider, ModalBody, ModalContent, ModalFooter, ModalHeader, Pagination, Progress, Radio, RadioGroup, ScrollShadow, SelectItem, Skeleton, Spinner, Switch, Tab, TableHeader, TableBody, TableColumn, TableRow, TableCell, Tooltip, useDisclosure } from '@heroui/react'
+export { Accordion, AccordionItem, Avatar, AutocompleteItem, CardBody, CardFooter, CardHeader, Checkbox, Divider, ModalBody, ModalContent, ModalFooter, ModalHeader, Pagination, Progress, Radio, RadioGroup, ScrollShadow, SelectItem, Spinner, Switch, Tab, TableHeader, TableBody, TableColumn, TableRow, TableCell, Tooltip, useDisclosure } from '@heroui/react'
+export { Skeleton, LoadingReveal } from '../AsciiLoading'
 
 export const Button = element(HeroButton, 'button')
 export const Card = element(HeroCard, 'card')

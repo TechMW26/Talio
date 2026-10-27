@@ -1,6 +1,7 @@
 'use client'
 
 import { useId } from 'react'
+import { Skeleton } from './AsciiLoading'
 
 // Talio brand color
 const TALIO_TEAL = '#7DBCAF'
@@ -22,7 +23,7 @@ const FOX_PATH = "M218.185 401.899C213.175 405.409 205.665 410.209 201.505 412.5
  * @param {string} props.className - Additional CSS classes
  * @param {string} props.color - Custom color (default: '#7DBCAF' - Talio teal)
  */
-export default function Loader({ size = 'md', className = '', color = TALIO_TEAL }) {
+function BrandActionLoader({ size = 'md', className = '', color = TALIO_TEAL }) {
   // Size presets in pixels
   const sizeMap = {
     xs: 16,
@@ -154,10 +155,21 @@ export default function Loader({ size = 'md', className = '', color = TALIO_TEAL
 /**
  * Page-level loader wrapper with centered positioning
  */
+export default function Loader({ size = 'md', className = '', color = TALIO_TEAL }) {
+  if (size === 'xs' || size === 'sm') return <BrandActionLoader size={size} className={className} color={color} />
+  const pixels = { md: 48, lg: 64, xl: 96 }[size] || 48
+  return <Skeleton className={`talio-loader rounded-lg ${className}`} style={{ width: pixels, height: pixels, color }} />
+}
+
 export function PageLoader({ message = 'Loading...', size = 'lg' }) {
   return (
     <div role="status" aria-label={message} className="flex w-full flex-col items-center justify-center min-h-[calc(100vh-7rem)] supports-[height:100dvh]:min-h-[calc(100dvh-7rem)]">
-      <Loader size={size} />
+      <div className="w-full max-w-3xl space-y-5 px-4">
+        <Skeleton className="h-7 w-1/3 rounded-lg" />
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-4 w-3/4 rounded" />
+      </div>
     </div>
   )
 }

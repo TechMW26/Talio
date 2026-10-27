@@ -105,7 +105,7 @@ export default function ChatPopup({ chat, index }) {
       setAnimationState('minimizing')
       // Clear position to force recalculation for minimized state
       updateChatPosition?.(chat._id, null, null)
-      setTimeout(() => setAnimationState('normal'), 300)
+      setTimeout(() => setAnimationState('normal'), 120)
     }
   }, [shouldAutoMinimize, isMinimized, chat._id, updateChatPosition])
 
@@ -116,42 +116,11 @@ export default function ChatPopup({ chat, index }) {
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
   }
 
-  // Animation keyframes for genie effect
-  const genieMinimizeAnimation = `
-    @keyframes genieMinimize {
-      0% {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-        border-radius: 16px;
-      }
-      50% {
-        transform: scale(0.5, 0.8) translateY(50%);
-        opacity: 0.8;
-        border-radius: 12px;
-      }
-      100% {
-        transform: scale(0.3, 0.1) translateY(100%);
-        opacity: 0;
-        border-radius: 8px;
-      }
-    }
-    @keyframes genieMaximize {
-      0% {
-        transform: scale(0.3, 0.1) translateY(100%);
-        opacity: 0;
-        border-radius: 8px;
-      }
-      50% {
-        transform: scale(0.5, 0.8) translateY(50%);
-        opacity: 0.8;
-        border-radius: 12px;
-      }
-      100% {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-        border-radius: 16px;
-      }
-    }
+  // Compositor-only pop; no shape morphing or screen travel.
+  const popupAnimation = `
+    @keyframes chatPopOut { from { transform: scale(1); opacity: 1; } to { transform: scale(.96); opacity: 0; } }
+    @keyframes chatPopIn { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .talio-chat-popup { animation: none !important; transition: none !important; } }
     @keyframes pulse {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.1); }
@@ -181,7 +150,7 @@ export default function ChatPopup({ chat, index }) {
     setTimeout(() => {
       setIsMinimized(true)
       setAnimationState('normal')
-    }, 300)
+    }, 120)
   }
 
   // Handle maximize with animation
@@ -207,7 +176,7 @@ export default function ChatPopup({ chat, index }) {
     }
     setTimeout(() => {
       setAnimationState('normal')
-    }, 300)
+    }, 180)
   }
 
   // Handle mouse down for dragging
@@ -1018,7 +987,7 @@ export default function ChatPopup({ chat, index }) {
     const position = chatPositions?.[chat._id] || getDefaultPosition()
     return (
       <>
-        <style>{genieMinimizeAnimation}</style>
+        <style>{popupAnimation}</style>
         <div
           className="fixed rounded-xl cursor-pointer overflow-visible"
           style={{
@@ -1026,7 +995,7 @@ export default function ChatPopup({ chat, index }) {
             top: `${position.y}px`,
             width: '180px',
             zIndex,
-            animation: 'slideIn 0.3s ease-out',
+            animation: 'chatPopIn 0.18s ease-out',
             transition: 'transform 0.2s ease',
             ...glassStyle,
             background: 'rgba(255, 255, 255, 0.9)',
@@ -1081,10 +1050,10 @@ export default function ChatPopup({ chat, index }) {
 
   return (
     <>
-      <style>{genieMinimizeAnimation}</style>
+      <style>{popupAnimation}</style>
       <div
         ref={popupRef}
-        className="fixed rounded-2xl overflow-hidden flex flex-col"
+        className="talio-chat-popup fixed rounded-2xl overflow-hidden flex flex-col"
         style={{
           width: `${popupWidth}px`,
           height: `${popupHeight}px`,
@@ -1092,12 +1061,12 @@ export default function ChatPopup({ chat, index }) {
           top: `${safePosition.y}px`,
           zIndex,
           ...glassStyle,
-          transition: 'width 0.3s ease, height 0.3s ease, box-shadow 0.2s ease',
+          transition: 'none',
           animation: animationState === 'minimizing'
-            ? 'genieMinimize 0.3s ease-in forwards'
+            ? 'chatPopOut 0.12s ease-in forwards'
             : animationState === 'maximizing'
-              ? 'genieMaximize 0.3s ease-out forwards'
-              : 'slideIn 0.4s ease-out',
+              ? 'chatPopIn 0.18s ease-out forwards'
+              : 'chatPopIn 0.18s ease-out',
           boxShadow: isFocused
             ? `0 20px 50px rgba(0, 0, 0, 0.2), 0 0 0 2px ${primaryColor}40, inset 0 1px 0 rgba(255, 255, 255, 0.5)`
             : '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5)',

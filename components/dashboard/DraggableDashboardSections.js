@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { FiMove, FiSettings, FiEye, FiEyeOff, FiRotateCcw } from 'react-icons/fi'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 // Sortable Section Item
 function SortableSectionItem({ id, children, isEditMode, isHidden, onToggleVisibility }) {
@@ -179,9 +180,9 @@ export default function DraggableDashboardSections({
 
     if (!isLoaded) {
         return (
-            <div className="space-y-5 sm:space-y-8 animate-pulse">
+            <div className="space-y-5 sm:space-y-8 ">
                 {sections.map((_, i) => (
-                    <div key={i} className="h-48 bg-gray-200 dark:bg-zinc-700 rounded-2xl" />
+                    <TalioSkeleton key={i} className="h-48 bg-gray-200 dark:bg-zinc-700 rounded-2xl" />
                 ))}
             </div>
         )

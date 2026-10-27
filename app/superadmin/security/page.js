@@ -4,6 +4,7 @@ import { Tabs, Tab } from '@/components/ui/fernly'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import toast from '@/utils/toast'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 const TABS = [
     { id: 'overview', label: 'Overview' },
@@ -186,7 +187,7 @@ export default function SuperAdminSecurityPage() {
                 <div className="space-y-6">
                     {statsLoading ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {[...Array(8)].map((_, i) => (<div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />))}
+                            {[...Array(8)].map((_, i) => (<TalioSkeleton key={i} className="h-28 bg-gray-100 rounded-xl " />))}
                         </div>
                     ) : (
                         <>

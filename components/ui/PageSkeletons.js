@@ -1,6 +1,7 @@
 'use client'
 
-import { Skeleton, Card, CardBody } from '@heroui/react'
+import { Card, CardBody } from '@heroui/react'
+import { Skeleton } from '@/components/ui/AsciiLoading'
 
 /**
  * Per-page skeleton loaders for navigation transitions.

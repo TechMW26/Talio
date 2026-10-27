@@ -18,6 +18,7 @@ import {
 import ModalPortal from '@/components/ModalPortal'
 import Loader from '@/components/ui/Loader'
 import { getDateKeyInTimezone, getTodayDateString, IST_TIMEZONE } from '@/lib/timezone'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 /**
  * RawCaptureViewer Component
@@ -272,13 +273,13 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
             {groupedCaptures.map((session, sessionIndex) => (
               <div key={session._id} className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="h-px flex-1 bg-gray-200"></div>
+                  <TalioSkeleton className="h-px flex-1 bg-gray-200" />
                   <span className="text-xs font-medium text-gray-500 px-2 py-1 bg-gray-100 rounded-full">
                     {session.sessionTitle || `Session ${session.displayNumber}`} • {formatTime(session.startTime)} - {formatTime(session.endTime)}
                     {session.isComplete && ' ✓'}
                     {session.analysis?.isAnalyzed && ' ★'}
                   </span>
-                  <div className="h-px flex-1 bg-gray-200"></div>
+                  <TalioSkeleton className="h-px flex-1 bg-gray-200" />
                 </div>
                 
                 <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
@@ -315,11 +316,11 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
             {ungroupedCaptures.length > 0 && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="h-px flex-1 bg-gray-200"></div>
+                  <TalioSkeleton className="h-px flex-1 bg-gray-200" />
                   <span className="text-xs font-medium text-gray-500 px-2 py-1 bg-gray-100 rounded-full">
                     Other Captures
                   </span>
-                  <div className="h-px flex-1 bg-gray-200"></div>
+                  <TalioSkeleton className="h-px flex-1 bg-gray-200" />
                 </div>
                 
                 <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">

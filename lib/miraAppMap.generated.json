@@ -5,6 +5,7 @@
     "controls": [],
     "sources": [
       "app/auth/callback/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/Loader.js"
     ]
   },
@@ -22,6 +23,7 @@
     ],
     "sources": [
       "app/auth/change-password/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/Loader.js"
     ]
   },
@@ -58,6 +60,7 @@
     ],
     "sources": [
       "app/auth/reset-password/[token]/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackIcon.js",
       "components/ui/Loader.js"
     ]
@@ -90,6 +93,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -116,6 +120,7 @@
       "app/dashboard/announcements/create/page.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -138,6 +143,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js",
@@ -156,6 +162,7 @@
     "sources": [
       "app/dashboard/app-info/page.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -202,6 +209,7 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -230,6 +238,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -274,10 +283,12 @@
       "components/attendance/AttendanceLegend.js",
       "components/attendance/LocationAccessStatus.js",
       "components/attendance/attendance-colors.module.css",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/calendar.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -321,6 +332,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/FernlyMotion.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -352,6 +364,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/calendar.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -405,6 +418,7 @@
       "components/chat/MemberAvatar.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -451,6 +465,7 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js",
@@ -481,6 +496,7 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -536,6 +552,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -644,6 +661,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -734,9 +752,11 @@
     "sources": [
       "app/dashboard/employees/add/page.js",
       "components/employees/BulkImportEmployees.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -813,6 +833,7 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -845,6 +866,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -903,6 +925,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -931,6 +954,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -953,6 +977,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -990,6 +1015,7 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1005,6 +1031,7 @@
       "app/dashboard/fcm-diagnostic/page.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1031,6 +1058,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1062,6 +1090,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1093,6 +1122,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1134,6 +1164,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/calendar.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -1171,6 +1202,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1213,6 +1245,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -1242,6 +1275,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1270,6 +1304,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1311,6 +1346,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1336,6 +1372,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1363,6 +1400,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1400,6 +1438,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1425,6 +1464,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1484,6 +1524,7 @@
       "app/dashboard/mail/page.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -1514,7 +1555,9 @@
     "sources": [
       "app/dashboard/manpower-requests/page.js",
       "components/recruitment/ManpowerRequests.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1559,6 +1602,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1620,10 +1664,12 @@
       "app/dashboard/meetings/components/MeetingCard.js",
       "app/dashboard/meetings/components/MeetingJoinLink.js",
       "app/dashboard/meetings/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1660,7 +1706,9 @@
       "components/dashboard/HomeDashboard.module.css",
       "components/dashboard/index.js",
       "components/dashboards/UnifiedDashboard.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js",
@@ -1695,6 +1743,7 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js",
@@ -1771,6 +1820,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1809,6 +1859,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js",
@@ -1867,6 +1918,7 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1900,6 +1952,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -1928,6 +1981,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2058,6 +2112,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -2090,6 +2145,7 @@
       "components/productivity/AnalyzedComposite.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2127,9 +2183,11 @@
       "components/TiltWrapper.js",
       "components/profile/ProfilePhotoEditor.js",
       "components/profile/ProfilePhotoEditor.module.css",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -2159,6 +2217,7 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/Portal.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -2287,10 +2346,12 @@
       "components/tasks/ManageTaskStatusesModal.js",
       "components/tasks/SubtaskCompletionButton.js",
       "components/tasks/TaskStatusProgressBar.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/Portal.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
@@ -2322,6 +2383,7 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/Portal.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -2394,11 +2456,13 @@
       "components/tasks/KanbanBoard.js",
       "components/tasks/KanbanBoard.module.css",
       "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/Portal.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
@@ -2435,6 +2499,7 @@
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/Portal.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -2499,10 +2564,12 @@
       "components/tasks/KanbanBoard.js",
       "components/tasks/KanbanBoard.module.css",
       "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/Portal.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
@@ -2540,6 +2607,7 @@
       "components/ui/FernlyMotion.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2588,10 +2656,12 @@
       "components/rbac/AuditLogPanel.js",
       "components/rbac/RoleAssignModal.js",
       "components/rbac/RoleBuilder.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/Modal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2626,6 +2696,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -2655,6 +2726,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2697,6 +2769,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2723,6 +2796,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2753,6 +2827,7 @@
       "app/dashboard/recruitment/create/page.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2783,6 +2858,7 @@
       "app/dashboard/recruitment/edit/[id]/page.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2819,6 +2895,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2852,6 +2929,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2881,7 +2959,9 @@
     "sources": [
       "app/dashboard/recruitment/requisitions/page.js",
       "components/recruitment/ManpowerRequests.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2907,8 +2987,10 @@
     "sources": [
       "app/dashboard/reports/page.js",
       "components/mobile/MobileComponents.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2957,6 +3039,7 @@
       "components/employees/ResignationPanel.js",
       "components/employees/SettlementEditor.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -2999,10 +3082,12 @@
       "app/dashboard/sandbox/components/CreateIdeaModal.js",
       "app/dashboard/sandbox/components/IdeaCard.js",
       "app/dashboard/sandbox/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3045,6 +3130,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3096,10 +3182,12 @@
     ],
     "sources": [
       "app/dashboard/settings/notifications/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3133,6 +3221,7 @@
       "Add useful context such as your role, projects, terminology, or preferences…",
       "Add your redirect URL exactly",
       "Address",
+      "Asia/Kolkata",
       "Associate the correct company page",
       "Attendance machines",
       "Attendance machines could not be loaded",
@@ -3172,6 +3261,7 @@
       "Enter company name",
       "Example: Keep routine answers concise and use my team's project naming conventions.",
       "Fixed Amount (₹)",
+      "From",
       "Full Day Hours",
       "Full address (auto-filled from map)",
       "Geofence Coordinates",
@@ -3183,11 +3273,13 @@
       "Import CSV",
       "Induction & orientation",
       "Induction presentation",
+      "Keep proactive interruptions quiet during these hours",
       "Last Sync",
       "Late Arrival Deduction",
       "Late Threshold (min)",
       "Latitude",
       "Learn from successful music requests",
+      "Let MIRA keep track of my work",
       "Location Name",
       "Login",
       "Longitude",
@@ -3215,10 +3307,14 @@
       "Present days",
       "Previous",
       "Primary Location",
+      "Proactive MIRA",
+      "Proactive timezone",
       "Productivity",
       "Professional Tax",
       "Provident Fund (PF)",
       "Publish induction",
+      "Quiet hours end",
+      "Quiet hours start",
       "Radius (meters)",
       "Rate Multiplier",
       "Recruitment",
@@ -3240,9 +3336,11 @@
       "TDS (Tax Deducted at Source)",
       "TDS Percentage (%)",
       "Time Zone",
+      "Timezone",
       "Timezone *",
       "Token Health",
       "United States",
+      "Until",
       "Upload induction PDF or PowerPoint (.pptx), up to 25 MB / 100 pages",
       "Value",
       "Website",
@@ -3275,6 +3373,7 @@
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -3303,6 +3402,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3439,6 +3539,7 @@
     "sources": [
       "app/dashboard/talioboard/[id]/page.js",
       "components/ui/AIActivityBeam.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackIcon.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
@@ -3446,6 +3547,7 @@
       "components/ui/MiraLoadingOverlay.js",
       "components/ui/MiraPet.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/UploadButton.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -3505,6 +3607,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3571,6 +3674,7 @@
       "components/charts/FernlyCharts.module.css",
       "components/charts/FernlyVisuals.js",
       "components/productivity/AnalyzedComposite.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackIcon.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
@@ -3578,6 +3682,7 @@
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/calendar.module.css",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
@@ -3622,6 +3727,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3652,6 +3758,7 @@
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
       "components/ui/LoadingButton.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3720,9 +3827,11 @@
       "components/charts/FernlyCharts.module.css",
       "components/charts/FernlyVisuals.js",
       "components/tasks/SubtaskCompletionButton.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3744,6 +3853,7 @@
       "components/ui/BackgroundRefreshIndicator.js",
       "components/ui/ErrorBoundary.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3790,6 +3900,7 @@
     ],
     "sources": [
       "app/join/[guestLink]/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/Loader.js"
     ]
   },
@@ -3855,9 +3966,11 @@
       "components/meetings/MeetingVisualIcons.js",
       "components/meetings/ParticipantGrid.js",
       "components/ui/AIActivityBeam.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -3893,6 +4006,7 @@
     ],
     "sources": [
       "app/offline/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/Loader.js"
     ]
   },
@@ -3904,6 +4018,7 @@
     ],
     "sources": [
       "app/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/Loader.js"
     ]
   },
@@ -3968,6 +4083,7 @@
     ],
     "sources": [
       "app/setup/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/Loader.js"
     ]
   },
@@ -3983,7 +4099,8 @@
       "User Statistics by Company"
     ],
     "sources": [
-      "app/superadmin/analytics/page.js"
+      "app/superadmin/analytics/page.js",
+      "components/ui/AsciiLoading.js"
     ]
   },
   {
@@ -4076,10 +4193,12 @@
     "sources": [
       "app/superadmin/companies/[id]/page.js",
       "components/superadmin/HrmsModuleControls.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
       "components/ui/Loader.js",
       "components/ui/ModalPortal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -4181,6 +4300,7 @@
       "components/superadmin/HrmsModuleControls.js",
       "components/ui/BackIcon.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"
@@ -4199,7 +4319,8 @@
       "Subscription Filter"
     ],
     "sources": [
-      "app/superadmin/companies/page.js"
+      "app/superadmin/companies/page.js",
+      "components/ui/AsciiLoading.js"
     ]
   },
   {
@@ -4216,7 +4337,8 @@
       "Total Companies"
     ],
     "sources": [
-      "app/superadmin/dashboard/page.js"
+      "app/superadmin/dashboard/page.js",
+      "components/ui/AsciiLoading.js"
     ]
   },
   {
@@ -4240,6 +4362,7 @@
     ],
     "sources": [
       "app/superadmin/email/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/Loader.js"
     ]
   },
@@ -4276,7 +4399,8 @@
       "Reminders"
     ],
     "sources": [
-      "app/superadmin/reminders/page.js"
+      "app/superadmin/reminders/page.js",
+      "components/ui/AsciiLoading.js"
     ]
   },
   {
@@ -4332,7 +4456,9 @@
     ],
     "sources": [
       "app/superadmin/security/page.js",
+      "components/ui/AsciiLoading.js",
       "components/ui/HeroModal.js",
+      "components/ui/PopupMotion.js",
       "components/ui/fernly/elements.module.css",
       "components/ui/fernly/index.js",
       "components/ui/fernly/native.js"

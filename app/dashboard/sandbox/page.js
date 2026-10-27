@@ -31,6 +31,7 @@ import { FaThumbtack, FaUserSecret, FaPaperPlane } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import CreateIdeaModal from './components/CreateIdeaModal'
 import IdeaCard from './components/IdeaCard'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function SandboxPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -232,10 +233,10 @@ export default function SandboxPage() {
         ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <Surface key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+              <Surface key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <TalioSkeleton className="h-4 bg-gray-200 rounded w-3/4 mb-3" />
+                <TalioSkeleton className="h-3 bg-gray-200 rounded w-1/2 mb-2" />
+                <TalioSkeleton className="h-3 bg-gray-200 rounded w-2/3" />
               </Surface>
             ))}
           </div>

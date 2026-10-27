@@ -28,6 +28,7 @@ test('streams the configured default voice with server-only credentials and igno
   expect(global.fetch).toHaveBeenCalledWith('https://api.elevenlabs.io/v1/text-to-speech/ftDdhfYtmfGP0tFlBYA1/stream?output_format=pcm_24000', expect.objectContaining({ headers: expect.objectContaining({ 'xi-api-key': 'test-key' }) }))
   expect(rateLimit).toHaveBeenCalledWith('MIRA_VOICE', 'tenantA:u')
   expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ model_id: 'eleven_v4', apply_text_normalization: 'auto' })
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body).voice_settings).toEqual({ stability: 0.4, similarity_boost: 0.75 })
 })
 test('uses a saved per-user MIRA voice', async () => {
   voicePreferences = { voiceId: '6JsmTroalVewG1gA6Jmw' }
@@ -41,7 +42,8 @@ test('direct speech preserves expression and explicit Hindi pronunciation withou
   expect(response.status).toBe(200)
   await response.arrayBuffer()
   expect(database.get).not.toHaveBeenCalled()
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ text: '[excited][fast] बहुत अच्छी खबर है!', model_id: 'eleven_v4', language_code: 'hi', voice_settings: { stability: 0.4, speed: 1.2 } })
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ text: '[excited][fast] बहुत अच्छी खबर है!', model_id: 'eleven_v4', language_code: 'hi', voice_settings: { stability: 0.4, similarity_boost: 0.75 } })
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body).voice_settings).not.toHaveProperty('speed')
 })
 test('allows only curated voices for an unsaved preview and rejects arbitrary provider IDs', async () => {
   const response = await run({ text: 'Hello', voiceId: 'iWq9tCtTw1SYmVpvsRjY' })
@@ -84,6 +86,22 @@ test('speech chunks stream in order with bounded text per provider request', asy
   expect(bytes[2]).toBe(2)
   expect(JSON.parse(global.fetch.mock.calls[0][1].body).text.length).toBeLessThanOrEqual(120)
   expect(global.fetch.mock.calls.every(([, opts]) => JSON.parse(opts.body).text.length <= 280)).toBe(true)
+})
+test('request cancellation reaches the selected full V4 provider request', async () => {
+  const abort = new AbortController()
+  const request = new Request('http://localhost/api/ai/mira-voice', { method: 'POST', signal: abort.signal, body: JSON.stringify({ text: '[warm][fast] Hello.' }) })
+  const response = await POST(request)
+  const upstreamSignal = global.fetch.mock.calls[0][1].signal
+  expect(upstreamSignal.aborted).toBe(false)
+  abort.abort()
+  expect(upstreamSignal.aborted).toBe(true)
+  await response.body.cancel()
+})
+test('cancelling downstream PCM stops both the active and one-ahead synthesis', async () => {
+  const response = await run({ text: 'A short sentence about today. '.repeat(20) })
+  expect(global.fetch).toHaveBeenCalledTimes(2)
+  await response.body.cancel()
+  expect(global.fetch.mock.calls.every(([, options]) => options.signal.aborted)).toBe(true)
 })
 test('recognition token is authenticated and non-cacheable', async () => {
   global.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ token: 'temporary' })))

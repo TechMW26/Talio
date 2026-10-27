@@ -23,7 +23,7 @@ describe('DashboardRouteTransition', () => {
     view.rerender(<DashboardRouteTransition><section>Documents</section></DashboardRouteTransition>)
     expect(view.container.querySelector('.dashboard-route-page')).toHaveAttribute('data-page-sizing', 'document')
   })
-  test.each([false, true])('loaded content animates without remounting; reduced motion=%s', async reduced => {
+  test.each([false, true])('route defers reveal to the shared coordinator; reduced motion=%s', async reduced => {
     const original = window.matchMedia, originalAnimate = Element.prototype.animate
     window.matchMedia = () => ({ matches: reduced, addEventListener() {}, removeEventListener() {} })
     const animate = jest.fn(() => ({ cancel: jest.fn() }))
@@ -32,8 +32,9 @@ describe('DashboardRouteTransition', () => {
       const { rerender, unmount } = render(<DashboardRouteTransition><section><div data-page-skeleton="true" /></section></DashboardRouteTransition>)
       rerender(<DashboardRouteTransition><section><h1>Loaded content</h1></section></DashboardRouteTransition>)
       await waitFor(() => expect(screen.getByText('Loaded content')).toBeVisible())
-      if (!reduced) await waitFor(() => expect(animate).toHaveBeenCalled())
-      else expect(animate).not.toHaveBeenCalled()
+      // The global loading coordinator owns terminal reveals. A second route
+      // animation would race it and also move stateful controls unnecessarily.
+      expect(animate).not.toHaveBeenCalled()
       unmount()
     } finally { window.matchMedia = original; Element.prototype.animate = originalAnimate }
   })

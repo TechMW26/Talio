@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 import DesktopPermissionGate from '@/components/ui/DesktopPermissionGate'
 import ScrollToTop from '@/components/ScrollToTop'
 import WebNetworkRecovery from '@/components/WebNetworkRecovery'
+import LoadingRevealCoordinator from '@/components/ui/LoadingRevealCoordinator'
 import {
     patchBrowserFetchForFreshness,
     revalidateApiQueries,
@@ -132,6 +133,7 @@ export function Providers({ children }) {
                         <ClientDataSyncBridge />
                         <ScrollToTop />
                         <WebNetworkRecovery />
+                        <LoadingRevealCoordinator />
                         {children}
                     </DesktopPermissionGate>
                 </SWRConfig>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from '@/utils/toast'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 export default function RemindersPage() {
   const [reminders, setReminders] = useState([])
@@ -111,7 +112,7 @@ export default function RemindersPage() {
       {loading ? (
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse"></div>
+            <TalioSkeleton key={i} className="h-24 bg-gray-100 rounded-2xl " />
           ))}
         </div>
       ) : reminders.length === 0 ? (

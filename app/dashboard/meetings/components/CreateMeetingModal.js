@@ -25,6 +25,7 @@ import { ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@/com
 import { useAILoading } from '@/contexts/AILoadingContext'
 import { getDateTimePartsInTimezone, parseDateTimeInTimezone, IST_TIMEZONE } from '@/lib/timezone'
 import { filterDepartmentGroupEmployees, hasActiveGroupSearch, isDepartmentGroupExpanded } from '@/lib/departmentGroupSearch'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 const toISTDateTimeLocal = (date) => {
   const parts = getDateTimePartsInTimezone(date, IST_TIMEZONE)
@@ -737,8 +738,8 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 {loadingInvitees ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map(i => (
-                      <div key={i} className="animate-pulse">
-                        <div className="h-12 bg-gray-200 rounded-lg"></div>
+                      <div key={i} className="">
+                        <TalioSkeleton className="h-12 bg-gray-200 rounded-lg" />
                       </div>
                     ))}
                   </div>

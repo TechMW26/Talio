@@ -521,11 +521,11 @@ html.dark body .dashboard-page-canvas {
 
 /* Fernly's shared fade/slide vocabulary. Keep persistent shell/Mira stationary. */
 @keyframes fernly-page-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes fernly-dialog-enter { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes fernly-dialog-enter {from { opacity: 0; transform: scale(.96); }to { opacity: 1; transform: scale(1); } }
 @keyframes fernly-card-enter { from { opacity: 0; transform: translateY(36px) scale(.985); } to { opacity: 1; transform: none; } }
 /* Shared cards opt in without animating assistant overlays, charts or draggable items. */
 .dashboard-page-canvas .card:not([class*="mira"]):not([draggable="true"]), [data-fernly-card] { animation: fernly-card-enter .85s cubic-bezier(.22,1,.36,1) both; }
-.modal-overlay > .modal-container { animation: fernly-dialog-enter .35s cubic-bezier(.22,1,.36,1) both; }
+.modal-overlay > .modal-container { animation: fernly-dialog-enter 0.18s cubic-bezier(.22,1,.36,1) both; }
 @media (prefers-reduced-motion: reduce) { .modal-overlay > .modal-container, .dashboard-page-canvas .card, [data-fernly-card] { animation: none; } }
 
 .dashboard-route-page {
@@ -2212,45 +2212,29 @@ html.dark .whiteboard-light-override header.bg-white {
 }
 
 /* Modal Enter Animation */
-@keyframes modal-enter {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+@keyframes modal-enter {from { opacity: 0; transform: scale(.96); }to { opacity: 1; transform: scale(1); }
 }
 
 .animate-modal-enter {
-  animation: modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modal-enter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Overlay backdrop blur entrance/exit */
 @keyframes overlay-blur-in {
   from {
     opacity: 0;
-    backdrop-filter: blur(0px);
-    -webkit-backdrop-filter: blur(0px);
   }
   to {
     opacity: 1;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
   }
 }
 
 @keyframes overlay-blur-out {
   from {
     opacity: 1;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
   }
   to {
     opacity: 0;
-    backdrop-filter: blur(0px);
-    -webkit-backdrop-filter: blur(0px);
   }
 }
 
@@ -2260,7 +2244,7 @@ html.dark .whiteboard-light-override header.bg-white {
    blur backdrop, and smooth animation
    ============================================ */
 [data-slot="backdrop"].backdrop-opacity-disabled,
-[data-slot="backdrop"],
+[data-slot="backdrop"], .talio-popup-backdrop,
 div[class*="backdrop-blur"] + div[role="dialog"],
 .z-50[data-slot="wrapper"] {
   z-index: 99999 !important;
@@ -2274,7 +2258,7 @@ section[role="dialog"] {
 }
 
 [data-slot="backdrop"] {
-  animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  animation: overlay-blur-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
 }
 
 /* Keep close controls inside rounded modal corners and above header content. */
@@ -2341,20 +2325,20 @@ button[title="Close"] svg,
 /* All modals use rgba(0, 0, 0, 0.6) with 10px backdrop blur */
 .modal-overlay-bg {
   background-color: rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .modal-overlay-dark {
   background-color: rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .modal-overlay-light {
   background-color: rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* Overlay with animation - no blur */
@@ -2369,9 +2353,9 @@ button[title="Close"] svg,
 
 .modal-overlay-animated {
   background-color: rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  animation: overlay-blur-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Card Hover Effect */
@@ -2573,9 +2557,9 @@ textarea::placeholder {
   padding: 1rem;
   overflow-y: auto;
   background-color: rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  animation: overlay-blur-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Modal Backdrop - Transparent black background - GLOBAL STANDARD */
@@ -2583,10 +2567,10 @@ textarea::placeholder {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   z-index: 99998;
-  animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: overlay-blur-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Modal Container - The white modal box */
@@ -2601,7 +2585,7 @@ textarea::placeholder {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modal-enter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Modal Size Variants */
@@ -2843,4 +2827,61 @@ html.theme-switching *::after {
 }
 html.theme-switching [data-vt-sidebar] {
   view-transition-name: sidebar;
+}
+
+/* Shared data-loading treatment. Static glyphs keep large tables inexpensive. */
+.talio-ascii-skeleton {
+  position: relative;
+  min-width: 0;
+  min-height: .25rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+.talio-ascii-skeleton:not([data-loaded="true"]) {
+  background: transparent !important;
+  color: hsl(var(--heroui-default-400, 220 9% 55%));
+}
+.talio-ascii-pattern.ars {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  container-type: size;
+  --ars-base: .42;
+}
+.talio-ascii-pattern .ars-block { height: 100%; border-radius: inherit; }
+.talio-ascii-pattern .ars-base {
+  font-size: 10px;
+  font-size: max(10px, calc(100cqw / 57), calc(100cqh / 9.6));
+  line-height: 1.2;
+}
+:root { --ascii-accent: #7dbcaf; }
+
+/* One compositor-only motion across legacy portals, dialogs and popovers. */
+[data-talio-popup-portal] > .fixed > :not(.fixed):not(.absolute),
+[data-slot="content"][data-open="true"],
+.animate-modal-enter,
+.modal-overlay > .modal-container {
+  animation: modal-enter .18s cubic-bezier(.2,.8,.2,1) both;
+}
+[data-slot="backdrop"], .talio-popup-backdrop,
+[data-talio-popup-portal] > .fixed,
+.modal-overlay, .modal-backdrop,
+.modal-overlay-bg, .modal-overlay-animated {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* A custom modal already has a dimmed overlay; don't paint it twice. */
+.modal-overlay > .modal-backdrop { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-modal-enter, .modal-container, .modal-overlay,
+  [data-slot="backdrop"], .talio-popup-backdrop, [data-slot="content"],
+  [data-talio-popup-portal] > .fixed > :not(.fixed):not(.absolute) {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import { HiOutlinePlus, HiOutlineBriefcase, HiOutlineClock, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineInbox, HiOutlineArrowRight, HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2'
+import { Skeleton as TalioSkeleton } from '@/components/ui/AsciiLoading'
 
 const endpoint = '/api/recruitment/requisitions'
 const field = 'w-full rounded-xl border border-default-300 bg-content1 p-3 text-sm text-foreground'
@@ -126,7 +127,7 @@ export default function ManpowerRequests() {
     <section className="overflow-hidden rounded-2xl border border-default-200 bg-content1" aria-label="Manpower request list">
     <div className="px-5 pt-5 sm:px-6 sm:pt-6"><Tabs aria-label="Request status" selectedKey={status} onSelectionChange={selectStatus}>{Object.entries(statuses).map(([key, label]) => <Tab key={key} title={label} />)}</Tabs></div>
     <div className="space-y-4 p-5 sm:p-6"><div><h2 className="text-lg font-semibold">{statuses[status]}</h2><p className="mt-1 text-xs text-default-500">{!isLoading && !error && Number.isFinite(data?.total) ? `${data.total} request(s) · ` : ''}Only requests you are authorised to view.</p></div>
-    {isLoading && <div className="space-y-3" aria-hidden="true">{[1, 2].map(key => <div key={key} className="h-24 animate-pulse rounded-xl bg-default-100" />)}</div>}
+    {isLoading && <div className="space-y-3" aria-hidden="true">{[1, 2].map(key => <TalioSkeleton key={key} className="h-24 rounded-xl bg-default-100" />)}</div>}
     {!isLoading && !error && data?.data?.length === 0 && <div className="flex min-h-60 flex-col items-center justify-center rounded-xl border border-dashed border-default-200 px-6 py-10 text-center"><span className="mb-4 rounded-2xl bg-default-100 p-4"><HiOutlineInbox className="h-8 w-8 text-default-400" aria-hidden="true" /></span><h3 className="font-semibold">{status === 'all' ? 'No manpower requests yet.' : `No ${status} requests.`}</h3><p className="mt-2 max-w-sm text-sm text-default-500">{status === 'all' ? 'Create a request to share your workforce needs with HR and start the hiring process.' : 'Requests will appear here when they reach this stage.'}</p></div>}
     {data?.data?.map(record => <RequestCard key={`${record._id}-${record.status}`} record={record} isHr={data.isHr} busy={mutation.isLoading} onReview={save} />)}
     {data?.total > 20 && <nav aria-label="Request pages" className="flex items-center gap-3"><button className={button} disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</button><span>Page {page} of {Math.ceil(data.total / 20)}</span><button className={button} disabled={page * 20 >= data.total} onClick={() => setPage(p => p + 1)}>Next</button></nav>}
