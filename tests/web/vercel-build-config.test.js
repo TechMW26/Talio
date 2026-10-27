@@ -17,6 +17,7 @@ describe('Vercel production build configuration', () => {
   test('includes the shared MIRA action policy without desktop build artifacts', () => {
     const ignore = require('ignore')().add(fs.readFileSync(path.join(root, '.vercelignore'), 'utf8'))
     expect(ignore.ignores('desktop-app/src/miraActionPlan.js')).toBe(false)
+    expect(ignore.ignores('desktop-app/src/miraOrchestration.js')).toBe(false)
     expect(ignore.ignores('desktop-app/src/miraSemantic.js')).toBe(true)
     expect(ignore.ignores('desktop-app/src/main.js')).toBe(true)
     expect(ignore.ignores('desktop-app/node_modules/example/index.js')).toBe(true)
