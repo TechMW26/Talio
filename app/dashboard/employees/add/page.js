@@ -347,6 +347,11 @@ export default function AddEmployeePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    // Employees must belong to a company: the system role is resolved against it.
+    if (!formData.company) {
+      toast.error('Please select a company')
+      return
+    }
     const payload = { ...formData }
 
     // Custom/preset designation selected from UI (e.g. CTO/CMO/CEO) is created server-side.
@@ -817,9 +822,10 @@ export default function AddEmployeePage() {
                 {/* Company */}
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-2">
-                    Company
+                    Company *
                   </label>
                   <Select
+                    isRequired
                     name="company"
                     selectedKeys={formData.company ? new Set([String(formData.company)]) : new Set()}
                     onSelectionChange={(keys) => {

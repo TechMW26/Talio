@@ -48,16 +48,24 @@ emulator('atomic native leave requests', () => {
     expect(await balance()).toMatchObject({ pending: 0, usedDays: 0, remainingDays: 5 })
   })
   test('concurrent requests cannot over-reserve a balance', async () => {
-    const results = await Promise.allSettled([1, 2, 3].map(() => submit()))
+    const results = await Promise.allSettled([
+      submit({ startDate: '2026-10-05', endDate: '2026-10-06' }),
+      submit({ startDate: '2026-10-07', endDate: '2026-10-08' }),
+      submit({ startDate: '2026-10-12', endDate: '2026-10-13' }),
+    ])
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(2)
     expect(await balance()).toMatchObject({ pending: 4, remainingDays: 1 })
+  })
+  test('rejects overlapping pending or approved requests', async () => {
+    await submit()
+    await expect(submit({ startDate: '2026-10-06', endDate: '2026-10-07' })).rejects.toThrow('overlaps')
   })
   test('legacy unreserved pending records deduct on approval and rejection does not change balances', async () => {
     const id = 'dddddddddddddddddddddddd'
     await database.create('leaves', { _id: id, employee: employeeId, leaveType: type._id, startDate: new Date('2026-10-05'), endDate: new Date('2026-10-06'), days: 2, status: 'pending', createdAt: new Date() })
     await transitionLeaveRequest(database, manager, id, { status: 'approved' })
     expect(await balance()).toMatchObject({ pending: 0, usedDays: 2, remainingDays: 3 })
-    const next = await submit()
+    const next = await submit({ startDate: '2026-11-02', endDate: '2026-11-03' })
     await transitionLeaveRequest(database, manager, next._id, { status: 'rejected', reason: 'Not approved' })
     expect(await balance()).toMatchObject({ pending: 0, usedDays: 2, remainingDays: 3 })
   })

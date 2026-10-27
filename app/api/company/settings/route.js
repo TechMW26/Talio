@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { buildCacheKey, getCache, setCache } from '@/lib/cache'
+import { resolveWorkingDays } from '@/lib/officeHours'
 
 // Day name to numeric mapping (JavaScript: 0=Sunday, 1=Monday, etc.)
 const DAY_NAME_TO_NUMBER = {
@@ -34,6 +35,13 @@ export async function GET(request) {
       companyId = employee?.company
     }
 
+    // Single-company tenants often leave employees unlinked; fall back to that company
+    // so the calendar and check-in policy still match what admins configured.
+    if (!companyId) {
+      const { records } = await database.list('companies', { limit: 2 })
+      if (records.length === 1) companyId = records[0]?._id
+    }
+
     if (!companyId) {
       return NextResponse.json({
         success: false,
@@ -65,8 +73,8 @@ export async function GET(request) {
     }
 
     // Convert working days from names to numeric values for frontend
-    const workingDayNames = company.workingHours?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-    const workingDaysNumeric = workingDayNames.map(day => DAY_NAME_TO_NUMBER[day.toLowerCase()]).filter(d => d !== undefined)
+    const workingDayNames = resolveWorkingDays(company.workingHours?.workingDays)
+    const workingDaysNumeric = workingDayNames.map(day => DAY_NAME_TO_NUMBER[day]).filter(d => d !== undefined)
 
     const response = {
       success: true,

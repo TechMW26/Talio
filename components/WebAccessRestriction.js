@@ -25,6 +25,16 @@ export function isNativeApp() {
 }
 
 /**
+ * Local-development escape hatch so non-admin test accounts can use the web
+ * dashboard on localhost. Requires NODE_ENV=development, so a production build
+ * can never honour the flag even if it is present in the environment.
+ */
+function isDevWebAccessAllowed() {
+  if (process.env.NODE_ENV !== 'development') return false
+  return String(process.env.NEXT_PUBLIC_ALLOW_WEB_DASHBOARD_IN_DEV || '').trim().toLowerCase() === 'true'
+}
+
+/**
  * Check if user should be restricted from web access
  * Only admins can access via web browser
  */
@@ -33,6 +43,9 @@ export function shouldRestrictWebAccess() {
 
   // Allow access if using native app
   if (isNativeApp()) return false
+
+  // Allow access for every role during local development when explicitly opted in
+  if (isDevWebAccessAllowed()) return false
 
   // Check user role
   const user = getCurrentUser()

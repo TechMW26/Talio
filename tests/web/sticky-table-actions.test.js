@@ -4,7 +4,7 @@ import postcss from 'postcss'
 
 const read = file => fs.readFileSync(path.join(process.cwd(), file), 'utf8')
 test('Assets and other native action tables explicitly mark the action header', () => {
-  for (const file of ['assets', 'employees', 'attendance', 'users', 'designations', 'recruitment', 'leave/requests', 'leave/approvals', 'leave/allocations', 'helpdesk/manage']) {
+  for (const file of ['assets', 'employees', 'attendance', 'users', 'designations', 'recruitment', 'leave/requests', 'leave/approvals', 'leave/allocations', 'leave/encashment', 'helpdesk/manage']) {
     expect(read(`app/dashboard/${file}/page.js`)).toMatch(/<th\b[^>]*data-sticky-actions="true"[^>]*>\s*Actions?\s*<\/th>/)
   }
 })

@@ -15,20 +15,21 @@ import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { currentFiscalYear } from '@/lib/leavePolicy'
 
 export default function LeaveAllocationsPage() {
   const [showModal, setShowModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [importStep, setImportStep] = useState('upload') // 'upload' | 'preview' | 'applying'
   const [importFile, setImportFile] = useState(null)
-  const [importYear, setImportYear] = useState(new Date().getFullYear())
+  const [importYear, setImportYear] = useState(currentFiscalYear())
   const [importParsing, setImportParsing] = useState(false)
   const [importPreviewData, setImportPreviewData] = useState([])
   const [importSummary, setImportSummary] = useState(null)
   const [selectedImportRows, setSelectedImportRows] = useState([])
   const [importApplying, setImportApplying] = useState(false)
   const fileInputRef = useRef(null)
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedYear, setSelectedYear] = useState(currentFiscalYear())
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [employeePage, setEmployeePage] = useState(1)
   const [bulkMode, setBulkMode] = useState(false)
@@ -42,7 +43,7 @@ export default function LeaveAllocationsPage() {
     employee: '',
     leaveType: '',
     totalDays: '',
-    year: new Date().getFullYear(),
+    year: currentFiscalYear(),
   })
 
   // User from localStorage

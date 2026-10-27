@@ -42,7 +42,7 @@ test('every dashboard route remains present and the audit does not hide headings
     }
   }
   walk('app/dashboard')
-  expect(routes).toHaveLength(90)
+  expect(routes).toHaveLength(91)
   for (const file of routes) expect(read(file)).toContain('export default')
   expect(read('components/ui/fernly/native.js')).not.toContain('sr-only')
 })
