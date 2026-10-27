@@ -38,6 +38,7 @@
   "/dashboard/leave/approvals",
   "/dashboard/leave/balance",
   "/dashboard/leave/early-leave",
+  "/dashboard/leave/encashment",
   "/dashboard/leave",
   "/dashboard/leave/requests",
   "/dashboard/leave/work-from-home",
