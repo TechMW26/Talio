@@ -198,7 +198,13 @@ export async function POST(request) {
       }
     }
     const allowed = new Set(ASSET_FIELDS.map(field => field.key))
-    mapping = Object.fromEntries(Object.entries(mapping).filter(([index, field]) => /^\d+$/.test(index) && Number(index) < headers.length && allowed.has(field)))
+       mapping = Object.fromEntries(Object.entries(mapping).filter(([index, field]) => /^\d+$/.test(index) && Number(index) < headers.length && allowed.has(field)))
+    // Auto-detected mappings can match two similar headers (e.g. "Name" and "Asset Name").
+    // Keep the first column per field; the user can change it in the preview.
+    if (!mappingJson) {
+      const used = new Set()
+      mapping = Object.fromEntries(Object.entries(mapping).sort(([a], [b]) => Number(a) - Number(b)).filter(([, field]) => !used.has(field) && used.add(field)))
+    }
     if (new Set(Object.values(mapping)).size !== Object.values(mapping).length) return NextResponse.json({ success: false, message: 'Map each asset field to only one column.' }, { status: 400 })
     const missingFields = ['assetCode', 'name'].filter(key => !Object.values(mapping).includes(key))
     if (mode === 'import' && missingFields.length) return NextResponse.json({ success: false, message: 'Map Asset Code and Asset Name before importing.' }, { status: 400 })

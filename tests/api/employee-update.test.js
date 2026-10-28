@@ -50,3 +50,21 @@ test('invalid framing is rejected before storage work', async () => {
   expect(uploadImage).not.toHaveBeenCalled()
   expect(mutateFirestoreEmployee).not.toHaveBeenCalled()
 })
+test('correcting the joining date moves an open probation end date', async () => {
+  await database.mutate('employees', employeeId, e => ({ ...e, dateOfJoining: new Date('2026-09-01T12:00:00Z'), lifecycle: { stage: 'probation', probation: { applicable: true, status: 'in_progress', durationMonths: 3, startDate: new Date('2026-09-01T12:00:00Z'), endDate: new Date('2026-12-01T12:00:00Z'), reviewDate: new Date('2026-12-01T12:00:00Z') } } }))
+  expect((await update({ dateOfJoining: '2026-07-15' })).status).toBe(200)
+  const { patch } = mutateFirestoreEmployee.mock.calls.at(-1)[0]
+  expect(patch.lifecycle.stage).toBe('probation')
+  expect(patch.lifecycle.probation.endDate.toISOString().slice(0, 10)).toBe('2026-10-15')
+  expect(patch.lifecycle.probation.reviewDate.toISOString().slice(0, 10)).toBe('2026-10-15')
+})
+test('an extended probation keeps its HR-decided end date when the joining date changes', async () => {
+  await database.mutate('employees', employeeId, e => ({ ...e, dateOfJoining: new Date('2026-09-01T12:00:00Z'), lifecycle: { probation: { applicable: true, status: 'extended', durationMonths: 4, endDate: new Date('2027-01-01T12:00:00Z'), reviewDate: new Date('2027-01-01T12:00:00Z') } } }))
+  expect((await update({ dateOfJoining: '2026-07-15' })).status).toBe(200)
+  expect(mutateFirestoreEmployee.mock.calls.at(-1)[0].patch.lifecycle).toBeUndefined()
+})
+test('re-saving the same joining date leaves probation untouched', async () => {
+  await database.mutate('employees', employeeId, e => ({ ...e, dateOfJoining: new Date('2026-09-01T12:00:00Z'), lifecycle: { probation: { applicable: true, status: 'in_progress', durationMonths: 3, reviewDate: new Date('2026-12-01T12:00:00Z') } } }))
+  expect((await update({ dateOfJoining: '2026-09-01' })).status).toBe(200)
+  expect(mutateFirestoreEmployee.mock.calls.at(-1)[0].patch.lifecycle).toBeUndefined()
+})
