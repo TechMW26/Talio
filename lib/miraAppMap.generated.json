@@ -1719,6 +1719,24 @@
     ]
   },
   {
+    "route": "/dashboard/mira/connect",
+    "name": "mira / connect",
+    "controls": [
+      "ABCDE-12345",
+      "Active MIRA connections",
+      "Allow connection",
+      "Connect standalone MIRA",
+      "Decline",
+      "MIRA connection code",
+      "Review request",
+      "Revoke access",
+      "Standalone MIRA is requesting access"
+    ],
+    "sources": [
+      "app/dashboard/mira/connect/page.js"
+    ]
+  },
+  {
     "route": "/dashboard",
     "name": "Dashboard",
     "controls": [

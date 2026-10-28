@@ -102,6 +102,8 @@ export async function middleware(request) {
   // Public routes that don't require authentication
   const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/forgot-password', '/auth/reset-password', '/setup', '/join', '/download']
   const publicApiRoutes = [
+    '/api/mira/link/device', // Short-lived, rate-limited pairing; never accepts a login credential.
+    '/api/mira/link/gateway', // Dedicated revocable grant, verified and scoped in the route.
     '/api/ai/mira-agent/llm', // Dedicated short-lived voice credential is verified in this route.
     '/api/ai/mira-agent/llm/chat/completions', // OpenAI-compatible provider URL suffix; same scoped credential check.
     '/api/auth/login',

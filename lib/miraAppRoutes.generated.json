@@ -47,6 +47,7 @@
   "/dashboard/meetings/[id]",
   "/dashboard/meetings",
   "/dashboard/meetings/room/[roomId]",
+  "/dashboard/mira/connect",
   "/dashboard",
   "/dashboard/payroll/generate",
   "/dashboard/payroll",
