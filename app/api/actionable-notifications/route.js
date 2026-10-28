@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { ensureProbationReviewReminder } from '@/lib/hrms/probationReminder.server'
+import { ensurePendingResignationReminder } from '@/lib/hrms/resignationReminder.server'
+import { getResignationStore } from '@/lib/hrms/resignationStore.server'
 import { isFeatureEnabled } from '@/lib/planFeatures'
 import { getActionableDatabase, listActionableNotifications, storeActionableNotification, notificationUserId } from '@/lib/actionableNotificationStore.server'
 
@@ -10,6 +12,7 @@ export async function GET(request) {
     if (!auth.success) return NextResponse.json({ message: auth.message }, { status: auth.status || 401 })
     const database = await getActionableDatabase(auth)
     if (isFeatureEnabled(auth.companyFeatures, 'probation')) await ensureProbationReviewReminder({ database, user: auth.user }).catch(error => console.error('[Probation reminder]', error.message))
+          if (isFeatureEnabled(auth.companyFeatures, 'exitManagement')) await Promise.resolve().then(() => ensurePendingResignationReminder({ database, resignationStore: getResignationStore(auth), user: auth.user })).catch(error => console.error('[Resignation reminder]', error.message))
     const params = new URL(request.url).searchParams
     const result = await listActionableNotifications(database, notificationUserId(auth.user), { status: params.get('status') || 'pending', type: params.get('type'), limit: Number(params.get('limit') || 50) })
     return NextResponse.json(result)
