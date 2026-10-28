@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import LoginForm from './LoginForm'
+import { miraLinkAfterLogin } from '@/lib/miraAccountLinkReturn'
 import toast from '@/utils/toast'
 import { FaEnvelope, FaLock, FaExclamationTriangle, FaRedoAlt } from 'react-icons/fa'
 import { resetRedirectFlag } from '@/utils/userHelper'
@@ -115,7 +116,7 @@ export default function LoginPage() {
             // Token is valid, redirect to dashboard
             console.log('[Login Page] Token valid, redirecting to dashboard...')
             // Use _auth=local to bypass middleware cookie check (for environments where cookies don't work)
-            window.location.href = '/dashboard?_auth=local'
+            window.location.href = miraLinkAfterLogin(window.location.search) || '/dashboard?_auth=local'
             return // Keep showing loading while redirecting
           } else {
             // Token is invalid, clear storage and show login
@@ -266,7 +267,7 @@ export default function LoginPage() {
 
         console.log('[Login] Redirecting to dashboard...')
         // Use window.location.href for reliable redirect
-        window.location.href = '/dashboard'
+        window.location.href = miraLinkAfterLogin(window.location.search) || '/dashboard'
       } else {
         setLoginError({
           errorType: data.errorType || 'unknown',

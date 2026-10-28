@@ -1,5 +1,6 @@
 'use client'
 import InductionGate from '@/components/induction/InductionGate'
+import { miraLinkLoginUrl } from '@/lib/miraAccountLinkReturn'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
@@ -131,7 +132,7 @@ export default function DashboardLayout({ children }) {
 
       if (!optimisticAuth) {
         // No auth, redirect to login
-        window.location.href = '/login'
+        window.location.href = miraLinkLoginUrl(window.location) || '/login'
         return
       }
 
@@ -155,7 +156,7 @@ export default function DashboardLayout({ children }) {
         localStorage.removeItem('user')
         localStorage.removeItem('userId')
         document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-        window.location.href = '/login'
+        window.location.href = miraLinkLoginUrl(window.location) || '/login'
       }
 
       try {
