@@ -19,7 +19,9 @@ async function handle(request, method) {
       const grants = (await system.list(LINK_GRANTS, { filters: [
         { field: 'owner', operator: '==', value: String(auth.user._id) },
         { field: 'tenant', operator: '==', value: auth.tenant.databaseName },
-      ], limit: 50 })).records.filter(row => !row.revoked && row.expiresAt > Date.now())
+        { field: 'revoked', operator: '==', value: false },
+        { field: 'expiresAt', operator: '>', value: Date.now() },
+      ], orderBy: [{ field: 'createdAt', direction: 'desc' }], limit: 50 })).records.filter(row => !row.revoked && row.expiresAt > Date.now())
       return NextResponse.json({ account: { name: auth.user.name || auth.user.email, company: auth.tenant.companyName },
         ...(userCode ? { request: await inspectMiraLink(system, userCode) } : {}),
         grants: grants.map(row => ({ id: row._id, scopes: row.scopes, createdAt: row.createdAt, expiresAt: row.expiresAt })),

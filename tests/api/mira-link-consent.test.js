@@ -13,7 +13,8 @@ const request = (method, body, origin = 'https://app.talio.in') => new Request('
 beforeEach(() => { jest.clearAllMocks(); getAuthAndDatabase.mockResolvedValue(auth); getFirestoreSystemDatabase.mockResolvedValue(system) })
 test('connection lists are scoped by both current owner and tenant', async () => {
   expect((await GET(new Request('https://app.talio.in/api/mira/link/consent?owner=other&tenant=foreign'))).status).toBe(200)
-  expect(system.list.mock.calls[0][1].filters).toEqual([{ field: 'owner', operator: '==', value: 'owner' }, { field: 'tenant', operator: '==', value: 'talio_company_one' }])
+  expect(system.list.mock.calls[0][1].filters).toEqual([{ field: 'owner', operator: '==', value: 'owner' }, { field: 'tenant', operator: '==', value: 'talio_company_one' }, { field: 'revoked', operator: '==', value: false }, { field: 'expiresAt', operator: '>', value: expect.any(Number) }])
+  expect(system.list.mock.calls[0][1].orderBy).toEqual([{ field: 'createdAt', direction: 'desc' }])
 })
 test('explicit consent uses verified auth rather than a client-supplied account', async () => {
   const body = { userCode: 'ABCDE-12345', approve: true, userId: 'other', databaseName: 'foreign' }
