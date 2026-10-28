@@ -3,7 +3,7 @@ jest.mock('jose', () => ({ SignJWT: jest.fn(() => ({ setProtectedHeader() { retu
 jest.mock('@/lib/platform/firestoreApplication.server', () => ({ getFirestoreSystemDatabase: jest.fn(), getFirestoreTenantDatabase: jest.fn() }))
 jest.mock('@/lib/miraAccountLink.server', () => ({ readMiraLinkGrant: jest.fn(), revokeMiraLink: jest.fn() }))
 jest.mock('@/lib/miraAccess.server', () => ({ getMiraAccess: jest.fn(async () => ({ allowed: true })) }))
-jest.mock('@/lib/companyFeatures.server', () => ({ checkTenantFeatureAccess: jest.fn(async () => ({ success: true })) }))
+jest.mock('@/lib/companyFeatures.server', () => ({ checkTenantFeatureAccess: jest.fn(async auth => ({ success: auth.success === true && Boolean(auth.tenant?.companySlug) })) }))
 jest.mock('@/lib/permissions', () => ({ resolveUserPermissions: jest.fn(async () => ({})), checkPermission: jest.fn(() => true) }))
 jest.mock('@/lib/miraContext.server', () => ({ MIRA_CONTEXT_STORE_OPTIONS: { queryFields: { tasks: ['updatedAt'] } }, fetchMiraContext: jest.fn(async () => ({ myTasks: [] })) }))
 jest.mock('@/lib/miraProactive.server', () => ({ MIRA_PROACTIVE_STORE_OPTIONS: { queryFields: { tasks: ['dueDate'] } }, getMiraProactiveFeed: jest.fn(async () => ({ events: [] })) }))
@@ -16,7 +16,8 @@ import { readMiraLinkGrant, revokeMiraLink } from '@/lib/miraAccountLink.server'
 import { checkPermission } from '@/lib/permissions'
 import { fetchMiraContext } from '@/lib/miraContext.server'
 import { POST as actionPost, GET as actionGet } from '@/app/api/ai/mira-actions/route'
-const grant = { _id: 'grant', owner: 'owner', tenant: 'talio_company_one', scopes: ['workplace:read', 'workplace:act'], authVersion: 2 }
+import { SignJWT } from 'jose'
+const grant = { _id: 'grant', owner: 'owner', tenant: 'talio_company_one', companySlug: 'one', scopes: ['workplace:read', 'workplace:act'], authVersion: 2 }
 const database = { get: jest.fn() }
 const request = body => POST(new Request('https://app.talio.in/api/mira/link/gateway', { method: 'POST', headers: { authorization: 'Bearer opaque-token' }, body: JSON.stringify(body) }))
 beforeEach(() => { jest.clearAllMocks(); readMiraLinkGrant.mockResolvedValue({ ...grant }); getFirestoreTenantDatabase.mockResolvedValue(database); database.get.mockResolvedValue({ _id: 'owner', name: 'Owner', role: 'employee', isActive: true, authVersion: 2 }); checkPermission.mockReturnValue(true) })
@@ -60,6 +61,7 @@ test('arbitrary routes/tools are not accepted; receipt recovery cannot repeat wr
   expect((await request({ operation: 'receipt', requestId: 'stable-request-identity', actionType: 'create_task' })).status).toBe(200)
   expect(actionPost).not.toHaveBeenCalled()
   expect(new URL(actionGet.mock.calls[0][0].url).searchParams.get('requestId')).toBe('linked-grant-stable-request-identity')
+  expect(SignJWT.mock.calls.at(-1)[0]).toMatchObject({ databaseName: 'talio_company_one', companySlug: 'one' })
 })
 test('disconnect still works after the Talio account is disabled', async () => {
   database.get.mockResolvedValue(null)

@@ -34,7 +34,7 @@ export async function POST(request) {
     const user = await database.get('users', grant.owner)
     if (!user?.isActive || (Number(user.authVersion) || 0) !== grant.authVersion) return reply({ success: false, error: 'Please link Talio again.' }, 401)
     const tenant = { databaseName: grant.tenant, companyName: grant.companyName, companySlug: grant.companySlug }
-    const [feature, access] = await Promise.all([checkTenantFeatureAccess({ user, tenant }, { allOf: ['miraAI'] }), getMiraAccess(database, user)])
+    const [feature, access] = await Promise.all([checkTenantFeatureAccess({ success: true, user, tenant }, { allOf: ['miraAI'] }), getMiraAccess(database, user)])
     if (!feature.success || !access.allowed) return reply({ success: false, error: 'Mira access is not enabled for this Talio account.' }, 403)
     if (body.operation === 'status') return reply({ success: true, linked: true, account: { name: user.name || user.email, company: tenant.companyName }, scopes: grant.scopes, expiresAt: grant.expiresAt })
     if (!grant.scopes.includes('workplace:read')) return reply({ success: false, error: 'Workplace read access was not approved.' }, 403)
@@ -52,7 +52,7 @@ export async function POST(request) {
     }
     if (body.operation === 'receipt') {
       if (!grant.scopes.includes('workplace:act') || !MIRA_RECEIPT_ACTION_TYPES.has(body.actionType) || !/^[A-Za-z0-9_-]{16,100}$/.test(body.requestId || '')) return reply({ success: false, error: 'Invalid action receipt request.' }, 400)
-      const token = await new SignJWT({ userId: String(user._id), databaseName: grant.tenant, authVersion: Number(user.authVersion) || 0 }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('60s').sign(new TextEncoder().encode(process.env.JWT_SECRET))
+      const token = await new SignJWT({ userId: String(user._id), databaseName: grant.tenant, companySlug: tenant.companySlug, companyName: tenant.companyName, authVersion: Number(user.authVersion) || 0 }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('60s').sign(new TextEncoder().encode(process.env.JWT_SECRET))
       const url = new URL('/api/ai/mira-actions', request.url)
       url.searchParams.set('requestId', 'linked-' + grant._id + '-' + body.requestId)
       url.searchParams.set('type', body.actionType)
