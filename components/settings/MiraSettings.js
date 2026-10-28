@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { FaCheck, FaSave, FaVolumeUp } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { toast } from '@/utils/toast'
@@ -114,6 +115,11 @@ export default function MiraSettings() {
       <div className="mt-1 text-right text-xs text-default-400">{knowledge.length}/8000</div>
     </section>
 
+    <section className="rounded-2xl border border-default-200 bg-content1 p-5 md:p-6">
+      <h3 className="text-lg font-semibold text-foreground">Standalone MIRA connections</h3>
+      <p className="mt-1 mb-4 text-sm text-default-500">Approve a code from standalone MIRA, review granted access or revoke a connection. Your Talio login and workplace permissions stay separate from MIRA.</p>
+      <Link href="/dashboard/mira/connect" className="inline-flex rounded-xl border border-default-200 px-4 py-2 text-sm font-medium text-foreground hover:bg-default-100">Manage standalone MIRA connections</Link>
+    </section>
     <div className="flex justify-end"><button type="button" onClick={save} disabled={saving || isLoading} className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"><FaSave aria-hidden="true" />{saving ? 'Saving…' : 'Save MIRA settings'}</button></div>
   </div>
 }
