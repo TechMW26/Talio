@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { randomBytes } from 'node:crypto'
 import { acceptAndStartExit } from '@/lib/hrms/resignationExit.server'
 import { getResignationStore } from '@/lib/hrms/resignationStore.server'
+import { defaultNoticeDays } from '@/lib/hrms/employeeLifecycle.server'
 import { isFeatureEnabled } from '@/lib/planFeatures'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { HR_ROLES, idOf, isHr, failure, reasonText, publicResignation, transition, resolveReviewers, notifyResignation } from '@/lib/hrms/resignation.server'
@@ -35,8 +36,7 @@ export async function GET(request) {
         const user = event.actor ? await store.get('users', idOf(event.actor)) : null
         return { ...event, actor: user ? { _id: user._id, email: user.email } : null }
       }))
-      return { ...record, employee: employee ? { _id: employee._id, firstName: employee.firstName, lastName: employee.lastName, employeeCode: employee.employeeCode } : null, timeline }
-    }))
+      return { ...record, employee: employee ? { _id: employee._id, firstName: employee.firstName, lastName: employee.lastName, employeeCode: employee.employeeCode } : null, defaultNoticeDays: employee ? defaultNoticeDays(employee) : 30, timeline }    }))
     return json({ success: true, data: records.map(r => publicResignation(r, actor)), canManageExits: isHr(actor), canSubmit: Boolean(actor.employeeId) })
   } catch (error) { return failed(error) }
 }

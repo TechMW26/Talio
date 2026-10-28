@@ -3,6 +3,7 @@ import {
   addMonthsClamped,
   applyLifecycleAction,
   buildEmployeeLifecycle,
+  defaultNoticeDays,
   getLifecycleProgress,
   hydrateEmployeeLifecycle,
   reconcileOnboardingChecklist,
@@ -408,5 +409,25 @@ describe('employee lifecycle', () => {
     })
     expect(formatEmployeeAddress({ street: '1 Test Road', city: 'Bhopal', state: 'MP' })).toBe('1 Test Road, Bhopal, MP')
     expect(() => normalizeEmployeeAddress(['invalid'])).toThrow('Address must be text or a structured address')
+  })
+})
+
+describe('company probation and notice policy', () => {
+  test('probation is never shorter than 3 months, including interns', () => {
+    const intern = buildEmployeeLifecycle({ dateOfJoining: '2026-10-01', employmentType: 'intern' }, new Date('2026-10-01T06:00:00Z'))
+    expect(intern.probation.durationMonths).toBe(3)
+    expect(intern.probation.endDate.toISOString().slice(0, 10)).toBe('2027-01-01')
+    const requestedOne = buildEmployeeLifecycle({ dateOfJoining: '2026-10-01', probationDurationMonths: 1 }, new Date('2026-10-01T06:00:00Z'))
+    expect(requestedOne.probation.durationMonths).toBe(3)
+    const longer = buildEmployeeLifecycle({ dateOfJoining: '2026-10-01', probationDurationMonths: 6 }, new Date('2026-10-01T06:00:00Z'))
+    expect(longer.probation.durationMonths).toBe(6)
+  })
+
+  test('notice is 15 days on probation and 30 days once confirmed', () => {
+    expect(defaultNoticeDays({ lifecycle: { probation: { applicable: true, status: 'in_progress' }, noticePeriodDays: 30 } })).toBe(15)
+    expect(defaultNoticeDays({ lifecycle: { probation: { applicable: true, status: 'extended' }, noticePeriodDays: 30 } })).toBe(15)
+    expect(defaultNoticeDays({ lifecycle: { probation: { applicable: true, status: 'confirmed' }, noticePeriodDays: 30 } })).toBe(30)
+    expect(defaultNoticeDays({ lifecycle: { probation: { applicable: false, status: 'waived' } } })).toBe(30)
+    expect(defaultNoticeDays({})).toBe(30)
   })
 })

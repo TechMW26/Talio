@@ -19,7 +19,7 @@ const dateLabel = value => value ? new Date(value).toLocaleDateString('en-GB', {
 function RequestCard({ record, busy, onAction, canManageExits, onUpdated }) {
   const [action, setAction] = useState('')
   const [reason, setReason] = useState('')
-  const [days, setDays] = useState(record.proposal?.noticeDays ?? 30)
+  const [days, setDays] = useState(record.proposal?.noticeDays ?? record.defaultNoticeDays ?? 30)
   const [start, setStart] = useState(record.proposal?.noticeStartDate?.slice(0, 10) || new Date().toISOString().slice(0, 10))
   const needsReason = ['propose', 'negotiate', 'return', 'reject'].includes(action)
   const proposedEnd = /^\d{4}-\d{2}-\d{2}$/.test(start) && days !== '' && Number.isInteger(Number(days)) && Number(days) >= 0 && Number(days) <= 365 ? new Date(new Date(`${start}T00:00:00Z`).getTime() + Number(days) * 86400000) : null
