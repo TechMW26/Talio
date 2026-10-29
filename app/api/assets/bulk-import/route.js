@@ -208,7 +208,7 @@ export async function POST(request) {
       if (headers.some(header => key(header) === 'assetname')) {
         headers.forEach((header, index) => { if (key(header) === 'name') mapping[index] = 'assignedToName' })
       }
-    }
+    }        const allowed = new Set(ASSET_FIELDS.map(field => field.key))
        mapping = Object.fromEntries(Object.entries(mapping).filter(([index, field]) => /^\d+$/.test(index) && Number(index) < headers.length && allowed.has(field)))
     // Auto-detected mappings can match two similar headers (e.g. "Name" and "Asset Name").
     // Keep the first column per field; the user can change it in the preview.
