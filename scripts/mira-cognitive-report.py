@@ -20,6 +20,9 @@ inputs = {name: json.loads(Path(path).read_text()) for name, path in {
 }.items()}
 for response in inputs['responses']:
     response.get('output', {}).pop('reasoning_content', None)
+transport_path = Path('/tmp/mira-voice-transport.json')
+transport = json.loads(transport_path.read_text()) if transport_path.exists() else []
+page_count = 3 if transport else 2
 live = [dict(a) for key in ['intent_orchestration', 'cognitive'] for suite in inputs[key]['testResults'] for a in suite['assertionResults']]
 # Explicit semantic adjudication of an equivalent number word; preserve raw
 # assertions and provider outputs unchanged in inputs for auditability.
@@ -56,6 +59,7 @@ for attempt in range(1, 4):
     repeat = json.loads(Path(f'/tmp/mira-repeat-{attempt}.json').read_text())
     evidence['reasoningRepeatAcceptance'].append({'attempt': attempt, 'passed': repeat['numPassedTests'], 'failed': repeat['numFailedTests']})
 evidence['reasoningReference'] = 'https://api-docs.deepseek.com/guides/thinking_mode/'
+evidence['voiceTransport'] = transport
 evidence['sourceSha256'] = {name: hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in [
     'lib/miraReasoningPolicy.js', 'lib/miraAgentGateway.js', 'lib/miraSystemPrompt.js',
     'lib/miraStreamingSpeech.js', 'tests/api/mira-cognitive-live.test.js',
@@ -81,7 +85,7 @@ def page(n,title):
     text(94,777,'INTERNAL ENGINEERING EVALUATION',8,muted)
     text(45,735,title,22,ink,'Helvetica-Bold')
     text(45,28,'MIRA-CONTROLLED-v1  |  '+now.strftime('%d %b %Y, %H:%M IST'),8,muted)
-    text(510,28,f'{n} / 2',8,muted)
+    text(510,28,f'{n} / {page_count}',8,muted)
 
 page(1,'Cognitive performance scorecard')
 text(45,705,'CONTROLLED BENCHMARK CERTIFICATE - NOT ACCREDITED',9,teal,'Helvetica-Bold')
@@ -152,5 +156,38 @@ lines(175,['Base code revision: '+revision[:16],
  'SHA-256: '+digest[:32],digest[32:]],9)
 lines(90,['Voice: real Hindi transcription/reply; closure observed; audio quality pending.',
           'Desktop acceptance used production; reasoning/latency changes tested locally.'],9)
+if transport:
+    c.showPage()
+    page(3,'Live voice transport acceptance')
+    text(45,700,'ADDITIONAL AUTOMATED CHECKS - NOT COGNITIVE SCORE POINTS',9,teal,'Helvetica-Bold')
+    lines(670,['Synthetic English and Hindi prompts passed through the production DeepSeek',
+        'stream gateway and speech chunker into ElevenLabs V4 PCM synthesis.',
+        'The default Alisha voice was used, not a verified account-selected voice.',
+        'No microphone was opened and no audio was played in these tests.'])
+    y=570
+    text(45,y,'LANGUAGE',9,muted,'Helvetica-Bold')
+    text(180,y,'FIRST TEXT',9,muted); text(300,y,'FIRST AUDIO BYTE',9,muted); text(450,y,'PCM BYTES',9,muted)
+    for r in transport:
+        y -= 35
+        text(45,y,r['language'].upper(),11,ink,'Helvetica-Bold')
+        text(180,y,str(r.get('firstTextMs','N/A'))+' ms',10)
+        text(300,y,str(r.get('firstAudioMs','N/A'))+' ms',10)
+        text(450,y,str(r['bytes']),10)
+    lines(445,['Both streams contained nonzero, 16-bit-aligned PCM audio at 24 kHz.',
+        'Times start before generation and end when the first PCM bytes are read.',
+        'They exclude ASR, Talio authentication/billing routes, browser playback,',
+        'speaker hardware and acoustic perception. They are NOT full voice E2E.',
+        'Sample size: one turn per language; no statistical latency claim.',
+        'The observed audio-start latency is above 250 ms in both tests.'])
+    text(45,315,'REMAINING ACCEPTANCE GATES',11,teal,'Helvetica-Bold')
+    lines(290,['User-supervised English/Hindi switching, intentional interruption, clean',
+        'audible delivery without self-interruption, and intentional spoken closure',
+        'remain pending. The user requested automated testing first.',
+        'A previous macOS session demonstrated Calculator execution/correction',
+        'and real Hindi transcription; this does not certify every OS or workflow.'])
+    text(45,175,'REPRODUCE',11,teal,'Helvetica-Bold')
+    lines(150,['Set MIRA_VOICE_TRANSPORT_LIVE=1 and run the Jest test:',
+        'tests/api/mira-voice-transport-live.test.js',
+        'Evidence: voiceTransport in mira-cognitive-evidence.json'],9)
 c.save()
 print(json.dumps({'pdf':str(pdf),'evidence':str(evidence_path),'score':score,'passed':passed,'total':total,'groups':groups,'medianMs':percentile(.5),'p95Ms':percentile(.95)},indent=2))

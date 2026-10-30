@@ -1,7 +1,7 @@
 {
   "benchmark": "MIRA-CONTROLLED-v1",
-  "timestamp": "2026-10-30T17:07:27.665205+05:30",
-  "baseRevision": "489b4b7d8f3416609de0d0fc78731baf468d74cd",
+  "timestamp": "2026-10-30T17:16:41.792034+05:30",
+  "baseRevision": "8bed21943599e0e33dbbe5fd7b1982fe6518d8f1",
   "score": 10.0,
   "passed": 51,
   "total": 51,
@@ -22727,6 +22727,36 @@
     }
   ],
   "reasoningReference": "https://api-docs.deepseek.com/guides/thinking_mode/",
+  "voiceTransport": [
+    {
+      "language": "en",
+      "prompt": "What is a rainbow? Give one short sentence.",
+      "voice": "ftDdhfYtmfGP0tFlBYA1",
+      "model": "eleven_v4",
+      "bytes": 253440,
+      "nonzero": true,
+      "passed": true,
+      "firstTextMs": 934,
+      "generationFinishedMs": 1187,
+      "firstAudioMs": 3317,
+      "totalMs": 4395,
+      "text": "[confident][fast] A rainbow is sunlight bent and split by raindrops into a curved band of colours."
+    },
+    {
+      "language": "hi",
+      "prompt": "इंद्रधनुष क्या है? एक छोटे वाक्य में बताओ।",
+      "voice": "ftDdhfYtmfGP0tFlBYA1",
+      "model": "eleven_v4",
+      "bytes": 318720,
+      "nonzero": true,
+      "passed": true,
+      "firstTextMs": 646,
+      "generationFinishedMs": 1109,
+      "firstAudioMs": 2074,
+      "totalMs": 3993,
+      "text": "[confident][fast] इंद्रधनुष सूरज की रोशनी बारिश की बूंदों में टूटने से बनता है—सात रंगों का घुमावदार पुल।"
+    }
+  ],
   "sourceSha256": {
     "lib/miraReasoningPolicy.js": "33996e2ef2c799da47f834b260243805d3790b3a64eb0d7d7120692199efee38",
     "lib/miraAgentGateway.js": "94d7293705b84896de92dbf857ceaf49e96898ae2e21db60b13a783fa0a474d6",

@@ -20,6 +20,20 @@ done
 python3 scripts/mira-cognitive-report.py
 ```
 
+Optional live English/Hindi generation-to-synthesis transport check (no mic or
+speaker playback):
+
+```sh
+MIRA_VOICE_TRANSPORT_LIVE=1 npx jest --runInBand --runTestsByPath tests/api/mira-voice-transport-live.test.js
+python3 scripts/mira-cognitive-report.py
+```
+
+This also requires the existing `ELEVENLABS_API_KEY`. It uses the default
+Alisha voice and V4 PCM streaming settings. It does not exercise authenticated
+Talio HTTP routes, account-selected voices or browser playback. Audio timing is
+reported separately from cognitive score; never substitute first-text time for
+first-audio time. When present, transport evidence adds a third certificate page.
+
 Report generation needs reportlab. Render and visually inspect both PDF pages
 before delivery. Preserve failures rather than rerunning until a desired score
 is achieved. Repeated acceptance checks are supplemental, not extra points.
