@@ -725,7 +725,6 @@ export default function CandidateDetailPage() {
                     selectedKeys={new Set([String(convertData.probationDurationMonths)])}
                     onSelectionChange={(keys) => setConvertData((prev) => ({ ...prev, probationDurationMonths: Number(Array.from(keys)[0] || 3) }))}
                   >
-                    <SelectItem key="1">1 month</SelectItem>
                     <SelectItem key="3">3 months</SelectItem>
                     <SelectItem key="6">6 months</SelectItem>
                     <SelectItem key="12">12 months</SelectItem>

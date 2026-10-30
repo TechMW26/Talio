@@ -1008,7 +1008,6 @@ export default function AddEmployeePage() {
                           aria-label="Probation duration"
                           classNames={{ trigger: 'bg-white dark:bg-default-100 border border-default-300', popoverContent: 'bg-content1' }}
                         >
-                          <SelectItem key="1">1 month</SelectItem>
                           <SelectItem key="3">3 months</SelectItem>
                           <SelectItem key="6">6 months</SelectItem>
                           <SelectItem key="12">12 months</SelectItem>

@@ -177,7 +177,12 @@ export async function POST(request) {
       if (!mapping || Array.isArray(mapping) || typeof mapping !== 'object') return NextResponse.json({ success: false, message: 'Invalid column mapping' }, { status: 400 })
     } else {
       const normalize = value => String(value).toLowerCase().replace(/[^a-z0-9]/g, '')
-      const aliases = { assetid: 'assetCode', assetnumber: 'assetCode', type: 'category', brand: 'manufacturer', employeecode: 'assignedToCode', employeeemail: 'assignedToEmail', assignedname: 'assignedToName', serialno: 'serialNumber', modelno: 'model', price: 'purchasePrice', cost: 'purchasePrice' }
+            const aliases = { assetid: 'assetCode', assetnumber: 'assetCode', type: 'category', brand: 'manufacturer', employeecode: 'assignedToCode', employeeemail: 'assignedToEmail', assignedname: 'assignedToName', serialno: 'serialNumber', modelno: 'model', price: 'purchasePrice', cost: 'purchasePrice',
+        // Header spellings used in the company asset tracker sheet.
+        warrentystatus: 'warrantyStatus', assetsid1serialno: 'serialNumber', assetid1serialno: 'serialNumber',
+        assetsid2modelno: 'model', assetid2modelno: 'model', assetsid2modelnobox: 'model', assetid2modelnobox: 'model',
+        retrunbyempdate: 'returnDate', returnbyempdate: 'returnDate', retrunbyemployeedate: 'returnDate', returndate: 'returnDate',
+        employeename: 'assignedToName', empname: 'assignedToName', assignedto: 'assignedToName', assigndate: 'assignedDate' }
       const known = { ...aliases }
       for (const field of ASSET_FIELDS) { known[normalize(field.key)] = field.key; known[normalize(field.label)] = field.key }
       for (const [key, label] of ASSET_TRACKER_FIELDS) known[normalize(label)] = key === 'assignedTo' ? 'assignedToName' : key
@@ -197,8 +202,20 @@ export async function POST(request) {
         if (field) mapping[index] = field.key
       }
     }
-    const allowed = new Set(ASSET_FIELDS.map(field => field.key))
-    mapping = Object.fromEntries(Object.entries(mapping).filter(([index, field]) => /^\d+$/.test(index) && Number(index) < headers.length && allowed.has(field)))
+        // In the tracker sheet "Asset Name" is the item and a plain "Name" column is the employee.
+    if (!mappingJson) {
+      const key = header => String(header).toLowerCase().replace(/[^a-z0-9]/g, '')
+      if (headers.some(header => key(header) === 'assetname')) {
+        headers.forEach((header, index) => { if (key(header) === 'name') mapping[index] = 'assignedToName' })
+      }
+    }        const allowed = new Set(ASSET_FIELDS.map(field => field.key))
+       mapping = Object.fromEntries(Object.entries(mapping).filter(([index, field]) => /^\d+$/.test(index) && Number(index) < headers.length && allowed.has(field)))
+    // Auto-detected mappings can match two similar headers (e.g. "Name" and "Asset Name").
+    // Keep the first column per field; the user can change it in the preview.
+    if (!mappingJson) {
+      const used = new Set()
+      mapping = Object.fromEntries(Object.entries(mapping).sort(([a], [b]) => Number(a) - Number(b)).filter(([, field]) => !used.has(field) && used.add(field)))
+    }
     if (new Set(Object.values(mapping)).size !== Object.values(mapping).length) return NextResponse.json({ success: false, message: 'Map each asset field to only one column.' }, { status: 400 })
     const missingFields = ['assetCode', 'name'].filter(key => !Object.values(mapping).includes(key))
     if (mode === 'import' && missingFields.length) return NextResponse.json({ success: false, message: 'Map Asset Code and Asset Name before importing.' }, { status: 400 })
