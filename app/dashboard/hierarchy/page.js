@@ -8,17 +8,12 @@ import { createPortal } from 'react-dom';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import { useSocket } from '@/contexts/SocketContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { ORGANOGRAM_GEOMETRY, ORGANOGRAM_BAND_ORDER, buildLayout, organogramCanvasWidth, fitOrganogramWidth } from '@/lib/organogramLayout';
 
-const NW = 214;
-const NH = 164;
-const H_GAP = 20;
-const ROW_GAP = 68;
-const BAND_GAP = 96;
-const AVATAR_H = 36;
-const PAD_X = 42;
+const { NW, NH, AVATAR_H, BAND_GAP } = ORGANOGRAM_GEOMETRY;
 
 const LEVELS = [9, 8, 7, 6, 5, 4, 3, 2, 1];
-const BAND_ORDER = [9, 8, 7, 'HR', 6, 5, 4, 3, 2, 1];
+const BAND_ORDER = ORGANOGRAM_BAND_ORDER;
 const LEVEL_NAMES = {
   9: 'Director',
   8: 'Assistant Director',
@@ -55,14 +50,6 @@ const BAND_COLORS = {
   1: '#64748b',
 };
 
-function isHrNode(node) {
-  if (node?.isHR) return true;
-  const dept = (node?.department || '').toString().trim().toLowerCase();
-  const desig = (node?.designation || '').toString().trim().toLowerCase();
-  const re = /(human\s*resource|people\s*operations|people\s*&?\s*culture|talent\s*management|^hr$|\bhr\b|hrbp|hr\s*ops)/;
-  return re.test(dept) || re.test(desig);
-}
-
 const PALETTE = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6'];
 
 function deptColor(id) {
@@ -82,84 +69,6 @@ function flattenTree(nodes, acc = { nodes: [], edges: [] }) {
     }
   }
   return acc;
-}
-
-function parseDateSafe(value) {
-  if (!value) return null;
-  const t = new Date(value).getTime();
-  return Number.isFinite(t) ? t : null;
-}
-
-function compareByTenureThenAge(a, b) {
-  const joinA = parseDateSafe(a.dateOfJoining);
-  const joinB = parseDateSafe(b.dateOfJoining);
-  if (joinA !== null && joinB !== null && joinA !== joinB) return joinA - joinB;
-  if (joinA !== null && joinB === null) return -1;
-  if (joinA === null && joinB !== null) return 1;
-
-  const dobA = parseDateSafe(a.dateOfBirth);
-  const dobB = parseDateSafe(b.dateOfBirth);
-  if (dobA !== null && dobB !== null && dobA !== dobB) return dobA - dobB;
-  if (dobA !== null && dobB === null) return -1;
-  if (dobA === null && dobB !== null) return 1;
-
-  return (a.name || '').localeCompare(b.name || '');
-}
-
-function buildLayout(allNodes, canvasW) {
-  const maxCols = Math.max(3, Math.floor((canvasW - PAD_X * 2 + H_GAP) / (NW + H_GAP)));
-
-  const byLevel = {};
-  for (const key of BAND_ORDER) byLevel[key] = [];
-  for (const n of allNodes) {
-    if (isHrNode(n)) {
-      byLevel.HR.push(n);
-      continue;
-    }
-    const lvl = Math.min(Math.max(Number(n.level) || 1, 1), 9);
-    byLevel[lvl].push(n);
-  }
-  for (const key of BAND_ORDER) byLevel[key].sort(compareByTenureThenAge);
-
-  const bandInfo = {};
-  let currentY = AVATAR_H + 8;
-
-  // Bands that should always render a divider/label even when empty
-  const ALWAYS_SHOW = new Set(['HR', 6, 5, 4]);
-  const EMPTY_BAND_H = 28;
-
-  for (const lvl of BAND_ORDER) {
-    const group = byLevel[lvl];
-    if (!group.length) {
-      if (!ALWAYS_SHOW.has(lvl)) continue;
-      const bandStartY = currentY;
-      bandInfo[lvl] = { startY: bandStartY, endY: bandStartY + EMPTY_BAND_H, count: 0 };
-      currentY += EMPTY_BAND_H + BAND_GAP;
-      continue;
-    }
-
-    const bandStartY = currentY;
-    const numRows = Math.ceil(group.length / maxCols);
-
-    for (let i = 0; i < group.length; i++) {
-      const rowIdx = Math.floor(i / maxCols);
-      const colIdx = i % maxCols;
-
-      const rowStart = rowIdx * maxCols;
-      const rowCount = Math.min(maxCols, group.length - rowStart);
-      const rowW = rowCount * NW + (rowCount - 1) * H_GAP;
-      const startX = (canvasW - rowW) / 2;
-
-      group[i]._x = startX + colIdx * (NW + H_GAP) + NW / 2;
-      group[i]._y = currentY + rowIdx * (NH + ROW_GAP);
-    }
-
-    const bandH = numRows * NH + (numRows - 1) * ROW_GAP;
-    bandInfo[lvl] = { startY: bandStartY, endY: bandStartY + bandH, count: group.length };
-    currentY += bandH + BAND_GAP;
-  }
-
-  return { bandInfo, canvasH: currentY + 20 };
 }
 
 function OrgCard({
@@ -524,6 +433,7 @@ export default function HierarchyPage() {
   }, [onEmployeeUpdated, onEmployeeCreated, mutate]);
 
   const vpRef = useRef(null);
+  const controlsRef = useRef(null);
   const [vpW, setVpW] = useState(0);
 
   useEffect(() => {
@@ -541,7 +451,7 @@ export default function HierarchyPage() {
   const [scale, setScale] = useState(1);
   const drag = useRef({ active: false, moved: false, sx: 0, sy: 0, ox: 0, oy: 0 });
 
-  const canvasW = Math.max(vpW || 0, 1200);
+  const canvasW = useMemo(() => organogramCanvasWidth(data?.data?.roots, vpW), [data?.data?.roots, vpW]);
 
   const { allNodes, edges, nodeMap, bandInfo, canvasH, viewerId, totalEmployees } = useMemo(() => {
     const roots = data?.data?.roots || [];
@@ -648,11 +558,12 @@ export default function HierarchyPage() {
   const fitToScreen = useCallback(() => {
     if (!vpRef.current) return;
     const vw = vpRef.current.clientWidth;
-    // Default to 80% zoom, but shrink further if the canvas is wider than the viewport at 80%.
-    const widthFitScale = vw / (canvasW + 10);
-    const s = Math.min(0.8, widthFitScale);
+    // Fit every director inside the usable screen area, not behind the sidebar.
+    // The canvas/background still extends behind the navigation as before.
+    const leftInset = Math.max(0, (controlsRef.current?.getBoundingClientRect().left || 0) - vpRef.current.getBoundingClientRect().left);
+    const { scale: s, tx: fittedX } = fitOrganogramWidth(canvasW, vw, leftInset, 16);
     setScale(s);
-    setTx((vw - canvasW * s) / 2);
+    setTx(fittedX);
     // Anchor near the top but leave comfortable headroom so the Directors band
     // isn't flush against the toolbar.
     setTy(72);
@@ -865,6 +776,7 @@ export default function HierarchyPage() {
 
         {totalEmployees > 0 && (
           <div
+            ref={controlsRef}
             style={{
               position: 'absolute',
               top: 'var(--organogram-controls-top)',
