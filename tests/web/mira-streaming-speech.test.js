@@ -1,5 +1,22 @@
 import { createMiraStreamingSpeech } from '@/lib/miraStreamingSpeech'
 
+test('starts a short complete opening clause without waiting for the sentence', async () => {
+  const prepare = jest.fn(() => ({})), speak = jest.fn()
+  const speech = createMiraStreamingSpeech({ prepare, speak, live: () => true })
+  const first = '[warm] Once the water has boiled, '
+  speech.update(first + 'add')
+  expect(prepare).toHaveBeenCalledWith(first)
+  await speech.finish(first + 'add the pasta.')
+  expect(speak.mock.calls.map(([text]) => text).join('')).toBe(first + 'add the pasta.')
+})
+
+test('does not send a tiny acknowledgement to TTS early', () => {
+  const prepare = jest.fn(() => ({}))
+  const speech = createMiraStreamingSpeech({ prepare, speak: jest.fn(), live: () => true })
+  speech.update('[warm] Okay, let me')
+  expect(prepare).not.toHaveBeenCalled()
+})
+
 test('prepares the first meaningful clause before sentence completion without filler audio', async () => {
   const prepare = jest.fn(() => ({})), speak = jest.fn()
   const speech = createMiraStreamingSpeech({ prepare, speak, live: () => true })
