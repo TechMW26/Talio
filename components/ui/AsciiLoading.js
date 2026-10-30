@@ -22,7 +22,7 @@ export function useLoadingReady(ref, loading = true) {
 /** HeroUI-compatible skeleton: existing dimensions and loaded children survive. */
 export const Skeleton = forwardRef(function Skeleton({
   isLoaded = false, children, className = '', classNames = {}, style,
-  disableAnimation: _disableAnimation, as: Tag = 'div', ...props
+  disableAnimation = false, as: Tag = 'div', ...props
 }, forwardedRef) {
   const ref = useRef(null)
   useLoadingReady(ref, !isLoaded)
@@ -34,7 +34,7 @@ export const Skeleton = forwardRef(function Skeleton({
     }} data-slot="skeleton" data-loaded={isLoaded ? 'true' : undefined}
       aria-busy={!isLoaded || undefined}
       className={`talio-ascii-skeleton ${className} ${classNames.base || ''}`} style={style}>
-      {!isLoaded && <AsciiSkeleton variant="dither" rows={8} animate={false} width="100%" height="100%" className="talio-ascii-pattern" />}
+      {!isLoaded && <AsciiSkeleton variant="dither" rows={8} animate={!disableAnimation} width="100%" height="100%" className="talio-ascii-pattern" />}
       {children != null && <div className={classNames.content} style={isLoaded ? undefined : { visibility: 'hidden' }}>{children}</div>}
     </Tag>
   )

@@ -17,6 +17,12 @@ beforeEach(() => {
   frames = new Map(); reduce = false; controllers = []
   window.matchMedia = jest.fn(() => ({ matches: reduce, addEventListener: jest.fn(), removeEventListener: jest.fn() }))
   let id = 0
+  jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    measureText: text => ({ width: String(text).length * 6 }),
+    clearRect: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    fillText: jest.fn(), save: jest.fn(), restore: jest.fn(),
+    beginPath: jest.fn(), rect: jest.fn(), clip: jest.fn(),
+  })
   jest.spyOn(window, 'requestAnimationFrame').mockImplementation(fn => { frames.set(++id, fn); return id })
   jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(key => frames.delete(key))
   jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 300, bottom: 200, width: 300, height: 200 })
@@ -42,15 +48,33 @@ function Fixture({ loading, extra = false }) {
   </section></>
 }
 
-test('dither preserves supplied geometry and does not create animation canvases', () => {
+test('dither preserves supplied geometry and enables the shared shimmer by default', () => {
   const ref = createRef()
   const { container } = render(<Skeleton ref={ref} className="h-10 w-24 rounded-lg" style={{ maxWidth: 96 }} />)
   expect(ref.current).toHaveClass('h-10', 'w-24')
   expect(ref.current).toHaveStyle({ maxWidth: '96px' })
   expect(container.querySelector('.ars-dither')).not.toBeNull()
+  expect(container.querySelector('[data-ars-animate]')).not.toBeNull()
+  expect(container.querySelector('canvas')).not.toBeNull()
+  expect(ref.current).toHaveAttribute('aria-busy', 'true')
+})
+test('disableAnimation keeps the static dither and can be toggled without changing layout', () => {
+  const { container, rerender } = render(<Skeleton disableAnimation className="h-10 w-24" />)
+  const root = container.firstChild
+  expect(container.querySelector('.ars-dither')).not.toBeNull()
   expect(container.querySelector('[data-ars-animate]')).toBeNull()
   expect(container.querySelector('canvas')).toBeNull()
-  expect(ref.current).toHaveAttribute('aria-busy', 'true')
+  rerender(<Skeleton className="h-10 w-24" />)
+  expect(container.firstChild).toBe(root)
+  expect(container.querySelector('canvas')).not.toBeNull()
+  rerender(<Skeleton disableAnimation className="h-10 w-24" />)
+  expect(container.querySelector('canvas')).toBeNull()
+})
+test('reduced-motion preference keeps the skeleton static', () => {
+  reduce = true
+  const { container } = render(<Skeleton />)
+  expect(container.querySelector('.ars-dither')).not.toBeNull()
+  expect(container.querySelector('canvas')).toBeNull()
 })
 test('isLoaded keeps the same child DOM and removes placeholders', () => {
   const { rerender, container } = render(<Skeleton><input aria-label="Name" defaultValue="Ada" /></Skeleton>)
@@ -60,6 +84,7 @@ test('isLoaded keeps the same child DOM and removes placeholders', () => {
   expect(screen.getByRole('textbox')).toBe(input)
   expect(input.value).toBe('New name')
   expect(container.querySelector('[data-ascii-skeleton]')).toBeNull()
+  expect(container.querySelector('canvas')).toBeNull()
 })
 test('loading completion batches sibling skeletons into one terminal reveal', async () => {
   const { rerender } = render(<Fixture loading />)

@@ -2829,7 +2829,8 @@ html.theme-switching [data-vt-sidebar] {
   view-transition-name: sidebar;
 }
 
-/* Shared data-loading treatment. Static glyphs keep large tables inexpensive. */
+/* Shared data-loading treatment. The library batches visible shimmer canvases
+   on one animation clock and leaves reduced-motion placeholders static. */
 .talio-ascii-skeleton {
   position: relative;
   min-width: 0;
