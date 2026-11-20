@@ -17,7 +17,7 @@ export default function CustomizableDashboard({ userId, userRole = 'employee', d
   // permitted registered widget, independent of legacy customization storage.
   // Department heads use the full-access dashboard matrix in UnifiedDashboard;
   // its supplied components still enforce feature permissions and data scope.
-  const effectiveRole = userRole === 'department_head' ? 'admin' : userRole
+  const effectiveRole = ({ department_head: 'admin', department_manager: 'employee', team_leader: 'employee', team_lead: 'employee' })[userRole] || userRole
   const orderedWidgets = getWidgetsForRole(effectiveRole).filter(widget => widgetComponents[widget.id])
   const sections = groupDashboardWidgets(orderedWidgets)
   const section = sections.find(item => item.id === category) || sections[0]
