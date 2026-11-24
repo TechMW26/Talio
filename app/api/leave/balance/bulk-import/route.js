@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { collectFirestorePages } from '@/lib/platform/firestoreQueries.server'
-import { adjustLeaveBalance, validateLeaveYear } from '@/lib/leaveBalances.server'
+import { adjustLeaveBalance, setOpeningUsedLeave, validateLeaveYear } from '@/lib/leaveBalances.server'
 import { generateContent } from '@/lib/gemini'
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 import { clearCachePattern, buildCachePattern } from '@/lib/cache'
@@ -246,7 +246,9 @@ ${[headerLine, ...rows].join('\n')}`
       }
 
       try {
-        const result = await adjustLeaveBalance(database, user, { employee: alloc.employeeId, leaveType: alloc.leaveTypeId, year, totalDays })
+        const result = alloc.importAs === 'taken'
+          ? await setOpeningUsedLeave(database, user, { employee: alloc.employeeId, leaveType: alloc.leaveTypeId, year, usedDays: totalDays, allottedDays: alloc.allottedDays })
+          : await adjustLeaveBalance(database, user, { employee: alloc.employeeId, leaveType: alloc.leaveTypeId, year, totalDays })
         return result.created ? { created: true } : { updated: true }
       } catch (err) {
         return { failed: true, error: `Failed for ${alloc.employeeName}: ${err.message}` }

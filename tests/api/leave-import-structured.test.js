@@ -54,7 +54,7 @@ describe('structured leave import', () => {
     expect(rows[1].matched).toBe(false)
   })
 
-  test('reads HR workbook: all tracker sheets, 2-row header, Balance over Alloted', () => {
+  test('reads HR workbook: all tracker sheets, 2-row header, imports leave taken (Alloted - Balance)', () => {
     const tracker = name => ({ name, rows: [
       ['E.ID', 'Name', 'Designation', 'LEAVE Balance', '', '', 'Current Balance'],
       ['', '', '', 'CL Alloted', 'SL Alloted', 'EL Alloted', 'CL Balance', 'SL Balance', 'EL Balance'],
@@ -65,10 +65,22 @@ describe('structured leave import', () => {
     const rows = parseStructuredLeaveImport([dtps, mwa, detail], employees, leaveTypes)
     expect(rows).toHaveLength(9)
     expect(rows.filter(r => r.sheet === 'DTPS')).toHaveLength(0)
-    expect(rows.find(r => r.employeeId === 'e1' && r.leaveTypeId === 'cl')).toMatchObject({ totalDays: 4.5, matched: true })
+    expect(rows.find(r => r.employeeId === 'e1' && r.leaveTypeId === 'cl')).toMatchObject({ totalDays: 2.5, importAs: 'taken', leaveTypeName: 'Casual Leave (taken so far, yearly 7)', allottedDays: 7, matched: true })
+    expect(rows.find(r => r.employeeId === 'e1' && r.leaveTypeId === 'el')).toMatchObject({ totalDays: 6, importAs: 'taken' })
     const dup = rows.filter(r => r.employeeCode === 'D73')
     expect(dup).toHaveLength(6)
     expect(dup.every(r => !r.matched && /same code/.test(r.unmatchedEmployee))).toBe(true)
+  })
+
+  test('balance above allotted is flagged, not imported', () => {
+    const rows = parseStructuredLeaveImport(['E.ID,CL Alloted,CL Balance', 'D73,7,9'], employees, leaveTypes)
+    expect(rows[0]).toMatchObject({ matched: false, totalDays: -2, importAs: 'taken' })
+    expect(rows[0].unmatchedLeaveType).toMatch(/more than allotted/)
+  })
+
+  test('balance-only sheets keep the fixed allocation import', () => {
+    const rows = parseStructuredLeaveImport(['E.ID,CL Balance', 'D73,3'], employees, leaveTypes)
+    expect(rows[0]).toMatchObject({ totalDays: 3, importAs: 'total', leaveTypeName: 'Casual Leave', matched: true })
   })
 
   test('returns null for files without leave type columns', () => {

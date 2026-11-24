@@ -35,6 +35,56 @@ describe('computed leave balance', () => {
     expect(entries.LWP).toMatchObject({ accrued: 0, carriedForward: 0, used: 0, available: null, requiresBalance: false, isLeaveWithoutPay: true, yearlyEntitlement: null })
   })
 
+  test('leave taken before Talio (opening used) is deducted while accrual keeps running', () => {
+    const oldEmployee = { _id: employeeId, dateOfJoining: '2025-08-07' }
+    const opening = [{ _id: 'eeeeeeeeeeeeeeeeeeeeeeee', employee: employeeId, leaveType: typeIds.CL, year: 2026, openingUsedDays: 2.5, overrideDays: null, source: 'opening', totalDays: 0 }]
+    const at = asOf => byCode(computeLeaveBalanceEntries({ employeeId, employee: oldEmployee, types, balances: opening, requests: [request('CL', 'approved', 1, '2026-12-10')], year: 2026, asOf })).CL
+    expect(at('2026-11-24')).toMatchObject({ accrued: 4.5, openingUsedDays: 2.5, used: 3.5, available: 1 })
+    expect(at('2027-01-05')).toMatchObject({ accrued: 5.5, used: 3.5, available: 2 })
+    expect(at('2027-03-31')).toMatchObject({ accrued: 7, used: 3.5, available: 3.5 })
+  })
+
+  test('HR yearly limit caps monthly accrual (pro-rata EL 13.5 never grows to 18)', () => {
+    const oldEmployee = { _id: employeeId, dateOfJoining: '2025-01-27' }
+    const balances = [{ _id: 'eeeeeeeeeeeeeeeeeeeeeeee', employee: employeeId, leaveType: typeIds.EL, year: 2026, source: 'opening', overrideDays: null, openingUsedDays: 2, openingAllottedDays: 13.5, openingCarriedForward: 0 }]
+    const at = asOf => byCode(computeLeaveBalanceEntries({ employeeId, employee: oldEmployee, types, balances, requests: [], year: 2026, asOf })).EL
+    expect(at('2026-11-24')).toMatchObject({ accrued: 12, available: 10, yearlyEntitlement: 13.5 })
+    expect(at('2027-03-31')).toMatchObject({ accrued: 13.5, carriedForward: 0, available: 11.5 })
+  })
+
+  test('imported EL carry replaces last year\'s Talio carry, so EL is not added twice', () => {
+    const oldEmployee = { _id: employeeId, dateOfJoining: '2024-01-01' }
+    const balances = [{ _id: 'eeeeeeeeeeeeeeeeeeeeeeee', employee: employeeId, leaveType: typeIds.EL, year: 2026, source: 'opening', overrideDays: null, openingUsedDays: 0, openingAllottedDays: 18, openingCarriedForward: 0 }]
+    const priorAvailableByType = new Map([[typeIds.EL, 18]])
+    const imported = byCode(computeLeaveBalanceEntries({ employeeId, employee: oldEmployee, types, balances, requests: [], year: 2026, asOf: '2027-03-31', priorAvailableByType })).EL
+    expect(imported).toMatchObject({ accrued: 18, carriedForward: 0, available: 18 })
+    const notImported = byCode(computeLeaveBalanceEntries({ employeeId, employee: oldEmployee, types, balances: [], requests: [], year: 2026, asOf: '2027-03-31', priorAvailableByType })).EL
+    expect(notImported).toMatchObject({ carriedForward: 18 })
+  })
+
+  test('approved leave before the import date is not deducted twice; later leave is', () => {
+    const oldEmployee = { _id: employeeId, dateOfJoining: '2025-08-07' }
+    const balances = [{ _id: 'eeeeeeeeeeeeeeeeeeeeeeee', employee: employeeId, leaveType: typeIds.CL, year: 2026, source: 'opening', overrideDays: null, openingUsedDays: 2.5, openingAllottedDays: 7, openingCarriedForward: null, openingAsOf: new Date('2026-11-24T06:00:00Z') }]
+    const requests = [request('CL', 'approved', 1, '2026-10-05'), request('CL', 'approved', 1, '2026-12-10'), request('CL', 'pending', 0.5, '2026-11-01')]
+    const cl = byCode(computeLeaveBalanceEntries({ employeeId, employee: oldEmployee, types, balances, requests, year: 2026, asOf: '2027-03-31' })).CL
+    expect(cl).toMatchObject({ accrued: 7, used: 3.5, pending: 0.5, available: 3 })
+  })
+
+  test('employees without an import keep normal accrual up to the policy maximum', () => {
+    const newJoiner = { _id: employeeId, dateOfJoining: '2026-10-01' }
+    const entries = byCode(computeLeaveBalanceEntries({ employeeId, employee: newJoiner, types, balances: [], requests: [], year: 2026, asOf: '2027-03-31' }))
+    expect(entries.CL.accrued).toBeLessThanOrEqual(7)
+    expect(entries.CL).toMatchObject({ accrued: 3.5, yearlyEntitlement: 7 })
+    expect(entries.EL.accrued).toBeLessThanOrEqual(18)
+  })
+
+  test('opening used is ignored for manual types', () => {
+    const manual = [{ _id: '222222222222222222222222', code: 'BL', name: 'Bereavement Leave', isActive: true }]
+    const balances = [{ _id: '444444444444444444444444', employee: employeeId, leaveType: '222222222222222222222222', year: 2026, overrideDays: 3, source: 'manual', openingUsedDays: 2 }]
+    const [entry] = computeLeaveBalanceEntries({ employeeId, employee, types: manual, balances, requests: [], year: 2026, asOf: '2026-10-23' })
+    expect(entry).toMatchObject({ used: 0, available: 3 })
+  })
+
   test('orders types CL, SL, EL, WL, BL, LWP regardless of input order', () => {
     const manualTypes = [
       { _id: '111111111111111111111111', code: 'LWP', name: 'Leave Without Pay', isActive: true },

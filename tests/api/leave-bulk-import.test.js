@@ -154,6 +154,27 @@ describe('leave balance bulk import', () => {
     expect(clearCachePattern).toHaveBeenCalledTimes(2)
   })
 
+  test('imports leave taken so far without fixing the allocation, so accrual keeps running', async () => {
+    await database.create('leavebalances', { _id: 'b1', employee: EMPLOYEE_ID, leaveType: LEAVE_TYPE_ID, year: 2026, totalDays: 5, overrideDays: 5, source: 'manual' })
+    const allocations = [{ employeeId: EMPLOYEE_ID, employeeName: 'John Doe', leaveTypeId: LEAVE_TYPE_ID, totalDays: 2.5, importAs: 'taken' }]
+    const res = await POST(requestWith({ mode: 'apply', year: '2026', allocations: JSON.stringify(allocations) }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ created: 0, updated: 1, failed: 0 })
+    const balances = (await database.list('leavebalances')).records
+    expect(balances).toHaveLength(1)
+    expect(balances[0]).toMatchObject({ employee: EMPLOYEE_ID, leaveType: LEAVE_TYPE_ID, year: 2026, openingUsedDays: 2.5, overrideDays: null, source: 'opening' })
+  })
+
+  test('stores HR yearly limit and EL carry with the taken days', async () => {
+    const allocations = [{ employeeId: EMPLOYEE_ID, employeeName: 'John Doe', leaveTypeId: LEAVE_TYPE_ID, totalDays: 2.5, allottedDays: 7, importAs: 'taken' }]
+    const res = await POST(requestWith({ mode: 'apply', year: '2026', allocations: JSON.stringify(allocations) }))
+    expect(await res.json()).toMatchObject({ created: 1, failed: 0 })
+    const [balance] = (await database.list('leavebalances')).records
+    expect(balance).toMatchObject({ openingUsedDays: 2.5, openingAllottedDays: 7, openingCarriedForward: 0, source: 'opening', overrideDays: null })
+    expect(balance.openingAsOf).toBeInstanceOf(Date)
+  })
+
   test('skips invalid rows and reports errors in row order', async () => {
     const allocations = [
       { employeeId: EMPLOYEE_ID, employeeName: 'John Doe', leaveTypeId: LEAVE_TYPE_ID, totalDays: 10 },
