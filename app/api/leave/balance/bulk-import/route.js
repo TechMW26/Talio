@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndDatabase } from '@/lib/auth'
 import { collectFirestorePages } from '@/lib/platform/firestoreQueries.server'
-import { adjustLeaveBalance, validateLeaveYear } from '@/lib/leaveBalances.server'
+import { adjustLeaveBalance, setOpeningUsedLeave, validateLeaveYear } from '@/lib/leaveBalances.server'
 import { generateContent } from '@/lib/gemini'
 import { parseAIJsonResponse } from '@/lib/aiJsonResponse'
 import { clearCachePattern, buildCachePattern } from '@/lib/cache'
 import { normalizeLeaveTypes } from '@/lib/leaveData'
 import { EMPLOYED_STATUSES, LEAVE_BALANCE_STORE_OPTIONS } from '@/lib/leaveAllocation.server'
-import { readFirstWorksheetRows } from '@/lib/spreadsheets.server'
+import { readAllWorksheetRows, readFirstWorksheetRows } from '@/lib/spreadsheets.server'
+import { csvTextToRows, parseStructuredLeaveImport } from '@/lib/leaveImportParser'
 
 const csvCell = value => {
   const text = value instanceof Date ? value.toISOString().slice(0, 10) : String(value ?? '')
@@ -86,6 +87,25 @@ export async function POST(request) {
 
       if (!fileContent.trim()) {
         return NextResponse.json({ success: false, message: 'File is empty' }, { status: 400 })
+      }
+
+      // HR sheets (code/name + one column per leave type) are read directly, no AI needed.
+      // For .xlsx every worksheet is read, so one workbook can hold all companies.
+      const sheets = String(file.name || '').toLowerCase().endsWith('.xlsx')
+        ? await readAllWorksheetRows(Buffer.from(arrayBuffer)).catch(() => null)
+        : null
+      const structured = parseStructuredLeaveImport(sheets || csvTextToRows(fileContent), employees, leaveTypes)
+      if (structured && structured.length > 0) {
+        return NextResponse.json({
+          success: true,
+          data: structured,
+          summary: {
+            total: structured.length,
+            matched: structured.filter(d => d.matched).length,
+            unmatched: structured.filter(d => !d.matched).length,
+          },
+          year,
+        })
       }
 
       // Build context for AI
@@ -226,7 +246,9 @@ ${[headerLine, ...rows].join('\n')}`
       }
 
       try {
-        const result = await adjustLeaveBalance(database, user, { employee: alloc.employeeId, leaveType: alloc.leaveTypeId, year, totalDays })
+        const result = alloc.importAs === 'taken'
+          ? await setOpeningUsedLeave(database, user, { employee: alloc.employeeId, leaveType: alloc.leaveTypeId, year, usedDays: totalDays, allottedDays: alloc.allottedDays })
+          : await adjustLeaveBalance(database, user, { employee: alloc.employeeId, leaveType: alloc.leaveTypeId, year, totalDays })
         return result.created ? { created: true } : { updated: true }
       } catch (err) {
         return { failed: true, error: `Failed for ${alloc.employeeName}: ${err.message}` }
