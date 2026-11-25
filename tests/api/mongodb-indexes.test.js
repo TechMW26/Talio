@@ -14,6 +14,10 @@ test('hot indexes remain scoped, partial and comfortably below the64index cap', 
   expect(RECORD_INDEXES.find(index => index.name === 'talio_project_status_v1').key).toMatchObject({ 'envelope.data.project': 1, 'envelope.data.status': 1 })
   expect(RECORD_INDEXES.find(index => index.name === 'talio_project_order_v1').key).toMatchObject({ 'envelope.data.project': 1, 'envelope.data.order': -1 })
   expect(RECORD_INDEXES.find(index => index.name === 'talio_task_v1').partialFilterExpression).toEqual({ 'envelope.data.task': { $exists: true } })
+  // Chat list: participant equality, newest first (matches the chat query's sort).
+  expect(RECORD_INDEXES.find(index => index.name === 'talio_chat_participant_recent_v1').key).toEqual({ ...PREFIX, 'envelope.data.participants': 1, 'envelope.data.lastMessageAt': -1, recordKey: 1 })
+  expect(RECORD_INDEXES.find(index => index.name === 'talio_meeting_room_v1').key).toEqual({ ...PREFIX, 'envelope.data.roomId': 1, recordKey: 1 })
+  expect(RECORD_INDEXES.find(index => index.name === 'talio_meeting_guest_link_v1').key).toEqual({ ...PREFIX, 'envelope.data.guestAccess.guestLink': 1, recordKey: 1 })
 })
 
 test('index installation is idempotent and never removes an existing index', async () => {
