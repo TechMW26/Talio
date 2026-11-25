@@ -14,6 +14,7 @@ import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { canEmployeeCancelLeave } from '@/lib/leaveCancel'
 
 export default function LeaveRequestsPage() {
   const [filter, setFilter] = useState('all')
@@ -30,6 +31,29 @@ export default function LeaveRequestsPage() {
     employeeId ? `/api/leave?employeeId=${employeeId}` : null
   )
   const leaves = leavesRes?.data || []
+
+  // Cancel own leave (pending, or approved and not started yet)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const [cancelling, setCancelling] = useState(false)
+  const confirmCancel = async () => {
+    if (!cancelTarget?._id) return
+    setCancelling(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/leave/${cancelTarget._id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || data.success === false) throw new Error(data.message || 'Failed to cancel leave request')
+      toast.success('Leave request cancelled')
+      setCancelTarget(null)
+      setShowModal(false)
+      setSelectedLeave(null)
+      await refreshLeaves()
+    } catch (err) {
+      toast.error(err.message || 'Failed to cancel leave request')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -194,6 +218,11 @@ export default function LeaveRequestsPage() {
                         >
                           View
                         </Button>
+                        {canEmployeeCancelLeave(leave) && (
+                          <Button size="sm" variant="light" color="danger" className="ml-1" onPress={() => setCancelTarget(leave)}>
+                            Cancel
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -267,9 +296,36 @@ export default function LeaveRequestsPage() {
                 </div>
               </ModalBody>
               <ModalFooter>
+                {canEmployeeCancelLeave(selectedLeave) && (
+                  <Button color="danger" variant="flat" onPress={() => setCancelTarget(selectedLeave)}>
+                    Cancel Leave
+                  </Button>
+                )}
                 <Button variant="flat" onPress={onClose}>
                   Close
                 </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+      {/* Cancel Leave Confirmation */}
+      <Modal isOpen={Boolean(cancelTarget)} onOpenChange={(open) => { if (!open && !cancelling) setCancelTarget(null) }} size="sm">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                <Heading2 className="text-lg font-bold text-default-800">Cancel this leave?</Heading2>
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600">
+                  {cancelTarget?.leaveType?.name || cancelTarget?.leaveTypeName || cancelTarget?.requestLabel || 'Leave'}: {cancelTarget?.startDate ? formatDate(cancelTarget.startDate) : ''} to {cancelTarget?.endDate ? formatDate(cancelTarget.endDate) : ''}.
+                  The days will go back to your leave balance.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="flat" onPress={onClose} isDisabled={cancelling}>Keep Leave</Button>
+                <Button color="danger" onPress={confirmCancel} isLoading={cancelling}>Yes, Cancel</Button>
               </ModalFooter>
             </>
           )}
