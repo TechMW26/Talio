@@ -5,7 +5,7 @@ import { Heading1, Heading3 } from '@/components/ui/fernly/native'
 import BackIcon from '@/components/ui/BackIcon'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem } from '@/components/ui/fernly'
+import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem, Checkbox } from '@/components/ui/fernly'
 import toast from '@/utils/toast'
 import { FaCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
@@ -40,6 +40,8 @@ export default function ApplyLeavePage() {
     reason: '',
     emergencyContact: '',
     handoverNotes: '',
+    isHalfDay: false,
+    halfDayPeriod: 'first_half',
   })
   const balanceYear = formData.startDate ? fiscalYearFor(formData.startDate) : currentFiscalYear()
 
@@ -86,6 +88,8 @@ export default function ApplyLeavePage() {
         reason: '',
         emergencyContact: '',
         handoverNotes: '',
+        isHalfDay: false,
+        halfDayPeriod: 'first_half',
       })
       refreshBalance()
       setTimeout(() => {
@@ -103,21 +107,28 @@ export default function ApplyLeavePage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    // A half day is always a single date: keep End Date equal to Start Date.
+    setFormData(prev => ({ ...prev, [name]: value, ...(prev.isHalfDay && name === 'startDate' ? { endDate: value } : {}) }))
   }
 
-  const calculateDays = () => countLeaveDays(formData.startDate, formData.endDate)
+  const toggleHalfDay = (checked) => {
+    setFormData(prev => ({ ...prev, isHalfDay: checked, ...(checked ? { endDate: prev.startDate } : {}) }))
+  }
+
+  const calculateDays = () => formData.isHalfDay
+    ? (countLeaveDays(formData.startDate, formData.startDate) > 0 ? 0.5 : 0)
+    : countLeaveDays(formData.startDate, formData.endDate)
   const days = calculateDays()
   const requiresBalance = selectedBalance?.requiresBalance !== false
   const availableBalance = requiresBalance ? Number(selectedBalance?.available ?? 0) : null
-  const paidDays = preview ? Number(preview.paidDays || 0) : days
+  const paidDays = formData.isHalfDay ? days : preview ? Number(preview.paidDays || 0) : days
   const lockedTill = selectedBalance?.isLocked ? formatUnlockDate(selectedBalance.unlocksOn) : ''
   const hasDates = Boolean(formData.startDate && formData.endDate)
   const dateError = hasDates && formData.endDate < formData.startDate
     ? 'End date cannot be before start date'
     : ''
   const noWorkingDays = hasDates && !dateError && days === 0
-    ? 'The selected dates contain no working days. Sundays are excluded.'
+    ? (formData.isHalfDay ? 'A half day cannot be taken on a Sunday.' : 'The selected dates contain no working days. Sundays are excluded.')
     : ''
   const lockedError = lockedTill ? `${selectedType?.name || 'This leave type'} is locked till ${lockedTill}` : ''
   const noticeError = preview?.violation?.message || ''
@@ -156,10 +167,12 @@ export default function ApplyLeavePage() {
     }
 
 
+    const { halfDayPeriod, ...fields } = formData
     await submitLeave.execute('/api/leave', {
-      ...formData,
-      requestType: 'leave',
-      isHalfDay: false,
+      ...fields,
+      ...(formData.isHalfDay ? { endDate: formData.startDate, halfDayPeriod } : {}),
+      requestType: formData.isHalfDay ? 'half_day' : 'leave',
+      isHalfDay: formData.isHalfDay,
       workFromHome: false,
       employee: employeeId,
       numberOfDays: days,
@@ -245,25 +258,45 @@ export default function ApplyLeavePage() {
                     </Select>
                   </div>
 
+                  {/* Half Day */}
+                  <Checkbox
+                    isSelected={formData.isHalfDay}
+                    onValueChange={toggleHalfDay}
+                  >
+                    Half Day Leave (0.5 day)
+                  </Checkbox>
+
                   {/* Date Range */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
                       type="date"
-                      label="Start Date"
+                      label={formData.isHalfDay ? 'Date' : 'Start Date'}
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleChange}
                       isRequired
                     />
-                    <Input
-                      type="date"
-                      label="End Date"
-                      name="endDate"
-                      value={formData.endDate}
-                      onChange={handleChange}
-                      min={formData.startDate || undefined}
-                      isRequired
-                    />
+                    {formData.isHalfDay ? (
+                      <Select
+                        label="Which half"
+                        selectedKeys={[formData.halfDayPeriod]}
+                        onSelectionChange={(keys) => setFormData(prev => ({ ...prev, halfDayPeriod: Array.from(keys)[0] || 'first_half' }))}
+                        isRequired
+                      >
+                        <SelectItem key="first_half">First half (morning)</SelectItem>
+                        <SelectItem key="second_half">Second half (afternoon)</SelectItem>
+                      </Select>
+                    ) : (
+                      <Input
+                        type="date"
+                        label="End Date"
+                        name="endDate"
+                        value={formData.endDate}
+                        onChange={handleChange}
+                        min={formData.startDate || undefined}
+                        isRequired
+                      />
+                    )}
                   </div>
 
                   {/* Live balance impact, including the notice-period split */}
