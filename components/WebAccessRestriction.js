@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@heroui/react'
 import { FaDownload, FaDesktop, FaApple, FaWindows } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
+import { isMailConnectRoute } from '@/lib/mailConnectAccess'
 
 /**
  * Check if the user is accessing via a native app (desktop)
@@ -46,6 +47,9 @@ export function shouldRestrictWebAccess() {
 
   // Allow access for every role during local development when explicitly opted in
   if (isDevWebAccessAllowed()) return false
+
+  // Gmail can only be connected in a browser: allow just that page
+  if (isMailConnectRoute(window.location.pathname, window.location.search)) return false
 
   // Check user role
   const user = getCurrentUser()

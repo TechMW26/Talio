@@ -20,6 +20,9 @@ import {
   FaLink, FaSmile, FaChevronDown, FaChevronRight, FaMagic
 } from 'react-icons/fa';
 import { Skeleton, Button, Tooltip } from '@/components/ui/fernly';
+import { isNativeApp } from '@/components/WebAccessRestriction';
+import { getCurrentUser } from '@/utils/userHelper';
+import { MAIL_CONNECT_URL } from '@/lib/mailConnectAccess';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import {
   MdRefresh, MdMoreVert, MdArchive, MdDelete,
@@ -73,6 +76,8 @@ export default function MailPage() {
   const [connectingEmail, setConnectingEmail] = useState(false);
   const [emails, setEmails] = useState([]);
   const [isDesktopApp, setIsDesktopApp] = useState(false);
+  // Employees reach this page in a browser only to connect Gmail; they use the inbox in the app.
+  const [connectOnly, setConnectOnly] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState('inbox');
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -977,6 +982,7 @@ export default function MailPage() {
     if (typeof window !== 'undefined' && window.isElectron) {
       setIsDesktopApp(true);
     }
+    setConnectOnly(!isNativeApp() && getCurrentUser()?.role !== 'admin');
 
     const params = new URLSearchParams(window.location.search);
     const connected = params.get('connected');
@@ -1090,6 +1096,28 @@ export default function MailPage() {
     );
   }
 
+  // Browser visit from the desktop app: once Gmail is connected, send them back to the app.
+  if (connectOnly && isConnected) {
+    return (
+      <div className="page-container">
+        <Surface className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
+          <div className="text-center max-w-md px-4">
+            <div className="w-20 h-20 mx-auto mb-8 bg-green-50 dark:bg-green-900/30 rounded-2xl flex items-center justify-center">
+              <HiOutlineEnvelope className="text-4xl text-green-600" />
+            </div>
+            <Heading2 className="text-2xl font-bold text-gray-800 dark:text-zinc-100 mb-2">
+              Email connected
+            </Heading2>
+            <p className="text-gray-600 dark:text-zinc-400 text-sm">
+              You can close this browser tab now. Go back to the Talio app, open Mail and click
+              &quot;I&apos;ve connected my email - Refresh&quot;.
+            </p>
+          </div>
+        </Surface>
+      </div>
+    );
+  }
+
   // Not connected - Gmail style connect screen
   if (!isConnected) {
     // Desktop app users need to connect via web browser (OAuth redirect doesn't work in Electron)
@@ -1121,7 +1149,7 @@ export default function MailPage() {
                 color="primary"
                 size="lg"
                 onPress={() => {
-                  window.open('https://app.talio.in/dashboard/mail', '_blank');
+                  window.open(`https://app.talio.in${MAIL_CONNECT_URL}`, '_blank');
                 }}
                 startContent={
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,6 +1,7 @@
 'use client'
 import InductionGate from '@/components/induction/InductionGate'
 import { miraLinkLoginUrl } from '@/lib/miraAccountLinkReturn'
+import { mailConnectLoginUrl } from '@/lib/mailConnectAccess'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
@@ -121,7 +122,8 @@ export default function DashboardLayout({ children }) {
       setIsWebRestricted(restricted)
     }, 100)
     return () => clearTimeout(timer)
-  }, [])
+    // Re-check on every page change: only the mail connect page is allowed in the browser.
+  }, [pathname])
 
   // Check if user needs to change password on first login
   // OPTIMIZED: Render immediately with localStorage data, validate in background
@@ -132,7 +134,7 @@ export default function DashboardLayout({ children }) {
 
       if (!optimisticAuth) {
         // No auth, redirect to login
-        window.location.href = miraLinkLoginUrl(window.location) || '/login'
+        window.location.href = miraLinkLoginUrl(window.location) || mailConnectLoginUrl(window.location) || '/login'
         return
       }
 
@@ -156,7 +158,7 @@ export default function DashboardLayout({ children }) {
         localStorage.removeItem('user')
         localStorage.removeItem('userId')
         document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-        window.location.href = miraLinkLoginUrl(window.location) || '/login'
+        window.location.href = miraLinkLoginUrl(window.location) || mailConnectLoginUrl(window.location) || '/login'
       }
 
       try {
