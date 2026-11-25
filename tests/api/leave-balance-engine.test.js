@@ -39,8 +39,8 @@ describe('computed leave balance', () => {
     const oldEmployee = { _id: employeeId, dateOfJoining: '2025-08-07' }
     const opening = [{ _id: 'eeeeeeeeeeeeeeeeeeeeeeee', employee: employeeId, leaveType: typeIds.CL, year: 2026, openingUsedDays: 2.5, overrideDays: null, source: 'opening', totalDays: 0 }]
     const at = asOf => byCode(computeLeaveBalanceEntries({ employeeId, employee: oldEmployee, types, balances: opening, requests: [request('CL', 'approved', 1, '2026-12-10')], year: 2026, asOf })).CL
-    expect(at('2026-11-24')).toMatchObject({ accrued: 4.5, openingUsedDays: 2.5, used: 3.5, available: 1 })
-    expect(at('2027-01-05')).toMatchObject({ accrued: 5.5, used: 3.5, available: 2 })
+    expect(at('2026-11-24')).toMatchObject({ accrued: 4.08, openingUsedDays: 2.5, used: 3.5, available: 0.58 })
+    expect(at('2027-01-05')).toMatchObject({ accrued: 5.25, used: 3.5, available: 1.75 })
     expect(at('2027-03-31')).toMatchObject({ accrued: 7, used: 3.5, available: 3.5 })
   })
 
@@ -48,7 +48,7 @@ describe('computed leave balance', () => {
     const oldEmployee = { _id: employeeId, dateOfJoining: '2025-01-27' }
     const balances = [{ _id: 'eeeeeeeeeeeeeeeeeeeeeeee', employee: employeeId, leaveType: typeIds.EL, year: 2026, source: 'opening', overrideDays: null, openingUsedDays: 2, openingAllottedDays: 13.5, openingCarriedForward: 0 }]
     const at = asOf => byCode(computeLeaveBalanceEntries({ employeeId, employee: oldEmployee, types, balances, requests: [], year: 2026, asOf })).EL
-    expect(at('2026-11-24')).toMatchObject({ accrued: 12, available: 10, yearlyEntitlement: 13.5 })
+    expect(at('2026-11-24')).toMatchObject({ accrued: 10.5, available: 8.5, yearlyEntitlement: 13.5 })
     expect(at('2027-03-31')).toMatchObject({ accrued: 13.5, carriedForward: 0, available: 11.5 })
   })
 
@@ -142,9 +142,9 @@ describe('computed leave balance', () => {
       year: 2026,
       asOf: '2026-07-31',
     }))
-    expect(beforeUnlock.CL).toMatchObject({ isLocked: true, available: 0, unlocksOn: '2026-08-01', accrued: 1.5 })
-    expect(beforeUnlock.SL).toMatchObject({ isLocked: true, available: 0, unlocksOn: '2026-08-01', accrued: 1 })
-    expect(beforeUnlock.EL).toMatchObject({ isLocked: true, available: 0, unlocksOn: '2026-11-01', accrued: 4.5 })
+    expect(beforeUnlock.CL).toMatchObject({ isLocked: true, available: 0, unlocksOn: '2026-08-01', accrued: 1.17 })
+    expect(beforeUnlock.SL).toMatchObject({ isLocked: true, available: 0, unlocksOn: '2026-08-01', accrued: 0.83 })
+    expect(beforeUnlock.EL).toMatchObject({ isLocked: true, available: 0, unlocksOn: '2026-11-01', accrued: 3 })
   })
 
   test('respects the as-of date of the previous month boundary', () => {
@@ -157,7 +157,7 @@ describe('computed leave balance', () => {
       year: 2026,
       asOf: '2026-08-01',
     }))
-    expect(atUnlock.CL).toMatchObject({ isLocked: false, available: 2, unlocksOn: '2026-08-01' })
+    expect(atUnlock.CL).toMatchObject({ isLocked: false, available: 1.75, unlocksOn: '2026-08-01' })
   })
 
   test('LWP days reduce CL/SL/EL accrual and are reported on the LWP entry', () => {
@@ -170,9 +170,9 @@ describe('computed leave balance', () => {
       year: 2026,
       asOf: '2027-03-31',
     }))
-    expect(entries.CL.accrued).toBe(6.5)
-    expect(entries.SL.accrued).toBe(4.5)
-    expect(entries.EL.accrued).toBe(17.5)
+    expect(entries.CL.accrued).toBe(6.94)
+    expect(entries.SL.accrued).toBe(4.96)
+    expect(entries.EL.accrued).toBe(17.85)
     expect(entries.LWP).toMatchObject({ used: 3, pending: 0, available: null, isLocked: false })
   })
 

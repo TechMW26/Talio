@@ -14,6 +14,7 @@ describe('leave balance scope', () => {
     database = {
       list: jest.fn(async collection => ({ records: collection === 'employees' ? [{ _id: own }] : [] })),
       getMany: jest.fn(async () => []),
+      get: jest.fn(async (collection, id) => collection === 'employees' ? { _id: id, status: 'active', firstName: 'Own' } : null),
     }
     getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'user', role: 'employee', employeeId: own }, tenant: { databaseName: 'tenant-a' }, database })
   })
@@ -26,11 +27,12 @@ describe('leave balance scope', () => {
     expect(database.list).toHaveBeenCalledWith('leavebalances', expect.objectContaining({ filters: [{ field: 'employee', operator: '==', value: own }, { field: 'year', operator: '==', value: 2026 }] }))
     expect(ensureEmployeeLeaveBalances).toHaveBeenCalledWith({ database, employeeId: own, year: 2026 })
   })
-  test('excludes departed employees from HR aggregate', async () => {
+  test('excludes departed employees from HR aggregate and computes each balance with the engine', async () => {
     getAuthAndDatabase.mockResolvedValue({ success: true, user: { _id: 'hr', role: 'hr' }, tenant: { databaseName: 'tenant-a' }, database })
-    await GET(new Request('https://talio.test/api/leave/balance?year=2026'))
+    expect((await GET(new Request('https://talio.test/api/leave/balance?year=2026'))).status).toBe(200)
     expect(database.list).toHaveBeenCalledWith('employees', expect.objectContaining({ filters: [{ field: 'status', operator: 'in', value: ['active', 'probation'] }] }))
-    expect(database.list).toHaveBeenCalledWith('leavebalances', expect.objectContaining({ filters: [{ field: 'employee', operator: 'in', value: [own] }, { field: 'year', operator: '==', value: 2026 }] }))
+    expect(database.list).toHaveBeenCalledWith('leavebalances', expect.objectContaining({ filters: [{ field: 'employee', operator: '==', value: own }, { field: 'year', operator: '==', value: 2026 }] }))
+    expect(ensureEmployeeLeaveBalances).not.toHaveBeenCalled()
   })
   test.each(['2026junk', 'NaN', '2026.5'])('rejects invalid year %s', async year => {
     expect((await GET(new Request(`https://talio.test/api/leave/balance?year=${year}`))).status).toBe(400)
