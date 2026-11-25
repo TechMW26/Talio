@@ -26,6 +26,36 @@ export default function AnnouncementsPage() {
   const { data: announcementsRes, error, isLoading, isValidating, mutate: refreshAnnouncements } = useAuthedSWR('/api/announcements')
   const announcements = announcementsRes?.data || []
 
+  // Drafts waiting for HR/Admin approval (holiday announcements are prepared automatically)
+  const canApproveDrafts = Boolean(user && ['admin', 'super_admin', 'hr'].includes(user.role))
+  const { data: draftsRes, mutate: refreshDrafts } = useAuthedSWR(canApproveDrafts ? '/api/announcements?status=draft' : null)
+  const drafts = draftsRes?.data || []
+  const [draftEdits, setDraftEdits] = useState({})
+  const [draftBusyId, setDraftBusyId] = useState(null)
+  const draftValue = (draft, field) => draftEdits[draft._id]?.[field] ?? draft[field] ?? ''
+  const editDraft = (id, field, value) => setDraftEdits(current => ({ ...current, [id]: { ...current[id], [field]: value } }))
+
+  const handleDraft = async (draft, action) => {
+    setDraftBusyId(draft._id)
+    try {
+      const token = localStorage.getItem('token')
+      const publish = action === 'publish'
+      const response = await fetch(`/api/announcements/${draft._id}`, {
+        method: publish ? 'PUT' : 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: publish ? JSON.stringify({ title: draftValue(draft, 'title'), content: draftValue(draft, 'content'), status: 'published', publishDate: new Date().toISOString() }) : undefined,
+      })
+      const data = await response.json()
+      if (!response.ok || data.success === false) throw new Error(data.message)
+      toast.success(publish ? 'Announcement published' : 'Draft discarded')
+      await Promise.all([refreshDrafts(), refreshAnnouncements()])
+    } catch (err) {
+      toast.error(err.message || 'Could not update the draft')
+    } finally {
+      setDraftBusyId(null)
+    }
+  }
+
   // Real-time updates
   const { socket, isConnected, onAnnouncementUpdate, subscribe } = useSocket()
 
@@ -136,6 +166,51 @@ export default function AnnouncementsPage() {
           </NativeButton>
         )}
       </div>
+
+      {/* Drafts waiting for approval */}
+      {canApproveDrafts && drafts.length > 0 && (
+        <div className="mb-4 sm:mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:p-5">
+          <Heading3 className="text-base sm:text-lg font-semibold text-amber-800">Waiting for your approval ({drafts.length})</Heading3>
+          <p className="text-xs sm:text-sm text-amber-700 mt-1 mb-3">
+            Prepared automatically from the holiday calendar. Employees see it only after you click Publish.
+          </p>
+          <div className="space-y-3">
+            {drafts.map((draft) => (
+              <div key={draft._id} className="rounded-lg bg-white p-3 sm:p-4 shadow-sm">
+                <input
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800"
+                  value={draftValue(draft, 'title')}
+                  onChange={(e) => editDraft(draft._id, 'title', e.target.value)}
+                  aria-label="Announcement title"
+                />
+                <textarea
+                  className="mt-2 w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"
+                  rows={6}
+                  value={draftValue(draft, 'content')}
+                  onChange={(e) => editDraft(draft._id, 'content', e.target.value)}
+                  aria-label="Announcement message"
+                />
+                <div className="mt-2 flex flex-col sm:flex-row gap-2 sm:justify-end">
+                  <NativeButton
+                    onClick={() => handleDraft(draft, 'discard')}
+                    disabled={draftBusyId === draft._id}
+                    className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Discard
+                  </NativeButton>
+                  <NativeButton
+                    onClick={() => handleDraft(draft, 'publish')}
+                    disabled={draftBusyId === draft._id || !String(draftValue(draft, 'title')).trim() || !String(draftValue(draft, 'content')).trim()}
+                    className="px-4 py-2 text-sm rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                  >
+                    {draftBusyId === draft._id ? 'Saving...' : 'Publish to everyone'}
+                  </NativeButton>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Announcements List */}
       <div className="space-y-3 sm:space-y-4">

@@ -17,6 +17,7 @@ import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import { normalizeLeaveBalances } from '@/lib/leaveData'
+import { canEmployeeCancelLeave } from '@/lib/leaveCancel'
 
 // Skeleton for leave page
 function LeaveSkeleton() {
@@ -109,6 +110,25 @@ export default function LeavePage() {
     },
     onError: (msg) => toast.error(msg || 'Failed to submit leave request'),
   })
+
+  // Cancel own leave (pending, or approved and not started yet)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const cancelMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: [
+      employeeId ? `/api/leave?employeeId=${employeeId}` : null,
+      /^\/api\/leave\/balance/,
+    ].filter(Boolean),
+    onSuccess: () => {
+      toast.success('Leave request cancelled')
+      setCancelTarget(null)
+    },
+    onError: (msg) => toast.error(msg || 'Failed to cancel leave request'),
+  })
+  const confirmCancel = async () => {
+    if (!cancelTarget?._id) return
+    await cancelMutation.execute(`/api/leave/${cancelTarget._id}`)
+  }
 
   // Real-time updates
   const { socket, isConnected, onLeaveStatusUpdate, onLeaveRequest, subscribe } = useSocket()
@@ -284,6 +304,11 @@ export default function LeavePage() {
                         <p className="text-default-800 mt-1">{leave.reason}</p>
                       </div>
                     </div>
+                    {canEmployeeCancelLeave(leave) && (
+                      <Button size="sm" color="danger" variant="flat" className="mt-3 w-full" onPress={() => setCancelTarget(leave)}>
+                        Cancel Leave
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -313,12 +338,15 @@ export default function LeavePage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-content1 divide-y divide-default-200">
                 {leaves.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-4 py-4 text-center text-default-500">
+                    <td colSpan="7" className="px-4 py-4 text-center text-default-500">
                       No leave requests found
                     </td>
                   </tr>
@@ -350,6 +378,15 @@ export default function LeavePage() {
                           <span className="capitalize">{leave.status}</span>
                         </Chip>
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {canEmployeeCancelLeave(leave) ? (
+                          <Button size="sm" color="danger" variant="flat" onPress={() => setCancelTarget(leave)}>
+                            Cancel
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-default-400">-</span>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -358,6 +395,29 @@ export default function LeavePage() {
           </div>
         </CardBody>
       </Card>
+
+      {/* Cancel Leave Confirmation */}
+      <Modal isOpen={Boolean(cancelTarget)} onOpenChange={(open) => { if (!open) setCancelTarget(null) }} size="sm">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                <Heading2 className="text-lg font-bold text-default-800">Cancel this leave?</Heading2>
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600">
+                  {cancelTarget?.leaveType?.name || cancelTarget?.leaveTypeName || 'Leave'}: {formatDate(cancelTarget?.startDate)} to {formatDate(cancelTarget?.endDate)} ({cancelTarget?.numberOfDays} {cancelTarget?.isHalfDay ? 'half day' : 'days'}).
+                  The days will go back to your leave balance.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="flat" onPress={onClose} isDisabled={cancelMutation.isLoading}>Keep Leave</Button>
+                <LoadingButton color="danger" onPress={confirmCancel} isLoading={cancelMutation.isLoading}>Yes, Cancel</LoadingButton>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Apply Leave Modal */}
       <Modal isOpen={showModal} onOpenChange={setShowModal} size="lg">

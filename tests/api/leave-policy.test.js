@@ -55,29 +55,52 @@ describe('monthly accrual from DOJ', () => {
     expect(accruedDays({ ...base, annualDays: 18 })).toBe(18)
   })
 
-  test('credits each month on the 1st and rounds the running total down to 0.5', () => {
+  test('credits a month only when it is completed, with exact decimals', () => {
     const base = { joiningDate: '2026-04-01', fiscalYear: 2026 }
     expect(monthlyCreditDays(7)).toBeCloseTo(7 / 12, 10)
-    expect(accruedDays({ ...base, annualDays: 7, asOf: '2026-04-01' })).toBe(0.5)
-    expect(accruedDays({ ...base, annualDays: 5, asOf: '2026-04-01' })).toBe(0)
-    expect(accruedDays({ ...base, annualDays: 18, asOf: '2026-04-01' })).toBe(1.5)
-    expect(accruedDays({ ...base, annualDays: 18, asOf: '2026-04-15' })).toBe(1.5)
-    expect(accruedDays({ ...base, annualDays: 5, asOf: '2026-09-30' })).toBe(2.5)
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2026-04-01' })).toBe(0)
+    expect(accruedDays({ ...base, annualDays: 18, asOf: '2026-04-30' })).toBe(0)
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2026-05-01' })).toBe(0.58)
+    expect(accruedDays({ ...base, annualDays: 5, asOf: '2026-05-01' })).toBe(0.42)
+    expect(accruedDays({ ...base, annualDays: 18, asOf: '2026-05-01' })).toBe(1.5)
+    expect(accruedDays({ ...base, annualDays: 5, asOf: '2026-09-30' })).toBe(2.08)
     expect(roundDownHalf(3.99)).toBe(3.5)
     expect(roundDownHalf(4)).toBe(4)
   })
 
-  test('prorates the joining month by employed days', () => {
-    // 21 Apr 2026 joins with 10 of April's 30 days, then 11 full months.
-    const base = { joiningDate: '2026-04-21', asOf: asOfYearEnd, fiscalYear: 2026 }
-    expect(accruedDays({ ...base, annualDays: 7 })).toBe(6.5)
-    expect(accruedDays({ ...base, annualDays: 18 })).toBe(17)
+  test('employees who joined before the fiscal year get last month\'s credit on the 1st', () => {
+    const base = { joiningDate: '2025-08-07', fiscalYear: 2026 }
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2026-11-30' })).toBe(4.08)
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2026-12-01' })).toBe(4.67)
+    expect(accruedDays({ ...base, annualDays: 18, asOf: '2026-12-01' })).toBe(12)
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2027-03-31' })).toBe(7)
+  })
+
+  test('new joiner (10 Nov) gets the first credit on 10 Dec, counted from the joining date', () => {
+    const base = { joiningDate: '2026-11-10', fiscalYear: 2026 }
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2026-11-25' })).toBe(0)
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2026-12-09' })).toBe(0)
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2026-12-10' })).toBe(0.58)
+    expect(accruedDays({ ...base, annualDays: 5, asOf: '2026-12-10' })).toBe(0.42)
+    expect(accruedDays({ ...base, annualDays: 18, asOf: '2026-12-10' })).toBe(1.5)
+    expect(accruedDays({ ...base, annualDays: 7, asOf: '2027-01-10' })).toBe(1.17)
+  })
+
+  test('at year end the month still running is credited, so totals never fall short or exceed the limit', () => {
+    expect(accruedDays({ joiningDate: '2026-04-21', asOf: asOfYearEnd, fiscalYear: 2026, annualDays: 7 })).toBe(7)
+    expect(accruedDays({ joiningDate: '2026-04-21', asOf: '2027-03-30', fiscalYear: 2026, annualDays: 7 })).toBe(6.42)
+    expect(accruedDays({ joiningDate: '2026-11-10', asOf: asOfYearEnd, fiscalYear: 2026, annualDays: 7 })).toBe(2.92)
+    expect(accruedDays({ joiningDate: '2026-11-10', asOf: asOfYearEnd, fiscalYear: 2026, annualDays: 18 })).toBe(7.5)
+    expect(accruedDays({ joiningDate: '2025-01-13', asOf: '2027-06-30', fiscalYear: 2026, annualDays: 18 })).toBe(18)
+    // The March service month credited at year end is not credited again next year.
+    expect(accruedDays({ joiningDate: '2026-11-10', asOf: '2027-04-09', fiscalYear: 2027, annualDays: 7 })).toBe(0)
+    expect(accruedDays({ joiningDate: '2026-11-10', asOf: '2027-05-10', fiscalYear: 2027, annualDays: 7 })).toBe(0.58)
   })
 
   test('stops at the current date instead of crediting the whole year', () => {
     const base = { joiningDate: '2026-04-01', annualDays: 18, fiscalYear: 2026 }
-    expect(accruedDays({ ...base, asOf: '2026-07-31' })).toBe(6)
-    expect(accruedDays({ ...base, asOf: '2026-08-01' })).toBe(7.5)
+    expect(accruedDays({ ...base, asOf: '2026-07-31' })).toBe(4.5)
+    expect(accruedDays({ ...base, asOf: '2026-08-01' })).toBe(6)
   })
 
   test('returns zero before joining and outside the fiscal year', () => {
@@ -87,11 +110,11 @@ describe('monthly accrual from DOJ', () => {
   })
 
   test('LWP days do not accrue', () => {
-    // 3 LWP days in June remove 3/30 of June's credit.
+    // 3 LWP days in June remove 3/30 of that service month's credit.
     const lwpDaysByMonth = { '2026-06': 3 }
     const base = { joiningDate: '2026-04-01', asOf: asOfYearEnd, fiscalYear: 2026, lwpDaysByMonth }
-    expect(accruedDays({ ...base, annualDays: 7 })).toBe(6.5)
-    expect(accruedDays({ ...base, annualDays: 18 })).toBe(17.5)
+    expect(accruedDays({ ...base, annualDays: 7 })).toBe(6.94)
+    expect(accruedDays({ ...base, annualDays: 18 })).toBe(17.85)
     expect(accruedDays({ ...base, annualDays: 18, lwpDaysByMonth: {} })).toBe(18)
   })
 

@@ -38,3 +38,16 @@ test('admins stay unrestricted regardless of the flag', () => {
   localStorage.setItem('user', JSON.stringify({ role: 'admin', firstName: 'Admin' }))
   expect(shouldRestrictWebAccess()).toBe(false)
 })
+
+test('employees can open only the Gmail connect page in a browser', () => {
+  process.env.NODE_ENV = 'production'
+  window.history.pushState({}, '', '/dashboard/mail?desktopConnect=1')
+  expect(shouldRestrictWebAccess()).toBe(false)
+  window.history.pushState({}, '', '/dashboard/mail?connected=true')
+  expect(shouldRestrictWebAccess()).toBe(false)
+  window.history.pushState({}, '', '/dashboard/mail')
+  expect(shouldRestrictWebAccess()).toBe(true)
+  window.history.pushState({}, '', '/dashboard/leave?desktopConnect=1')
+  expect(shouldRestrictWebAccess()).toBe(true)
+  window.history.pushState({}, '', '/')
+})

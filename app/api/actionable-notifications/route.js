@@ -3,6 +3,9 @@ import { getAuthAndDatabase } from '@/lib/auth'
 import { ensureProbationReviewReminder } from '@/lib/hrms/probationReminder.server'
 import { ensurePendingResignationReminder } from '@/lib/hrms/resignationReminder.server'
 import { getResignationStore } from '@/lib/hrms/resignationStore.server'
+import { ensureHolidayAnnouncementReminder } from '@/lib/holidayAnnouncements.server'
+import { communicationDatabase } from '@/lib/communicationsStore.server'
+import { normalizeActionableNotification } from '@/lib/actionableNotificationStore.server'
 import { isFeatureEnabled } from '@/lib/planFeatures'
 import { getActionableDatabase, listActionableNotifications, storeActionableNotification, notificationUserId } from '@/lib/actionableNotificationStore.server'
 
@@ -13,6 +16,7 @@ export async function GET(request) {
     const database = await getActionableDatabase(auth)
     if (isFeatureEnabled(auth.companyFeatures, 'probation')) await ensureProbationReviewReminder({ database, user: auth.user }).catch(error => console.error('[Probation reminder]', error.message))
         if (isFeatureEnabled(auth.companyFeatures, 'exitManagement')) await Promise.resolve().then(async () => ensurePendingResignationReminder({ database, resignationStore: await getResignationStore(auth), user: auth.user })).catch(error => console.error('[Resignation reminder]', error.message))
+        await Promise.resolve().then(async () => ensureHolidayAnnouncementReminder({ database, communications: await communicationDatabase(auth), user: auth.user, createCard: normalizeActionableNotification })).catch(error => console.error('[Holiday announcement reminder]', error.message))
     const params = new URL(request.url).searchParams
     const result = await listActionableNotifications(database, notificationUserId(auth.user), { status: params.get('status') || 'pending', type: params.get('type'), limit: Number(params.get('limit') || 50) })
     return NextResponse.json(result)
