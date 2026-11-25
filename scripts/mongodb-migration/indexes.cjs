@@ -49,6 +49,12 @@ const RECORD_INDEXES = [
   queryIndex('project_status', ['project', 'status']),
   queryIndex('project_order', ['project', 'order'], { order: -1 }),
   queryIndex('task', ['task']),
+  // Chat list on every open: chats embed their messages, so an unindexed
+  // participant lookup reads every conversation in the company.
+  queryIndex('chat_participant_recent', ['participants', 'lastMessageAt'], { lastMessageAt: -1 }),
+  // Meeting join/refresh and guest links look a meeting up by room or link.
+  queryIndex('meeting_room', ['roomId']),
+  queryIndex('meeting_guest_link', ['guestAccess.guestLink']),
 ]
 
 const same = (first, second) => JSON.stringify(first) === JSON.stringify(second)

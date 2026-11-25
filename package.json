@@ -18,6 +18,8 @@
     "start:next": "cross-env TZ=Asia/Kolkata next start",
     "lint": "next lint",
     "attendance:bridge": "node scripts/talio-attendance-bridge.mjs",
+    "db:indexes:report": "node scripts/mongodb-migration/setup-indexes.cjs plan",
+    "db:indexes:apply": "node scripts/mongodb-migration/setup-indexes.cjs apply",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
